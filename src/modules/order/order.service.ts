@@ -12,6 +12,7 @@ import { resolveUnitPrice, type CustomerContext } from '@/modules/pricing/pricin
 import { getDeliveryGeo } from '@/lib/deliveryLocation';
 import { CartService, type CartContext } from '@/modules/cart/cart.service';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
+import { creditVendorOnDelivery } from '@/modules/vendor/vendorSettlement.service';
 import {
   promotionService,
   evaluateVendorPromo,
@@ -21,8 +22,16 @@ import {
 
 // Payment methods that draw on a CreditWallet. 'h1_wallet'/'wallet' uses the platform
 // (vendor-less) wallet; the rest use the order's vendor credit line.
-const CREDIT_PAYMENTS = ['credit', 'vendor_credit', 'h1_wallet', 'wallet'];
+const CREDIT_PAYMENTS = ['credit', 'vendor_credit', 'h1_wallet', 'wallet', 'discco'];
 const isCreditPayment = (m: string | null | undefined): boolean => !!m && CREDIT_PAYMENTS.includes(m);
+
+/** Map checkout payment methods to VendorCustomer.allowedPaymentModes values. */
+function normalizeVendorPaymentMode(method: string): string {
+  if (method === 'vendor_credit' || method === 'discco') return 'credit';
+  if (method === 'wallet' || method === 'h1_wallet' || method === 'online' || method === 'bank_transfer') return 'prepaid';
+  if (method === 'po_number') return 'cheque';
+  return method;
+}
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -195,8 +204,17 @@ export class OrderService {
         //    commission attribution at order creation time.
         const vendorCustomer = await tx.vendorCustomer.findUnique({
           where: { vendorId_userId: { vendorId: vo.vendorId, userId } },
-          select: { salespersonId: true, tags: true },
+          select: { salespersonId: true, tags: true, allowedPaymentModes: true },
         });
+
+        if (!isDraft && vendorCustomer?.allowedPaymentModes?.length) {
+          const normalized = normalizeVendorPaymentMode(input.paymentMethod);
+          if (!vendorCustomer.allowedPaymentModes.includes(normalized)) {
+            throw Errors.badRequest(
+              `Payment method "${input.paymentMethod}" is not allowed for your account with this vendor`,
+            );
+          }
+        }
         const customerCtx: CustomerContext = {
           userId,
           businessAccountId,
@@ -1124,7 +1142,71 @@ export class OrderService {
     });
   }
 
-  // Valid status transitions — any move not in this map is rejected.
+  /** Post-confirm quantity adjustments while order is confirmed or processing. */
+  async amendOrderLines(
+    orderId: string,
+    vendorId: string,
+    itemLines: Array<{ itemId: string; fulfilledQty: number }>,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { id: orderId, vendorId, status: { in: ['confirmed', 'processing', 'ready_for_dispatch'] } },
+        include: { items: true },
+      });
+      if (!order) throw Errors.badRequest('Order cannot be amended in its current status');
+
+      const orderItemMap = new Map(order.items.map((i) => [i.id, i]));
+      for (const line of itemLines) {
+        const item = orderItemMap.get(line.itemId);
+        if (!item) throw Errors.badRequest(`Item ${line.itemId} does not belong to this order`);
+        if (line.fulfilledQty < 0 || line.fulfilledQty > item.quantity) {
+          throw Errors.badRequest(`Invalid quantity for "${item.productName}"`);
+        }
+      }
+
+      const fulfilledMap = new Map(itemLines.map((l) => [l.itemId, l.fulfilledQty]));
+      for (const item of order.items) {
+        if (!fulfilledMap.has(item.id)) fulfilledMap.set(item.id, item.fulfilledQty ?? item.quantity);
+      }
+
+      const totalFulfilled = Array.from(fulfilledMap.values()).reduce((s, q) => s + q, 0);
+      if (totalFulfilled === 0) throw Errors.badRequest('At least one item must remain on the order');
+
+      const prevReserved = order.items.map((i) => ({
+        productId: i.productId,
+        quantity: order.isPartial ? (i.fulfilledQty ?? i.quantity) : i.quantity,
+      }));
+      await this.inventoryService.releaseStock(prevReserved, tx);
+
+      const toReserve = order.items
+        .map((i) => ({ productId: i.productId, quantity: fulfilledMap.get(i.id) ?? i.quantity }))
+        .filter((l) => l.quantity > 0);
+      await this.inventoryService.reserveStock(toReserve, tx);
+
+      let newSubtotal = 0;
+      for (const item of order.items) {
+        const fulfilled = fulfilledMap.get(item.id) ?? item.quantity;
+        const itemTotal = Math.round(Number(item.totalPrice) * (fulfilled / item.quantity) * 100) / 100;
+        newSubtotal += itemTotal;
+        await tx.orderItem.update({ where: { id: item.id }, data: { fulfilledQty: fulfilled } });
+      }
+
+      const isPartial = order.items.some((i) => (fulfilledMap.get(i.id) ?? i.quantity) < i.quantity);
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          isPartial,
+          subtotal: newSubtotal,
+          totalAmount: Math.max(0, newSubtotal - Number(order.promoDiscount) - Number(order.couponDiscount) - Number(order.walletApplied)),
+        },
+      });
+
+      emitEvent('OrderConfirmed', { orderId, userId: updated.userId, vendorId });
+      return updated;
+    });
+  }
+
+  // Valid status transitions
   // V2.2 Phase 5 widened the graph with the richer client states. The old
   // happy path (pending→confirmed→processing→shipped→delivered) still holds;
   // ready_for_dispatch / partially_delivered / returned are optional stops.
@@ -1264,6 +1346,7 @@ export class OrderService {
       }
       if (status === 'delivered') {
         await promotionService.settleCashbackForOrder(tx, orderId);
+        await creditVendorOnDelivery(orderId, tx);
       }
       if (status === 'returned') {
         await promotionService.cancelCashbackForOrder(tx, orderId);

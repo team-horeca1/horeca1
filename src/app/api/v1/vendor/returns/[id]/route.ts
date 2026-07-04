@@ -13,6 +13,7 @@ import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
+import { debitVendorOnRefund } from '@/modules/vendor/vendorSettlement.service';
 
 function extractId(req: NextRequest) {
   return new URL(req.url).pathname.split('/').at(-1) ?? '';
@@ -119,6 +120,21 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
             `Credit note on return ${returnId}`,
           );
         }
+      }
+
+      if (
+        body.resolutionType === 'refund' &&
+        body.refundAmount &&
+        body.refundAmount > 0 &&
+        returnReq.order.paymentMethod &&
+        !['credit', 'vendor_credit', 'h1_wallet', 'wallet'].includes(returnReq.order.paymentMethod)
+      ) {
+        await debitVendorOnRefund(
+          vendorId,
+          returnReq.order.id,
+          body.refundAmount,
+          `Return ${returnId} refund approved`,
+        );
       }
     }
 

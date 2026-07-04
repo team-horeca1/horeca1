@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { buildCategoryTree, filterProductsByCatalogTab } from '@/lib/categoryTree';
 import { useCart } from '@/context/CartContext';
 import type { Vendor, VendorProduct } from '@/types';
-import { Package, Star, CheckCircle, Clock, ChevronRight, LayoutGrid } from 'lucide-react';
+import { Package, Star, CheckCircle, Clock, ChevronRight, LayoutGrid, CreditCard } from 'lucide-react';
 import Image from 'next/image';
 
 interface VendorOrder {
@@ -50,6 +50,7 @@ export default function VendorStorePage() {
     const [reviewsLoading, setReviewsLoading] = useState(false);
     const [prevOrderedProducts, setPrevOrderedProducts] = useState<VendorProduct[]>([]);
     const [prevOrderedLoading, setPrevOrderedLoading] = useState(false);
+    const [vendorCredit, setVendorCredit] = useState<{ limit: number; available: number } | null>(null);
 
     // Grid (2-up) vs list (1-up) product layout. Persisted per-browser so power
     // buyers don't have to re-pick on every visit.
@@ -80,6 +81,22 @@ export default function VendorStorePage() {
             setProducts(p.products);
         }).catch(console.error).finally(() => setLoading(false));
     }, [vendorId]);
+
+    useEffect(() => {
+        if (sessionStatus !== 'authenticated' || !vendorId) return;
+        fetch('/api/v1/wallet')
+            .then((r) => r.json())
+            .then((j) => {
+                if (!j.success || !Array.isArray(j.data)) return;
+                type W = { vendorId: string | null; creditLimit: string | number; outstandingAmount: string | number; status: string };
+                const w = (j.data as W[]).find((x) => x.vendorId === vendorId && x.status === 'ACTIVE');
+                if (!w) return;
+                const limit = Number(w.creditLimit);
+                const outstanding = Number(w.outstandingAmount);
+                setVendorCredit({ limit, available: Math.max(0, limit - outstanding) });
+            })
+            .catch(() => {});
+    }, [sessionStatus, vendorId]);
 
     // Track recently viewed vendor for "Continue Ordering" section
     useEffect(() => {
@@ -250,6 +267,20 @@ export default function VendorStorePage() {
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
             />
+
+            {vendorCredit && vendorCredit.limit > 0 && (
+                <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] pt-3">
+                    <div className="flex items-center gap-3 bg-purple-50 border border-purple-100 rounded-xl px-4 py-3">
+                        <CreditCard size={18} className="text-purple-600 shrink-0" />
+                        <div className="min-w-0">
+                            <p className="text-[13px] font-bold text-purple-900">DiSCCO credit with {vendor.name}</p>
+                            <p className="text-[12px] text-purple-700">
+                                ₹{vendorCredit.available.toLocaleString('en-IN')} available of ₹{vendorCredit.limit.toLocaleString('en-IN')} limit
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* The hierarchical Categories >> Sub-Categories sidebar (rendered inside
                 the main content block below) covers category nav at every breakpoint,

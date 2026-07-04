@@ -96,7 +96,32 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
     if (!order) throw Errors.notFound('Order');
 
-    return NextResponse.json({ success: true, data: order });
+    const productIds = order.items.map((i) => i.productId);
+    const [inventories, productsWithSubs] = await Promise.all([
+      prisma.inventory.findMany({ where: { productId: { in: productIds } } }),
+      prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, substituteIds: true } }),
+    ]);
+    const allSubIds = [...new Set(productsWithSubs.flatMap((p) => p.substituteIds ?? []))];
+    const substituteProducts = allSubIds.length
+      ? await prisma.product.findMany({ where: { id: { in: allSubIds } }, select: { id: true, name: true, sku: true } })
+      : [];
+
+    const enrichedItems = order.items.map((item) => {
+      const inv = inventories.find((i) => i.productId === item.productId);
+      const stockAvailable = inv ? inv.qtyAvailable - inv.qtyReserved : 0;
+      const prod = productsWithSubs.find((p) => p.id === item.productId);
+      const substitutes = (prod?.substituteIds ?? [])
+        .map((sid) => substituteProducts.find((s) => s.id === sid))
+        .filter(Boolean);
+      return {
+        ...item,
+        stockAvailable,
+        isLowStock: stockAvailable < item.quantity,
+        substitutes,
+      };
+    });
+
+    return NextResponse.json({ success: true, data: { ...order, items: enrichedItems } });
   } catch (error) {
     return errorResponse(error);
   }
@@ -120,9 +145,13 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     const body = await req.json();
     const orderService = new OrderService();
 
-    // Partial accept path — body contains an 'items' array
+    // Partial accept (pending) or post-confirm amend
     if (Array.isArray(body.items)) {
       const { items } = partialAcceptSchema.parse(body);
+      if (body.mode === 'amend') {
+        const updated = await orderService.amendOrderLines(orderId, vendorId, items);
+        return NextResponse.json({ success: true, data: updated });
+      }
       const updated = await orderService.partialAccept(orderId, vendorId, items);
       return NextResponse.json({ success: true, data: updated });
     }
