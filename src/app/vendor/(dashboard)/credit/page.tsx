@@ -4,13 +4,15 @@
  * Vendor → DiSCCO Credit — excel-style customer grid for credit assignment + CRM fields.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   Loader2, CreditCard, Search, X, IndianRupee,
-  AlertTriangle, ShieldOff, Landmark,
+  AlertTriangle, ShieldOff,
 } from 'lucide-react';
+import { CreditCollectionsPanel } from '@/components/features/vendor/CreditCollectionsPanel';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -233,7 +235,22 @@ function CreditModal({ row, onClose, onSaved }: {
   );
 }
 
-export default function VendorCreditPage() {
+export default function VendorCreditPageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#299E60]" /></div>}>
+      <VendorCreditPage />
+    </Suspense>
+  );
+}
+
+function VendorCreditPage() {
+  const searchParams = useSearchParams();
+  const pageTab = searchParams.get('tab') === 'collections' ? 'collections' : 'customers';
+  const [mainTab, setMainTab] = useState<'customers' | 'collections'>(pageTab);
+
+  useEffect(() => {
+    setMainTab(pageTab);
+  }, [pageTab]);
   const { data: session } = useSession();
   const canApprove = useMemo(() => {
     const perms = ((session?.user as Record<string, unknown> | undefined)?.permissions as string[] | undefined) ?? [];
@@ -320,17 +337,34 @@ export default function VendorCreditPage() {
     <div className="space-y-5 pb-10">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-[24px] font-bold text-[#181725]">DiSCCO Credit</h1>
-          <p className="text-[12px] text-[#AEAEAE]">Assign credit lines and track customer status — changes save to checkout immediately</p>
+          <h1 className="text-[24px] font-bold text-[#181725]">Credit &amp; Collections</h1>
+          <p className="text-[12px] text-[#AEAEAE]">Assign credit lines, track outstanding balances, and manage recovery</p>
         </div>
-        <Link
-          href="/vendor/collections"
-          className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] bg-white border border-[#EEEEEE] text-[13px] font-semibold text-[#181725] hover:border-[#299E60]/40 transition-colors"
-        >
-          <Landmark size={15} strokeWidth={1.5} />
-          Collections &amp; recovery
-        </Link>
       </div>
+
+      <div className="flex bg-[#F5F5F5] rounded-[10px] p-0.5 gap-0.5 w-fit">
+        {([
+          { id: 'customers' as const, label: 'Customers' },
+          { id: 'collections' as const, label: 'Collections & Recovery' },
+        ]).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setMainTab(t.id)}
+            className={cn(
+              'h-[34px] px-5 rounded-[8px] text-[13px] font-semibold transition-all',
+              mainTab === t.id ? 'bg-white text-[#181725] shadow-sm' : 'text-[#7C7C7C]',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {mainTab === 'collections' ? (
+        <CreditCollectionsPanel />
+      ) : (
+        <>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
@@ -413,6 +447,8 @@ export default function VendorCreditPage() {
           onClose={() => setAdvancedRow(null)}
           onSaved={load}
         />
+      )}
+        </>
       )}
     </div>
   );

@@ -29,6 +29,7 @@ function agingBucket(overdueDays: number): 'current' | 'd1_30' | 'd31_60' | 'd60
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'creditLine.view');
     const vendorId = await resolveVendorId(ctx, req);
 
     // All CreditWallet rows scoped to this vendor, ordered by outstanding desc

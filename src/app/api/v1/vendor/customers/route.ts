@@ -20,6 +20,7 @@ const upsertSchema = z.object({
   tags: z.array(z.string()).optional(),
   notes: z.string().max(2000).nullable().optional(),
   paymentTerms: z.string().max(50).nullable().optional(),
+  allowedPaymentModes: z.array(z.enum(['cod', 'prepaid', 'credit', 'cheque', 'discco', 'online'])).optional(),
 });
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
@@ -125,6 +126,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
         tags: body.tags ?? [],
         notes: body.notes ?? null,
         paymentTerms: body.paymentTerms ?? null,
+        allowedPaymentModes: body.allowedPaymentModes ?? ['cod', 'prepaid', 'credit', 'cheque'],
       },
       update: {
         ...(body.status !== undefined && { status: body.status }),
@@ -135,6 +137,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
         ...(body.tags !== undefined && { tags: body.tags }),
         ...(body.notes !== undefined && { notes: body.notes }),
         ...(body.paymentTerms !== undefined && { paymentTerms: body.paymentTerms }),
+        ...(body.allowedPaymentModes !== undefined && { allowedPaymentModes: body.allowedPaymentModes }),
       },
       include: {
         user: { select: { id: true, fullName: true, businessName: true, email: true } },

@@ -38,7 +38,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     };
 
     // Fetch all relevant data in parallel
-    const [deliveredOrders, creditTxns, walletData] = await Promise.all([
+    const [deliveredOrders, creditWalletTxns, walletData] = await Promise.all([
       prisma.order.findMany({
         where: {
           vendorId,
@@ -55,14 +55,17 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         orderBy: { updatedAt: 'desc' },
       }),
 
-      prisma.creditTransaction.findMany({
+      prisma.creditWalletTxn.findMany({
         where: {
-          vendorId,
+          wallet: { vendorId },
           ...(Object.keys(dateFilter).length ? { createdAt: dateFilter } : {}),
         },
         include: {
-          order: { select: { orderNumber: true } },
-          creditAccount: { select: { user: { select: { fullName: true, businessName: true } } } },
+          wallet: {
+            select: {
+              user: { select: { fullName: true, businessName: true } },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -101,21 +104,36 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       });
     }
 
-    for (const txn of creditTxns) {
+    const creditOrderIds = creditWalletTxns
+      .filter((t) => t.type === 'ORDER_DEBIT' && t.referenceId)
+      .map((t) => t.referenceId as string);
+    const creditOrderNumbers = creditOrderIds.length > 0
+      ? Object.fromEntries(
+          (await prisma.order.findMany({
+            where: { id: { in: creditOrderIds } },
+            select: { id: true, orderNumber: true },
+          })).map((o) => [o.id, o.orderNumber]),
+        )
+      : {};
+
+    for (const txn of creditWalletTxns) {
       const customerName =
-        txn.creditAccount.user.businessName ?? txn.creditAccount.user.fullName;
-      const orderRef = txn.order?.orderNumber ?? null;
+        txn.wallet.user.businessName ?? txn.wallet.user.fullName ?? 'Customer';
+      const orderRef = txn.referenceId ? creditOrderNumbers[txn.referenceId] ?? null : null;
+      const isDebit = txn.type === 'ORDER_DEBIT';
+      const isPayment = txn.type === 'REPAYMENT' || txn.type === 'REVERSAL';
       entries.push({
         id: `credit-${txn.id}`,
         date: txn.createdAt.toISOString(),
-        type: txn.type === 'debit' ? 'credit_debit' : 'credit_payment',
-        description:
-          txn.type === 'debit'
-            ? `Credit issued to ${customerName}`
-            : `Credit payment from ${customerName}`,
+        type: isDebit ? 'credit_debit' : 'credit_payment',
+        description: isDebit
+          ? `Credit order — ${customerName}`
+          : isPayment
+            ? `Credit repayment from ${customerName}`
+            : `${txn.type} — ${customerName}`,
         referenceNumber: orderRef,
-        credit: txn.type === 'credit' ? Number(txn.amount) : 0,
-        debit: txn.type === 'debit' ? Number(txn.amount) : 0,
+        credit: isPayment ? Number(txn.amount) : 0,
+        debit: isDebit ? Number(txn.amount) : 0,
         balance: 0,
       });
     }

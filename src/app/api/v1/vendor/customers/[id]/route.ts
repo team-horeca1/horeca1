@@ -22,6 +22,7 @@ const patchSchema = z.object({
   tags: z.array(z.string()).optional(),
   notes: z.string().max(2000).nullable().optional(),
   paymentTerms: z.string().max(50).nullable().optional(),
+  allowedPaymentModes: z.array(z.enum(['cod', 'prepaid', 'credit', 'cheque', 'discco', 'online'])).optional(),
 });
 
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
@@ -44,6 +45,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         ...(body.tags !== undefined && { tags: body.tags }),
         ...(body.notes !== undefined && { notes: body.notes }),
         ...(body.paymentTerms !== undefined && { paymentTerms: body.paymentTerms }),
+        ...(body.allowedPaymentModes !== undefined && { allowedPaymentModes: body.allowedPaymentModes }),
       },
       include: {
         user: { select: { id: true, fullName: true, businessName: true, email: true } },

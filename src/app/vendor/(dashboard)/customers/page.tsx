@@ -34,6 +34,7 @@ interface VendorCustomer {
   tags: string[];
   notes: string | null;
   paymentTerms: string | null;
+  allowedPaymentModes?: string[];
   createdAt: string;
   user: VendorCustomerUser;
   priceList: PriceList | null;
@@ -314,6 +315,7 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
   const [salesExecutive, setSalesExecutive] = useState(customer.salesExecutive ?? '');
   const [deliveryRoute, setDeliveryRoute] = useState(customer.deliveryRoute ?? '');
   const [paymentTerms, setPaymentTerms] = useState(customer.paymentTerms ?? '');
+  const [allowedModes, setAllowedModes] = useState<string[]>(customer.allowedPaymentModes ?? ['cod', 'prepaid', 'credit', 'cheque']);
   const [notes, setNotes] = useState(customer.notes ?? '');
   const [tags, setTags] = useState<string[]>(customer.tags ?? []);
   const [tagInput, setTagInput] = useState('');
@@ -347,6 +349,7 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
           salesExecutive: salesExecutive || null,
           deliveryRoute: deliveryRoute || null,
           paymentTerms: paymentTerms || null,
+          allowedPaymentModes: allowedModes,
           notes: notes || null,
           tags,
         }),
@@ -443,6 +446,25 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
                 placeholder="e.g. Route A"
                 className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
               />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[12px] font-semibold text-[#7C7C7C] mb-2">Allowed payment modes at checkout</label>
+            <div className="flex flex-wrap gap-2">
+              {(['cod', 'prepaid', 'credit', 'cheque', 'online'] as const).map((mode) => (
+                <label key={mode} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#181725] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={allowedModes.includes(mode)}
+                    onChange={(e) => {
+                      setAllowedModes((prev) => e.target.checked ? [...prev, mode] : prev.filter((m) => m !== mode));
+                    }}
+                    className="w-4 h-4 rounded text-[#299E60]"
+                  />
+                  {mode.toUpperCase()}
+                </label>
+              ))}
             </div>
           </div>
 

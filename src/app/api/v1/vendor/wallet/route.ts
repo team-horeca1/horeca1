@@ -1,13 +1,22 @@
 // GET  /api/v1/vendor/wallet — Vendor wallet balance + transaction history + payout info
-// POST /api/v1/vendor/wallet — Admin-only: credit/debit adjustment
+// POST /api/v1/vendor/wallet — Admin adjustment (credit/debit)
 // PROTECTED: Vendor only
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
+import { Errors } from '@/middleware/errorHandler';
+
+const adjustmentSchema = z.object({
+  amount: z.number().positive(),
+  type: z.enum(['credit', 'debit']),
+  notes: z.string().max(500).optional(),
+  vendorId: z.string().uuid().optional(),
+});
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
@@ -98,6 +107,51 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         pendingPayout,
       },
     });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
+export const POST = vendorOnly(async (req: NextRequest, ctx) => {
+  try {
+    if (ctx.role !== 'admin') {
+      throw Errors.forbidden('Admin only');
+    }
+    const body = adjustmentSchema.parse(await req.json());
+    const vendorId = body.vendorId ?? await resolveVendorId(ctx, req);
+
+    const wallet = await prisma.vendorWallet.upsert({
+      where: { vendorId },
+      create: { vendorId, balance: 0, pendingAmount: 0 },
+      update: {},
+    });
+
+    const delta = body.type === 'credit' ? body.amount : -body.amount;
+    const newBalance = Math.round((Number(wallet.balance) + delta) * 100) / 100;
+    if (newBalance < 0) throw Errors.badRequest('Adjustment would make balance negative');
+
+    await prisma.$transaction(async (tx) => {
+      await tx.vendorWalletTxn.create({
+        data: {
+          walletId: wallet.id,
+          type: 'adjustment',
+          amount: Math.abs(body.amount),
+          balanceAfter: newBalance,
+          notes: body.notes ?? `Admin ${body.type}`,
+        },
+      });
+      await tx.vendorWallet.update({
+        where: { id: wallet.id },
+        data: {
+          balance: newBalance,
+          ...(body.type === 'credit'
+            ? { pendingAmount: { increment: body.amount } }
+            : { pendingAmount: { decrement: Math.min(body.amount, Number(wallet.pendingAmount)) } }),
+        },
+      });
+    });
+
+    return NextResponse.json({ success: true, data: { balance: newBalance } });
   } catch (error) {
     return errorResponse(error);
   }
