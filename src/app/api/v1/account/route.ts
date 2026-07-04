@@ -9,11 +9,17 @@ import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import {
-  VendorDetailsSchema,
+  vendorDetailsSchema,
   PrimaryOutletSchema,
   GST_RE,
   PAN_RE,
 } from '@/lib/validators/vendor-kyc';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
+import {
+  normalizeVendorTypeSelections,
+  legacyScalarsFromSelections,
+} from '@/lib/constants/vendorProfile';
+import type { Prisma } from '@prisma/client';
 
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
   try {
@@ -50,42 +56,44 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
 
 // All KYC validators live in src/lib/validators/vendor-kyc.ts so the
 // admin-side create-vendor endpoint can re-use the exact same schemas.
-const CreateBody = z.object({
-  legalName: z.string().min(2).max(255),
-  displayName: z.string().max(255).optional(),
-  gstin: z.string().regex(GST_RE, 'Invalid GSTIN format').optional().or(z.literal('')),
-  pan: z.string().regex(PAN_RE, 'Invalid PAN format').optional().or(z.literal('')),
-  fssaiNumber: z.string().max(50).optional().or(z.literal('')),
-  gstTreatment: z.string().max(40).optional(),
-  placeOfSupply: z.string().max(100).optional(),
-  billingAddressLine: z.string().optional(),
-  billingCity: z.string().optional(),
-  billingState: z.string().optional(),
-  billingPincode: z.string().optional(),
-  businessType: z.string().max(50).optional(),
-  subType: z.string().max(80).optional(),
-  cuisine: z.string().max(120).optional(),
-  salutation: z.string().max(20).optional(),
-  firstName: z.string().max(120).optional(),
-  lastName: z.string().max(120).optional(),
-  designation: z.string().max(120).optional(),
-  workPhone: z.string().max(20).optional(),
-  isCustomer: z.boolean().optional().default(true),
-  isVendor: z.boolean().optional().default(false),
-  isBrand: z.boolean().optional().default(false),
-  primaryOutlet: PrimaryOutletSchema,
-  vendorDetails: VendorDetailsSchema.optional(),
-  // Brand profile (when isBrand)
-  productCategories: z.array(z.string()).optional(),
-  businessSize: z.string().max(50).optional(),
-  distributionPresence: z.string().max(120).optional(),
-  targetSegments: z.array(z.string()).optional(),
-  horecaFocused: z.boolean().optional(),
-  retailFocused: z.boolean().optional(),
-  website: z.string().max(512).optional(),
-  tagline: z.string().max(512).optional(),
-  description: z.string().optional(),
-});
+function createAccountBodySchema(relaxedContact: boolean) {
+  return z.object({
+    legalName: z.string().min(2).max(255),
+    displayName: z.string().max(255).optional(),
+    gstin: z.string().regex(GST_RE, 'Invalid GSTIN format').optional().or(z.literal('')),
+    pan: z.string().regex(PAN_RE, 'Invalid PAN format').optional().or(z.literal('')),
+    fssaiNumber: z.string().max(50).optional().or(z.literal('')),
+    gstTreatment: z.string().max(40).optional(),
+    placeOfSupply: z.string().max(100).optional(),
+    billingAddressLine: z.string().optional(),
+    billingCity: z.string().optional(),
+    billingState: z.string().optional(),
+    billingPincode: z.string().optional(),
+    businessType: z.string().max(50).optional(),
+    subType: z.string().max(80).optional(),
+    cuisine: z.string().max(120).optional(),
+    salutation: z.string().max(20).optional(),
+    firstName: z.string().max(120).optional(),
+    lastName: z.string().max(120).optional(),
+    designation: z.string().max(120).optional(),
+    workPhone: z.string().max(20).optional(),
+    isCustomer: z.boolean().optional().default(true),
+    isVendor: z.boolean().optional().default(false),
+    isBrand: z.boolean().optional().default(false),
+    primaryOutlet: PrimaryOutletSchema,
+    vendorDetails: vendorDetailsSchema(relaxedContact).optional(),
+    // Brand profile (when isBrand)
+    productCategories: z.array(z.string()).optional(),
+    businessSize: z.string().max(50).optional(),
+    distributionPresence: z.string().max(120).optional(),
+    targetSegments: z.array(z.string()).optional(),
+    horecaFocused: z.boolean().optional(),
+    retailFocused: z.boolean().optional(),
+    website: z.string().max(512).optional(),
+    tagline: z.string().max(512).optional(),
+    description: z.string().optional(),
+  });
+}
 
 function slugify(name: string, userId: string): string {
   const base = name.toLowerCase().trim()
@@ -97,7 +105,8 @@ function slugify(name: string, userId: string): string {
 
 export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
-    const body = CreateBody.parse(await req.json());
+    const relaxedContact = isRegisterEmailOtpEnabled();
+    const body = createAccountBodySchema(relaxedContact).parse(await req.json());
 
     // One Vendor / Brand row per BusinessAccount is still enforced
     // (Vendor.businessAccountId @unique), but a single User can now own many
@@ -196,6 +205,13 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       // path — caller is expected to PATCH /vendor/settings to complete it).
       if (body.isVendor && vendorAdminTemplate) {
         const vd = body.vendorDetails;
+        const typeSelections = vd
+          ? normalizeVendorTypeSelections(vd.vendorTypeSelections)
+          : [];
+        const typeLegacy = legacyScalarsFromSelections(typeSelections);
+        const selectionsJson = typeSelections.length > 0
+          ? (typeSelections as unknown as Prisma.InputJsonValue)
+          : undefined;
         const vendor = await tx.vendor.create({
           data: {
             userId: ctx.userId,
@@ -210,7 +226,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
             tradeName: body.displayName ?? null,
 
             ...(vd ? {
-              vendorType: vd.vendorType,
+              vendorType: typeLegacy?.vendorType ?? vd.vendorType,
               panNumber: vd.panNumber || null,
               authorizedPersonName: vd.authorizedPersonName,
               authorizedPersonPhone: vd.authorizedPersonPhone,
@@ -239,7 +255,8 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
               fssaiNumber: vd.fssaiNumber || null,
               udyamNumber: vd.udyamNumber || null,
               cinNumber: vd.cinNumber || null,
-              subType: vd.subType || null,
+              subType: typeLegacy?.subType ?? vd.subType ?? null,
+              vendorTypeSelections: selectionsJson,
               categoriesHandled: vd.categoriesHandled ?? [],
               businessSize: vd.businessSize || null,
               coverage: vd.coverage || null,

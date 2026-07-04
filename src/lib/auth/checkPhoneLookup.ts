@@ -18,7 +18,7 @@ export interface PhoneCheckResult {
   suggestedAction: PhoneCheckSuggestedAction;
 }
 
-function resolveVendorStatus(
+export function resolveVendorStatus(
   vendors: Array<{ isVerified: boolean }>,
 ): VendorPhoneStatus {
   if (vendors.some(v => v.isVerified)) return 'active';
@@ -26,7 +26,7 @@ function resolveVendorStatus(
   return 'none';
 }
 
-function resolveAccountType(
+export function resolveAccountType(
   userRole: string,
   vendorStatus: VendorPhoneStatus,
 ): string {
@@ -35,7 +35,7 @@ function resolveAccountType(
   return userRole;
 }
 
-function resolveSuggestedAction(
+export function resolveSuggestedAction(
   intent: PhoneCheckIntent,
   exists: boolean,
   userRole: string,

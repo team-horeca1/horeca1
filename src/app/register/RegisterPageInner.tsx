@@ -24,8 +24,11 @@ import {
   derivedFullName,
   derivedLegalName,
 } from '@/lib/validators/customer-profile';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 
 const RESEND_COOLDOWN = 60;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_REGISTER_ALLOWED = isRegisterEmailOtpEnabled();
 
 type Step = 'form' | 'otp' | 'success';
 
@@ -64,7 +67,10 @@ export default function RegisterPageInner() {
     hcidDisplay?: string;
     accountLabel: string;
     suggestedAction: 'login_to_link' | 'login_only';
+    contactType?: 'phone' | 'email';
   } | null>(null);
+
+  const [verifyChannel, setVerifyChannel] = useState<'phone' | 'email'>('phone');
 
   const setFE = useCallback((key: string, msg: string) => {
     setFieldErrors(prev => {
@@ -119,29 +125,66 @@ export default function RegisterPageInner() {
     setFieldErrors({});
 
     const phone = (profile.phone ?? profile.mobilePhone ?? '').replace(/\D/g, '').slice(-10);
+    const email = (profile.email ?? '').trim().toLowerCase();
+    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
+
+    if (useEmail && !EMAIL_RE.test(email)) {
+      setApiError('Enter a valid email address');
+      return;
+    }
+    if (!useEmail && phone.length !== 10) {
+      setApiError('Enter a valid 10-digit mobile number');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const checkRes = await fetch('/api/v1/auth/check-phone', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, intent: 'customer' }),
-      });
-      const checkData = await checkRes.json();
-      if (checkData.success && checkData.data?.exists) {
-        const data = checkData.data as PhoneCheckResult;
-        setExistingPhoneModal({
-          phone,
-          hcidDisplay: data.hcidDisplay,
-          accountLabel: accountLabelFromCheck(data),
-          suggestedAction: 'login_only',
+      if (useEmail) {
+        const checkRes = await fetch('/api/v1/auth/check-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, intent: 'customer' }),
         });
-        return;
+        const checkData = await checkRes.json();
+        if (checkData.success && checkData.data?.exists) {
+          const data = checkData.data as PhoneCheckResult;
+          setExistingPhoneModal({
+            phone: email,
+            hcidDisplay: data.hcidDisplay,
+            accountLabel: accountLabelFromCheck(data),
+            suggestedAction: 'login_only',
+            contactType: 'email',
+          });
+          return;
+        }
+      } else {
+        const checkRes = await fetch('/api/v1/auth/check-phone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, intent: 'customer' }),
+        });
+        const checkData = await checkRes.json();
+        if (checkData.success && checkData.data?.exists) {
+          const data = checkData.data as PhoneCheckResult;
+          setExistingPhoneModal({
+            phone,
+            hcidDisplay: data.hcidDisplay,
+            accountLabel: accountLabelFromCheck(data),
+            suggestedAction: 'login_only',
+            contactType: 'phone',
+          });
+          return;
+        }
       }
 
       const res = await fetch('/api/v1/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, mode: 'register' }),
+        body: JSON.stringify(
+          useEmail
+            ? { email, mode: 'register', intent: 'customer' }
+            : { phone, mode: 'register', intent: 'customer' },
+        ),
       });
       const data = await res.json();
       if (!data.success) { setApiError(data.error || 'Failed to send OTP'); return; }
@@ -157,12 +200,15 @@ export default function RegisterPageInner() {
     setIsLoading(true);
     setApiError('');
     const phone = (profile.phone ?? profile.mobilePhone ?? '').replace(/\D/g, '').slice(-10);
+    const email = (profile.email ?? '').trim().toLowerCase();
+    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
     const fullName = derivedFullName(profile);
     const businessName = derivedLegalName(profile);
 
     try {
       const result = await signIn('otp', {
-        phone,
+        phone: useEmail ? '' : phone,
+        loginEmail: useEmail ? email : '',
         code,
         fullName,
         businessName,
@@ -259,6 +305,8 @@ export default function RegisterPageInner() {
 
   if (step === 'otp') {
     const phone = (profile.phone ?? profile.mobilePhone ?? '').replace(/\D/g, '').slice(-10);
+    const email = (profile.email ?? '').trim().toLowerCase();
+    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
     return (
       <CenteredCard>
         <div className="p-6 sm:p-8">
@@ -268,7 +316,12 @@ export default function RegisterPageInner() {
           </button>
           <h1 className="text-[22px] font-[800] text-gray-800 mb-1 leading-tight">Enter verification code</h1>
           <p className="text-[13px] text-gray-400 mb-6">
-            We sent a 4-digit code to <span className="font-bold text-gray-700">+91 {phone.slice(0, 5)} {phone.slice(5)}</span>
+            We sent a 4-digit code to{' '}
+            <span className="font-bold text-gray-700">
+              {useEmail
+                ? email
+                : `+91 ${phone.slice(0, 5)} ${phone.slice(5)}`}
+            </span>
           </p>
           {apiError && <ErrorBanner>{apiError}</ErrorBanner>}
           <div className="flex gap-3 justify-center my-6">
@@ -336,6 +389,29 @@ export default function RegisterPageInner() {
         <div className="p-5 sm:p-7">
           {apiError && <ErrorBanner>{apiError}</ErrorBanner>}
 
+          {EMAIL_REGISTER_ALLOWED && (
+            <div className="flex gap-2 mb-5 p-1 bg-gray-100 rounded-xl">
+              {(['phone', 'email'] as const).map(ch => (
+                <button
+                  key={ch}
+                  type="button"
+                  onClick={() => {
+                    setVerifyChannel(ch);
+                    setApiError('');
+                  }}
+                  className={cn(
+                    'flex-1 py-2.5 rounded-lg text-[12px] font-bold transition-colors',
+                    verifyChannel === ch
+                      ? 'bg-white text-[#299E60] shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700',
+                  )}
+                >
+                  {ch === 'phone' ? 'Verify via Mobile' : 'Verify via Email'}
+                </button>
+              ))}
+            </div>
+          )}
+
           <CustomerProfileForm
             value={profile}
             onChange={patchProfile}
@@ -369,10 +445,15 @@ export default function RegisterPageInner() {
         intent="customer"
         redirectTo={redirectTo || '/'}
         suggestedAction={existingPhoneModal?.suggestedAction ?? 'login_only'}
+        contactType={existingPhoneModal?.contactType ?? 'phone'}
         onClose={() => setExistingPhoneModal(null)}
         onUseDifferentNumber={() => {
           setExistingPhoneModal(null);
-          patchProfile({ phone: '', mobilePhone: '' });
+          if (existingPhoneModal?.contactType === 'email') {
+            patchProfile({ email: '' });
+          } else {
+            patchProfile({ phone: '', mobilePhone: '' });
+          }
           setApiError('');
         }}
       />

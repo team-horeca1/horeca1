@@ -15,6 +15,7 @@ interface ExistingPhoneModalProps {
   intent: ExistingPhoneIntent;
   redirectTo: string;
   suggestedAction: 'login_to_link' | 'login_only';
+  contactType?: 'phone' | 'email';
   onClose: () => void;
   onUseDifferentNumber: () => void;
 }
@@ -23,28 +24,40 @@ function intentCopy(
   intent: ExistingPhoneIntent,
   accountLabel: string,
   phone: string,
-): { title: string; body: string; cta: string } {
+  contactType: 'phone' | 'email',
+): { title: string; body: string; cta: string; contactLabel: string; useDifferent: string } {
   const digits = phone.replace(/\D/g, '').slice(-10);
   const masked = digits.length === 10 ? `+91 ${digits.slice(0, 5)} ${digits.slice(5)}` : phone;
+  const contactWord = contactType === 'email' ? 'email address' : 'mobile number';
+  const contactLabel = contactType === 'email' ? 'Email' : 'Mobile';
+  const useDifferent = contactType === 'email' ? 'Use a different email' : 'Use a different number';
 
   if (intent === 'vendor') {
     return {
-      title: 'This number is already registered',
-      body: `This mobile number is already linked to an existing account as a ${accountLabel}. Log in to register a new vendor business under your HCID.`,
+      title: `This ${contactWord} is already registered`,
+      body: `This ${contactWord} is already linked to an existing account as a ${accountLabel}. Log in to register a new vendor business under your HCID.`,
       cta: 'Log in & continue vendor setup',
+      contactLabel,
+      useDifferent,
     };
   }
   if (intent === 'brand') {
     return {
-      title: 'This number is already registered',
-      body: `This mobile number is already linked to an existing account as a ${accountLabel}. Log in to add a brand business under your HCID.`,
+      title: `This ${contactWord} is already registered`,
+      body: `This ${contactWord} is already linked to an existing account as a ${accountLabel}. Log in to add a brand business under your HCID.`,
       cta: 'Log in & continue brand setup',
+      contactLabel,
+      useDifferent,
     };
   }
   return {
     title: 'You already have an account',
-    body: `This mobile number (${masked}) is already registered as a ${accountLabel}. Log in instead of creating a duplicate account.`,
+    body: contactType === 'email'
+      ? `This email (${phone}) is already registered as a ${accountLabel}. Log in instead of creating a duplicate account.`
+      : `This mobile number (${masked}) is already registered as a ${accountLabel}. Log in instead of creating a duplicate account.`,
     cta: 'Log in to your account',
+    contactLabel,
+    useDifferent,
   };
 }
 
@@ -56,6 +69,7 @@ export function ExistingPhoneModal({
   intent,
   redirectTo,
   suggestedAction,
+  contactType = 'phone',
   onClose,
   onUseDifferentNumber,
 }: ExistingPhoneModalProps) {
@@ -63,11 +77,12 @@ export function ExistingPhoneModal({
 
   const digits = phone.replace(/\D/g, '').slice(-10);
   const loginQs = new URLSearchParams();
-  if (digits) loginQs.set('phone', digits);
+  if (contactType === 'email') loginQs.set('email', phone.trim().toLowerCase());
+  else if (digits) loginQs.set('phone', digits);
   if (redirectTo) loginQs.set('redirect', redirectTo);
   const loginHref = `/login?${loginQs.toString()}`;
 
-  const copy = intentCopy(intent, accountLabel, phone);
+  const copy = intentCopy(intent, accountLabel, phone, contactType);
   const showHcid = !!hcidDisplay;
 
   return (
@@ -89,9 +104,11 @@ export function ExistingPhoneModal({
         <div className="p-6 space-y-4">
           <div className="rounded-xl border border-[#EEEEEE] bg-[#FAFAFA] px-4 py-3 space-y-2">
             <div className="flex justify-between gap-3 text-[12px]">
-              <span className="text-gray-400 font-bold uppercase tracking-wider">Mobile</span>
-              <span className="font-bold text-gray-800">
-                +91 {digits.slice(0, 5)} {digits.slice(5)}
+              <span className="text-gray-400 font-bold uppercase tracking-wider">{copy.contactLabel}</span>
+              <span className="font-bold text-gray-800 text-right break-all">
+                {contactType === 'email'
+                  ? phone
+                  : `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`}
               </span>
             </div>
             {showHcid && (
@@ -119,7 +136,7 @@ export function ExistingPhoneModal({
             onClick={onUseDifferentNumber}
             className="px-5 py-2.5 text-[13px] font-bold text-gray-500 hover:bg-gray-100/80 rounded-xl transition-all"
           >
-            Use a different number
+            {copy.useDifferent}
           </button>
           <Link
             href={loginHref}

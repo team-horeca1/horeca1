@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { GST_RE, PINCODE_RE } from '@/lib/validators/vendor-kyc';
 import { BRAND_TYPES, subTypesForBrandType } from '@/lib/constants/brandProfile';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -150,8 +151,24 @@ export function validateBrandProfile(
     } else if (brandType && subTypesForBrandType(brandType).length > 0) {
       errors.subType = 'Sub-type is required';
     }
-    if (!phone || phone.length !== 10) errors.phone = 'Enter a valid 10-digit mobile number';
-    if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
+    const relaxedContact = isRegisterEmailOtpEnabled() && context === 'publicRegister';
+    if (relaxedContact) {
+      const hasPhone = phone.length === 10;
+      const hasEmail = !!email && EMAIL_RE.test(email);
+      if (!hasPhone && !hasEmail) {
+        errors.phone = 'Enter a mobile number or email address';
+        errors.email = 'Enter a mobile number or email address';
+      } else {
+        if (phone && phone.length !== 10) errors.phone = 'Enter a valid 10-digit mobile number';
+        if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
+        if (!hasPhone && hasEmail && (!password || password.length < 6)) {
+          errors.password = 'Password is required when registering with email only';
+        }
+      }
+    } else {
+      if (!phone || phone.length !== 10) errors.phone = 'Enter a valid 10-digit mobile number';
+      if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
+    }
     if (context === 'adminCreate') {
       if (!email || !EMAIL_RE.test(email)) errors.email = 'Owner email is required';
       if (!password || password.length < 6) errors.password = 'Password must be at least 6 characters';

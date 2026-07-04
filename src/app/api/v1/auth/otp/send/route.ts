@@ -2,8 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/providers/email';
 import { withRateLimit } from '@/middleware/withRateLimit';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
+import { lookupEmailForRegistration, type EmailCheckIntent } from '@/lib/auth/checkEmailLookup';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const REGISTER_INTENTS = ['customer', 'brand', 'vendor'] as const;
+
+function parseIntent(raw: unknown): EmailCheckIntent {
+  return REGISTER_INTENTS.includes(raw as EmailCheckIntent) ? (raw as EmailCheckIntent) : 'customer';
+}
+
+function emailExistsMessage(intent: EmailCheckIntent): string {
+  if (intent === 'vendor') {
+    return 'This email is already registered. Log in to add a vendor under your account.';
+  }
+  if (intent === 'brand') {
+    return 'This email is already registered. Log in to add a brand under your account.';
+  }
+  return 'This email is already registered. Log in instead of creating a duplicate account.';
+}
 
 function generateOTP(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
@@ -47,6 +65,7 @@ async function postHandler(req: NextRequest) {
   try {
     const body = await req.json();
     const mode: 'login' | 'register' = body.mode === 'register' ? 'register' : 'login';
+    const intent = parseIntent(body.intent);
 
     const rawPhone = String(body.phone ?? '').replace(/\D/g, '');
     const phone = rawPhone.length === 12 ? rawPhone.replace(/^91/, '') : rawPhone;
@@ -76,11 +95,26 @@ async function postHandler(req: NextRequest) {
       );
     }
 
-    if (useEmail && mode === 'register') {
+    if (useEmail && mode === 'register' && !isRegisterEmailOtpEnabled()) {
       return NextResponse.json(
         { success: false, error: 'Registration requires a phone number' },
         { status: 400 }
       );
+    }
+
+    if (useEmail && mode === 'register' && isRegisterEmailOtpEnabled()) {
+      const check = await lookupEmailForRegistration(email, intent);
+      if (check.exists) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: 'EMAIL_EXISTS',
+            error: emailExistsMessage(intent),
+            data: check,
+          },
+          { status: 409 },
+        );
+      }
     }
 
     // Account-existence check applies to EMAIL login only. A phone login

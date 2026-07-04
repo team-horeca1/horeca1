@@ -11,15 +11,18 @@ import { withRateLimit } from '@/middleware/withRateLimit';
 import { uniqueHcid } from '@/lib/hcid';
 import { emitEvent } from '@/events/emitter';
 import { BrandProfileSchema, validateBrandProfile, derivedLegalName } from '@/lib/validators/brand-profile';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 import {
   mapToBusinessAccount,
   mapToBrandFields,
 } from '@/lib/brandProfileMapper';
 
 const PHONE_RE = /^\d{10}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const Body = BrandProfileSchema.extend({
-  phone: z.string().regex(PHONE_RE, 'Invalid phone number'),
+const BodyBase = BrandProfileSchema.extend({
+  phone: z.string().optional().or(z.literal('')),
+  verifiedEmail: z.string().optional().or(z.literal('')),
   password: z.string().min(6).optional().or(z.literal('')),
 });
 
@@ -31,38 +34,94 @@ function slugify(name: string, suffix: string): string {
   return `${base || 'brand'}-${suffix.slice(0, 8)}`;
 }
 
+function parseBody(raw: unknown) {
+  const relaxed = isRegisterEmailOtpEnabled();
+  const parsed = BodyBase.parse(raw);
+
+  const phoneRaw = (parsed.phone ?? '').replace(/\D/g, '');
+  const phone = phoneRaw.length === 12 ? phoneRaw.replace(/^91/, '') : phoneRaw;
+  const verifiedEmail = (parsed.verifiedEmail || parsed.email || '').trim().toLowerCase();
+  const ownerEmail = (parsed.email || verifiedEmail).trim().toLowerCase();
+
+  if (!relaxed) {
+    if (!PHONE_RE.test(phone)) throw Errors.badRequest('Invalid phone number');
+  } else {
+    const hasPhone = PHONE_RE.test(phone);
+    const hasEmail = !!ownerEmail && EMAIL_RE.test(ownerEmail);
+    if (!hasPhone && !hasEmail) {
+      throw Errors.badRequest('Provide a verified mobile number or email address');
+    }
+    if (phone && !PHONE_RE.test(phone)) throw Errors.badRequest('Invalid phone number');
+    if (ownerEmail && !EMAIL_RE.test(ownerEmail)) throw Errors.badRequest('Invalid email address');
+    if (!hasPhone && (!parsed.password || parsed.password.length < 6)) {
+      throw Errors.badRequest('Password is required when registering with email only');
+    }
+  }
+
+  return {
+    ...parsed,
+    phone: PHONE_RE.test(phone) ? phone : '',
+    email: ownerEmail || null,
+    verifiedEmail: verifiedEmail || ownerEmail || null,
+    relaxed,
+  };
+}
+
 async function postHandler(req: NextRequest) {
   try {
-    const raw = await req.json();
-    const input = Body.parse(raw);
+    const input = parseBody(await req.json());
 
-    const validation = validateBrandProfile(input, 'publicRegister');
+    const validation = validateBrandProfile(
+      { ...input, email: input.email ?? undefined },
+      'publicRegister',
+    );
     if (!validation.success) {
       throw Errors.badRequest(validation.message ?? 'Invalid brand profile');
     }
 
-    const phone = input.phone;
-    const email = input.email?.trim().toLowerCase() || null;
+    const phone = input.phone || null;
+    const email = input.email;
+    const verifyEmail = input.verifiedEmail;
+
+    const otpWhere = input.relaxed
+      ? {
+          OR: [
+            ...(phone ? [{ phone, used: true as const }] : []),
+            ...(verifyEmail ? [{ email: verifyEmail, used: true as const }] : []),
+          ],
+          createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
+        }
+      : {
+          phone: phone!,
+          used: true as const,
+          createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
+        };
 
     const verifiedOtp = await prisma.otpCode.findFirst({
-      where: {
-        phone,
-        used: true,
-        createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
-      },
+      where: otpWhere,
       orderBy: { createdAt: 'desc' },
       select: { id: true },
     });
     if (!verifiedOtp) {
-      throw Errors.badRequest('Phone number is not verified. Please verify your number first.');
+      throw Errors.badRequest(
+        input.relaxed
+          ? 'Contact is not verified. Please verify your mobile or email first.'
+          : 'Phone number is not verified. Please verify your number first.',
+      );
     }
 
     const existing = await prisma.user.findFirst({
-      where: { OR: [{ phone }, ...(email ? [{ email }] : [])] },
+      where: {
+        OR: [
+          ...(phone ? [{ phone }] : []),
+          ...(email ? [{ email }] : []),
+        ],
+      },
       select: { id: true, phone: true, email: true },
     });
     if (existing) {
-      throw Errors.duplicate(existing.phone === phone ? 'Phone' : 'Email');
+      const dupField = phone && existing.phone === phone ? 'Phone' : 'Email';
+      throw Errors.duplicate(dupField);
     }
 
     const brandAdminTemplate = await prisma.accountRole.findFirst({
@@ -75,17 +134,17 @@ async function postHandler(req: NextRequest) {
 
     const hashedPassword = input.password ? await bcrypt.hash(input.password, 12) : null;
     const hcidDisplay = await uniqueHcid();
-    const brandFields = mapToBrandFields(input);
+    const brandFields = mapToBrandFields({ ...input, email: input.email ?? undefined });
     const brandName = brandFields.name as string;
-    const baData = mapToBusinessAccount(input);
+    const baData = mapToBusinessAccount({ ...input, email: input.email ?? undefined });
 
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
-          phone,
+          phone: phone || null,
           email,
           password: hashedPassword,
-          fullName: input.fullName ?? ([input.firstName, input.lastName].filter(Boolean).join(' ') || phone),
+          fullName: input.fullName ?? ([input.firstName, input.lastName].filter(Boolean).join(' ') || phone || email || 'Brand User'),
           businessName: brandName,
           role: 'brand',
           hcidDisplay,
@@ -97,7 +156,7 @@ async function postHandler(req: NextRequest) {
 
       const account = await tx.businessAccount.create({
         data: {
-          legalName: derivedLegalName(input) || brandName,
+          legalName: derivedLegalName({ ...input, email: input.email ?? undefined }) || brandName,
           ...(baData as object),
           isCustomer: false,
           isVendor: false,
@@ -132,11 +191,6 @@ async function postHandler(req: NextRequest) {
         data: { userId: user.id, businessAccountId: account.id, outletId: null, roleId: brandAdminTemplate.id },
       });
 
-      // A label-only brand (no owner) may already exist for this name — created
-      // earlier via product import or vendor "Request brand". Brand.name is
-      // unique, so we CLAIM that record (attach this onboarding account) instead
-      // of inserting a duplicate. If the name is owned by a real account already,
-      // it's a genuine conflict.
       const existingBrand = await tx.brand.findFirst({
         where: { name: { equals: brandName, mode: 'insensitive' } },
         select: { id: true, userId: true, slug: true },

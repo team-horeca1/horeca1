@@ -11,6 +11,7 @@ import { provisionDefaultAccount } from '@/lib/provisionAccount';
 import { uniqueHcid } from '@/lib/hcid';
 import { flatten } from '@/lib/permissions/engine';
 import { phoneLookupVariants } from '@/lib/phone';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 import type { PermissionKey, PermissionsJson } from '@/lib/permissions/registry';
 
 function vendorSlug(name: string): string {
@@ -80,7 +81,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!code) return null;
 
         const usePhone = !!phone;
-        const useEmail = !usePhone && !isRegister && !!loginEmail;
+        const useEmail = !usePhone && !!loginEmail;
+        if (useEmail && isRegister && !isRegisterEmailOtpEnabled()) return null;
         if (!usePhone && !useEmail) return null;
 
         const record = await prisma.otpCode.findFirst({
@@ -103,12 +105,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               select: { id: true, email: true, fullName: true, role: true, image: true, isActive: true },
             });
 
-        if (useEmail && !user) return null;
+        if (useEmail && !user && !isRegister) return null;
 
-        if (!user && usePhone) {
-          const fullName = String(credentials?.fullName ?? '').trim() || phone;
+        if (!user && (usePhone || (useEmail && isRegister))) {
+          const fullName = String(credentials?.fullName ?? '').trim()
+            || (usePhone ? phone : loginEmail);
           const businessName = String(credentials?.businessName ?? '').trim() || null;
-          const rawEmail = String(credentials?.email ?? '').trim().toLowerCase();
+          const rawEmail = useEmail
+            ? loginEmail
+            : String(credentials?.email ?? '').trim().toLowerCase();
           const email = rawEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail) ? rawEmail : null;
           const role = credentials?.role === 'vendor'
             ? 'vendor'
@@ -145,18 +150,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const longitude = lngRaw ? Number(lngRaw) : null;
           const placeId = str('placeId');
 
+          const rawPassword = String(credentials?.password ?? '');
+          if (useEmail && isRegister && rawPassword.length < 6) return null;
+
           const emailTaken = email
             ? !!(await prisma.user.findUnique({ where: { email }, select: { id: true } }))
             : false;
           const finalEmail = emailTaken ? null : email;
 
-          const rawPassword = String(credentials?.password ?? '');
           const passwordHash = rawPassword.length >= 6 ? await bcrypt.hash(rawPassword, 10) : null;
 
           const hcidDisplay = await uniqueHcid();
           user = await prisma.user.create({
             data: {
-              phone,
+              phone: usePhone ? phone : null,
               fullName,
               businessName,
               email: finalEmail,

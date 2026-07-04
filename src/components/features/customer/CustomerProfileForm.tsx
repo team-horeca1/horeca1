@@ -23,6 +23,7 @@ import {
 } from '@/lib/constants/customerProfile';
 import { validateFieldBlur, type CustomerProfileInput } from '@/lib/validators/customer-profile';
 import { derivedDisplayName, derivedLegalName } from '@/lib/validators/customer-profile';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 
 export interface ContactPerson {
   salutation?: string;
@@ -134,6 +135,7 @@ export function CustomerProfileForm({
   const set = (patch: Partial<CustomerProfileValues>) => onChange(patch);
   const blur = (field: string, v: string) => onFieldBlur?.(field, v);
   const isWide = layout === 'wide';
+  const relaxedContact = isRegisterEmailOtpEnabled();
   const GRID = isWide
     ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3'
     : 'grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4';
@@ -314,9 +316,9 @@ export function CustomerProfileForm({
           {visibleSections.auth && (
             <>
               <SectionHeader icon={User} spanClass={SPAN_FULL}>Contact &amp; Login</SectionHeader>
-              <TextField label="Email (optional)" type="email" value={value.email ?? ''}
+              <TextField label={relaxedContact ? 'Email (optional if mobile provided)' : 'Email (optional)'} type="email" value={value.email ?? ''}
                 error={errors.email} onChange={v => set({ email: v })} placeholder="you@example.com" />
-              <FormField label="Mobile" required error={errors.phone}>
+              <FormField label={relaxedContact ? 'Mobile (optional if email provided)' : 'Mobile'} required={!relaxedContact} error={errors.phone}>
                 <PhoneInput value={value.phone ?? value.mobilePhone ?? ''}
                   onChange={v => set({ phone: v, mobilePhone: v })} />
               </FormField>

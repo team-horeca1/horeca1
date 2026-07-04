@@ -4,6 +4,7 @@
 
 import { z } from 'zod';
 import { GST_RE, PAN_RE, PINCODE_RE } from '@/lib/validators/vendor-kyc';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -145,9 +146,31 @@ export function validateCustomerProfile(
     if (!fullName || fullName.length < 2) errors.firstName = 'Contact name is required';
     if (!legalName || legalName.length < 2) errors.legalName = 'Legal business name is required';
     if (!trim(data.businessType)) errors.businessType = 'Business type is required';
-    if (!phone || phone.length !== 10) errors.phone = 'Enter a valid 10-digit mobile number';
-    if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
-    if (password && password.length < 6) errors.password = 'Password must be at least 6 characters';
+
+    const relaxed = isRegisterEmailOtpEnabled() && context === 'selfRegister';
+    if (relaxed) {
+      const hasPhone = phone.length === 10;
+      const hasEmail = !!email && EMAIL_RE.test(email);
+      if (!hasPhone && !hasEmail) {
+        errors.phone = 'Enter a mobile number or email address';
+        errors.email = 'Enter a mobile number or email address';
+      } else {
+        if (phone && phone.length !== 10) errors.phone = 'Enter a valid 10-digit mobile number';
+        if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
+        if (!hasPhone && hasEmail && (!password || password.length < 6)) {
+          errors.password = 'Password is required when registering with email only';
+        }
+      }
+    } else {
+      if (!phone || phone.length !== 10) errors.phone = 'Enter a valid 10-digit mobile number';
+      if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
+    }
+
+    if (!relaxed && password && password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    } else if (relaxed && password && password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    }
   }
 
   if (context === 'addBusiness') {

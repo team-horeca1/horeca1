@@ -22,13 +22,17 @@ import { buildBrandProfile, buildAddBusinessPayload } from '@/lib/brandProfileMa
 import { ExistingPhoneModal } from '@/components/auth/ExistingPhoneModal';
 import { accountLabelFromCheck } from '@/lib/auth/phoneCheckLabels';
 import type { PhoneCheckResult } from '@/lib/auth/checkPhoneLookup';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
+
+const EMAIL_REGISTER_ALLOWED = isRegisterEmailOtpEnabled();
 
 const STEP_TITLES = [
-  { id: 1, label: 'Verify Mobile', icon: Phone },
+  { id: 1, label: EMAIL_REGISTER_ALLOWED ? 'Verify Contact' : 'Verify Mobile', icon: Phone },
   { id: 2, label: 'Brand Profile', icon: Building2 },
 ];
 
 const PHONE_RE = /^\d{10}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESEND_COOLDOWN = 60;
 
 export default function BrandRegisterPage() {
@@ -43,6 +47,9 @@ export default function BrandRegisterPage() {
 
   const [phone, setPhone] = useState('');
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [verifyChannel, setVerifyChannel] = useState<'phone' | 'email'>('phone');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [emailVerified, setEmailVerified] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '']);
   const [otpLoading, setOtpLoading] = useState(false);
@@ -64,6 +71,7 @@ export default function BrandRegisterPage() {
     hcidDisplay?: string;
     accountLabel: string;
     suggestedAction: 'login_to_link' | 'login_only';
+    contactType?: 'phone' | 'email';
   } | null>(null);
 
   const authSeedDone = useRef(false);
@@ -108,38 +116,79 @@ export default function BrandRegisterPage() {
 
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
+  const resetOtpState = () => {
+    setOtpSent(false);
+    setPhoneVerified(false);
+    setEmailVerified(false);
+    setOtpDigits(['', '', '', '']);
+  };
+
+  const openExistingPhoneModal = (
+    contact: string,
+    data: PhoneCheckResult,
+    contactType: 'phone' | 'email' = 'phone',
+  ) => {
+    setExistingPhoneModal({
+      phone: contact,
+      hcidDisplay: data.hcidDisplay,
+      accountLabel: accountLabelFromCheck(data),
+      suggestedAction: data.suggestedAction === 'login_only' ? 'login_only' : 'login_to_link',
+      contactType,
+    });
+  };
+
   const sendOtp = async () => {
-    const digits = phone.replace(/\D/g, '').slice(-10);
-    if (!PHONE_RE.test(digits)) {
-      setError('Enter a valid 10-digit mobile number');
-      return;
+    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
+    if (useEmail) {
+      if (!EMAIL_RE.test(registerEmail.trim())) {
+        setError('Enter a valid email address');
+        return;
+      }
+    } else {
+      const digits = phone.replace(/\D/g, '').slice(-10);
+      if (!PHONE_RE.test(digits)) {
+        setError('Enter a valid 10-digit mobile number');
+        return;
+      }
     }
     setOtpLoading(true);
     setError('');
     try {
       if (!isAuthMode) {
-        const checkRes = await fetch('/api/v1/auth/check-phone', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone: digits, intent: 'brand' }),
-        });
-        const checkData = await checkRes.json();
-        if (checkData.success && checkData.data?.exists) {
-          const data = checkData.data as PhoneCheckResult;
-          setExistingPhoneModal({
-            phone: digits,
-            hcidDisplay: data.hcidDisplay,
-            accountLabel: accountLabelFromCheck(data),
-            suggestedAction: data.suggestedAction === 'login_only' ? 'login_only' : 'login_to_link',
+        if (useEmail) {
+          const checkRes = await fetch('/api/v1/auth/check-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: registerEmail.trim().toLowerCase(), intent: 'brand' }),
           });
-          return;
+          const checkData = await checkRes.json();
+          if (checkData.success && checkData.data?.exists) {
+            openExistingPhoneModal(registerEmail.trim().toLowerCase(), checkData.data as PhoneCheckResult, 'email');
+            return;
+          }
+        } else {
+          const digits = phone.replace(/\D/g, '').slice(-10);
+          const checkRes = await fetch('/api/v1/auth/check-phone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: digits, intent: 'brand' }),
+          });
+          const checkData = await checkRes.json();
+          if (checkData.success && checkData.data?.exists) {
+            openExistingPhoneModal(digits, checkData.data as PhoneCheckResult, 'phone');
+            return;
+          }
         }
       }
 
       const res = await fetch('/api/v1/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: digits, mode: 'register' }),
+        body: JSON.stringify(
+          useEmail
+            ? { email: registerEmail.trim().toLowerCase(), mode: 'register', intent: 'brand' }
+            : { phone: phone.replace(/\D/g, '').slice(-10), mode: 'register', intent: 'brand' },
+        ),
       });
       const data = await res.json();
       if (!data.success) {
@@ -157,6 +206,7 @@ export default function BrandRegisterPage() {
   };
 
   const verifyOtp = async (code: string) => {
+    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
     const digits = phone.replace(/\D/g, '').slice(-10);
     setOtpLoading(true);
     setError('');
@@ -164,7 +214,11 @@ export default function BrandRegisterPage() {
       const res = await fetch('/api/v1/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: digits, code }),
+        body: JSON.stringify(
+          useEmail
+            ? { email: registerEmail.trim().toLowerCase(), code }
+            : { phone: digits, code },
+        ),
       });
       const data = await res.json();
       if (!data.success) {
@@ -173,8 +227,14 @@ export default function BrandRegisterPage() {
         otpRefs[0].current?.focus();
         return;
       }
-      setPhoneVerified(true);
-      setProfile(prev => ({ ...prev, phone: digits, mobilePhone: digits }));
+      if (useEmail) {
+        setEmailVerified(true);
+        const verified = registerEmail.trim().toLowerCase();
+        setProfile(prev => ({ ...prev, email: verified }));
+      } else {
+        setPhoneVerified(true);
+        setProfile(prev => ({ ...prev, phone: digits, mobilePhone: digits }));
+      }
       setStep(2);
     } catch {
       setError('Verification failed. Please try again.');
@@ -248,9 +308,12 @@ export default function BrandRegisterPage() {
       }
 
       const phoneDigits = phone.replace(/\D/g, '').slice(-10);
+      const verifiedEmail = registerEmail.trim().toLowerCase();
       const payload = {
         ...buildBrandProfile({ ...profile, password }),
-        phone: phoneDigits,
+        phone: phoneVerified ? phoneDigits : '',
+        verifiedEmail: emailVerified ? verifiedEmail : '',
+        email: profile.email?.trim().toLowerCase() || (emailVerified ? verifiedEmail : ''),
         password: password || undefined,
       };
 
@@ -346,20 +409,72 @@ export default function BrandRegisterPage() {
 
           {step === 1 && !isAuthMode && (
             <div className="space-y-5">
-              <p className="text-[14px] text-gray-600">Verify your mobile number to start brand onboarding.</p>
+              <p className="text-[14px] text-gray-600">
+                {EMAIL_REGISTER_ALLOWED
+                  ? 'Verify your mobile or email to start brand onboarding.'
+                  : 'Verify your mobile number to start brand onboarding.'}
+              </p>
+
+              {EMAIL_REGISTER_ALLOWED && (
+                <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
+                  {(['phone', 'email'] as const).map(ch => (
+                    <button
+                      key={ch}
+                      type="button"
+                      onClick={() => {
+                        setVerifyChannel(ch);
+                        resetOtpState();
+                        setError('');
+                      }}
+                      className={cn(
+                        'flex-1 py-2.5 rounded-lg text-[12px] font-bold transition-colors',
+                        verifyChannel === ch
+                          ? 'bg-white text-[#299E60] shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700',
+                      )}
+                    >
+                      {ch === 'phone' ? 'Mobile' : 'Email'}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {(!EMAIL_REGISTER_ALLOWED || verifyChannel === 'phone') ? (
               <div>
                 <label className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-1.5 block">Mobile Number</label>
                 <input
                   type="tel"
                   value={phone}
-                  onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  onChange={e => {
+                    const next = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    if (next !== phone && (otpSent || phoneVerified)) resetOtpState();
+                    setPhone(next);
+                    setError('');
+                  }}
                   placeholder="10-digit mobile"
                   className="w-full h-[48px] px-4 border border-[#EEEEEE] rounded-xl text-[15px] outline-none focus:border-[#299E60]/40"
                   disabled={phoneVerified}
                 />
               </div>
+              ) : (
+              <div>
+                <label className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-1.5 block">Email Address</label>
+                <input
+                  type="email"
+                  value={registerEmail}
+                  onChange={e => {
+                    if (e.target.value !== registerEmail && (otpSent || emailVerified)) resetOtpState();
+                    setRegisterEmail(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="you@example.com"
+                  className="w-full h-[48px] px-4 border border-[#EEEEEE] rounded-xl text-[15px] outline-none focus:border-[#299E60]/40"
+                  disabled={emailVerified}
+                />
+              </div>
+              )}
 
-              {otpSent && !phoneVerified && (
+              {otpSent && !phoneVerified && !emailVerified && (
                 <div>
                   <label className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-2 block">Enter OTP</label>
                   <div className="flex gap-3 justify-center">
@@ -448,13 +563,16 @@ export default function BrandRegisterPage() {
         intent="brand"
         redirectTo="/brand/register"
         suggestedAction={existingPhoneModal?.suggestedAction ?? 'login_to_link'}
+        contactType={existingPhoneModal?.contactType ?? 'phone'}
         onClose={() => setExistingPhoneModal(null)}
         onUseDifferentNumber={() => {
           setExistingPhoneModal(null);
-          setPhone('');
-          setOtpSent(false);
-          setPhoneVerified(false);
-          setOtpDigits(['', '', '', '']);
+          if (existingPhoneModal?.contactType === 'email') {
+            setRegisterEmail('');
+          } else {
+            setPhone('');
+          }
+          resetOtpState();
           setError('');
         }}
       />
