@@ -7,6 +7,7 @@ import IORedis from 'ioredis';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/providers/email';
 import { sendSms } from '@/lib/providers/sms';
+import { sendWhatsApp } from '@/lib/providers/whatsapp';
 import { sendPushToUser } from '@/lib/providers/push';
 
 interface NotificationJobData {
@@ -40,7 +41,7 @@ async function processNotification(job: Job<NotificationJobData>) {
     if (channel === 'email') {
       if (!user.email) throw new Error('User has no email address');
       await sendEmail({ to: user.email, subject: title, text: body, name: user.fullName ?? undefined });
-    } else if (channel === 'sms' || channel === 'whatsapp') {
+    } else if (channel === 'sms') {
       if (!user.phone) throw new Error('User has no phone number');
       await sendSms({
         to: user.phone,
@@ -49,6 +50,9 @@ async function processNotification(job: Job<NotificationJobData>) {
         variables: smsVariables,
         channel,
       });
+    } else if (channel === 'whatsapp') {
+      if (!user.phone) throw new Error('User has no phone number');
+      await sendWhatsApp(user.phone, smsTemplateId ? body : `${title}\n\n${body}`);
     } else if (channel === 'push') {
       await sendPushToUser(userId, title, body);
     }

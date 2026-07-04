@@ -29,11 +29,12 @@ interface ErrorResponse {
 // dumps ("Invalid `prisma.…` invocation in …") to the client.
 export function friendlyErrorMessage(error: unknown, fallback = 'Something went wrong'): string {
   if (error instanceof ZodError) {
-    const flat = error.flatten().fieldErrors as Record<string, string[] | undefined>;
-    const firstField = Object.entries(flat).find(([, msgs]) => Array.isArray(msgs) && msgs.length > 0);
-    return firstField
-      ? `${firstField[0]}: ${firstField[1]?.[0] ?? 'invalid'}`
-      : 'Invalid input';
+    const issue = error.issues[0];
+    if (issue) {
+      const path = issue.path.map(String).join('.');
+      return path ? `${path}: ${issue.message}` : issue.message;
+    }
+    return 'Invalid input';
   }
   if (typeof error === 'object' && error !== null && 'code' in error) {
     const code = (error as { code?: unknown }).code;
@@ -44,6 +45,14 @@ export function friendlyErrorMessage(error: unknown, fallback = 'Something went 
     }
     if (code === 'P2003') return 'Linked record not found';
     if (code === 'P2000') return 'A value is too long for its field';
+  }
+  if (error instanceof Error && error.name === 'PrismaClientValidationError') {
+    const unknownArg = error.message.match(/Unknown argument `([^`]+)`/);
+    if (unknownArg) {
+      return `Database schema out of date (${unknownArg[1]}). Run: npx prisma generate && restart dev server`;
+    }
+    const line = error.message.split('\n').find((l) => l.includes('Invalid')) ?? error.message.split('\n')[0];
+    return line?.trim() || fallback;
   }
   if (error instanceof Error && error.message && !error.message.includes('invocation')) {
     return error.message;
@@ -56,13 +65,17 @@ export function errorResponse(error: unknown): NextResponse<ErrorResponse> {
   // instead of a generic "Invalid input". Full per-field details still in details.fields.
   if (error instanceof ZodError) {
     const flat = error.flatten().fieldErrors as Record<string, string[] | undefined>;
+    const issues = error.issues.map((issue) => ({
+      path: issue.path.map(String).join('.'),
+      message: issue.message,
+    }));
     return NextResponse.json(
       {
         success: false as const,
         error: {
           code: 'VALIDATION_ERROR',
           message: friendlyErrorMessage(error),
-          details: { fields: flat },
+          details: { fields: flat, issues },
         },
       },
       { status: 400 }
@@ -108,7 +121,7 @@ export function errorResponse(error: unknown): NextResponse<ErrorResponse> {
       success: false as const,
       error: {
         code: 'INTERNAL_ERROR',
-        message: 'Something went wrong',
+        message: friendlyErrorMessage(error, 'Something went wrong'),
       },
     },
     { status: 500 }
