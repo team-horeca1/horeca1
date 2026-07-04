@@ -366,10 +366,100 @@ export default function FinancePage() {
                     </table>
                 </div>
             </div>
+
+            <VendorSettlementsPanel />
+
             </>
             )}
 
 
+        </div>
+    );
+}
+
+interface SettlementRow {
+    id: string;
+    vendorName: string;
+    netAmount: number;
+    status: string;
+    bankReference: string | null;
+    periodStart: string;
+    periodEnd: string;
+    orderCount: number;
+}
+
+function VendorSettlementsPanel() {
+    const [settlements, setSettlements] = useState<SettlementRow[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const load = () => {
+        setLoading(true);
+        fetch('/api/v1/admin/settlements?status=pending')
+            .then((r) => r.json())
+            .then((j) => { if (j.success) setSettlements(j.data.settlements); })
+            .finally(() => setLoading(false));
+    };
+
+    useEffect(() => { load(); }, []);
+
+    const markTransferred = async (id: string) => {
+        const ref = prompt('Bank reference / UTR:');
+        if (!ref) return;
+        const res = await fetch(`/api/v1/admin/settlements/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'settled', bankReference: ref }),
+        });
+        const json = await res.json();
+        if (json.success) load();
+    };
+
+    return (
+        <div className="bg-white rounded-[24px] border border-[#EEEEEE] shadow-sm overflow-hidden mt-8">
+            <div className="px-8 py-6 border-b border-[#EEEEEE] flex items-center justify-between">
+                <div>
+                    <h2 className="text-[20px] font-[900] text-[#181725]">Vendor Settlement Batches</h2>
+                    <p className="text-[13px] text-[#7C7C7C] mt-1">Pending payouts to vendor bank accounts</p>
+                </div>
+            </div>
+            {loading ? (
+                <div className="p-12 flex justify-center"><Loader2 className="animate-spin text-[#299E60]" /></div>
+            ) : settlements.length === 0 ? (
+                <p className="p-8 text-center text-[#AEAEAE] text-sm font-bold">No pending settlement batches</p>
+            ) : (
+                <table className="w-full text-left">
+                    <thead>
+                        <tr className="bg-[#F8F9FB]">
+                            <th className="px-8 py-4 text-[12px] font-bold text-[#7C7C7C] uppercase">Vendor</th>
+                            <th className="px-6 py-4 text-[12px] font-bold text-[#7C7C7C] uppercase">Period</th>
+                            <th className="px-6 py-4 text-[12px] font-bold text-[#7C7C7C] uppercase">Net</th>
+                            <th className="px-6 py-4 text-[12px] font-bold text-[#7C7C7C] uppercase">Orders</th>
+                            <th className="px-6 py-4 text-[12px] font-bold text-[#7C7C7C] uppercase">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#EEEEEE]">
+                        {settlements.map((s) => (
+                            <tr key={s.id}>
+                                <td className="px-8 py-4 font-bold text-[#181725]">{s.vendorName}</td>
+                                <td className="px-6 py-4 text-sm text-[#7C7C7C]">
+                                    {new Date(s.periodStart).toLocaleDateString('en-IN')} – {new Date(s.periodEnd).toLocaleDateString('en-IN')}
+                                </td>
+                                <td className="px-6 py-4 font-[900]">{formatINR(s.netAmount)}</td>
+                                <td className="px-6 py-4">{s.orderCount}</td>
+                                <td className="px-6 py-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => markTransferred(s.id)}
+                                        className="px-4 py-2 bg-[#299E60] text-white text-xs font-bold rounded-lg hover:bg-[#238c54]"
+                                    >
+                                        Mark Transferred
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
         </div>
     );
 }
