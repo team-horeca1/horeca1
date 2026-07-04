@@ -117,7 +117,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     // key to prisma.vendor.update throws and the whole save fails.
     const vendorFields = [
       'businessName', 'description', 'addressLine', 'city', 'state', 'addressPincode',
-      'tradeName', 'vendorType', 'subType', 'gstNumber', 'panNumber', 'fssaiNumber',
+      'tradeName', 'vendorType', 'subType', 'vendorTypeSelections', 'gstNumber', 'panNumber', 'fssaiNumber',
       'udyamNumber', 'cinNumber', 'deliveryCapability', 'authorizedPersonName',
       'authorizedPersonPhone', 'authorizedPersonEmail', 'pickupAddressLine',
       'pickupCity', 'pickupState', 'pickupPincode', 'bankAccountName',

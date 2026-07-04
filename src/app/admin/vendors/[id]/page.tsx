@@ -34,6 +34,10 @@ import {
     Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  formatVendorTypeSelections,
+  normalizeVendorTypeSelections,
+} from '@/lib/constants/vendorProfile';
 import { resolveVendorCode, formatVendorSku } from '@/lib/sku';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
@@ -117,6 +121,8 @@ interface VendorData {
     // KYC / onboarding fields
     tradeName: string | null;
     vendorType: string | null;
+    subType: string | null;
+    vendorTypeSelections: unknown;
     gstNumber: string | null;
     panNumber: string | null;
     fssaiNumber: string | null;
@@ -1238,7 +1244,11 @@ export default function VendorDetailsPage() {
                                                 className="w-full h-[38px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60]"
                                             />
                                         ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">{vendor.vendorType || 'Not provided'}</span>
+                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">
+                                              {formatVendorTypeSelections(normalizeVendorTypeSelections(vendor.vendorTypeSelections))
+                                                || vendor.vendorType
+                                                || 'Not provided'}
+                                            </span>
                                         )}
                                     </div>
 
