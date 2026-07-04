@@ -5,6 +5,22 @@ import type { PrismaClient } from '@prisma/client';
 
 type TxClient = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
 
+async function logInventoryChange(
+  inventoryId: string,
+  vendorId: string,
+  field: string,
+  oldValue: number,
+  newValue: number,
+  reason?: string,
+  changedBy?: string,
+  tx?: TxClient,
+) {
+  const db = tx ?? prisma;
+  await db.inventoryLog.create({
+    data: { inventoryId, vendorId, field, oldValue, newValue, reason, changedBy },
+  });
+}
+
 export class InventoryService {
   async getStock(productId: string) {
     const inv = await prisma.inventory.findUnique({ where: { productId } });
@@ -12,19 +28,51 @@ export class InventoryService {
     return inv;
   }
 
-  async updateStock(productId: string, vendorId: string, data: { qtyAvailable?: number; lowStockThreshold?: number }) {
+  async updateStock(
+    productId: string,
+    vendorId: string,
+    data: {
+      qtyAvailable?: number;
+      qtyInTransit?: number;
+      qtyDamaged?: number;
+      qtyReturned?: number;
+      lowStockThreshold?: number;
+    },
+    changedBy?: string,
+  ) {
+    const before = await prisma.inventory.findUnique({ where: { productId } });
+    if (!before || before.vendorId !== vendorId) throw Errors.notFound('Inventory');
+
     const inv = await prisma.inventory.update({
       where: { productId },
       data,
     });
 
-    if (data.qtyAvailable !== undefined && data.qtyAvailable <= inv.lowStockThreshold) {
-      emitEvent('StockUpdated', {
-        productId,
-        vendorId,
-        qtyAvailable: data.qtyAvailable,
-        lowStockThreshold: inv.lowStockThreshold,
+    for (const [field, val] of Object.entries(data)) {
+      if (val === undefined) continue;
+      const oldVal = Number((before as Record<string, unknown>)[field] ?? 0);
+      if (oldVal !== val) {
+        await logInventoryChange(inv.id, vendorId, field, oldVal, val, 'manual_update', changedBy);
+      }
+    }
+
+    if (data.qtyAvailable !== undefined) {
+      const available = data.qtyAvailable - inv.qtyReserved;
+      if (available <= inv.lowStockThreshold) {
+        emitEvent('StockUpdated', {
+          productId,
+          vendorId,
+          qtyAvailable: data.qtyAvailable,
+          lowStockThreshold: inv.lowStockThreshold,
+        });
+      }
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: { autoDisableOos: true },
       });
+      if (vendor?.autoDisableOos && available <= 0) {
+        await prisma.product.update({ where: { id: productId }, data: { isActive: false } });
+      }
     }
 
     return inv;

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { FileClaimModal } from '@/components/features/vendor/FileClaimModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,12 @@ interface OrderUser {
     businessName: string | null;
 }
 
+interface SubstituteProduct {
+    id: string;
+    name: string;
+    sku: string | null;
+}
+
 interface OrderItem {
     id: string;
     productId: string;
@@ -30,6 +37,9 @@ interface OrderItem {
     fulfilledQty: number;
     unitPrice: number;
     totalPrice: number;
+    stockAvailable?: number;
+    isLowStock?: boolean;
+    substitutes?: SubstituteProduct[];
     product?: {
         imageUrl: string | null;
         sku: string | null;
@@ -280,6 +290,7 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
     const [showProofModal, setShowProofModal] = useState(false);
     const [proofType, setProofType] = useState<'otp' | 'photo' | 'notes' | 'none'>('none');
     const [proofNotes, setProofNotes] = useState('');
+    const [proofUrl, setProofUrl] = useState('');
     const [busy, setBusy] = useState(false);
     const reasonRef = useRef<HTMLTextAreaElement>(null);
 
@@ -300,8 +311,9 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
 
     const hint =
         order.status === 'pending' ? (isPartialAccept ? 'Adjust fulfilled quantities below, then confirm.' : 'Accept in full or reduce quantities for partial fulfilment.') :
-            order.status === 'confirmed' ? 'Mark as packed once items are ready in the warehouse.' :
-                order.status === 'processing' ? 'Mark as dispatched once goods are handed to delivery.' :
+            order.status === 'confirmed' || order.status === 'processing' ? 'Adjust quantities if needed, then advance fulfilment.' :
+                order.status === 'shipped' ? 'Confirm full or partial delivery with optional proof.' :
+                order.status === 'partially_delivered' ? 'Complete remaining delivery when balance arrives.' :
                     'Confirm delivery once the customer has received the goods.';
 
     return (
@@ -407,6 +419,13 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
                                     {busy ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
                                     Confirm Delivery
                                 </button>
+                                <button
+                                    onClick={() => run('partially_delivered')}
+                                    disabled={busy}
+                                    className="h-[48px] px-6 rounded-[12px] border border-[#F59E0B] text-[#976538] text-[14px] font-bold hover:bg-[#FFF4E5] flex items-center gap-2 disabled:opacity-60"
+                                >
+                                    Partial Delivery
+                                </button>
                                 {showProofModal && (
                                     <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
                                         <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-[420px]">
@@ -437,6 +456,14 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
                                                             className="w-full h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/50" />
                                                     </div>
                                                 )}
+                                                {proofType === 'photo' && (
+                                                    <div>
+                                                        <label className="block text-[11px] font-bold text-[#7C7C7C] uppercase mb-1">Photo URL (ImageKit)</label>
+                                                        <input type="url" value={proofUrl} onChange={e => setProofUrl(e.target.value)}
+                                                            placeholder="https://..."
+                                                            className="w-full h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/50" />
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="px-6 py-4 border-t border-[#F5F5F5] flex gap-3 justify-end">
                                                 <button onClick={() => setShowProofModal(false)}
@@ -448,6 +475,7 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
                                                         setShowProofModal(false);
                                                         run('delivered', undefined, {
                                                             proofType: proofType !== 'none' ? proofType : undefined,
+                                                            proofUrl: proofUrl.trim() || undefined,
                                                             notes: proofNotes.trim() || undefined,
                                                         });
                                                     }}
@@ -461,6 +489,24 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
                                     </div>
                                 )}
                             </>
+                        )}
+                        {order.status === 'partially_delivered' && (
+                            <button
+                                onClick={() => setShowProofModal(true)}
+                                disabled={busy}
+                                className="h-[48px] px-8 rounded-[12px] bg-[#299E60] text-white text-[15px] font-bold hover:bg-[#238a54] flex items-center gap-2 disabled:opacity-60"
+                            >
+                                Complete Delivery
+                            </button>
+                        )}
+                        {['confirmed', 'processing', 'ready_for_dispatch'].includes(order.status) && (
+                            <button
+                                onClick={runAccept}
+                                disabled={busy}
+                                className="h-[48px] px-6 rounded-[12px] border border-[#4F46E5] text-[#4F46E5] text-[14px] font-bold hover:bg-indigo-50 flex items-center gap-2 disabled:opacity-60"
+                            >
+                                Save Quantity Changes
+                            </button>
                         )}
                         {/* Reject / Cancel */}
                         {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing') && (
@@ -609,6 +655,67 @@ export default function VendorOrderDetailPage() {
     const [fulfilledQtys, setFulfilledQtys] = useState<Record<string, number>>({});
     const [ewayBill, setEwayBill] = useState('');
     const [ewaySaving, setEwaySaving] = useState(false);
+    const [showClaimModal, setShowClaimModal] = useState(false);
+    const [itemsExpanded, setItemsExpanded] = useState(true);
+    const [creatingPicklist, setCreatingPicklist] = useState(false);
+    const [printingPicklist, setPrintingPicklist] = useState(false);
+
+    const ensurePicklist = async (): Promise<{ id: string; orderId: string; status: string; reused?: boolean }> => {
+        const res = await fetch('/api/v1/vendor/warehouse/picklists', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId: order!.id }),
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.error?.message || 'Failed to create picklist');
+        return json.data;
+    };
+
+    const openPicklistPrint = async (picklistId: string, picklistStatus: string) => {
+        if (picklistStatus === 'draft') {
+            await fetch(`/api/v1/vendor/warehouse/picklists/${picklistId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'printed' }),
+            });
+        }
+        window.open(`/api/v1/vendor/orders/${orderId}/picklist`, '_blank');
+    };
+
+    const createPicklist = async () => {
+        if (!order) return;
+        setCreatingPicklist(true);
+        try {
+            const data = await ensurePicklist();
+            await openPicklistPrint(data.id, data.status);
+            toast.success(
+                data.reused ? 'Picklist ready (existing)' : 'Picklist created',
+                {
+                    action: {
+                        label: 'Open in Warehouse',
+                        onClick: () => router.push(`/vendor/warehouse?tab=picklists&open=${data.id}`),
+                    },
+                },
+            );
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Failed to create picklist');
+        } finally {
+            setCreatingPicklist(false);
+        }
+    };
+
+    const printPicklist = async () => {
+        if (!order) return;
+        setPrintingPicklist(true);
+        try {
+            const data = await ensurePicklist();
+            await openPicklistPrint(data.id, data.status);
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Failed to print picklist');
+        } finally {
+            setPrintingPicklist(false);
+        }
+    };
 
     const fetchOrder = useCallback(async () => {
         try {
@@ -620,7 +727,7 @@ export default function VendorOrderDetailPage() {
             setEwayBill(json.data.ewayBillNo ?? '');
             const init: Record<string, number> = {};
             for (const item of json.data.items as OrderItem[]) {
-                init[item.id] = item.quantity;
+                init[item.id] = item.fulfilledQty ?? item.quantity;
             }
             setFulfilledQtys(init);
         } catch (err: unknown) {
@@ -635,6 +742,9 @@ export default function VendorOrderDetailPage() {
     // Derived state for partial-fulfilment indicators
     const isPartialAccept = order?.status === 'pending' && order.items.some(
         item => (fulfilledQtys[item.id] ?? item.quantity) < item.quantity
+    );
+    const isAmendDirty = order && ['confirmed', 'processing', 'ready_for_dispatch'].includes(order.status) && order.items.some(
+        item => (fulfilledQtys[item.id] ?? item.fulfilledQty ?? item.quantity) !== (item.fulfilledQty ?? item.quantity)
     );
     const adjustedTotal = order?.items.reduce((sum, item) => {
         const fulfilled = fulfilledQtys[item.id] ?? item.quantity;
@@ -694,16 +804,19 @@ export default function VendorOrderDetailPage() {
                 itemId: item.id,
                 fulfilledQty: qtys[item.id] ?? item.quantity,
             }));
+            const isAmend = order.status !== 'pending';
             const res = await fetch(`/api/v1/vendor/orders/${orderId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items }),
+                body: JSON.stringify({ items, ...(isAmend ? { mode: 'amend' } : {}) }),
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.error?.message || 'Accept failed');
             setOrder(prev => prev ? { ...prev, ...json.data } : prev);
             toast.success(
-                isPartialAccept
+                isAmend
+                    ? 'Order quantities updated.'
+                    : isPartialAccept
                     ? 'Partial order accepted! Unfulfilled stock released.'
                     : 'Order accepted! Inventory reserved.'
             );
@@ -755,12 +868,16 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
     }
 
     const isPending = order.status === 'pending';
+    const isAmendable = ['confirmed', 'processing', 'ready_for_dispatch'].includes(order.status);
+    const canEditQty = isPending || isAmendable;
+    const canFileClaim = ['delivered', 'partially_delivered'].includes(order.status);
+    const canCreatePicklist = ['confirmed', 'processing', 'ready_for_dispatch', 'shipped'].includes(order.status);
 
     return (
         <div className="space-y-6 pb-12 px-4 md:px-0">
 
             {/* Page Header */}
-            <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-4 print:hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#EEEEEE] pb-4 print:hidden">
                 <div className="flex items-center gap-3 text-[13px] text-[#6B7280]">
                     <button
                         onClick={() => router.back()}
@@ -784,18 +901,49 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                         <p className="text-[#6B7280] text-[12px] font-medium mt-1">ID: {order.orderNumber} &bull; Placed at {formatDateTime(order.createdAt)}</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 text-[13px]">
+                <div className="flex flex-wrap items-center gap-2 text-[13px]">
+                    {canCreatePicklist && (
+                        <button
+                            type="button"
+                            onClick={createPicklist}
+                            disabled={creatingPicklist}
+                            className="h-[34px] px-4 rounded-[10px] border border-[#EEEEEE] text-[13px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] flex items-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                        >
+                            {creatingPicklist ? <Loader2 size={15} className="animate-spin" /> : <ClipboardList size={15} />}
+                            Create picklist
+                        </button>
+                    )}
                     {(['confirmed', 'processing', 'shipped'] as const).includes(order.status as 'confirmed' | 'processing' | 'shipped') && (
                         <button
-                            onClick={() => window.print()}
-                            className="h-[34px] px-4 rounded-[10px] border border-[#EEEEEE] text-[13px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                            type="button"
+                            onClick={printPicklist}
+                            disabled={printingPicklist}
+                            className="h-[34px] px-4 rounded-[10px] border border-[#EEEEEE] text-[13px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] flex items-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50"
                         >
-                            <Printer size={15} />
+                            {printingPicklist ? <Loader2 size={15} className="animate-spin" /> : <Printer size={15} />}
                             Print Picklist
+                        </button>
+                    )}
+                    {canFileClaim && (
+                        <button
+                            type="button"
+                            onClick={() => setShowClaimModal(true)}
+                            className="h-[34px] px-4 rounded-[10px] bg-[#181725] text-white text-[13px] font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                        >
+                            <FileText size={15} />
+                            File claim
                         </button>
                     )}
                 </div>
             </div>
+
+            <FileClaimModal
+                open={showClaimModal}
+                onClose={() => setShowClaimModal(false)}
+                orderId={order.id}
+                orderNumber={order.orderNumber}
+                onCreated={() => router.push('/vendor/claims')}
+            />
 
             {/* Print picklist — only rendered in DOM for confirmed/processing/shipped so
                 the @media print style tag is present when the user prints */}
@@ -844,6 +992,18 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                     </div>
                 </div>
             )}
+
+            {/* Mobile action panel — stacked above content */}
+            <div className="lg:hidden print:hidden">
+                <ActionPanel
+                    order={order}
+                    fulfilledQtys={fulfilledQtys}
+                    adjustedTotal={adjustedTotal}
+                    isPartialAccept={!!isPartialAccept}
+                    onAction={handleAction}
+                    onAccept={handleAccept}
+                />
+            </div>
 
             {/* Main Layout Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -956,19 +1116,71 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
 
                     {/* Order Items Table Card */}
                     <div className="bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm overflow-hidden">
-                        <div className="px-5 py-4 border-b border-[#EEEEEE] bg-[#FAFAFA] flex items-center justify-between">
+                        <button
+                            type="button"
+                            onClick={() => setItemsExpanded((p) => !p)}
+                            className="md:hidden w-full px-5 py-4 border-b border-[#EEEEEE] bg-[#FAFAFA] flex items-center justify-between"
+                        >
+                            <h3 className="text-[14px] font-black text-[#111827] flex items-center gap-1.5">
+                                <Package size={16} className="text-[#299E60]" />
+                                Products ({order.items.length})
+                            </h3>
+                            <ChevronRight size={16} className={cn('text-[#AEAEAE] transition-transform', itemsExpanded && 'rotate-90')} />
+                        </button>
+                        <div className="hidden md:flex px-5 py-4 border-b border-[#EEEEEE] bg-[#FAFAFA] items-center justify-between">
                             <h3 className="text-[14px] font-black text-[#111827] flex items-center gap-1.5">
                                 <Package size={16} className="text-[#299E60]" />
                                 Products Sub-items List ({order.items.length})
                             </h3>
                             {isPending && (
-                                <span className="text-[11px] text-[#AEAEAE] hidden sm:block">
+                                <span className="text-[11px] text-[#AEAEAE]">
                                     Adjust &quot;Fulfil&quot; qty to ship less than ordered
                                 </span>
                             )}
                         </div>
 
-                        <div className="overflow-x-auto w-full">
+                        {/* Mobile card list */}
+                        <div className={cn('md:hidden divide-y divide-[#F3F4F6]', !itemsExpanded && 'hidden')}>
+                            {order.items.map((item) => {
+                                const fulfilled = canEditQty ? (fulfilledQtys[item.id] ?? item.fulfilledQty ?? item.quantity) : item.fulfilledQty;
+                                const isReduced = canEditQty && fulfilled < item.quantity;
+                                return (
+                                    <div key={item.id} className="p-4 space-y-2">
+                                        <div className="flex justify-between gap-2">
+                                            <p className="text-[13px] font-bold text-[#111827]">{item.productName}</p>
+                                            <p className="text-[13px] font-bold text-[#111827] shrink-0">{formatPrice(item.totalPrice)}</p>
+                                        </div>
+                                        <p className="text-[11px] text-[#7C7C7C]">Qty {item.quantity} · {formatPrice(item.unitPrice)} each</p>
+                                        {isPending && item.isLowStock && (
+                                            <div className="bg-amber-50 border border-amber-200 rounded-[8px] px-3 py-2 text-[11px] text-amber-900">
+                                                <p className="font-bold flex items-center gap-1"><AlertTriangle size={12} /> Only {item.stockAvailable ?? 0} in stock</p>
+                                                {(item.substitutes?.length ?? 0) > 0 && (
+                                                    <p className="mt-1">Suggest: {item.substitutes!.map((s) => s.name).join(', ')}</p>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFulfilledQty(item.id, Math.min(item.stockAvailable ?? 0, item.quantity), item.quantity)}
+                                                    className="mt-1.5 text-[#299E60] font-bold"
+                                                >
+                                                    Accept {Math.min(item.stockAvailable ?? 0, item.quantity)} only
+                                                </button>
+                                            </div>
+                                        )}
+                                        {canEditQty && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[11px] font-bold text-[#7C7C7C]">Fulfil:</span>
+                                                <button type="button" onClick={() => setFulfilledQty(item.id, fulfilled - 1, item.quantity)} className="w-7 h-7 rounded border border-[#EEEEEE] flex items-center justify-center"><Minus size={12} /></button>
+                                                <span className="text-[13px] font-bold w-8 text-center">{fulfilled}</span>
+                                                <button type="button" onClick={() => setFulfilledQty(item.id, fulfilled + 1, item.quantity)} className="w-7 h-7 rounded border border-[#EEEEEE] flex items-center justify-center"><Plus size={12} /></button>
+                                                {isReduced && <span className="text-[10px] text-amber-700 font-bold">partial</span>}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="hidden md:block overflow-x-auto w-full">
                             <table className="w-full border-collapse text-left text-[13px]">
                                 <thead>
                                     <tr className="bg-[#FAFAFA] border-b border-[#EEEEEE] text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">
@@ -976,7 +1188,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                         <th className="px-5 py-3 font-bold text-center">SKU / HSN</th>
                                         <th className="px-5 py-3 font-bold text-right">Unit Price</th>
                                         <th className="px-5 py-3 font-bold text-center">Ordered</th>
-                                        {isPending && (
+                                        {canEditQty && (
                                             <th className="px-5 py-3 font-bold text-center text-[#976538]">Fulfil</th>
                                         )}
                                         <th className="px-5 py-3 font-bold text-center print:hidden">GST</th>
@@ -989,14 +1201,14 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                         const itemGST = taxPct > 0
                                             ? Number(item.totalPrice) - (Number(item.totalPrice) / (1 + taxPct / 100))
                                             : 0;
-                                        const fulfilled = isPending ? (fulfilledQtys[item.id] ?? item.quantity) : item.fulfilledQty;
-                                        const isReduced = isPending && fulfilled < item.quantity;
-                                        const isSkipped = isPending && fulfilled === 0;
+                                        const fulfilled = canEditQty ? (fulfilledQtys[item.id] ?? item.fulfilledQty ?? item.quantity) : item.fulfilledQty;
+                                        const isReduced = canEditQty && fulfilled < item.quantity;
+                                        const isSkipped = canEditQty && fulfilled === 0;
 
                                         return (
                                             <tr key={item.id} className={cn(
                                                 'hover:bg-[#F9FAFB]/30 transition-colors',
-                                                isSkipped && isPending ? 'opacity-40' : ''
+                                                isSkipped && canEditQty ? 'opacity-40' : ''
                                             )}>
                                                 <td className="px-5 py-4">
                                                     <div className="flex items-center gap-3">
@@ -1016,6 +1228,24 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                                     {item.product.packSize}{item.product.unit ? ` · ${item.product.unit}` : ''}
                                                                 </p>
                                                             )}
+                                                            {isPending && item.isLowStock && (
+                                                                <div className="mt-2 bg-amber-50 border border-amber-200 rounded-[8px] px-2.5 py-1.5 text-[11px] text-amber-900 max-w-[280px]">
+                                                                    <p className="font-bold flex items-center gap-1">
+                                                                        <AlertTriangle size={11} />
+                                                                        Only {item.stockAvailable ?? 0} available
+                                                                    </p>
+                                                                    {(item.substitutes?.length ?? 0) > 0 && (
+                                                                        <p className="mt-0.5">Suggest: {item.substitutes!.map((s) => s.name).join(', ')}</p>
+                                                                    )}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setFulfilledQty(item.id, Math.min(item.stockAvailable ?? 0, item.quantity), item.quantity)}
+                                                                        className="mt-1 text-[#299E60] font-bold hover:underline"
+                                                                    >
+                                                                        Accept {Math.min(item.stockAvailable ?? 0, item.quantity)} only
+                                                                    </button>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </td>
@@ -1034,7 +1264,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                 </td>
                                                 
                                                 {/* Fulfil qty editor — only visible on pending orders */}
-                                                {isPending && (
+                                                {canEditQty && (
                                                     <td className="px-5 py-4 text-center">
                                                         <div className="inline-flex items-center gap-1">
                                                             <button
@@ -1097,8 +1327,8 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
 
                 {/* Right side 1 column: Actions panel, Billing ledger, status overrides, and notes */}
                 <div className="space-y-6">
-                    {/* Action Panel */}
-                    <div className="print:hidden">
+                    {/* Action Panel — desktop only (mobile shown above) */}
+                    <div className="print:hidden hidden lg:block">
                         <ActionPanel
                             order={order}
                             fulfilledQtys={fulfilledQtys}

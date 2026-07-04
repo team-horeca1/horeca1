@@ -50,7 +50,8 @@ const updateSettingsSchema = z.object({
   bankAccountType: z.enum(['current', 'savings']).optional().nullable(),
   // Payment modes accepted by vendor
   paymentModes: z.array(z.enum(['cod', 'prepaid', 'credit', 'cheque', 'discco'])).optional(),
-  // Notification preferences — map of event key → array of channels
+  vendorType: z.enum(['distributor', 'wholesaler', 'dark_store']).optional(),
+  multiWarehouseEnabled: z.boolean().optional(),
   notificationPrefs: z.record(z.string(), z.array(z.string())).optional(),
 });
 
@@ -104,7 +105,11 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     const body = await req.json();
     const allowedFields = updateSettingsSchema.parse(body);
 
-    const { paymentModes, notificationPrefs, ...scalarFields } = allowedFields;
+    const { paymentModes, notificationPrefs, multiWarehouseEnabled, ...scalarFields } = allowedFields;
+
+    const existing = multiWarehouseEnabled !== undefined
+      ? await prisma.vendor.findUnique({ where: { id: vendorId }, select: { multiWarehouseEnabled: true, businessAccountId: true } })
+      : null;
 
     const updated = await prisma.vendor.update({
       where: { id: vendorId },
@@ -112,8 +117,23 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         ...scalarFields,
         ...(paymentModes !== undefined && { paymentModes }),
         ...(notificationPrefs !== undefined && { notificationPrefs: notificationPrefs as Record<string, string[]> }),
+        ...(multiWarehouseEnabled !== undefined && { multiWarehouseEnabled }),
       },
     });
+
+    if (multiWarehouseEnabled === true && existing && !existing.multiWarehouseEnabled) {
+      const primaryOutlet = await prisma.outlet.findFirst({
+        where: { businessAccountId: existing.businessAccountId, isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (primaryOutlet) {
+        await prisma.inventory.updateMany({
+          where: { vendorId, outletId: null },
+          data: { outletId: primaryOutlet.id },
+        });
+      }
+    }
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {

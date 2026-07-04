@@ -280,36 +280,30 @@ function PendingOrdersWidget({
 // ─── Setup Banner ──────────────────────────────────────────────────────────────
 
 function SetupBanner() {
-  const [show, setShow] = useState(true);
-  const { data: session } = useSession();
-  const activeAccountId = (session?.user as { activeBusinessAccountId?: string } | undefined)?.activeBusinessAccountId;
+  const [show, setShow] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const scopedKey = activeAccountId ? `vendor_setup_completed_${activeAccountId}` : null;
-      const setupCompleted = (scopedKey && localStorage.getItem(scopedKey)) || localStorage.getItem('vendor_setup_completed');
-      if (setupCompleted) {
-        Promise.resolve().then(() => setShow(false));
-      }
-    }
-  }, [activeAccountId]);
+    fetch('/api/v1/vendor/setup')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success && !j.data.wizardComplete) setShow(true);
+      })
+      .catch(() => {});
+  }, []);
 
-  if (!show) return null;
+  if (!show || dismissed) return null;
   return (
     <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-5 text-white mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md shadow-emerald-600/10">
       <div>
         <p className="text-[17px] font-bold">Complete your store setup</p>
-        <p className="text-[13px] text-emerald-100 font-medium mt-0.5">Set up your profile, delivery slots, and list your first products to start accepting customer orders live.</p>
+        <p className="text-[13px] text-emerald-100 font-medium mt-0.5">Finish profile, delivery, and products to go live on Horeca1.</p>
       </div>
       <div className="flex items-center gap-3 w-full sm:w-auto shrink-0 justify-end">
         <Link href="/vendor/setup" className="bg-white text-emerald-700 text-[13px] font-bold px-4 py-2 rounded-xl hover:bg-emerald-50 transition-colors shadow-sm whitespace-nowrap">
-          Start Setup
+          Continue Setup
         </Link>
-        <button onClick={() => { 
-          const key = activeAccountId ? `vendor_setup_completed_${activeAccountId}` : 'vendor_setup_completed';
-          localStorage.setItem(key, '1'); 
-          setShow(false); 
-        }} className="text-white/70 hover:text-white transition-colors text-[24px] leading-none shrink-0">&times;</button>
+        <button type="button" onClick={() => setDismissed(true)} className="text-white/70 hover:text-white transition-colors text-[24px] leading-none shrink-0">&times;</button>
       </div>
     </div>
   );
@@ -2403,14 +2397,23 @@ function FinancialDetailDrawer({
         }
     }, [fetchWalletData, isOpen]);
 
-    const handleRequestInstantPayout = () => {
+    const handleRequestInstantPayout = async () => {
         setPayoutLoading(true);
-        setTimeout(() => {
-            setPayoutLoading(false);
-            toast.success('Instant settlement payout request approved! Check your bank account in 5 mins.');
+        try {
+            const res = await fetch('/api/v1/vendor/wallet/payout', { method: 'POST' });
+            const json = await res.json();
+            if (!json.success) {
+                toast.error(json.error?.message ?? json.error ?? 'Payout request failed');
+                return;
+            }
+            toast.success(json.data?.message ?? 'Payout initiated successfully');
             onPayoutSuccess();
             fetchWalletData();
-        }, 1500);
+        } catch {
+            toast.error('Payout request failed');
+        } finally {
+            setPayoutLoading(false);
+        }
     };
 
     return (

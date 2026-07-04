@@ -13,17 +13,17 @@ import {
   FormField, FormInput, FormSelect, FormTextarea, TextField, SectionLabel, inputClass, PasswordField,
 } from '@/components/ui/form';
 import {
-  VENDOR_BUSINESS_TYPES, subTypesForVendorType, categoriesForSubType,
   BUSINESS_SIZES, COVERAGE_OPTIONS, MONTHLY_SUPPLY_BANDS, VENDOR_LEAD_STATUSES,
-  slugForVendorType, type VendorBusinessType,
+  categoryPresetsForSelections,
 } from '@/lib/constants/vendorProfile';
-import { SALUTATIONS, INDIAN_STATES } from '@/lib/constants/customerProfile';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 import {
   validateFieldBlur,
   type VendorProfileInput,
-  displayVendorType,
-  normalizedVendorTypeSlug,
+  getEffectiveVendorTypeSelections,
 } from '@/lib/validators/vendor-profile';
+import { VendorTypeMatrix } from './VendorTypeMatrix';
+import { SALUTATIONS, INDIAN_STATES } from '@/lib/constants/customerProfile';
 
 export type VendorProfileValues = VendorProfileInput;
 
@@ -70,10 +70,6 @@ function SectionHeader({ icon: Icon, children, spanClass }: {
   );
 }
 
-function resolveDisplayType(vendorBusinessType: string | undefined, vendorType: string | undefined): string {
-  return displayVendorType(vendorBusinessType || vendorType) ?? vendorBusinessType ?? vendorType ?? '';
-}
-
 export function VendorProfileForm({
   value,
   onChange,
@@ -100,17 +96,10 @@ export function VendorProfileForm({
     ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3'
     : 'grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4';
   const SPAN_FULL = isWide ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2';
-
-  const displayType = resolveDisplayType(value.vendorBusinessType, value.vendorType);
-  const subTypes = subTypesForVendorType(displayType);
-  const categoryPresets = categoriesForSubType(displayType, value.subType ?? '');
+  const relaxedContact = isRegisterEmailOtpEnabled();
+  const typeSelections = getEffectiveVendorTypeSelections(value);
+  const categoryPresets = categoryPresetsForSelections(typeSelections);
   const selectedCategories = value.categoriesHandled ?? [];
-
-  const handleTypeChange = (label: string) => {
-    const slug = slugForVendorType(label as VendorBusinessType) ?? label;
-    set({ vendorBusinessType: label, vendorType: slug, subType: '', categoriesHandled: [] });
-  };
-
   const toggleCategory = (cat: string) => {
     const next = selectedCategories.includes(cat)
       ? selectedCategories.filter(c => c !== cat)
@@ -152,35 +141,12 @@ export function VendorProfileForm({
               error={errors.tradeName}
               onChange={v => set({ tradeName: v, displayName: v })}
               placeholder="Storefront name" />
-            <FormField label="Vendor Type" required className={SPAN_FULL}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {VENDOR_BUSINESS_TYPES.map(t => {
-                  const slug = slugForVendorType(t);
-                  const selected = value.vendorBusinessType === t
-                    || normalizedVendorTypeSlug(value.vendorType) === slug;
-                  return (
-                    <button key={t} type="button" onClick={() => handleTypeChange(t)}
-                      className={cn(
-                        'p-3 rounded-xl border text-left transition-colors',
-                        selected
-                          ? 'border-[#299E60] bg-[#EEF8F1] ring-1 ring-[#299E60]/20'
-                          : 'border-[#EEEEEE] bg-white hover:border-gray-300',
-                      )}>
-                      <p className="text-[12.5px] font-bold text-[#181725]">{t}</p>
-                    </button>
-                  );
-                })}
-              </div>
-              {errors.vendorBusinessType && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.vendorBusinessType}</p>}
-            </FormField>
-            <FormField label="Sub-Type" required={subTypes.length > 0}>
-              <FormSelect value={value.subType ?? ''} onChange={v => set({ subType: v, categoriesHandled: [] })}
-                hasError={!!errors.subType} disabled={!displayType}>
-                <option value="">Select sub-type</option>
-                {subTypes.map(s => <option key={s} value={s}>{s}</option>)}
-              </FormSelect>
-              {errors.subType && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.subType}</p>}
-            </FormField>
+            <VendorTypeMatrix
+              value={value}
+              onChange={onChange}
+              error={errors.vendorTypeSelections || errors.vendorBusinessType || errors.subType}
+              className={SPAN_FULL}
+            />
             {categoryPresets.length > 0 && (
               <FormField label="Categories Handled" className={SPAN_FULL}>
                 <div className="flex flex-wrap gap-2">
@@ -226,16 +192,22 @@ export function VendorProfileForm({
               <TextField label="Designation" value={value.designation ?? ''}
                 onChange={v => set({ designation: v })} placeholder="e.g. Director" />
             )}
-            <TextField label="Mobile" required
+            <TextField
+              label={relaxedContact ? 'Mobile (optional if email provided)' : 'Mobile'}
+              required={!relaxedContact}
               value={value.phone ?? value.mobilePhone ?? value.authorizedPersonPhone ?? ''}
-              error={errors.phone}
+              error={errors.phone || errors.authorizedPersonPhone}
               onChange={v => {
                 const p = v.replace(/\D/g, '').slice(-10);
                 set({ phone: p, mobilePhone: p, authorizedPersonPhone: p });
               }}
               placeholder="10-digit mobile" inputMode="numeric" />
-            <TextField label="Email" value={value.email ?? value.authorizedPersonEmail ?? ''}
-              error={errors.email} onChange={v => set({ email: v, authorizedPersonEmail: v })}
+            <TextField
+              label={relaxedContact ? 'Email (optional if mobile provided)' : 'Email'}
+              required={false}
+              value={value.email ?? value.authorizedPersonEmail ?? ''}
+              error={errors.email}
+              onChange={v => set({ email: v, authorizedPersonEmail: v })}
               placeholder="contact@vendor.com" />
           </>
         )}

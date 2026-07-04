@@ -17,7 +17,11 @@ import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 // Validation schema for inventory updates
 const updateInventorySchema = z.object({
   productId: z.string().uuid(),
+  outletId: z.string().uuid().optional().nullable(),
   qtyAvailable: z.number().int().min(0).optional(),
+  qtyInTransit: z.number().int().min(0).optional(),
+  qtyDamaged: z.number().int().min(0).optional(),
+  qtyReturned: z.number().int().min(0).optional(),
   lowStockThreshold: z.number().int().min(0).optional(),
 });
 
@@ -41,9 +45,19 @@ const bulkUpdateSchema = z.object({
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     const vendorId = await resolveVendorId(ctx, req);
+    const outletId = new URL(req.url).searchParams.get('outletId');
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { multiWarehouseEnabled: true },
+    });
+
+    const where: { vendorId: string; outletId?: string | null } = { vendorId };
+    if (vendor?.multiWarehouseEnabled && outletId) {
+      where.outletId = outletId;
+    }
 
     const inventory = await prisma.inventory.findMany({
-      where: { vendorId },
+      where,
       include: {
         product: {
           select: { id: true, name: true, sku: true, unit: true, imageUrl: true, isActive: true, basePrice: true },
@@ -71,13 +85,23 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     requirePermission(ctx, 'inventory.edit');
 
     const body = await req.json();
-    const { productId, qtyAvailable, lowStockThreshold } = updateInventorySchema.parse(body);
+    const { productId, outletId, qtyAvailable, qtyInTransit, qtyDamaged, qtyReturned, lowStockThreshold } = updateInventorySchema.parse(body);
 
     const inventoryService = new InventoryService();
     const updated = await inventoryService.updateStock(productId, vendorId, {
       ...(qtyAvailable !== undefined && { qtyAvailable }),
+      ...(qtyInTransit !== undefined && { qtyInTransit }),
+      ...(qtyDamaged !== undefined && { qtyDamaged }),
+      ...(qtyReturned !== undefined && { qtyReturned }),
       ...(lowStockThreshold !== undefined && { lowStockThreshold }),
-    });
+    }, ctx.userId);
+
+    if (outletId !== undefined) {
+      await prisma.inventory.updateMany({
+        where: { productId, vendorId },
+        data: { outletId },
+      });
+    }
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {

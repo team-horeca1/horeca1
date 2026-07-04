@@ -95,3 +95,96 @@ export function slugForVendorType(vendorType: string): string | undefined {
   }
   return undefined;
 }
+
+/** One vendor type row with multi-select sub-types (onboarding matrix). */
+export type VendorTypeSelection = {
+  type: VendorBusinessType;
+  slug: string;
+  subTypes: string[];
+};
+
+export function normalizeVendorTypeSelections(
+  raw: unknown,
+): VendorTypeSelection[] {
+  if (!Array.isArray(raw)) return [];
+  const out: VendorTypeSelection[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as Record<string, unknown>;
+    const type = String(rec.type ?? '').trim();
+    const slug = String(rec.slug ?? slugForVendorType(type) ?? '').trim();
+    const subTypes = Array.isArray(rec.subTypes)
+      ? rec.subTypes.map((s) => String(s).trim()).filter(Boolean)
+      : [];
+    if (!type || !(VENDOR_BUSINESS_TYPES as readonly string[]).includes(type)) continue;
+    if (subTypes.length === 0) continue;
+    const allowed = subTypesForVendorType(type);
+    const validSubs = subTypes.filter((s) => allowed.includes(s));
+    if (validSubs.length === 0) continue;
+    out.push({ type: type as VendorBusinessType, slug: slug || slugForVendorType(type)!, subTypes: validSubs });
+  }
+  return out;
+}
+
+/** Build selections from legacy single type + subType fields. */
+export function legacyToVendorTypeSelections(
+  vendorBusinessType: string | undefined | null,
+  vendorType: string | undefined | null,
+  subType: string | undefined | null,
+): VendorTypeSelection[] {
+  const display = vendorBusinessType?.trim()
+    || (vendorType
+      ? (VENDOR_BUSINESS_TYPES as readonly string[]).find(
+          (t) => slugForVendorType(t as VendorBusinessType) === vendorType,
+        )
+      : undefined);
+  if (!display) return [];
+  const st = (subType ?? '').trim();
+  if (!st) return [];
+  return [{
+    type: display as VendorBusinessType,
+    slug: slugForVendorType(display as VendorBusinessType) ?? vendorType ?? display,
+    subTypes: [st],
+  }];
+}
+
+/** Primary legacy scalar fields from first selection row. */
+export function legacyScalarsFromSelections(
+  selections: VendorTypeSelection[],
+): { vendorBusinessType: string; vendorType: string; subType: string } | null {
+  const first = selections[0];
+  if (!first) return null;
+  return {
+    vendorBusinessType: first.type,
+    vendorType: first.slug,
+    subType: first.subTypes[0] ?? '',
+  };
+}
+
+/** Human-readable summary for admin display. */
+export function formatVendorTypeSelections(selections: VendorTypeSelection[]): string {
+  if (!selections.length) return '';
+  return selections
+    .map((s) => {
+      const subs = s.subTypes.join(', ');
+      return subs ? `${s.type} (${subs})` : s.type;
+    })
+    .join(' · ');
+}
+
+/** Union of category presets across all selected type|subType pairs. */
+export function categoryPresetsForSelections(selections: VendorTypeSelection[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of selections) {
+    for (const st of s.subTypes) {
+      for (const cat of categoriesForSubType(s.type, st)) {
+        if (!seen.has(cat)) {
+          seen.add(cat);
+          out.push(cat);
+        }
+      }
+    }
+  }
+  return out;
+}

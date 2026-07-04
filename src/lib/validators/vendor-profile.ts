@@ -14,8 +14,12 @@ import {
   VENDOR_BUSINESS_TYPES,
   slugForVendorType,
   subTypesForVendorType,
+  normalizeVendorTypeSelections,
+  legacyToVendorTypeSelections,
   type VendorBusinessType,
+  type VendorTypeSelection,
 } from '@/lib/constants/vendorProfile';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -35,6 +39,11 @@ export const VendorProfileSchema = z.object({
   /** Legacy slug or new CSV slug — used when vendorBusinessType absent. */
   vendorType: z.string().optional(),
   subType: z.string().optional(),
+  vendorTypeSelections: z.array(z.object({
+    type: z.string(),
+    slug: z.string(),
+    subTypes: z.array(z.string()),
+  })).optional(),
   categoriesHandled: z.array(z.string()).optional(),
 
   legalName: z.string().optional(),
@@ -166,6 +175,76 @@ export function displayVendorType(vendorType: string | undefined | null): string
   return entry ?? slug;
 }
 
+export function getEffectiveVendorTypeSelections(data: VendorProfileInput): VendorTypeSelection[] {
+  const fromJson = normalizeVendorTypeSelections(data.vendorTypeSelections);
+  if (fromJson.length > 0) return fromJson;
+  return legacyToVendorTypeSelections(
+    data.vendorBusinessType,
+    data.vendorType,
+    data.subType,
+  );
+}
+
+/** Contact channel validation — phone and/or email depending on context. */
+export function contactChannelErrors(
+  data: VendorProfileInput,
+  context: VendorValidationContext,
+): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const authPhone = trim(data.authorizedPersonPhone || data.mobilePhone || data.phone)
+    .replace(/\D/g, '').slice(-10);
+  const email = trim(data.email || data.authorizedPersonEmail);
+  const relaxed = isRegisterEmailOtpEnabled() && context === 'selfRegister';
+
+  if (relaxed) {
+    const hasPhone = authPhone.length === 10;
+    const hasEmail = !!email && EMAIL_RE.test(email);
+    if (!hasPhone && !hasEmail) {
+      errors.authorizedPersonPhone = 'Enter a mobile number or email address';
+      errors.email = 'Enter a mobile number or email address';
+    } else {
+      if (authPhone && authPhone.length !== 10) {
+        errors.authorizedPersonPhone = 'Enter a valid 10-digit mobile number';
+      }
+      if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
+    }
+  } else {
+    if (!authPhone || authPhone.length !== 10) {
+      errors.authorizedPersonPhone = 'Enter a valid 10-digit mobile number';
+    }
+    if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
+    if (context === 'adminCreate') {
+      if (!trim(data.email) || !EMAIL_RE.test(trim(data.email))) {
+        errors.email = 'Enter a valid owner email';
+      }
+    }
+  }
+  return errors;
+}
+
+function validateVendorTypeSelections(data: VendorProfileInput): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const selections = getEffectiveVendorTypeSelections(data);
+  if (selections.length === 0) {
+    errors.vendorTypeSelections = 'Select at least one vendor type and sub-type';
+    return errors;
+  }
+  for (const row of selections) {
+    if (!(VENDOR_BUSINESS_TYPES as readonly string[]).includes(row.type)) {
+      errors.vendorTypeSelections = 'Select a valid vendor type';
+      break;
+    }
+    const allowed = subTypesForVendorType(row.type);
+    for (const st of row.subTypes) {
+      if (allowed.length > 0 && !allowed.includes(st)) {
+        errors.vendorTypeSelections = `Invalid sub-type "${st}" for ${row.type}`;
+        break;
+      }
+    }
+  }
+  return errors;
+}
+
 export function validateVendorProfile(
   data: VendorProfileInput,
   context: VendorValidationContext,
@@ -175,35 +254,20 @@ export function validateVendorProfile(
   const legalName = derivedLegalName(data);
   const tradeName = derivedTradeName(data);
   const authName = derivedAuthorizedPersonName(data);
-  const authPhone = trim(data.authorizedPersonPhone || data.mobilePhone || data.phone).replace(/\D/g, '').slice(-10);
   const gstin = trim(data.gstin || data.gstNumber).toUpperCase();
   const pan = trim(data.pan || data.panNumber).toUpperCase();
-  const email = trim(data.email || data.authorizedPersonEmail);
   const password = trim(data.password);
-  const vendorSlug = resolveVendorTypeSlug(data);
+  const selections = getEffectiveVendorTypeSelections(data);
+  const vendorSlug = selections[0]?.slug ?? resolveVendorTypeSlug(data);
 
   const checkIdentity = step === 'identity' || step === 'full' || !step;
   const checkContact = step === 'contact' || step === 'full' || !step;
 
   if (checkIdentity) {
-    if (!vendorSlug && !trim(data.vendorBusinessType)) {
-      errors.vendorBusinessType = 'Vendor type is required';
-    } else if (trim(data.vendorBusinessType) && !(VENDOR_BUSINESS_TYPES as readonly string[]).includes(trim(data.vendorBusinessType))) {
-      errors.vendorBusinessType = 'Select a valid vendor type';
-    }
+    Object.assign(errors, validateVendorTypeSelections(data));
     if (context !== 'addBusiness') {
       if (!legalName || legalName.length < 2) errors.legalName = 'Legal business name is required';
       if (!tradeName || tradeName.length < 2) errors.tradeName = 'Trade / display name is required';
-    }
-    const display = displayVendorType(data.vendorBusinessType || data.vendorType);
-    const subType = trim(data.subType);
-    if (display && subType) {
-      const allowed = subTypesForVendorType(display);
-      if (allowed.length > 0 && !allowed.includes(subType)) {
-        errors.subType = 'Select a valid sub-type for this vendor type';
-      }
-    } else if (display && subTypesForVendorType(display).length > 0) {
-      errors.subType = 'Sub-type is required';
     }
   }
 
@@ -212,8 +276,7 @@ export function validateVendorProfile(
       const ownerName = derivedFullName(data);
       if (!ownerName || ownerName.length < 2) errors.firstName = 'Contact name is required';
       if (!authName || authName.length < 2) errors.authorizedPersonName = 'Authorized person name is required';
-      if (!authPhone || authPhone.length !== 10) errors.authorizedPersonPhone = 'Enter a valid 10-digit mobile number';
-      if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
+      Object.assign(errors, contactChannelErrors(data, context));
       if (context === 'selfRegister' && (step === 'contact' || step === 'full' || !step)) {
         if (!password) errors.password = 'Password is required';
         else if (password.length < 6) errors.password = 'Password must be at least 6 characters';
@@ -221,14 +284,11 @@ export function validateVendorProfile(
         errors.password = 'Password must be at least 6 characters';
       }
     }
-    if (context === 'adminCreate' && checkContact) {
-      if (!trim(data.email) || !EMAIL_RE.test(trim(data.email))) errors.email = 'Enter a valid owner email';
-    }
   }
 
   if (context === 'addBusiness' && !step) {
     if (!legalName || legalName.length < 2) errors.legalName = 'Legal business name is required';
-    if (!vendorSlug) errors.vendorBusinessType = 'Vendor type is required';
+    if (!vendorSlug && selections.length === 0) errors.vendorBusinessType = 'Vendor type is required';
   }
 
   if (gstin && !GST_RE.test(gstin)) errors.gstin = 'Format: 22ABCDE1234F1Z5';

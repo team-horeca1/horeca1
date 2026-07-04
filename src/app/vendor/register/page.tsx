@@ -30,9 +30,13 @@ import {
 import { ExistingPhoneModal } from '@/components/auth/ExistingPhoneModal';
 import { accountLabelFromCheck } from '@/lib/auth/phoneCheckLabels';
 import type { PhoneCheckResult } from '@/lib/auth/checkPhoneLookup';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
+import { getEffectiveVendorTypeSelections } from '@/lib/validators/vendor-profile';
+
+const EMAIL_REGISTER_ALLOWED = isRegisterEmailOtpEnabled();
 
 const STEP_TITLES = [
-  { id: 1, label: 'Verify Mobile', icon: Phone },
+  { id: 1, label: EMAIL_REGISTER_ALLOWED ? 'Verify Contact' : 'Verify Mobile', icon: Phone },
   { id: 2, label: 'Business Profile', icon: Building2 },
   { id: 3, label: 'Contact & Ops', icon: FileText },
   { id: 4, label: 'GST & PAN', icon: FileText },
@@ -72,6 +76,58 @@ const blankAddress = (): Address => ({ addressLine: '', city: '', state: '', pin
 
 const RESEND_COOLDOWN = 60;
 
+type ApiErrorPayload = {
+  message?: string;
+  details?: {
+    issues?: Array<{ path: string; message: string }>;
+    fields?: Record<string, unknown>;
+  };
+};
+
+/** Map API field path → wizard step (2–7). */
+function stepForApiField(path: string): number {
+  const f = path.toLowerCase();
+  if (/vendortype|subtype|categor|businesssize|coverage|warehouse|fleet|monthlysupply/.test(f)) return 2;
+  if (/authorized|password/.test(f) || f === 'email' || f.endsWith('.email')) return 3;
+  if (/gst|pan/.test(f)) return 4;
+  if (/bank/.test(f)) return 5;
+  if (/billing|pickup|primaryoutlet|addressline/.test(f)) return 6;
+  if (/pincode|serviceable|delivery|fssai|udyam|cin/.test(f)) return 7;
+  if (f === 'legalname' || f === 'displayname') return 2;
+  return 3;
+}
+
+/** Map API path → inline form field key used by VendorProfileForm / step validators. */
+function formFieldKeyFromApiPath(path: string): string {
+  const stripped = path.replace(/^vendorDetails\./, '');
+  const nestedMap: Record<string, string> = {
+    'billingAddress.addressLine': 'billingAddressLine',
+    'billingAddress.city': 'billingCity',
+    'billingAddress.state': 'billingState',
+    'billingAddress.pincode': 'billingPincode',
+    'primaryOutlet.addressLine': 'pickupAddressLine',
+    'primaryOutlet.city': 'pickupCity',
+    'primaryOutlet.state': 'pickupState',
+    'primaryOutlet.pincode': 'pickupPincode',
+    'primaryOutlet.name': 'tradeName',
+    gstin: 'gstNumber',
+    pan: 'panNumber',
+  };
+  if (nestedMap[stripped]) return nestedMap[stripped];
+  return stripped.replace(/\./g, '');
+}
+
+function inferStepFromMessage(message: string): number | null {
+  const m = message.toLowerCase();
+  if (m.includes('vendor type') || m.includes('sub-type')) return 2;
+  if (m.includes('phone') || m.includes('email') || m.includes('password') || m.includes('authorized')) return 3;
+  if (m.includes('gst') || m.includes('pan')) return 4;
+  if (m.includes('bank') || m.includes('ifsc')) return 5;
+  if (m.includes('address') || m.includes('pickup') || m.includes('billing')) return 6;
+  if (m.includes('pincode') || m.includes('delivery') || m.includes('serviceable')) return 7;
+  return null;
+}
+
 export default function VendorRegisterPage() {
   const router = useRouter();
   // Auth-aware mode: when a user is already signed in, the wizard runs in
@@ -92,6 +148,9 @@ export default function VendorRegisterPage() {
   // Step 1 — phone verify
   const [phone, setPhone] = useState('');
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [verifyChannel, setVerifyChannel] = useState<'phone' | 'email'>('phone');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [emailVerified, setEmailVerified] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '']);
   const [otpLoading, setOtpLoading] = useState(false);
@@ -144,6 +203,7 @@ export default function VendorRegisterPage() {
     hcidDisplay?: string;
     accountLabel: string;
     suggestedAction: 'login_to_link' | 'login_only';
+    contactType?: 'phone' | 'email';
   } | null>(null);
 
   const getMergedVendorProfile = useCallback((): VendorProfileInput => ({
@@ -266,41 +326,86 @@ export default function VendorRegisterPage() {
     }, 1000);
   }, []);
 
-  const openExistingPhoneModal = (phoneDigits: string, data: PhoneCheckResult) => {
+  const openExistingPhoneModal = (
+    contact: string,
+    data: PhoneCheckResult,
+    contactType: 'phone' | 'email' = 'phone',
+  ) => {
     setExistingPhoneModal({
-      phone: phoneDigits,
+      phone: contact,
       hcidDisplay: data.hcidDisplay,
       accountLabel: accountLabelFromCheck(data),
       suggestedAction: data.suggestedAction === 'login_only' ? 'login_only' : 'login_to_link',
+      contactType,
     });
   };
 
-  // ─── Step 1: Phone OTP ─────────────────────────────────────────────────
+  // ─── Step 1: Phone or email OTP ─────────────────────────────────────────
+  const resetOtpState = () => {
+    setOtpSent(false);
+    setPhoneVerified(false);
+    setEmailVerified(false);
+    setOtpDigits(['', '', '', '']);
+  };
+
   const handleSendOtp = async () => {
     setError('');
-    if (!PHONE_RE.test(phone)) { setError('Enter a valid 10-digit mobile number'); return; }
+    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
+    if (useEmail) {
+      if (!EMAIL_RE.test(registerEmail.trim())) {
+        setError('Enter a valid email address');
+        return;
+      }
+    } else if (!PHONE_RE.test(phone)) {
+      setError('Enter a valid 10-digit mobile number');
+      return;
+    }
     setOtpLoading(true);
     try {
       if (!isAuthMode) {
-        const checkRes = await fetch('/api/v1/auth/check-phone', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone, intent: 'vendor' }),
-        });
-        const checkData = await checkRes.json();
-        if (checkData.success && checkData.data?.exists) {
-          openExistingPhoneModal(phone, checkData.data as PhoneCheckResult);
-          return;
+        if (useEmail) {
+          const checkRes = await fetch('/api/v1/auth/check-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: registerEmail.trim().toLowerCase(), intent: 'vendor' }),
+          });
+          const checkData = await checkRes.json();
+          if (checkData.success && checkData.data?.exists) {
+            openExistingPhoneModal(registerEmail.trim().toLowerCase(), checkData.data as PhoneCheckResult, 'email');
+            return;
+          }
+        } else {
+          const checkRes = await fetch('/api/v1/auth/check-phone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, intent: 'vendor' }),
+          });
+          const checkData = await checkRes.json();
+          if (checkData.success && checkData.data?.exists) {
+            openExistingPhoneModal(phone, checkData.data as PhoneCheckResult, 'phone');
+            return;
+          }
         }
       }
 
       const res = await fetch('/api/v1/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, mode: 'register' }),
+        body: JSON.stringify(
+          useEmail
+            ? { email: registerEmail.trim().toLowerCase(), mode: 'register', intent: 'vendor' }
+            : { phone, mode: 'register', intent: 'vendor' },
+        ),
       });
       const data = await res.json();
-      if (!data.success) { setError(data.error || 'Failed to send OTP'); return; }
+      if (!data.success) {
+        if (data.code === 'EMAIL_EXISTS' && data.data) {
+          openExistingPhoneModal(registerEmail.trim().toLowerCase(), data.data as PhoneCheckResult, 'email');
+          return;
+        }
+        setError(data.error || 'Failed to send OTP');
+        return;
+      }
       setOtpSent(true);
       startResendTimer();
       setTimeout(() => otpRefs[0].current?.focus(), 80);
@@ -312,11 +417,16 @@ export default function VendorRegisterPage() {
     if (code.length !== 4) return;
     setError('');
     setOtpLoading(true);
+    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
     try {
       const res = await fetch('/api/v1/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, code }),
+        body: JSON.stringify(
+          useEmail
+            ? { email: registerEmail.trim().toLowerCase(), code }
+            : { phone, code },
+        ),
       });
       const data = await res.json();
       if (!data.success) {
@@ -325,7 +435,14 @@ export default function VendorRegisterPage() {
         setTimeout(() => otpRefs[0].current?.focus(), 50);
         return;
       }
-      setPhoneVerified(true);
+      if (useEmail) {
+        const verified = registerEmail.trim().toLowerCase();
+        setEmailVerified(true);
+        setEmail(verified);
+        setAuthorizedPersonEmail(verified);
+      } else {
+        setPhoneVerified(true);
+      }
       setStep(2);
     } catch { setError('Verification failed. Please try again.'); }
     finally { setOtpLoading(false); }
@@ -418,7 +535,12 @@ export default function VendorRegisterPage() {
   // missed errors into fieldErrors, and returns a single banner-level
   // message when the step can't advance.
   const validateStepAt = useCallback((s: number): string | null => {
-    if (s === 1) return phoneVerified ? null : 'Please verify your mobile number first';
+    if (s === 1) {
+      if (phoneVerified || emailVerified) return null;
+      return EMAIL_REGISTER_ALLOWED
+        ? 'Please verify your mobile number or email first'
+        : 'Please verify your mobile number first';
+    }
     if (s === 2) {
       const v = validateVendorProfile(getMergedVendorProfile(), 'selfRegister', 'identity');
       if (!v.success) {
@@ -449,7 +571,7 @@ export default function VendorRegisterPage() {
     }
     return null;
   }, [
-    phoneVerified, getMergedVendorProfile, isAuthMode, validateAllForStep,
+    phoneVerified, emailVerified, getMergedVendorProfile, isAuthMode, validateAllForStep,
     pincodes.length, deliveryCapability,
   ]);
 
@@ -524,6 +646,33 @@ export default function VendorRegisterPage() {
     );
   };
 
+  const applySubmitError = useCallback((apiErr: ApiErrorPayload | string | undefined) => {
+    const message = typeof apiErr === 'string'
+      ? apiErr
+      : apiErr?.message || 'Failed to submit. Please check the highlighted fields.';
+    setError(message);
+
+    const issues = typeof apiErr === 'object' ? apiErr?.details?.issues : undefined;
+    const formErrors: Record<string, string> = {};
+
+    if (issues?.length) {
+      for (const issue of issues) {
+        formErrors[formFieldKeyFromApiPath(issue.path)] = issue.message;
+      }
+      setFieldErrors(prev => ({ ...prev, ...formErrors }));
+      setStep(stepForApiField(issues[0].path));
+      return;
+    }
+
+    const hinted = inferStepFromMessage(message);
+    if (hinted) setStep(hinted);
+  }, []);
+
+  const resolveTypeSlug = useCallback((profile: VendorProfileValues) => {
+    const selections = getEffectiveVendorTypeSelections(profile);
+    return resolveVendorTypeSlug(profile) ?? selections[0]?.slug ?? 'distributor';
+  }, []);
+
   const handleSubmit = async () => {
     setError('');
     const range = validateStepsRange(2, 7);
@@ -538,7 +687,10 @@ export default function VendorRegisterPage() {
     try {
       if (isAuthMode) {
         // ── AUTH MODE: add a vendor under existing HCID ───────────────────
-        const typeSlug = resolveVendorTypeSlug(vendorProfile);
+        const typeSlug = resolveTypeSlug(vendorProfile);
+        const merged = getMergedVendorProfile();
+        const authPhone = (merged.authorizedPersonPhone ?? '').replace(/\D/g, '').slice(-10);
+        const authEmail = (merged.authorizedPersonEmail ?? merged.email ?? '').trim().toLowerCase();
         const body = {
           legalName: derivedLegalName(vendorProfile) || businessName.trim(),
           displayName: derivedTradeName(vendorProfile) || tradeName.trim(),
@@ -559,6 +711,7 @@ export default function VendorRegisterPage() {
           vendorDetails: {
             vendorType: typeSlug,
             subType: vendorProfile.subType,
+            vendorTypeSelections: getEffectiveVendorTypeSelections(vendorProfile),
             categoriesHandled: vendorProfile.categoriesHandled,
             businessSize: vendorProfile.businessSize,
             coverage: vendorProfile.coverage,
@@ -567,8 +720,8 @@ export default function VendorRegisterPage() {
             monthlySupplyBand: vendorProfile.monthlySupplyBand,
             panNumber: (panNumber || vendorProfile.pan || '').toUpperCase().trim(),
             authorizedPersonName: derivedAuthorizedPersonName(vendorProfile),
-            authorizedPersonPhone: vendorProfile.authorizedPersonPhone || authorizedPersonPhone,
-            authorizedPersonEmail: (authorizedPersonEmail || vendorProfile.authorizedPersonEmail || '').trim().toLowerCase(),
+            authorizedPersonPhone: authPhone.length === 10 ? authPhone : '',
+            authorizedPersonEmail: authEmail || '',
             billingAddress,
             bankAccountName: bankAccountName.trim(),
             bankAccountNumber: bankAccountNumber.trim(),
@@ -589,7 +742,7 @@ export default function VendorRegisterPage() {
         });
         const data = await res.json();
         if (!data.success) {
-          setError(data.error?.message || data.error || 'Failed to create vendor');
+          applySubmitError(data.error);
           return;
         }
         // Switch session context to the new business account so the vendor
@@ -610,11 +763,17 @@ export default function VendorRegisterPage() {
       const trade = derivedTradeName(vendorProfile) || tradeName.trim();
       const ownerName = fullName.trim() || derivedFullName(vendorProfile);
       const authName = derivedAuthorizedPersonName(vendorProfile);
-      const typeSlug = resolveVendorTypeSlug(vendorProfile);
+      const typeSlug = resolveTypeSlug(vendorProfile);
+      const typeSelections = getEffectiveVendorTypeSelections(vendorProfile);
+      const merged = getMergedVendorProfile();
+      const authPhone = (merged.authorizedPersonPhone ?? '').replace(/\D/g, '').slice(-10);
+      const authEmail = (merged.authorizedPersonEmail ?? merged.email ?? registerEmail).trim().toLowerCase();
       const body = {
-        phone,
+        phone: phoneVerified ? phone : '',
+        verifiedEmail: emailVerified ? registerEmail.trim().toLowerCase() : '',
         vendorType: typeSlug,
         vendorBusinessType: vendorProfile.vendorBusinessType,
+        vendorTypeSelections: typeSelections,
         subType: vendorProfile.subType,
         categoriesHandled: vendorProfile.categoriesHandled,
         businessSize: vendorProfile.businessSize,
@@ -628,8 +787,8 @@ export default function VendorRegisterPage() {
         email: (email || vendorProfile.email || '').trim().toLowerCase(),
         password: password || vendorProfile.password,
         authorizedPersonName: authName,
-        authorizedPersonPhone: vendorProfile.authorizedPersonPhone || authorizedPersonPhone,
-        authorizedPersonEmail: (authorizedPersonEmail || vendorProfile.authorizedPersonEmail || '').trim().toLowerCase(),
+        authorizedPersonPhone: authPhone.length === 10 ? authPhone : '',
+        authorizedPersonEmail: authEmail || '',
         gstNumber: (gstNumber || vendorProfile.gstin || vendorProfile.gstNumber || '').toUpperCase().trim(),
         panNumber: (panNumber || vendorProfile.pan || vendorProfile.panNumber || '').toUpperCase().trim(),
         salutation: vendorProfile.salutation || null,
@@ -656,7 +815,7 @@ export default function VendorRegisterPage() {
       });
       const data = await res.json();
       if (!data.success) {
-        setError(data.error?.message || data.error || 'Failed to submit application');
+        applySubmitError(data.error);
         return;
       }
       // Vendor row now exists — attach staged KYC files via the OTP-gated
@@ -676,7 +835,9 @@ export default function VendorRegisterPage() {
         await signOut({ redirect: false });
       } catch { /* non-fatal */ }
       setSubmitted({ hcid: data.data?.hcidDisplay ?? '' });
-    } catch { setError('Submission failed. Please try again.'); }
+    } catch (err) {
+      applySubmitError(err instanceof Error ? err.message : 'Submission failed. Please try again.');
+    }
     finally { setSubmitting(false); }
   };
 
@@ -725,7 +886,11 @@ export default function VendorRegisterPage() {
           ) : (
             <>
               <button
-                onClick={() => router.push(`/login?phone=${encodeURIComponent(phone)}`)}
+                onClick={() => router.push(
+                  emailVerified
+                    ? `/login?email=${encodeURIComponent(registerEmail.trim().toLowerCase())}`
+                    : `/login?phone=${encodeURIComponent(phone)}`,
+                )}
                 className={cn(FORM.primaryBtn, 'w-full py-3')}
               >
                 Continue to log in
@@ -823,9 +988,40 @@ export default function VendorRegisterPage() {
                   <ArrowLeft size={14} /> Choose a different signup type
                 </Link>
               )}
-              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Verify your mobile number</h2>
-              <p className="text-[13px] text-gray-500 mb-6">We&apos;ll send a 4-digit OTP to confirm.</p>
+              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">
+                {EMAIL_REGISTER_ALLOWED ? 'Verify your contact' : 'Verify your mobile number'}
+              </h2>
+              <p className="text-[13px] text-gray-500 mb-6">
+                {EMAIL_REGISTER_ALLOWED
+                  ? 'We\'ll send a 4-digit OTP to your mobile or email.'
+                  : 'We\'ll send a 4-digit OTP to confirm.'}
+              </p>
 
+              {EMAIL_REGISTER_ALLOWED && (
+                <div className="flex gap-2 mb-5 p-1 bg-gray-100 rounded-xl">
+                  {(['phone', 'email'] as const).map(ch => (
+                    <button
+                      key={ch}
+                      type="button"
+                      onClick={() => {
+                        setVerifyChannel(ch);
+                        resetOtpState();
+                        setError('');
+                      }}
+                      className={cn(
+                        'flex-1 py-2.5 rounded-lg text-[12px] font-bold transition-colors',
+                        verifyChannel === ch
+                          ? 'bg-white text-[#299E60] shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700',
+                      )}
+                    >
+                      {ch === 'phone' ? 'Mobile' : 'Email'}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {(!EMAIL_REGISTER_ALLOWED || verifyChannel === 'phone') ? (
               <Field label="Mobile number" required>
                 <div className="relative flex items-center">
                   <span className="absolute left-4 text-[13px] font-bold text-gray-500 z-10">+91</span>
@@ -833,13 +1029,8 @@ export default function VendorRegisterPage() {
                     value={phone}
                     onChange={e => {
                       const next = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      // Editing the phone after Send OTP / Verify must invalidate
-                      // the OTP state — otherwise the wizard would carry a "Verified"
-                      // marker for a number the user no longer typed.
                       if (next !== phone && (otpSent || phoneVerified)) {
-                        setOtpSent(false);
-                        setPhoneVerified(false);
-                        setOtpDigits(['', '', '', '']);
+                        resetOtpState();
                       }
                       setPhone(next);
                       setError('');
@@ -848,21 +1039,53 @@ export default function VendorRegisterPage() {
                     className={inputClass(false, 'pl-12')} />
                 </div>
               </Field>
+              ) : (
+              <Field label="Email address" required>
+                <input
+                  type="email"
+                  value={registerEmail}
+                  onChange={e => {
+                    const next = e.target.value;
+                    if (next !== registerEmail && (otpSent || emailVerified)) {
+                      resetOtpState();
+                    }
+                    setRegisterEmail(next);
+                    setError('');
+                  }}
+                  placeholder="you@company.com"
+                  className={inputClass(false)}
+                />
+              </Field>
+              )}
 
               {!otpSent ? (
-                <button onClick={handleSendOtp} disabled={otpLoading || !PHONE_RE.test(phone)}
+                <button
+                  onClick={handleSendOtp}
+                  disabled={
+                    otpLoading
+                    || (verifyChannel === 'email'
+                      ? !EMAIL_RE.test(registerEmail.trim())
+                      : !PHONE_RE.test(phone))
+                  }
                   className={cn(FORM.primaryBtn, 'mt-4 py-3 px-6')}>
                   {otpLoading && <Loader2 size={16} className="animate-spin" />} Send OTP
                 </button>
               ) : (
                 <div className="mt-6">
-                  <Field label={`Enter the 4-digit OTP sent to +91 ${phone}`} required>
+                  <Field
+                    label={
+                      verifyChannel === 'email'
+                        ? `Enter the 4-digit OTP sent to ${registerEmail.trim().toLowerCase()}`
+                        : `Enter the 4-digit OTP sent to +91 ${phone}`
+                    }
+                    required
+                  >
                     <div className="flex gap-3">
                       {otpDigits.map((d, i) => (
                         <input key={i} ref={otpRefs[i]} type="text" inputMode="numeric" maxLength={4}
                           value={d} onChange={e => handleOtpInput(i, e.target.value)}
                           onKeyDown={e => { if (e.key === 'Backspace' && !otpDigits[i] && i > 0) otpRefs[i - 1].current?.focus(); }}
-                          disabled={otpLoading || phoneVerified}
+                          disabled={otpLoading || phoneVerified || emailVerified}
                           className={cn(
                             'w-[56px] h-[56px] text-center text-[22px] font-[800] border-2 rounded-xl outline-none transition-all',
                             d ? 'border-[#299E60] bg-green-50 text-[#299E60]' : 'border-gray-200 bg-white',
@@ -873,7 +1096,7 @@ export default function VendorRegisterPage() {
                     </div>
                   </Field>
                   <div className="mt-3 flex items-center gap-4 text-[13px]">
-                    {phoneVerified ? (
+                    {phoneVerified || emailVerified ? (
                       <span className="text-[#299E60] font-bold flex items-center gap-1"><CheckCircle2 size={14} /> Verified</span>
                     ) : resendTimer > 0 ? (
                       <span className="text-gray-400">Resend OTP in <strong>{resendTimer}s</strong></span>
@@ -885,13 +1108,11 @@ export default function VendorRegisterPage() {
                         the user filled in steps 2-7 stays in component state. */}
                     <button
                       onClick={() => {
-                        setOtpSent(false);
-                        setPhoneVerified(false);
-                        setOtpDigits(['', '', '', '']);
+                        resetOtpState();
                         setError('');
                       }}
                       className="text-gray-500 hover:underline">
-                      Change number
+                      {verifyChannel === 'email' ? 'Change email' : 'Change number'}
                     </button>
                   </div>
                 </div>
@@ -1273,13 +1494,16 @@ export default function VendorRegisterPage() {
         intent="vendor"
         redirectTo="/vendor/register"
         suggestedAction={existingPhoneModal?.suggestedAction ?? 'login_to_link'}
+        contactType={existingPhoneModal?.contactType ?? 'phone'}
         onClose={() => setExistingPhoneModal(null)}
         onUseDifferentNumber={() => {
           setExistingPhoneModal(null);
-          setPhone('');
-          setOtpSent(false);
-          setPhoneVerified(false);
-          setOtpDigits(['', '', '', '']);
+          if (existingPhoneModal?.contactType === 'email') {
+            setRegisterEmail('');
+          } else {
+            setPhone('');
+          }
+          resetOtpState();
           setError('');
         }}
       />

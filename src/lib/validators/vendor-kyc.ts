@@ -11,12 +11,14 @@
  */
 
 import { z } from 'zod';
+import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 
 export const GST_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 export const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
 export const IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 export const PHONE_RE = /^\d{10}$/;
 export const PINCODE_RE = /^\d{6}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const BillingAddressSchema = z.object({
   addressLine: z.string().min(5).max(500),
@@ -40,13 +42,13 @@ export type DeliveryCapability = (typeof DELIVERY_CAPABILITIES)[number];
  * Full vendor KYC block. Required to seed a workable vendor profile —
  * settlement, dispatch, and tax-compliant invoicing all depend on these.
  */
-export const VendorDetailsSchema = z.object({
+const VendorDetailsSchemaBase = z.object({
   vendorType: z.enum(VENDOR_TYPES),
   // PAN is optional with no format check — vendors can be onboarded before KYC
   // docs are in hand; admin verifies later at /admin/vendors/[id].
   panNumber: z.string().regex(PAN_RE, 'Invalid PAN format').optional().or(z.literal('')),
   authorizedPersonName: z.string().min(2).max(255),
-  authorizedPersonPhone: z.string().regex(PHONE_RE, 'Invalid authorized person phone'),
+  authorizedPersonPhone: z.string().optional().or(z.literal('')),
   authorizedPersonEmail: z.string().email().optional().or(z.literal('')),
   billingAddress: BillingAddressSchema,
   bankAccountName: z.string().min(2).max(100),
@@ -61,6 +63,11 @@ export const VendorDetailsSchema = z.object({
   cinNumber: z.string().max(50).optional().or(z.literal('')),
   // Tier A profile (mastersheet) — optional on KYC block
   subType: z.string().max(80).optional(),
+  vendorTypeSelections: z.array(z.object({
+    type: z.string().min(1),
+    slug: z.string().min(1),
+    subTypes: z.array(z.string().min(1)).min(1),
+  })).optional(),
   categoriesHandled: z.array(z.string()).optional(),
   businessSize: z.string().max(50).optional(),
   coverage: z.string().max(120).optional(),
@@ -68,7 +75,49 @@ export const VendorDetailsSchema = z.object({
   deliveryFleet: z.union([z.boolean(), z.string()]).optional(),
   monthlySupplyBand: z.string().max(50).optional(),
 });
-export type VendorDetailsInput = z.infer<typeof VendorDetailsSchema>;
+
+export function vendorDetailsSchema(relaxedContact = isRegisterEmailOtpEnabled()) {
+  return VendorDetailsSchemaBase.superRefine((data, ctx) => {
+    const authPhone = (data.authorizedPersonPhone ?? '').replace(/\D/g, '').slice(-10);
+    const authEmail = (data.authorizedPersonEmail ?? '').trim().toLowerCase();
+
+    if (relaxedContact) {
+      const hasPhone = authPhone.length === 10;
+      const hasEmail = !!authEmail && EMAIL_RE.test(authEmail);
+      if (!hasPhone && !hasEmail) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['authorizedPersonPhone'],
+          message: 'Enter a mobile number or email for the authorized person',
+        });
+      } else if (authPhone && authPhone.length !== 10) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['authorizedPersonPhone'],
+          message: 'Invalid authorized person phone',
+        });
+      }
+    } else if (!PHONE_RE.test(authPhone)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['authorizedPersonPhone'],
+        message: 'Invalid authorized person phone',
+      });
+    }
+
+    if (authEmail && !EMAIL_RE.test(authEmail)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['authorizedPersonEmail'],
+        message: 'Invalid authorized person email',
+      });
+    }
+  });
+}
+
+/** Default export — respects REGISTER_EMAIL_OTP flag at module load (server routes). */
+export const VendorDetailsSchema = vendorDetailsSchema();
+export type VendorDetailsInput = z.infer<typeof VendorDetailsSchemaBase>;
 
 /** Primary outlet (pickup / warehouse) address attached to the BusinessAccount. */
 export const PrimaryOutletSchema = z.object({

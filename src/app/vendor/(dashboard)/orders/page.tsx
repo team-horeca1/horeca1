@@ -177,7 +177,7 @@ export default function VendorOrdersPage() {
             const res = await fetch(`/api/v1/vendor/orders/${orderId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: newStatus }),
+                body: JSON.stringify({ status: newStatus, force: true }),
             });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.error?.message || json.message || 'Failed to update status');
@@ -315,14 +315,40 @@ export default function VendorOrdersPage() {
                 )}
             </div>
 
-            {/* Table */}
+            {/* Table — desktop */}
             <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
                         <Loader2 className="animate-spin text-[#299E60]" size={28} />
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <>
+                    <div className="md:hidden divide-y divide-[#F5F5F5] p-3 space-y-3">
+                        {orders.length === 0 ? (
+                            <p className="py-12 text-center text-[14px] text-[#AEAEAE]">
+                                {searchQuery ? `No orders matching "${searchQuery}"` : `No ${activeTab === 'all' ? '' : activeTab + ' '}orders`}
+                            </p>
+                        ) : orders.map((order) => (
+                            <Link
+                                key={order.id}
+                                href={`/vendor/orders/${order.id}`}
+                                className="block bg-[#FAFAFA] rounded-[12px] border border-[#EEEEEE] p-4 space-y-2"
+                            >
+                                <div className="flex justify-between items-start gap-2">
+                                    <p className="text-[14px] font-bold text-[#181725]">{order.orderNumber}</p>
+                                    <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-[6px] uppercase', STATUS_STYLE[order.status] || 'bg-gray-100')}>
+                                        {STATUS_LABELS[order.status] ?? order.status}
+                                    </span>
+                                </div>
+                                <p className="text-[12px] text-[#7C7C7C]">{order.user.fullName}</p>
+                                <div className="flex justify-between text-[13px] font-bold">
+                                    <span className="text-[#AEAEAE]">{new Date(order.createdAt).toLocaleDateString('en-IN')}</span>
+                                    <span>{formatINR(Number(order.totalAmount))}</span>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                    <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
                             <thead>
                                 <tr className="bg-[#FAFAFA] border-b border-[#EEEEEE]">
@@ -440,6 +466,7 @@ export default function VendorOrdersPage() {
                             </tbody>
                         </table>
                     </div>
+                    </>
                 )}
 
                 {/* Pagination */}

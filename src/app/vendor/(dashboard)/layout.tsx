@@ -41,22 +41,21 @@ import {
     LogOut,
     Users,
     UserCircle,
-    Landmark,
     RotateCcw,
     Wallet,
     BookOpen,
     Tag,
     Gift,
     CreditCard,
-    Upload,
     BadgeIndianRupee,
-    Wand2,
     Clock,
+    Container,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
 import { VendorOutletStrip } from '@/components/vendor/VendorOutletStrip';
 import { VendorNotificationBell } from '@/components/features/vendor/VendorNotificationBell';
+import { VendorGlobalSearch } from '@/components/vendor/VendorGlobalSearch';
 import type { PermissionKey } from '@/lib/permissions/registry';
 
 interface VendorSidebarLink {
@@ -67,25 +66,51 @@ interface VendorSidebarLink {
     requiredPerm?: PermissionKey | PermissionKey[] | null;
 }
 
-const SIDEBAR_LINKS: VendorSidebarLink[] = [
-    { name: 'Dashboard',     icon: LayoutDashboard, href: '/vendor/dashboard',      requiredPerm: 'dashboard.view' },
-    { name: 'Orders',        icon: ShoppingBag,     href: '/vendor/orders',         requiredPerm: 'orders.view' },
-    { name: 'Products',      icon: Package,         href: '/vendor/products',       requiredPerm: 'products.view' },
-    { name: 'Brand Mappings',icon: GitMerge,        href: '/vendor/brand-mappings', requiredPerm: 'products.edit' },
-    { name: 'Inventory',     icon: Warehouse,       href: '/vendor/inventory',      requiredPerm: 'inventory.view' },
-    { name: 'Credit',        icon: CreditCard,      href: '/vendor/credit',         requiredPerm: ['creditLine.view', 'creditLine.approve'] },
-    { name: 'Collections',   icon: Landmark,        href: '/vendor/collections',    requiredPerm: 'products.edit' },
-    { name: 'Returns',       icon: RotateCcw,       href: '/vendor/returns',        requiredPerm: 'orders.edit' },
-    { name: 'Customers',     icon: UserCircle,      href: '/vendor/customers',      requiredPerm: 'customers.view' },
-    { name: 'Price Lists',   icon: Tag,             href: '/vendor/price-lists',    requiredPerm: 'products.edit' },
-    { name: 'Promotions',    icon: Gift,            href: '/vendor/promotions',     requiredPerm: 'promotions.view' },
-    { name: 'Wallet',        icon: Wallet,          href: '/vendor/wallet',         requiredPerm: 'payments.view' },
-    { name: 'Ledger',        icon: BookOpen,        href: '/vendor/ledger',         requiredPerm: 'payments.view' },
-    { name: 'Reports',       icon: BarChart3,       href: '/vendor/reports',        requiredPerm: 'analytics.view' },
-    { name: 'Notifications', icon: Bell,            href: '/vendor/notifications' },
-    { name: 'Team',          icon: Users,           href: '/vendor/team',           requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
-    { name: 'Sales Team',    icon: BadgeIndianRupee,href: '/vendor/sales-team',     requiredPerm: ['salespersons.view', 'commissions.view'] },
-    { name: 'Settings',      icon: Settings,        href: '/vendor/settings',       requiredPerm: 'settings.view' },
+const SIDEBAR_GROUPS: { label: string; links: VendorSidebarLink[] }[] = [
+  {
+    label: 'Operations',
+    links: [
+      { name: 'Dashboard', icon: LayoutDashboard, href: '/vendor/dashboard', requiredPerm: 'dashboard.view' },
+      { name: 'Orders', icon: ShoppingBag, href: '/vendor/orders', requiredPerm: 'orders.view' },
+      { name: 'Inventory', icon: Warehouse, href: '/vendor/inventory', requiredPerm: 'inventory.view' },
+      { name: 'Warehouse', icon: Container, href: '/vendor/warehouse', requiredPerm: 'inventory.view' },
+      { name: 'Returns', icon: RotateCcw, href: '/vendor/returns', requiredPerm: 'orders.edit' },
+      { name: 'Claims', icon: ShieldAlert, href: '/vendor/claims', requiredPerm: 'orders.edit' },
+    ],
+  },
+  {
+    label: 'Catalog',
+    links: [
+      { name: 'Products', icon: Package, href: '/vendor/products', requiredPerm: 'products.view' },
+      { name: 'Brand Mappings', icon: GitMerge, href: '/vendor/brand-mappings', requiredPerm: 'products.view' },
+      { name: 'Price Lists', icon: Tag, href: '/vendor/price-lists', requiredPerm: 'products.edit' },
+      { name: 'Promotions', icon: Gift, href: '/vendor/promotions', requiredPerm: 'promotions.view' },
+    ],
+  },
+  {
+    label: 'Customers',
+    links: [
+      { name: 'Customers', icon: UserCircle, href: '/vendor/customers', requiredPerm: 'customers.view' },
+      { name: 'Sales Team', icon: BadgeIndianRupee, href: '/vendor/sales-team', requiredPerm: ['salespersons.view', 'commissions.view'] },
+    ],
+  },
+  {
+    label: 'Finance',
+    links: [
+      { name: 'Credit & Collections', icon: CreditCard, href: '/vendor/credit', requiredPerm: ['creditLine.view', 'creditLine.approve'] },
+      { name: 'Wallet', icon: Wallet, href: '/vendor/wallet', requiredPerm: 'payments.view' },
+      { name: 'Ledger', icon: BookOpen, href: '/vendor/ledger', requiredPerm: 'payments.view' },
+      { name: 'Reports', icon: BarChart3, href: '/vendor/reports', requiredPerm: 'analytics.view' },
+    ],
+  },
+  {
+    label: 'Account',
+    links: [
+      { name: 'Notifications', icon: Bell, href: '/vendor/notifications' },
+      { name: 'Team', icon: Users, href: '/vendor/team', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
+      { name: 'Settings', icon: Settings, href: '/vendor/settings', requiredPerm: 'settings.view' },
+    ],
+  },
 ];
 
 export default function VendorLayout({
@@ -100,6 +125,7 @@ export default function VendorLayout({
     const [adminVendorName, setAdminVendorName] = useState<string | null>(null);
     const [isApplicationPending, setIsApplicationPending] = useState(false);
     const [checkingApplication, setCheckingApplication] = useState(true);
+    const [hasBrandMappings, setHasBrandMappings] = useState(false);
 
     const userRole = (session?.user as { role?: string } | undefined)?.role;
     const activeAccountType = (session?.user as {
@@ -108,6 +134,29 @@ export default function VendorLayout({
     const isActiveVendor = activeAccountType?.isVendor === true;
     const isActiveBrand = activeAccountType?.isBrand === true;
     const isAdmin = userRole === 'admin';
+    const canUseVendorPortal = isAdmin || isActiveVendor || userRole === 'vendor';
+
+    const fetchBrandMappingAccess = React.useCallback(() => {
+        if (status !== 'authenticated' || !canUseVendorPortal) return;
+        fetch('/api/v1/vendor/brand-mappings/brands')
+            .then((res) => res.json())
+            .then((res) => {
+                if (res.success) setHasBrandMappings(res.data?.hasAuthorizedBrands === true);
+                else setHasBrandMappings(false);
+            })
+            .catch(() => setHasBrandMappings(false));
+    }, [status, canUseVendorPortal]);
+
+    React.useEffect(() => {
+        fetchBrandMappingAccess();
+    }, [fetchBrandMappingAccess, pathname]);
+
+    React.useEffect(() => {
+        if (status !== 'authenticated' || !canUseVendorPortal) return;
+        const onFocus = () => fetchBrandMappingAccess();
+        window.addEventListener('focus', onFocus);
+        return () => window.removeEventListener('focus', onFocus);
+    }, [status, canUseVendorPortal, fetchBrandMappingAccess]);
 
     // Filter sidebar links by the user's permission set.
     // Empty array means no restrictions yet (owner/legacy) — show all.
@@ -119,7 +168,13 @@ export default function VendorLayout({
             ? need.some((p) => sessionPerms.includes(p))
             : sessionPerms.includes(need);
     };
-    const visibleLinks = SIDEBAR_LINKS.filter((link) => can(link.requiredPerm));
+    const visibleGroups = SIDEBAR_GROUPS.map((g) => ({
+      ...g,
+      links: g.links.filter((link) => {
+        if (link.href === '/vendor/brand-mappings' && !hasBrandMappings) return false;
+        return can(link.requiredPerm);
+      }),
+    })).filter((g) => g.links.length > 0);
 
     // Only treat the impersonation cookie as authoritative when the current
     // session is actually an admin. A vendor logging in fresh would otherwise
@@ -181,7 +236,21 @@ export default function VendorLayout({
         };
     }, [status, isAdmin, isActiveVendor]);
 
-    // Refresh permissions automatically so role/outlet changes by an admin
+    // Redirect to setup wizard until go_live is marked complete
+    React.useEffect(() => {
+        if (status !== 'authenticated' || isAdmin || !isActiveVendor) return;
+        if (pathname === '/vendor/setup') return;
+        fetch('/api/v1/vendor/setup')
+            .then((r) => r.json())
+            .then((j) => {
+                if (j.success && !j.data.wizardComplete && pathname === '/vendor/dashboard') {
+                    router.replace('/vendor/setup');
+                }
+            })
+            .catch(() => {});
+    }, [status, isAdmin, isActiveVendor, pathname, router]);
+
+    // Refresh permissions automatically
     // propagate to the browser without requiring logout/login.
     React.useEffect(() => {
         if (status !== 'authenticated') return;
@@ -407,14 +476,7 @@ export default function VendorLayout({
 
                 {/* Search Bar - centered */}
                 <div className="flex-1 flex justify-center px-10">
-                    <div className="relative group w-full max-w-[520px]">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#AEAEAE]" size={18} />
-                        <input
-                            type="text"
-                            placeholder="search"
-                            className="w-full bg-[#F5F5F5] border border-[#EEEEEE] rounded-[14px] py-3 pl-11 pr-4 text-[14px] outline-none transition-all placeholder:text-[#AEAEAE] font-medium focus:border-[#299E60]/40 focus:bg-white focus:shadow-sm"
-                        />
-                    </div>
+                    <VendorGlobalSearch />
                 </div>
 
                 {/* Right Side - Bell + User */}
@@ -469,7 +531,13 @@ export default function VendorLayout({
                                     )}
                                 </div>
                             )}
-                            {visibleLinks.map((link) => {
+                            {visibleGroups.map((group) => (
+                                <div key={group.label} className="mb-4">
+                                    {!isCollapsed && (
+                                        <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-[#AEAEAE]">{group.label}</p>
+                                    )}
+                                    <div className="space-y-1">
+                                        {group.links.map((link) => {
                                 const isActive = pathname === link.href;
                                 return (
                                     <Link
@@ -494,6 +562,9 @@ export default function VendorLayout({
                                     </Link>
                                 );
                             })}
+                                    </div>
+                                </div>
+                            ))}
                         </nav>
 
                         {/* View Storefront */}

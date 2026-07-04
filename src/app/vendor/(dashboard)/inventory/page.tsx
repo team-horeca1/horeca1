@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -177,8 +178,11 @@ function CsvUploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
 
 // ─── Inline row component ─────────────────────────────────────────────────────
 
-function InventoryRow({ item, onSaved }: { item: InventoryItem; onSaved: (updated: Partial<InventoryItem> & { id: string }) => void }) {
+function InventoryRow({ item, onSaved, outletId }: { item: InventoryItem; onSaved: (updated: Partial<InventoryItem> & { id: string }) => void; outletId?: string | null }) {
     const [qty, setQty] = useState(item.qtyAvailable);
+    const [transit, setTransit] = useState(item.qtyInTransit);
+    const [damaged, setDamaged] = useState(item.qtyDamaged);
+    const [returned, setReturned] = useState(item.qtyReturned);
     const [threshold, setThreshold] = useState(item.lowStockThreshold);
     const [editingThreshold, setEditingThreshold] = useState(false);
     const [dirty, setDirty] = useState(false);
@@ -186,49 +190,80 @@ function InventoryRow({ item, onSaved }: { item: InventoryItem; onSaved: (update
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Sync if parent refreshes
-    useEffect(() => { setQty(item.qtyAvailable); setThreshold(item.lowStockThreshold); setDirty(false); }, [item.qtyAvailable, item.lowStockThreshold]);
+    useEffect(() => {
+        setQty(item.qtyAvailable);
+        setTransit(item.qtyInTransit);
+        setDamaged(item.qtyDamaged);
+        setReturned(item.qtyReturned);
+        setThreshold(item.lowStockThreshold);
+        setDirty(false);
+    }, [item.qtyAvailable, item.qtyInTransit, item.qtyDamaged, item.qtyReturned, item.lowStockThreshold]);
 
-    const persist = useCallback(async (newQty: number, newThreshold: number) => {
+    const persist = useCallback(async (payload: {
+        qtyAvailable?: number;
+        qtyInTransit?: number;
+        qtyDamaged?: number;
+        qtyReturned?: number;
+        lowStockThreshold?: number;
+    }) => {
         setSaving(true);
         try {
             const res = await fetch('/api/v1/vendor/inventory', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productId: item.productId, qtyAvailable: newQty, lowStockThreshold: newThreshold }),
+                body: JSON.stringify({ productId: item.productId, ...(outletId ? { outletId } : {}), ...payload }),
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.error?.message || 'Save failed');
             setDirty(false);
-            onSaved({ id: item.id, qtyAvailable: newQty, lowStockThreshold: newThreshold, isLowStock: newQty - item.qtyReserved <= newThreshold });
+            const newQty = payload.qtyAvailable ?? qty;
+            const newThreshold = payload.lowStockThreshold ?? threshold;
+            onSaved({
+                id: item.id,
+                qtyAvailable: newQty,
+                qtyInTransit: payload.qtyInTransit ?? transit,
+                qtyDamaged: payload.qtyDamaged ?? damaged,
+                qtyReturned: payload.qtyReturned ?? returned,
+                lowStockThreshold: newThreshold,
+                isLowStock: newQty - item.qtyReserved <= newThreshold,
+            });
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Save failed');
         } finally {
             setSaving(false);
         }
-    }, [item.productId, item.id, item.qtyReserved, onSaved]);
+    }, [item.productId, item.id, item.qtyReserved, qty, threshold, transit, damaged, returned, onSaved, outletId]);
 
-    const scheduleAutoSave = (newQty: number, newThreshold: number) => {
+    const scheduleAutoSave = (fields: Parameters<typeof persist>[0]) => {
         if (saveTimer.current) clearTimeout(saveTimer.current);
         setDirty(true);
-        saveTimer.current = setTimeout(() => persist(newQty, newThreshold), 900);
+        saveTimer.current = setTimeout(() => persist(fields), 900);
     };
 
     const nudgeQty = (delta: number) => {
         const newQty = Math.max(0, qty + delta);
         setQty(newQty);
-        scheduleAutoSave(newQty, threshold);
+        scheduleAutoSave({ qtyAvailable: newQty, lowStockThreshold: threshold });
     };
 
     const handleQtyInput = (v: string) => {
         const n = parseInt(v, 10);
         if (isNaN(n) || n < 0) return;
         setQty(n);
-        scheduleAutoSave(n, threshold);
+        scheduleAutoSave({ qtyAvailable: n, lowStockThreshold: threshold });
+    };
+
+    const handleBucket = (field: 'qtyInTransit' | 'qtyDamaged' | 'qtyReturned', value: number) => {
+        const v = Math.max(0, value);
+        if (field === 'qtyInTransit') setTransit(v);
+        if (field === 'qtyDamaged') setDamaged(v);
+        if (field === 'qtyReturned') setReturned(v);
+        scheduleAutoSave({ [field]: v });
     };
 
     const handleThresholdBlur = () => {
         setEditingThreshold(false);
-        if (threshold !== item.lowStockThreshold) scheduleAutoSave(qty, threshold);
+        if (threshold !== item.lowStockThreshold) scheduleAutoSave({ qtyAvailable: qty, lowStockThreshold: threshold });
     };
 
     const net = qty - item.qtyReserved;
@@ -278,23 +313,35 @@ function InventoryRow({ item, onSaved }: { item: InventoryItem; onSaved: (update
 
             {/* In Transit */}
             <td className="px-5 py-3.5 text-center">
-                <span className={cn('text-[13px] font-medium', item.qtyInTransit > 0 ? 'text-blue-600' : 'text-[#AEAEAE]')}>
-                    {item.qtyInTransit}
-                </span>
+                <input
+                    type="number"
+                    min={0}
+                    value={transit}
+                    onChange={(e) => handleBucket('qtyInTransit', parseInt(e.target.value, 10) || 0)}
+                    className="w-[52px] h-7 text-center text-[13px] font-medium border border-[#EEEEEE] rounded-[6px] outline-none focus:border-blue-400/50"
+                />
             </td>
 
             {/* Damaged */}
             <td className="px-5 py-3.5 text-center">
-                <span className={cn('text-[13px] font-medium', item.qtyDamaged > 0 ? 'text-[#E74C3C]' : 'text-[#AEAEAE]')}>
-                    {item.qtyDamaged}
-                </span>
+                <input
+                    type="number"
+                    min={0}
+                    value={damaged}
+                    onChange={(e) => handleBucket('qtyDamaged', parseInt(e.target.value, 10) || 0)}
+                    className="w-[52px] h-7 text-center text-[13px] font-medium border border-[#EEEEEE] rounded-[6px] outline-none focus:border-[#E74C3C]/40"
+                />
             </td>
 
             {/* Returned */}
             <td className="px-5 py-3.5 text-center">
-                <span className={cn('text-[13px] font-medium', item.qtyReturned > 0 ? 'text-amber-600' : 'text-[#AEAEAE]')}>
-                    {item.qtyReturned}
-                </span>
+                <input
+                    type="number"
+                    min={0}
+                    value={returned}
+                    onChange={(e) => handleBucket('qtyReturned', parseInt(e.target.value, 10) || 0)}
+                    className="w-[52px] h-7 text-center text-[13px] font-medium border border-[#EEEEEE] rounded-[6px] outline-none focus:border-amber-400/50"
+                />
             </td>
 
             {/* Net */}
@@ -347,11 +394,73 @@ function InventoryRow({ item, onSaved }: { item: InventoryItem; onSaved: (update
     );
 }
 
+function InventoryMobileCard({ item, onSaved, outletId }: { item: InventoryItem; onSaved: (updated: Partial<InventoryItem> & { id: string }) => void; outletId?: string | null }) {
+    const [qty, setQty] = useState(item.qtyAvailable);
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => { setQty(item.qtyAvailable); }, [item.qtyAvailable]);
+
+    const net = qty - item.qtyReserved;
+
+    const saveQty = async (newQty: number) => {
+        setQty(newQty);
+        setSaving(true);
+        try {
+            const res = await fetch('/api/v1/vendor/inventory', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productId: item.productId, ...(outletId ? { outletId } : {}), qtyAvailable: newQty }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error?.message || 'Save failed');
+            onSaved({ id: item.id, qtyAvailable: newQty, isLowStock: newQty - item.qtyReserved <= item.lowStockThreshold });
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Save failed');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className={cn('bg-[#FAFAFA] rounded-[12px] border border-[#EEEEEE] p-4 space-y-2', net <= 0 && 'border-red-200 bg-red-50/30')}>
+            <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-[8px] bg-[#F1F4F9] overflow-hidden shrink-0 relative flex items-center justify-center">
+                    {item.product.imageUrl ? (
+                        <Image src={item.product.imageUrl} alt="" fill className="object-cover" unoptimized />
+                    ) : (
+                        <Package size={15} className="text-[#AEAEAE]" />
+                    )}
+                </div>
+                <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-bold text-[#181725] leading-tight">{item.product.name}</p>
+                    <p className="text-[11px] text-[#AEAEAE]">{item.product.sku ? `SKU ${item.product.sku}` : ''}</p>
+                </div>
+                <span className={cn('text-[12px] font-bold', net <= 0 ? 'text-[#E74C3C]' : 'text-[#181725]')}>Net {net}</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
+                <span className="px-2 py-0.5 rounded bg-white border border-[#EEEEEE]">Reserved {item.qtyReserved}</span>
+                <span className="px-2 py-0.5 rounded bg-white border border-[#EEEEEE]">Transit {item.qtyInTransit}</span>
+                <span className="px-2 py-0.5 rounded bg-white border border-[#EEEEEE]">Damaged {item.qtyDamaged}</span>
+                <span className="px-2 py-0.5 rounded bg-white border border-[#EEEEEE]">Returned {item.qtyReturned}</span>
+            </div>
+            <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-[#7C7C7C]">Available</span>
+                <button type="button" onClick={() => saveQty(Math.max(0, qty - 1))} className="w-7 h-7 rounded border border-[#EEEEEE]">−</button>
+                <span className="text-[13px] font-bold w-8 text-center">{qty}</span>
+                <button type="button" onClick={() => saveQty(qty + 1)} className="w-7 h-7 rounded border border-[#EEEEEE]">+</button>
+                {saving && <Loader2 size={12} className="animate-spin text-[#299E60]" />}
+            </div>
+        </div>
+    );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function VendorInventoryPage() {
+    const { activeOutletId, currentOutlet } = useBusinessAccountSwitcher();
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [multiWarehouseEnabled, setMultiWarehouseEnabled] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
     const [showCsvModal, setShowCsvModal] = useState(false);
@@ -360,7 +469,10 @@ export default function VendorInventoryPage() {
     const fetchInventory = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const res = await fetch('/api/v1/vendor/inventory');
+            const params = new URLSearchParams();
+            if (multiWarehouseEnabled && activeOutletId) params.set('outletId', activeOutletId);
+            const qs = params.toString();
+            const res = await fetch(`/api/v1/vendor/inventory${qs ? `?${qs}` : ''}`);
             const json = await res.json();
             if (json.success) setItems(json.data);
         } catch (err) {
@@ -368,6 +480,13 @@ export default function VendorInventoryPage() {
         } finally {
             setLoading(false);
         }
+    }, [multiWarehouseEnabled, activeOutletId]);
+
+    useEffect(() => {
+        fetch('/api/v1/vendor/settings')
+            .then((r) => r.json())
+            .then((j) => { if (j.success) setMultiWarehouseEnabled(!!j.data.multiWarehouseEnabled); })
+            .catch(() => {});
     }, []);
 
     useEffect(() => { fetchInventory(); }, [fetchInventory]);
@@ -423,6 +542,12 @@ export default function VendorInventoryPage() {
                     </button>
                 </div>
             </div>
+
+            {multiWarehouseEnabled && currentOutlet && (
+                <div className="bg-[#EFF6FF] border border-[#DBEAFE] rounded-[12px] px-4 py-3 text-[13px] text-[#1E40AF] font-semibold">
+                    Stock shown for: <span className="font-bold">{currentOutlet.name}</span>
+                </div>
+            )}
 
             {/* Low stock alert banner */}
             {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
@@ -505,7 +630,13 @@ export default function VendorInventoryPage() {
                         </p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <>
+                        <div className="md:hidden p-3 space-y-3">
+                            {filtered.map((item) => (
+                                <InventoryMobileCard key={item.id} item={item} onSaved={handleRowSaved} outletId={multiWarehouseEnabled ? activeOutletId : null} />
+                            ))}
+                        </div>
+                        <div className="hidden md:block overflow-x-auto">
                         <table className="w-full">
                             <thead>
                                 <tr className="bg-[#FAFAFA] border-b border-[#EEEEEE]">
@@ -522,11 +653,12 @@ export default function VendorInventoryPage() {
                             </thead>
                             <tbody className="divide-y divide-[#F5F5F5]">
                                 {filtered.map(item => (
-                                    <InventoryRow key={item.id} item={item} onSaved={handleRowSaved} />
+                                    <InventoryRow key={item.id} item={item} onSaved={handleRowSaved} outletId={multiWarehouseEnabled ? activeOutletId : null} />
                                 ))}
                             </tbody>
                         </table>
-                    </div>
+                        </div>
+                    </>
                 )}
                 {!loading && filtered.length > 0 && (
                     <div className="px-5 py-3 border-t border-[#F5F5F5]">

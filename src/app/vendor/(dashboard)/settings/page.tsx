@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { ImageUploadField } from '@/components/ui/ImageUploadField';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { toast } from 'sonner';
+import { useSession } from 'next-auth/react';
 
 interface ServiceArea {
     id: string;
@@ -31,6 +32,8 @@ interface VendorSettings {
     bannerUrl: string | null;
     minOrderValue: number;
     creditEnabled: boolean;
+    vendorType: string | null;
+    multiWarehouseEnabled: boolean;
     deliveryFee: number;
     freeDeliveryAbove: number | null;
     addressLine: string | null;
@@ -76,6 +79,8 @@ function formatTime(t: string): string {
 
 export default function VendorSettingsPage() {
     const confirm = useConfirm();
+    const { data: session } = useSession();
+    const activeBusinessAccountId = (session?.user as { activeBusinessAccountId?: string } | undefined)?.activeBusinessAccountId;
     const [settings, setSettings] = useState<VendorSettings | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -111,6 +116,8 @@ export default function VendorSettingsPage() {
 
     // Payment modes
     const [paymentModes, setPaymentModes] = useState<string[]>(['cod', 'prepaid']);
+    const [vendorType, setVendorType] = useState<'distributor' | 'wholesaler' | 'dark_store'>('distributor');
+    const [multiWarehouseEnabled, setMultiWarehouseEnabled] = useState(false);
 
     // Bank account details
     const [bankAccountName, setBankAccountName] = useState('');
@@ -163,6 +170,10 @@ export default function VendorSettingsPage() {
                 if (Array.isArray(data.paymentModes) && data.paymentModes.length > 0) {
                     setPaymentModes(data.paymentModes);
                 }
+                if (data.vendorType === 'distributor' || data.vendorType === 'wholesaler' || data.vendorType === 'dark_store') {
+                    setVendorType(data.vendorType);
+                }
+                setMultiWarehouseEnabled(!!data.multiWarehouseEnabled);
                 setBankAccountName(data.bankAccountName || '');
                 setBankAccountNumber(data.bankAccountNumber || '');
                 setBankIfsc(data.bankIfsc || '');
@@ -257,6 +268,8 @@ export default function VendorSettingsPage() {
                     bankName: bankName || null,
                     bankAccountType: bankAccountType || null,
                     paymentModes,
+                    vendorType,
+                    multiWarehouseEnabled,
                 }),
             });
             const json = await res.json();
@@ -446,6 +459,24 @@ export default function VendorSettingsPage() {
                 <p className="text-[#000000] text-[13px] font-medium opacity-70">Manage your store settings</p>
             </div>
 
+            {activeBusinessAccountId && (
+                <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm p-6 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <Building2 size={20} className="text-[#299E60]" />
+                        <div>
+                            <h2 className="text-[16px] font-bold text-[#181725]">Outlets & branches</h2>
+                            <p className="text-[12px] text-[#AEAEAE]">Manage warehouse and delivery locations for multi-outlet ops</p>
+                        </div>
+                    </div>
+                    <Link
+                        href={`/account/${activeBusinessAccountId}/outlets`}
+                        className="h-[40px] px-4 rounded-[10px] bg-[#181725] text-white text-[13px] font-bold flex items-center"
+                    >
+                        Manage outlets
+                    </Link>
+                </div>
+            )}
+
             {/* Business Profile */}
             <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-[#EEEEEE] flex items-center gap-2">
@@ -488,6 +519,31 @@ export default function VendorSettingsPage() {
                             folder="vendors"
                             variant="vendor-cover"
                         />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-[13px] font-bold text-[#181725] mb-1.5">Business type</label>
+                            <select
+                                value={vendorType}
+                                onChange={(e) => setVendorType(e.target.value as typeof vendorType)}
+                                className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40 bg-white"
+                            >
+                                <option value="distributor">Distributor</option>
+                                <option value="wholesaler">Wholesaler</option>
+                                <option value="dark_store">Dark store</option>
+                            </select>
+                        </div>
+                        <div className="flex items-end pb-1">
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={multiWarehouseEnabled}
+                                    onChange={(e) => setMultiWarehouseEnabled(e.target.checked)}
+                                    className="w-5 h-5 accent-[#299E60]"
+                                />
+                                <span className="text-[14px] font-bold text-[#181725]">Enable multi-warehouse inventory</span>
+                            </label>
+                        </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>

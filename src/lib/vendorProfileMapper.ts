@@ -11,7 +11,12 @@ import {
   derivedTradeName,
   primaryPhoneDigits,
   resolveVendorTypeSlug,
+  getEffectiveVendorTypeSelections,
 } from '@/lib/validators/vendor-profile';
+import {
+  legacyScalarsFromSelections,
+  type VendorTypeSelection,
+} from '@/lib/constants/vendorProfile';
 
 function str(v: string | undefined | null): string | null {
   const t = (v ?? '').trim();
@@ -33,7 +38,7 @@ function boolOrNull(v: boolean | string | undefined): boolean | null {
 
 export function mapToUserFields(p: VendorProfileInput): {
   fullName: string;
-  phone: string;
+  phone: string | null;
   email: string | null;
   businessName: string | null;
   gstNumber: string | null;
@@ -44,7 +49,7 @@ export function mapToUserFields(p: VendorProfileInput): {
   const fullName = derivedFullName(p);
   return {
     fullName: fullName || legalName,
-    phone: primaryPhoneDigits(p),
+    phone: primaryPhoneDigits(p) || null,
     email: str(p.email),
     businessName: legalName || null,
     gstNumber: str(p.gstin || p.gstNumber)?.toUpperCase() ?? null,
@@ -59,6 +64,8 @@ export function mapToBusinessAccount(
   const legalName = derivedLegalName(p) || 'Vendor Business';
   const displayName = derivedTradeName(p);
   const phone = primaryPhoneDigits(p);
+  const selections = getEffectiveVendorTypeSelections(p);
+  const legacy = legacyScalarsFromSelections(selections);
 
   return {
     legalName,
@@ -67,8 +74,11 @@ export function mapToBusinessAccount(
     gstin: str(p.gstin || p.gstNumber)?.toUpperCase() ?? null,
     pan: str(p.pan || p.panNumber)?.toUpperCase() ?? null,
     fssaiNumber: str(p.fssaiNumber),
-    businessType: str(p.vendorBusinessType) || 'vendor',
-    subType: str(p.subType),
+    businessType: legacy?.vendorBusinessType || str(p.vendorBusinessType) || 'vendor',
+    subType: legacy?.subType || str(p.subType),
+    vendorTypeSelections: selections.length > 0
+      ? (selections as unknown as Prisma.InputJsonValue)
+      : undefined,
     salutation: str(p.salutation),
     firstName: str(p.firstName),
     lastName: str(p.lastName),
@@ -90,12 +100,17 @@ export function mapToVendorProfile(
   const legalName = derivedLegalName(p);
   const tradeName = derivedTradeName(p);
   const vendorTypeSlug = resolveVendorTypeSlug(p);
+  const selections = getEffectiveVendorTypeSelections(p);
+  const legacy = legacyScalarsFromSelections(selections);
 
   return {
     businessName: legalName || undefined,
     tradeName: tradeName || null,
-    vendorType: vendorTypeSlug,
-    subType: str(p.subType),
+    vendorType: legacy?.vendorType || vendorTypeSlug,
+    subType: legacy?.subType || str(p.subType),
+    vendorTypeSelections: selections.length > 0
+      ? (selections as unknown as Prisma.InputJsonValue)
+      : undefined,
     categoriesHandled: Array.isArray(p.categoriesHandled) ? p.categoriesHandled : [],
     businessSize: str(p.businessSize),
     coverage: str(p.coverage),
@@ -160,6 +175,7 @@ export function buildVendorProfile(p: VendorProfileInput): Record<string, unknow
     vendorBusinessType: str(p.vendorBusinessType),
     vendorType: resolveVendorTypeSlug(p),
     subType: str(p.subType),
+    vendorTypeSelections: getEffectiveVendorTypeSelections(p) as VendorTypeSelection[],
     categoriesHandled: p.categoriesHandled ?? [],
     salutation: str(p.salutation),
     firstName: str(p.firstName),
