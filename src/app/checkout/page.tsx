@@ -153,6 +153,16 @@ const PAYMENT_OPTIONS = [
   },
 ];
 
+const PAYMENT_TO_VENDOR_MODE: Record<string, string> = {
+  online: 'prepaid',
+  credit: 'credit',
+  wallet: 'prepaid',
+  bank_transfer: 'prepaid',
+  po_number: 'cheque',
+};
+
+const DEFAULT_VENDOR_PAYMENT_MODES = ['cod', 'prepaid', 'credit', 'cheque', 'online'];
+
 // ─── Inline "Delivering to" row + outlet switcher dropdown ──────────────────
 // Colocated with the checkout page because it's the only consumer. Uses the
 // shared `useBusinessAccountSwitcher` for switching, plus a one-off fetch of
@@ -378,6 +388,7 @@ function CheckoutPageContent() {
     const [previewSubtotal, setPreviewSubtotal] = useState<number | null>(null);
     // Collapsible vendor cards — collapsed by default for compact checkout.
     const [expandedVendors, setExpandedVendors] = useState<Set<string>>(new Set());
+    const [allowedModesByVendor, setAllowedModesByVendor] = useState<Record<string, string[]>>({});
     const toggleVendorExpand = (vendorId: string) => {
         setExpandedVendors(prev => { const next = new Set(prev); if (next.has(vendorId)) next.delete(vendorId); else next.add(vendorId); return next; });
     };
@@ -475,6 +486,17 @@ function CheckoutPageContent() {
     );
     const selectedVendorCount = selectedGroups.length;
 
+    const availablePaymentOptions = useMemo(() => {
+        const vendorIds = selectedGroups.map((g) => g.vendorId);
+        if (!vendorIds.length) return PAYMENT_OPTIONS;
+        let intersection = new Set(allowedModesByVendor[vendorIds[0]] ?? DEFAULT_VENDOR_PAYMENT_MODES);
+        for (const vid of vendorIds.slice(1)) {
+            const modes = new Set(allowedModesByVendor[vid] ?? DEFAULT_VENDOR_PAYMENT_MODES);
+            intersection = new Set([...intersection].filter((m) => modes.has(m)));
+        }
+        return PAYMENT_OPTIONS.filter((opt) => intersection.has(PAYMENT_TO_VENDOR_MODE[opt.id] ?? opt.id));
+    }, [selectedGroups, allowedModesByVendor]);
+
     const toggleVendor = (vendorId: string) => {
         setExcludedVendorIds(prev => {
             const next = new Set(prev);
@@ -489,10 +511,23 @@ function CheckoutPageContent() {
         window.scrollTo({ top: 0, behavior: 'instant' });
     }, [step]);
 
-    // Load the customer's credit wallets (DiSCCO lines, one per vendor + the
-    // H1 platform wallet) when the payment step is reached. Fetched once per
-    // session and indexed by vendorId so each vendor group can show its own
-    // available-credit summary under "Pay via Credit".
+    React.useEffect(() => {
+        if (step !== 'payment' || sessionStatus !== 'authenticated') return;
+        const vendorIds = selectedGroups.map((g) => g.vendorId);
+        if (!vendorIds.length) return;
+        fetch(`/api/v1/checkout/payment-modes?vendorIds=${vendorIds.join(',')}`)
+            .then((r) => r.json())
+            .then((j) => { if (j.success) setAllowedModesByVendor(j.data as Record<string, string[]>); })
+            .catch(() => {});
+    }, [step, sessionStatus, selectedGroups]);
+
+    React.useEffect(() => {
+        if (availablePaymentOptions.length > 0 && !availablePaymentOptions.some((o) => o.id === selectedPayment)) {
+            setSelectedPayment(availablePaymentOptions[0].id);
+        }
+    }, [availablePaymentOptions, selectedPayment]);
+
+    // Load the customer's credit wallets
     React.useEffect(() => {
         if (step !== 'payment' || sessionStatus !== 'authenticated' || creditWalletsLoaded) return;
         fetch('/api/v1/wallet')
@@ -1119,7 +1154,9 @@ function CheckoutPageContent() {
                                     <p className="text-[13px] text-gray-400 font-medium mt-0.5">Choose how you&apos;d like to pay</p>
                                 </div>
                                 <div className="divide-y divide-[#F5F5F5]">
-                                    {PAYMENT_OPTIONS.map((opt) => {
+                                    {availablePaymentOptions.length === 0 ? (
+                                        <p className="px-5 py-6 text-[13px] text-amber-700 font-medium">No shared payment methods are enabled for all vendors in this order. Contact your suppliers.</p>
+                                    ) : availablePaymentOptions.map((opt) => {
                                         const isSelected = selectedPayment === opt.id;
                                         return (
                                             <button
