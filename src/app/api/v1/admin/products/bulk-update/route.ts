@@ -20,14 +20,15 @@ import {
   filterSchemaBase, setSchemaBase,
   applyAdjustment, applyOfferPrice, round, buildPreviewSample,
 } from '@/modules/catalog/bulk-update.shared';
+import { resolveBulkProductFilter, buildSeasonalMetadataPatch } from '@/modules/catalog/bulk-filter';
 
 // ── Schemas ─────────────────────────────────────────────────────────────
 
 const filterSchema = filterSchemaBase
   .extend({ vendorId: z.string().uuid().nullable().optional() }) // null = catalog products
   .refine(
-    (f) => !!(f.productIds || f.categoryId || f.brand || typeof f.isActive === 'boolean' || f.vendorId !== undefined),
-    { message: 'Provide at least one filter criterion (productIds | categoryId | brand | isActive | vendorId)' },
+    (f) => !!(f.productIds || f.skus?.length || f.categoryId || f.brand || typeof f.isActive === 'boolean' || f.vendorId !== undefined),
+    { message: 'Provide at least one filter criterion (productIds | skus | categoryId | brand | isActive | vendorId)' },
   );
 
 const setSchema = setSchemaBase.refine(
@@ -46,12 +47,17 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     const body = bodySchema.parse(await req.json());
     const isPreview = new URL(req.url).searchParams.get('mode') === 'preview';
 
+    const vendorScope = body.filter.vendorId && typeof body.filter.vendorId === 'string'
+      ? { vendorId: body.filter.vendorId }
+      : undefined;
+    const resolved = await resolveBulkProductFilter(body.filter, vendorScope);
+
     // Build the WHERE clause.
     const where: Record<string, unknown> = {};
-    if (body.filter.productIds) where.id = { in: body.filter.productIds };
-    if (body.filter.categoryId) where.categoryId = body.filter.categoryId;
-    if (body.filter.brand) where.brand = body.filter.brand;
-    if (typeof body.filter.isActive === 'boolean') where.isActive = body.filter.isActive;
+    if (resolved.productIds) where.id = { in: resolved.productIds };
+    if (resolved.categoryId) where.categoryId = resolved.categoryId;
+    if (resolved.brand) where.brand = resolved.brand;
+    if (typeof resolved.isActive === 'boolean') where.isActive = resolved.isActive;
     if (body.filter.vendorId !== undefined) where.vendorId = body.filter.vendorId; // can be null
 
     const offer = body.set.offer;
@@ -203,6 +209,15 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
           }
         }
         updatedCount = Math.max(updatedCount, products.length);
+      }
+
+      if (body.set.seasonalOffFrom || body.set.seasonalOffTo) {
+        const matched = await tx.product.findMany({ where, select: { id: true, metadata: true } });
+        for (const p of matched) {
+          const patch = buildSeasonalMetadataPatch(p.metadata, body.set.seasonalOffFrom, body.set.seasonalOffTo);
+          await tx.product.update({ where: { id: p.id }, data: patch });
+        }
+        updatedCount = Math.max(updatedCount, matched.length);
       }
     });
 

@@ -245,6 +245,17 @@ const productImportRowSchema = z
     'Veg / Non-Veg': z.coerce.string().optional(),
     'Storage type': z.coerce.string().optional(),
     'MOQ': z.coerce.number().int().min(1).optional(),
+    'Pack Size': z.coerce.string().optional(),
+    'Description': z.coerce.string().optional(),
+    'Item Description': z.coerce.string().optional(),
+    'MRP': z.coerce.number().positive().optional(),
+    'Gross Rate': z.coerce.number().positive().optional(),
+    'Gross rate': z.coerce.number().positive().optional(),
+    'Credit Eligible': z.coerce.string().optional().or(z.coerce.boolean()),
+    'Shelf Life (days)': z.coerce.number().int().min(0).optional(),
+    'Shelf Life': z.coerce.number().int().min(0).optional(),
+    'Country of Origin': z.coerce.string().optional(),
+    'Tags': z.coerce.string().optional(),
     // Zoho and other metadata fields
     'Account': z.coerce.string().optional(),
     'Account Code': z.coerce.string().optional(),
@@ -370,6 +381,14 @@ export interface ParsedProductRow {
   vegNonVeg?: string;
   storageType?: string;
   moq?: number;
+  packSize?: string;
+  description?: string;
+  originalPrice?: number;
+  creditEligible?: boolean;
+  isActive?: boolean;
+  shelfLifeDays?: number;
+  countryOfOrigin?: string;
+  tags?: string[];
   bulkSlabs: {
     minQty: number;
     grossRate: number;
@@ -515,6 +534,27 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
       vegNonVeg: normalizeVegNonVeg(r['Veg / Non-Veg']),
       storageType: r['Storage type'],
       moq: r['MOQ'],
+      packSize: r['Pack Size'] || r['Usage unit'] || undefined,
+      description: r['Description'] || r['Item Description'] || undefined,
+      originalPrice: (() => {
+        const mrp = r['MRP'] ?? r['Gross Rate'] ?? r['Gross rate'];
+        if (mrp == null) return undefined;
+        const n = Number(mrp);
+        return Number.isFinite(n) && n > 0 ? n : undefined;
+      })(),
+      creditEligible: (() => {
+        const v = String(r['Credit Eligible'] ?? '').toLowerCase();
+        if (!v) return undefined;
+        return v === 'yes' || v === 'true' || v === '1';
+      })(),
+      isActive: (() => {
+        const v = String(r['Item Status'] ?? r['Active on Online Store'] ?? '').toLowerCase();
+        if (!v) return undefined;
+        return v === 'active' || v === 'yes' || v === 'true';
+      })(),
+      shelfLifeDays: r['Shelf Life (days)'] ?? r['Shelf Life'] ?? undefined,
+      countryOfOrigin: r['Country of Origin'] || undefined,
+      tags: r['Tags'] ? String(r['Tags']).split(/[,;]/).map((t) => t.trim()).filter(Boolean) : undefined,
       bulkSlabs,
       metadata: {
         itemId: r['Item ID'],

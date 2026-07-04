@@ -28,6 +28,7 @@ import {
     BoxIcon,
     Settings as SettingsIcon,
     BarChart3,
+    Wand2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -35,6 +36,7 @@ import { ImageUpload, MultiImageUpload } from '@/components/ui/ImageUpload';
 import ProductImportModal from '@/components/features/admin/ProductImportModal';
 import BulkProductToolbar from '@/components/features/shared/BulkProductToolbar';
 import VendorBulkGrid from '@/components/features/vendor/VendorBulkGrid';
+import AdminBulkEngine from '@/components/features/admin/AdminBulkEngine';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { CategoryHierarchyPicker } from '@/components/features/brand/CategoryHierarchyPicker';
 import { BrandSinglePicker } from '@/components/features/brand/BrandSinglePicker';
@@ -461,6 +463,7 @@ export default function ProductsPage() {
 
     // Bulk Update Engine — row selection
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkOpen, setBulkOpen] = useState(false);
     const toggleSelect = (id: string) => {
         setSelectedIds(prev => {
             const next = new Set(prev);
@@ -3155,11 +3158,29 @@ export default function ProductsPage() {
                 isAdmin
             />
 
+            <AdminBulkEngine
+                open={bulkOpen}
+                onClose={() => setBulkOpen(false)}
+                products={products}
+                selectedIds={Array.from(selectedIds)}
+                vendors={vendors}
+                onComplete={() => { void fetchProducts(); setSelectedIds(new Set()); }}
+            />
+
 
             {/* Floating selection action bar */}
             {selectedIds.size > 0 && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[55] flex items-center gap-3 bg-[#181725] text-white rounded-[14px] shadow-2xl px-5 py-3 animate-in slide-in-from-bottom-4 duration-200">
                     <span className="text-[13px] font-bold">{selectedIds.size} selected</span>
+                    {perms.canWriteProducts && (
+                        <button
+                            type="button"
+                            onClick={() => setBulkOpen(true)}
+                            className="h-[36px] px-4 bg-[#299E60] hover:bg-[#238a54] rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 transition-colors"
+                        >
+                            <Wand2 size={14} /> Bulk edit
+                        </button>
+                    )}
                     <button
                         onClick={() => setShowBulkDeleteModal(true)}
                         className="h-[36px] px-4 bg-[#E74C3C] hover:bg-[#cf4436] rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 transition-colors"

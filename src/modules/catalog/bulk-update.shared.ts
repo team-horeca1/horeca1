@@ -11,6 +11,7 @@ import { z } from 'zod';
 // narrows the matched set further.
 export const filterSchemaBase = z.object({
   productIds: z.array(z.string().uuid()).min(1).max(500).optional(),
+  skus: z.array(z.string().min(1).max(100)).min(1).max(500).optional(),
   categoryId: z.string().uuid().optional(),
   brand: z.string().min(1).max(150).optional(),
   isActive: z.boolean().optional(),
@@ -80,6 +81,10 @@ export const setSchemaBase = z.object({
   // Offers
   clearPromo:      z.boolean().optional(),
   offer:           offerSchema.optional(),
+
+  // Seasonal disable — stores window in metadata; sets isActive false when today is in range
+  seasonalOffFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  seasonalOffTo:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 export type BulkSet = z.infer<typeof setSchemaBase>;
 

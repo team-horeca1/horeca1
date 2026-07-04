@@ -34,12 +34,13 @@ import {
   filterSchemaBase, setSchemaBase,
   applyAdjustment, applyOfferPrice, round, buildPreviewSample,
 } from '@/modules/catalog/bulk-update.shared';
+import { resolveBulkProductFilter, buildSeasonalMetadataPatch } from '@/modules/catalog/bulk-filter';
 
 // ── Schemas ─────────────────────────────────────────────────────────────
 
 const filterSchema = filterSchemaBase.refine(
-  (f) => !!(f.productIds || f.categoryId || f.brand || typeof f.isActive === 'boolean'),
-  { message: 'Provide at least one filter criterion (productIds | categoryId | brand | isActive)' },
+  (f) => !!(f.productIds || f.skus?.length || f.categoryId || f.brand || typeof f.isActive === 'boolean'),
+  { message: 'Provide at least one filter criterion (productIds | skus | categoryId | brand | isActive)' },
 );
 
 const setSchema = setSchemaBase.refine(
@@ -59,13 +60,15 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     const body = bodySchema.parse(await req.json());
     const isPreview = new URL(req.url).searchParams.get('mode') === 'preview';
 
+    const resolved = await resolveBulkProductFilter(body.filter, { vendorId });
+
     // Build the WHERE clause — vendorId is non-negotiable. Every other
     // criterion narrows the set further. AND semantics (all must match).
     const where: Record<string, unknown> = { vendorId };
-    if (body.filter.productIds) where.id = { in: body.filter.productIds };
-    if (body.filter.categoryId) where.categoryId = body.filter.categoryId;
-    if (body.filter.brand) where.brand = body.filter.brand;
-    if (typeof body.filter.isActive === 'boolean') where.isActive = body.filter.isActive;
+    if (resolved.productIds) where.id = { in: resolved.productIds };
+    if (resolved.categoryId) where.categoryId = resolved.categoryId;
+    if (resolved.brand) where.brand = resolved.brand;
+    if (typeof resolved.isActive === 'boolean') where.isActive = resolved.isActive;
 
     const offer = body.set.offer;
     const newCategoryIds = body.set.categoryIds;
@@ -221,6 +224,16 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
           }
         }
         updatedCount = Math.max(updatedCount, products.length);
+      }
+
+      // 3. Seasonal disable metadata window
+      if (body.set.seasonalOffFrom || body.set.seasonalOffTo) {
+        const matched = await tx.product.findMany({ where, select: { id: true, metadata: true } });
+        for (const p of matched) {
+          const patch = buildSeasonalMetadataPatch(p.metadata, body.set.seasonalOffFrom, body.set.seasonalOffTo);
+          await tx.product.update({ where: { id: p.id }, data: patch });
+        }
+        updatedCount = Math.max(updatedCount, matched.length);
       }
     });
 

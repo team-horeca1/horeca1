@@ -115,7 +115,7 @@ const blank = {
   gst:      { value: '' },
   offer:    { mode: '' as '' | 'setPrice' | 'percentOff' | 'clear', value: '', startTime: '', endTime: '', applyToSlabs: false },
   stock:    { mode: '' as '' | 'set' | 'increase' | 'decrease', value: '', threshold: '' },
-  status:   { value: 'active' as 'active' | 'inactive' },
+  status:   { value: 'active' as 'active' | 'inactive', offFrom: '', offTo: '' },
   credit:   { value: 'yes' as 'yes' | 'no' },
   featured: { value: 'yes' as 'yes' | 'no' },
   category: { categoryIds: [] as string[], replaceTags: false, tags: '' },
@@ -140,8 +140,9 @@ function mapAdjust(mode: PriceMode, value: string) {
 export default function BulkEngineDrawer({ open, onClose, onComplete, config, allProducts, selectedIds }: Props) {
   const confirm = useConfirm();
 
-  const [targetMode, setTargetMode] = useState<'pick' | 'rule'>('pick');
+  const [targetMode, setTargetMode] = useState<'pick' | 'rule' | 'sku'>('pick');
   const [rule, setRule] = useState({ categoryId: '', brand: '', status: '', minPrice: '', maxPrice: '', tag: '', vendorId: '' });
+  const [skuPaste, setSkuPaste] = useState('');
   const [action, setAction] = useState<ActionKey | null>(null);
   const [cfg, setCfg] = useState(structuredClone(blank));
 
@@ -156,6 +157,7 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
     if (!open) return;
     setTargetMode(selectedIds.length > 0 ? 'pick' : 'rule');
     setRule({ categoryId: '', brand: '', status: '', minPrice: '', maxPrice: '', tag: '', vendorId: '' });
+    setSkuPaste('');
     setAction(null);
     setCfg(structuredClone(blank));
     setPreview(null);
@@ -175,16 +177,23 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
     return true;
   }).map((p) => p.id), [allProducts, rule]);
 
+  const skuList = useMemo(
+    () => skuPaste.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean).slice(0, 500),
+    [skuPaste],
+  );
+
   const targetIds = useMemo(
-    () => (targetMode === 'pick' ? selectedIds : ruleIds).slice(0, 500),
+    () => (targetMode === 'pick' ? selectedIds : targetMode === 'rule' ? ruleIds : []).slice(0, 500),
     [targetMode, selectedIds, ruleIds],
   );
-  const overCap = (targetMode === 'pick' ? selectedIds.length : ruleIds.length) > 500;
+  const overCap = targetMode === 'sku'
+    ? skuList.length > 500
+    : (targetMode === 'pick' ? selectedIds.length : ruleIds.length) > 500;
   const targetProducts = useMemo(() => {
     const set = new Set(targetIds);
     return allProducts.filter((p) => set.has(p.id));
   }, [allProducts, targetIds]);
-  const count = targetIds.length;
+  const count = targetMode === 'sku' ? skuList.length : targetIds.length;
 
   // Load price lists when the customer-pricing panel opens.
   useEffect(() => {
@@ -210,7 +219,14 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
       return Object.keys(set).length ? set : null;
     }
     if (action === 'gst') return cfg.gst.value !== '' ? { taxPercent: Number(cfg.gst.value) } : null;
-    if (action === 'status') return { isActive: cfg.status.value === 'active' };
+    if (action === 'status') {
+      const out: Record<string, unknown> = { isActive: cfg.status.value === 'active' };
+      if (cfg.status.value === 'inactive' && cfg.status.offFrom && cfg.status.offTo) {
+        out.seasonalOffFrom = cfg.status.offFrom;
+        out.seasonalOffTo = cfg.status.offTo;
+      }
+      return out;
+    }
     if (action === 'credit') return { creditEligible: cfg.credit.value === 'yes' };
     if (action === 'featured') return { isFeatured: cfg.featured.value === 'yes' };
     if (action === 'offer') {
@@ -337,10 +353,13 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
       } else {
         const set = buildSet();
         if (!set) throw new Error('Nothing to change');
+        const filter = targetMode === 'sku'
+          ? { skus: skuList }
+          : { productIds: targetIds };
         const res = await fetch(config.endpoints.bulkUpdate, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filter: { productIds: targetIds }, set }),
+          body: JSON.stringify({ filter, set }),
         });
         const j = await res.json();
         if (!j.success) throw new Error(j.error?.message || 'Bulk update failed');
@@ -404,9 +423,10 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
             <>
               {/* Target strip */}
               <div className="bg-white rounded-[14px] border border-[#EEEEEE] p-4 shadow-sm">
-                <div className="flex gap-2 mb-3">
+                <div className="flex gap-2 mb-3 flex-wrap">
                   <TargetTab active={targetMode === 'pick'} onClick={() => setTargetMode('pick')} icon={CheckSquare} label={`Pick items (${selectedIds.length})`} />
                   <TargetTab active={targetMode === 'rule'} onClick={() => setTargetMode('rule')} icon={Filter} label="Match by rule" />
+                  <TargetTab active={targetMode === 'sku'} onClick={() => setTargetMode('sku')} icon={Tag} label="SKU list" />
                 </div>
                 {targetMode === 'pick' ? (
                   <p className="text-[12px] font-semibold text-[#7C7C7C]">
@@ -414,6 +434,17 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
                       ? 'No rows ticked. Close, tick products in the table, then re-open — or switch to “Match by rule”.'
                       : `${selectedIds.length} row${selectedIds.length !== 1 ? 's' : ''} ticked in the table.`}
                   </p>
+                ) : targetMode === 'sku' ? (
+                  <div>
+                    <p className="text-[12px] font-semibold text-[#7C7C7C] mb-2">Paste SKUs or vendor SKUs (one per line or comma-separated)</p>
+                    <textarea
+                      value={skuPaste}
+                      onChange={(e) => setSkuPaste(e.target.value)}
+                      rows={4}
+                      placeholder="SKU-001&#10;SKU-002"
+                      className="w-full border border-[#EEEEEE] rounded-[10px] px-3 py-2 text-[13px] font-medium outline-none focus:border-[#299E60]/40 bg-[#FAFAFA]"
+                    />
+                  </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2.5">
                     {config.vendors && (
@@ -685,12 +716,23 @@ function ConfigPanel({ action, cfg, setCfg, config, priceLists, targetProducts }
 
   if (action === 'status') {
     return (
-      <Field label="Set active status">
-        <div className="grid grid-cols-2 gap-2">
-          <Chip active={cfg.status.value === 'active'} onClick={() => setCfg((p) => ({ ...p, status: { value: 'active' } }))} label="Active" />
-          <Chip active={cfg.status.value === 'inactive'} onClick={() => setCfg((p) => ({ ...p, status: { value: 'inactive' } }))} label="Inactive (seasonal)" />
-        </div>
-      </Field>
+      <>
+        <Field label="Set active status">
+          <div className="grid grid-cols-2 gap-2">
+            <Chip active={cfg.status.value === 'active'} onClick={() => setCfg((p) => ({ ...p, status: { ...p.status, value: 'active' } }))} label="Active" />
+            <Chip active={cfg.status.value === 'inactive'} onClick={() => setCfg((p) => ({ ...p, status: { ...p.status, value: 'inactive' } }))} label="Inactive (seasonal)" />
+          </div>
+        </Field>
+        {cfg.status.value === 'inactive' && (
+          <Field label="Seasonal off window (optional)">
+            <div className="grid grid-cols-2 gap-2">
+              <input type="date" value={cfg.status.offFrom} onChange={(e) => setCfg((p) => ({ ...p, status: { ...p.status, offFrom: e.target.value } }))} className={inputCls} />
+              <input type="date" value={cfg.status.offTo} onChange={(e) => setCfg((p) => ({ ...p, status: { ...p.status, offTo: e.target.value } }))} className={inputCls} />
+            </div>
+            <p className="text-[11px] text-[#AEAEAE] font-medium mt-1">Products auto-deactivate when today falls in this range.</p>
+          </Field>
+        )}
+      </>
     );
   }
 
