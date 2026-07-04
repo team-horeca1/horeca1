@@ -123,12 +123,6 @@ export default function AdminBrandEditPage() {
     const [approvalLoading, setApprovalLoading] = useState(false);
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectNote, setRejectNote] = useState('');
-    const [authDistributors, setAuthDistributors] = useState<Array<{
-        id: string; vendorId: string; status: string;
-        brandApprovedAt: string | null; adminApprovedAt: string | null;
-        vendor: { id: string; businessName: string; city: string | null };
-    }>>([]);
-    const [authLoading, setAuthLoading] = useState(false);
 
     const [form, setForm] = useState({
         name: '',
@@ -175,35 +169,6 @@ export default function AdminBrandEditPage() {
             setLoading(false);
         }
     }, [id]);
-
-    const loadAuthDistributors = useCallback(async () => {
-        if (!id) return;
-        setAuthLoading(true);
-        try {
-            const res = await fetch(`/api/v1/admin/brands/${id}/authorized-distributors`);
-            const d = await res.json();
-            if (d.success) setAuthDistributors(d.data.distributors ?? []);
-        } catch { /* silent */ }
-        finally { setAuthLoading(false); }
-    }, [id]);
-
-    useEffect(() => { loadAuthDistributors(); }, [loadAuthDistributors]);
-
-    const handleAdminDistributorAction = async (vendorId: string, action: 'approve' | 'reject') => {
-        try {
-            const res = await fetch(`/api/v1/admin/brands/${id}/authorized-distributors`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ vendorId, action }),
-            });
-            const d = await res.json();
-            if (!d.success) throw new Error(d.error?.message || 'Action failed');
-            toast.success(action === 'approve' ? 'Distributor approved' : 'Distributor rejected');
-            loadAuthDistributors();
-        } catch (e: unknown) {
-            toast.error(e instanceof Error ? e.message : 'Action failed');
-        }
-    };
 
     useEffect(() => {
         void loadBrand();
@@ -636,45 +601,6 @@ export default function AdminBrandEditPage() {
                         aspectHint="Shows on the brand card top section (220×160 area)"
                         variant="brand-card-top"
                     />
-                </div>
-
-                {/* Authorized distributors */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
-                    <h2 className="text-[15px] font-bold text-[#181725]">Authorized Distributors</h2>
-                    <p className="text-[12px] text-gray-500 -mt-2">Admin veto/override — both brand and admin must approve before a vendor appears on the brand store.</p>
-                    {authLoading ? (
-                        <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-[#53B175]" /></div>
-                    ) : authDistributors.length === 0 ? (
-                        <p className="text-[13px] text-gray-400">No distributor authorization requests yet.</p>
-                    ) : (
-                        <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
-                            {authDistributors.map((d) => (
-                                <div key={d.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-                                    <div>
-                                        <p className="text-[13px] font-bold text-[#181725]">{d.vendor.businessName}</p>
-                                        <p className="text-[11px] text-gray-500">
-                                            {d.vendor.city ?? '—'} · Brand {d.brandApprovedAt ? '✓' : '—'} · Admin {d.adminApprovedAt ? '✓' : '—'}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className={cn('text-[10px] font-bold uppercase px-2 py-0.5 rounded',
-                                            d.status === 'approved' ? 'bg-green-50 text-green-700'
-                                                : d.status === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600')}>
-                                            {d.status}
-                                        </span>
-                                        {canApprove && d.status === 'pending' && (
-                                            <>
-                                                <button type="button" onClick={() => handleAdminDistributorAction(d.vendorId, 'approve')}
-                                                    className="h-[30px] px-3 bg-[#53B175] text-white rounded-lg text-[11px] font-bold">Approve</button>
-                                                <button type="button" onClick={() => handleAdminDistributorAction(d.vendorId, 'reject')}
-                                                    className="h-[30px] px-3 bg-gray-100 text-gray-700 rounded-lg text-[11px] font-bold">Reject</button>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
                 </div>
 
                 {/* Tier B — admin ops */}

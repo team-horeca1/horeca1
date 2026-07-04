@@ -1,7 +1,6 @@
-// GET   /api/v1/brand/authorized-distributors — list distributor authorization requests
-// POST  /api/v1/brand/authorized-distributors — brand approves a vendor (dual gate: admin still required)
-// PATCH /api/v1/brand/authorized-distributors — reject a vendor
-// REQUIRES: role=brand or admin
+// GET   /api/v1/brand/authorized-distributors — list linked distributors
+// POST  /api/v1/brand/authorized-distributors — add / approve / reject a vendor
+// PATCH /api/v1/brand/authorized-distributors — same as POST
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -16,7 +15,7 @@ import type { AuthContext } from '@/middleware/auth';
 
 const actionSchema = z.object({
   vendorId: z.string().uuid(),
-  action: z.enum(['approve', 'reject']),
+  action: z.enum(['add', 'approve', 'reject']),
   note: z.string().max(500).optional(),
 });
 

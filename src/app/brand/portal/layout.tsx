@@ -7,7 +7,6 @@ import { useSession } from 'next-auth/react';
 import {
     LayoutDashboard,
     Package,
-    GitMerge,
     Settings,
     BarChart3,
     Users,
@@ -39,7 +38,6 @@ interface BrandSidebarLink {
 const SIDEBAR_LINKS: BrandSidebarLink[] = [
     { name: 'Dashboard', icon: LayoutDashboard, href: '/brand/portal', requiredPerm: 'dashboard.view' },
     { name: 'My Products', icon: Package, href: '/brand/portal/products', requiredPerm: 'products.view' },
-    { name: 'Distributor Map', icon: GitMerge, href: '/brand/portal/mappings', requiredPerm: 'vendors.view' },
     { name: 'Distributors', icon: Users, href: '/brand/portal/distributors', requiredPerm: 'vendors.view' },
     { name: 'Analytics', icon: BarChart3, href: '/brand/portal/analytics', requiredPerm: 'analytics.view' },
     { name: 'Team', icon: Users, href: '/brand/portal/team', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },

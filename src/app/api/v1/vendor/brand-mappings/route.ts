@@ -19,7 +19,7 @@ import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
-import { ensurePendingDistributorAuth } from '@/lib/brandAuthorizedDistributor';
+import { getApprovedDistributorKeys, approvedDistributorWhere } from '@/lib/brandAuthorizedDistributor';
 import type { AuthContext } from '@/middleware/auth';
 
 const createMappingSchema = z.object({
@@ -35,15 +35,27 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
 
     const distributorAuths = await prisma.brandAuthorizedDistributor.findMany({
       where: { vendorId },
-      select: { brandId: true, status: true },
+      select: { brandId: true, status: true, brandApprovedAt: true },
     });
+    const approvedKeys = await getApprovedDistributorKeys({ vendorId });
+    const approvedBrandIds = [...approvedKeys].map((k) => k.split(':')[0]);
+
+    if (approvedBrandIds.length === 0) {
+      if (view === 'table') {
+        return NextResponse.json({
+          success: true,
+          data: { rows: [], brands: [], distributorAuths, hasAuthorizedBrands: false },
+        });
+      }
+      return NextResponse.json({
+        success: true,
+        data: { unmapped: [], pendingReview: [], mapped: [], hasAuthorizedBrands: false },
+      });
+    }
+
+    const approvedBrandSet = new Set(approvedBrandIds);
     const authByBrand = new Map(distributorAuths.map((a) => [a.brandId, a.status]));
 
-    // Fetch every active approved product for this vendor, with ALL its mappings
-    // in any reviewable state. We deliberately DO NOT `take: 1` — the auto-mapper
-    // can produce multiple plausible candidates per product (e.g. "Tomato Ketchup
-    // 1kg" against Knorr + Heinz + Maggi catalogs) and the vendor needs to see
-    // every suggestion so they can confirm the correct one and reject the rest.
     const products = await prisma.product.findMany({
       where: { vendorId, isActive: true, approvalStatus: 'approved' },
       select: {
@@ -86,8 +98,9 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     }> = [];
 
     for (const p of products) {
-      const liveMappings = p.brandMappings.filter(m => m.status === 'auto_mapped' || m.status === 'verified');
-      const pendingMappings = p.brandMappings.filter(m => m.status === 'pending_review');
+      const brandMappings = p.brandMappings.filter((m) => approvedBrandSet.has(m.brandId ?? m.brandMasterProduct.brand.id));
+      const liveMappings = brandMappings.filter(m => m.status === 'auto_mapped' || m.status === 'verified');
+      const pendingMappings = brandMappings.filter(m => m.status === 'pending_review');
 
       // Each LIVE mapping = its own row (a vendor product can legitimately appear under
       // multiple brand storefronts; the vendor needs per-link controls).
@@ -156,10 +169,11 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       const rows: TableRow[] = [];
 
       for (const p of products) {
-        const liveMappings = p.brandMappings.filter(
+        const brandMappings = p.brandMappings.filter((m) => approvedBrandSet.has(m.brandMasterProduct.brand.id));
+        const liveMappings = brandMappings.filter(
           (m) => m.status === 'auto_mapped' || m.status === 'verified',
         );
-        const pendingMappings = p.brandMappings.filter((m) => m.status === 'pending_review');
+        const pendingMappings = brandMappings.filter((m) => m.status === 'pending_review');
 
         if (liveMappings.length > 0) {
           for (const m of liveMappings) {
@@ -234,13 +248,9 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
 
       const brands = await prisma.brand.findMany({
         where: {
+          id: { in: approvedBrandIds },
           isActive: true,
           approvalStatus: 'approved',
-          masterProducts: {
-            some: {
-              mappings: { some: { distributorProduct: { vendorId } } },
-            },
-          },
         },
         select: { id: true, name: true, slug: true, logoUrl: true },
         orderBy: { name: 'asc' },
@@ -248,7 +258,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
 
       return NextResponse.json({
         success: true,
-        data: { rows, brands, distributorAuths },
+        data: { rows, brands, distributorAuths, hasAuthorizedBrands: true },
       });
     }
 
@@ -283,7 +293,14 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     });
     if (!masterProduct) throw Errors.notFound('Brand master product not found');
 
-    // Upsert: if a rejected mapping exists, override it; if verified, no-op
+    const auth = await prisma.brandAuthorizedDistributor.findFirst({
+      where: approvedDistributorWhere({ brandId: masterProduct.brandId, vendorId }),
+      select: { status: true },
+    });
+    if (!auth) {
+      throw Errors.forbidden('Your vendor is not an authorized distributor for this brand');
+    }
+
     const mapping = await prisma.brandProductMapping.upsert({
       where: {
         brandMasterProductId_distributorProductId: {
@@ -309,8 +326,6 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         updatedAt: new Date(),
       },
     });
-
-    await ensurePendingDistributorAuth(masterProduct.brandId, vendorId);
 
     logAction(ctx, req, {
       action: AUDIT_ACTIONS.brandMappingVerified,

@@ -158,7 +158,7 @@ export class BrandService {
               },
             },
             mappings: {
-              where: { status: { in: ['auto_mapped', 'verified'] } },
+              where: { status: 'verified' },
               include: {
                 distributorProduct: {
                   select: {
@@ -340,7 +340,7 @@ export class BrandService {
   async getAnalytics(brandId: string) {
     // 1) Mapped distributor products + serviced pincodes
     const mappings = await prisma.brandProductMapping.findMany({
-      where: { brandId, status: { in: ['verified', 'auto_mapped'] } },
+      where: { brandId, status: 'verified' },
       select: {
         distributorProductId: true,
         brandMasterProduct: { select: { id: true, name: true, imageUrl: true, packSize: true } },
@@ -590,7 +590,7 @@ export class BrandService {
         categoryRel: { select: { id: true, name: true } },
         _count: {
           select: {
-            mappings: { where: { status: { in: ['auto_mapped', 'verified'] } } },
+            mappings: { where: { status: 'verified' } },
           },
         },
       },
@@ -955,8 +955,6 @@ export class BrandService {
 
     if (action === 'approved') {
       emitEvent('BrandApproved', { brandId, brandName: brand.name, approvedBy: adminId });
-      // Kick off initial auto-mapping
-      runMappingForBrand(brandId).catch(console.error);
     } else {
       // Rejection: notify the brand owner so they see why and can resubmit.
       emitEvent('BrandRejected', { brandId, brandName: brand.name, rejectedBy: adminId, reason: _reviewNote });

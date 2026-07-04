@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import type { BrandAuthorizedDistributorStatus } from '@prisma/client';
+import type { BrandAuthorizedDistributorStatus, Prisma } from '@prisma/client';
 
 export function distributorAuthKey(brandId: string, vendorId: string): string {
   return `${brandId}:${vendorId}`;
@@ -7,29 +7,56 @@ export function distributorAuthKey(brandId: string, vendorId: string): string {
 
 export function recomputeAuthStatus(
   brandApprovedAt: Date | null | undefined,
-  adminApprovedAt: Date | null | undefined,
+  _adminApprovedAt: Date | null | undefined,
   rejectedAt: Date | null | undefined,
 ): BrandAuthorizedDistributorStatus {
   if (rejectedAt) return 'rejected';
-  if (brandApprovedAt && adminApprovedAt) return 'approved';
+  if (brandApprovedAt) return 'approved';
   return 'pending';
+}
+
+/** Prisma filter: brand-approved distributors (handles legacy rows stuck in pending). */
+export function approvedDistributorWhere(filter?: {
+  brandId?: string;
+  vendorId?: string;
+}): Prisma.BrandAuthorizedDistributorWhereInput {
+  return {
+    rejectedAt: null,
+    ...(filter?.brandId && { brandId: filter.brandId }),
+    ...(filter?.vendorId && { vendorId: filter.vendorId }),
+    OR: [
+      { status: 'approved' },
+      { status: 'pending', brandApprovedAt: { not: null } },
+    ],
+  };
+}
+
+/** Repair rows that have brandApprovedAt but stale status=pending. */
+async function syncStaleApprovedRows(filter?: { brandId?: string; vendorId?: string }): Promise<void> {
+  await prisma.brandAuthorizedDistributor.updateMany({
+    where: {
+      status: 'pending',
+      brandApprovedAt: { not: null },
+      rejectedAt: null,
+      ...(filter?.brandId && { brandId: filter.brandId }),
+      ...(filter?.vendorId && { vendorId: filter.vendorId }),
+    },
+    data: { status: 'approved' },
+  });
 }
 
 /** Set of `brandId:vendorId` keys with fully approved distributor status. */
 export async function getApprovedDistributorKeys(
   filter?: { brandId?: string; vendorId?: string },
 ): Promise<Set<string>> {
+  await syncStaleApprovedRows(filter);
+
   const rows = await prisma.brandAuthorizedDistributor.findMany({
-    where: {
-      status: 'approved',
-      ...(filter?.brandId && { brandId: filter.brandId }),
-      ...(filter?.vendorId && { vendorId: filter.vendorId }),
-    },
+    where: approvedDistributorWhere(filter),
     select: { brandId: true, vendorId: true },
   });
   return new Set(rows.map((r) => distributorAuthKey(r.brandId, r.vendorId)));
 }
-
 export async function ensurePendingDistributorAuth(brandId: string, vendorId: string): Promise<void> {
   await prisma.brandAuthorizedDistributor.upsert({
     where: { brandId_vendorId: { brandId, vendorId } },
@@ -44,26 +71,20 @@ export async function approveDistributorByBrand(
   userId: string,
   note?: string,
 ) {
-  const existing = await prisma.brandAuthorizedDistributor.findUnique({
-    where: { brandId_vendorId: { brandId, vendorId } },
-  });
   const now = new Date();
-  const adminApprovedAt = existing?.adminApprovedAt ?? null;
-  const status = recomputeAuthStatus(now, adminApprovedAt, null);
 
   return prisma.brandAuthorizedDistributor.upsert({
     where: { brandId_vendorId: { brandId, vendorId } },
     create: {
       brandId,
       vendorId,
-      status,
+      status: 'approved',
       brandApprovedAt: now,
       brandApprovedBy: userId,
-      adminApprovedAt,
       note: note ?? null,
     },
     update: {
-      status,
+      status: 'approved',
       brandApprovedAt: now,
       brandApprovedBy: userId,
       rejectedAt: null,

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import {
-    Package, Plus, Pencil, Trash2, Loader2, X, Check, GitMerge, Upload,
+    Package, Plus, Pencil, Trash2, Loader2, X, Check, Upload,
     Info, Tag
 } from 'lucide-react';
 import { cn, formatPackSize } from '@/lib/utils';
@@ -241,19 +241,6 @@ export default function BrandProductsPage() {
         finally { setActionLoading(null); }
     };
 
-    const handleRunMapping = async (id: string) => {
-        setActionLoading(`map-${id}`);
-        try {
-            await fetch('/api/v1/brand/coverage', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ brandMasterProductId: id }),
-            });
-            fetchProducts();
-        } catch { /* silent */ }
-        finally { setActionLoading(null); }
-    };
-
     return (
         <div className="max-w-[1100px] mx-auto space-y-6 animate-in fade-in duration-500">
             {/* Header */}
@@ -342,14 +329,6 @@ export default function BrandProductsPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => handleRunMapping(product.id)}
-                                                    disabled={!!actionLoading}
-                                                    title="Run auto-mapping"
-                                                    className="h-[32px] w-[32px] flex items-center justify-center bg-[#EEF8F1] text-[#53B175] rounded-[8px] hover:bg-[#53B175] hover:text-white transition-colors disabled:opacity-50"
-                                                >
-                                                    {actionLoading === `map-${product.id}` ? <Loader2 size={14} className="animate-spin" /> : <GitMerge size={14} />}
-                                                </button>
                                                 <button
                                                     onClick={() => openEdit(product)}
                                                     className="h-[32px] w-[32px] flex items-center justify-center bg-[#F0F4FF] text-[#3B82F6] rounded-[8px] hover:bg-[#3B82F6] hover:text-white transition-colors"

@@ -41,6 +41,7 @@ import { FORM, FormField as Field, FormInput, SectionLabel, selectClass, textare
 interface Props {
   onClose: () => void;
   onCreated: (vendor: { id: string; businessName: string; slug: string; user: { id: string; fullName: string; email: string } }) => void;
+  createEndpoint?: string;
 }
 
 const STEP_LABELS = ['Owner & Business', 'KYC & Bank', 'Address & Operations'];
@@ -66,7 +67,7 @@ const DELIVERY_LABEL: Record<DeliveryCapability, string> = {
   both:        'Both — own + third-party',
 };
 
-export function AddVendorWizard({ onClose, onCreated }: Props) {
+export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/admin/vendors' }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -270,7 +271,7 @@ export function AddVendorWizard({ onClose, onCreated }: Props) {
           cinNumber: cinNumber.trim() || undefined,
         },
       };
-      const res = await fetch('/api/v1/admin/vendors', {
+      const res = await fetch(createEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -280,8 +281,9 @@ export function AddVendorWizard({ onClose, onCreated }: Props) {
         setError(json.error?.message || json.error || 'Failed to create vendor');
         return;
       }
-      toast.success(`${json.data.businessName} created`);
-      onCreated(json.data);
+      const created = json.data?.vendor ?? json.data;
+      toast.success(`${created.businessName} created`);
+      onCreated(created);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create vendor');
     } finally {
