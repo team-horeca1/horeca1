@@ -5,6 +5,7 @@ import {
   CheckCircle2, ChevronRight, ChevronLeft, Store, Truck, Package, Users, Rocket, Sparkles,
   Warehouse, CreditCard, Wallet, Loader2,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { ImageUpload } from '@/components/ui/ImageUpload';
@@ -200,50 +201,50 @@ export default function SetupWizardPage() {
         {current.key === 'delivery' && (
           <div className="text-center">
             <p className="text-[14px] text-[#7C7C7C] mb-6">Configure pincodes and delivery time slots.</p>
-            <a href="/vendor/settings#delivery" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
+            <Link href="/vendor/settings#delivery" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
               Configure Delivery <ChevronRight size={16} />
-            </a>
+            </Link>
           </div>
         )}
 
         {current.key === 'products' && (
           <div className="text-center space-y-3">
-            <a href="/vendor/products" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
+            <Link href="/vendor/products" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
               Add Products <ChevronRight size={16} />
-            </a>
+            </Link>
             <p className="text-[12px] text-[#AEAEAE]">Use bulk import for large catalogs</p>
           </div>
         )}
 
         {current.key === 'inventory' && (
           <div className="text-center">
-            <a href="/vendor/inventory" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
+            <Link href="/vendor/inventory" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
               Manage Inventory <ChevronRight size={16} />
-            </a>
+            </Link>
           </div>
         )}
 
         {current.key === 'credit' && (
           <div className="text-center">
-            <a href="/vendor/credit" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
+            <Link href="/vendor/credit" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
               Credit & Collections <ChevronRight size={16} />
-            </a>
+            </Link>
           </div>
         )}
 
         {current.key === 'payment_modes' && (
           <div className="text-center">
-            <a href="/vendor/settings#payments" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
+            <Link href="/vendor/settings#payments" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
               Payment Settings <ChevronRight size={16} />
-            </a>
+            </Link>
           </div>
         )}
 
         {current.key === 'team' && (
           <div className="text-center">
-            <a href="/vendor/team" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
+            <Link href="/vendor/team" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
               Invite Team <ChevronRight size={16} />
-            </a>
+            </Link>
           </div>
         )}
 
