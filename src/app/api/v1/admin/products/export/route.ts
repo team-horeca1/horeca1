@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { totalStockQty } from '@/lib/inventoryHelpers';
 import {
   exportProductsToXlsx,
   exportProductsToCsv,
@@ -41,7 +42,7 @@ export const GET = adminOnly(async (req: NextRequest) => {
       include: {
         vendor: { select: { businessName: true, vendorCode: true } },
         category: { select: { name: true, parentId: true, parent: { select: { name: true } } } },
-        inventory: { select: { qtyAvailable: true } },
+        inventories: { select: { qtyAvailable: true } },
         priceSlabs: { orderBy: { sortOrder: 'asc' }, take: 2 },
         categoryLinks: {
           include: { category: { select: { name: true, parentId: true } } },
@@ -76,7 +77,7 @@ export const GET = adminOnly(async (req: NextRequest) => {
         promoPrice: p.promoPrice ? Number(p.promoPrice) : null,
         imageUrl: p.imageUrl,
         imageName: p.imageUrl ? p.imageUrl.split('/').pop() || '' : '',
-        stock: p.inventory?.qtyAvailable ?? 0,
+        stock: totalStockQty(p.inventories),
         approvalStatus: p.approvalStatus,
         barcode: p.barcode,
         aliasName: p.aliasNames?.[0] ?? null,

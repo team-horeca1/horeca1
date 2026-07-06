@@ -7,11 +7,12 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
-import { resolveVendorContext } from '@/lib/resolveVendorId';
+import { resolveVendorOutletContext } from '@/lib/resolveVendorOutletContext';
 import { requirePermission } from '@/lib/permissions/engine';
 
 const addSchema = z.object({
   pincode: z.string().min(4).max(10),
+  outletId: z.string().uuid().optional(),
 });
 
 const updateSchema = z.object({
@@ -26,19 +27,23 @@ const deleteSchema = z.object({
 // POST — add new service area pincode
 export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    const { vendorId } = await resolveVendorContext(ctx, req);
+    const outletCtx = await resolveVendorOutletContext(ctx, req);
     requirePermission(ctx, 'settings.edit');
     const body = await req.json();
-    const { pincode } = addSchema.parse(body);
+    const { pincode, outletId: bodyOutletId } = addSchema.parse(body);
 
-    const existing = await prisma.serviceArea.findUnique({
-      where: { vendorId_pincode: { vendorId, pincode } },
+    const outletId = outletCtx.multiWarehouseEnabled
+      ? (bodyOutletId ?? outletCtx.outletId)
+      : null;
+
+    const existing = await prisma.serviceArea.findFirst({
+      where: { vendorId: outletCtx.vendorId, pincode, outletId },
     });
     if (existing) throw Errors.conflict('Service area with this pincode already exists');
 
     const area = await prisma.serviceArea.create({
-      data: { vendorId, pincode, isActive: true },
-      select: { id: true, pincode: true, isActive: true },
+      data: { vendorId: outletCtx.vendorId, outletId, pincode, isActive: true },
+      select: { id: true, pincode: true, isActive: true, outletId: true },
     });
 
     return NextResponse.json({ success: true, data: area }, { status: 201 });
@@ -50,18 +55,18 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
 // PATCH — toggle active/inactive
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    const { vendorId } = await resolveVendorContext(ctx, req);
+    const outletCtx = await resolveVendorOutletContext(ctx, req);
     requirePermission(ctx, 'settings.edit');
     const body = await req.json();
     const { id, isActive } = updateSchema.parse(body);
 
-    const area = await prisma.serviceArea.findFirst({ where: { id, vendorId } });
+    const area = await prisma.serviceArea.findFirst({ where: { id, vendorId: outletCtx.vendorId } });
     if (!area) throw Errors.notFound('Service area');
 
     const updated = await prisma.serviceArea.update({
       where: { id },
       data: { isActive },
-      select: { id: true, pincode: true, isActive: true },
+      select: { id: true, pincode: true, isActive: true, outletId: true },
     });
 
     return NextResponse.json({ success: true, data: updated });
@@ -73,12 +78,12 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
 // DELETE — remove service area
 export const DELETE = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    const { vendorId } = await resolveVendorContext(ctx, req);
+    const outletCtx = await resolveVendorOutletContext(ctx, req);
     requirePermission(ctx, 'settings.edit');
     const body = await req.json();
     const { id } = deleteSchema.parse(body);
 
-    const area = await prisma.serviceArea.findFirst({ where: { id, vendorId } });
+    const area = await prisma.serviceArea.findFirst({ where: { id, vendorId: outletCtx.vendorId } });
     if (!area) throw Errors.notFound('Service area');
 
     await prisma.serviceArea.delete({ where: { id } });

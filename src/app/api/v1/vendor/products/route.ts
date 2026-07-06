@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { ensureInventoryForAllOutlets } from '@/lib/inventoryOutlet';
 import { CatalogService } from '@/modules/catalog/catalog.service';
 import { emitEvent } from '@/events/emitter';
 import { resolveVendorId, resolveVendorContext } from '@/lib/resolveVendorId';
@@ -155,15 +156,32 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       });
     }
 
-    // Initialize inventory record for the new product
-    await prisma.inventory.create({
-      data: {
-        productId: product.id,
-        vendorId,
-        qtyAvailable: 0,
-        lowStockThreshold: 10,
-      },
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { businessAccountId: true, multiWarehouseEnabled: true },
     });
+    if (!vendor) throw Errors.notFound('Vendor');
+
+    // Initialize inventory at primary outlet (or all outlets when multi-warehouse)
+    if (vendor.multiWarehouseEnabled) {
+      await ensureInventoryForAllOutlets(product.id, vendorId, vendor.businessAccountId);
+    } else {
+      const primaryOutlet = await prisma.outlet.findFirst({
+        where: { businessAccountId: vendor.businessAccountId, isActive: true },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (!primaryOutlet) throw Errors.badRequest('Vendor has no outlet for inventory');
+      await prisma.inventory.create({
+        data: {
+          productId: product.id,
+          vendorId,
+          outletId: primaryOutlet.id,
+          qtyAvailable: 0,
+          lowStockThreshold: 10,
+        },
+      });
+    }
 
     // Only notify admins if product needs approval (not auto-approved or draft)
     if (!isDraft && product.approvalStatus === 'pending') {

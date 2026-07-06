@@ -23,6 +23,7 @@ export interface TeamMemberItem {
     isActive: boolean;
   };
   role: { name: string };
+  outletAccess?: string;
 }
 
 interface Props {
@@ -98,6 +99,9 @@ export function TeamMemberList({
                   <p className="text-[12px] text-[#7C7C7C] truncate">
                     {member.user.email ?? member.user.phone ?? '—'}
                   </p>
+                  {member.outletAccess && (
+                    <p className="text-[11px] font-bold text-[#1D4ED8] mt-0.5">{member.outletAccess}</p>
+                  )}
                 </div>
 
                 <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] shrink-0"

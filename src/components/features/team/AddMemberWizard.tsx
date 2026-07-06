@@ -254,6 +254,10 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
       }
       setStep(2);
     } else if (step === 2) {
+      if (!allOutlets && selectedOutletIds.size === 0) {
+        setError('Select at least one outlet, or choose "All outlets"');
+        return;
+      }
       setStep(3);
     }
   };

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
+import { useVendorOutletScope } from '@/hooks/useVendorOutletScope';
 import { openAccountSwitcher } from '@/lib/accountSwitcherEvents';
 import { toast } from 'sonner';
 
@@ -2556,6 +2557,8 @@ function FinancialDetailDrawer({
 export default function VendorDashboardPage() {
     const { data: session } = useSession();
     const { currentOutlet } = useBusinessAccountSwitcher();
+    const { outletQuery, scopeVersion, currentOutlet: scopedOutlet, multiWarehouseEnabled } = useVendorOutletScope();
+    const [viewAllOutlets, setViewAllOutlets] = useState(false);
     const activeAccountType = (session?.user as {
         activeBusinessAccountType?: { isVendor: boolean; isBrand: boolean };
     } | undefined)?.activeBusinessAccountType;
@@ -2638,7 +2641,8 @@ export default function VendorDashboardPage() {
         if (!silent) setLoading(true);
         setError(null);
         setIsNetworkError(false);
-        fetch('/api/v1/vendor/dashboard')
+        const qs = viewAllOutlets && multiWarehouseEnabled ? '?outletId=all' : outletQuery();
+        fetch(`/api/v1/vendor/dashboard${qs}`)
             .then(res => res.json().then(json => ({ res, json })))
             .then(({ res, json }) => {
                 if (json.success) {
@@ -2655,7 +2659,7 @@ export default function VendorDashboardPage() {
                 setIsNetworkError(true);
             })
             .finally(() => { if (!silent) setLoading(false); });
-    }, []);
+    }, [outletQuery, scopeVersion, viewAllOutlets, multiWarehouseEnabled]);
 
     // Load auxiliary lists to supply modal dropdown selectors
     useEffect(() => {
@@ -2728,6 +2732,13 @@ export default function VendorDashboardPage() {
                 <div className="relative z-10">
                     <div className="flex items-center gap-2.5 flex-wrap">
                         <h1 className="text-[24px] font-semibold text-white tracking-tight leading-none">Today's Operations Control Center</h1>
+                        {multiWarehouseEnabled && (
+                            <p className="text-emerald-200/90 text-[13px] mt-2 font-medium">
+                                {viewAllOutlets
+                                    ? 'Aggregated across all warehouses'
+                                    : `Warehouse: ${scopedOutlet?.name ?? currentOutlet?.name ?? '—'}`}
+                            </p>
+                        )}
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
                             Live Pulse Active
@@ -2741,6 +2752,15 @@ export default function VendorDashboardPage() {
                     <span className="text-[11px] text-slate-450 font-extrabold hidden md:inline tracking-wider uppercase">
                         REFRESHED: {lastRefresh.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                     </span>
+                    {multiWarehouseEnabled && (
+                        <button
+                            type="button"
+                            onClick={() => setViewAllOutlets((v) => !v)}
+                            className="h-10 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-[13px] font-medium text-slate-200 border border-slate-700/50"
+                        >
+                            {viewAllOutlets ? 'This warehouse' : 'All warehouses'}
+                        </button>
+                    )}
                     <button
                         onClick={() => fetchDashboard()}
                         className="h-10 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-[13px] font-medium text-slate-200 hover:text-white flex items-center gap-2 border border-slate-700/50 hover:border-slate-600 transition-all shadow-md active:scale-95 cursor-pointer"

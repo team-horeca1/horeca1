@@ -45,11 +45,12 @@ function parseGrnItems(items: Prisma.JsonValue): GrnItem[] {
 export class WarehouseService {
   private orderService = new OrderService();
 
-  async lookupOrders(vendorId: string, q: string, limit = 8) {
+  async lookupOrders(vendorId: string, outletId: string | undefined, q: string, limit = 8) {
     return prisma.order.findMany({
       where: {
         vendorId,
         status: { in: [...FULFILLABLE_ORDER_STATUSES] },
+        ...(outletId ? { fulfillmentOutletId: outletId } : {}),
         ...(q.length >= 2
           ? { orderNumber: { contains: q, mode: 'insensitive' } }
           : {}),
@@ -81,9 +82,9 @@ export class WarehouseService {
     });
   }
 
-  async listPicklists(vendorId: string) {
+  async listPicklists(vendorId: string, outletId?: string) {
     const rows = await prisma.picklist.findMany({
-      where: { vendorId },
+      where: { vendorId, ...(outletId ? { outletId } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: { order: { select: { orderNumber: true, status: true } } },
@@ -119,6 +120,7 @@ export class WarehouseService {
 
   async createPicklist(
     vendorId: string,
+    outletId: string,
     input: { orderId?: string; notes?: string; items?: PicklistItem[] },
   ) {
     if (input.orderId) {
@@ -137,12 +139,14 @@ export class WarehouseService {
     let items = input.items ?? [];
     const orderId = input.orderId;
 
+    let resolvedOutletId = outletId;
     if (orderId && items.length === 0) {
       const order = await prisma.order.findFirst({
         where: { id: orderId, vendorId },
         include: { items: { include: { product: { select: { name: true } } } } },
       });
       if (!order) throw Errors.notFound('Order');
+      if (order.fulfillmentOutletId) resolvedOutletId = order.fulfillmentOutletId;
       if (!['confirmed', 'processing', 'ready_for_dispatch', 'shipped'].includes(order.status)) {
         throw Errors.badRequest(
           `Cannot create picklist for order in status "${order.status}". Order must be accepted first.`,
@@ -162,6 +166,7 @@ export class WarehouseService {
     const row = await prisma.picklist.create({
       data: {
         vendorId,
+        outletId: resolvedOutletId,
         orderId,
         notes: input.notes,
         items,
@@ -210,9 +215,9 @@ export class WarehouseService {
     }
   }
 
-  async listDispatches(vendorId: string) {
+  async listDispatches(vendorId: string, outletId?: string) {
     return prisma.dispatch.findMany({
-      where: { vendorId },
+      where: { vendorId, ...(outletId ? { outletId } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: { order: { select: { orderNumber: true, status: true } } },
@@ -240,6 +245,7 @@ export class WarehouseService {
 
   async createDispatch(
     vendorId: string,
+    outletId: string,
     input: {
       orderId?: string;
       picklistId?: string;
@@ -267,11 +273,13 @@ export class WarehouseService {
       throw Errors.badRequest('Dispatch requires an order or a picked picklist.');
     }
 
+    let resolvedOutletId = outletId;
     if (orderId) {
       const order = await prisma.order.findFirst({
         where: { id: orderId, vendorId },
       });
       if (!order) throw Errors.notFound('Order');
+      if (order.fulfillmentOutletId) resolvedOutletId = order.fulfillmentOutletId;
       const allowed = ['ready_for_dispatch', 'processing', 'shipped'];
       if (!allowed.includes(order.status)) {
         throw Errors.badRequest(
@@ -285,6 +293,7 @@ export class WarehouseService {
       const row = await prisma.dispatch.create({
         data: {
           vendorId,
+          outletId: resolvedOutletId,
           orderId,
           picklistId,
           driverName: input.driverName,
@@ -365,9 +374,9 @@ export class WarehouseService {
     return updated;
   }
 
-  async listGrns(vendorId: string) {
+  async listGrns(vendorId: string, outletId?: string) {
     const rows = await prisma.goodsReceipt.findMany({
-      where: { vendorId },
+      where: { vendorId, ...(outletId ? { outletId } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 50,
     });
@@ -388,6 +397,7 @@ export class WarehouseService {
 
   async createGrn(
     vendorId: string,
+    outletId: string,
     input: {
       referenceNo?: string;
       supplier?: string;
@@ -399,7 +409,7 @@ export class WarehouseService {
     const enrichedItems = await this.enrichGrnItems(vendorId, input.items);
 
     if (input.receive) {
-      return this.receiveGrnInternal(vendorId, {
+      return this.receiveGrnInternal(vendorId, outletId, {
         referenceNo: input.referenceNo,
         supplier: input.supplier,
         notes: input.notes,
@@ -410,6 +420,7 @@ export class WarehouseService {
     const row = await prisma.goodsReceipt.create({
       data: {
         vendorId,
+        outletId,
         referenceNo: input.referenceNo,
         supplier: input.supplier,
         notes: input.notes,
@@ -442,7 +453,8 @@ export class WarehouseService {
         throw Errors.badRequest('GRN has already been received or cancelled.');
       }
       const items = parseGrnItems(grn.items);
-      return this.receiveGrnInternal(vendorId, {
+      if (!grn.outletId) throw Errors.badRequest('GRN has no warehouse outlet assigned');
+      return this.receiveGrnInternal(vendorId, grn.outletId, {
         grnId,
         referenceNo: grn.referenceNo ?? undefined,
         supplier: grn.supplier ?? undefined,
@@ -473,6 +485,7 @@ export class WarehouseService {
 
   private async receiveGrnInternal(
     vendorId: string,
+    outletId: string,
     input: {
       grnId?: string;
       referenceNo?: string;
@@ -495,6 +508,7 @@ export class WarehouseService {
         grn = await tx.goodsReceipt.create({
           data: {
             vendorId,
+            outletId,
             referenceNo: input.referenceNo,
             supplier: input.supplier,
             notes: input.notes,
@@ -506,11 +520,13 @@ export class WarehouseService {
       }
 
       for (const line of input.items) {
-        const current = await tx.inventory.findUnique({ where: { productId: line.productId } });
+        const current = await tx.inventory.findUnique({
+          where: { productId_outletId: { productId: line.productId, outletId } },
+        });
         if (!current || current.vendorId !== vendorId) continue;
         const newQty = current.qtyAvailable + line.qty;
         const inv = await tx.inventory.update({
-          where: { productId: line.productId },
+          where: { productId_outletId: { productId: line.productId, outletId } },
           data: { qtyAvailable: newQty },
         });
         await tx.inventoryLog.create({

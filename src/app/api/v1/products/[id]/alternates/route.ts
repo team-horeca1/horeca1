@@ -13,31 +13,35 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
 import { attachCustomerPricing } from '@/modules/pricing/catalog-pricing';
+import { withLegacyInventory } from '@/lib/inventoryHelpers';
 
 const STOPWORDS = new Set(['the', 'and', 'for', 'with', 'pcs', 'kgs', 'ltr', 'pack']);
 
 // All tiers exit through here so logged-in buyers see THEIR price on
 // alternate-vendor suggestions too.
-async function respond(
-  alternates: Array<{ id: string; vendorId?: string | null; basePrice: unknown; brand?: string | null }>,
+async function respond<T extends { id: string; basePrice: unknown }>(
+  alternates: T[],
   matchType: string,
 ) {
+  const enriched = alternates.map((a) =>
+    withLegacyInventory(a as T & { inventories?: Array<{ qtyAvailable: number; qtyReserved?: number }> }),
+  );
   return NextResponse.json({
     success: true,
-    data: { alternates: await attachCustomerPricing(alternates), matchType },
+    data: { alternates: await attachCustomerPricing(enriched), matchType },
   });
 }
 
 const productInclude = {
   vendor: { select: { id: true, businessName: true, logoUrl: true, minOrderValue: true } },
-  inventory: { select: { qtyAvailable: true } },
+  inventories: { select: { qtyAvailable: true } },
   category: { select: { id: true, name: true } },
 } as const;
 
 const baseFilter: Prisma.ProductWhereInput = {
   isActive: true,
   approvalStatus: 'approved',
-  inventory: { qtyAvailable: { gt: 0 } },
+  inventories: { some: { qtyAvailable: { gt: 0 } } },
 };
 
 export async function GET(

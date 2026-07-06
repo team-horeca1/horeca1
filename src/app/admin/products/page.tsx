@@ -78,7 +78,7 @@ interface Product {
     vendor: { id: string; businessName: string; vendorCode?: string | null } | null;
     category: { id: string; name: string; parentId?: string | null } | null;
     categoryLinks?: { categoryId: string; isPrimary: boolean; category: { id: string; name: string } }[];
-    inventory: { qtyAvailable: number } | null;
+    inventory?: { qtyAvailable: number } | null;
     vendorCount?: number;
     isMasterRow?: boolean;
     vendors?: string[];
@@ -656,7 +656,11 @@ export default function ProductsPage() {
                             createdAt: String(p.createdAt ?? ''),
                             vendor: p.vendor as Product['vendor'],
                             category: p.category as Product['category'],
-                            inventory: p.inventory as Product['inventory'],
+                            inventory: (() => {
+                                const rows = p.inventories as Array<{ qtyAvailable: number }> | undefined;
+                                if (!rows?.length) return null;
+                                return { qtyAvailable: rows.reduce((s, r) => s + r.qtyAvailable, 0) };
+                            })(),
                             metadata: p.metadata as Record<string, unknown> | undefined,
                             isMasterRow: false,
                         }));

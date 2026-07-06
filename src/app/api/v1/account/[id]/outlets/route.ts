@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
 import { assertAccountMember, assertAccountPermission } from '@/lib/accountAccess';
 import { adoptOrCreateOutlet } from '@/lib/outletWrites';
+import { ensureInventoryRowsForOutlet } from '@/lib/inventoryOutlet';
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
@@ -87,10 +88,20 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
         });
       }
 
-      return outlet;
+      return { outlet, adopted };
     });
 
-    return NextResponse.json({ success: true, data: result }, { status: 201 });
+    if (!result.adopted) {
+      const vendor = await prisma.vendor.findUnique({
+        where: { businessAccountId: id },
+        select: { id: true },
+      });
+      if (vendor) {
+        await ensureInventoryRowsForOutlet(vendor.id, result.outlet.id);
+      }
+    }
+
+    return NextResponse.json({ success: true, data: result.outlet }, { status: 201 });
   } catch (err) { return errorResponse(err); }
 });
 

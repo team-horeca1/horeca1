@@ -13,6 +13,8 @@ import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { assertLeafCategory, findOrCreateMaster } from '@/modules/catalog/catalog.service';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
+import { totalStockQty } from '@/lib/inventoryHelpers';
+import { ensureInventoryForAllOutlets } from '@/lib/inventoryOutlet';
 
 // Validation schema for admin product creation
 // vendorId is optional — admin can create catalog products without a vendor
@@ -111,7 +113,7 @@ export const GET = adminOnly(async (req: NextRequest, _ctx) => {
       include: {
         vendor: { select: { id: true, businessName: true, vendorCode: true } },
         category: { select: { id: true, name: true, parentId: true } },
-        inventory: { select: { qtyAvailable: true } },
+        inventories: { select: { qtyAvailable: true } },
         priceSlabs: { orderBy: { sortOrder: 'asc' } },
         masterProduct: { select: { sku: true, name: true } },
       },
@@ -135,8 +137,8 @@ export const GET = adminOnly(async (req: NextRequest, _ctx) => {
         ...p,
         vendorCount: p.vendor ? 1 : 0,
         vendors: p.vendor ? [p.vendor.businessName] : [],
-        vendorStock: [{ vendor: p.vendor?.businessName ?? '', qty: p.inventory?.qtyAvailable ?? 0 }],
-        totalStock: p.inventory?.qtyAvailable ?? 0,
+        vendorStock: [{ vendor: p.vendor?.businessName ?? '', qty: totalStockQty(p.inventories) }],
+        totalStock: totalStockQty(p.inventories),
       }));
 
       const draftCount = allProducts.length;
@@ -182,8 +184,8 @@ export const GET = adminOnly(async (req: NextRequest, _ctx) => {
         ...p,
         vendorCount: 1,
         vendors: p.vendor ? [p.vendor.businessName] : [],
-        vendorStock: [{ vendor: p.vendor?.businessName ?? '', qty: p.inventory?.qtyAvailable ?? 0 }],
-        totalStock: p.inventory?.qtyAvailable ?? 0,
+        vendorStock: [{ vendor: p.vendor?.businessName ?? '', qty: totalStockQty(p.inventories) }],
+        totalStock: totalStockQty(p.inventories),
       }));
 
       return NextResponse.json({
@@ -229,8 +231,8 @@ export const GET = adminOnly(async (req: NextRequest, _ctx) => {
         ...p,
         vendorCount: 1,
         vendors: p.vendor ? [p.vendor.businessName] : [],
-        vendorStock: [{ vendor: p.vendor?.businessName ?? '', qty: p.inventory?.qtyAvailable ?? 0 }],
-        totalStock: p.inventory?.qtyAvailable ?? 0,
+        vendorStock: [{ vendor: p.vendor?.businessName ?? '', qty: totalStockQty(p.inventories) }],
+        totalStock: totalStockQty(p.inventories),
       }));
 
       const nextCursor = hasMore ? products[products.length - 1].id : null;
@@ -270,7 +272,7 @@ export const GET = adminOnly(async (req: NextRequest, _ctx) => {
       // Group by the real Horeca1 master SKU (P0-1). Falls back to normalized
       // name only for any product not yet backfilled to a master.
       const key = p.masterProductId ?? p.name.toLowerCase().trim();
-      const qty = p.inventory?.qtyAvailable ?? 0;
+      const qty = totalStockQty(p.inventories);
       const existing = catalogMap.get(key);
       if (existing) {
         // When the same item has several copies (e.g. a vendor copy + a
@@ -450,6 +452,12 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       }
 
       if (vendorId) {
+        const vendor = await tx.vendor.findUnique({
+          where: { id: vendorId },
+          select: { businessAccountId: true },
+        });
+        if (!vendor) throw Errors.notFound('Vendor');
+
         if (priceSlabs && priceSlabs.length > 0) {
           await tx.priceSlab.createMany({
             data: priceSlabs.map((slab, idx) => ({
@@ -464,14 +472,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           });
         }
 
-        await tx.inventory.create({
-          data: {
-            productId: created.id,
-            vendorId,
-            qtyAvailable: 0,
-            lowStockThreshold: 10,
-          },
-        });
+        await ensureInventoryForAllOutlets(created.id, vendorId, vendor.businessAccountId, {}, tx);
       }
 
       return created;

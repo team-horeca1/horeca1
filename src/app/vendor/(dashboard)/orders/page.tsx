@@ -6,8 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Search, Loader2, Eye, CheckCircle2, ChevronRight, ChevronLeft, AlertTriangle, Download, X, ChevronDown, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { useVendorOutletScope } from '@/hooks/useVendorOutletScope';
 
 interface VendorOrder {
     id: string;
@@ -16,8 +15,25 @@ interface VendorOrder {
     totalAmount: number;
     paymentStatus: string;
     createdAt: string;
+    outlet?: { name: string } | null;
+    deliveryAddressSnapshot?: { name?: string } | null;
+    fulfillmentOutlet?: { id: string; name: string } | null;
     user: { fullName: string; email: string; businessName?: string };
     _count?: { items: number };
+}
+
+function orderFulfillmentChip(order: VendorOrder) {
+    const deliver = order.outlet?.name
+        ?? (order.deliveryAddressSnapshot as { name?: string } | null)?.name;
+    const fulfill = order.fulfillmentOutlet?.name;
+    if (!deliver && !fulfill) return null;
+    return (
+        <p className="text-[10px] text-[#7C7C7C] mt-0.5 leading-snug">
+            {deliver && <span>Deliver: <span className="font-semibold text-[#181725]">{deliver}</span></span>}
+            {deliver && fulfill && ' · '}
+            {fulfill && <span>Fulfill: <span className="font-semibold text-[#299E60]">{fulfill}</span></span>}
+        </p>
+    );
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -76,6 +92,7 @@ function formatINR(v: number) {
 export default function VendorOrdersPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
+    const { outletQuery, scopeVersion, multiWarehouseEnabled } = useVendorOutletScope();
 
     // Read initial status from URL (e.g., ?status=pending from dashboard)
     const initialStatus = searchParams.get('status') || 'all';
@@ -106,6 +123,10 @@ export default function VendorOrdersPage() {
         if (opts.from) url.searchParams.set('dateFrom', opts.from);
         if (opts.to) url.searchParams.set('dateTo', opts.to);
         if (opts.payment) url.searchParams.set('paymentStatus', opts.payment);
+        const oq = outletQuery();
+        if (oq) {
+          new URLSearchParams(oq.slice(1)).forEach((v, k) => url.searchParams.set(k, v));
+        }
 
         fetch(url.toString())
             .then(res => res.json())
@@ -118,7 +139,7 @@ export default function VendorOrdersPage() {
             })
             .catch(console.error)
             .finally(() => setLoading(false));
-    }, []);
+    }, [outletQuery, scopeVersion]);
 
     // Re-fetch when tab changes (immediate)
     useEffect(() => {
@@ -336,6 +357,7 @@ export default function VendorOrdersPage() {
                             >
                                 <div className="flex justify-between items-start gap-2">
                                     <p className="text-[14px] font-bold text-[#181725]">{order.orderNumber}</p>
+                                    {orderFulfillmentChip(order)}
                                     <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-[6px] uppercase', STATUS_STYLE[order.status] || 'bg-gray-100')}>
                                         {STATUS_LABELS[order.status] ?? order.status}
                                     </span>
@@ -391,6 +413,7 @@ export default function VendorOrdersPage() {
                                                         {order.orderNumber}
                                                     </Link>
                                                 </div>
+                                                {orderFulfillmentChip(order)}
                                                 {overSLA && (
                                                     <p className="text-[10px] text-[#E74C3C] font-bold mt-0.5">Overdue — needs action</p>
                                                 )}

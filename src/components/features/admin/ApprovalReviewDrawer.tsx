@@ -75,7 +75,8 @@ interface VendorProductDetail {
     approvalStatus: string;
     category: { id: string; name: string } | null;
     vendor: { businessName: string } | null;
-    inventory: { qtyAvailable: number } | null;
+    inventory?: { qtyAvailable: number } | null;
+    inventories?: Array<{ qtyAvailable: number }>;
     masterProduct: { id: string; sku: string; name: string } | null;
     pendingEditPayload?: Record<string, unknown> | null;
 }
@@ -828,7 +829,12 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                         <DetailRow label="Price" value={`₹${Number(vendorProduct.basePrice).toLocaleString('en-IN')}`} />
                         <DetailRow label="POS SKU" value={vendorProduct.vendorSku ?? vendorProduct.sku} />
                         <DetailRow label="Catalog SKU" value={vendorProduct.masterProduct?.sku} />
-                        <DetailRow label="Stock" value={vendorProduct.inventory ? String(vendorProduct.inventory.qtyAvailable) : '—'} />
+                        <DetailRow label="Stock" value={(() => {
+                          const rows = vendorProduct.inventories;
+                          const qty = vendorProduct.inventory?.qtyAvailable
+                            ?? (rows?.length ? rows.reduce((s, r) => s + r.qtyAvailable, 0) : null);
+                          return qty != null ? String(qty) : '—';
+                        })()} />
                         <DetailRow label="Status" value={vendorProduct.approvalStatus} />
                     </div>
                     {vendorProduct.approvalStatus === 'pending_edit' && vendorProduct.pendingEditPayload && (() => {

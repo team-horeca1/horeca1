@@ -8,11 +8,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
-import { resolveVendorId } from '@/lib/resolveVendorId';
+import { resolveVendorOutletContext, buildFulfillmentOutletWhere } from '@/lib/resolveVendorOutletContext';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    const vendorId = await resolveVendorId(ctx, req);
+    const allOutlets = req.nextUrl.searchParams.get('outletId') === 'all';
+    const voc = await resolveVendorOutletContext(ctx, req, { allowAllOutlets: true });
+    const vendorId = voc.vendorId;
+    const orderScope = buildFulfillmentOutletWhere(voc, allOutlets);
 
     // Parse query params
     const params = req.nextUrl.searchParams;
@@ -33,6 +36,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     // Build where clause — customer drafts are private until submitted
     const where: Record<string, unknown> = {
       vendorId,
+      ...orderScope,
       ...(status && status !== 'draft' ? { status } : { status: { not: 'draft' } }),
       ...(search && {
         OR: [
@@ -57,6 +61,10 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         totalAmount: true,
         paymentStatus: true,
         createdAt: true,
+        outlet: { select: { name: true } },
+        deliveryAddressSnapshot: true,
+        fulfillmentOutletId: true,
+        fulfillmentOutlet: { select: { id: true, name: true } },
         user: {
           select: { fullName: true, email: true, businessName: true },
         },

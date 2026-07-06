@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2, Package, Truck, ClipboardList, Plus, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { useVendorOutletScope } from '@/hooks/useVendorOutletScope';
 import { cn } from '@/lib/utils';
 import { WarehouseLookupInput } from '@/components/features/vendor/warehouse/WarehouseLookupInput';
 import { WarehouseDetailDrawer } from '@/components/features/vendor/warehouse/WarehouseDetailDrawer';
@@ -45,6 +46,7 @@ function StatusChip({ status }: { status: string }) {
 function WarehousePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { currentOutlet, outletQuery, scopeVersion } = useVendorOutletScope();
 
   const initialTab = (searchParams.get('tab') as WarehouseTab) || 'picklists';
   const [tab, setTab] = useState<WarehouseTab>(
@@ -70,7 +72,7 @@ function WarehousePageInner() {
   const [grnSupplier, setGrnSupplier] = useState('');
   const [grnReceive, setGrnReceive] = useState(true);
 
-  const endpoint =
+    const endpoint =
     tab === 'picklists'
       ? '/api/v1/vendor/warehouse/picklists'
       : tab === 'dispatches'
@@ -88,7 +90,7 @@ function WarehousePageInner() {
     } finally {
       setLoading(false);
     }
-  }, [endpoint]);
+  }, [endpoint, scopeVersion]);
 
   const loadRecentOrders = useCallback(async () => {
     try {
@@ -98,7 +100,7 @@ function WarehousePageInner() {
     } catch {
       /* non-blocking */
     }
-  }, []);
+  }, [scopeVersion]);
 
   useEffect(() => {
     void load();

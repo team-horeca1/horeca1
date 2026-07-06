@@ -25,6 +25,8 @@ import {
   validateImportCategoryColumns,
 } from '@/modules/import-export/import-helpers';
 import { Prisma } from '@prisma/client';
+import { getPrimaryOutletIdForVendor, ensureInventoryForAllOutlets } from '@/lib/inventoryOutlet';
+import { totalStockQty } from '@/lib/inventoryHelpers';
 
 // ── Preview mode: parse file, match SKUs, return diff without committing ──
 // ── Commit mode: actually create/update products with backup ──
@@ -154,7 +156,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
             ...vendorFilter,
           },
           include: {
-            inventory: { select: { qtyAvailable: true } },
+            inventories: { select: { qtyAvailable: true } },
             priceSlabs: { orderBy: { sortOrder: 'asc' } },
           },
         })
@@ -171,7 +173,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     const nameProducts = await prisma.product.findMany({
       where: { name: { in: names, mode: 'insensitive' }, ...vendorFilter },
       include: {
-        inventory: { select: { qtyAvailable: true } },
+        inventories: { select: { qtyAvailable: true } },
         priceSlabs: { orderBy: { sortOrder: 'asc' } },
       },
     });
@@ -253,7 +255,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
               name: existing.name,
               basePrice: Number(existing.basePrice),
               taxPercent: Number(existing.taxPercent),
-              stock: existing.inventory?.qtyAvailable ?? 0,
+              stock: totalStockQty(existing.inventories),
               brand: existing.brand || undefined,
               sku: existing.sku || undefined,
             },
@@ -339,7 +341,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       basePrice: Number(p.basePrice),
       taxPercent: Number(p.taxPercent),
       promoPrice: p.promoPrice ? Number(p.promoPrice) : null,
-      stock: p.inventory?.qtyAvailable ?? 0,
+      stock: totalStockQty(p.inventories),
       priceSlabs: p.priceSlabs.map(s => ({
         minQty: s.minQty,
         price: Number(s.price),
@@ -714,10 +716,17 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           // one is safe because the FK to vendor is preserved.
           if (r.stock !== undefined) {
             if (vendorId) {
+              const outletId = await getPrimaryOutletIdForVendor(vendorId);
               await tx.inventory.upsert({
-                where: { productId: existing.id },
+                where: { productId_outletId: { productId: existing.id, outletId } },
                 update: { qtyAvailable: r.stock },
-                create: { productId: existing.id, vendorId, qtyAvailable: r.stock, lowStockThreshold: 10 },
+                create: {
+                  productId: existing.id,
+                  vendorId,
+                  outletId,
+                  qtyAvailable: r.stock,
+                  lowStockThreshold: 10,
+                },
               });
             } else {
               await tx.inventory.updateMany({
@@ -793,14 +802,24 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
             barcode: r.upc || null,
           };
 
-          // Inventory requires vendorId
-          if (vendorId) {
-            productData.inventory = {
-              create: { vendorId, qtyAvailable: r.stock ?? 0, lowStockThreshold: 10 },
-            };
-          }
-
+          // Inventory requires vendorId — seed per-outlet rows after create
           const product = await tx.product.create({ data: productData as Parameters<typeof prisma.product.create>[0]['data'] });
+
+          if (vendorId) {
+            const vendor = await tx.vendor.findUnique({
+              where: { id: vendorId },
+              select: { businessAccountId: true },
+            });
+            if (vendor) {
+              await ensureInventoryForAllOutlets(
+                product.id,
+                vendorId,
+                vendor.businessAccountId,
+                { initialQty: r.stock ?? 0 },
+                tx,
+              );
+            }
+          }
 
           if (vendorId) {
             await tx.product.update({

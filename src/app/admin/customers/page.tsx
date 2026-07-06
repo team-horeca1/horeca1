@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
@@ -77,14 +77,14 @@ export default function CustomersPage() {
         // Don't silently treat API failures (401/403/500) as "no users yet".
         // Surface the real reason via toast and clear the list so the admin
         // can see something went wrong (most commonly a stale JWT after a
-        // role change â€” fix: sign out + sign back in).
+        // role change — fix: sign out + sign back in).
         fetch(url.toString())
             .then(async (res) => {
                 const json = await res.json().catch(() => null);
                 if (!res.ok || !json?.success) {
                     const msg = json?.error?.message
                         ?? json?.error
-                        ?? (res.status === 401 ? 'Session expired â€” please sign in again'
+                        ?? (res.status === 401 ? 'Session expired — please sign in again'
                             : res.status === 403 ? 'Your account does not have admin access. If you just changed roles, sign out and sign back in to refresh the session.'
                             : `Failed to load users (HTTP ${res.status})`);
                     setUsers([]);
@@ -477,7 +477,7 @@ export default function CustomersPage() {
                                                 </Link>
                                             </td>
                                             <td className="p-4 text-[13px] font-medium text-[#7C7C7C]">{user.email}</td>
-                                            <td className="p-4 text-[13px] font-medium text-[#7C7C7C]">{user.phone || 'â€”'}</td>
+                                            <td className="p-4 text-[13px] font-medium text-[#7C7C7C]">{user.phone || '—'}</td>
                                             <td className="p-4">
                                                 <span className={cn(
                                                     "inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold capitalize",
@@ -488,7 +488,7 @@ export default function CustomersPage() {
                                                     {user.role}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-[13px] font-medium text-[#7C7C7C]">{user.businessName || 'â€”'}</td>
+                                            <td className="p-4 text-[13px] font-medium text-[#7C7C7C]">{user.businessName || '—'}</td>
                                             <td className="p-4">
                                                 <span className={cn(
                                                     "inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold",

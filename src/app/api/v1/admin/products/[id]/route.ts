@@ -76,7 +76,7 @@ export const GET = adminOnly(async (req: NextRequest, _ctx) => {
         vendor: true,
         category: true,
         priceSlabs: { orderBy: { sortOrder: 'asc' } },
-        inventory: true,
+        inventories: true,
         categoryLinks: {
           include: { category: { select: { id: true, name: true, slug: true } } },
         },
@@ -173,7 +173,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         include: {
           vendor: { select: { id: true, businessName: true } },
           category: { select: { id: true, name: true } },
-          inventory: { select: { qtyAvailable: true } },
+          inventories: { select: { qtyAvailable: true } },
           priceSlabs: { orderBy: { sortOrder: 'asc' } },
         },
       });

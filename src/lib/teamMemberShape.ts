@@ -30,6 +30,8 @@ export interface TeamMemberDTO {
     scope: 'admin' | 'vendor' | 'brand';
     description: string | null;
   };
+  /** Vendor portal: outlet scope label (e.g. "Powai" or "All outlets"). */
+  outletAccess?: string;
 }
 
 export interface TeamRoleDTO {

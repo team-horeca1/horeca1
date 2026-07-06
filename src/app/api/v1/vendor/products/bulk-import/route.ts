@@ -13,6 +13,7 @@ import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
+import { resolveVendorOutletContext } from '@/lib/resolveVendorOutletContext';
 import { requirePermission } from '@/lib/permissions/engine';
 
 const rowSchema = z.object({
@@ -38,6 +39,7 @@ const importSchema = z.object({
 export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
+    const outletCtx = await resolveVendorOutletContext(ctx, req);
     requirePermission(ctx, 'products.edit');
 
     const { rows, defaultCategoryId } = importSchema.parse(await req.json());
@@ -99,7 +101,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
           // Update stock if specified
           if (row.stock !== null && row.stock !== undefined) {
             await tx.inventory.update({
-              where: { productId: existingId },
+              where: { productId_outletId: { productId: existingId, outletId: outletCtx.outletId } },
               data: { qtyAvailable: row.stock },
             });
           }
@@ -141,6 +143,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
             data: {
               vendorId,
               productId: product.id,
+              outletId: outletCtx.outletId,
               qtyAvailable: row.stock ?? 0,
               qtyReserved: 0,
               lowStockThreshold: 10,

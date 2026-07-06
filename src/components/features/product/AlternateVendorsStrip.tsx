@@ -13,7 +13,7 @@ interface AlternateVendor {
   id: string;
   name: string;
   vendor: { id: string; businessName: string; minOrderValue: number | string } | null;
-  inventory: { qtyAvailable: number } | null;
+  inventory?: { qtyAvailable: number } | null;
   category: { id: string; name: string } | null;
 }
 

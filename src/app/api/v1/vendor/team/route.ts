@@ -63,15 +63,41 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
 
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
-      select: { userId: true, user: { select: { id: true, fullName: true, email: true, phone: true, hcidDisplay: true, isActive: true, createdAt: true } } },
+      select: {
+        userId: true,
+        businessAccountId: true,
+        user: { select: { id: true, fullName: true, email: true, phone: true, hcidDisplay: true, isActive: true, createdAt: true } },
+      },
     });
     if (!vendor) throw Errors.notFound('Vendor not found');
+
+    const outlets = await prisma.outlet.findMany({
+      where: { businessAccountId: vendor.businessAccountId, isActive: true },
+      select: { id: true, name: true },
+    });
+    const outletNames = new Map(outlets.map((o) => [o.id, o.name]));
 
     const members = await prisma.vendorTeamMember.findMany({
       where: { vendorId },
       orderBy: { createdAt: 'asc' },
       include: teamMemberInclude,
     });
+
+    const userRoles = await prisma.userRole.findMany({
+      where: {
+        businessAccountId: vendor.businessAccountId,
+        userId: { in: members.map((m) => m.userId) },
+        role: { scope: 'vendor' },
+      },
+      select: { userId: true, outletId: true },
+    });
+
+    const outletLabel = (userId: string) => {
+      const scoped = userRoles.filter((r) => r.userId === userId);
+      if (scoped.some((r) => r.outletId === null)) return 'All outlets';
+      const names = [...new Set(scoped.map((r) => (r.outletId ? outletNames.get(r.outletId) : null)).filter(Boolean))] as string[];
+      return names.length ? names.join(', ') : 'All outlets';
+    };
 
     const owner: TeamMemberDTO = toTeamMemberDTO({
       id: `owner-${vendor.user.id}`,
@@ -88,15 +114,20 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     if (adminTemplate) {
       owner.role = { id: adminTemplate.id, name: adminTemplate.name, scope: 'vendor', description: adminTemplate.description };
     }
+    owner.outletAccess = 'All outlets';
 
-    const others: TeamMemberDTO[] = members.map((m) => toTeamMemberDTO({
+    const others: TeamMemberDTO[] = members.map((m) => {
+      const dto = toTeamMemberDTO({
       id: m.id,
       createdAt: m.createdAt,
       legacyRole: m.role,
       isOwner: false,
       user: m.user,
       roleRef: m.roleRef,
-    }));
+    });
+      dto.outletAccess = outletLabel(m.userId);
+      return dto;
+    });
 
     return NextResponse.json({ success: true, data: [owner, ...others] });
   } catch (error) {

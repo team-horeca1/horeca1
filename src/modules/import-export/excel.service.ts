@@ -575,7 +575,7 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
           inventoryAccountCode: r['Inventory Account Code'],
           platformCommission: r['Platform Commission'],
         },
-        inventory: {
+        inventories: {
           reorderPoint: r['Reorder Point'],
           openingStock: r['Opening Stock'],
           valuationMethod: r['Valuation Method'],

@@ -1,4 +1,5 @@
 import { getApprovedDistributorKeys, filterAuthorizedMappings } from '@/lib/brandAuthorizedDistributor';
+import { aggregateInventories } from '@/lib/inventoryHelpers';
 import { Prisma, type ApprovalStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
@@ -748,7 +749,7 @@ export class CatalogService {
       orderBy: { name: 'asc' },
       include: {
         priceSlabs: { orderBy: { sortOrder: 'asc' } },
-        inventory: { select: { qtyAvailable: true, qtyReserved: true } },
+        inventories: { select: { qtyAvailable: true, qtyReserved: true } },
         // parent + parentId let the Vendor Store sidebar render the Hyperpure-style
         // hierarchical "Categories >> Sub-Categories" navigation per UI/UX Notes.
         category: {
@@ -807,8 +808,14 @@ export class CatalogService {
         brandMappings: filterAuthorizedMappings(p.brandMappings, vendorId, approvedKeys),
         categoryName: p.category?.name || '',
         categorySlug: p.category?.slug || '',
-        in_stock: p.inventory ? p.inventory.qtyAvailable - p.inventory.qtyReserved > 0 : false,
-        qty_available: p.inventory ? p.inventory.qtyAvailable - p.inventory.qtyReserved : 0,
+        in_stock: (() => {
+          const inv = aggregateInventories(p.inventories);
+          return inv ? inv.qtyAvailable - inv.qtyReserved > 0 : false;
+        })(),
+        qty_available: (() => {
+          const inv = aggregateInventories(p.inventories);
+          return inv ? inv.qtyAvailable - inv.qtyReserved : 0;
+        })(),
       })),
       pagination: {
         next_cursor: hasMore ? products[products.length - 1]?.id : null,

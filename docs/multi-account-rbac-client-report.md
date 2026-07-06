@@ -71,6 +71,7 @@ In plain language, here's what changes for users:
 
 ### For vendors specifically
 - Vendor is now a kind of Business Account — same model, same RBAC. A vendor with a Mumbai Warehouse and a Pune Warehouse can model them as two Outlets and switch between them.
+- **Vendor multi-outlet operations (shipped):** Per-warehouse inventory (`productId + outletId`), auto fulfillment routing at checkout (`fulfillmentOutletId` = nearest warehouse with stock), outlet-scoped dashboard/orders/inventory/warehouse APIs, per-outlet service areas and delivery slots, stock transfers between warehouses, in-portal **Outlets** management page, and outlet badges on team members.
 - Every vendor is also automatically marked as a customer (so vendors can buy from each other if they want, without a second login).
 
 ### For brands

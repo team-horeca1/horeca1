@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       where: {
         isActive: true,
         approvalStatus: 'approved',
-        inventory: { qtyAvailable: { gt: 0 } },
+        inventories: { some: { qtyAvailable: { gt: 0 } } },
         ...(vendorIdFilter ? { vendorId: { in: vendorIdFilter } } : {}),
         OR: [
           { promoPrice: { not: null } },
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
       },
       include: {
         vendor: { select: { id: true, businessName: true, logoUrl: true, minOrderValue: true } },
-        inventory: { select: { qtyAvailable: true } },
+        inventories: { select: { qtyAvailable: true } },
         category: { select: { id: true, name: true } },
         priceSlabs: { orderBy: { minQty: 'asc' }, take: 3 },
       },

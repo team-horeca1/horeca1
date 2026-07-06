@@ -125,7 +125,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       where: { id: productId, vendorId },
       include: {
         priceSlabs: { orderBy: { sortOrder: 'asc' } },
-        inventory: { select: { qtyAvailable: true, qtyReserved: true } },
+        inventories: { select: { qtyAvailable: true, qtyReserved: true } },
         category: { select: { id: true, name: true, slug: true } },
         // Multi-category set, primary first — used by the edit form to pre-fill
         // the multi-select picker. Always returned (empty for legacy rows).

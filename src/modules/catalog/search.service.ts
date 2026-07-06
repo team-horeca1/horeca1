@@ -12,7 +12,7 @@ const PRODUCT_INCLUDE = {
     select: { id: true, businessName: true, slug: true, logoUrl: true, rating: true, minOrderValue: true },
   },
   priceSlabs: { orderBy: { sortOrder: 'asc' as const } },
-  inventory: { select: { qtyAvailable: true } },
+  inventories: { select: { qtyAvailable: true } },
   category: { select: { id: true, name: true, slug: true, imageUrl: true } },
   brandMappings: {
     where: { status: { in: ['verified' as const, 'auto_mapped' as const] } },

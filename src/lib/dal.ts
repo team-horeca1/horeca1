@@ -11,6 +11,7 @@
 // ============================================================
 
 import type { Vendor, VendorProduct, BulkPriceTier, Category, VendorSummary, OrderList, OrderListItem } from '@/types';
+import { aggregateInventories } from '@/lib/inventoryHelpers';
 
 // Base URL for API calls — works both server-side and client-side
 function getBaseUrl() {
@@ -97,7 +98,11 @@ function toVendorSummary(v: Record<string, unknown>): VendorSummary {
 
 function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string, unknown>): VendorProduct {
   const priceSlabs = (p.priceSlabs as Array<Record<string, unknown>>) || [];
-  const inventory = p.inventory as Record<string, unknown> | null;
+  const inventory =
+    aggregateInventories(
+      p.inventories as Array<{ qtyAvailable: number; qtyReserved: number; lowStockThreshold?: number }> | undefined,
+    ) ??
+    (p.inventory as Record<string, unknown> | null);
   const vendor = (p.vendor as Record<string, unknown>) || vendorInfo || {};
 
   const basePrice = Number(p.basePrice) || 0;

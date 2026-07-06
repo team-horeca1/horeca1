@@ -1,5 +1,6 @@
 import type { ApprovalStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { aggregateInventories } from '@/lib/inventoryHelpers';
 import { getApprovedDistributorKeys, distributorAuthKey } from '@/lib/brandAuthorizedDistributor';
 import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
@@ -169,7 +170,7 @@ export class BrandService {
                     imageUrl: true,
                     packSize: true,
                     unit: true,
-                    inventory: { select: { qtyAvailable: true } },
+                    inventories: { select: { qtyAvailable: true } },
                     priceSlabs: { orderBy: { minQty: 'asc' }, select: { minQty: true, maxQty: true, price: true } },
                     vendor: {
                       select: {
@@ -268,8 +269,11 @@ export class BrandService {
           price: Math.round(priceWithTax * 100) / 100,
           basePrice: Number(m.distributorProduct.basePrice),
           taxPercent: Number(m.distributorProduct.taxPercent),
-          inStock: (m.distributorProduct.inventory?.qtyAvailable ?? 0) > 0,
-          stock: m.distributorProduct.inventory?.qtyAvailable ?? 0,
+          inStock: (() => {
+            const inv = aggregateInventories(m.distributorProduct.inventories);
+            return (inv?.qtyAvailable ?? 0) > 0;
+          })(),
+          stock: aggregateInventories(m.distributorProduct.inventories)?.qtyAvailable ?? 0,
           distributorProductId: m.distributorProduct.id,
           distributorProductName: m.distributorProduct.name,
           packSize: m.distributorProduct.packSize ?? '',

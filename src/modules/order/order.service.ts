@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { Prisma, type OrderStatus } from '@prisma/client';
 import { emitEvent } from '@/events/emitter';
 import { InventoryService } from '@/modules/inventory/inventory.service';
+import { FulfillmentRouterService } from '@/modules/fulfillment/fulfillmentRouter.service';
 import { Errors } from '@/middleware/errorHandler';
 import {
   createAccrual as createCommissionAccrual,
@@ -105,6 +106,33 @@ export interface OrderContext {
 export class OrderService {
   private inventoryService = new InventoryService();
   private cartService = new CartService();
+  private fulfillmentRouter = new FulfillmentRouterService();
+
+  /** Resolve warehouse outlet for inventory ops on an existing order. */
+  private async orderFulfillmentOutletId(
+    order: { fulfillmentOutletId: string | null; vendorId: string },
+    tx?: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  ): Promise<string> {
+    if (order.fulfillmentOutletId) return order.fulfillmentOutletId;
+    const db = tx ?? prisma;
+    const vendor = await db.vendor.findUnique({
+      where: { id: order.vendorId },
+      select: { businessAccountId: true },
+    });
+    if (!vendor) throw Errors.notFound('Vendor');
+    const ba = await db.businessAccount.findUnique({
+      where: { id: vendor.businessAccountId },
+      select: { primaryOutletId: true },
+    });
+    if (ba?.primaryOutletId) return ba.primaryOutletId;
+    const first = await db.outlet.findFirst({
+      where: { businessAccountId: vendor.businessAccountId, isActive: true },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (!first) throw Errors.badRequest('Vendor has no fulfillment outlet');
+    return first.id;
+  }
 
   async create(ctx: OrderContext, input: CreateOrderInput) {
     const { userId, businessAccountId, outletId } = ctx;
@@ -148,13 +176,22 @@ export class OrderService {
         promoDiscount: number;
         appliedPromoId: string | null;
         salespersonId: string | null;
+        fulfillmentOutletId: string;
       }
       const prepared: PreparedOrder[] = [];
 
       for (const vo of input.vendorOrders) {
+        const fulfillmentOutletId = await this.fulfillmentRouter.resolveFulfillmentOutlet({
+          vendorId: vo.vendorId,
+          deliveryPincode: outlet.pincode,
+          deliveryLat: outlet.latitude ?? null,
+          deliveryLng: outlet.longitude ?? null,
+          items: vo.items,
+        });
+
         // 1. Validate stock (skipped for drafts — no reservation happens yet)
         if (!isDraft) {
-          const stockCheck = await this.inventoryService.bulkCheck(vo.items, tx);
+          const stockCheck = await this.inventoryService.bulkCheck(vo.items, fulfillmentOutletId, tx);
           const outOfStock = stockCheck.find((s) => !s.available);
           if (outOfStock) {
             throw Errors.outOfStock(outOfStock.productName, outOfStock.qtyAvailable);
@@ -314,6 +351,7 @@ export class OrderService {
           promoDiscount,
           appliedPromoId,
           salespersonId: vendorCustomer?.salespersonId ?? null,
+          fulfillmentOutletId,
         });
       }
 
@@ -388,6 +426,7 @@ export class OrderService {
             vendorId: vo.vendorId,
             businessAccountId,
             outletId,
+            fulfillmentOutletId: p.fulfillmentOutletId,
             deliveryAddressSnapshot,
             status: isDraft ? 'draft' : 'pending',
             subtotal: p.subtotal,
@@ -408,7 +447,7 @@ export class OrderService {
         });
 
         // Reserve inventory (drafts reserve nothing until submitted)
-        if (!isDraft) await this.inventoryService.reserveStock(vo.items, tx);
+        if (!isDraft) await this.inventoryService.reserveStock(vo.items, p.fulfillmentOutletId, tx);
 
         // Debit the credit wallet for credit orders. debitWallet validates the
         // wallet (active, not blacklisted), repayment-mode reuse rules, and
@@ -666,7 +705,8 @@ export class OrderService {
       const effectivePaymentMethod = paymentMethod ?? order.paymentMethod;
 
       const items = order.items.map((i) => ({ productId: i.productId, quantity: i.quantity }));
-      const stock = await this.inventoryService.bulkCheck(items, tx);
+      const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
+      const stock = await this.inventoryService.bulkCheck(items, fulfillOutlet, tx);
       const oos = stock.find((s) => !s.available);
       if (oos) throw Errors.outOfStock(oos.productName, oos.qtyAvailable);
 
@@ -676,7 +716,7 @@ export class OrderService {
         throw Errors.belowMOV(vendor.businessName, Number(vendor.minOrderValue), Number(order.subtotal));
       }
 
-      await this.inventoryService.reserveStock(items, tx);
+      await this.inventoryService.reserveStock(items, fulfillOutlet, tx);
 
       // Submitting a credit draft debits the wallet now (validates limit + mode).
       const creditPaid =
@@ -755,12 +795,16 @@ export class OrderService {
       // revised total dipped below the minimum.
 
       if (reserveDeltas.length) {
-        const check = await this.inventoryService.bulkCheck(reserveDeltas, tx);
+        const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
+        const check = await this.inventoryService.bulkCheck(reserveDeltas, fulfillOutlet, tx);
         const oos = check.find((s) => !s.available);
         if (oos) throw Errors.outOfStock(oos.productName, oos.qtyAvailable);
-        await this.inventoryService.reserveStock(reserveDeltas, tx);
+        await this.inventoryService.reserveStock(reserveDeltas, fulfillOutlet, tx);
       }
-      if (releaseDeltas.length) await this.inventoryService.releaseStock(releaseDeltas, tx);
+      if (releaseDeltas.length) {
+        const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
+        await this.inventoryService.releaseStock(releaseDeltas, fulfillOutlet, tx);
+      }
 
       return tx.order.update({
         where: { id: orderId },
@@ -825,7 +869,9 @@ export class OrderService {
       const child = await tx.order.create({
         data: {
           orderNumber, userId: order.userId, vendorId, businessAccountId: order.businessAccountId,
-          outletId: order.outletId, deliveryAddressSnapshot: order.deliveryAddressSnapshot as Prisma.InputJsonValue,
+          outletId: order.outletId,
+          fulfillmentOutletId: order.fulfillmentOutletId,
+          deliveryAddressSnapshot: order.deliveryAddressSnapshot as Prisma.InputJsonValue,
           status: 'pending', subtotal: childSubtotal, totalAmount: childSubtotal,
           paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus,
           deliverySlotId: order.deliverySlotId, salespersonId: order.salespersonId,
@@ -925,11 +971,20 @@ export class OrderService {
 
       if (subtotal < Number(newVendor.minOrderValue)) throw Errors.belowMOV(newVendor.businessName, Number(newVendor.minOrderValue), subtotal);
 
-      const check = await this.inventoryService.bulkCheck(reserveNew, tx);
+      const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
+      const newFulfillOutlet = await this.fulfillmentRouter.resolveFulfillmentOutlet({
+        vendorId: newVendorId,
+        deliveryPincode: (order.deliveryAddressSnapshot as { pincode?: string })?.pincode ?? null,
+        deliveryLat: (order.deliveryAddressSnapshot as { latitude?: number })?.latitude ?? null,
+        deliveryLng: (order.deliveryAddressSnapshot as { longitude?: number })?.longitude ?? null,
+        items: reserveNew,
+      });
+
+      const check = await this.inventoryService.bulkCheck(reserveNew, newFulfillOutlet, tx);
       const oos = check.find((s) => !s.available);
       if (oos) throw Errors.outOfStock(oos.productName, oos.qtyAvailable);
-      await this.inventoryService.releaseStock(releaseOld, tx);
-      await this.inventoryService.reserveStock(reserveNew, tx);
+      await this.inventoryService.releaseStock(releaseOld, fulfillOutlet, tx);
+      await this.inventoryService.reserveStock(reserveNew, newFulfillOutlet, tx);
 
       const totalAmount = Math.max(0, subtotal - Number(order.promoDiscount) - Number(order.couponDiscount) - Number(order.walletApplied));
 
@@ -951,6 +1006,7 @@ export class OrderService {
         where: { id: orderId },
         data: {
           vendorId: newVendorId,
+          fulfillmentOutletId: newFulfillOutlet,
           salespersonId: vc?.salespersonId ?? null,
           deliverySlotId: null,
           subtotal,
@@ -1111,7 +1167,10 @@ export class OrderService {
       const toRelease = order.items
         .map(i => ({ productId: i.productId, quantity: i.quantity - (fulfilledMap.get(i.id) ?? i.quantity) }))
         .filter(r => r.quantity > 0);
-      if (toRelease.length > 0) await this.inventoryService.releaseStock(toRelease, tx);
+      if (toRelease.length > 0) {
+        const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
+        await this.inventoryService.releaseStock(toRelease, fulfillOutlet, tx);
+      }
 
       // Recalculate order total proportionally & update each item's fulfilledQty
       let newSubtotal = 0;
@@ -1176,12 +1235,13 @@ export class OrderService {
         productId: i.productId,
         quantity: order.isPartial ? (i.fulfilledQty ?? i.quantity) : i.quantity,
       }));
-      await this.inventoryService.releaseStock(prevReserved, tx);
+      const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
+      await this.inventoryService.releaseStock(prevReserved, fulfillOutlet, tx);
 
       const toReserve = order.items
         .map((i) => ({ productId: i.productId, quantity: fulfilledMap.get(i.id) ?? i.quantity }))
         .filter((l) => l.quantity > 0);
-      await this.inventoryService.reserveStock(toReserve, tx);
+      await this.inventoryService.reserveStock(toReserve, fulfillOutlet, tx);
 
       let newSubtotal = 0;
       for (const item of order.items) {
@@ -1279,13 +1339,12 @@ export class OrderService {
       // it (guards forced admin jumps from double-decrementing).
       const RESERVED_STATES = ['pending', 'confirmed', 'processing', 'ready_for_dispatch', 'shipped', 'partially_delivered'];
       const stockReserved = RESERVED_STATES.includes(order.status as string);
+      const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
       if (status === 'cancelled' && stockReserved) {
-        // Release reserved stock so it becomes available for other orders
-        await this.inventoryService.releaseStock(effectiveLines, tx);
+        await this.inventoryService.releaseStock(effectiveLines, fulfillOutlet, tx);
       }
       if (status === 'delivered' && stockReserved) {
-        // Goods have left the warehouse — deduct from physical available stock
-        await this.inventoryService.finalizeStock(effectiveLines, tx);
+        await this.inventoryService.finalizeStock(effectiveLines, fulfillOutlet, tx);
       }
 
       // Timestamp fields

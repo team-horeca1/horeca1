@@ -7,6 +7,7 @@ import { filterProductBrandMappings } from '@/lib/brandAuthorizedDistributor';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { attachCustomerPricing } from '@/modules/pricing/catalog-pricing';
+import { withLegacyInventory } from '@/lib/inventoryHelpers';
 
 export async function GET(req: NextRequest) {
   try {
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
         category: { select: { id: true, name: true, slug: true } },
         vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true, rating: true, minOrderValue: true } },
         priceSlabs: { orderBy: { minQty: 'asc' }, select: { minQty: true, maxQty: true, price: true } },
-        inventory: { select: { qtyAvailable: true } },
+        inventories: { select: { qtyAvailable: true, qtyReserved: true } },
         brandMappings: {
           where: { status: { in: ['verified', 'auto_mapped'] } },
           select: {
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest) {
 
     // Logged-in buyers see THEIR price (price lists / overrides) on the
     // detail page — same resolver the cart uses.
-    const [filtered] = await filterProductBrandMappings([product]);
+    const [filtered] = await filterProductBrandMappings([withLegacyInventory(product)]);
     const [withPricing] = await attachCustomerPricing([filtered]);
     return NextResponse.json({ success: true, data: withPricing });
   } catch (error) {

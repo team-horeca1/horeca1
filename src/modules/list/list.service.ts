@@ -13,7 +13,7 @@ export class ListService {
             product: {
               include: {
                 priceSlabs: { orderBy: { sortOrder: 'asc' } },
-                inventory: { select: { qtyAvailable: true } },
+                inventories: { select: { qtyAvailable: true } },
                 vendor: { select: { id: true, businessName: true, logoUrl: true } },
                 category: { select: { id: true, name: true } },
               },
@@ -36,7 +36,7 @@ export class ListService {
             product: {
               include: {
                 priceSlabs: { orderBy: { sortOrder: 'asc' } },
-                inventory: { select: { qtyAvailable: true } },
+                inventories: { select: { qtyAvailable: true } },
               },
             },
           },

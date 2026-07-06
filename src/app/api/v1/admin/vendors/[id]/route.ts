@@ -378,14 +378,13 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
           } else {
             // Create new slot
             // Check if slot with same vendorId, dayOfWeek, and slotStart already exists to avoid unique constraint error
-            const existingSame = await tx.deliverySlot.findUnique({
+            const existingSame = await tx.deliverySlot.findFirst({
               where: {
-                vendorId_dayOfWeek_slotStart: {
-                  vendorId: id,
-                  dayOfWeek: slotData.dayOfWeek,
-                  slotStart: slotData.slotStart
-                }
-              }
+                vendorId: id,
+                outletId: null,
+                dayOfWeek: slotData.dayOfWeek,
+                slotStart: slotData.slotStart,
+              },
             });
 
             if (existingSame) {

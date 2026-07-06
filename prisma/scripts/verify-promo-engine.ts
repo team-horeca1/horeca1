@@ -62,6 +62,20 @@ async function main() {
   const vendorBA = await prisma.businessAccount.create({
     data: { legalName: `Promo Verify Supplies ${tag}`, isVendor: true, isCustomer: false },
   });
+  const vendorOutlet = await prisma.outlet.create({
+    data: {
+      businessAccountId: vendorBA.id,
+      name: 'Promo Verify Warehouse',
+      addressLine: '2 Test Street',
+      city: 'Mumbai',
+      state: 'MH',
+      pincode: '400001',
+    },
+  });
+  await prisma.businessAccount.update({
+    where: { id: vendorBA.id },
+    data: { primaryOutletId: vendorOutlet.id },
+  });
   const vendor = await prisma.vendor.create({
     data: {
       userId: vendorUser.id, businessAccountId: vendorBA.id,
@@ -76,7 +90,7 @@ async function main() {
     },
   });
   await prisma.inventory.create({
-    data: { productId: product.id, vendorId: vendor.id, qtyAvailable: 100 },
+    data: { productId: product.id, vendorId: vendor.id, outletId: vendorOutlet.id, qtyAvailable: 100 },
   });
 
   const coupon = await prisma.coupon.create({

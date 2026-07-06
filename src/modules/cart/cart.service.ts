@@ -65,7 +65,7 @@ export class CartService {
                 taxPercent: true, minOrderQty: true, packSize: true,
                 unit: true, creditEligible: true,
                 priceSlabs: { orderBy: { minQty: 'asc' as const }, select: { minQty: true, maxQty: true, price: true } },
-                inventory: { select: { qtyAvailable: true } },
+                inventories: { select: { qtyAvailable: true } },
               },
             },
             vendor: { select: { id: true, businessName: true, slug: true, minOrderValue: true, logoUrl: true } },

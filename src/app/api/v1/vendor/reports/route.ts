@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId } from '@/lib/resolveVendorId';
+import { totalStockQty } from '@/lib/inventoryHelpers';
 import type { AuthContext } from '@/middleware/auth';
 
 // Resolve period param → start date and bucket granularity
@@ -95,7 +96,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
             slug: { not: { startsWith: '_deleted_' } },
             orderItems: { none: { order: { createdAt: { gte: thirtyDaysAgo }, status: { not: 'cancelled' } } } },
           },
-          select: { id: true, name: true, basePrice: true, sku: true, inventory: { select: { qtyAvailable: true } } },
+          select: { id: true, name: true, basePrice: true, sku: true, inventories: { select: { qtyAvailable: true } } },
           take: 10,
           orderBy: { createdAt: 'asc' },
         }),
@@ -205,7 +206,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       name: p.name,
       sku: p.sku,
       basePrice: Number(p.basePrice),
-      stock: p.inventory?.qtyAvailable ?? 0,
+      stock: totalStockQty(p.inventories),
     }));
 
     // ─── Category sales aggregation ─────────────────────────────────────────

@@ -6,11 +6,15 @@ import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
-import { resolveVendorId } from '@/lib/resolveVendorId';
+import { resolveVendorOutletContext, buildFulfillmentOutletWhere, buildInventoryOutletWhere } from '@/lib/resolveVendorOutletContext';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    const vendorId = await resolveVendorId(ctx, req);
+    const allOutlets = req.nextUrl.searchParams.get('outletId') === 'all';
+    const voc = await resolveVendorOutletContext(ctx, req, { allowAllOutlets: true });
+    const vendorId = voc.vendorId;
+    const orderScope = { vendorId, ...buildFulfillmentOutletWhere(voc, allOutlets) };
+    const invScope = { vendorId, ...buildInventoryOutletWhere(voc, allOutlets) };
 
     // IST-aware day/month boundaries
     const nowIST = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
@@ -52,30 +56,30 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       upcomingDueAggregate,
       creditCustomersCount,
     ] = await Promise.all([
-      prisma.order.count({ where: { vendorId } }),
+      prisma.order.count({ where: orderScope }),
 
       prisma.order.aggregate({
         _sum: { totalAmount: true },
-        where: { vendorId, status: { in: [...activeStatuses] } },
+        where: { ...orderScope, status: { in: [...activeStatuses] } },
       }),
 
       // Sales placed (& confirmed) today
       prisma.order.aggregate({
         _sum: { totalAmount: true },
-        where: { vendorId, status: { in: [...activeStatuses] }, createdAt: { gte: todayStartIST } },
+        where: { ...orderScope, status: { in: [...activeStatuses] }, createdAt: { gte: todayStartIST } },
       }),
 
       // Month-to-date sales
       prisma.order.aggregate({
         _sum: { totalAmount: true },
-        where: { vendorId, status: { in: [...activeStatuses] }, createdAt: { gte: monthStartIST } },
+        where: { ...orderScope, status: { in: [...activeStatuses] }, createdAt: { gte: monthStartIST } },
       }),
 
       // Unpaid / partially paid order value (outstanding receivables)
       prisma.order.aggregate({
         _sum: { totalAmount: true },
         where: {
-          vendorId,
+          ...orderScope,
           paymentStatus: { in: ['unpaid', 'partial'] },
           status: { notIn: ['cancelled'] },
         },
@@ -84,19 +88,19 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       prisma.product.count({ where: { vendorId, isActive: true } }),
 
       prisma.inventory.findMany({
-        where: { vendorId },
+        where: invScope,
         select: { qtyAvailable: true, qtyReserved: true, lowStockThreshold: true },
       }),
 
       prisma.order.groupBy({
         by: ['status'],
-        where: { vendorId },
+        where: orderScope,
         _count: { id: true },
       }),
 
       // Pending orders needing action — oldest first (most urgent)
       prisma.order.findMany({
-        where: { vendorId, status: 'pending' },
+        where: { ...orderScope, status: 'pending' },
         take: 20,
         orderBy: { createdAt: 'asc' },
         select: {
@@ -112,7 +116,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
       // Recent 10 orders for the activity table
       prisma.order.findMany({
-        where: { vendorId },
+        where: orderScope,
         take: 10,
         orderBy: { createdAt: 'desc' },
         select: {
@@ -181,7 +185,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
       // All orders for this vendor — used to compute customer segments in JS
       prisma.order.findMany({
-        where: { vendorId },
+        where: orderScope,
         select: { userId: true, createdAt: true },
       }),
 
@@ -192,11 +196,11 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       }),
 
       // Fulfillment: packing pending (processing), dispatch pending (shipped), delayed (48h+)
-      prisma.order.count({ where: { vendorId, status: 'processing' } }),
-      prisma.order.count({ where: { vendorId, status: 'shipped' } }),
+      prisma.order.count({ where: { ...orderScope, status: 'processing' } }),
+      prisma.order.count({ where: { ...orderScope, status: 'shipped' } }),
       prisma.order.count({
         where: {
-          vendorId,
+          ...orderScope,
           status: { in: ['confirmed', 'processing', 'shipped'] },
           createdAt: { lt: new Date(Date.now() - 48 * 60 * 60 * 1000) },
         },

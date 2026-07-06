@@ -27,6 +27,9 @@ import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse, friendlyErrorMessage } from '@/middleware/errorHandler';
 import { parseProductImport, generateImportTemplate, type ParsedProductRow } from '@/modules/import-export/excel.service';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
+import { resolveVendorOutletContext } from '@/lib/resolveVendorOutletContext';
+import { ensureInventoryForAllOutlets } from '@/lib/inventoryOutlet';
+import { totalStockQty } from '@/lib/inventoryHelpers';
 import { requirePermission } from '@/lib/permissions/engine';
 import {
   assertLeafCategory,
@@ -147,6 +150,7 @@ export const GET = vendorOnly(async () => {
 export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
+    const outletCtx = await resolveVendorOutletContext(ctx, req);
     requirePermission(ctx, 'products.create');
 
     const formData = await req.formData();
@@ -195,7 +199,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
             ...NOT_TOMBSTONED,
           },
           include: {
-            inventory: { select: { qtyAvailable: true } },
+            inventories: { select: { qtyAvailable: true } },
             priceSlabs: { orderBy: { sortOrder: 'asc' } },
           },
         })
@@ -210,7 +214,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     const nameProducts = await prisma.product.findMany({
       where: { name: { in: names, mode: 'insensitive' }, vendorId, ...NOT_TOMBSTONED },
       include: {
-        inventory: { select: { qtyAvailable: true } },
+        inventories: { select: { qtyAvailable: true } },
         priceSlabs: { orderBy: { sortOrder: 'asc' } },
       },
     });
@@ -291,7 +295,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
               name: existing.name,
               basePrice: Number(existing.basePrice),
               taxPercent: Number(existing.taxPercent),
-              stock: existing.inventory?.qtyAvailable ?? 0,
+              stock: totalStockQty(existing.inventories),
               brand: existing.brand || undefined,
               sku: existing.sku || undefined,
             },
@@ -378,7 +382,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       basePrice: Number(p.basePrice),
       taxPercent: Number(p.taxPercent),
       promoPrice: p.promoPrice ? Number(p.promoPrice) : null,
-      stock: p.inventory?.qtyAvailable ?? 0,
+      stock: totalStockQty(p.inventories),
       priceSlabs: p.priceSlabs.map(s => ({
         minQty: s.minQty,
         price: Number(s.price),
@@ -821,9 +825,15 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
 
             if (r.stock !== undefined) {
               await tx.inventory.upsert({
-                where: { productId: existing.id },
+                where: { productId_outletId: { productId: existing.id, outletId: outletCtx.outletId } },
                 update: { qtyAvailable: r.stock },
-                create: { productId: existing.id, vendorId, qtyAvailable: r.stock, lowStockThreshold: 10 },
+                create: {
+                  productId: existing.id,
+                  vendorId,
+                  outletId: outletCtx.outletId,
+                  qtyAvailable: r.stock,
+                  lowStockThreshold: 10,
+                },
               });
             }
 
@@ -867,11 +877,21 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
                 shelfLifeDays: r.shelfLifeDays != null ? Number(r.shelfLifeDays) : null,
                 countryOfOrigin: r.countryOfOrigin || null,
                 tags: r.tags ?? [],
-                inventory: {
-                  create: { vendorId, qtyAvailable: r.stock ?? 0, lowStockThreshold: 10 },
-                },
               },
             });
+            const vendor = await tx.vendor.findUnique({
+              where: { id: vendorId },
+              select: { businessAccountId: true },
+            });
+            if (vendor) {
+              await ensureInventoryForAllOutlets(
+                product.id,
+                vendorId,
+                vendor.businessAccountId,
+                { initialQty: r.stock ?? 0 },
+                tx,
+              );
+            }
             await tx.product.update({
               where: { id: product.id },
               data: {

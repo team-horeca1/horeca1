@@ -12,6 +12,7 @@ import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId, resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { GST_RE } from '@/lib/validators/vendor-kyc';
+import { seedInventoryRowsForMultiWarehouse } from '@/lib/inventoryOutlet';
 
 const optionalUrlSchema = z.string()
   .optional()
@@ -69,7 +70,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       where: { id: vendorId },
       include: {
         serviceAreas: {
-          select: { id: true, pincode: true, isActive: true },
+          select: { id: true, pincode: true, isActive: true, outletId: true },
         },
         deliverySlots: {
           select: {
@@ -79,6 +80,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
             slotEnd: true,
             cutoffTime: true,
             isActive: true,
+            outletId: true,
           },
           orderBy: { dayOfWeek: 'asc' },
         },
@@ -122,17 +124,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     });
 
     if (multiWarehouseEnabled === true && existing && !existing.multiWarehouseEnabled) {
-      const primaryOutlet = await prisma.outlet.findFirst({
-        where: { businessAccountId: existing.businessAccountId, isActive: true },
-        orderBy: { createdAt: 'asc' },
-        select: { id: true },
-      });
-      if (primaryOutlet) {
-        await prisma.inventory.updateMany({
-          where: { vendorId, outletId: null },
-          data: { outletId: primaryOutlet.id },
-        });
-      }
+      await seedInventoryRowsForMultiWarehouse(vendorId, existing.businessAccountId);
     }
 
     return NextResponse.json({ success: true, data: updated });

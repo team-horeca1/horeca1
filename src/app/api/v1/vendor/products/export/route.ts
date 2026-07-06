@@ -4,6 +4,7 @@ import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
+import { totalStockQty } from '@/lib/inventoryHelpers';
 import {
   exportProductsToXlsx,
   exportProductsToCsv,
@@ -32,7 +33,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       include: {
         vendor: { select: { businessName: true, vendorCode: true } },
         category: { select: { name: true, parentId: true, parent: { select: { name: true } } } },
-        inventory: { select: { qtyAvailable: true } },
+        inventories: { select: { qtyAvailable: true } },
         priceSlabs: { orderBy: { sortOrder: 'asc' }, take: 3 },
         categoryLinks: {
           include: { category: { select: { name: true, parentId: true } } },
@@ -67,7 +68,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         promoPrice: p.promoPrice ? Number(p.promoPrice) : null,
         imageUrl: p.imageUrl,
         imageName: p.imageUrl ? p.imageUrl.split('/').pop() || '' : '',
-        stock: p.inventory?.qtyAvailable ?? 0,
+        stock: totalStockQty(p.inventories),
         approvalStatus: p.approvalStatus,
         barcode: p.barcode,
         aliasName: p.aliasNames?.[0] ?? null,
