@@ -117,6 +117,7 @@ model User {
 
   productAuditLogs       ProductAuditLog[] @relation("ProductAuditActor")
   masterProductRevisions MasterProductRevision[] @relation("MasterRevisionActor")
+  stockTransfersCreated  StockTransfer[]         @relation("StockTransferCreator")
 
   @@index([email])
   @@index([phone])
@@ -239,6 +240,7 @@ model Vendor {
   picklists           Picklist[]
   dispatches          Dispatch[]
   goodsReceipts       GoodsReceipt[]
+  stockTransfers      StockTransfer[]
 
   // Ordering defaults applied to new products and checkout
   defaultMOQ          Int?      @map("default_moq")
@@ -299,19 +301,24 @@ model Vendor {
 model ServiceArea {
   id       String  @id @default(uuid()) @db.Uuid
   vendorId String  @map("vendor_id") @db.Uuid
+  // null = vendor-wide legacy row (single-outlet vendors); set when multi-warehouse.
+  outletId String? @map("outlet_id") @db.Uuid
   pincode  String  @db.VarChar(10)
   isActive Boolean @default(true) @map("is_active")
 
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  outlet Outlet? @relation("ServiceAreaOutlet", fields: [outletId], references: [id], onDelete: Cascade)
 
-  @@unique([vendorId, pincode])
+  @@unique([vendorId, outletId, pincode])
   @@index([pincode])
+  @@index([outletId])
   @@map("service_areas")
 }
 
 model DeliverySlot {
   id         String  @id @default(uuid()) @db.Uuid
   vendorId   String  @map("vendor_id") @db.Uuid
+  outletId   String? @map("outlet_id") @db.Uuid
   dayOfWeek  Int     @map("day_of_week")
   slotStart  String  @map("slot_start") @db.VarChar(10)
   slotEnd    String  @map("slot_end") @db.VarChar(10)
@@ -319,9 +326,11 @@ model DeliverySlot {
   isActive   Boolean @default(true) @map("is_active")
 
   vendor Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  outlet Outlet? @relation("DeliverySlotOutlet", fields: [outletId], references: [id], onDelete: Cascade)
   orders Order[]
 
-  @@unique([vendorId, dayOfWeek, slotStart])
+  @@unique([vendorId, outletId, dayOfWeek, slotStart])
+  @@index([outletId])
   @@map("delivery_slots")
 }
 
@@ -456,7 +465,7 @@ model Product {
   masterProduct       MasterProduct?       @relation("MasterToVendorProduct", fields: [masterProductId], references: [id], onDelete: Restrict)
   categoryLinks       ProductCategory[]
   priceSlabs          PriceSlab[]
-  inventory           Inventory?
+  inventories         Inventory[]
   cartItems           CartItem[]
   orderItems          OrderItem[]
   quickOrderListItems QuickOrderListItem[]
@@ -686,9 +695,9 @@ model ComboItem {
 
 model Inventory {
   id                String   @id @default(uuid()) @db.Uuid
-  productId         String   @unique @map("product_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
   vendorId          String   @map("vendor_id") @db.Uuid
-  outletId          String?  @map("outlet_id") @db.Uuid
+  outletId          String   @map("outlet_id") @db.Uuid
   qtyAvailable      Int      @default(0) @map("qty_available")
   qtyReserved       Int      @default(0) @map("qty_reserved")
   qtyInTransit      Int      @default(0) @map("qty_in_transit")
@@ -699,8 +708,9 @@ model Inventory {
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   vendor  Vendor  @relation(fields: [vendorId], references: [id])
-  outlet  Outlet? @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  outlet  Outlet  @relation(fields: [outletId], references: [id], onDelete: Restrict)
 
+  @@unique([productId, outletId])
   @@index([vendorId])
   @@index([outletId])
   @@map("inventory")
@@ -754,6 +764,8 @@ model Order {
   // V2.2: outlet-stamped order with snapshotted delivery address. NOT NULL after Step C.
   businessAccountId        String @map("business_account_id") @db.Uuid
   outletId                 String @map("outlet_id") @db.Uuid
+  // Vendor warehouse that fulfills this order (may differ from customer delivery outlet).
+  fulfillmentOutletId      String? @map("fulfillment_outlet_id") @db.Uuid
   deliveryAddressSnapshot  Json   @map("delivery_address_snapshot")
   status         OrderStatus  @default(pending)
   subtotal       Decimal      @db.Decimal(12, 2)
@@ -802,6 +814,7 @@ model Order {
   cashbackEntry   CashbackEntry?
   businessAccount BusinessAccount @relation(fields: [businessAccountId], references: [id])
   outlet          Outlet          @relation(fields: [outletId], references: [id])
+  fulfillmentOutlet Outlet?       @relation("OrderFulfillmentOutlet", fields: [fulfillmentOutletId], references: [id], onDelete: SetNull)
   deliverySlot    DeliverySlot?   @relation(fields: [deliverySlotId], references: [id])
   salesperson     Salesperson?    @relation(fields: [salespersonId], references: [id], onDelete: SetNull)
   items          OrderItem[]
@@ -818,6 +831,7 @@ model Order {
   @@index([vendorId])
   @@index([businessAccountId])
   @@index([outletId])
+  @@index([fulfillmentOutletId])
   @@index([status])
   @@index([salespersonId])
   @@index([createdAt(sort: Desc)])
@@ -1834,6 +1848,14 @@ model Outlet {
   // V2.2 Phase 4 — pricelists assigned to this outlet
   priceListAssignments PriceListAssignment[] @relation("PriceListAssignmentOutlet")
   inventories          Inventory[]
+  fulfillmentOrders    Order[]               @relation("OrderFulfillmentOutlet")
+  serviceAreas         ServiceArea[]         @relation("ServiceAreaOutlet")
+  deliverySlots        DeliverySlot[]        @relation("DeliverySlotOutlet")
+  picklists            Picklist[]
+  dispatches           Dispatch[]
+  goodsReceipts        GoodsReceipt[]
+  stockTransfersFrom   StockTransfer[]       @relation("StockTransferFrom")
+  stockTransfersTo     StockTransfer[]       @relation("StockTransferTo")
 
   @@index([businessAccountId])
   @@index([pincode])
@@ -2373,6 +2395,7 @@ enum GoodsReceiptStatus {
 model Picklist {
   id        String         @id @default(uuid()) @db.Uuid
   vendorId  String         @map("vendor_id") @db.Uuid
+  outletId  String?        @map("outlet_id") @db.Uuid
   orderId   String?        @map("order_id") @db.Uuid
   status    PicklistStatus @default(draft)
   notes     String?        @db.Text
@@ -2380,10 +2403,12 @@ model Picklist {
   createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  order  Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  vendor Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  outlet Outlet? @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  order  Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([vendorId])
+  @@index([outletId])
   @@index([orderId])
   @@map("picklists")
 }
@@ -2391,6 +2416,7 @@ model Picklist {
 model Dispatch {
   id              String         @id @default(uuid()) @db.Uuid
   vendorId        String         @map("vendor_id") @db.Uuid
+  outletId        String?        @map("outlet_id") @db.Uuid
   orderId         String?        @map("order_id") @db.Uuid
   picklistId      String?        @map("picklist_id") @db.Uuid
   status          DispatchStatus @default(pending)
@@ -2402,10 +2428,12 @@ model Dispatch {
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  order  Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  vendor Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  outlet Outlet? @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  order  Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([vendorId])
+  @@index([outletId])
   @@index([orderId])
   @@map("dispatches")
 }
@@ -2413,6 +2441,7 @@ model Dispatch {
 model GoodsReceipt {
   id          String             @id @default(uuid()) @db.Uuid
   vendorId    String             @map("vendor_id") @db.Uuid
+  outletId    String?            @map("outlet_id") @db.Uuid
   referenceNo String?            @map("reference_no") @db.VarChar(50)
   status      GoodsReceiptStatus @default(draft)
   supplier    String?            @db.VarChar(150)
@@ -2422,10 +2451,46 @@ model GoodsReceipt {
   createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  outlet Outlet? @relation(fields: [outletId], references: [id], onDelete: SetNull)
 
   @@index([vendorId])
+  @@index([outletId])
   @@map("goods_receipts")
+}
+
+enum StockTransferStatus {
+  pending
+  in_transit
+  completed
+  cancelled
+
+  @@map("stock_transfer_status")
+}
+
+model StockTransfer {
+  id           String              @id @default(uuid()) @db.Uuid
+  vendorId     String              @map("vendor_id") @db.Uuid
+  fromOutletId String              @map("from_outlet_id") @db.Uuid
+  toOutletId   String              @map("to_outlet_id") @db.Uuid
+  status       StockTransferStatus @default(pending)
+  items        Json                @default("[]")
+  notes        String?             @db.Text
+  createdBy    String?             @map("created_by") @db.Uuid
+  completedAt  DateTime?           @map("completed_at") @db.Timestamptz
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  vendor     Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  fromOutlet Outlet @relation("StockTransferFrom", fields: [fromOutletId], references: [id], onDelete: Restrict)
+  toOutlet   Outlet @relation("StockTransferTo", fields: [toOutletId], references: [id], onDelete: Restrict)
+  creator    User?  @relation("StockTransferCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([vendorId])
+  @@index([fromOutletId])
+  @@index([toOutletId])
+  @@index([status])
+  @@map("stock_transfers")
 }
 
 // ─── Phase 1: Salesman Commission (V2.2) ──────────────────────────────────
