@@ -1,10 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { clearForcePickerCookie, clearDismissFlag } from '@/lib/postLoginPicker';
+import { redirectIfPortalMismatch } from '@/lib/portalRouting';
 
 /**
  * V2.2 — Multi-account + multi-outlet switcher hook.
@@ -38,6 +40,8 @@ export interface OutletSummary {
 
 export function useBusinessAccountSwitcher() {
   const { data: session, update } = useSession();
+  const pathname = usePathname();
+  const router = useRouter();
   const { clearCart } = useCart();
   const { clearWishlist } = useWishlist();
 
@@ -84,11 +88,17 @@ export function useBusinessAccountSwitcher() {
         if (!res.ok) { setSwitching(false); return; }
         clearWishlist();
         await update({ activeBusinessAccountId: businessAccountId, activeOutletId: outletId ?? undefined });
+
+        const target = accounts.find((a) => a.id === businessAccountId);
+        if (target && pathname) {
+          const dest = redirectIfPortalMismatch(pathname, target);
+          if (dest) router.replace(dest);
+        }
       } finally {
         setSwitching(false);
       }
     },
-    [switching, activeBusinessAccountId, clearCart, clearWishlist, update],
+    [switching, activeBusinessAccountId, accounts, pathname, clearCart, clearWishlist, update, router],
   );
 
   const switchOutlet = useCallback(

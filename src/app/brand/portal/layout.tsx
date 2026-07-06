@@ -22,6 +22,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { defaultPortalPath } from '@/lib/portalRouting';
 import { signOut } from 'next-auth/react';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
 import { NotificationBell } from '@/components/features/NotificationBell';
@@ -137,6 +138,12 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
         };
     }, [status, isAdmin, isActiveBrand]);
 
+    React.useEffect(() => {
+        if (status !== 'authenticated' || isAdmin || isActiveBrand) return;
+        if (!activeAccountType) return;
+        router.replace(defaultPortalPath(activeAccountType));
+    }, [status, isAdmin, isActiveBrand, activeAccountType, router]);
+
     const handleExitAdminView = async () => {
         await fetch('/api/v1/admin/impersonate/brand', { method: 'DELETE' });
         router.push('/admin/brands');
@@ -172,51 +179,8 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
 
     if (!isAdmin && !isActiveBrand) {
         return (
-            <div className="flex flex-col min-h-screen bg-[#F8F9FB]">
-                <header className="h-[70px] bg-white border-b border-[#EEEEEE] flex items-center px-6 shrink-0 justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-[#53B175] rounded-[10px] flex items-center justify-center shrink-0">
-                            <Package size={18} className="text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-[17px] font-extrabold leading-tight text-[#181725]">Brand Portal</h1>
-                            <p className="text-[10px] text-[#AEAEAE] font-semibold uppercase tracking-wide -mt-0.5">HoReCa Hub</p>
-                        </div>
-                    </div>
-                    <BusinessAccountSwitcherDropdown />
-                </header>
-
-                <div className="flex-1 flex items-center justify-center p-6">
-                    <div className="bg-white border border-[#EEEEEE] rounded-[24px] p-10 max-w-[500px] w-full text-center shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                        <div className="w-[80px] h-[80px] bg-[#EDE9FE] rounded-full flex items-center justify-center mx-auto mb-6 text-[#7C3AED]">
-                            <ShieldAlert size={40} className="stroke-[2.5]" />
-                        </div>
-
-                        <h2 className="text-[24px] font-bold text-[#181725] mb-3">Switch to a Brand Account</h2>
-                        <p className="text-[14px] text-[#7C7C7C] leading-relaxed mb-8">
-                            Your currently selected business account is not a brand profile.
-                            Use the account switcher above to select a brand account, or go to the correct portal.
-                        </p>
-
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                            {isActiveVendor && (
-                                <Link
-                                    href="/vendor/dashboard"
-                                    className="px-6 py-3 bg-[#299E60] hover:bg-[#238a54] text-white font-bold text-[14px] rounded-[12px] transition-all flex items-center justify-center gap-2"
-                                >
-                                    Go to Vendor Dashboard
-                                </Link>
-                            )}
-                            <button
-                                onClick={() => router.push('/')}
-                                className="px-6 py-3 bg-white hover:bg-[#F8F9FB] text-[#181725] font-bold text-[14px] border border-[#EEEEEE] rounded-[12px] transition-all flex items-center justify-center gap-2"
-                            >
-                                <Home size={18} />
-                                Go to Homepage
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            <div className="flex items-center justify-center min-h-[50vh] bg-[#F8F9FB]">
+                <Loader2 className="animate-spin text-[#53B175]" size={36} />
             </div>
         );
     }
@@ -351,18 +315,9 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
 
                 <div className="flex-1" />
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 shrink-0">
                     <NotificationBell accentColor="#53B175" />
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-[#53B175]/15 flex items-center justify-center text-[#53B175] text-[12px] font-black">
-                            {session?.user?.name?.[0]?.toUpperCase() ?? 'B'}
-                        </div>
-                        {!isCollapsed && (
-                            <span className="text-[13px] font-bold text-[#181725] max-w-[140px] truncate">
-                                {session?.user?.name ?? 'Brand User'}
-                            </span>
-                        )}
-                    </div>
+                    <BusinessAccountSwitcherDropdown />
                 </div>
             </header>
 

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
-import { usePathname, useParams } from 'next/navigation';
+import { usePathname, useParams, useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Building2, MapPin, Users, ShieldCheck, Loader2 } from 'lucide-react';
 
 interface AccountHeader {
@@ -25,9 +25,43 @@ const TABS = [
 ];
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={(
+      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
+        <Loader2 className="animate-spin text-[#299E60]" />
+      </div>
+    )}>
+      <AccountLayoutInner>{children}</AccountLayoutInner>
+    </Suspense>
+  );
+}
+
+function AccountLayoutInner({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const id = params.id;
+  const fromPortal = searchParams.get('from');
+  const fromQs = fromPortal ? `?from=${fromPortal}` : '';
+
+  useEffect(() => {
+    if (fromPortal !== 'vendor') return;
+    let tab = 'overview';
+    if (pathname.endsWith('/outlets')) tab = 'outlets';
+    else if (pathname.endsWith('/users') || pathname.endsWith('/roles')) tab = 'team';
+    const dest = tab === 'overview' ? '/vendor/account' : `/vendor/account?tab=${tab}`;
+    router.replace(dest);
+  }, [fromPortal, pathname, router]);
+
+  const backHref =
+    fromPortal === 'vendor' ? '/vendor/dashboard'
+    : fromPortal === 'brand' ? '/brand/portal'
+    : '/';
+  const backLabel =
+    fromPortal === 'vendor' ? 'Back to Vendor Panel'
+    : fromPortal === 'brand' ? 'Back to Brand Portal'
+    : 'Back';
 
   const [account, setAccount] = useState<AccountHeader | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,9 +89,9 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
       <div className="max-w-[1200px] mx-auto px-[clamp(1rem,3vw,2rem)] py-[clamp(1rem,3vw,2rem)]">
-        <Link href="/" className="inline-flex items-center gap-2 text-[13px] text-[#666] hover:text-[#181725] mb-4">
+        <Link href={backHref} className="inline-flex items-center gap-2 text-[13px] text-[#666] hover:text-[#181725] mb-4">
           <ArrowLeft size={14} />
-          Back
+          {backLabel}
         </Link>
 
         {loading ? (
@@ -93,8 +127,8 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
             {/* Tabs */}
             <nav className="bg-white rounded-2xl border border-[#F0F0F0] p-1 mb-[clamp(1rem,2vw,1.5rem)] flex gap-1 overflow-x-auto">
               {TABS.map((t) => {
-                const href = `${basePath}${t.href}`;
-                const active = pathname === href || (t.href === '' && pathname === basePath);
+                const href = `${basePath}${t.href}${fromQs}`;
+                const active = pathname === `${basePath}${t.href}` || (t.href === '' && pathname === basePath);
                 const Icon = t.icon;
                 return (
                   <Link
