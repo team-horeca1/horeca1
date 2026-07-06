@@ -124,7 +124,9 @@ const blank = {
 };
 
 function mapAdjust(mode: PriceMode, value: string) {
+  if (!mode || value.trim() === '') return null;
   const v = Number(value);
+  if (Number.isNaN(v)) return null;
   switch (mode) {
     case 'incPct':   return { type: 'percent', value: v };
     case 'decPct':   return { type: 'percent', value: -v };
@@ -133,6 +135,10 @@ function mapAdjust(mode: PriceMode, value: string) {
     case 'decAmt':   return { type: 'fixed', value: -v };
     default:         return null;
   }
+}
+
+function priceAdjustReady(mode: PriceMode, value: string) {
+  return !!mode && value.trim() !== '' && !Number.isNaN(Number(value));
 }
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
@@ -182,10 +188,22 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
     [skuPaste],
   );
 
-  const targetIds = useMemo(
-    () => (targetMode === 'pick' ? selectedIds : targetMode === 'rule' ? ruleIds : []).slice(0, 500),
-    [targetMode, selectedIds, ruleIds],
-  );
+  const knownIds = useMemo(() => new Set(allProducts.map((p) => p.id)), [allProducts]);
+
+  const targetIds = useMemo(() => {
+    let ids: string[];
+    if (targetMode === 'pick') {
+      // Drop stale ids that are no longer in the loaded catalog (e.g. after account switch).
+      ids = selectedIds.filter((id) => knownIds.has(id));
+    } else if (targetMode === 'rule') {
+      ids = ruleIds;
+    } else {
+      ids = [];
+    }
+    return ids.slice(0, 500);
+  }, [targetMode, selectedIds, ruleIds, knownIds]);
+
+  const stalePickCount = targetMode === 'pick' ? Math.max(0, selectedIds.length - targetIds.length) : 0;
   const overCap = targetMode === 'sku'
     ? skuList.length > 500
     : (targetMode === 'pick' ? selectedIds.length : ruleIds.length) > 500;
@@ -279,7 +297,7 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
   const canApply = useMemo(() => {
     if (count === 0 || !action) return false;
     switch (action) {
-      case 'price':    return !!mapAdjust(cfg.price.mode, cfg.price.value) || !!mapAdjust(cfg.price.mrpMode, cfg.price.mrpValue);
+      case 'price':    return priceAdjustReady(cfg.price.mode, cfg.price.value) || priceAdjustReady(cfg.price.mrpMode, cfg.price.mrpValue);
       case 'gst':      return cfg.gst.value !== '';
       case 'offer':    return cfg.offer.mode === 'clear' || (!!cfg.offer.mode && cfg.offer.value !== '');
       case 'stock':    return (!!cfg.stock.mode && cfg.stock.value !== '') || cfg.stock.threshold !== '';
@@ -322,7 +340,10 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
         });
         const j = await res.json();
         if (!j.success) throw new Error(j.error?.message || 'Stock update failed');
-        updated = j.updated ?? count;
+        const matched = j.matched ?? count;
+        updated = j.updated ?? 0;
+        if (matched === 0) throw new Error('No products matched for stock update. Refresh and re-select products.');
+        if (updated === 0) throw new Error('No stock rows were updated. Check warehouse stock exists for these products.');
       } else if (action === 'customer') {
         const url = config.endpoints.priceListBulkApply?.(cfg.customer.listId);
         if (!url) throw new Error('Customer pricing not available');
@@ -363,11 +384,24 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
         });
         const j = await res.json();
         if (!j.success) throw new Error(j.error?.message || 'Bulk update failed');
-        updated = j.data?.updated ?? count;
+        const matched = j.data?.matched ?? 0;
+        updated = j.data?.updated ?? 0;
+        if (matched === 0) {
+          throw new Error(
+            targetMode === 'sku'
+              ? 'No products matched those SKUs for your vendor account.'
+              : 'No products matched. Refresh the page, re-select products, and try again.',
+          );
+        }
+        if (updated === 0) {
+          throw new Error('No products were updated. Check your values and try again.');
+        }
       }
 
       setResult({ updated, label: actionLabel });
-      toast.success(`${actionLabel}: ${updated} product${updated !== 1 ? 's' : ''} updated`);
+      if (updated > 0) {
+        toast.success(`${actionLabel}: ${updated} product${updated !== 1 ? 's' : ''} updated`);
+      }
       onComplete();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Bulk action failed');
@@ -432,7 +466,9 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
                   <p className="text-[12px] font-semibold text-[#7C7C7C]">
                     {selectedIds.length === 0
                       ? 'No rows ticked. Close, tick products in the table, then re-open — or switch to “Match by rule”.'
-                      : `${selectedIds.length} row${selectedIds.length !== 1 ? 's' : ''} ticked in the table.`}
+                      : stalePickCount > 0
+                        ? `${targetIds.length} of ${selectedIds.length} selection${selectedIds.length !== 1 ? 's' : ''} still valid — refresh the product list and re-select.`
+                        : `${selectedIds.length} row${selectedIds.length !== 1 ? 's' : ''} ticked in the table.`}
                   </p>
                 ) : targetMode === 'sku' ? (
                   <div>
@@ -586,14 +622,20 @@ function fmt(v: string | number | null): string {
 }
 
 function ResultPanel({ result, onAnother, onClose }: { result: { updated: number; label: string }; onAnother: () => void; onClose: () => void }) {
+  const ok = result.updated > 0;
   return (
     <div className="flex flex-col items-center text-center py-10 gap-4">
-      <div className="w-16 h-16 rounded-full bg-[#EBFDF2] border border-[#299E60]/10 flex items-center justify-center">
-        <BadgeCheck size={32} className="text-[#299E60]" />
+      <div className={cn(
+        'w-16 h-16 rounded-full border flex items-center justify-center',
+        ok ? 'bg-[#EBFDF2] border-[#299E60]/10' : 'bg-amber-50 border-amber-200',
+      )}>
+        <BadgeCheck size={32} className={ok ? 'text-[#299E60]' : 'text-amber-600'} />
       </div>
       <div>
         <h3 className="text-[20px] font-black text-[#181725]">{result.updated} updated</h3>
-        <p className="text-[13px] text-[#7C7C7C] font-semibold mt-1">{result.label} applied successfully.</p>
+        <p className="text-[13px] text-[#7C7C7C] font-semibold mt-1">
+          {ok ? `${result.label} applied successfully.` : `No products were updated for ${result.label.toLowerCase()}.`}
+        </p>
       </div>
       <div className="flex items-center gap-2.5 mt-2">
         <button onClick={onAnother} className="h-[42px] px-5 border border-[#EEEEEE] hover:bg-[#F8F9FB] rounded-[12px] text-[13px] font-bold text-[#181725]">Do another</button>

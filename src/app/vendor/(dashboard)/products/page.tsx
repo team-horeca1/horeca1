@@ -508,6 +508,7 @@ export default function VendorProductsPage() {
     // Bulk Update — in-browser grid (primary) + Advanced engine drawer + row selection
     const [bulkOpen, setBulkOpen] = useState(false);
     const [gridOpen, setGridOpen] = useState(false);
+    const [bulkEngineIds, setBulkEngineIds] = useState<string[] | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     // Bulk import
@@ -3422,10 +3423,10 @@ export default function VendorProductsPage() {
 
             <VendorBulkEngine
                 open={bulkOpen}
-                onClose={() => setBulkOpen(false)}
+                onClose={() => { setBulkOpen(false); setBulkEngineIds(null); }}
                 products={products}
-                selectedIds={Array.from(selectedIds)}
-                onComplete={() => { fetchProducts(false); setSelectedIds(new Set()); }}
+                selectedIds={bulkEngineIds ?? Array.from(selectedIds)}
+                onComplete={() => { fetchProducts(false); setSelectedIds(new Set()); setBulkEngineIds(null); }}
             />
 
             <VendorBulkGrid
@@ -3444,7 +3445,14 @@ export default function VendorProductsPage() {
                 onComplete={() => fetchProducts(false)}
                 categories={categories}
                 brands={brands}
-                onOpenAdvanced={() => setBulkOpen(true)}
+                onOpenAdvanced={() => {
+                    setBulkEngineIds(
+                        selectedIds.size > 0
+                            ? Array.from(selectedIds)
+                            : products.map((p) => p.id),
+                    );
+                    setBulkOpen(true);
+                }}
                 readOnlyCommission
             />
 

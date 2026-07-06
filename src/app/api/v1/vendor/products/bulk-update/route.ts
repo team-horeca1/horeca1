@@ -95,7 +95,10 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     }
 
     if (matchedCount === 0) {
-      return NextResponse.json({ success: true, data: { matched: 0, updated: 0 } });
+      return NextResponse.json({
+        success: true,
+        data: { matched: 0, updated: 0, message: 'No products matched this filter for your vendor account.' },
+      });
     }
 
     // Direct-field updates → one statement.
