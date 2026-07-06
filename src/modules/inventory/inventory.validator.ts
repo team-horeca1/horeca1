@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const updateStockSchema = z.object({
+  outletId: z.string().uuid().optional(),
   qtyAvailable: z.number().int().min(0).optional(),
   lowStockThreshold: z.number().int().min(0).optional(),
 });

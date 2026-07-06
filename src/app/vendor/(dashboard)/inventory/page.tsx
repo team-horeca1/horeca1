@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
+import { useVendorOutletScope } from '@/hooks/useVendorOutletScope';
+import { StockTransferModal } from '@/components/features/vendor/StockTransferModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -457,10 +458,10 @@ function InventoryMobileCard({ item, onSaved, outletId }: { item: InventoryItem;
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function VendorInventoryPage() {
-    const { activeOutletId, currentOutlet } = useBusinessAccountSwitcher();
+    const { activeOutletId, currentOutlet, multiWarehouseEnabled, outletQuery, scopeVersion } = useVendorOutletScope();
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [multiWarehouseEnabled, setMultiWarehouseEnabled] = useState(false);
+    const [viewAll, setViewAll] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
     const [showCsvModal, setShowCsvModal] = useState(false);
@@ -469,10 +470,10 @@ export default function VendorInventoryPage() {
     const fetchInventory = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const params = new URLSearchParams();
-            if (multiWarehouseEnabled && activeOutletId) params.set('outletId', activeOutletId);
-            const qs = params.toString();
-            const res = await fetch(`/api/v1/vendor/inventory${qs ? `?${qs}` : ''}`);
+            const endpoint = viewAll && multiWarehouseEnabled
+                ? '/api/v1/vendor/inventory/consolidated'
+                : `/api/v1/vendor/inventory${outletQuery(viewAll)}`;
+            const res = await fetch(endpoint);
             const json = await res.json();
             if (json.success) setItems(json.data);
         } catch (err) {
@@ -480,16 +481,11 @@ export default function VendorInventoryPage() {
         } finally {
             setLoading(false);
         }
-    }, [multiWarehouseEnabled, activeOutletId]);
-
-    useEffect(() => {
-        fetch('/api/v1/vendor/settings')
-            .then((r) => r.json())
-            .then((j) => { if (j.success) setMultiWarehouseEnabled(!!j.data.multiWarehouseEnabled); })
-            .catch(() => {});
-    }, []);
+    }, [multiWarehouseEnabled, outletQuery, viewAll, scopeVersion]);
 
     useEffect(() => { fetchInventory(); }, [fetchInventory]);
+
+    const [showTransfer, setShowTransfer] = useState(false);
 
     const handleRowSaved = useCallback((updated: Partial<InventoryItem> & { id: string }) => {
         setItems(prev => prev.map(i => i.id === updated.id ? { ...i, ...updated } : i));
@@ -533,8 +529,16 @@ export default function VendorInventoryPage() {
                             className="h-[38px] w-[200px] bg-white border border-[#EEEEEE] rounded-[10px] pl-9 pr-3 text-[12px] outline-none placeholder:text-[#AEAEAE] focus:border-[#299E60]/40 shadow-sm"
                         />
                     </div>
+                    {multiWarehouseEnabled && !viewAll && activeOutletId && (
+                        <button
+                            type="button"
+                            onClick={() => setShowTransfer(true)}
+                            className="h-[38px] px-4 rounded-[10px] border border-[#299E60] text-[#299E60] text-[12px] font-bold hover:bg-emerald-50"
+                        >
+                            Transfer stock
+                        </button>
+                    )}
                     <button
-                        onClick={() => setShowCsvModal(true)}
                         className="h-[38px] px-4 rounded-[10px] bg-[#181725] text-white text-[12px] font-bold flex items-center gap-2 hover:bg-[#2d2d40] transition-all shadow-sm"
                     >
                         <Upload size={13} />
@@ -543,9 +547,29 @@ export default function VendorInventoryPage() {
                 </div>
             </div>
 
-            {multiWarehouseEnabled && currentOutlet && (
-                <div className="bg-[#EFF6FF] border border-[#DBEAFE] rounded-[12px] px-4 py-3 text-[13px] text-[#1E40AF] font-semibold">
-                    Stock shown for: <span className="font-bold">{currentOutlet.name}</span>
+            {multiWarehouseEnabled && (
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="bg-[#EFF6FF] border border-[#DBEAFE] rounded-[12px] px-4 py-3 text-[13px] text-[#1E40AF] font-semibold flex-1 min-w-[200px]">
+                        {viewAll
+                            ? 'Showing stock across all warehouses'
+                            : <>Stock for: <span className="font-bold">{currentOutlet?.name ?? 'warehouse'}</span></>}
+                    </div>
+                    <div className="flex rounded-[10px] border border-[#EEEEEE] overflow-hidden bg-white">
+                        <button
+                            type="button"
+                            onClick={() => setViewAll(false)}
+                            className={`px-3 py-2 text-[12px] font-bold ${!viewAll ? 'bg-[#299E60] text-white' : 'text-[#7C7C7C]'}`}
+                        >
+                            This warehouse
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewAll(true)}
+                            className={`px-3 py-2 text-[12px] font-bold ${viewAll ? 'bg-[#299E60] text-white' : 'text-[#7C7C7C]'}`}
+                        >
+                            All warehouses
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -623,11 +647,26 @@ export default function VendorInventoryPage() {
                         <Loader2 className="animate-spin text-[#299E60]" size={28} />
                     </div>
                 ) : filtered.length === 0 ? (
-                    <div className="py-16 text-center">
+                    <div className="py-16 text-center px-6">
                         <Package size={36} className="text-[#E5E7EB] mx-auto mb-3" />
                         <p className="text-[14px] font-bold text-[#AEAEAE]">
-                            {searchQuery ? `No products matching "${searchQuery}"` : `No ${activeFilter === 'all' ? '' : activeFilter.replace('_', ' ')} products`}
+                            {searchQuery
+                                ? `No products matching "${searchQuery}"`
+                                : activeFilter !== 'all'
+                                    ? `No ${activeFilter.replace('_', ' ')} products at this warehouse`
+                                    : items.length === 0
+                                        ? 'No products in your catalog yet'
+                                        : 'No products match this filter'}
                         </p>
+                        {!searchQuery && activeFilter === 'all' && items.length === 0 && multiWarehouseEnabled && !viewAll && (
+                            <p className="text-[12px] text-[#7C7C7C] mt-2 max-w-md mx-auto">
+                                Stock is tracked per warehouse. Add products in Catalog, or use{' '}
+                                <button type="button" onClick={() => setShowTransfer(true)} className="text-[#299E60] font-semibold hover:underline">
+                                    Transfer stock
+                                </button>{' '}
+                                from another warehouse.
+                            </p>
+                        )}
                     </div>
                 ) : (
                     <>
@@ -673,6 +712,14 @@ export default function VendorInventoryPage() {
                 <CsvUploadModal
                     onClose={() => setShowCsvModal(false)}
                     onSuccess={() => { setShowCsvModal(false); fetchInventory(true); }}
+                />
+            )}
+            {showTransfer && activeOutletId && (
+                <StockTransferModal
+                    fromOutletId={activeOutletId}
+                    fromOutletName={currentOutlet?.name}
+                    onClose={() => setShowTransfer(false)}
+                    onSuccess={() => fetchInventory(true)}
                 />
             )}
         </div>

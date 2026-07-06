@@ -21,16 +21,39 @@ async function logInventoryChange(
   });
 }
 
+function invKey(productId: string, outletId: string) {
+  return { productId_outletId: { productId, outletId } };
+}
+
 export class InventoryService {
-  async getStock(productId: string) {
-    const inv = await prisma.inventory.findUnique({ where: { productId } });
-    if (!inv) throw Errors.notFound('Inventory');
-    return inv;
+  async getStock(productId: string, outletId?: string) {
+    if (outletId) {
+      const inv = await prisma.inventory.findUnique({
+        where: invKey(productId, outletId),
+      });
+      if (!inv) throw Errors.notFound('Inventory');
+      return inv;
+    }
+    const rows = await prisma.inventory.findMany({ where: { productId } });
+    const agg = rows.reduce(
+      (acc, r) => ({
+        qtyAvailable: acc.qtyAvailable + r.qtyAvailable,
+        qtyReserved: acc.qtyReserved + r.qtyReserved,
+        qtyInTransit: acc.qtyInTransit + r.qtyInTransit,
+        qtyDamaged: acc.qtyDamaged + r.qtyDamaged,
+        qtyReturned: acc.qtyReturned + r.qtyReturned,
+        lowStockThreshold: Math.min(acc.lowStockThreshold, r.lowStockThreshold),
+      }),
+      { qtyAvailable: 0, qtyReserved: 0, qtyInTransit: 0, qtyDamaged: 0, qtyReturned: 0, lowStockThreshold: 10 },
+    );
+    if (rows.length === 0) throw Errors.notFound('Inventory');
+    return { productId, ...agg, id: rows[0].id, vendorId: rows[0].vendorId, outletId: rows[0].outletId };
   }
 
   async updateStock(
     productId: string,
     vendorId: string,
+    outletId: string,
     data: {
       qtyAvailable?: number;
       qtyInTransit?: number;
@@ -40,11 +63,13 @@ export class InventoryService {
     },
     changedBy?: string,
   ) {
-    const before = await prisma.inventory.findUnique({ where: { productId } });
+    const before = await prisma.inventory.findUnique({
+      where: invKey(productId, outletId),
+    });
     if (!before || before.vendorId !== vendorId) throw Errors.notFound('Inventory');
 
     const inv = await prisma.inventory.update({
-      where: { productId },
+      where: invKey(productId, outletId),
       data,
     });
 
@@ -71,21 +96,30 @@ export class InventoryService {
         select: { autoDisableOos: true },
       });
       if (vendor?.autoDisableOos && available <= 0) {
-        await prisma.product.update({ where: { id: productId }, data: { isActive: false } });
+        const total = await prisma.inventory.aggregate({
+          where: { productId },
+          _sum: { qtyAvailable: true, qtyReserved: true },
+        });
+        const totalAvail = (total._sum.qtyAvailable ?? 0) - (total._sum.qtyReserved ?? 0);
+        if (totalAvail <= 0) {
+          await prisma.product.update({ where: { id: productId }, data: { isActive: false } });
+        }
       }
     }
 
     return inv;
   }
 
-  async bulkCheck(items: Array<{ productId: string; quantity: number }>, tx?: TxClient) {
+  async bulkCheck(
+    items: Array<{ productId: string; quantity: number }>,
+    outletId: string,
+    tx?: TxClient,
+  ) {
     const db = tx || prisma;
-    const ids = items.map(i => i.productId);
-    // Single round-trip instead of N parallel findUnique calls (which all
-    // hit the same Postgres connection pool and bottleneck on big carts)
+    const ids = items.map((i) => i.productId);
     const [inventories, products] = await Promise.all([
       db.inventory.findMany({
-        where: { productId: { in: ids } },
+        where: { productId: { in: ids }, outletId },
         select: { productId: true, qtyAvailable: true, qtyReserved: true },
       }),
       db.product.findMany({
@@ -93,9 +127,9 @@ export class InventoryService {
         select: { id: true, name: true },
       }),
     ]);
-    const invByProductId = new Map(inventories.map(inv => [inv.productId, inv]));
-    const nameByProductId = new Map(products.map(p => [p.id, p.name]));
-    return items.map(item => {
+    const invByProductId = new Map(inventories.map((inv) => [inv.productId, inv]));
+    const nameByProductId = new Map(products.map((p) => [p.id, p.name]));
+    return items.map((item) => {
       const inv = invByProductId.get(item.productId);
       const available = inv ? inv.qtyAvailable - inv.qtyReserved : 0;
       return {
@@ -107,33 +141,43 @@ export class InventoryService {
     });
   }
 
-  async reserveStock(items: Array<{ productId: string; quantity: number }>, tx?: TxClient) {
+  async reserveStock(
+    items: Array<{ productId: string; quantity: number }>,
+    outletId: string,
+    tx?: TxClient,
+  ) {
     const db = tx || prisma;
     for (const item of items) {
       await db.inventory.update({
-        where: { productId: item.productId },
+        where: invKey(item.productId, outletId),
         data: { qtyReserved: { increment: item.quantity } },
       });
     }
   }
 
-  async releaseStock(items: Array<{ productId: string; quantity: number }>, tx?: TxClient) {
+  async releaseStock(
+    items: Array<{ productId: string; quantity: number }>,
+    outletId: string,
+    tx?: TxClient,
+  ) {
     const db = tx || prisma;
     for (const item of items) {
       await db.inventory.update({
-        where: { productId: item.productId },
+        where: invKey(item.productId, outletId),
         data: { qtyReserved: { decrement: item.quantity } },
       });
     }
   }
 
-  // Called when an order is delivered: deduct the goods that left the warehouse
-  // from both the available pool and the reserved pool.
-  async finalizeStock(items: Array<{ productId: string; quantity: number }>, tx?: TxClient) {
+  async finalizeStock(
+    items: Array<{ productId: string; quantity: number }>,
+    outletId: string,
+    tx?: TxClient,
+  ) {
     const db = tx || prisma;
     for (const item of items) {
       await db.inventory.update({
-        where: { productId: item.productId },
+        where: invKey(item.productId, outletId),
         data: {
           qtyAvailable: { decrement: item.quantity },
           qtyReserved: { decrement: item.quantity },
@@ -142,99 +186,201 @@ export class InventoryService {
     }
   }
 
-  // Bulk stock update — set absolute qtyAvailable per product.
-  // Validates each productId belongs to vendorId before writing.
   async bulkUpdateStock(
     vendorId: string,
+    outletId: string,
     items: Array<{ productId: string; qtyAvailable: number }>,
   ) {
-    const ids = items.map(i => i.productId);
+    const ids = items.map((i) => i.productId);
     const owned = await prisma.inventory.findMany({
-      where: { productId: { in: ids }, vendorId },
+      where: { productId: { in: ids }, vendorId, outletId },
       select: { productId: true },
     });
-    const ownedSet = new Set(owned.map(r => r.productId));
-    const invalid = ids.filter(id => !ownedSet.has(id));
+    const ownedSet = new Set(owned.map((r) => r.productId));
+    const invalid = ids.filter((id) => !ownedSet.has(id));
     if (invalid.length > 0) {
-      throw new Error(`Products not owned by this vendor: ${invalid.join(', ')}`);
+      throw new Error(`Products not owned by this vendor at this outlet: ${invalid.join(', ')}`);
     }
 
     return prisma.$transaction(
-      items.map(item =>
+      items.map((item) =>
         prisma.inventory.update({
-          where: { productId: item.productId },
+          where: invKey(item.productId, outletId),
           data: { qtyAvailable: item.qtyAvailable },
         }),
       ),
     );
   }
 
-  // Bulk stock adjust for the Bulk Update Engine. Supports set / increase /
-  // decrease against a list of products, plus an optional low-stock threshold.
-  // Upserts the inventory row when a product doesn't have one yet (decrease
-  // clamps at 0). Pass scopeVendorId for the vendor portal (enforces ownership);
-  // omit it for admin (each row uses the product's own vendorId).
   async bulkAdjustStock(opts: {
     productIds: string[];
+    outletId?: string;
     mode?: 'set' | 'increase' | 'decrease';
     value?: number;
     lowStockThreshold?: number;
     scopeVendorId?: string | null;
   }): Promise<{ updated: number; skipped: number }> {
-    const { productIds, mode, value, lowStockThreshold, scopeVendorId } = opts;
+    const { productIds, outletId, mode, value, lowStockThreshold, scopeVendorId } = opts;
 
     const products = await prisma.product.findMany({
       where: { id: { in: productIds }, ...(scopeVendorId ? { vendorId: scopeVendorId } : {}) },
       select: { id: true, vendorId: true },
     });
-    const productMap = new Map(products.map(p => [p.id, p.vendorId]));
-    const missing = productIds.filter(id => !productMap.has(id));
+    const productMap = new Map(products.map((p) => [p.id, p.vendorId]));
+    const missing = productIds.filter((id) => !productMap.has(id));
     if (missing.length > 0) {
       throw new Error(`Products not found${scopeVendorId ? ' for this vendor' : ''}: ${missing.join(', ')}`);
     }
 
-    // Current quantities so increase/decrease can be computed (and clamped).
     const existing = await prisma.inventory.findMany({
-      where: { productId: { in: productIds } },
-      select: { productId: true, qtyAvailable: true },
+      where: {
+        productId: { in: productIds },
+        ...(outletId ? { outletId } : {}),
+      },
+      select: { productId: true, outletId: true, qtyAvailable: true },
     });
-    const qtyMap = new Map(existing.map(r => [r.productId, r.qtyAvailable]));
+    const rowsByProduct = new Map<string, typeof existing>();
+    for (const row of existing) {
+      const list = rowsByProduct.get(row.productId) ?? [];
+      list.push(row);
+      rowsByProduct.set(row.productId, list);
+    }
 
     const ops = [];
     let skipped = 0;
     for (const pid of productIds) {
       const vendorId = productMap.get(pid);
-      // Catalog-level products (no vendor) can't track stock — skip them.
-      if (!vendorId) { skipped++; continue; }
-
-      const current = qtyMap.get(pid) ?? 0;
-      let nextQty: number | undefined;
-      if (value !== undefined && mode) {
-        if (mode === 'set') nextQty = Math.max(0, value);
-        else if (mode === 'increase') nextQty = current + value;
-        else nextQty = Math.max(0, current - value); // decrease, clamped
+      if (!vendorId) {
+        skipped++;
+        continue;
       }
 
-      const update: { qtyAvailable?: number; lowStockThreshold?: number } = {};
-      if (nextQty !== undefined) update.qtyAvailable = nextQty;
-      if (lowStockThreshold !== undefined) update.lowStockThreshold = lowStockThreshold;
-      if (Object.keys(update).length === 0) { skipped++; continue; }
+      const targetRows = outletId
+        ? existing.filter((r) => r.productId === pid && r.outletId === outletId)
+        : rowsByProduct.get(pid) ?? [];
 
-      ops.push(
-        prisma.inventory.upsert({
-          where: { productId: pid },
-          create: {
-            productId: pid,
-            vendorId,
-            qtyAvailable: nextQty ?? 0,
-            lowStockThreshold: lowStockThreshold ?? 10,
-          },
-          update,
-        }),
-      );
+      if (targetRows.length === 0 && outletId) {
+        skipped++;
+        continue;
+      }
+
+      for (const row of targetRows.length ? targetRows : [{ productId: pid, outletId: outletId!, qtyAvailable: 0 }]) {
+        const oid = row.outletId ?? outletId;
+        if (!oid) {
+          skipped++;
+          continue;
+        }
+        const current = row.qtyAvailable ?? 0;
+        let nextQty: number | undefined;
+        if (value !== undefined && mode) {
+          if (mode === 'set') nextQty = Math.max(0, value);
+          else if (mode === 'increase') nextQty = current + value;
+          else nextQty = Math.max(0, current - value);
+        }
+
+        const update: { qtyAvailable?: number; lowStockThreshold?: number } = {};
+        if (nextQty !== undefined) update.qtyAvailable = nextQty;
+        if (lowStockThreshold !== undefined) update.lowStockThreshold = lowStockThreshold;
+        if (Object.keys(update).length === 0) {
+          skipped++;
+          continue;
+        }
+
+        ops.push(
+          prisma.inventory.upsert({
+            where: invKey(pid, oid),
+            create: {
+              productId: pid,
+              vendorId,
+              outletId: oid,
+              qtyAvailable: nextQty ?? 0,
+              lowStockThreshold: lowStockThreshold ?? 10,
+            },
+            update,
+          }),
+        );
+      }
     }
 
     await prisma.$transaction(ops);
     return { updated: ops.length, skipped };
+  }
+
+  async transferStock(opts: {
+    vendorId: string;
+    fromOutletId: string;
+    toOutletId: string;
+    items: Array<{ productId: string; quantity: number }>;
+    createdBy?: string;
+    notes?: string;
+  }) {
+    if (opts.fromOutletId === opts.toOutletId) {
+      throw Errors.badRequest('Source and destination outlets must differ');
+    }
+
+    return prisma.$transaction(async (tx) => {
+      for (const item of opts.items) {
+        const check = await this.bulkCheck([item], opts.fromOutletId, tx);
+        if (!check[0]?.available) {
+          throw Errors.outOfStock(check[0]?.productName ?? 'Item', check[0]?.qtyAvailable ?? 0);
+        }
+      }
+
+      const transfer = await tx.stockTransfer.create({
+        data: {
+          vendorId: opts.vendorId,
+          fromOutletId: opts.fromOutletId,
+          toOutletId: opts.toOutletId,
+          status: 'completed',
+          items: opts.items,
+          notes: opts.notes,
+          createdBy: opts.createdBy,
+          completedAt: new Date(),
+        },
+      });
+
+      for (const item of opts.items) {
+        await tx.inventory.update({
+          where: invKey(item.productId, opts.fromOutletId),
+          data: { qtyAvailable: { decrement: item.quantity } },
+        });
+        await tx.inventory.upsert({
+          where: invKey(item.productId, opts.toOutletId),
+          create: {
+            productId: item.productId,
+            vendorId: opts.vendorId,
+            outletId: opts.toOutletId,
+            qtyAvailable: item.quantity,
+            lowStockThreshold: 10,
+          },
+          update: { qtyAvailable: { increment: item.quantity } },
+        });
+      }
+
+      return transfer;
+    });
+  }
+
+  async getConsolidated(vendorId: string, accessibleOutletIds: string[]) {
+    const where: { vendorId: string; outletId?: { in: string[] } } = { vendorId };
+    if (accessibleOutletIds.length > 0) {
+      where.outletId = { in: accessibleOutletIds };
+    }
+
+    const rows = await prisma.inventory.findMany({
+      where,
+      include: {
+        product: {
+          select: { id: true, name: true, sku: true, unit: true, imageUrl: true, isActive: true },
+        },
+        outlet: { select: { id: true, name: true } },
+      },
+      orderBy: [{ product: { name: 'asc' } }, { outlet: { name: 'asc' } }],
+    });
+
+    return rows.map((item) => ({
+      ...item,
+      isLowStock: item.qtyAvailable - item.qtyReserved <= item.lowStockThreshold,
+    }));
   }
 }

@@ -1,24 +1,12 @@
 'use client';
 
-/**
- * VendorOutletStrip
- * -----------------
- * V2.2 — Visual indicator strip that sits directly below the vendor portal
- * top header. It surfaces the active OUTLET (i.e. the dispatch warehouse the
- * vendor is currently operating from) and lets the vendor switch between
- * the outlets attached to the active BusinessAccount.
- *
- * This is purely UI: it does NOT scope orders/inventory/delivery slots —
- * actual outlet-scoping of vendor data is deferred to V2.3 (ticket T-102).
- * The underlying API call (switchOutlet) refreshes the JWT session so that
- * V2.3 services can pick up the new activeOutletId server-side.
- */
-
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Warehouse, MapPin, Check, AlertCircle, ChevronDown, Loader2 } from 'lucide-react';
+import { Warehouse, MapPin, Check, AlertCircle, ChevronDown, Loader2, Plus } from 'lucide-react';
+import { toast } from 'sonner';
 import { useSession } from 'next-auth/react';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
+import { emitVendorOutletChanged } from '@/hooks/useVendorOutletScope';
 import { cn } from '@/lib/utils';
 
 export function VendorOutletStrip() {
@@ -81,6 +69,9 @@ export function VendorOutletStrip() {
         }
         setIsPickerOpen(false);
         await switchOutlet(outletId);
+        const picked = outlets.find((o) => o.id === outletId);
+        toast.success(`Now operating from ${picked?.name ?? 'warehouse'}`);
+        emitVendorOutletChanged();
     };
 
     return (
@@ -108,7 +99,7 @@ export function VendorOutletStrip() {
                 {/* Pending-address warning pill */}
                 {requiresAddressUpdate && (
                     <Link
-                        href={`/account/${currentAccount.id}/outlets`}
+                        href="/vendor/outlets"
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors text-[11px] font-bold border border-amber-200"
                     >
                         <AlertCircle size={12} />
@@ -137,16 +128,25 @@ export function VendorOutletStrip() {
                             />
                         </button>
                     ) : (
-                        <span className="text-[11px] text-emerald-700/60 italic">
-                            Single outlet
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-emerald-700/60">
+                                Single warehouse
+                            </span>
+                            <Link
+                                href="/vendor/outlets?action=add"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/70 hover:bg-white border border-emerald-200 text-emerald-800 text-[11px] font-bold transition-colors"
+                            >
+                                <Plus size={11} />
+                                Add warehouse
+                            </Link>
+                        </div>
                     )}
 
                     {isPickerOpen && hasMultipleOutlets && (
                         <div className="absolute right-0 top-[calc(100%+6px)] w-[clamp(240px,28vw,320px)] bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#F0F0F0] z-50 overflow-hidden">
                             <div className="px-4 py-2 border-b border-[#F0F0F0]">
                                 <p className="text-[11px] font-semibold text-[#AEAEAE] uppercase tracking-wider">
-                                    Switch dispatch outlet
+                                    Select warehouse
                                 </p>
                             </div>
                             <div className="max-h-[260px] overflow-y-auto py-1">
@@ -184,6 +184,14 @@ export function VendorOutletStrip() {
                                     );
                                 })}
                             </div>
+                            <Link
+                                href="/vendor/outlets?action=add"
+                                onClick={() => setIsPickerOpen(false)}
+                                className="flex items-center gap-2 px-4 py-3 border-t border-[#F0F0F0] text-emerald-800 hover:bg-emerald-50/60 transition-colors text-[12px] font-bold"
+                            >
+                                <Plus size={14} />
+                                Add warehouse
+                            </Link>
                         </div>
                     )}
                 </div>

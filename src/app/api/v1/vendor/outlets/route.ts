@@ -1,29 +1,21 @@
-// GET /api/v1/vendor/outlets — list outlets for the vendor's business account
-
 import { NextRequest, NextResponse } from 'next/server';
 import { vendorOnly } from '@/middleware/rbac';
-import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
-import type { AuthContext } from '@/middleware/auth';
+import { resolveVendorContext } from '@/lib/resolveVendorId';
 
-export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
+export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
       select: {
         businessAccountId: true,
-        businessName: true,
-        businessAccount: { select: { displayName: true, legalName: true } },
+        businessAccount: { select: { primaryOutletId: true, displayName: true, legalName: true } },
       },
     });
-
     if (!vendor) return NextResponse.json({ success: true, data: { businessAccount: null, outlets: [] } });
 
-    // If the caller is outlet-scoped (their UserRole has outletId set on at
-    // least one row), only return the outlets they can actually access.
-    // Account-wide members (accessibleOutletIds is empty) see everything.
     const outlets = await prisma.outlet.findMany({
       where: {
         businessAccountId: vendor.businessAccountId,
@@ -32,18 +24,47 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
           ? { id: { in: ctx.accessibleOutletIds } }
           : {}),
       },
-      select: { id: true, name: true, code: true, addressLine: true, city: true, pincode: true },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        addressLine: true,
+        city: true,
+        pincode: true,
+        requiresAddressUpdate: true,
+      },
       orderBy: { name: 'asc' },
     });
+
+    const enriched = await Promise.all(
+      outlets.map(async (o) => {
+        const [serviceAreaCount, stockAgg] = await Promise.all([
+          prisma.serviceArea.count({ where: { vendorId, outletId: o.id, isActive: true } }),
+          prisma.inventory.aggregate({
+            where: { vendorId, outletId: o.id },
+            _sum: { qtyAvailable: true },
+            _count: { id: true },
+          }),
+        ]);
+        return {
+          ...o,
+          isPrimary: o.id === vendor.businessAccount.primaryOutletId,
+          serviceAreaCount,
+          skuCount: stockAgg._count.id,
+          totalQty: stockAgg._sum.qtyAvailable ?? 0,
+        };
+      }),
+    );
 
     return NextResponse.json({
       success: true,
       data: {
         businessAccount: {
           id: vendor.businessAccountId,
-          name: vendor.businessAccount.displayName ?? vendor.businessAccount.legalName ?? vendor.businessName,
+          name: vendor.businessAccount.displayName ?? vendor.businessAccount.legalName,
+          primaryOutletId: vendor.businessAccount.primaryOutletId,
         },
-        outlets,
+        outlets: enriched,
       },
     });
   } catch (error) {
