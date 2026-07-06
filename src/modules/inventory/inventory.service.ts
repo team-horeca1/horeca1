@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
+import { ensureInventoryRowsForOutlet } from '@/lib/inventoryOutlet';
 import type { PrismaClient } from '@prisma/client';
 
 type TxClient = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
@@ -359,6 +360,103 @@ export class InventoryService {
 
       return transfer;
     });
+  }
+
+  async bulkUpdateStockBySku(opts: {
+    vendorId: string;
+    businessAccountId: string;
+    defaultOutletId: string;
+    multiWarehouse: boolean;
+    items: Array<{
+      sku: string;
+      qtyAvailable: number;
+      lowStockThreshold?: number;
+      warehousePincode?: string;
+    }>;
+  }): Promise<{
+    matched: number;
+    updated: number;
+    skipped: number;
+    errors: Array<{ sku: string; error: string }>;
+  }> {
+    const { vendorId, businessAccountId, defaultOutletId, multiWarehouse, items } = opts;
+
+    const products = await prisma.product.findMany({
+      where: { vendorId },
+      select: { id: true, sku: true, vendorSku: true },
+    });
+
+    const skuToProduct = new Map<string, { id: string }>();
+    for (const p of products) {
+      if (p.sku) skuToProduct.set(p.sku.toLowerCase(), { id: p.id });
+      if (p.vendorSku) skuToProduct.set(p.vendorSku.toLowerCase(), { id: p.id });
+    }
+
+    const outlets = await prisma.outlet.findMany({
+      where: { businessAccountId, isActive: true },
+      select: { id: true, pincode: true },
+    });
+    const pincodeToOutlet = new Map(
+      outlets.filter((o) => o.pincode).map((o) => [o.pincode!.trim(), o.id]),
+    );
+
+    const errors: Array<{ sku: string; error: string }> = [];
+    const updates: Array<{ productId: string; outletId: string; qtyAvailable: number; lowStockThreshold?: number }> = [];
+
+    for (const item of items) {
+      const product = skuToProduct.get(item.sku.toLowerCase());
+      if (!product) {
+        errors.push({ sku: item.sku, error: 'SKU not found for your catalog' });
+        continue;
+      }
+
+      let outletId = defaultOutletId;
+      if (multiWarehouse && item.warehousePincode?.trim()) {
+        const resolved = pincodeToOutlet.get(item.warehousePincode.trim());
+        if (!resolved) {
+          errors.push({ sku: item.sku, error: `Unknown warehouse pincode: ${item.warehousePincode}` });
+          continue;
+        }
+        outletId = resolved;
+      }
+
+      updates.push({
+        productId: product.id,
+        outletId,
+        qtyAvailable: item.qtyAvailable,
+        ...(item.lowStockThreshold !== undefined && { lowStockThreshold: item.lowStockThreshold }),
+      });
+    }
+
+    if (updates.length === 0) {
+      return { matched: 0, updated: 0, skipped: items.length, errors };
+    }
+
+    const outletIds = [...new Set(updates.map((u) => u.outletId))];
+    for (const oid of outletIds) {
+      await ensureInventoryRowsForOutlet(vendorId, oid);
+    }
+
+    let updated = 0;
+    await prisma.$transaction(
+      updates.map((u) =>
+        prisma.inventory.update({
+          where: invKey(u.productId, u.outletId),
+          data: {
+            qtyAvailable: u.qtyAvailable,
+            ...(u.lowStockThreshold !== undefined && { lowStockThreshold: u.lowStockThreshold }),
+          },
+        }),
+      ),
+    );
+    updated = updates.length;
+
+    return {
+      matched: updates.length,
+      updated,
+      skipped: items.length - updates.length,
+      errors,
+    };
   }
 
   async getConsolidated(vendorId: string, accessibleOutletIds: string[]) {

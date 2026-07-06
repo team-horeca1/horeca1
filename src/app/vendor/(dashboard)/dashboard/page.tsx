@@ -312,136 +312,7 @@ function SetupBanner() {
 
 // ─── Smart Action Modals ─────────────────────────────────────────────────────────
 
-// 1. Upload Inventory Modal
-function UploadInventoryModal({
-    isOpen,
-    onClose,
-    onSuccess,
-}: {
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
-}) {
-    const [file, setFile] = useState<File | null>(null);
-    const [uploading, setUploading] = useState(false);
-    const [progress, setProgress] = useState(0);
-
-    if (!isOpen) return null;
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]);
-        }
-    };
-
-    const handleUpload = () => {
-        if (!file) {
-            toast.error('Please select an inventory template CSV file first.');
-            return;
-        }
-
-        setUploading(true);
-        setProgress(0);
-
-        // Simulate progress bar animation
-        const interval = setInterval(() => {
-            setProgress((prev) => {
-                if (prev >= 100) {
-                    clearInterval(interval);
-                    setTimeout(() => {
-                        setUploading(false);
-                        setFile(null);
-                        toast.success(`Inventory updated successfully! 42 items synchronized.`);
-                        onSuccess();
-                        onClose();
-                    }, 500);
-                    return 100;
-                }
-                return prev + 10;
-            });
-        }, 120);
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-2xl w-full max-w-md flex flex-col">
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                    <div>
-                        <h3 className="text-[18px] font-bold text-gray-900">Upload Inventory</h3>
-                        <p className="text-[12px] text-gray-500">Bulk sync available stock and low stock thresholds.</p>
-                    </div>
-                    <button onClick={onClose} className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
-                        <X size={20} />
-                    </button>
-                </div>
-                <div className="p-6 space-y-5">
-                    {!uploading ? (
-                        <>
-                            <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 text-center hover:border-emerald-500 hover:bg-emerald-50/10 transition-all cursor-pointer relative group">
-                                <input
-                                    type="file"
-                                    accept=".csv"
-                                    onChange={handleFileChange}
-                                    className="absolute inset-0 opacity-0 cursor-pointer"
-                                />
-                                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 border border-emerald-100 group-hover:scale-110 transition-transform">
-                                    <Upload size={20} />
-                                </div>
-                                <p className="text-[13px] font-bold text-gray-900">
-                                    {file ? file.name : 'Click to browse or drag & drop CSV'}
-                                </p>
-                                <p className="text-[11px] text-gray-400 mt-1 font-medium">Accepts template-compliant .csv files up to 5MB</p>
-                            </div>
-                            <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 flex items-center justify-between">
-                                <span className="text-[11px] text-gray-500 font-bold">Template guidelines:</span>
-                                <a
-                                    href="#"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        toast.success('Downloading inventory schema template...');
-                                    }}
-                                    className="text-[11px] text-emerald-600 font-extrabold hover:underline"
-                                >
-                                    Download CSV template
-                                </a>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="py-6 flex flex-col items-center">
-                            <Loader2 size={36} className="animate-spin text-emerald-600 mb-4" />
-                            <p className="text-[14px] font-bold text-gray-900">Uploading and validating sheet...</p>
-                            <div className="w-full bg-gray-100 h-2 rounded-full mt-4 overflow-hidden max-w-xs">
-                                <div className="h-full bg-emerald-600 transition-all duration-100" style={{ width: `${progress}%` }} />
-                            </div>
-                            <span className="text-[12px] font-extrabold text-emerald-600 mt-2">{progress}%</span>
-                        </div>
-                    )}
-
-                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            disabled={uploading}
-                            className="h-10 px-4 rounded-xl border border-gray-200 text-[13px] font-bold text-gray-500 hover:bg-gray-50 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleUpload}
-                            disabled={uploading}
-                            className="h-10 px-5 rounded-xl bg-emerald-600 text-white text-[13px] font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-sm"
-                        >
-                            Confirm Sync
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// 3. Create Scheme (Promotion) Modal
+// 1. Create Scheme (Promotion) Modal
 function CreateSchemeModal({
     isOpen,
     onClose,
@@ -2582,7 +2453,6 @@ export default function VendorDashboardPage() {
     const [dbCustomers, setDbCustomers] = useState<Customer[]>([]);
 
     // Modals visibility states
-    const [isUploadInventoryOpen, setIsUploadInventoryOpen] = useState(false);
     const [isCreateSchemeOpen, setIsCreateSchemeOpen] = useState(false);
     const [isPushOfferOpen, setIsPushOfferOpen] = useState(false);
     const [isSendReminderOpen, setIsSendReminderOpen] = useState(false);
@@ -2849,15 +2719,15 @@ export default function VendorDashboardPage() {
                                 </div>
                                 <span className="text-[12px] font-bold text-emerald-700">Add Products</span>
                             </Link>
-                            <button
-                                onClick={() => setIsUploadInventoryOpen(true)}
+                            <Link
+                                href="/vendor/inventory"
                                 className="flex flex-col items-center justify-center p-4 bg-blue-50/20 border border-blue-100 rounded-2xl hover:bg-blue-50 hover:shadow-sm hover:-translate-y-0.5 transition-all text-center group"
                             >
                                 <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                                     <Upload size={18} />
                                 </div>
                                 <span className="text-[12px] font-bold text-blue-700">Upload Inventory</span>
-                            </button>
+                            </Link>
                             <button
                                 onClick={() => setIsCreateSchemeOpen(true)}
                                 className="flex flex-col items-center justify-center p-4 bg-amber-50/25 border border-amber-100/60 rounded-2xl hover:bg-amber-50 hover:shadow-sm hover:-translate-y-0.5 transition-all text-center group"
@@ -3330,12 +3200,6 @@ export default function VendorDashboardPage() {
             )}
 
             {/* Modals Mounting Deck */}
-            <UploadInventoryModal
-                isOpen={isUploadInventoryOpen}
-                onClose={() => setIsUploadInventoryOpen(false)}
-                onSuccess={() => fetchDashboard()}
-            />
-
             <CreateSchemeModal
                 isOpen={isCreateSchemeOpen}
                 onClose={() => setIsCreateSchemeOpen(false)}

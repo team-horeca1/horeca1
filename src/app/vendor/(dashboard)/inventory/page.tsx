@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import {
-    Loader2, Package, AlertTriangle, Search, Upload,
+    Loader2, Package, AlertTriangle, Search, Upload, Download,
     ChevronDown, ChevronUp, X, FileText, Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -36,60 +36,149 @@ interface InventoryItem {
 
 type FilterTab = 'all' | 'low_stock' | 'out_of_stock';
 
-// ─── CSV helpers ──────────────────────────────────────────────────────────────
+// ─── Bulk upload helpers ────────────────────────────────────────────────────────
 
-interface CsvRow { productId: string; qtyAvailable: number; error?: string }
+interface ImportRow {
+    sku: string;
+    productName?: string;
+    qtyAvailable: number;
+    lowStockThreshold?: number;
+    warehousePincode?: string;
+    error?: string;
+}
 
-function parseCsv(text: string): CsvRow[] {
+function parseImportFile(text: string): ImportRow[] {
     const lines = text.trim().split('\n').filter(Boolean);
-    const rows: CsvRow[] = [];
-    for (const line of lines) {
-        const [rawId, rawQty] = line.split(',').map(s => s.trim());
-        if (!rawId || rawId.toLowerCase() === 'productid') continue; // skip header
-        const qty = parseInt(rawQty ?? '', 10);
+    if (lines.length === 0) return [];
+
+    const header = lines[0].split(',').map((s) => s.trim().toLowerCase());
+    const skuIdx = header.findIndex((h) => h === 'sku');
+    const qtyIdx = header.findIndex((h) => h.includes('qty') && h.includes('available'));
+    const thresholdIdx = header.findIndex((h) => h.includes('low') || h.includes('threshold'));
+    const pincodeIdx = header.findIndex((h) => h.includes('pincode') || h.includes('warehouse'));
+
+    const rows: ImportRow[] = [];
+    for (const line of lines.slice(1)) {
+        const cols = line.split(',').map((s) => s.trim().replace(/^"|"$/g, ''));
+        const sku = skuIdx >= 0 ? cols[skuIdx] ?? '' : cols[0] ?? '';
+        if (!sku || sku.toLowerCase() === 'sku' || sku.toLowerCase().includes('required')) continue;
+        const qtyRaw = qtyIdx >= 0 ? cols[qtyIdx] : cols[1];
+        const qty = parseInt(qtyRaw ?? '', 10);
+        const thresholdRaw = thresholdIdx >= 0 ? cols[thresholdIdx] : '';
+        const threshold = thresholdRaw ? parseInt(thresholdRaw, 10) : undefined;
         rows.push({
-            productId: rawId,
+            sku,
             qtyAvailable: isNaN(qty) ? 0 : qty,
-            error: !rawId.match(/^[0-9a-f-]{36}$/) ? 'Invalid UUID' : isNaN(qty) ? 'Missing qty' : undefined,
+            lowStockThreshold: threshold !== undefined && !isNaN(threshold) ? threshold : undefined,
+            warehousePincode: pincodeIdx >= 0 ? cols[pincodeIdx] || undefined : undefined,
+            error: isNaN(qty) ? 'Invalid quantity' : undefined,
         });
     }
     return rows;
 }
 
-// ─── CSV Upload Modal ─────────────────────────────────────────────────────────
+async function parseXlsxFile(file: File): Promise<ImportRow[]> {
+    const XLSX = await import('xlsx');
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: 'array' });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json<Record<string, string | number>>(sheet, { defval: '' });
+    return raw
+        .filter((row) => {
+            const sku = String(row.SKU ?? row.sku ?? '').trim();
+            if (!sku) return false;
+            const lower = sku.toLowerCase();
+            if (lower === 'sku' || lower.includes('required')) return false;
+            return true;
+        })
+        .map((row) => {
+            const sku = String(row.SKU ?? row.sku ?? '').trim();
+            const qtyRaw = row['Qty Available'] ?? row.qtyAvailable ?? row.qty ?? '';
+            const qty = parseInt(String(qtyRaw), 10);
+            const thresholdRaw = row['Low Stock Threshold'] ?? row.lowStockThreshold ?? '';
+            const threshold = thresholdRaw !== '' ? parseInt(String(thresholdRaw), 10) : undefined;
+            return {
+                sku,
+                qtyAvailable: isNaN(qty) ? 0 : qty,
+                lowStockThreshold: threshold !== undefined && !isNaN(threshold) ? threshold : undefined,
+                warehousePincode: String(row['Warehouse Pincode'] ?? row.warehousePincode ?? '').trim() || undefined,
+                error: isNaN(qty) ? 'Invalid quantity' : undefined,
+            };
+        });
+}
 
-function CsvUploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-    const [rows, setRows] = useState<CsvRow[]>([]);
+// ─── Bulk Upload Modal ────────────────────────────────────────────────────────
+
+function BulkUploadModal({
+    onClose,
+    onSuccess,
+    warehouseName,
+    viewAll,
+    multiWarehouse,
+}: {
+    onClose: () => void;
+    onSuccess: () => void;
+    warehouseName?: string;
+    viewAll: boolean;
+    multiWarehouse: boolean;
+}) {
+    const [rows, setRows] = useState<ImportRow[]>([]);
     const [uploading, setUploading] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
 
-    const handleFile = (file: File) => {
-        const reader = new FileReader();
-        reader.onload = (e) => setRows(parseCsv(e.target?.result as string));
-        reader.readAsText(file);
+    const downloadExport = () => {
+        const params = new URLSearchParams({ format: 'xlsx' });
+        if (viewAll) params.set('consolidated', 'true');
+        window.open(`/api/v1/vendor/inventory/export?${params}`, '_blank');
+    };
+
+    const downloadTemplate = () => {
+        window.open('/api/v1/vendor/inventory/import?template=true', '_blank');
+    };
+
+    const handleFile = async (file: File) => {
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        if (ext === 'xlsx' || ext === 'xls') {
+            setRows(await parseXlsxFile(file));
+        } else {
+            const reader = new FileReader();
+            reader.onload = (e) => setRows(parseImportFile(e.target?.result as string));
+            reader.readAsText(file);
+        }
     };
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         const file = e.dataTransfer.files[0];
-        if (file) handleFile(file);
+        if (file) void handleFile(file);
     };
 
-    const errorCount = rows.filter(r => r.error).length;
-    const validRows = rows.filter(r => !r.error);
+    const errorCount = rows.filter((r) => r.error).length;
+    const validRows = rows.filter((r) => !r.error);
 
     const handleUpload = async () => {
         if (validRows.length === 0) return;
         setUploading(true);
         try {
-            const res = await fetch('/api/v1/vendor/inventory', {
+            const res = await fetch('/api/v1/vendor/inventory/import', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items: validRows.map(r => ({ productId: r.productId, qtyAvailable: r.qtyAvailable })) }),
+                body: JSON.stringify({
+                    items: validRows.map((r) => ({
+                        sku: r.sku,
+                        qtyAvailable: r.qtyAvailable,
+                        ...(r.lowStockThreshold !== undefined && { lowStockThreshold: r.lowStockThreshold }),
+                        ...(r.warehousePincode && { warehousePincode: r.warehousePincode }),
+                    })),
+                }),
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.error?.message || 'Upload failed');
-            toast.success(`Updated ${json.updated} product${json.updated !== 1 ? 's' : ''}`);
+            const errCount = json.errors?.length ?? 0;
+            if (json.updated === 0) {
+                throw new Error(errCount > 0 ? json.errors[0]?.error : 'No products were updated');
+            }
+            toast.success(`Updated ${json.updated} product${json.updated !== 1 ? 's' : ''}${errCount ? ` (${errCount} skipped)` : ''}`);
             onSuccess();
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Upload failed');
@@ -100,12 +189,15 @@ function CsvUploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
 
     return (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-[560px] overflow-hidden">
-                {/* Header */}
+            <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-[600px] overflow-hidden">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[#F5F5F5]">
                     <div>
                         <p className="text-[16px] font-bold text-[#181725]">Bulk Stock Update</p>
-                        <p className="text-[12px] text-[#AEAEAE] mt-0.5">Upload a CSV: <span className="font-mono">productId,qtyAvailable</span></p>
+                        <p className="text-[12px] text-[#AEAEAE] mt-0.5">
+                            {viewAll
+                                ? 'Upload by SKU — use Warehouse Pincode column for multi-warehouse'
+                                : <>Updating stock for: <span className="font-semibold text-[#181725]">{warehouseName ?? 'active warehouse'}</span></>}
+                        </p>
                     </div>
                     <button onClick={onClose} className="p-1.5 rounded-[8px] hover:bg-[#F5F5F5] transition-colors">
                         <X size={16} className="text-[#7C7C7C]" />
@@ -113,20 +205,46 @@ function CsvUploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
                 </div>
 
                 <div className="p-6 space-y-4">
-                    {/* Drop zone */}
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={downloadExport}
+                            className="h-[36px] px-3 rounded-[8px] border border-[#EEEEEE] text-[12px] font-bold text-[#181725] hover:bg-[#F5F5F5] flex items-center gap-1.5"
+                        >
+                            <Download size={13} />
+                            Download current stock
+                        </button>
+                        <button
+                            type="button"
+                            onClick={downloadTemplate}
+                            className="h-[36px] px-3 rounded-[8px] border border-[#EEEEEE] text-[12px] font-bold text-[#181725] hover:bg-[#F5F5F5] flex items-center gap-1.5"
+                        >
+                            <FileText size={13} />
+                            Download template
+                        </button>
+                    </div>
+
                     <div
-                        onDragOver={e => e.preventDefault()}
+                        onDragOver={(e) => e.preventDefault()}
                         onDrop={handleDrop}
                         onClick={() => fileRef.current?.click()}
                         className="border-2 border-dashed border-[#EEEEEE] rounded-[12px] p-8 text-center cursor-pointer hover:border-[#299E60]/50 hover:bg-[#EEF8F1]/30 transition-all"
                     >
                         <Upload size={24} className="text-[#AEAEAE] mx-auto mb-2" />
-                        <p className="text-[13px] font-bold text-[#181725]">Drop CSV here or click to browse</p>
-                        <p className="text-[11px] text-[#AEAEAE] mt-1">Columns: <span className="font-mono">productId, qtyAvailable</span></p>
-                        <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
+                        <p className="text-[13px] font-bold text-[#181725]">Drop CSV/XLSX here or click to browse</p>
+                        <p className="text-[11px] text-[#AEAEAE] mt-1">
+                            Columns: <span className="font-mono">SKU, Qty Available</span>
+                            {multiWarehouse && <>, <span className="font-mono">Warehouse Pincode</span></>}
+                        </p>
+                        <input
+                            ref={fileRef}
+                            type="file"
+                            accept=".csv,.xlsx,.xls,text/csv"
+                            className="hidden"
+                            onChange={(e) => e.target.files?.[0] && void handleFile(e.target.files[0])}
+                        />
                     </div>
 
-                    {/* Preview */}
                     {rows.length > 0 && (
                         <div className="rounded-[10px] border border-[#EEEEEE] overflow-hidden">
                             <div className="px-4 py-2.5 bg-[#FAFAFA] border-b border-[#EEEEEE] flex items-center justify-between">
@@ -137,14 +255,14 @@ function CsvUploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
                             </div>
                             <div className="max-h-[200px] overflow-y-auto divide-y divide-[#F5F5F5]">
                                 {rows.slice(0, 50).map((row, i) => (
-                                    <div key={i} className={cn('flex items-center justify-between px-4 py-2', row.error && 'bg-red-50/60')}>
-                                        <span className={cn('text-[12px] font-mono', row.error ? 'text-[#E74C3C]' : 'text-[#181725]')}>
-                                            {row.productId.slice(0, 18)}…
+                                    <div key={i} className={cn('flex items-center justify-between px-4 py-2 gap-2', row.error && 'bg-red-50/60')}>
+                                        <span className={cn('text-[12px] font-mono truncate', row.error ? 'text-[#E74C3C]' : 'text-[#181725]')}>
+                                            {row.sku}
                                         </span>
                                         {row.error ? (
-                                            <span className="text-[11px] text-[#E74C3C] font-bold">{row.error}</span>
+                                            <span className="text-[11px] text-[#E74C3C] font-bold shrink-0">{row.error}</span>
                                         ) : (
-                                            <span className="text-[12px] font-bold text-[#299E60]">qty → {row.qtyAvailable}</span>
+                                            <span className="text-[12px] font-bold text-[#299E60] shrink-0">qty → {row.qtyAvailable}</span>
                                         )}
                                     </div>
                                 ))}
@@ -157,7 +275,6 @@ function CsvUploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
                         </div>
                     )}
 
-                    {/* Actions */}
                     <div className="flex items-center gap-3 pt-1">
                         <button onClick={onClose} className="flex-1 h-[42px] rounded-[10px] border border-[#EEEEEE] text-[13px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] transition-all">
                             Cancel
@@ -539,6 +656,20 @@ export default function VendorInventoryPage() {
                         </button>
                     )}
                     <button
+                        type="button"
+                        onClick={() => {
+                            const params = new URLSearchParams({ format: 'xlsx' });
+                            if (viewAll) params.set('consolidated', 'true');
+                            window.open(`/api/v1/vendor/inventory/export?${params}`, '_blank');
+                        }}
+                        className="h-[38px] px-4 rounded-[10px] border border-[#EEEEEE] bg-white text-[#181725] text-[12px] font-bold flex items-center gap-2 hover:bg-[#F9F9F9] transition-all"
+                    >
+                        <Download size={13} />
+                        Export
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setShowCsvModal(true)}
                         className="h-[38px] px-4 rounded-[10px] bg-[#181725] text-white text-[12px] font-bold flex items-center gap-2 hover:bg-[#2d2d40] transition-all shadow-sm"
                     >
                         <Upload size={13} />
@@ -709,9 +840,12 @@ export default function VendorInventoryPage() {
             </div>
 
             {showCsvModal && (
-                <CsvUploadModal
+                <BulkUploadModal
                     onClose={() => setShowCsvModal(false)}
                     onSuccess={() => { setShowCsvModal(false); fetchInventory(true); }}
+                    warehouseName={currentOutlet?.name}
+                    viewAll={viewAll}
+                    multiWarehouse={multiWarehouseEnabled}
                 />
             )}
             {showTransfer && activeOutletId && (
