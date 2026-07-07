@@ -58,7 +58,7 @@ export function InviteSuccessModal({ inviteMeta, memberName, onClose }: InviteSu
           {deliveryFailed && (
             <div className="flex items-start gap-2 text-[12px] text-amber-800 bg-amber-50 border border-amber-100 rounded-[10px] p-3">
               <AlertCircle size={14} className="shrink-0 mt-0.5" />
-              <span>Email/SMS could not be sent (SMTP or SMS not configured). Copy the credentials below and share them directly.</span>
+              <span>Email/SMS could not be sent. Copy the credentials below and share them directly.</span>
             </div>
           )}
 

@@ -18,6 +18,7 @@ import { phoneLookupVariants, normalizePhone } from '@/lib/phone';
 import { toTeamMemberDTO, teamMemberInclude, type TeamMemberDTO } from '@/lib/teamMemberShape';
 import { sendEmailInBackground } from '@/lib/providers/email';
 import { buildInviteEmail, buildInviteSms } from '@/lib/email-templates/invite';
+import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import { sendSms } from '@/lib/providers/sms';
 import { runInBackground } from '@/lib/asyncBackground';
 import type { AuthContext } from '@/middleware/auth';
@@ -335,47 +336,50 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     const loginUrl = (process.env.AUTH_URL ?? 'http://localhost:3000') + '/login';
     const loginIdentifier = user.email ?? user.phone ?? identifierTrim;
 
-    // Notifications in background — never block the HTTP response on SMTP/SMS.
+    let credentialsDelivered = { email: false, sms: false };
+
+    // Credential delivery — await Resend/MSG91 (fast HTTP). Notification-only path stays background.
     if (tempPassword) {
-      const inviterId = ctx.userId;
-      const businessName = vendor.businessName;
+      const inviter = await prisma.user.findUnique({
+        where: { id: ctx.userId },
+        select: { fullName: true },
+      });
+      const inviterName = inviter?.fullName ?? undefined;
       const recipientEmail = user.email;
       const recipientPhone = user.phone;
       const recipientName = user.fullName ?? '';
-      const newUser = isNewUser;
-      runInBackground('invite-email', async () => {
-        const inviter = await prisma.user.findUnique({
-          where: { id: inviterId },
-          select: { fullName: true },
+
+      let emailContent: { subject: string; text: string; html: string } | undefined;
+      if (recipientEmail) {
+        emailContent = buildInviteEmail({
+          recipientName,
+          recipientEmail,
+          tempPassword,
+          scope: 'vendor',
+          businessName: vendor.businessName,
+          loginUrl,
+          inviterName,
         });
-        const inviterName = inviter?.fullName ?? undefined;
+      }
 
-        if (recipientEmail) {
-          const { subject, text, html } = buildInviteEmail({
-            recipientName,
-            recipientEmail,
-            tempPassword,
-            scope: 'vendor',
-            businessName,
-            loginUrl,
-            inviterName,
-          });
-          sendEmailInBackground({ to: recipientEmail, subject, text, html }, 'invite-email');
-        }
+      let smsBody: string | undefined;
+      if (recipientPhone && (isNewUser || !recipientEmail)) {
+        smsBody = buildInviteSms({
+          recipientName,
+          loginIdentifier: recipientPhone,
+          tempPassword,
+          businessName: vendor.businessName,
+          loginUrl,
+          inviterName,
+        });
+      }
 
-        if (recipientPhone && (newUser || !recipientEmail)) {
-          const smsBody = buildInviteSms({
-            recipientName,
-            loginIdentifier: recipientPhone,
-            tempPassword,
-            businessName,
-            loginUrl,
-            inviterName,
-          });
-          void sendSms({ to: recipientPhone, body: smsBody, channel: 'sms' }).catch((err) => {
-            console.error('[invite-email]', err);
-          });
-        }
+      credentialsDelivered = await deliverInviteCredentials({
+        email: recipientEmail,
+        phone: recipientPhone,
+        emailContent,
+        smsBody,
+        smsOnlyIfNoEmail: true,
       });
     } else {
       const inviterId = ctx.userId;
@@ -417,7 +421,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
                 tempPassword,
                 loginIdentifier,
                 loginUrl,
-                credentialsDelivered: { email: false, sms: false },
+                credentialsDelivered,
               },
             }
           : {}),

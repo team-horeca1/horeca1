@@ -22,9 +22,8 @@ import { uniqueHcid } from '@/lib/hcid';
 import { phoneLookupVariants } from '@/lib/phone';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { toTeamMemberDTO, teamMemberInclude, type TeamMemberDTO } from '@/lib/teamMemberShape';
-import { sendEmailInBackground } from '@/lib/providers/email';
 import { buildInviteEmail } from '@/lib/email-templates/invite';
-import { runInBackground } from '@/lib/asyncBackground';
+import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import type { AuthContext } from '@/middleware/auth';
 import type { TeamRole } from '@prisma/client';
 
@@ -199,27 +198,25 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
     const loginUrl = (process.env.AUTH_URL ?? 'http://localhost:3000') + '/login';
     const loginIdentifier = user.email ?? user.phone ?? identifierTrim;
 
-    // Send credential email in background — SMTP timeouts must not block the API
-    // response (nginx returns 504 HTML otherwise, breaking the Add Member wizard).
+    let credentialsDelivered = { email: false, sms: false };
+
     if (user.email && tempPassword) {
-      const inviterId = ctx.userId;
-      const recipientEmail = user.email;
-      const recipientName = user.fullName ?? '';
-      runInBackground('invite-email', async () => {
-        const inviter = await prisma.user.findUnique({
-          where: { id: inviterId },
-          select: { fullName: true },
-        });
-        const { subject, text, html } = buildInviteEmail({
-          recipientName,
-          recipientEmail,
-          tempPassword,
-          scope: 'admin',
-          businessName: 'HoReCa Hub Admin',
-          loginUrl,
-          inviterName: inviter?.fullName ?? undefined,
-        });
-        sendEmailInBackground({ to: recipientEmail, subject, text, html }, 'invite-email');
+      const inviter = await prisma.user.findUnique({
+        where: { id: ctx.userId },
+        select: { fullName: true },
+      });
+      const { subject, text, html } = buildInviteEmail({
+        recipientName: user.fullName ?? '',
+        recipientEmail: user.email,
+        tempPassword,
+        scope: 'admin',
+        businessName: 'HoReCa Hub Admin',
+        loginUrl,
+        inviterName: inviter?.fullName ?? undefined,
+      });
+      credentialsDelivered = await deliverInviteCredentials({
+        email: user.email,
+        emailContent: { subject, text, html },
       });
     }
 
@@ -233,7 +230,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
                 tempPassword,
                 loginIdentifier,
                 loginUrl,
-                credentialsDelivered: { email: false, sms: false },
+                credentialsDelivered,
               },
             }
           : {}),

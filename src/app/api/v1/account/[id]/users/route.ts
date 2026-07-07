@@ -15,6 +15,7 @@ import { uniqueHcid } from '@/lib/hcid';
 import { phoneLookupVariants, normalizePhone } from '@/lib/phone';
 import { sendEmailInBackground } from '@/lib/providers/email';
 import { buildInviteEmail, buildInviteSms } from '@/lib/email-templates/invite';
+import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import { sendSms } from '@/lib/providers/sms';
 import { runInBackground } from '@/lib/asyncBackground';
 
@@ -238,54 +239,51 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const loginUrl = (process.env.AUTH_URL ?? 'http://localhost:3000') + '/login';
     const loginIdentifier = inviteeUser.email ?? inviteeUser.phone ?? body.identifier.trim();
 
-    // Notifications in background — never block the HTTP response on SMTP/SMS.
+    let credentialsDelivered = { email: false, sms: false };
+
     if (tempPassword) {
-      const inviterId = ctx.userId;
-      const accountId = id;
+      const [account, inviter] = await Promise.all([
+        prisma.businessAccount.findUnique({ where: { id }, select: { legalName: true, displayName: true } }),
+        prisma.user.findUnique({ where: { id: ctx.userId }, select: { fullName: true } }),
+      ]);
+      const businessName = account?.displayName || account?.legalName || 'your business';
+      const inviterName = inviter?.fullName?.trim() || undefined;
       const recipientEmail = inviteeUser.email;
       const recipientPhone = inviteeUser.phone;
       const recipientName = inviteeUser.fullName;
-      const newUser = isNewUser;
-      runInBackground('invite-email', async () => {
-        const [account, inviter] = await Promise.all([
-          prisma.businessAccount.findUnique({ where: { id: accountId }, select: { legalName: true, displayName: true } }),
-          prisma.user.findUnique({ where: { id: inviterId }, select: { fullName: true } }),
-        ]);
-        const businessName = account?.displayName || account?.legalName || 'your business';
-        const inviterName = inviter?.fullName?.trim() || undefined;
 
-        if (recipientEmail) {
-          const { subject, text, html } = buildInviteEmail({
-            recipientName,
-            recipientEmail,
-            tempPassword,
-            scope: 'customer',
-            businessName,
-            loginUrl,
-            inviterName,
-          });
-          sendEmailInBackground({
-            to: recipientEmail,
-            subject,
-            text,
-            html,
-            name: recipientName,
-          }, 'invite-email');
-        }
+      let emailContent: { subject: string; text: string; html: string; name?: string } | undefined;
+      if (recipientEmail) {
+        const built = buildInviteEmail({
+          recipientName,
+          recipientEmail,
+          tempPassword,
+          scope: 'customer',
+          businessName,
+          loginUrl,
+          inviterName,
+        });
+        emailContent = { ...built, name: recipientName };
+      }
 
-        if (recipientPhone && (newUser || !recipientEmail)) {
-          const smsBody = buildInviteSms({
-            recipientName,
-            loginIdentifier: recipientPhone,
-            tempPassword,
-            businessName,
-            loginUrl,
-            inviterName,
-          });
-          void sendSms({ to: recipientPhone, body: smsBody, channel: 'sms' }).catch((err) => {
-            console.error('[invite-email]', err);
-          });
-        }
+      let smsBody: string | undefined;
+      if (recipientPhone && (isNewUser || !recipientEmail)) {
+        smsBody = buildInviteSms({
+          recipientName,
+          loginIdentifier: recipientPhone,
+          tempPassword,
+          businessName,
+          loginUrl,
+          inviterName,
+        });
+      }
+
+      credentialsDelivered = await deliverInviteCredentials({
+        email: recipientEmail,
+        phone: recipientPhone,
+        emailContent,
+        smsBody,
+        smsOnlyIfNoEmail: true,
       });
     } else {
       const inviterId = ctx.userId;
@@ -334,7 +332,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
                 tempPassword,
                 loginIdentifier,
                 loginUrl,
-                credentialsDelivered: { email: false, sms: false },
+                credentialsDelivered,
               },
             }
           : {}),

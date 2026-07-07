@@ -9,7 +9,7 @@ if (!match) {
 }
 const key = match[1].trim();
 const count = execSync(
-  'ssh root@64.227.187.210 "grep -c ^RESEND_API_KEY= /opt/horeca1/.env.production 2>/dev/null || echo 0"',
+  `ssh root@64.227.187.210 "grep -c '^RESEND_API_KEY=' /opt/horeca1/.env.production 2>/dev/null || echo 0"`,
   { encoding: 'utf8' },
 ).trim();
 
@@ -30,7 +30,7 @@ if (count === '0') {
 // Resend requires a verified-domain From address for external recipients.
 const fromLine = 'EMAIL_FROM=HoReCa Hub <noreply@freshville.store>';
 const fromCount = execSync(
-  'ssh root@64.227.187.210 "grep -c ^EMAIL_FROM= /opt/horeca1/.env.production 2>/dev/null || echo 0"',
+  `ssh root@64.227.187.210 "grep -c '^EMAIL_FROM=' /opt/horeca1/.env.production 2>/dev/null || echo 0"`,
   { encoding: 'utf8' },
 ).trim();
 if (fromCount === '0') {
@@ -43,6 +43,7 @@ if (fromCount === '0') {
 }
 console.log('Set EMAIL_FROM to noreply@freshville.store (verify domain in Resend)');
 
-execSync('ssh root@64.227.187.210 "cd /opt/horeca1/docker && docker compose -f docker-compose.prod.yml up -d app worker"', {
-  stdio: 'inherit',
-});
+execSync(
+  'ssh root@64.227.187.210 "cd /opt/horeca1/docker && docker compose -f docker-compose.prod.yml up -d --force-recreate app worker"',
+  { stdio: 'inherit' },
+);

@@ -14,6 +14,7 @@ import { phoneLookupVariants } from '@/lib/phone';
 import { toTeamMemberDTO, teamMemberInclude, type TeamMemberDTO } from '@/lib/teamMemberShape';
 import { sendEmailInBackground } from '@/lib/providers/email';
 import { buildInviteEmail } from '@/lib/email-templates/invite';
+import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import { sendSms } from '@/lib/providers/sms';
 import { runInBackground } from '@/lib/asyncBackground';
 import type { AuthContext } from '@/middleware/auth';
@@ -227,27 +228,25 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
     const loginUrl = (process.env.AUTH_URL ?? 'http://localhost:3000') + '/login';
     const loginIdentifier = user.email ?? user.phone ?? identifierTrim;
 
-    // Notifications in background — never block the HTTP response on SMTP/SMS.
+    let credentialsDelivered = { email: false, sms: false };
+
     if (tempPassword && user.email) {
-      const inviterId = ctx.userId;
-      const recipientEmail = user.email;
-      const recipientName = user.fullName ?? '';
-      const brandName = brand.name;
-      runInBackground('invite-email', async () => {
-        const inviter = await prisma.user.findUnique({
-          where: { id: inviterId },
-          select: { fullName: true },
-        });
-        const { subject, text, html } = buildInviteEmail({
-          recipientName,
-          recipientEmail,
-          tempPassword,
-          scope: 'brand',
-          businessName: brandName,
-          loginUrl,
-          inviterName: inviter?.fullName ?? undefined,
-        });
-        sendEmailInBackground({ to: recipientEmail, subject, text, html }, 'invite-email');
+      const inviter = await prisma.user.findUnique({
+        where: { id: ctx.userId },
+        select: { fullName: true },
+      });
+      const emailContent = buildInviteEmail({
+        recipientName: user.fullName ?? '',
+        recipientEmail: user.email,
+        tempPassword,
+        scope: 'brand',
+        businessName: brand.name,
+        loginUrl,
+        inviterName: inviter?.fullName ?? undefined,
+      });
+      credentialsDelivered = await deliverInviteCredentials({
+        email: user.email,
+        emailContent,
       });
     } else if (!tempPassword) {
       const inviterId = ctx.userId;
@@ -289,7 +288,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
                 tempPassword,
                 loginIdentifier,
                 loginUrl,
-                credentialsDelivered: { email: false, sms: false },
+                credentialsDelivered,
               },
             }
           : {}),
