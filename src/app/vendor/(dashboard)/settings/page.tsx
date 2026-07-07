@@ -12,7 +12,7 @@ import { PaymentsTab } from '@/components/features/vendor/settings/PaymentsTab';
 import { PoliciesTab } from '@/components/features/vendor/settings/PoliciesTab';
 import { DocumentsTab } from '@/components/features/vendor/settings/DocumentsTab';
 import type { DeliverySlot, ServiceArea, SettingsTabId, VendorDocument, VendorSettings } from '@/components/features/vendor/settings/types';
-import { SETTINGS_TABS } from '@/components/features/vendor/settings/types';
+import { normalizeTimeInput, SETTINGS_TABS } from '@/components/features/vendor/settings/types';
 
 function parseTab(raw: string | null): SettingsTabId {
   if (raw && SETTINGS_TABS.some((t) => t.id === raw)) return raw as SettingsTabId;
@@ -62,7 +62,6 @@ function VendorSettingsContent() {
   const [bankName, setBankName] = useState('');
   const [bankAccountType, setBankAccountType] = useState<'current' | 'savings' | ''>('');
   const [defaultMOQ, setDefaultMOQ] = useState('');
-  const [defaultTaxPercent, setDefaultTaxPercent] = useState('');
   const [deliveryFeeVal, setDeliveryFeeVal] = useState('');
   const [freeDeliveryAbove, setFreeDeliveryAbove] = useState('');
   const [returnPolicy, setReturnPolicy] = useState('');
@@ -81,7 +80,6 @@ function VendorSettingsContent() {
       if (json.success) {
         const data = json.data as VendorSettings & {
           defaultMOQ?: number | null;
-          defaultTaxPercent?: number | null;
           returnPolicy?: string | null;
           cancellationPolicy?: string | null;
           paymentModes?: string[];
@@ -99,7 +97,6 @@ function VendorSettingsContent() {
         setAddressPincode(data.addressPincode || '');
         setGstNumber(data.gstNumber || '');
         setDefaultMOQ(data.defaultMOQ != null ? String(data.defaultMOQ) : '');
-        setDefaultTaxPercent(data.defaultTaxPercent != null ? String(data.defaultTaxPercent) : '');
         setDeliveryFeeVal(data.deliveryFee != null ? String(data.deliveryFee) : '');
         setFreeDeliveryAbove(data.freeDeliveryAbove != null ? String(data.freeDeliveryAbove) : '');
         setReturnPolicy(data.returnPolicy || '');
@@ -200,7 +197,6 @@ function VendorSettingsContent() {
           addressPincode: addressPincode || undefined,
           gstNumber: gstNumber || undefined,
           defaultMOQ: defaultMOQ ? parseInt(defaultMOQ, 10) : undefined,
-          defaultTaxPercent: defaultTaxPercent ? parseFloat(defaultTaxPercent) : undefined,
           deliveryFee: deliveryFeeVal ? parseFloat(deliveryFeeVal) : undefined,
           freeDeliveryAbove: freeDeliveryAbove ? parseFloat(freeDeliveryAbove) : undefined,
           returnPolicy: returnPolicy || undefined,
@@ -295,14 +291,21 @@ function VendorSettingsContent() {
     setSlotCutoff('');
   };
 
-  const openAddSlot = () => { resetSlotForm(); setShowSlotForm(true); };
+  const openAddSlot = () => {
+    setEditingSlotId(null);
+    setSlotDay(1);
+    setSlotStart('10:00');
+    setSlotEnd('20:00');
+    setSlotCutoff('17:00');
+    setShowSlotForm(true);
+  };
 
   const openEditSlot = (slot: DeliverySlot) => {
     setEditingSlotId(slot.id);
     setSlotDay(slot.dayOfWeek);
-    setSlotStart(slot.slotStart);
-    setSlotEnd(slot.slotEnd);
-    setSlotCutoff(slot.cutoffTime);
+    setSlotStart(normalizeTimeInput(slot.slotStart));
+    setSlotEnd(normalizeTimeInput(slot.slotEnd));
+    setSlotCutoff(normalizeTimeInput(slot.cutoffTime));
     setShowSlotForm(true);
   };
 
@@ -442,7 +445,6 @@ function VendorSettingsContent() {
             onSaveSlot={handleSaveSlot} onResetSlotForm={resetSlotForm}
             onToggleSlot={handleToggleSlot} onDeleteSlot={handleDeleteSlot}
             defaultMOQ={defaultMOQ} setDefaultMOQ={setDefaultMOQ}
-            defaultTaxPercent={defaultTaxPercent} setDefaultTaxPercent={setDefaultTaxPercent}
             deliveryFeeVal={deliveryFeeVal} setDeliveryFeeVal={setDeliveryFeeVal}
             freeDeliveryAbove={freeDeliveryAbove} setFreeDeliveryAbove={setFreeDeliveryAbove}
             {...saveProps}

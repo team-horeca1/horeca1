@@ -62,11 +62,25 @@ export const DOC_TYPE_LABELS: Record<string, string> = {
 
 export const DAY_NAMES = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export function formatTime(t: string): string {
-  const [hours, minutes] = t.split(':');
-  const h = parseInt(hours, 10);
-  return `${h % 12 || 12}:${minutes} ${h >= 12 ? 'PM' : 'AM'}`;
+/** Normalize stored time strings (e.g. "9:05" or "09:05:00") for `<input type="time">`. */
+export function normalizeTimeInput(t: string): string {
+  const match = t.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return '';
+  return `${match[1].padStart(2, '0')}:${match[2]}`;
 }
+
+export function formatTime(t: string): string {
+  const match = t.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return t;
+  const h = parseInt(match[1], 10);
+  return `${h % 12 || 12}:${match[2]} ${h >= 12 ? 'PM' : 'AM'}`;
+}
+
+export const SLOT_TIME_PRESETS = [
+  { label: 'Morning', start: '08:00', end: '12:00', cutoff: '07:00' },
+  { label: 'Afternoon', start: '12:00', end: '17:00', cutoff: '11:00' },
+  { label: 'Full day', start: '10:00', end: '20:00', cutoff: '17:00' },
+] as const;
 
 export type SettingsTabId = 'store' | 'delivery' | 'payments' | 'policies' | 'documents';
 
