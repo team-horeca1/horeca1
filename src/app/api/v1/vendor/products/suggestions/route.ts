@@ -33,14 +33,18 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
           approvalStatus: 'approved',
           isActive: true,
           slug: { not: { startsWith: '_deleted_' } },
-          name: { contains: q, mode: 'insensitive' },
-          // Surface BOTH other vendors' listings AND admin-created catalog
-          // products (vendorId = null). A plain `{ not: vendor.id }` filter
-          // silently drops the catalog rows: in SQL `NULL <> 'uuid'` is unknown,
-          // not true, so null-vendor products never matched — which is why an
-          // admin "catalog" product wouldn't show up in vendor search. Only
-          // this vendor's OWN rows must be excluded.
-          ...(vendor ? { OR: [{ vendorId: null }, { vendorId: { not: vendor.id } }] } : {}),
+          AND: [
+            {
+              OR: [
+                { name: { contains: q, mode: 'insensitive' } },
+                { brand: { contains: q, mode: 'insensitive' } },
+                { sku: { contains: q, mode: 'insensitive' } },
+              ],
+            },
+            ...(vendor
+              ? [{ OR: [{ vendorId: null }, { vendorId: { not: vendor.id } }] }]
+              : []),
+          ],
         },
         select: {
           id: true,
@@ -73,8 +77,12 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         ? prisma.product.findMany({
             where: {
               vendorId: vendor.id,
-              name: { contains: q, mode: 'insensitive' },
               slug: { not: { startsWith: '_deleted_' } },
+              OR: [
+                { name: { contains: q, mode: 'insensitive' } },
+                { brand: { contains: q, mode: 'insensitive' } },
+                { sku: { contains: q, mode: 'insensitive' } },
+              ],
             },
             select: {
               id: true,

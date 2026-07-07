@@ -1613,7 +1613,6 @@ export default function ProductsPage() {
 
     const mapServerErrorToField = (msg: string): ProductValidationField | null => {
         const m = msg.toLowerCase();
-        if (m.includes('substitut')) return 'substituteIds';
         if (m.includes('hsn')) return 'hsn';
         if (m.includes('image')) return 'imageUrl';
         if (m.includes('sku')) return 'sku';

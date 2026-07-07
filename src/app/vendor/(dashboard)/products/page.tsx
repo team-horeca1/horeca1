@@ -4,14 +4,14 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
     Search, Plus, Loader2, Package, Pencil, X,
-    ChevronRight, ChevronLeft, Info, ImageIcon, Settings as SettingsIcon, DollarSign, Trash2,
+    ChevronRight, ChevronLeft, Info, ImageIcon, Settings as SettingsIcon, Trash2,
     BarChart3, BoxIcon, Tag, Upload, Percent, Star, Wand2,
     ChevronDown, FileDown, FileSpreadsheet, AlertCircle, Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseVendorSku, resolveVendorCode } from '@/lib/sku';
 import { toast } from 'sonner';
-import { ImageUpload, MultiImageUpload } from '@/components/ui/ImageUpload';
+import { ImageUpload } from '@/components/ui/ImageUpload';
 import { CategoryHierarchyPicker } from '@/components/features/brand/CategoryHierarchyPicker';
 import { BrandSinglePicker } from '@/components/features/brand/BrandSinglePicker';
 import VendorProductImportModal from '@/components/features/vendor/VendorProductImportModal';
@@ -234,8 +234,6 @@ const EMPTY_FORM: ProductForm = {
     itemStatus: 'Active',
     activeOnlineStore: true,
 };
-
-const TAX_OPTIONS = ['0', '5', '12', '18', '28'];
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -537,6 +535,8 @@ export default function VendorProductsPage() {
     const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const skipDraftAutosaveRef = useRef(false);
     const creatingDraftRef = useRef(false);
+    const draftSlugRef = useRef<string | null>(null);
+    const [draftSavedOnce, setDraftSavedOnce] = useState(false);
 
     const captureSnapshot = useCallback(
         () => serializeFormSnapshot(form, { masterProductId, basedOnProductId }),
@@ -673,8 +673,8 @@ export default function VendorProductsPage() {
             }
 
             const [res, masterRes] = await Promise.all([
-                fetch(`/api/v1/vendor/products/suggestions?q=${encodeURIComponent(query)}`),
-                fetch(`/api/v1/master-products?search=${encodeURIComponent(query)}&limit=5`),
+                fetch(`/api/v1/vendor/products/suggestions?q=${encodeURIComponent(trimmed)}`),
+                fetch(`/api/v1/master-products?search=${encodeURIComponent(trimmed)}&limit=8`),
             ]);
             const json = await res.json();
             const masterJson = await masterRes.json();
@@ -689,7 +689,7 @@ export default function VendorProductsPage() {
                 setNoCatalogMatch(false);
             } else {
                 setShowSuggestions(false);
-                setNoCatalogMatch(true);
+                setNoCatalogMatch(trimmed.length >= 2);
             }
         } catch {
             setSuggestions([]);
@@ -724,18 +724,170 @@ export default function VendorProductsPage() {
         }));
     };
 
-    const handleCatalogSearchChange = (query: string) => {
-        setCatalogSearch(query);
-        setNoCatalogMatch(false);
-
-        if (suggestionTimeoutRef.current) clearTimeout(suggestionTimeoutRef.current);
-        suggestionTimeoutRef.current = setTimeout(() => fetchSuggestions(query), 350);
-    };
+    const isCatalogSearchEnabled = useCallback(() => {
+        if (masterProductId || basedOnProductId) return false;
+        if (!editingProduct) return true;
+        if (editingProduct.approvalStatus === 'rejected') return true;
+        if (editingProduct.listingStatus === 'draft') return true;
+        return false;
+    }, [editingProduct, masterProductId, basedOnProductId]);
 
     const handleProductNameChange = (name: string) => {
         setForm(prev => ({ ...prev, name, slug: slugify(name) }));
         clearFieldError('name');
+
+        const canSearchCatalog = isCatalogSearchEnabled();
+        if (!canSearchCatalog) return;
+
+        setCatalogSearch(name);
+        setNoCatalogMatch(false);
+        if (suggestionTimeoutRef.current) clearTimeout(suggestionTimeoutRef.current);
+
+        const trimmed = name.trim();
+        if (trimmed.length < 2) {
+            setShowSuggestions(false);
+            setSuggestions([]);
+            setMasterSuggestions([]);
+            setOwnMatches([]);
+            return;
+        }
+
+        suggestionTimeoutRef.current = setTimeout(() => {
+            void fetchSuggestions(trimmed);
+        }, 280);
     };
+
+    const catalogSearchEnabled = isCatalogSearchEnabled();
+
+    const renderCatalogSuggestionPanel = () => {
+        if (!catalogSearchEnabled) return null;
+        return (
+            <>
+                {showSuggestions && (masterSuggestions.length > 0 || suggestions.length > 0) && (
+                    <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-[#EEEEEE] rounded-[10px] shadow-lg max-h-[280px] overflow-y-auto">
+                        {masterSuggestions.length > 0 && (
+                            <>
+                                <div className="px-3 py-1.5 bg-[#F8F9FB] border-b border-[#EEEEEE] text-[10px] font-bold text-[#AEAEAE] uppercase tracking-wider">
+                                    Master Catalog — instant approval
+                                </div>
+                                {masterSuggestions.map((m) => (
+                                    <button
+                                        key={m.id}
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => fillFromMaster(m)}
+                                        className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-[#EEF8F1] transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-[#181725] truncate">{m.name}</p>
+                                            <p className="text-[11px] text-[#AEAEAE] truncate">
+                                                {m.brand ? `Brand: ${m.brand}` : ''}
+                                                {m.sku ? `${m.brand ? ' • ' : ''}SKU: ${m.sku}` : ''}
+                                            </p>
+                                        </div>
+                                        {m.imageUrl && (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img
+                                                src={m.imageUrl}
+                                                alt=""
+                                                className="w-8 h-8 rounded-[6px] object-cover border border-[#EEEEEE] shrink-0"
+                                            />
+                                        )}
+                                    </button>
+                                ))}
+                            </>
+                        )}
+                        {suggestions.length > 0 && (
+                            <>
+                                <div className="px-3 py-1.5 bg-[#F8F9FB] border-b border-[#EEEEEE] text-[10px] font-bold text-[#AEAEAE] uppercase tracking-wider">
+                                    Approved marketplace products
+                                </div>
+                                {suggestions.map((s) => (
+                                    <button
+                                        key={s.id}
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => fillFromSuggestion(s)}
+                                        className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-[#EEF8F1] transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-[#181725] truncate">{s.name}</p>
+                                            <p className="text-[11px] text-[#AEAEAE] truncate">
+                                                {s.vendor?.businessName ? `Sold by ${s.vendor.businessName}` : 'Catalog product'}
+                                                {s.sku ? ` • SKU: ${s.sku}` : ''}
+                                            </p>
+                                        </div>
+                                        {s.imageUrl && (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img
+                                                src={s.imageUrl}
+                                                alt=""
+                                                className="w-8 h-8 rounded-[6px] object-cover border border-[#EEEEEE] shrink-0"
+                                            />
+                                        )}
+                                    </button>
+                                ))}
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {ownMatches.length > 0 && showSuggestions && (
+                    <div className="mt-1.5 rounded-[10px] bg-[#FFF7E6] border border-amber-200 px-3 py-2 text-[12px] text-amber-800">
+                        <p className="font-bold mb-1">You already list similar products:</p>
+                        <ul className="list-disc list-inside space-y-0.5">
+                            {ownMatches.map((o) => (
+                                <li key={o.id}>
+                                    {o.name}
+                                    <span className="text-[#AEAEAE] ml-1">
+                                        ({o.approvalStatus}{o.isActive ? '' : ', inactive'})
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {noCatalogMatch && form.name.trim().length >= 2 && !loadingSuggestions && (
+                    <p className="text-[11px] text-[#7C7C7C] font-medium mt-1">
+                        No catalog match — continue as a new product for admin approval.
+                    </p>
+                )}
+            </>
+        );
+    };
+
+    const renderProductNameField = (colClass: string) => (
+        <div
+            id="ff-name"
+            className={cn('relative', colClass)}
+            ref={catalogSearchEnabled ? suggestionsRef : undefined}
+        >
+            <FieldLabel required>Product Name</FieldLabel>
+            <div className="relative">
+                <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => handleProductNameChange(e.target.value)}
+                    onFocus={() => {
+                        if (catalogSearchEnabled && form.name.trim().length >= 2) {
+                            void fetchSuggestions(form.name.trim());
+                        }
+                    }}
+                    placeholder={catalogSearchEnabled ? 'Type name, SKU, or brand to search catalog…' : undefined}
+                    className={cn(inputCls, fieldErrors.name && 'border-[#E74C3C]')}
+                />
+                {catalogSearchEnabled && loadingSuggestions && (
+                    <Loader2
+                        size={16}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-[#299E60]"
+                    />
+                )}
+            </div>
+            {fieldErrors.name && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.name}</p>}
+            {renderCatalogSuggestionPanel()}
+        </div>
+    );
 
     const fillFromMaster = (m: {
         id: string; sku: string; name: string; brand: string | null; imageUrl: string | null;
@@ -867,6 +1019,7 @@ export default function VendorProductsPage() {
     const buildProductBody = useCallback((opts: { isDraft: boolean }) => {
         const isNewSubmission = !editingProduct && !masterProductId && !basedOnProductId;
         const parsedBase = form.basePrice ? parseFloat(form.basePrice) : 0;
+        const taxRate = form.taxPercent ? parseFloat(form.taxPercent) : 0;
 
         const metadata = {
             accounting: {
@@ -876,10 +1029,10 @@ export default function VendorProductsPage() {
                 exemptionReason: form.exemptionReason.trim(),
                 taxabilityType: form.taxabilityType.trim(),
                 intraStateTaxName: form.intraStateTaxName.trim(),
-                intraStateTaxRate: form.intraStateTaxRate ? Number(form.intraStateTaxRate) : undefined,
+                intraStateTaxRate: taxRate,
                 intraStateTaxType: form.intraStateTaxType.trim(),
                 interStateTaxName: form.interStateTaxName.trim(),
-                interStateTaxRate: form.interStateTaxRate ? Number(form.interStateTaxRate) : undefined,
+                interStateTaxRate: taxRate,
                 interStateTaxType: form.interStateTaxType.trim(),
                 inventoryAccount: form.inventoryAccount.trim(),
                 inventoryAccountCode: form.inventoryAccountCode.trim(),
@@ -919,7 +1072,18 @@ export default function VendorProductsPage() {
 
         const body: Record<string, unknown> = {
             name: form.name.trim() || 'Untitled product',
-            slug: form.slug || slugify(form.name.trim() || 'untitled-product'),
+            slug: (() => {
+                if (opts.isDraft) {
+                    if (editingProduct?.slug) return editingProduct.slug;
+                    if (form.slug?.trim()) return form.slug.trim();
+                    if (form.name.trim()) return slugify(form.name.trim());
+                    if (!draftSlugRef.current) {
+                        draftSlugRef.current = `draft-${crypto.randomUUID().slice(0, 8)}`;
+                    }
+                    return draftSlugRef.current;
+                }
+                return form.slug || slugify(form.name.trim() || 'untitled-product');
+            })(),
             listingStatus: opts.isDraft ? 'draft' : 'submitted',
             isActive: !opts.isDraft,
             packSize: form.packSize || undefined,
@@ -1009,6 +1173,56 @@ export default function VendorProductsPage() {
 
     const saveDraftRef = useRef<(force?: boolean) => Promise<boolean>>(async () => false);
 
+    const adoptDraftProduct = useCallback((p: {
+        id: string;
+        name: string;
+        slug: string;
+        basePrice: unknown;
+        originalPrice?: unknown;
+        packSize?: string | null;
+        unit?: string | null;
+        imageUrl?: string | null;
+        isFeatured?: boolean;
+        description?: string | null;
+        creditEligible?: boolean;
+        categoryId?: string | null;
+        sku?: string | null;
+        approvalStatus?: string;
+    }) => {
+        const cat = categories.find(c => c.id === p.categoryId);
+        const draftProduct: VendorProduct = {
+            id: p.id,
+            name: p.name,
+            slug: p.slug,
+            basePrice: Number(p.basePrice),
+            originalPrice: p.originalPrice ? Number(p.originalPrice) : undefined,
+            packSize: p.packSize ?? null,
+            unit: p.unit ?? null,
+            imageUrl: p.imageUrl ?? null,
+            isActive: false,
+            isFeatured: p.isFeatured ?? false,
+            description: p.description ?? null,
+            creditEligible: p.creditEligible ?? false,
+            categoryName: cat?.name ?? '',
+            categorySlug: cat?.slug ?? '',
+            in_stock: false,
+            qty_available: 0,
+            sku: p.sku ?? null,
+            approvalStatus: (p.approvalStatus as VendorProduct['approvalStatus']) ?? 'pending',
+            listingStatus: 'draft',
+        };
+        setEditingProduct(draftProduct);
+        setProducts(prev => {
+            if (prev.some(existing => existing.id === p.id)) {
+                return prev.map(existing =>
+                    existing.id === p.id ? { ...existing, ...draftProduct } : existing
+                );
+            }
+            return [draftProduct, ...prev];
+        });
+        return draftProduct;
+    }, [categories]);
+
     const saveDraft = useCallback(async (force = false): Promise<boolean> => {
         if (skipDraftAutosaveRef.current && !force) return false;
         if (!force) {
@@ -1016,6 +1230,7 @@ export default function VendorProductsPage() {
         }
 
         setDraftSaving(true);
+        setDraftSaveError(null);
         try {
             const body = buildProductBody({ isDraft: true });
             let res: Response;
@@ -1034,48 +1249,45 @@ export default function VendorProductsPage() {
                 });
             }
 
-            const json = await res.json();
+            let json = await res.json();
+
+            if (!json.success && !editingProduct && res.status === 409) {
+                const slug = String(body.slug ?? '');
+                const localMatch = products.find(
+                    (p) => p.listingStatus === 'draft' && p.slug === slug,
+                );
+                if (localMatch) {
+                    adoptDraftProduct(localMatch);
+                    res = await fetch(`/api/v1/vendor/products/${localMatch.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body),
+                    });
+                    json = await res.json();
+                } else if (!draftSlugRef.current || slug === 'untitled-product') {
+                    draftSlugRef.current = `draft-${crypto.randomUUID().slice(0, 8)}`;
+                    body.slug = draftSlugRef.current;
+                    res = await fetch('/api/v1/vendor/products', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body),
+                    });
+                    json = await res.json();
+                }
+            }
+
             if (!json.success) {
                 setDraftSaveError(json.error?.message ?? 'Couldn\'t save draft — retry');
                 return false;
             }
             setDraftSaveError(null);
+            setDraftSavedOnce(true);
 
             const p = json.data;
             syncSavedSnapshot();
 
             if (!editingProduct) {
-                const cat = categories.find(c => c.id === p.categoryId);
-                const draftProduct: VendorProduct = {
-                    id: p.id,
-                    name: p.name,
-                    slug: p.slug,
-                    basePrice: Number(p.basePrice),
-                    originalPrice: p.originalPrice ? Number(p.originalPrice) : undefined,
-                    packSize: p.packSize ?? null,
-                    unit: p.unit ?? null,
-                    imageUrl: p.imageUrl ?? null,
-                    isActive: false,
-                    isFeatured: p.isFeatured ?? false,
-                    description: p.description ?? null,
-                    creditEligible: p.creditEligible ?? false,
-                    categoryName: cat?.name ?? '',
-                    categorySlug: cat?.slug ?? '',
-                    in_stock: false,
-                    qty_available: 0,
-                    sku: p.sku ?? null,
-                    approvalStatus: p.approvalStatus ?? 'pending',
-                    listingStatus: 'draft',
-                };
-                setEditingProduct(draftProduct);
-                setProducts(prev => {
-                    if (prev.some(existing => existing.id === p.id)) {
-                        return prev.map(existing =>
-                            existing.id === p.id ? { ...existing, ...draftProduct } : existing
-                        );
-                    }
-                    return [draftProduct, ...prev];
-                });
+                adoptDraftProduct(p);
             } else {
                 setEditingProduct(prev => prev ? { ...prev, listingStatus: 'draft', isActive: false } : prev);
                 setProducts(prev => prev.map(existing =>
@@ -1091,7 +1303,7 @@ export default function VendorProductsPage() {
         } finally {
             setDraftSaving(false);
         }
-    }, [canAutosaveDraft, isFormDirty, buildProductBody, editingProduct, categories, syncSavedSnapshot]);
+    }, [canAutosaveDraft, isFormDirty, buildProductBody, editingProduct, products, adoptDraftProduct, syncSavedSnapshot]);
 
     useEffect(() => {
         saveDraftRef.current = saveDraft;
@@ -1102,6 +1314,9 @@ export default function VendorProductsPage() {
     const openAddPanel = () => {
         if (draftSaveTimeoutRef.current) clearTimeout(draftSaveTimeoutRef.current);
         skipDraftAutosaveRef.current = true;
+        draftSlugRef.current = null;
+        setDraftSaveError(null);
+        setDraftSavedOnce(false);
         setEditingProduct(null);
         setForm(EMPTY_FORM);
         setFormError('');
@@ -1135,6 +1350,9 @@ export default function VendorProductsPage() {
     const openEditPanel = async (product: VendorProduct) => {
         if (draftSaveTimeoutRef.current) clearTimeout(draftSaveTimeoutRef.current);
         skipDraftAutosaveRef.current = true;
+        setDraftSaveError(null);
+        draftSlugRef.current = product.listingStatus === 'draft' ? product.slug : null;
+        setDraftSavedOnce(product.listingStatus === 'draft');
         setEditingProduct(product);
         setForm(EMPTY_FORM);
         setFormError('');
@@ -1379,6 +1597,9 @@ export default function VendorProductsPage() {
 
     const closePanelImmediate = () => {
         if (draftSaveTimeoutRef.current) clearTimeout(draftSaveTimeoutRef.current);
+        draftSlugRef.current = null;
+        setDraftSaveError(null);
+        setDraftSavedOnce(false);
         setIsPanelOpen(false);
         setEditingProduct(null);
         setShowCloseConfirm(false);
@@ -1440,7 +1661,6 @@ export default function VendorProductsPage() {
 
     const mapServerErrorToField = (msg: string): ProductValidationField | null => {
         const m = msg.toLowerCase();
-        if (m.includes('substitut')) return 'substituteIds';
         if (m.includes('hsn')) return 'hsn';
         if (m.includes('image')) return 'imageUrl';
         if (m.includes('pos sku') || m.includes('vendor sku')) return 'vendorSku';
@@ -1486,27 +1706,6 @@ export default function VendorProductsPage() {
         setForm(prev => ({
             ...prev,
             priceSlabs: prev.priceSlabs.filter((_, i) => i !== index),
-        }));
-    };
-
-    /* ---- Additional images ---- */
-
-    const addImage = () => {
-        setForm(prev => ({ ...prev, images: [...prev.images, ''] }));
-    };
-
-    const updateImage = (index: number, value: string) => {
-        setForm(prev => {
-            const images = [...prev.images];
-            images[index] = value;
-            return { ...prev, images };
-        });
-    };
-
-    const removeImage = (index: number) => {
-        setForm(prev => ({
-            ...prev,
-            images: prev.images.filter((_, i) => i !== index),
         }));
     };
 
@@ -2236,7 +2435,7 @@ export default function VendorProductsPage() {
                     {/* Panel */}
                     <div
                         ref={panelRef}
-                        className="fixed top-0 left-0 h-full w-full bg-white z-[70] shadow-2xl flex flex-col animate-in slide-in-from-left duration-300"
+                        className="fixed top-0 right-0 h-full w-full bg-white z-[70] shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
                     >
                         {/* Panel Header */}
                         <div className="flex items-center justify-between px-4 lg:px-6 py-4 border-b border-[#EEEEEE] shrink-0">
@@ -2250,7 +2449,7 @@ export default function VendorProductsPage() {
                                             ID: {editingProduct.id}
                                         </p>
                                     )}
-                                    {(draftSaving || draftSaveError || editingProduct?.listingStatus === 'draft') && (
+                                    {(draftSaving || draftSaveError || (draftSavedOnce && editingProduct?.listingStatus === 'draft')) && (
                                         <span className={cn(
                                             'inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-[6px]',
                                             draftSaveError
@@ -2268,7 +2467,7 @@ export default function VendorProductsPage() {
                                                     <button
                                                         type="button"
                                                         className="underline ml-1"
-                                                        onClick={() => void saveDraftRef.current()}
+                                                        onClick={() => void saveDraftRef.current(true)}
                                                     >
                                                         Retry
                                                     </button>
@@ -2289,9 +2488,8 @@ export default function VendorProductsPage() {
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto bg-[#F8F9FB] px-4 lg:px-6 py-4">
-                            <div className="w-full">
-                                <form id="vendor-product-form" onSubmit={handleSubmit} className="space-y-8">
+                        <div className="flex-1 overflow-y-auto bg-[#F8F9FB] px-4 lg:px-8 py-4">
+                            <form id="vendor-product-form" onSubmit={handleSubmit} className="space-y-4">
                                     {loadingProduct ? (
                                         <div className="flex items-center justify-center py-32">
                                             <Loader2 className="animate-spin text-[#299E60]" size={32} />
@@ -2318,156 +2516,29 @@ export default function VendorProductsPage() {
                                         </div>
                                     )}
 
-                                    <FormSection title="Product essentials" icon={<Info size={16} />} requiredBadge sectionId="essentials">
+                                    <FormSection title="Product essentials" icon={<Info size={16} />} requiredBadge sectionId="essentials" className="!p-4 !space-y-3">
 
-                                            {(!editingProduct || editingProduct.approvalStatus === 'rejected') && (
-                                                identityFromCatalog ? (
-                                                    <div className="rounded-[10px] bg-[#EEF8F1] border border-[#299E60]/30 px-4 py-3 flex items-center justify-between gap-3">
-                                                        <p className="text-[12px] font-medium text-[#299E60]">
-                                                            {masterProductId
-                                                                ? `Linked to master catalog — ${catalogSearch || form.name}`
-                                                                : `Based on approved product — ${catalogSearch || form.name}`}
-                                                        </p>
-                                                        <button
-                                                            type="button"
-                                                            onClick={clearCatalogSelection}
-                                                            className="text-[12px] font-bold text-[#299E60] hover:underline shrink-0"
-                                                        >
-                                                            Change
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <div className="relative" ref={suggestionsRef}>
-                                                        <FieldLabel>Search master catalog (optional — instant approval)</FieldLabel>
-                                                        <div className="relative">
-                                                            <input
-                                                                type="text"
-                                                                value={catalogSearch}
-                                                                onChange={(e) => handleCatalogSearchChange(e.target.value)}
-                                                                onFocus={() => {
-                                                                    if (catalogSearch.trim().length >= 2) {
-                                                                        void fetchSuggestions(catalogSearch);
-                                                                    }
-                                                                }}
-                                                                className={inputCls}
-                                                                placeholder="e.g., RIC-BAS-001 or Butter"
-                                                            />
-                                                            {loadingSuggestions && (
-                                                                <Loader2
-                                                                    size={16}
-                                                                    className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-[#299E60]"
-                                                                />
-                                                            )}
-                                                        </div>
-
-                                                        {showSuggestions && (masterSuggestions.length > 0 || suggestions.length > 0) && (
-                                                            <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-[#EEEEEE] rounded-[10px] shadow-lg max-h-[280px] overflow-y-auto">
-                                                                {masterSuggestions.length > 0 && (
-                                                                    <>
-                                                                        <div className="px-3 py-1.5 bg-[#F8F9FB] border-b border-[#EEEEEE] text-[10px] font-bold text-[#AEAEAE] uppercase tracking-wider">
-                                                                            Master Catalog
-                                                                        </div>
-                                                                        {masterSuggestions.map((m) => (
-                                                                            <button
-                                                                                key={m.id}
-                                                                                type="button"
-                                                                                onMouseDown={(e) => e.preventDefault()}
-                                                                                onClick={() => fillFromMaster(m)}
-                                                                                className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-[#EEF8F1] transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
-                                                                            >
-                                                                                <div className="min-w-0">
-                                                                                    <p className="font-bold text-[#181725] truncate">{m.name}</p>
-                                                                                    <p className="text-[11px] text-[#AEAEAE] truncate">
-                                                                                        {m.brand ? `Brand: ${m.brand}` : ''}
-                                                                                        {m.sku ? `${m.brand ? ' • ' : ''}SKU: ${m.sku}` : ''}
-                                                                                    </p>
-                                                                                </div>
-                                                                                {m.imageUrl && (
-                                                                                    // eslint-disable-next-line @next/next/no-img-element
-                                                                                    <img
-                                                                                        src={m.imageUrl}
-                                                                                        alt=""
-                                                                                        className="w-8 h-8 rounded-[6px] object-cover border border-[#EEEEEE] shrink-0"
-                                                                                    />
-                                                                                )}
-                                                                            </button>
-                                                                        ))}
-                                                                    </>
-                                                                )}
-                                                                {suggestions.length > 0 && (
-                                                                    <>
-                                                                        <div className="px-3 py-1.5 bg-[#F8F9FB] border-b border-[#EEEEEE] text-[10px] font-bold text-[#AEAEAE] uppercase tracking-wider">
-                                                                            Approved Marketplace Products
-                                                                        </div>
-                                                                        {suggestions.map((s) => (
-                                                                            <button
-                                                                                key={s.id}
-                                                                                type="button"
-                                                                                onMouseDown={(e) => e.preventDefault()}
-                                                                                onClick={() => fillFromSuggestion(s)}
-                                                                                className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-[#EEF8F1] transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
-                                                                            >
-                                                                                <div className="min-w-0">
-                                                                                    <p className="font-bold text-[#181725] truncate">{s.name}</p>
-                                                                                    <p className="text-[11px] text-[#AEAEAE] truncate">
-                                                                                        {s.vendor?.businessName ? `Sold by ${s.vendor.businessName}` : 'Catalog product'}
-                                                                                        {s.sku ? ` • SKU: ${s.sku}` : ''}
-                                                                                    </p>
-                                                                                </div>
-                                                                                {s.imageUrl && (
-                                                                                    // eslint-disable-next-line @next/next/no-img-element
-                                                                                    <img
-                                                                                        src={s.imageUrl}
-                                                                                        alt=""
-                                                                                        className="w-8 h-8 rounded-[6px] object-cover border border-[#EEEEEE] shrink-0"
-                                                                                    />
-                                                                                )}
-                                                                            </button>
-                                                                        ))}
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        )}
-
-                                                        {ownMatches.length > 0 && showSuggestions && (
-                                                            <div className="mt-2 rounded-[10px] bg-[#FFF7E6] border border-amber-200 px-3 py-2 text-[12px] text-amber-800">
-                                                                <p className="font-bold mb-1">You already list similar products:</p>
-                                                                <ul className="list-disc list-inside space-y-0.5">
-                                                                    {ownMatches.map((o) => (
-                                                                        <li key={o.id}>
-                                                                            {o.name}
-                                                                            <span className="text-[#AEAEAE] ml-1">
-                                                                                ({o.approvalStatus}{o.isActive ? '' : ', inactive'})
-                                                                            </span>
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            </div>
-                                                        )}
-
-                                                        {noCatalogMatch && catalogSearch.trim().length >= 2 && !loadingSuggestions && (
-                                                            <p className="text-[11px] text-amber-700 font-medium mt-1.5">
-                                                                No catalog match found — you can still add this as a new product for admin approval.
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                )
+                                            {(!editingProduct || editingProduct.approvalStatus === 'rejected') && identityFromCatalog && (
+                                                <div className="rounded-[10px] bg-[#EEF8F1] border border-[#299E60]/30 px-4 py-3 flex items-center justify-between gap-3">
+                                                    <p className="text-[12px] font-medium text-[#299E60]">
+                                                        {masterProductId
+                                                            ? `Linked to master catalog — ${catalogSearch || form.name}`
+                                                            : `Based on approved product — ${catalogSearch || form.name}`}
+                                                    </p>
+                                                    <button
+                                                        type="button"
+                                                        onClick={clearCatalogSelection}
+                                                        className="text-[12px] font-bold text-[#299E60] hover:underline shrink-0"
+                                                    >
+                                                        Change
+                                                    </button>
+                                                </div>
                                             )}
 
-                                            <div id="ff-name">
-                                                <FieldLabel required>Product Name</FieldLabel>
-                                                <input
-                                                    type="text"
-                                                    value={form.name}
-                                                    onChange={(e) => handleProductNameChange(e.target.value)}
-                                                    className={cn(inputCls, fieldErrors.name && 'border-[#E74C3C]')}
-                                                />
-                                                {fieldErrors.name && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.name}</p>}
-                                            </div>
-
-                                            {masterProductId && (
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
+                                            {masterProductId ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-3">
+                                                    {renderProductNameField('sm:col-span-2 xl:col-span-4')}
+                                                    <div className="xl:col-span-2">
                                                         <FieldLabel>Catalog SKU</FieldLabel>
                                                         <input
                                                             type="text"
@@ -2476,7 +2547,7 @@ export default function VendorProductsPage() {
                                                             className={cn(inputCls, 'bg-[#F8F9FB] cursor-not-allowed')}
                                                         />
                                                     </div>
-                                                    <div id="ff-vendorSku">
+                                                    <div id="ff-vendorSku" className="xl:col-span-2">
                                                         <FieldLabel required>Your POS SKU</FieldLabel>
                                                         <input
                                                             type="text"
@@ -2489,44 +2560,51 @@ export default function VendorProductsPage() {
                                                             <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.vendorSku}</p>
                                                         )}
                                                     </div>
-                                                </div>
-                                            )}
-
-                                            {!masterProductId && (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <div id="ff-sku">
-                                                        <FieldLabel required>SKU</FieldLabel>
-                                                        <input type="text" value={form.sku} onChange={(e) => updateField('sku', e.target.value)} className={cn(inputCls, fieldErrors.sku && 'border-[#E74C3C]')} />
-                                                        {fieldErrors.sku && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.sku}</p>}
-                                                    </div>
-                                                    <div id="ff-hsn">
+                                                    <div id="ff-hsn" className="xl:col-span-2">
                                                         <FieldLabel required>HSN Code</FieldLabel>
                                                         <input type="text" value={form.hsn} onChange={(e) => updateField('hsn', e.target.value)} className={cn(inputCls, fieldErrors.hsn && 'border-[#E74C3C]')} />
                                                         {fieldErrors.hsn && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.hsn}</p>}
                                                     </div>
+                                                    <div id="ff-brand" className="sm:col-span-2 xl:col-span-2">
+                                                        <FieldLabel required>Brand</FieldLabel>
+                                                        <BrandSinglePicker
+                                                            value={form.brand}
+                                                            onChange={(val) => updateField('brand', val)}
+                                                            brands={brands}
+                                                            onSuggest={(name) => suggestBrand(name)}
+                                                            suggesting={brandSuggesting}
+                                                            hasError={!!fieldErrors.brand}
+                                                        />
+                                                        {fieldErrors.brand && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.brand}</p>}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-3">
+                                                    {renderProductNameField('sm:col-span-2 xl:col-span-5')}
+                                                    <div id="ff-sku" className="xl:col-span-2">
+                                                        <FieldLabel required>SKU</FieldLabel>
+                                                        <input type="text" value={form.sku} onChange={(e) => updateField('sku', e.target.value)} className={cn(inputCls, fieldErrors.sku && 'border-[#E74C3C]')} />
+                                                        {fieldErrors.sku && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.sku}</p>}
+                                                    </div>
+                                                    <div id="ff-hsn" className="xl:col-span-2">
+                                                        <FieldLabel required>HSN Code</FieldLabel>
+                                                        <input type="text" value={form.hsn} onChange={(e) => updateField('hsn', e.target.value)} className={cn(inputCls, fieldErrors.hsn && 'border-[#E74C3C]')} />
+                                                        {fieldErrors.hsn && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.hsn}</p>}
+                                                    </div>
+                                                    <div id="ff-brand" className="sm:col-span-2 xl:col-span-3">
+                                                        <FieldLabel required>Brand</FieldLabel>
+                                                        <BrandSinglePicker
+                                                            value={form.brand}
+                                                            onChange={(val) => updateField('brand', val)}
+                                                            brands={brands}
+                                                            onSuggest={(name) => suggestBrand(name)}
+                                                            suggesting={brandSuggesting}
+                                                            hasError={!!fieldErrors.brand}
+                                                        />
+                                                        {fieldErrors.brand && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.brand}</p>}
+                                                    </div>
                                                 </div>
                                             )}
-
-                                            {masterProductId && (
-                                                <div id="ff-hsn">
-                                                    <FieldLabel required>HSN Code</FieldLabel>
-                                                    <input type="text" value={form.hsn} onChange={(e) => updateField('hsn', e.target.value)} className={cn(inputCls, fieldErrors.hsn && 'border-[#E74C3C]')} />
-                                                    {fieldErrors.hsn && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.hsn}</p>}
-                                                </div>
-                                            )}
-
-                                            <div id="ff-brand">
-                                                <FieldLabel required>Brand</FieldLabel>
-                                                <BrandSinglePicker
-                                                    value={form.brand}
-                                                    onChange={(val) => updateField('brand', val)}
-                                                    brands={brands}
-                                                    onSuggest={(name) => suggestBrand(name)}
-                                                    suggesting={brandSuggesting}
-                                                    hasError={!!fieldErrors.brand}
-                                                />
-                                                {fieldErrors.brand && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.brand}</p>}
-                                            </div>
 
                                             <div id="ff-categoryIds">
                                                 <CategoryHierarchyPicker
@@ -2553,49 +2631,144 @@ export default function VendorProductsPage() {
                                                 )}
                                             </div>
 
-                                            <div id="ff-imageUrl">
-                                                <FieldLabel required>Image URL</FieldLabel>
-                                                <ImageUpload
-                                                    value={form.imageUrl}
-                                                    onChange={(url) => updateField('imageUrl', url)}
-                                                    label="Primary Image"
-                                                />
-                                                {fieldErrors.imageUrl && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.imageUrl}</p>}
-                                            </div>
-
-                                            <div id="ff-basePrice">
-                                                <FieldLabel required>Taxable Rate (ex-GST)</FieldLabel>
-                                                <div className="relative max-w-md">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEAEAE] font-medium">₹</span>
-                                                    <input type="number" min="0" step="0.01" value={form.basePrice} onChange={(e) => updateField('basePrice', e.target.value)} className={cn(inputCls, 'pl-7', fieldErrors.basePrice && 'border-[#E74C3C]')} />
+                                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pt-1">
+                                                <div className="space-y-3">
+                                                    <div id="ff-imageUrl">
+                                                        <FieldLabel required>Primary image</FieldLabel>
+                                                        <ImageUpload
+                                                            value={form.imageUrl}
+                                                            onChange={(url) => updateField('imageUrl', url)}
+                                                            label="Primary Image"
+                                                        />
+                                                        {fieldErrors.imageUrl && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.imageUrl}</p>}
+                                                    </div>
                                                 </div>
-                                                {fieldErrors.basePrice && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.basePrice}</p>}
+
+                                                <div className="space-y-3">
+                                                    <h4 className="text-[13px] font-bold text-[#181725]">Pricing &amp; GST</h4>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                                        <div id="ff-basePrice">
+                                                            <FieldLabel required>Taxable (ex-GST)</FieldLabel>
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEAEAE] font-medium">₹</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                    value={form.basePrice}
+                                                                    onChange={(e) => {
+                                                                        const base = e.target.value;
+                                                                        updateField('basePrice', base);
+                                                                        const tp = parseFloat(form.taxPercent || '0');
+                                                                        const b = parseFloat(base);
+                                                                        if (!isNaN(b) && !isNaN(tp)) {
+                                                                            updateField('originalPrice', (b * (1 + tp / 100)).toFixed(2));
+                                                                        }
+                                                                    }}
+                                                                    className={cn(inputCls, 'pl-7', fieldErrors.basePrice && 'border-[#E74C3C]')}
+                                                                />
+                                                            </div>
+                                                            {fieldErrors.basePrice && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.basePrice}</p>}
+                                                        </div>
+                                                        <div id="ff-taxPercent">
+                                                            <FieldLabel>Tax % (GST)</FieldLabel>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                max="100"
+                                                                step="0.01"
+                                                                value={form.taxPercent}
+                                                                onChange={e => {
+                                                                    const tp = e.target.value;
+                                                                    updateField('taxPercent', tp);
+                                                                    const base = parseFloat(form.basePrice);
+                                                                    const percent = parseFloat(tp);
+                                                                    if (!isNaN(base) && !isNaN(percent)) {
+                                                                        updateField('originalPrice', (base * (1 + percent / 100)).toFixed(2));
+                                                                    }
+                                                                }}
+                                                                placeholder="0"
+                                                                className={cn(inputCls, fieldErrors.taxPercent && 'border-[#E74C3C]')}
+                                                            />
+                                                            {fieldErrors.taxPercent && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.taxPercent}</p>}
+                                                        </div>
+                                                        <div>
+                                                            <FieldLabel>Gross (incl. GST)</FieldLabel>
+                                                            <div className="relative">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#299E60] font-bold">₹</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                    value={form.originalPrice}
+                                                                    onChange={e => {
+                                                                        const gross = e.target.value;
+                                                                        updateField('originalPrice', gross);
+                                                                        const tp = parseFloat(form.taxPercent || '0');
+                                                                        const g = parseFloat(gross);
+                                                                        if (!isNaN(g) && !isNaN(tp)) {
+                                                                            updateField('basePrice', (g / (1 + tp / 100)).toFixed(2));
+                                                                        }
+                                                                    }}
+                                                                    placeholder="0.00"
+                                                                    className={cn(inputCls, 'pl-7 font-bold text-[#299E60] bg-[#EEF8F1]/10')}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <FieldLabel>Taxability</FieldLabel>
+                                                            <select
+                                                                value={form.taxabilityType}
+                                                                onChange={e => {
+                                                                    const next = e.target.value;
+                                                                    updateField('taxabilityType', next);
+                                                                    updateField('taxable', next === 'taxable');
+                                                                    if (next === 'taxable') {
+                                                                        updateField('exemptionReason', '');
+                                                                    }
+                                                                }}
+                                                                className={selectCls}
+                                                            >
+                                                                <option value="taxable">Taxable</option>
+                                                                <option value="exempt">Exempt</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    {form.taxabilityType === 'exempt' && (
+                                                        <div>
+                                                            <FieldLabel>Exemption reason</FieldLabel>
+                                                            <input
+                                                                type="text"
+                                                                value={form.exemptionReason}
+                                                                onChange={e => updateField('exemptionReason', e.target.value)}
+                                                                placeholder="Enter exemption reason"
+                                                                className={inputCls}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    {parseFloat(form.basePrice) > 0 && (
+                                                        <p className="text-[11px] text-[#7C7C7C] font-medium">
+                                                            GST amount: ₹{taxAmount}
+                                                            {savings != null && savings > 0 && ` · ${savings}% off MRP`}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
 
-                                            <div className="space-y-3 pt-2 border-t border-[#EEEEEE]">
+                                            <div className="space-y-3 pt-1 border-t border-[#EEEEEE]">
                                                 <h4 className="text-[13px] font-bold text-[#181725]">Tax details</h4>
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                                                     <div id="ff-intraStateTaxName">
                                                         <FieldLabel required>Intra State Tax Name</FieldLabel>
                                                         <input type="text" value={form.intraStateTaxName} onChange={e => updateField('intraStateTaxName', e.target.value)} className={cn(inputCls, fieldErrors.intraStateTaxName && 'border-[#E74C3C]')} />
-                                                    </div>
-                                                    <div id="ff-intraStateTaxRate">
-                                                        <FieldLabel required>Intra State Tax Rate</FieldLabel>
-                                                        <input type="number" step="0.01" value={form.intraStateTaxRate} onChange={e => updateField('intraStateTaxRate', e.target.value)} className={cn(inputCls, fieldErrors.intraStateTaxRate && 'border-[#E74C3C]')} />
                                                     </div>
                                                     <div id="ff-intraStateTaxType">
                                                         <FieldLabel required>Intra State Tax Type</FieldLabel>
                                                         <input type="text" value={form.intraStateTaxType} onChange={e => updateField('intraStateTaxType', e.target.value)} className={cn(inputCls, fieldErrors.intraStateTaxType && 'border-[#E74C3C]')} />
                                                     </div>
-                                                </div>
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                                     <div id="ff-interStateTaxName">
                                                         <FieldLabel required>Inter State Tax Name</FieldLabel>
                                                         <input type="text" value={form.interStateTaxName} onChange={e => updateField('interStateTaxName', e.target.value)} className={cn(inputCls, fieldErrors.interStateTaxName && 'border-[#E74C3C]')} />
-                                                    </div>
-                                                    <div id="ff-interStateTaxRate">
-                                                        <FieldLabel required>Inter State Tax Rate</FieldLabel>
-                                                        <input type="number" step="0.01" value={form.interStateTaxRate} onChange={e => updateField('interStateTaxRate', e.target.value)} className={cn(inputCls, fieldErrors.interStateTaxRate && 'border-[#E74C3C]')} />
                                                     </div>
                                                     <div id="ff-interStateTaxType">
                                                         <FieldLabel required>Inter State Tax Type</FieldLabel>
@@ -2604,7 +2777,7 @@ export default function VendorProductsPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                                                 <div id="ff-countryOfOrigin">
                                                     <FieldLabel required>Country of Origin</FieldLabel>
                                                     <input type="text" value={form.countryOfOrigin} onChange={e => updateField('countryOfOrigin', e.target.value)} className={cn(inputCls, fieldErrors.countryOfOrigin && 'border-[#E74C3C]')} />
@@ -2644,7 +2817,8 @@ export default function VendorProductsPage() {
                                             </div>
 
                                             <div id="ff-substituteIds">
-                                                <FieldLabel required>Substitute Mapping</FieldLabel>
+                                                <FieldLabel>Substitute Mapping</FieldLabel>
+                                                <p className="text-[11px] text-[#AEAEAE] mb-2">Optional — suggest alternate products if out of stock</p>
                                                 <SubstituteProductPicker
                                                     selectedIds={form.substituteIds}
                                                     currentProductId={editingProduct?.id}
@@ -2655,7 +2829,7 @@ export default function VendorProductsPage() {
                                             </div>
                                 </FormSection>
 
-                                <FormSection title="Status & availability" icon={<Clock size={16} />} sectionId="status">
+                                <FormSection title="Status & availability" icon={<Clock size={16} />} sectionId="status" className="!p-4 !space-y-3">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
                                                 <FieldLabel>Item Status</FieldLabel>
@@ -2686,100 +2860,7 @@ export default function VendorProductsPage() {
                                         </div>
                                 </FormSection>
 
-                                <FormSection title="Pricing & tax" icon={<DollarSign size={16} />} sectionId="pricing">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div>
-                                                    <FieldLabel>Tax % (GST)</FieldLabel>
-                                                    <select
-                                                        value={form.taxPercent}
-                                                        onChange={e => {
-                                                            const tp = e.target.value;
-                                                            updateField('taxPercent', tp);
-                                                            const base = parseFloat(form.basePrice);
-                                                            const percent = parseFloat(tp);
-                                                            if (!isNaN(base) && !isNaN(percent)) {
-                                                                updateField('originalPrice', (base * (1 + percent / 100)).toFixed(2));
-                                                            }
-                                                        }}
-                                                        className={selectCls}
-                                                    >
-                                                        {TAX_OPTIONS.map(t => (
-                                                            <option key={t} value={t}>{t}%</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <FieldLabel>Gross Rate (incl. GST)</FieldLabel>
-                                                    <div className="relative">
-                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#299E60] font-bold">₹</span>
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            step="0.01"
-                                                            value={form.originalPrice}
-                                                            onChange={e => {
-                                                                const gross = e.target.value;
-                                                                updateField('originalPrice', gross);
-                                                                const tp = parseFloat(form.taxPercent || '0');
-                                                                const g = parseFloat(gross);
-                                                                if (!isNaN(g) && !isNaN(tp)) {
-                                                                    updateField('basePrice', (g / (1 + tp / 100)).toFixed(2));
-                                                                }
-                                                            }}
-                                                            placeholder="0.00"
-                                                            className={cn(inputCls, 'pl-7 font-bold text-[#299E60] bg-[#EEF8F1]/10')}
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div>
-                                                    <FieldLabel>Taxability Type</FieldLabel>
-                                                    <select
-                                                        value={form.taxabilityType}
-                                                        onChange={e => updateField('taxabilityType', e.target.value)}
-                                                        className={selectCls}
-                                                    >
-                                                        <option value="taxable">Taxable</option>
-                                                        <option value="exempt">Exempt</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#EEEEEE]">
-                                                <div className="flex items-center">
-                                                    <label className="flex items-center gap-3 cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={form.taxable}
-                                                            onChange={(e) => updateField('taxable', e.target.checked)}
-                                                            className="w-5 h-5 accent-[#299E60]"
-                                                        />
-                                                        <div>
-                                                            <span className="text-[13.5px] font-bold text-[#181725]">Taxable Item</span>
-                                                            <p className="text-[11px] text-[#AEAEAE]">Uncheck if item is exempt from all taxes</p>
-                                                        </div>
-                                                    </label>
-                                                </div>
-
-                                                {!form.taxable && (
-                                                    <div>
-                                                        <FieldLabel>Exemption Reason</FieldLabel>
-                                                        <input
-                                                            type="text"
-                                                            value={form.exemptionReason}
-                                                            onChange={e => updateField('exemptionReason', e.target.value)}
-                                                            placeholder="Enter exemption reason"
-                                                            className={inputCls}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-                                </FormSection>
-
-                                <FormSection title="Accounting" icon={<SettingsIcon size={16} />} sectionId="accounting">
+                                <FormSection title="Accounting" icon={<SettingsIcon size={16} />} sectionId="accounting" className="!p-4 !space-y-3">
                                             
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
@@ -2842,7 +2923,7 @@ export default function VendorProductsPage() {
                                             </div>
                                 </FormSection>
 
-                                <FormSection title="Inventory" icon={<BarChart3 size={16} />} sectionId="inventory">
+                                <FormSection title="Inventory" icon={<BarChart3 size={16} />} sectionId="inventory" className="!p-4 !space-y-3">
                                             
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
@@ -2897,7 +2978,7 @@ export default function VendorProductsPage() {
                                             </div>
                                 </FormSection>
 
-                                <FormSection title="Packaging & dimensions" icon={<Package size={16} />} sectionId="packaging">
+                                <FormSection title="Packaging & dimensions" icon={<Package size={16} />} sectionId="packaging" className="!p-4 !space-y-3">
                                             
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
@@ -3003,7 +3084,7 @@ export default function VendorProductsPage() {
                                             </div>
                                 </FormSection>
 
-                                <FormSection title="Additional identifiers" icon={<Tag size={16} />} sectionId="identifiers">
+                                <FormSection title="Additional identifiers" icon={<Tag size={16} />} sectionId="identifiers" className="!p-4 !space-y-3">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
                                                 <FieldLabel>EAN</FieldLabel>
@@ -3041,7 +3122,7 @@ export default function VendorProductsPage() {
                                             </div>
                                 </FormSection>
 
-                                <FormSection title="Additional details" icon={<BoxIcon size={16} />} sectionId="details">
+                                <FormSection title="Additional details" icon={<BoxIcon size={16} />} sectionId="details" className="!p-4 !space-y-3">
                                         <div>
                                             <FieldLabel>Description</FieldLabel>
                                             <textarea
@@ -3052,13 +3133,6 @@ export default function VendorProductsPage() {
                                                 placeholder="Enter product description"
                                             />
                                         </div>
-                                        <MultiImageUpload
-                                            values={form.images.filter(Boolean)}
-                                            onChange={(urls) => setForm(prev => ({ ...prev, images: urls }))}
-                                            folder="products"
-                                            label="Additional Images"
-                                            max={8}
-                                        />
                                         <div>
                                             <FieldLabel>Tags</FieldLabel>
                                             <TagInput
@@ -3187,7 +3261,7 @@ export default function VendorProductsPage() {
                                             </div>
                                 </FormSection>
 
-                                <FormSection title="Bulk pricing tiers" icon={<Tag size={16} />} sectionId="bulk">
+                                <FormSection title="Bulk pricing tiers" icon={<Tag size={16} />} sectionId="bulk" className="!p-4 !space-y-3">
                                             <div className="flex items-start justify-between gap-4 mb-2">
                                                 <p className="text-[12px] text-[#AEAEAE] font-medium">
                                                     Each tier applies from its min quantity. Up to 3 tiers (taxable rate, ex-GST).
@@ -3284,7 +3358,6 @@ export default function VendorProductsPage() {
                                     </>
                                     )}
                                 </form>
-                            </div>
                         </div>
 
                         {/* Panel Footer */}

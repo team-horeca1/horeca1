@@ -41,6 +41,9 @@ export function friendlyErrorMessage(error: unknown, fallback = 'Something went 
     const target = (error as { meta?: { target?: unknown } }).meta?.target;
     if (code === 'P2002') {
       const field = Array.isArray(target) ? String(target[target.length - 1]) : 'Record';
+      if (field === 'slug' || field === 'Record') {
+        return 'A product with this name or slug already exists';
+      }
       return `${field} already exists`;
     }
     if (code === 'P2003') return 'Linked record not found';
