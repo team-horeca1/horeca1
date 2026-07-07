@@ -7,16 +7,15 @@ import {
 } from 'lucide-react';
 import type { RoleItem } from './AddMemberWizard';
 import { PermissionMatrix, countMatrixPermissions } from './PermissionMatrix';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import type { RoleScope } from '@/lib/permissions/portalFeatures';
 
 interface OutletItem {
   id: string;
   name: string;
-  code: string | null;
-  addressLine: string;
-  city: string | null;
-  pincode: string | null;
+  code?: string | null;
+  addressLine?: string;
+  city?: string | null;
+  pincode?: string | null;
 }
 
 interface MemberDetails {
@@ -29,43 +28,79 @@ interface MemberDetails {
 interface EditMemberModalProps {
   memberId: string;
   memberName: string;
+  initialRoleId?: string | null;
   roles: RoleItem[];
-  scope?: 'vendor' | 'brand' | 'admin' | 'account';
+  scope?: RoleScope;
+  accent?: string;
+  teamMemberEndpoint: string;
+  outletsEndpoint?: string;
+  outlets?: Array<{ id: string; name: string }>;
+  userRoles?: Array<{ id: string; outletId: string | null; role: { id: string; name: string } }>;
+  showOutlets?: boolean;
+  showStorefront?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
 
 type PermissionsMap = Record<string, Record<string, boolean>>;
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-
 const ROLE_STYLES: Record<string, { color: string; bg: string; border: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
-  'Vendor Admin':      { color: '#D97706', bg: '#FFF7E6', border: '#F59E0B', Icon: Crown },
-  'Vendor Manager':    { color: '#2563EB', bg: '#EFF6FF', border: '#3B82F6', Icon: Shield },
-  'Sales Rep':         { color: '#059669', bg: '#ECFDF5', border: '#10B981', Icon: Users },
+  'Vendor Admin': { color: '#D97706', bg: '#FFF7E6', border: '#F59E0B', Icon: Crown },
+  'Vendor Manager': { color: '#2563EB', bg: '#EFF6FF', border: '#3B82F6', Icon: Shield },
+  'Sales Rep': { color: '#059669', bg: '#ECFDF5', border: '#10B981', Icon: Users },
   'Finance Executive': { color: '#7C3AED', bg: '#F3F0FF', border: '#8B5CF6', Icon: DollarSign },
-  'Order Manager':     { color: '#EA580C', bg: '#FFF7ED', border: '#F97316', Icon: Package },
+  'Order Manager': { color: '#EA580C', bg: '#FFF7ED', border: '#F97316', Icon: Package },
   'Warehouse Manager': { color: '#374151', bg: '#F3F4F6', border: '#6B7280', Icon: Archive },
-  'Vendor Editor':     { color: '#DB2777', bg: '#FDF2F8', border: '#EC4899', Icon: Edit3 },
-  'Vendor Viewer':     { color: '#6B7280', bg: '#F3F4F6', border: '#9CA3AF', Icon: Eye },
+  'Vendor Editor': { color: '#DB2777', bg: '#FDF2F8', border: '#EC4899', Icon: Edit3 },
+  'Vendor Viewer': { color: '#6B7280', bg: '#F3F4F6', border: '#9CA3AF', Icon: Eye },
+  'Brand Admin': { color: '#D97706', bg: '#FFF7E6', border: '#F59E0B', Icon: Crown },
+  'Brand Manager': { color: '#2563EB', bg: '#EFF6FF', border: '#3B82F6', Icon: Shield },
+  'Brand Editor': { color: '#DB2777', bg: '#FDF2F8', border: '#EC4899', Icon: Edit3 },
+  'Brand Viewer': { color: '#6B7280', bg: '#F3F4F6', border: '#9CA3AF', Icon: Eye },
+  'Super Admin': { color: '#D97706', bg: '#FFF7E6', border: '#F59E0B', Icon: Crown },
+  'Ops Admin': { color: '#2563EB', bg: '#EFF6FF', border: '#3B82F6', Icon: Shield },
+  Owner: { color: '#D97706', bg: '#FFF7E6', border: '#F59E0B', Icon: Crown },
+  Manager: { color: '#2563EB', bg: '#EFF6FF', border: '#3B82F6', Icon: Shield },
+  Editor: { color: '#DB2777', bg: '#FDF2F8', border: '#EC4899', Icon: Edit3 },
+  Viewer: { color: '#6B7280', bg: '#F3F4F6', border: '#9CA3AF', Icon: Eye },
 };
 
 function getRoleStyle(name: string) {
   return ROLE_STYLES[name] ?? { color: '#6B7280', bg: '#F3F4F6', border: '#9CA3AF', Icon: Eye };
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+export function EditMemberModal({
+  memberId,
+  memberName,
+  initialRoleId,
+  roles,
+  scope = 'vendor',
+  accent = '#299E60',
+  teamMemberEndpoint,
+  outletsEndpoint,
+  outlets: outletsProp = [],
+  userRoles,
+  showOutlets = true,
+  showStorefront = true,
+  onClose,
+  onSaved,
+}: EditMemberModalProps) {
+  const isPortalScope = scope === 'admin' || scope === 'brand';
+  const isAccountScope = scope === 'account';
+  const hasMemberGet = scope === 'vendor';
 
-export function EditMemberModal({ memberId, memberName, roles, scope = 'vendor', onClose, onSaved }: EditMemberModalProps) {
-  const [loading, setLoading] = useState(true);
-  const [outlets, setOutlets] = useState<OutletItem[]>([]);
+  const [loading, setLoading] = useState(hasMemberGet);
+  const [outlets, setOutlets] = useState<OutletItem[]>(outletsProp);
 
-  // Editable state
+  const seedRoleId = initialRoleId ?? userRoles?.[0]?.role.id ?? roles[0]?.id ?? '';
   const [allOutlets, setAllOutlets] = useState(true);
   const [selectedOutletIds, setSelectedOutletIds] = useState<Set<string>>(new Set());
-  const [selectedRoleId, setSelectedRoleId] = useState('');
-  const [permissions, setPermissions] = useState<PermissionsMap>({});
+  const [selectedRoleId, setSelectedRoleId] = useState(seedRoleId);
+  const [accountOutletId, setAccountOutletId] = useState(userRoles?.[0]?.outletId ?? '');
+  const [permissions, setPermissions] = useState<PermissionsMap>(() => {
+    const r = roles.find((x) => x.id === seedRoleId);
+    return r ? structuredClone(r.permissions) : {};
+  });
   const [sfView, setSfView] = useState(false);
   const [sfOrder, setSfOrder] = useState(false);
   const [sfPay, setSfPay] = useState(false);
@@ -73,44 +108,55 @@ export function EditMemberModal({ memberId, memberName, roles, scope = 'vendor',
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load member details + outlets + registry in parallel
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/v1/vendor/team/${memberId}`).then(r => r.json()),
-      fetch('/api/v1/vendor/outlets').then(r => r.json()),
-    ]).then(([memberJson, outletsJson]) => {
-      if (outletsJson.success) setOutlets(outletsJson.data.outlets ?? []);
-      if (memberJson.success) {
-        const d = memberJson.data as MemberDetails;
-        // Initialise outlet selection
-        if (d.outletIds.length === 0) {
-          setAllOutlets(true);
-          setSelectedOutletIds(new Set());
-        } else {
-          setAllOutlets(false);
-          setSelectedOutletIds(new Set(d.outletIds));
-        }
-        // Find matching role chip
-        const matchingRole = roles.find(r => r.id === d.role.id);
-        if (matchingRole) {
-          setSelectedRoleId(matchingRole.id);
-          setPermissions(structuredClone(matchingRole.permissions));
-        }
-        // Storefront
-        setSfView(d.storefrontAccess.view);
-        setSfOrder(d.storefrontAccess.order);
-        setSfPay(d.storefrontAccess.pay);
-      }
-    }).catch(() => {
-      setError('Failed to load member details');
-    }).finally(() => {
+    if (!hasMemberGet) {
       setLoading(false);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [memberId]);
+      return;
+    }
 
-  // Show all roles as chips except Storefront ones (custom roles created by the vendor are included).
-  const templates = roles.filter(r => !r.name.startsWith('Storefront'));
+    const memberUrl = teamMemberEndpoint || `/api/v1/vendor/team/${memberId}`;
+    const outletsUrl = outletsEndpoint ?? '/api/v1/vendor/outlets';
+
+    Promise.all([
+      fetch(memberUrl).then((r) => r.json()),
+      fetch(outletsUrl).then((r) => r.json()),
+    ])
+      .then(([memberJson, outletsJson]) => {
+        if (outletsJson.success) {
+          const data = outletsJson.data;
+          setOutlets(Array.isArray(data) ? data : (data.outlets ?? []));
+        }
+        if (memberJson.success) {
+          const d = memberJson.data as MemberDetails;
+          if (d.outletIds.length === 0) {
+            setAllOutlets(true);
+            setSelectedOutletIds(new Set());
+          } else {
+            setAllOutlets(false);
+            setSelectedOutletIds(new Set(d.outletIds));
+          }
+          const matchingRole = roles.find((r) => r.id === d.role.id);
+          if (matchingRole) {
+            setSelectedRoleId(matchingRole.id);
+            setPermissions(structuredClone(matchingRole.permissions));
+          }
+          setSfView(d.storefrontAccess.view);
+          setSfOrder(d.storefrontAccess.order);
+          setSfPay(d.storefrontAccess.pay);
+        }
+      })
+      .catch(() => {
+        setError('Failed to load member details');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [hasMemberGet, memberId, teamMemberEndpoint, outletsEndpoint, roles]);
+
+  const templates = roles.filter((r) => !r.name.startsWith('Storefront'));
+  const selectedRole = roles.find((r) => r.id === selectedRoleId);
+  const isDirty =
+    selectedRole && JSON.stringify(permissions) !== JSON.stringify(selectedRole.permissions);
 
   const handleSelectRole = useCallback((role: RoleItem) => {
     setSelectedRoleId(role.id);
@@ -126,24 +172,51 @@ export function EditMemberModal({ memberId, memberName, roles, scope = 'vendor',
 
   const toggleOutlet = (id: string) => {
     setAllOutlets(false);
-    setSelectedOutletIds(prev => {
+    setSelectedOutletIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
   const handleSave = async () => {
-    if (Object.keys(permissions).length === 0) { setError('Select at least one permission'); return; }
     setSubmitting(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = { permissions };
-      if (!allOutlets) body.outletIds = Array.from(selectedOutletIds);
-      else body.outletIds = [];
-      body.storefrontAccess = { view: sfView, order: sfOrder, pay: sfPay };
+      let body: Record<string, unknown>;
 
-      const res = await fetch(`/api/v1/vendor/team/${memberId}`, {
+      if (isAccountScope) {
+        if (!selectedRoleId) {
+          setError('Pick a role');
+          setSubmitting(false);
+          return;
+        }
+        body = {
+          assignments: [{ roleId: selectedRoleId, outletId: accountOutletId || null }],
+        };
+      } else if (isPortalScope) {
+        if (!selectedRoleId && Object.keys(permissions).length === 0) {
+          setError('Select at least one permission');
+          setSubmitting(false);
+          return;
+        }
+        body = isDirty ? { permissions } : { roleId: selectedRoleId };
+      } else {
+        if (Object.keys(permissions).length === 0) {
+          setError('Select at least one permission');
+          setSubmitting(false);
+          return;
+        }
+        body = { permissions };
+        if (!allOutlets) body.outletIds = Array.from(selectedOutletIds);
+        else body.outletIds = [];
+        if (showStorefront) {
+          body.storefrontAccess = { view: sfView, order: sfOrder, pay: sfPay };
+        }
+      }
+
+      const res = await fetch(teamMemberEndpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -158,11 +231,11 @@ export function EditMemberModal({ memberId, memberName, roles, scope = 'vendor',
     }
   };
 
+  const displayOutlets = outlets.length > 0 ? outlets : outletsProp;
+
   return (
     <div className="fixed inset-0 z-[15000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-white rounded-[20px] w-full max-w-[900px] shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
-
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0F0F0] shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-[#FFF7E6] rounded-[10px] flex items-center justify-center">
@@ -170,7 +243,10 @@ export function EditMemberModal({ memberId, memberName, roles, scope = 'vendor',
             </div>
             <div>
               <h3 className="text-[16px] font-bold text-[#181725]">Edit Team Member</h3>
-              <p className="text-[11px] text-[#AEAEAE] font-medium">{memberName} — outlet access &amp; role</p>
+              <p className="text-[11px] text-[#AEAEAE] font-medium">
+                {memberName}
+                {isAccountScope ? ' — role & outlet' : ' — outlet access & role'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-[8px] hover:bg-gray-100 transition-colors">
@@ -180,130 +256,146 @@ export function EditMemberModal({ memberId, memberName, roles, scope = 'vendor',
 
         {loading ? (
           <div className="flex-1 flex items-center justify-center py-16">
-            <Loader2 size={28} className="animate-spin text-[#299E60]" />
+            <Loader2 size={28} className="animate-spin" style={{ color: accent }} />
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto px-6 py-5 min-h-0 space-y-6">
-
-            {/* Outlet access */}
-            <section>
-              <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-2">
-                Outlet Access
-              </p>
-              <div className="border border-[#EEEEEE] rounded-[12px] divide-y divide-[#F5F5F5] max-h-[260px] overflow-y-auto">
-                <button onClick={() => { setAllOutlets(true); setSelectedOutletIds(new Set()); }}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[#FAFAFA] transition-colors text-left">
-                  <Checkbox checked={allOutlets} accent="#299E60" />
-                  <div>
-                    <p className="text-[13px] font-bold text-[#181725]">All outlets (account-wide)</p>
-                    <p className="text-[11px] text-[#7C7C7C]">Access all current and future outlets</p>
-                  </div>
-                </button>
-                {outlets.map(outlet => (
-                  <button key={outlet.id} onClick={() => toggleOutlet(outlet.id)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAFAFA] transition-colors text-left">
-                    <Checkbox checked={!allOutlets && selectedOutletIds.has(outlet.id)} accent="#299E60" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-bold text-[#181725] flex items-center gap-2">
-                        {outlet.name}
-                        {outlet.code && (
-                          <span className="text-[10px] text-[#AEAEAE] font-mono bg-[#F5F5F5] px-1.5 py-0.5 rounded">{outlet.code}</span>
-                        )}
-                      </p>
-                      <p className="text-[11px] text-[#7C7C7C] truncate">
-                        {outlet.addressLine}{outlet.city ? `, ${outlet.city}` : ''}{outlet.pincode ? ` — ${outlet.pincode}` : ''}
-                      </p>
-                    </div>
-                    {!allOutlets && selectedOutletIds.has(outlet.id) && (
-                      <span className="text-[10px] font-bold text-[#299E60] bg-[#ECFDF5] px-2 py-0.5 rounded-full shrink-0">Assigned</span>
-                    )}
-                  </button>
-                ))}
-                {outlets.length === 0 && (
-                  <div className="px-4 py-8 text-center">
-                    <p className="text-[13px] font-bold text-[#AEAEAE]">No outlets configured</p>
-                    <p className="text-[11px] text-[#AEAEAE] mt-1">Member will have account-wide access.</p>
-                  </div>
-                )}
-              </div>
-              {!allOutlets && selectedOutletIds.size > 0 && (
-                <p className="text-[11px] text-[#299E60] font-bold mt-1.5">
-                  {selectedOutletIds.size} outlet{selectedOutletIds.size === 1 ? '' : 's'} selected — member can only access these.
+            {showOutlets && !isPortalScope && !isAccountScope && (
+              <section>
+                <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-2">
+                  Outlet Access
                 </p>
-              )}
-            </section>
+                <div className="border border-[#EEEEEE] rounded-[12px] divide-y divide-[#F5F5F5] max-h-[260px] overflow-y-auto">
+                  <button
+                    onClick={() => {
+                      setAllOutlets(true);
+                      setSelectedOutletIds(new Set());
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[#FAFAFA] transition-colors text-left"
+                  >
+                    <Checkbox checked={allOutlets} accent={accent} />
+                    <div>
+                      <p className="text-[13px] font-bold text-[#181725]">All outlets (account-wide)</p>
+                      <p className="text-[11px] text-[#7C7C7C]">Access all current and future outlets</p>
+                    </div>
+                  </button>
+                  {displayOutlets.map((outlet) => (
+                    <button
+                      key={outlet.id}
+                      onClick={() => toggleOutlet(outlet.id)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAFAFA] transition-colors text-left"
+                    >
+                      <Checkbox
+                        checked={!allOutlets && selectedOutletIds.has(outlet.id)}
+                        accent={accent}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-bold text-[#181725]">{outlet.name}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
-            {/* Role templates */}
             <section>
               <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-2">
-                Role Templates — click to auto-fill permissions
+                Role templates — click to auto-fill permissions
               </p>
               <div className="flex flex-wrap gap-2">
-                {templates.map(r => {
+                {templates.map((r) => {
                   const style = getRoleStyle(r.name);
                   const isSelected = r.id === selectedRoleId;
                   const { Icon } = style;
                   return (
-                    <button key={r.id} onClick={() => handleSelectRole(r)}
+                    <button
+                      key={r.id}
+                      onClick={() => handleSelectRole(r)}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-[10px] text-[12px] font-bold border-2 transition-all hover:shadow-sm"
-                      style={isSelected
-                        ? { background: style.bg, borderColor: style.border, color: style.color }
-                        : { background: 'white', borderColor: '#EEEEEE', color: '#7C7C7C' }
-                      }>
+                      style={
+                        isSelected
+                          ? { background: style.bg, borderColor: style.border, color: style.color }
+                          : { background: 'white', borderColor: '#EEEEEE', color: '#7C7C7C' }
+                      }
+                    >
                       <Icon size={13} />
                       {r.name}
                     </button>
                   );
                 })}
               </div>
-              {!selectedRoleId && (
-                <p className="text-[11px] text-[#AEAEAE] mt-1 italic">Custom permissions ({totalSelected} selected)</p>
+              {selectedRole?.description && (
+                <p className="text-[11px] text-[#7C7C7C] mt-2">{selectedRole.description}</p>
               )}
             </section>
 
-            {/* Permissions matrix */}
-            <section>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider">Permissions</p>
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${totalSelected > 0 ? 'bg-[#ECFDF5] text-[#299E60]' : 'bg-[#F5F5F5] text-[#AEAEAE]'}`}>
-                  {totalSelected} selected
-                </span>
-              </div>
-              <PermissionMatrix
-                scope={scope}
-                permissions={permissions}
-                onChange={handlePermissionsChange}
-                accent="#299E60"
-              />
-              <p className="text-[10px] text-[#AEAEAE] mt-1.5">
-                Click any checkbox to add or remove a permission. Templates above auto-fill this matrix.
-              </p>
-            </section>
+            {isAccountScope && displayOutlets.length > 0 && (
+              <section>
+                <label className="block text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-1.5">
+                  Limit to outlet
+                </label>
+                <select
+                  value={accountOutletId}
+                  onChange={(e) => setAccountOutletId(e.target.value)}
+                  className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none bg-[#FAFAFA] focus:bg-white transition-colors"
+                  style={{ borderColor: undefined }}
+                >
+                  <option value="">All outlets</option>
+                  {displayOutlets.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              </section>
+            )}
 
-            {/* Storefront access */}
-            <section className="bg-[#F0F7FF] border border-[#BFDBFE] rounded-[12px] p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Store size={15} className="text-[#2563EB]" />
-                <p className="text-[13px] font-bold text-[#181725]">Storefront Access</p>
-                <span className="text-[10px] text-[#2563EB] bg-[#DBEAFE] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide">As Buyer</span>
-              </div>
-              <p className="text-[11px] text-[#6B7280] mb-3 leading-relaxed">
-                Allow this member to access the HoReCa Hub storefront on behalf of your business.
-              </p>
-              <div className="space-y-2.5">
-                {([
-                  { label: 'Browse storefront & view products', Icon: Eye,          checked: sfView,  toggle: () => setSfView(!sfView) },
-                  { label: 'Place orders on storefront',        Icon: ShoppingCart, checked: sfOrder, toggle: () => setSfOrder(!sfOrder) },
-                  { label: 'Make payments on storefront',       Icon: CreditCard,   checked: sfPay,   toggle: () => setSfPay(!sfPay) },
-                ] as const).map(({ label, Icon, checked, toggle }) => (
-                  <button key={label} onClick={toggle} className="flex items-center gap-3 w-full text-left">
-                    <Checkbox checked={checked} accent="#2563EB" />
-                    <Icon size={13} className={checked ? 'text-[#2563EB]' : 'text-[#9CA3AF]'} />
-                    <span className={`text-[12px] font-medium ${checked ? 'text-[#181725]' : 'text-[#6B7280]'}`}>{label}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
+            {!isAccountScope && (
+              <section>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider">Permissions</p>
+                  <span
+                    className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                      totalSelected > 0 ? 'bg-[#ECFDF5] text-[#299E60]' : 'bg-[#F5F5F5] text-[#AEAEAE]'
+                    }`}
+                  >
+                    {totalSelected} selected
+                  </span>
+                </div>
+                <PermissionMatrix
+                  scope={scope}
+                  permissions={permissions}
+                  onChange={handlePermissionsChange}
+                  accent={accent}
+                />
+              </section>
+            )}
+
+            {showStorefront && !isPortalScope && !isAccountScope && (
+              <section className="bg-[#F0F7FF] border border-[#BFDBFE] rounded-[12px] p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Store size={15} className="text-[#2563EB]" />
+                  <p className="text-[13px] font-bold text-[#181725]">Storefront Access</p>
+                </div>
+                <div className="space-y-2.5">
+                  {(
+                    [
+                      { label: 'Browse storefront & view products', Icon: Eye, checked: sfView, toggle: () => setSfView(!sfView) },
+                      { label: 'Place orders on storefront', Icon: ShoppingCart, checked: sfOrder, toggle: () => setSfOrder(!sfOrder) },
+                      { label: 'Make payments on storefront', Icon: CreditCard, checked: sfPay, toggle: () => setSfPay(!sfPay) },
+                    ] as const
+                  ).map(({ label, Icon, checked, toggle }) => (
+                    <button key={label} onClick={toggle} className="flex items-center gap-3 w-full text-left">
+                      <Checkbox checked={checked} accent="#2563EB" />
+                      <Icon size={13} className={checked ? 'text-[#2563EB]' : 'text-[#9CA3AF]'} />
+                      <span className={`text-[12px] font-medium ${checked ? 'text-[#181725]' : 'text-[#6B7280]'}`}>
+                        {label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {error && (
               <div className="flex items-center gap-2 text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-[10px] p-3">
@@ -313,15 +405,20 @@ export function EditMemberModal({ memberId, memberName, roles, scope = 'vendor',
           </div>
         )}
 
-        {/* Footer */}
         {!loading && (
           <div className="px-6 py-4 border-t border-[#F0F0F0] flex items-center justify-end gap-3 shrink-0 bg-[#FAFAFA] rounded-b-[20px]">
-            <button onClick={onClose}
-              className="h-[40px] px-5 text-[13px] font-bold text-[#7C7C7C] hover:text-[#181725] transition-colors">
+            <button
+              onClick={onClose}
+              className="h-[40px] px-5 text-[13px] font-bold text-[#7C7C7C] hover:text-[#181725] transition-colors"
+            >
               Cancel
             </button>
-            <button onClick={handleSave} disabled={submitting}
-              className="h-[42px] px-6 bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold hover:bg-[#238a54] disabled:opacity-50 flex items-center gap-2 transition-colors shadow-sm">
+            <button
+              onClick={handleSave}
+              disabled={submitting}
+              className="h-[42px] px-6 text-white rounded-[10px] text-[13px] font-bold disabled:opacity-50 flex items-center gap-2 transition-colors shadow-sm"
+              style={{ backgroundColor: accent }}
+            >
               {submitting && <Loader2 size={14} className="animate-spin" />}
               {submitting ? 'Saving…' : 'Save Changes'}
             </button>
@@ -336,7 +433,11 @@ function Checkbox({ checked, accent }: { checked: boolean; accent: string }) {
   return (
     <div
       className="w-[20px] h-[20px] rounded-[5px] border-2 flex items-center justify-center shrink-0 transition-colors"
-      style={checked ? { borderColor: accent, backgroundColor: accent } : { borderColor: '#DDDDDD', backgroundColor: 'white' }}
+      style={
+        checked
+          ? { borderColor: accent, backgroundColor: accent }
+          : { borderColor: '#DDDDDD', backgroundColor: 'white' }
+      }
     >
       {checked && <Check size={12} className="text-white" />}
     </div>

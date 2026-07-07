@@ -53,6 +53,7 @@ export interface AddMemberWizardConfig {
   teamEndpoint?: string;     // overrides /api/v1/vendor/team
   modules?: ReadonlyArray<{ key: string; label: string }>; // overrides VENDOR_MODULES
   showStorefront?: boolean;  // vendor-only concept; default true for vendor, false otherwise
+  skipOutletStep?: boolean;  // admin/brand — skip outlet picker (2-step wizard)
   businessAccountLabel?: string; // step-2 left card title — e.g. 'Customer Account'
 }
 
@@ -143,10 +144,15 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   // Storefront access toggle is a vendor-team concept (vendor staff acting
   // as a buyer on the storefront). It has no meaning for account members.
   const showStorefront = config?.showStorefront ?? (scope === 'vendor');
+  const skipOutletStep = config?.skipOutletStep ?? (scope === 'admin' || scope === 'brand');
   const businessAccountLabel = config?.businessAccountLabel
     ?? (scope === 'account' ? 'Customer Account' : 'Vendor Account');
+  const totalSteps = skipOutletStep ? 2 : 3;
+  const stepLabels = skipOutletStep
+    ? ['Member Info', 'Role & Permissions']
+    : STEP_LABELS;
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState(1);
 
   // Step 1
   const [identifier, setIdentifier] = useState('');
@@ -178,7 +184,8 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   const [savedMemberData, setSavedMemberData] = useState<unknown>(null);
 
   useEffect(() => {
-    if (step === 2 && outlets.length === 0 && !outletsLoading) {
+    const outletStep = skipOutletStep ? -1 : 2;
+    if (step === outletStep && outlets.length === 0 && !outletsLoading) {
       setOutletsLoading(true);
       fetch(outletsEndpoint)
         .then(r => r.json())
@@ -260,7 +267,7 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
         return;
       }
       setStep(2);
-    } else if (step === 2) {
+    } else if (!skipOutletStep && step === 2) {
       if (!allOutlets && selectedOutletIds.size === 0) {
         setError('Select at least one outlet, or choose "All outlets"');
         return;
@@ -271,8 +278,11 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
 
   const handleBack = () => {
     setError(null);
-    setStep(prev => (prev > 1 ? (prev - 1) as 1 | 2 | 3 : prev));
+    setStep((prev) => (prev > 1 ? prev - 1 : prev));
   };
+
+  const isRoleStep = skipOutletStep ? step === 2 : step === 3;
+  const isOutletStep = !skipOutletStep && step === 2;
 
   const handleSave = async () => {
     const hasPerms = Object.keys(permissions).length > 0;
@@ -328,7 +338,7 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
             </div>
             <div>
               <h3 className="text-[16px] font-bold text-[#181725]">Add Team Member</h3>
-              <p className="text-[11px] text-[#AEAEAE] font-medium">Step {step} of 3 — {STEP_LABELS[step - 1]}</p>
+              <p className="text-[11px] text-[#AEAEAE] font-medium">Step {step} of {totalSteps} — {stepLabels[step - 1]}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-[8px] hover:bg-gray-100 transition-colors">
@@ -339,7 +349,7 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
         {/* Step indicator */}
         <div className="px-6 pt-4 shrink-0">
           <div className="flex items-center">
-            {([1, 2, 3] as const).map((s, i) => (
+            {Array.from({ length: totalSteps }, (_, i) => i + 1).map((s, i) => (
               <React.Fragment key={s}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold transition-all ${
                   s < step  ? 'bg-[#299E60] text-white' :
@@ -348,11 +358,11 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
                 }`}>
                   {s < step ? <Check size={14} /> : s}
                 </div>
-                {i < 2 && (
+                {i < totalSteps - 1 && (
                   <div className="flex-1 flex items-center gap-1 mx-2">
                     <div className={`flex-1 h-[2px] rounded transition-colors ${s < step ? 'bg-[#299E60]' : 'bg-[#F0F0F0]'}`} />
                     <span className={`text-[10px] font-bold whitespace-nowrap ${s < step ? 'text-[#299E60]' : 'text-[#AEAEAE]'}`}>
-                      {STEP_LABELS[s - 1]}
+                      {stepLabels[s - 1]}
                     </span>
                     <div className={`flex-1 h-[2px] rounded transition-colors ${s < step ? 'bg-[#299E60]' : 'bg-[#F0F0F0]'}`} />
                   </div>
@@ -372,7 +382,7 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
               password={password} setPassword={setPassword}
             />
           )}
-          {step === 2 && (
+          {isOutletStep && (
             <Step2Outlets
               baName={baName}
               outlets={outlets}
@@ -383,7 +393,7 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
               onToggleOutlet={toggleOutlet}
             />
           )}
-          {step === 3 && (
+          {isRoleStep && (
             <Step3Role
               templates={templates}
               selectedRoleId={selectedRoleId}
@@ -415,7 +425,7 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
             </button>
           ) : <div />}
 
-          {step < 3 ? (
+          {step < totalSteps ? (
             <button onClick={handleNext}
               className="h-[42px] px-6 bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold hover:bg-[#238a54] flex items-center gap-2 transition-colors shadow-sm">
               Next <ChevronRight size={15} />
