@@ -56,6 +56,44 @@ export interface VendorPromoResult {
   discount: number;
 }
 
+/** Attached to catalog products for storefront badges. */
+export interface StorePromotionAttachment {
+  id: string;
+  name: string;
+  type: 'bxgy' | 'pct_discount' | 'flat_discount' | 'bxgy_get';
+  badgeLabel: string;
+  buyQty?: number;
+  getQty?: number;
+  getProductId?: string;
+  getProductName?: string;
+  buyProductId?: string;
+  minOrderValue?: number;
+}
+
+/** Store-wide pct/flat offer shown in vendor header banner. */
+export interface VendorStoreWidePromo {
+  id: string;
+  name: string;
+  type: 'pct_discount' | 'flat_discount';
+  badgeLabel: string;
+  minOrderValue?: number;
+  discountPct?: number;
+  discountFlat?: number;
+}
+
+export interface BxgyCartResult {
+  promotionId: string;
+  promotionName: string;
+  buyProductId: string;
+  getProductId: string;
+  freeUnits: number;
+  sameProduct: boolean;
+  minQty: number;
+  getQty: number;
+}
+
+type LivePromotionRow = Awaited<ReturnType<typeof fetchLivePromotionsForVendors>>[number];
+
 export interface CouponApplication {
   coupon: Pick<
     Coupon,
@@ -146,6 +184,254 @@ export async function evaluateVendorPromo(
     return { promotionId: promo.id, name: promo.name, type: promo.type, discount: r2(discount) };
   }
   return null;
+}
+
+/** Shared live-window filter for storefront + checkout promotion reads. */
+export function livePromotionWhere(now: Date = new Date()) {
+  return {
+    isActive: true,
+    AND: [
+      { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+      { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+    ],
+  };
+}
+
+function promotionWithinUsage(p: { usageLimit: number | null; usageCount: number }) {
+  return p.usageLimit === null || p.usageCount < p.usageLimit;
+}
+
+function bxgyBadgeLabel(minQty: number, getQty: number, sameProduct: boolean) {
+  if (sameProduct && minQty === 1 && getQty === 1) return 'Buy 1 Get 1 Free';
+  if (sameProduct) return `Buy ${minQty} Get ${getQty} Free`;
+  return `Buy ${minQty} Get ${getQty} Free`;
+}
+
+/** Batch-fetch live promotions for one or more vendors (catalog + cart). */
+export async function fetchLivePromotionsForVendors(db: Db, vendorIds: string[]) {
+  if (vendorIds.length === 0) return [];
+  const now = new Date();
+  const rows = await db.promotion.findMany({
+    where: {
+      vendorId: { in: vendorIds },
+      ...livePromotionWhere(now),
+    },
+    include: {
+      buyProduct: { select: { id: true, name: true } },
+      getProduct: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  return rows.filter(promotionWithinUsage);
+}
+
+/** Map productId → primary storefront badge (BXGY buy product wins). */
+export function buildProductPromotionMap(
+  promos: LivePromotionRow[],
+): Map<string, StorePromotionAttachment> {
+  const map = new Map<string, StorePromotionAttachment>();
+  for (const p of promos) {
+    if (p.type === 'bxgy' && p.buyProductId) {
+      const minQty = p.minQty ?? 1;
+      const getQty = p.getQty ?? 1;
+      const sameProduct = p.buyProductId === p.getProductId;
+      const attachment: StorePromotionAttachment = {
+        id: p.id,
+        name: p.name,
+        type: 'bxgy',
+        badgeLabel: bxgyBadgeLabel(minQty, getQty, sameProduct),
+        buyQty: minQty,
+        getQty,
+        buyProductId: p.buyProductId,
+        getProductId: p.getProductId ?? undefined,
+        getProductName: p.getProduct?.name ?? undefined,
+        minOrderValue: p.minOrderValue != null ? Number(p.minOrderValue) : undefined,
+      };
+      if (!map.has(p.buyProductId)) map.set(p.buyProductId, attachment);
+
+      if (p.getProductId && !sameProduct && !map.has(p.getProductId)) {
+        map.set(p.getProductId, {
+          id: p.id,
+          name: p.name,
+          type: 'bxgy_get',
+          badgeLabel: 'Free with purchase',
+          buyProductId: p.buyProductId,
+          getProductId: p.getProductId,
+          getProductName: p.getProduct?.name ?? undefined,
+          buyQty: minQty,
+          getQty,
+        });
+      }
+    }
+  }
+  return map;
+}
+
+/** Map vendorId → store-wide pct/flat promos for header banners. */
+export function buildVendorWidePromoMap(
+  promos: LivePromotionRow[],
+): Map<string, VendorStoreWidePromo[]> {
+  const map = new Map<string, VendorStoreWidePromo[]>();
+  for (const p of promos) {
+    if (p.type !== 'pct_discount' && p.type !== 'flat_discount') continue;
+    const minVal = p.minOrderValue != null ? Number(p.minOrderValue) : undefined;
+    let badgeLabel = '';
+    if (p.type === 'pct_discount' && p.discountPct) {
+      badgeLabel = minVal
+        ? `${Number(p.discountPct).toFixed(0)}% off orders above ₹${minVal.toFixed(0)}`
+        : `${Number(p.discountPct).toFixed(0)}% off`;
+    } else if (p.type === 'flat_discount' && p.discountFlat) {
+      badgeLabel = minVal
+        ? `₹${Number(p.discountFlat).toFixed(0)} off orders above ₹${minVal.toFixed(0)}`
+        : `₹${Number(p.discountFlat).toFixed(0)} off`;
+    } else {
+      continue;
+    }
+    const entry: VendorStoreWidePromo = {
+      id: p.id,
+      name: p.name,
+      type: p.type,
+      badgeLabel,
+      minOrderValue: minVal,
+      discountPct: p.discountPct != null ? Number(p.discountPct) : undefined,
+      discountFlat: p.discountFlat != null ? Number(p.discountFlat) : undefined,
+    };
+    const list = map.get(p.vendorId) ?? [];
+    list.push(entry);
+    map.set(p.vendorId, list);
+  }
+  return map;
+}
+
+/** Returns an existing live BXGY on the same buy product, if any. */
+export async function findConflictingBxgyPromotion(
+  db: Db,
+  vendorId: string,
+  buyProductId: string,
+  excludePromotionId?: string,
+) {
+  const promos = await fetchLivePromotionsForVendors(db, [vendorId]);
+  return promos.find(
+    (p) =>
+      p.type === 'bxgy' &&
+      p.buyProductId === buyProductId &&
+      p.id !== excludePromotionId,
+  ) ?? null;
+}
+
+/** Merge BXGY free-item rows for display (cart/checkout bill). */
+export function mergeBxgyFreeItems(
+  items: Array<{
+    vendorId: string;
+    productId: string;
+    productName: string;
+    quantity: number;
+    promotionName: string;
+  }>,
+): Array<{
+  vendorId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  promotionName: string;
+}> {
+  const map = new Map<string, {
+    vendorId: string;
+    productId: string;
+    productName: string;
+    quantity: number;
+    promotionName: string;
+  }>();
+  for (const item of items) {
+    const key = `${item.vendorId}:${item.productId}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.quantity += item.quantity;
+    } else {
+      map.set(key, { ...item });
+    }
+  }
+  return Array.from(map.values());
+}
+
+/** Compute BXGY free goods for a vendor cart snapshot. */
+export async function evaluateBxgyForCart(
+  db: Db,
+  vendorId: string,
+  items: Array<{ productId: string; quantity: number; unitPrice: number }>,
+): Promise<BxgyCartResult[]> {
+  const promos = (await fetchLivePromotionsForVendors(db, [vendorId])).filter((p) => p.type === 'bxgy');
+  const paidQtyByProduct = new Map<string, number>();
+  for (const item of items) {
+    if (Number(item.unitPrice) <= 0) continue;
+    paidQtyByProduct.set(
+      item.productId,
+      (paidQtyByProduct.get(item.productId) ?? 0) + item.quantity,
+    );
+  }
+
+  const candidates: BxgyCartResult[] = [];
+  for (const p of promos) {
+    if (!p.buyProductId || !p.getProductId) continue;
+    const minQty = p.minQty ?? 1;
+    const getQty = p.getQty ?? 1;
+    const buyQty = paidQtyByProduct.get(p.buyProductId) ?? 0;
+    if (buyQty < minQty) continue;
+    const freeSets = Math.floor(buyQty / minQty);
+    const freeUnits = freeSets * getQty;
+    if (freeUnits <= 0) continue;
+    candidates.push({
+      promotionId: p.id,
+      promotionName: p.name,
+      buyProductId: p.buyProductId,
+      getProductId: p.getProductId,
+      freeUnits,
+      sameProduct: p.buyProductId === p.getProductId,
+      minQty,
+      getQty,
+    });
+  }
+
+  // One promo per buy/get pair — highest freeUnits wins (newest promo on tie).
+  const bestByPair = new Map<string, BxgyCartResult>();
+  const promoCreatedAt = new Map(promos.map((p) => [p.id, p.createdAt.getTime()]));
+  for (const c of candidates) {
+    const key = `${c.buyProductId}:${c.getProductId}`;
+    const prev = bestByPair.get(key);
+    if (!prev) {
+      bestByPair.set(key, c);
+      continue;
+    }
+    if (c.freeUnits > prev.freeUnits) {
+      bestByPair.set(key, c);
+      continue;
+    }
+    if (c.freeUnits === prev.freeUnits) {
+      const cTime = promoCreatedAt.get(c.promotionId) ?? 0;
+      const pTime = promoCreatedAt.get(prev.promotionId) ?? 0;
+      if (cTime > pTime) bestByPair.set(key, c);
+    }
+  }
+  return Array.from(bestByPair.values());
+}
+
+/** Billed quantity when BXGY applies to the same product line. */
+export function computeBxgyBilledQty(
+  quantity: number,
+  minQty: number,
+  getQty: number,
+): number {
+  const freeUnits = Math.floor(quantity / minQty) * getQty;
+  return Math.max(0, quantity - freeUnits);
+}
+
+/** Free units earned from a paid quantity (BXGY). */
+export function computeBxgyFreeUnits(
+  paidQty: number,
+  minQty: number,
+  getQty: number,
+): number {
+  return Math.floor(paidQty / minQty) * getQty;
 }
 
 async function loadAndValidateCoupon(
@@ -643,6 +929,13 @@ export const promotionService = {
     totalGST: number;
     autoPromos: Array<{ vendorId: string; promotionId: string; promotionName: string; type: string; discount: number }>;
     totalPromoDiscount: number;
+    bxgyFreeItems: Array<{
+      vendorId: string;
+      productId: string;
+      productName: string;
+      quantity: number;
+      promotionName: string;
+    }>;
     coupon:
       | { valid: true; code: string; name: string; estimatedDiscount: number; stacksWithCashback: boolean }
       | { valid: false; message: string }
@@ -652,8 +945,33 @@ export const promotionService = {
       ? { valid: false as const, message: 'No items found in your cart. Please add items before applying a coupon.' }
       : null;
     if (!args.items || args.items.length === 0) {
-      return { subtotal: 0, subtotalTaxable: 0, totalGST: 0, autoPromos: [], totalPromoDiscount: 0, coupon: emptyCoupon };
+      return {
+        subtotal: 0,
+        subtotalTaxable: 0,
+        totalGST: 0,
+        autoPromos: [],
+        totalPromoDiscount: 0,
+        bxgyFreeItems: [],
+        coupon: emptyCoupon,
+      };
     }
+
+    const scopedCart = await prisma.cart.findFirst({
+      where: {
+        userId: args.userId,
+        businessAccountId: args.businessAccountId,
+        outletId: args.outletId,
+      },
+      include: {
+        items: { include: { product: { select: { name: true } } } },
+      },
+    });
+    const cartUnitByProduct = new Map(
+      (scopedCart?.items ?? []).map((ci) => [ci.productId, Number(ci.unitPrice)]),
+    );
+    const productNameById = new Map(
+      (scopedCart?.items ?? []).map((ci) => [ci.productId, ci.product.name]),
+    );
 
     // Outlet context drives pincode/area pricelist assignment rules.
     const outlet = await prisma.outlet.findFirst({
@@ -685,6 +1003,7 @@ export const promotionService = {
     for (const item of args.items) {
       const product = productById.get(item.productId);
       if (!product) continue;
+      if (cartUnitByProduct.get(item.productId) === 0) continue;
       const customer: CustomerContext = {
         userId: args.userId,
         businessAccountId: args.businessAccountId,
@@ -719,7 +1038,43 @@ export const promotionService = {
 
     const drafts = Array.from(draftsByVendor.values());
     if (drafts.length === 0) {
-      return { subtotal: 0, subtotalTaxable: 0, totalGST: 0, autoPromos: [], totalPromoDiscount: 0, coupon: emptyCoupon };
+      return {
+        subtotal: 0,
+        subtotalTaxable: 0,
+        totalGST: 0,
+        autoPromos: [],
+        totalPromoDiscount: 0,
+        bxgyFreeItems: [],
+        coupon: emptyCoupon,
+      };
+    }
+
+    const bxgyFreeItems: Array<{
+      vendorId: string;
+      productId: string;
+      productName: string;
+      quantity: number;
+      promotionName: string;
+    }> = [];
+    for (const vendorId of vendorIds) {
+      const vendorPreviewItems = args.items
+        .filter((i) => i.vendorId === vendorId && cartUnitByProduct.get(i.productId) !== 0)
+        .map((i) => ({ productId: i.productId, quantity: i.quantity, unitPrice: 1 }));
+      const bxgyResults = await evaluateBxgyForCart(prisma, vendorId, vendorPreviewItems);
+      for (const bxgy of bxgyResults) {
+        if (bxgy.freeUnits <= 0) continue;
+        const name =
+          productNameById.get(bxgy.getProductId) ??
+          (await prisma.product.findUnique({ where: { id: bxgy.getProductId }, select: { name: true } }))?.name ??
+          'Free item';
+        bxgyFreeItems.push({
+          vendorId,
+          productId: bxgy.getProductId,
+          productName: name,
+          quantity: bxgy.freeUnits,
+          promotionName: bxgy.promotionName,
+        });
+      }
     }
 
     // Server-authoritative subtotal (re-priced gross). The checkout/cart show
@@ -773,7 +1128,15 @@ export const promotionService = {
     const effectiveAutoPromos = suppressVendorPromos ? [] : autoPromos;
     const totalPromoDiscount = r2(effectiveAutoPromos.reduce((a, p) => a + p.discount, 0));
 
-    return { subtotal, subtotalTaxable, totalGST, autoPromos: effectiveAutoPromos, totalPromoDiscount, coupon };
+    return {
+      subtotal,
+      subtotalTaxable,
+      totalGST,
+      autoPromos: effectiveAutoPromos,
+      totalPromoDiscount,
+      bxgyFreeItems: mergeBxgyFreeItems(bxgyFreeItems),
+      coupon,
+    };
   },
 
   /** Wallet balance + cashback history for the rewards page. */

@@ -79,6 +79,9 @@ export interface VendorProduct extends Product {
     vendorMinOrderValue?: number; // vendor's min ₹ order value for this vendor group
     frequentlyOrdered?: boolean;
     isDeal?: boolean;
+    /** Live vendor store offer (BXGY, etc.) from promotions table. */
+    storePromotion?: StorePromotion;
+    hasStorePromotion?: boolean;
     /** True when `price` is a server-resolved customer-specific price (price list / override). */
     customerPriceApplied?: boolean;
 }
@@ -86,6 +89,21 @@ export interface VendorProduct extends Product {
 export interface BulkPriceTier {
     minQty: number;
     price: number;
+    originalPrice?: number;
+}
+
+/** Live vendor store offer attached by catalog APIs. */
+export interface StorePromotion {
+    id: string;
+    name: string;
+    type: 'bxgy' | 'pct_discount' | 'flat_discount' | 'bxgy_get';
+    badgeLabel: string;
+    buyQty?: number;
+    getQty?: number;
+    getProductId?: string;
+    getProductName?: string;
+    buyProductId?: string;
+    minOrderValue?: number;
 }
 
 export interface Category {
@@ -106,6 +124,19 @@ export interface CartItem {
     productId: string;
     product: VendorProduct;
     quantity: number;
+    cartItemId?: string;
+    isPromoFree?: boolean;
+    bxgyFreeQty?: number;
+    bxgyPromotionName?: string;
+}
+
+/** BXGY benefits summary for one vendor group (cart API). */
+export interface VendorPromoSummary {
+    vendorId: string;
+    promotionName: string;
+    type: 'bxgy';
+    paidLines: Array<{ productId: string; name: string; paidQty: number; freeQty: number }>;
+    freeLines: Array<{ productId: string; name: string; quantity: number; unitValueSaved: number }>;
 }
 
 export interface VendorCartGroup {
@@ -118,6 +149,7 @@ export interface VendorCartGroup {
     totalGST: number;        // GST portion = subtotal - subtotalTaxable
     minOrderValue: number;
     meetsMinOrder: boolean;
+    promoSummary?: VendorPromoSummary | null;
 }
 
 export interface Cart {
