@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
-import type { VendorProduct, CartItem, VendorCartGroup, BulkPriceTier } from '@/types';
+import type { VendorProduct, CartItem, VendorCartGroup, BulkPriceTier, VendorPromoSummary } from '@/types';
 import { dal } from '@/lib/dal';
 
 // CartItem extended with API item ID (needed for PATCH/DELETE on server cart)
@@ -50,47 +50,79 @@ function getEffectiveGrossPrice(basePriceGross: number, bulkPrices: BulkPriceTie
     return price;
 }
 
-function buildGroups(cart: CartItemWithId[]): VendorCartGroup[] {
+interface ApiGroupMeta {
+    subtotal: number;
+    meetsMinOrder: boolean;
+    promoSummary?: VendorPromoSummary | null;
+}
+
+function buildGroups(cart: CartItemWithId[], apiGroupMeta: Record<string, ApiGroupMeta>): VendorCartGroup[] {
     const grouped: Record<string, VendorCartGroup> = {};
     cart.forEach(item => {
         if (!item.product) return;
         const vId = item.product.vendorId;
         if (!grouped[vId]) {
+            const meta = apiGroupMeta[vId];
             grouped[vId] = {
                 vendorId: vId,
                 vendorName: item.product.vendorName,
                 vendorLogo: item.product.vendorLogo,
                 items: [],
-                subtotal: 0,
+                subtotal: meta?.subtotal ?? 0,
                 subtotalTaxable: 0,
                 totalGST: 0,
                 minOrderValue: item.product.vendorMinOrderValue || 0,
-                meetsMinOrder: false
+                meetsMinOrder: meta?.meetsMinOrder ?? false,
+                promoSummary: meta?.promoSummary ?? null,
             };
         }
         grouped[vId].items.push(item);
 
-        // Gross price (what customer sees) × qty
+        if (item.isPromoFree) return;
+
         const gross = (item.product.price || 0) * item.quantity;
-        // Back-calculate taxable from gross: taxable = gross / (1 + gst%)
         const tax = item.product.taxPercent || 0;
         const taxable = tax > 0 ? gross / (1 + tax / 100) : gross;
 
-        grouped[vId].subtotal += gross;
-        grouped[vId].subtotalTaxable += taxable;
-        grouped[vId].totalGST += gross - taxable;
-        grouped[vId].meetsMinOrder = grouped[vId].subtotal >= grouped[vId].minOrderValue;
+        if (!apiGroupMeta[vId]) {
+            grouped[vId].subtotal += gross;
+            grouped[vId].subtotalTaxable += taxable;
+            grouped[vId].totalGST += gross - taxable;
+            grouped[vId].meetsMinOrder = grouped[vId].subtotal >= grouped[vId].minOrderValue;
+        } else {
+            grouped[vId].subtotalTaxable += taxable;
+            grouped[vId].totalGST += gross - taxable;
+        }
     });
+
+    for (const g of Object.values(grouped)) {
+        if (apiGroupMeta[g.vendorId]) {
+            const meta = apiGroupMeta[g.vendorId];
+            g.subtotal = meta.subtotal;
+            g.meetsMinOrder = meta.meetsMinOrder;
+            g.promoSummary = meta.promoSummary ?? null;
+        }
+    }
     return Object.values(grouped);
 }
 
-// Transform API cart response into local CartItemWithId[]
-// API shape: { vendorGroups: [{ vendor, items: [{ id, quantity, unitPrice, product, vendor }], subtotal, meetsMov }], total }
-function fromApiCart(apiData: { vendorGroups: unknown[]; total: number }): CartItemWithId[] {
+function parseApiCart(apiData: { vendorGroups: unknown[]; total: number }): {
+    items: CartItemWithId[];
+    groupMeta: Record<string, ApiGroupMeta>;
+} {
     const items: CartItemWithId[] = [];
+    const groupMeta: Record<string, ApiGroupMeta> = {};
+
     for (const group of (apiData.vendorGroups || []) as Array<Record<string, unknown>>) {
-        // vendor info lives at group.vendor (not group.vendorName)
         const groupVendor = (group.vendor as Record<string, unknown>) || {};
+        const vendorId = (groupVendor.id as string) || '';
+        if (vendorId) {
+            groupMeta[vendorId] = {
+                subtotal: Number(group.subtotal) || 0,
+                meetsMinOrder: Boolean(group.meetsMov),
+                promoSummary: (group.promoSummary as VendorPromoSummary | null | undefined) ?? null,
+            };
+        }
 
         for (const raw of ((group.items || []) as Array<Record<string, unknown>>)) {
             const product = raw.product as Record<string, unknown> | null;
@@ -171,12 +203,15 @@ function fromApiCart(apiData: { vendorGroups: unknown[]; total: number }): CartI
                 productId: vp.id,
                 product: vp,
                 quantity: Number(raw.quantity) || 1,
-                cartItemId: raw.id as string, // cart item DB id for PATCH/DELETE
+                cartItemId: raw.id as string,
                 basePriceGross,
+                isPromoFree: Boolean(raw.isPromoFree),
+                bxgyFreeQty: Number(raw.bxgyFreeQty) || 0,
+                bxgyPromotionName: (raw.bxgyPromotionName as string) || undefined,
             });
         }
     }
-    return items;
+    return { items, groupMeta };
 }
 
 const STORAGE_KEY = 'horeca_cart';
@@ -199,7 +234,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const activeBAId = sessionUser.activeBusinessAccountId as string | undefined;
     const activeOutletId = sessionUser.activeOutletId as string | undefined;
     const [cart, setCart] = useState<CartItemWithId[]>([]);
+    const [apiGroupMeta, setApiGroupMeta] = useState<Record<string, ApiGroupMeta>>({});
     const [isInitialized, setIsInitialized] = useState(false);
+
+    const applyApiCart = useCallback((apiData: { vendorGroups: unknown[]; total: number }) => {
+        const { items, groupMeta } = parseApiCart(apiData);
+        setCart(items);
+        setApiGroupMeta(groupMeta);
+    }, []);
 
     // On mount or context switch: load cart (API if logged in, localStorage if guest).
     // On guest→login transition: merge localStorage items into the server cart
@@ -238,8 +280,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             mergeFirst
                 .then(() => dal.cart.get())
                 .then(apiData => {
-                    const items = fromApiCart(apiData as { vendorGroups: unknown[]; total: number });
-                    setCart(items);
+                    applyApiCart(apiData as { vendorGroups: unknown[]; total: number });
                 })
                 .catch((err: unknown) => {
                     const msg = err instanceof Error ? err.message : '';
@@ -281,8 +322,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 .then(async () => {
                     // Refresh cart from API to get cartItemId and server-computed prices
                     const apiData = await dal.cart.get();
-                    const items = fromApiCart(apiData as { vendorGroups: unknown[]; total: number });
-                    setCart(items);
+                    applyApiCart(apiData as { vendorGroups: unknown[]; total: number });
                 })
                 .catch(() => {
                     // Optimistic update on API failure — use locally-computed effective price
@@ -321,10 +361,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const removeFromCart = useCallback((productId: string) => {
         const item = cart.find(i => i.productId === productId);
         if (isLoggedIn && item?.cartItemId) {
-            dal.cart.removeItem(item.cartItemId).catch(() => {});
+            dal.cart.removeItem(item.cartItemId)
+                .then(() => dal.cart.get())
+                .then(apiData => applyApiCart(apiData as { vendorGroups: unknown[]; total: number }))
+                .catch(() => {});
         }
         setCart(prev => prev.filter(i => i.productId !== productId));
-    }, [isLoggedIn, cart]);
+    }, [isLoggedIn, cart, applyApiCart]);
 
     const updateQuantity = useCallback((productId: string, quantity: number) => {
         if (quantity <= 0) {
@@ -333,7 +376,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
 
         const item = cart.find(i => i.productId === productId);
-        if (!item) return;
+        if (!item || item.isPromoFree) return;
 
         // Enforce minOrderQuantity — silently block; UI must show the toast
         const minQty = item.product?.minOrderQuantity || 1;
@@ -345,14 +388,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         // the UI always shows exactly what checkout will charge.
         if (isLoggedIn && item.cartItemId) {
             const patch = dal.cart.updateItem(item.cartItemId, quantity);
-            if (item.product?.customerPriceApplied) {
-                patch
-                    .then(() => dal.cart.get())
-                    .then(apiData => setCart(fromApiCart(apiData as { vendorGroups: unknown[]; total: number })))
-                    .catch(() => {});
-            } else {
-                patch.catch(() => {});
-            }
+            patch
+                .then(() => dal.cart.get())
+                .then(apiData => applyApiCart(apiData as { vendorGroups: unknown[]; total: number }))
+                .catch(() => {});
         }
 
         setCart(prev => prev.map(i => {
@@ -374,23 +413,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 product: { ...i.product, price: newGrossPrice, taxableRate: newTaxableRate },
             };
         }));
-    }, [isLoggedIn, cart, removeFromCart]);
+    }, [isLoggedIn, cart, removeFromCart, applyApiCart]);
 
     const clearCart = useCallback(() => {
         if (isLoggedIn) {
             dal.cart.clear().catch(() => {});
         }
         setCart([]);
+        setApiGroupMeta({});
     }, [isLoggedIn]);
 
-    const groups = useMemo(() => buildGroups(cart), [cart]);
+    const groups = useMemo(() => buildGroups(cart, apiGroupMeta), [cart, apiGroupMeta]);
     const totalItems = useMemo(() => cart.reduce((sum, i) => sum + (i.quantity || 0), 0), [cart]);
 
-    // subtotal = gross total (GST-inclusive) — what customer pays before delivery
-    const subtotal = useMemo(() => cart.reduce((sum, i) => sum + ((i.product?.price || 0) * i.quantity), 0), [cart]);
+    const subtotal = useMemo(() => {
+        if (Object.keys(apiGroupMeta).length > 0) {
+            return Object.values(apiGroupMeta).reduce((s, m) => s + m.subtotal, 0);
+        }
+        return cart.reduce((sum, i) => {
+            if (i.isPromoFree) return sum;
+            return sum + ((i.product?.price || 0) * i.quantity);
+        }, 0);
+    }, [cart, apiGroupMeta]);
 
-    // totalTaxable = taxable value (ex-GST): gross / (1 + gst%)
     const totalTaxable = useMemo(() => cart.reduce((sum, i) => {
+        if (i.isPromoFree) return sum;
         const tax = i.product?.taxPercent || 0;
         const gross = (i.product?.price || 0) * i.quantity;
         return sum + (tax > 0 ? gross / (1 + tax / 100) : gross);

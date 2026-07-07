@@ -17,6 +17,7 @@ import { creditVendorOnDelivery } from '@/modules/vendor/vendorSettlement.servic
 import {
   promotionService,
   evaluateVendorPromo,
+  evaluateBxgyForCart,
   type CheckoutDraftItem,
   type CouponApplication,
 } from '@/modules/promotion/promotion.service';
@@ -172,9 +173,11 @@ export class OrderService {
         vo: VendorOrderInput;
         itemDetails: OrderLineCreate[];
         draftItems: CheckoutDraftItem[];
+        stockItems: Array<{ productId: string; quantity: number }>;
         subtotal: number;
         promoDiscount: number;
         appliedPromoId: string | null;
+        appliedBxgyPromoIds: string[];
         salespersonId: string | null;
         fulfillmentOutletId: string;
       }
@@ -266,11 +269,25 @@ export class OrderService {
         let subtotal = 0;
         const itemDetails = [];
         const draftItems: CheckoutDraftItem[] = [];
+        const stockItems: Array<{ productId: string; quantity: number }> = [];
+        const appliedBxgyPromoIds = new Set<string>();
+
+        const scopedCart = await tx.cart.findFirst({
+          where: { userId, businessAccountId, outletId },
+          select: { items: { select: { productId: true, unitPrice: true } } },
+        });
+        const cartUnitPriceByProduct = new Map(
+          (scopedCart?.items ?? []).map((ci) => [ci.productId, Number(ci.unitPrice)]),
+        );
+
+        const paidItemsForBxgy: Array<{ productId: string; quantity: number; unitPrice: number }> = [];
 
         for (const item of vo.items) {
+          const cartUnit = cartUnitPriceByProduct.get(item.productId);
+          const isPromoFreeLine = cartUnit === 0;
+
           const product = await tx.product.findUnique({
             where: { id: item.productId },
-            // categoryId + brand feed coupon scope matching (Promo Engine Phase 1)
             select: {
               id: true,
               name: true,
@@ -286,26 +303,31 @@ export class OrderService {
           });
           if (!product) throw Errors.notFound('Product');
 
-          // Item-level credit availability (Req): block credit payment for any
-          // item the vendor marked "credit not available".
           if (!isDraft && isCreditPayment(input.paymentMethod) && !product.creditEligible) {
             throw Errors.badRequest(`"${product.name}" is not available on credit — remove it or pay another way`);
           }
 
-          // Resolved taxable unit price — honours every assignment rule.
+          if (isPromoFreeLine) {
+            itemDetails.push({
+              productId: item.productId,
+              productName: product.name,
+              ...snapshotFromProduct(product),
+              quantity: item.quantity,
+              unitPrice: 0,
+              totalPrice: 0,
+            });
+            stockItems.push({ productId: item.productId, quantity: item.quantity });
+            continue;
+          }
+
           const resolved = await resolveUnitPrice(
             { productId: item.productId, vendorId: vo.vendorId, quantity: item.quantity, customer: customerCtx },
             tx,
           );
           const taxableUnitPrice = Number(resolved.unitPrice);
-
-          // Apply GST to get gross (customer-facing) price
           const taxPercent = Number(product.taxPercent) || 0;
           const grossUnitPrice = Math.round(taxableUnitPrice * (1 + taxPercent / 100) * 100) / 100;
 
-          // B-5: scheme free-goods — when a 'scheme' pricelist item matched, grant
-          // `schemeFreeQty` free units for every `schemeMinQty` ordered. The line
-          // still ships the full quantity; only the billed units are charged.
           let billedQty = item.quantity;
           if (resolved.schemeMinQty && resolved.schemeFreeQty && item.quantity >= resolved.schemeMinQty) {
             const freeQty = Math.floor(item.quantity / resolved.schemeMinQty) * resolved.schemeFreeQty;
@@ -328,6 +350,50 @@ export class OrderService {
             brand: product.brand,
             lineTotal: totalPrice,
           });
+          stockItems.push({ productId: item.productId, quantity: item.quantity });
+          paidItemsForBxgy.push({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: taxableUnitPrice,
+          });
+        }
+
+        const bxgyResults = await evaluateBxgyForCart(tx, vo.vendorId, paidItemsForBxgy);
+        for (const bxgy of bxgyResults) {
+          if (bxgy.freeUnits <= 0) continue;
+          appliedBxgyPromoIds.add(bxgy.promotionId);
+
+          if (bxgy.sameProduct) {
+            const existingFree = itemDetails.find(
+              (d) => d.productId === bxgy.getProductId && Number(d.unitPrice) === 0,
+            );
+            if (!existingFree) {
+              const freeProduct = await tx.product.findUnique({
+                where: { id: bxgy.getProductId },
+                select: {
+                  id: true,
+                  name: true,
+                  sku: true,
+                  hsn: true,
+                  packSize: true,
+                  taxPercent: true,
+                  category: { select: { name: true } },
+                  brand: true,
+                },
+              });
+              if (freeProduct) {
+                itemDetails.push({
+                  productId: bxgy.getProductId,
+                  productName: freeProduct.name,
+                  ...snapshotFromProduct(freeProduct),
+                  quantity: bxgy.freeUnits,
+                  unitPrice: 0,
+                  totalPrice: 0,
+                });
+                stockItems.push({ productId: bxgy.getProductId, quantity: bxgy.freeUnits });
+              }
+            }
+          }
         }
 
         if (!isDraft && subtotal < Number(vendor.minOrderValue)) {
@@ -347,9 +413,11 @@ export class OrderService {
           vo,
           itemDetails,
           draftItems,
+          stockItems,
           subtotal,
           promoDiscount,
           appliedPromoId,
+          appliedBxgyPromoIds: Array.from(appliedBxgyPromoIds),
           salespersonId: vendorCustomer?.salespersonId ?? null,
           fulfillmentOutletId,
         });
@@ -412,6 +480,12 @@ export class OrderService {
             data: { usageCount: { increment: 1 } },
           });
         }
+        for (const bxgyPromoId of p.appliedBxgyPromoIds ?? []) {
+          await tx.promotion.update({
+            where: { id: bxgyPromoId },
+            data: { usageCount: { increment: 1 } },
+          });
+        }
 
         // Generate order number
         const orderNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
@@ -447,7 +521,7 @@ export class OrderService {
         });
 
         // Reserve inventory (drafts reserve nothing until submitted)
-        if (!isDraft) await this.inventoryService.reserveStock(vo.items, p.fulfillmentOutletId, tx);
+        if (!isDraft) await this.inventoryService.reserveStock(p.stockItems, p.fulfillmentOutletId, tx);
 
         // Debit the credit wallet for credit orders. debitWallet validates the
         // wallet (active, not blacklisted), repayment-mode reuse rules, and

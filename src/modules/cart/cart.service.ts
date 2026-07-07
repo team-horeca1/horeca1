@@ -2,6 +2,12 @@ import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
 import { resolveUnitPrice, type CustomerContext } from '@/modules/pricing/pricing.service';
 import { getDeliveryGeo } from '@/lib/deliveryLocation';
+import {
+  evaluateBxgyForCart,
+  computeBxgyFreeUnits,
+  type BxgyCartResult,
+} from '@/modules/promotion/promotion.service';
+import type { VendorPromoSummary } from '@/types';
 
 /**
  * V2.2: cart is keyed by (userId, businessAccountId, outletId). Every method
@@ -53,6 +59,187 @@ export class CartService {
     };
   }
 
+  /** Sync BXGY free-product lines (different-product promos) and return per-vendor BXGY map. */
+  private async syncBxgyFreeItems(cartId: string) {
+    const items = await prisma.cartItem.findMany({ where: { cartId } });
+    const vendorIds = Array.from(new Set(items.map((i) => i.vendorId)));
+    const activeFreeKeys = new Set<string>();
+    const bxgyByVendor = new Map<string, BxgyCartResult[]>();
+
+    for (const vendorId of vendorIds) {
+      const vendorItems = items.filter((i) => i.vendorId === vendorId);
+      const paidItems = vendorItems
+        .filter((i) => Number(i.unitPrice) > 0)
+        .map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          unitPrice: Number(i.unitPrice),
+        }));
+      const bxgyResults = await evaluateBxgyForCart(prisma, vendorId, paidItems);
+      bxgyByVendor.set(vendorId, bxgyResults);
+
+      for (const bxgy of bxgyResults) {
+        if (bxgy.sameProduct) continue;
+        if (bxgy.freeUnits <= 0) continue;
+        const key = `${vendorId}:${bxgy.getProductId}`;
+        activeFreeKeys.add(key);
+        const existing = vendorItems.find(
+          (i) => i.productId === bxgy.getProductId && Number(i.unitPrice) === 0,
+        );
+        if (existing) {
+          if (existing.quantity !== bxgy.freeUnits) {
+            await prisma.cartItem.update({
+              where: { id: existing.id },
+              data: { quantity: bxgy.freeUnits },
+            });
+          }
+        } else {
+          await prisma.cartItem.create({
+            data: {
+              cartId,
+              productId: bxgy.getProductId,
+              vendorId,
+              quantity: bxgy.freeUnits,
+              unitPrice: 0,
+            },
+          });
+        }
+      }
+    }
+
+    for (const item of items) {
+      if (Number(item.unitPrice) !== 0) continue;
+      const key = `${item.vendorId}:${item.productId}`;
+      if (!activeFreeKeys.has(key)) {
+        await prisma.cartItem.delete({ where: { id: item.id } });
+      }
+    }
+
+    return bxgyByVendor;
+  }
+
+  private computeLineCharge(
+    item: { productId: string; vendorId: string; quantity: number; unitPrice: unknown },
+    bxgyResults: BxgyCartResult[],
+  ): number {
+    if (Number(item.unitPrice) <= 0) return 0;
+    const sameProductBxgy = bxgyResults.find(
+      (b) => b.sameProduct && b.buyProductId === item.productId,
+    );
+    const billedQty = sameProductBxgy
+      ? item.quantity
+      : item.quantity;
+    const freeUnits = sameProductBxgy
+      ? computeBxgyFreeUnits(item.quantity, sameProductBxgy.minQty, sameProductBxgy.getQty)
+      : 0;
+    const chargeQty = sameProductBxgy ? item.quantity : billedQty;
+    void freeUnits;
+    return Number(item.unitPrice) * chargeQty;
+  }
+
+  private buildPromoSummary(
+    vendorId: string,
+    items: Array<{
+      productId: string;
+      quantity: number;
+      unitPrice: unknown;
+      isPromoFree?: boolean;
+      bxgyFreeQty?: number;
+      bxgyPromotionName?: string;
+      product: { id: string; name: string; basePrice: unknown; taxPercent: unknown };
+    }>,
+    bxgyResults: BxgyCartResult[],
+  ): VendorPromoSummary | null {
+    if (bxgyResults.length === 0) return null;
+
+    const primary = bxgyResults[0];
+    const paidLines: VendorPromoSummary['paidLines'] = [];
+    const freeLines: VendorPromoSummary['freeLines'] = [];
+
+    for (const item of items) {
+      const taxPercent = Number(item.product.taxPercent) || 0;
+      const unitGross = Math.round(Number(item.product.basePrice) * (1 + taxPercent / 100) * 100) / 100;
+
+      if (item.isPromoFree) {
+        freeLines.push({
+          productId: item.productId,
+          name: item.product.name,
+          quantity: item.quantity,
+          unitValueSaved: unitGross,
+        });
+        continue;
+      }
+      const freeQty = item.bxgyFreeQty ?? 0;
+      if (freeQty > 0) {
+        paidLines.push({
+          productId: item.productId,
+          name: item.product.name,
+          paidQty: item.quantity,
+          freeQty,
+        });
+        if (bxgyResults.some((b) => b.sameProduct && b.buyProductId === item.productId)) {
+          freeLines.push({
+            productId: item.productId,
+            name: item.product.name,
+            quantity: freeQty,
+            unitValueSaved: unitGross,
+          });
+        }
+      }
+    }
+
+    for (const bxgy of bxgyResults) {
+      if (bxgy.sameProduct) continue;
+      const freeItem = items.find(
+        (i) => i.isPromoFree && i.productId === bxgy.getProductId,
+      );
+      if (freeItem) continue;
+      const getProduct = items.find((i) => i.productId === bxgy.getProductId);
+      const name = getProduct?.product.name ?? 'Free item';
+      const taxPercent = getProduct ? Number(getProduct.product.taxPercent) || 0 : 0;
+      const base = getProduct ? Number(getProduct.product.basePrice) : 0;
+      const unitGross = Math.round(base * (1 + taxPercent / 100) * 100) / 100;
+      freeLines.push({
+        productId: bxgy.getProductId,
+        name,
+        quantity: bxgy.freeUnits,
+        unitValueSaved: unitGross,
+      });
+    }
+
+    if (paidLines.length === 0 && freeLines.length === 0) return null;
+
+    return {
+      vendorId,
+      promotionName: primary.promotionName,
+      type: 'bxgy',
+      paidLines,
+      freeLines,
+    };
+  }
+
+  private enrichItemsWithBxgy<T extends { productId: string; vendorId: string; quantity: number; unitPrice: unknown }>(
+    items: T[],
+    bxgyResults: BxgyCartResult[],
+  ) {
+    return items.map((item) => {
+      const isPromoFree = Number(item.unitPrice) === 0;
+      const sameBxgy = bxgyResults.find((b) => b.sameProduct && b.buyProductId === item.productId);
+      const bxgyFreeQty = sameBxgy && !isPromoFree
+        ? computeBxgyFreeUnits(item.quantity, sameBxgy.minQty, sameBxgy.getQty)
+        : isPromoFree ? item.quantity : 0;
+      const bxgyPromo = bxgyResults.find(
+        (b) => !b.sameProduct && (b.getProductId === item.productId || b.buyProductId === item.productId),
+      );
+      return {
+        ...item,
+        isPromoFree,
+        bxgyFreeQty,
+        bxgyPromotionName: bxgyPromo?.promotionName ?? sameBxgy?.promotionName,
+      };
+    });
+  }
+
   async getCart(ctx: CartContext) {
     const cart = await prisma.cart.findFirst({
       where: { userId: ctx.userId, businessAccountId: ctx.businessAccountId, outletId: ctx.outletId },
@@ -87,6 +274,7 @@ export class CartService {
     const ctxCache = new Map<string, CustomerContext>();
     const refreshes: Array<{ id: string; unitPrice: number }> = [];
     for (const item of cart.items) {
+      if (Number(item.unitPrice) === 0) continue;
       let customer = ctxCache.get(item.vendorId);
       if (!customer) {
         customer = await this.buildCustomerContext(ctx, item.vendorId, outletInfo ?? undefined);
@@ -116,17 +304,43 @@ export class CartService {
       );
     }
 
-    // Group items by vendor
-    const vendorMap = new Map<string, { vendor: (typeof cart.items)[0]['vendor']; items: typeof cart.items; subtotal: number }>();
+    const bxgyByVendor = await this.syncBxgyFreeItems(cart.id);
 
-    for (const item of cart.items) {
+    // Re-load after BXGY sync may have added/removed free lines
+    const freshItems = await prisma.cartItem.findMany({
+      where: { cartId: cart.id },
+      include: {
+        product: {
+          select: {
+            id: true, name: true, imageUrl: true, basePrice: true, originalPrice: true,
+            taxPercent: true, minOrderQty: true, packSize: true,
+            unit: true, creditEligible: true,
+            priceSlabs: { orderBy: { minQty: 'asc' as const }, select: { minQty: true, maxQty: true, price: true } },
+            inventories: { select: { qtyAvailable: true } },
+          },
+        },
+        vendor: { select: { id: true, businessName: true, slug: true, minOrderValue: true, logoUrl: true } },
+      },
+    });
+
+    const vendorMap = new Map<string, {
+      vendor: (typeof freshItems)[0]['vendor'];
+      items: Array<ReturnType<CartService['enrichItemsWithBxgy']>[number] & { product: (typeof freshItems)[0]['product'] }>;
+      subtotal: number;
+      bxgyResults: BxgyCartResult[];
+    }>();
+
+    for (const item of freshItems) {
+      const bxgyResults = bxgyByVendor.get(item.vendorId) ?? [];
       const group = vendorMap.get(item.vendorId) || {
         vendor: item.vendor,
         items: [],
         subtotal: 0,
+        bxgyResults,
       };
-      group.items.push(item);
-      group.subtotal += Number(item.unitPrice) * item.quantity;
+      const enriched = this.enrichItemsWithBxgy([item], bxgyResults)[0];
+      group.items.push({ ...enriched, product: item.product });
+      group.subtotal += this.computeLineCharge(item, bxgyResults);
       vendorMap.set(item.vendorId, group);
     }
 
@@ -135,6 +349,7 @@ export class CartService {
       items: g.items,
       subtotal: g.subtotal,
       meetsMov: g.subtotal >= Number(g.vendor.minOrderValue),
+      promoSummary: this.buildPromoSummary(g.vendor.id, g.items, g.bxgyResults),
     }));
 
     const total = vendorGroups.reduce((sum, g) => sum + g.subtotal, 0);
@@ -172,11 +387,13 @@ export class CartService {
     const { unitPrice: resolved } = await resolveUnitPrice({ productId, vendorId, quantity, customer });
     const unitPrice = Number(resolved);
 
-    return prisma.cartItem.upsert({
+    const result = await prisma.cartItem.upsert({
       where: { cartId_productId: { cartId: cart.id, productId } },
       update: { quantity, unitPrice },
       create: { cartId: cart.id, productId, vendorId, quantity, unitPrice },
     });
+    await this.syncBxgyFreeItems(cart.id);
+    return result;
   }
 
   async updateQuantity(ctx: CartContext, itemId: string, quantity: number) {
@@ -188,6 +405,9 @@ export class CartService {
 
     const item = await prisma.cartItem.findFirst({ where: { id: itemId, cartId: cart.id } });
     if (!item) throw Errors.notFound('Cart item');
+    if (Number(item.unitPrice) === 0) {
+      throw Errors.badRequest('Promotional free items cannot be edited directly');
+    }
 
     const product = await prisma.product.findUnique({
       where: { id: item.productId },
@@ -205,10 +425,12 @@ export class CartService {
     });
     const unitPrice = Number(resolved);
 
-    return prisma.cartItem.update({
+    const result = await prisma.cartItem.update({
       where: { id: itemId },
       data: { quantity, unitPrice },
     });
+    await this.syncBxgyFreeItems(cart.id);
+    return result;
   }
 
   async removeItem(ctx: CartContext, itemId: string) {
@@ -218,7 +440,9 @@ export class CartService {
     });
     if (!cart) throw Errors.notFound('Cart');
 
-    return prisma.cartItem.delete({ where: { id: itemId, cartId: cart.id } });
+    const deleted = await prisma.cartItem.delete({ where: { id: itemId, cartId: cart.id } });
+    await this.syncBxgyFreeItems(cart.id);
+    return deleted;
   }
 
   async clearCart(ctx: CartContext) {
