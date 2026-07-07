@@ -225,7 +225,9 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       if (e && !EMAIL_RE.test(e)) throw Errors.badRequest('Enter a valid email address');
       if (e) {
         const taken = await prisma.user.findFirst({ where: { email: e, NOT: { id } }, select: { id: true } });
-        if (taken) throw Errors.badRequest('Another user already uses this email');
+        if (taken) {
+          throw Errors.fieldError('email', 'Another user already uses this email');
+        }
       }
       allowedFields.email = e || null;
     }
@@ -235,7 +237,9 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       if (p && !/^\d{10}$/.test(p)) throw Errors.badRequest('Enter a valid 10-digit phone number');
       if (p) {
         const taken = await prisma.user.findFirst({ where: { phone: p, NOT: { id } }, select: { id: true } });
-        if (taken) throw Errors.badRequest('Another user already uses this phone');
+        if (taken) {
+          throw Errors.fieldError('phone', 'Another user already uses this phone number');
+        }
       }
       allowedFields.phone = p || null;
     }

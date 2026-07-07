@@ -35,8 +35,11 @@ export class AuthService {
     });
 
     if (existing) {
-      throw Errors.duplicate(
-        existing.email === input.email ? 'Email' : 'Phone'
+      const field = existing.email === input.email ? 'email' : 'phone';
+      throw Errors.fieldError(
+        field,
+        `${field === 'email' ? 'Email' : 'Phone'} already exists`,
+        409,
       );
     }
 

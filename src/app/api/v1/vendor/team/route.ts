@@ -250,7 +250,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       select: { id: true },
     });
     if (existingMember) {
-      throw Errors.conflict('User is already on this vendor team — update their role instead');
+      throw Errors.fieldError('identifier', 'User is already on this vendor team — update their role instead', 409);
     }
 
     const legacyEnum: TeamRole = VENDOR_ROLE_TO_ENUM[role.name] ?? 'viewer';

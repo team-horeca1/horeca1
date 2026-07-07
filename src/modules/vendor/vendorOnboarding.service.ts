@@ -58,14 +58,14 @@ export async function createDirectVendor(
     where: { email: normalizedEmail },
     select: { id: true },
   });
-  if (existing) throw Errors.conflict('Email already in use');
+  if (existing) throw Errors.fieldError('email', 'Email already in use', 409);
 
   const phoneDigits = input.phone.replace(/\D/g, '');
   const phoneCollide = await prisma.user.findFirst({
     where: { phone: phoneDigits },
     select: { id: true },
   });
-  if (phoneCollide) throw Errors.conflict('Phone number already in use');
+  if (phoneCollide) throw Errors.fieldError('phone', 'Phone number already in use', 409);
 
   const [ownerTemplate, vendorAdminTemplate] = await Promise.all([
     prisma.accountRole.findFirst({
@@ -107,7 +107,9 @@ export async function createDirectVendor(
 
     const slug = slugify(input.businessName, user.id);
     const slugExists = await tx.vendor.findUnique({ where: { slug }, select: { id: true } });
-    if (slugExists) throw Errors.conflict('A vendor with this business name already exists');
+    if (slugExists) {
+      throw Errors.fieldError('businessName', 'A vendor with this business name already exists', 409);
+    }
 
     const account = await tx.businessAccount.create({
       data: {

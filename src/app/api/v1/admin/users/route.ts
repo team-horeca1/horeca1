@@ -276,11 +276,21 @@ export const POST = withRateLimit(adminOnly(async (req: NextRequest, ctx) => {
 
     // Uniqueness checks — match all legacy phone representations.
     const phoneTaken = await prisma.user.findFirst({ where: { phone: { in: phoneLookupVariants(phone) } }, select: { id: true } });
-    if (phoneTaken) throw Errors.badRequest('A user with this phone already exists');
+    if (phoneTaken) {
+      throw Errors.fieldError(
+        'phone',
+        'This mobile number is already registered. Search for the existing customer instead.',
+      );
+    }
 
     if (email) {
       const emailTaken = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-      if (emailTaken) throw Errors.badRequest('A user with this email already exists');
+      if (emailTaken) {
+        throw Errors.fieldError(
+          'email',
+          'This email is already registered. Search for the existing customer instead.',
+        );
+      }
     }
 
     const passwordHash = password ? await bcrypt.hash(password, 10) : null;

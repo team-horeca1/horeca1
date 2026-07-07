@@ -62,7 +62,9 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     // Confirm slug is free (extremely unlikely collision, but cheap to check).
     const slug = slugify(body.businessName, ctx.userId);
     const slugTaken = await prisma.vendor.findUnique({ where: { slug }, select: { id: true } });
-    if (slugTaken) throw Errors.conflict('A vendor with this business name already exists. Try a different name.');
+    if (slugTaken) {
+      throw Errors.fieldError('businessName', 'A vendor with this business name already exists. Try a different name.', 409);
+    }
 
     // Confirm the account isn't already a vendor account (defensive — shouldn't happen if no Vendor row).
     const account = await prisma.businessAccount.findUnique({

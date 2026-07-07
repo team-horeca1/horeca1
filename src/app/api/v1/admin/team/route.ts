@@ -166,7 +166,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
 
     const existingMember = await prisma.adminTeamMember.findUnique({ where: { userId: user.id }, select: { id: true } });
     if (existingMember) {
-      throw Errors.conflict('User is already on the admin team — update their role instead');
+      throw Errors.fieldError('identifier', 'User is already on the admin team — update their role instead', 409);
     }
 
     const legacyEnum: TeamRole = ADMIN_ROLE_TO_ENUM[role.name] ?? 'viewer';

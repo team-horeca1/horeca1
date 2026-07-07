@@ -163,7 +163,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
       select: { id: true },
     });
     if (existingMember) {
-      throw Errors.conflict('User is already on this brand team — update their role instead');
+      throw Errors.fieldError('identifier', 'User is already on this brand team — update their role instead', 409);
     }
 
     const legacyEnum: TeamRole = BRAND_ROLE_TO_ENUM[role.name] ?? 'viewer';

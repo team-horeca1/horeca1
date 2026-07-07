@@ -41,7 +41,9 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
 
       const slug = slugify(name);
       const slugExists = await prisma.brand.findUnique({ where: { slug }, select: { id: true } });
-      if (slugExists) throw Errors.conflict('A brand with this name already exists');
+      if (slugExists) {
+        throw Errors.fieldError('name', 'A brand with this name already exists', 409);
+      }
 
       const emailBase = slug.replace(/-/g, '') || 'brand';
       const email = `${emailBase}.${Date.now()}@brand.internal.horeca1`;
@@ -125,11 +127,13 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
     const displayName = brandFields.name ?? 'Brand';
 
     const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-    if (existing) throw Errors.conflict('Email already in use');
+    if (existing) throw Errors.fieldError('email', 'Email already in use', 409);
 
     const slug = slugify(displayName);
     const slugExists = await prisma.brand.findUnique({ where: { slug }, select: { id: true } });
-    if (slugExists) throw Errors.conflict('A brand with this name already exists');
+    if (slugExists) {
+      throw Errors.fieldError('legalName', 'A brand with this name already exists', 409);
+    }
 
     const hashedPassword = await bcrypt.hash(password, 12);
     const hcidDisplay = await uniqueHcid();
