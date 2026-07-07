@@ -9,9 +9,10 @@ import {
   ArrowLeft, ArrowRight, Loader2, CheckCircle2, Phone, Building2, FileText, Landmark,
   MapPin, Truck, ShieldCheck, X, Plus, Upload,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
-import { FORM, FormField as Field, FormInput, inputClass, selectClass } from '@/components/ui/form';
+import { FORM, FormField as Field, FormInput, inputClass, selectClass, FormErrorBanner } from '@/components/ui/form';
 import {
   VendorProfileForm,
   type VendorProfileValues,
@@ -651,6 +652,7 @@ export default function VendorRegisterPage() {
       ? apiErr
       : apiErr?.message || 'Failed to submit. Please check the highlighted fields.';
     setError(message);
+    toast.error(message);
 
     const issues = typeof apiErr === 'object' ? apiErr?.details?.issues : undefined;
     const formErrors: Record<string, string> = {};
@@ -972,11 +974,7 @@ export default function VendorRegisterPage() {
       {/* Body */}
       <main className="px-4 md:px-8 py-6 md:py-8 pb-28 md:pb-24">
         <div className="max-w-2xl mx-auto">
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-5 text-[13px] text-red-600 font-medium">
-              {error}
-            </div>
-          )}
+          <FormErrorBanner message={error || null} sticky className="mb-5" />
 
           {step === 1 && (
             <section>

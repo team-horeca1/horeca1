@@ -8,7 +8,8 @@ import { useState } from 'react';
 import { X, Loader2, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { FORM, TextField } from '@/components/ui/form';
+import { FORM, TextField, FormErrorBanner, useFormFeedback } from '@/components/ui/form';
+import { parseJsonResponse } from '@/lib/apiError';
 import {
   BrandProfileForm,
   type BrandProfileValues,
@@ -35,7 +36,7 @@ function tabForBrandErrors(errors: Record<string, string>): Tab {
     return 'admin';
   }
   if (keys.some(k => ['website', 'tagline', 'description'].includes(k))) return 'marketing';
-  if (keys.some(k => ['gstin', 'pincode', 'addressLine', 'outletName', 'city', 'state'].includes(k))) {
+  if (keys.some(k => ['gstin', 'pincode', 'addressLine', 'outletName', 'city', 'state', 'legalName', 'name'].includes(k))) {
     return 'location';
   }
   if (keys.some(k => ['businessSize', 'distributionPresence', 'targetSegments', 'horecaFocused', 'retailFocused'].includes(k))) {
@@ -44,13 +45,22 @@ function tabForBrandErrors(errors: Record<string, string>): Tab {
   return 'overview';
 }
 
+const BRAND_FIELD_ORDER = ['email', 'password', 'legalName', 'name', 'gstin', 'pincode', 'addressLine'];
+
 export default function BrandFormModal({ onClose, onCreated }: Props) {
   const [mode, setMode] = useState<Mode>('quick');
   const [quickName, setQuickName] = useState('');
   const [tab, setTab] = useState<Tab>('overview');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const {
+    bannerError,
+    fieldErrors,
+    setFieldErrors,
+    clearErrors,
+    clearFieldError,
+    applyApiError,
+    applyValidationErrors,
+  } = useFormFeedback();
   const [showPwd, setShowPwd] = useState(false);
   const [password, setPassword] = useState('');
   const [profile, setProfile] = useState<BrandProfileValues>({
@@ -59,10 +69,10 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
   });
 
   const handleQuickSave = async () => {
-    setError(null);
+    clearErrors();
     const name = quickName.trim();
     if (!name) {
-      setError('Brand name is required');
+      applyValidationErrors({ name: 'Brand name is required' }, 'Brand name is required');
       return;
     }
     setSubmitting(true);
@@ -72,32 +82,43 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quickCreate: true, name }),
       });
-      const json = await res.json();
+      const json = await parseJsonResponse<{ success: boolean; data?: { id: string; name: string; slug: string } }>(res);
       if (!json.success) {
-        setError(json.error?.message || 'Failed to create brand');
+        applyApiError(json, {
+          fieldOrder: ['name', 'legalName'],
+          onFieldError: () => {},
+        });
         return;
       }
       toast.success(`Brand "${name}" saved`);
-      onCreated(json.data);
-    } catch {
-      setError('Something went wrong');
+      if (json.data) onCreated(json.data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong';
+      applyValidationErrors({ _server: msg }, msg);
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleFullSubmit = async () => {
-    setError(null);
+    clearErrors();
     const validation = validateBrandProfile({ ...profile, password }, 'adminCreate');
     if (!validation.success) {
       setFieldErrors(validation.errors);
-      setError(validation.message ?? 'Please fix the highlighted fields');
       setTab(tabForBrandErrors(validation.errors));
+      applyValidationErrors(validation.errors, validation.message, {
+        fieldOrder: BRAND_FIELD_ORDER,
+        dataField: true,
+        toast: false,
+      });
       return;
     }
     if (!password || password.length < 6) {
-      setError('Password must be at least 6 characters');
       setTab('overview');
+      applyValidationErrors({ password: 'Password must be at least 6 characters' }, 'Password must be at least 6 characters', {
+        fieldOrder: BRAND_FIELD_ORDER,
+        dataField: true,
+      });
       return;
     }
 
@@ -116,15 +137,23 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const json = await res.json();
+      const json = await parseJsonResponse<{ success: boolean; data?: { id: string; name: string; slug: string } }>(res);
       if (!json.success) {
-        setError(json.error?.message || 'Failed to create brand');
+        applyApiError(json, {
+          fieldOrder: BRAND_FIELD_ORDER,
+          dataField: true,
+          onFieldError: (_field, fields) => {
+            setFieldErrors(fields);
+            setTab(tabForBrandErrors(fields));
+          },
+        });
         return;
       }
       toast.success('Brand created with storefront profile');
-      onCreated(json.data);
-    } catch {
-      setError('Something went wrong');
+      if (json.data) onCreated(json.data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong';
+      applyValidationErrors({ _server: msg }, msg);
     } finally {
       setSubmitting(false);
     }
@@ -162,6 +191,8 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
           </button>
         </div>
 
+        <FormErrorBanner message={bannerError} className="mx-6" />
+
         {mode === 'quick' ? (
           <>
             <div className="p-6 space-y-4">
@@ -169,12 +200,10 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
                 label="Brand Name"
                 required
                 value={quickName}
-                onChange={v => setQuickName(v)}
+                onChange={v => { setQuickName(v); if (fieldErrors.name) clearFieldError('name'); }}
                 placeholder="e.g., Everest"
+                error={fieldErrors.name}
               />
-              {error && (
-                <p className="text-[13px] text-[#E74C3C] font-medium bg-[#FEF2F2] px-3 py-2 rounded-[8px]">{error}</p>
-              )}
             </div>
             <div className="px-6 py-4 border-t border-[#EEEEEE] flex items-center justify-between gap-3 shrink-0">
               <button type="button" onClick={onClose}
@@ -187,7 +216,7 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
                   onClick={() => {
                     setMode('full');
                     setProfile(p => ({ ...p, displayName: quickName.trim() || p.displayName, name: quickName.trim() || p.name, legalName: quickName.trim() || p.legalName }));
-                    setError(null);
+                    clearErrors();
                   }}
                   className="h-[42px] px-4 flex items-center gap-2 bg-white border border-[#EEEEEE] text-[#181725] rounded-[10px] text-[13px] font-bold hover:bg-[#F8F9FB]"
                 >
@@ -220,12 +249,17 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
               {tab === 'overview' && (
                 <TextField label="Owner Email" required type="email" value={profile.email ?? ''}
                   error={fieldErrors.email}
-                  onChange={v => setProfile(p => ({ ...p, email: v }))}
+                  onChange={v => { setProfile(p => ({ ...p, email: v })); if (fieldErrors.email) clearFieldError('email'); }}
                   placeholder="brand@company.com" />
               )}
               <BrandProfileForm
                 value={profile}
-                onChange={patch => setProfile(p => ({ ...p, ...patch }))}
+                onChange={patch => {
+                  setProfile(p => ({ ...p, ...patch }));
+                  for (const key of Object.keys(patch)) {
+                    if (fieldErrors[key]) clearFieldError(key);
+                  }
+                }}
                 errors={fieldErrors}
                 onFieldBlur={(field, value) => {
                   const msg = validateFieldBlur(field, value);
@@ -238,18 +272,15 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
                 visibleSections={tabSections[tab]}
                 showPassword={tab === 'overview'}
                 password={password}
-                onPasswordChange={setPassword}
+                onPasswordChange={v => { setPassword(v); if (fieldErrors.password) clearFieldError('password'); }}
                 showPasswordToggle
                 passwordVisible={showPwd}
                 onTogglePassword={() => setShowPwd(v => !v)}
               />
-              {error && (
-                <p className="text-[13px] text-[#E74C3C] font-medium bg-[#FEF2F2] px-3 py-2 rounded-[8px]">{error}</p>
-              )}
             </div>
 
             <div className="px-6 py-4 border-t border-[#EEEEEE] flex items-center justify-between gap-3 shrink-0">
-              <button type="button" onClick={() => { setMode('quick'); setError(null); }}
+              <button type="button" onClick={() => { setMode('quick'); clearErrors(); }}
                 className="h-[42px] px-4 text-[13px] font-bold text-[#7C7C7C] hover:text-[#181725]">
                 ← Back to quick create
               </button>

@@ -7,7 +7,8 @@ import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { FORM } from '@/components/ui/form';
+import { FORM, FormErrorBanner, useFormFeedback } from '@/components/ui/form';
+import { parseJsonResponse } from '@/lib/apiError';
 import {
   CustomerProfileForm,
   type CustomerProfileValues,
@@ -49,8 +50,15 @@ export function CreateBusinessAccountModal({
   const [brandProfile, setBrandProfile] = useState<BrandProfileValues>({ ...EMPTY_BRAND_PROFILE });
   const [businessType, setBusinessType] = useState<'customer' | 'vendor' | 'brand'>('customer');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const {
+    bannerError,
+    fieldErrors,
+    setFieldErrors,
+    clearErrors,
+    clearFieldError,
+    applyApiError,
+    applyValidationErrors,
+  } = useFormFeedback();
   const [brandSubmitted, setBrandSubmitted] = useState(false);
 
   const setFE = (key: string, msg: string) => setFieldErrors(prev => {
@@ -64,8 +72,7 @@ export function CreateBusinessAccountModal({
   useEffect(() => {
     if (!isOpen) {
       setBrandSubmitted(false);
-      setError(null);
-      setFieldErrors({});
+      clearErrors();
       setSubmitting(false);
     }
   }, [isOpen]);
@@ -100,13 +107,12 @@ export function CreateBusinessAccountModal({
       const validation = validateBrandProfile(brandProfile, 'addBusiness');
       if (!validation.success) {
         setFieldErrors(validation.errors);
-        setError(validation.message ?? 'Please fix the highlighted fields before continuing.');
+        applyValidationErrors(validation.errors, validation.message, { toast: false });
         return;
       }
 
       setSubmitting(true);
-      setError(null);
-      setFieldErrors({});
+      clearErrors();
 
       try {
         const res = await fetch('/api/v1/account', {
@@ -115,13 +121,18 @@ export function CreateBusinessAccountModal({
           body: JSON.stringify(buildAddBusinessPayload(brandProfile)),
         });
 
-        const json = await res.json();
+        const json = await parseJsonResponse<{ success: boolean; data?: { account: { id: string }; outlet: { id: string } } }>(res);
         if (!json.success) {
-          setError(json.error?.message ?? 'Could not create business account.');
+          applyApiError(json);
           setSubmitting(false);
           return;
         }
 
+        if (!json.data) {
+          applyValidationErrors({ _server: 'Unexpected server response' }, 'Unexpected server response');
+          setSubmitting(false);
+          return;
+        }
         toast.success('Brand application submitted for review.');
         const newAccount = json.data.account;
         const newOutlet = json.data.outlet;
@@ -131,7 +142,7 @@ export function CreateBusinessAccountModal({
         setBrandSubmitted(true);
         setSubmitting(false);
       } catch {
-        setError('Network error — please try again.');
+        applyValidationErrors({ _server: 'Network error — please try again.' }, 'Network error — please try again.');
         setSubmitting(false);
       }
       return;
@@ -140,13 +151,12 @@ export function CreateBusinessAccountModal({
     const validation = validateCustomerProfile(profile, 'addBusiness');
     if (!validation.success) {
       setFieldErrors(validation.errors);
-      setError(validation.message ?? 'Please fix the highlighted fields before continuing.');
+      applyValidationErrors(validation.errors, validation.message, { dataField: true, toast: false });
       return;
     }
 
     setSubmitting(true);
-    setError(null);
-    setFieldErrors({});
+    clearErrors();
 
     const isCustomer = businessType === 'customer';
     const isVendor = businessType === 'vendor';
@@ -199,9 +209,15 @@ export function CreateBusinessAccountModal({
         body: JSON.stringify(payload),
       });
 
-      const json = await res.json();
+      const json = await parseJsonResponse<{ success: boolean; data?: { account: { id: string }; outlet: { id: string } } }>(res);
       if (!json.success) {
-        setError(json.error?.message ?? 'Could not create business account.');
+        applyApiError(json, { dataField: true, onFieldError: (_f, fields) => setFieldErrors(fields) });
+        setSubmitting(false);
+        return;
+      }
+
+      if (!json.data) {
+        applyValidationErrors({ _server: 'Unexpected server response' }, 'Unexpected server response');
         setSubmitting(false);
         return;
       }
@@ -242,7 +258,7 @@ export function CreateBusinessAccountModal({
         window.location.assign('/');
       }
     } catch {
-      setError('Network error — please try again.');
+      applyValidationErrors({ _server: 'Network error — please try again.' }, 'Network error — please try again.');
       setSubmitting(false);
     }
   };
@@ -296,6 +312,8 @@ export function CreateBusinessAccountModal({
             <X size={16} className="text-gray-400 hover:text-gray-700" />
           </button>
         </div>
+
+        <FormErrorBanner message={bannerError} className="mx-6" />
 
         <div className="p-6 overflow-y-auto flex-1 space-y-5">
           <div>
@@ -377,12 +395,6 @@ export function CreateBusinessAccountModal({
             />
           )}
 
-          {error && (
-            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-xl">
-              <AlertCircle size={15} className="text-red-500 shrink-0 mt-0.5" />
-              <p className="text-[12px] text-red-600 font-medium leading-normal">{error}</p>
-            </div>
-          )}
         </div>
 
         <div className="p-5 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0 bg-gray-50/50">

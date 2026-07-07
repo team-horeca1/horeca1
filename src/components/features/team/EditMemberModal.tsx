@@ -8,6 +8,9 @@ import {
 import type { RoleItem } from './AddMemberWizard';
 import { PermissionMatrix, countMatrixPermissions } from './PermissionMatrix';
 import type { RoleScope } from '@/lib/permissions/portalFeatures';
+import { FormErrorBanner, useFormFeedback } from '@/components/ui/form';
+import { parseJsonResponse } from '@/lib/apiError';
+import { toast } from 'sonner';
 
 interface OutletItem {
   id: string;
@@ -106,7 +109,7 @@ export function EditMemberModal({
   const [sfPay, setSfPay] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { bannerError, clearErrors, applyApiError, applyValidationErrors } = useFormFeedback();
 
   useEffect(() => {
     if (!hasMemberGet) {
@@ -146,7 +149,7 @@ export function EditMemberModal({
         }
       })
       .catch(() => {
-        setError('Failed to load member details');
+        applyValidationErrors({ _server: 'Failed to load member details' }, 'Failed to load member details');
       })
       .finally(() => {
         setLoading(false);
@@ -182,13 +185,13 @@ export function EditMemberModal({
 
   const handleSave = async () => {
     setSubmitting(true);
-    setError(null);
+    clearErrors();
     try {
       let body: Record<string, unknown>;
 
       if (isAccountScope) {
         if (!selectedRoleId) {
-          setError('Pick a role');
+          applyValidationErrors({}, 'Pick a role');
           setSubmitting(false);
           return;
         }
@@ -197,14 +200,14 @@ export function EditMemberModal({
         };
       } else if (isPortalScope) {
         if (!selectedRoleId && Object.keys(permissions).length === 0) {
-          setError('Select at least one permission');
+          applyValidationErrors({}, 'Select at least one permission');
           setSubmitting(false);
           return;
         }
         body = isDirty ? { permissions } : { roleId: selectedRoleId };
       } else {
         if (Object.keys(permissions).length === 0) {
-          setError('Select at least one permission');
+          applyValidationErrors({}, 'Select at least one permission');
           setSubmitting(false);
           return;
         }
@@ -221,11 +224,15 @@ export function EditMemberModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error?.message ?? 'Failed to save');
+      const json = await parseJsonResponse(res);
+      if (!json.success) {
+        applyApiError(json);
+        return;
+      }
       onSaved();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save');
+      const msg = err instanceof Error ? err.message : 'Failed to save';
+      applyValidationErrors({ _server: msg }, msg);
     } finally {
       setSubmitting(false);
     }
@@ -253,6 +260,8 @@ export function EditMemberModal({
             <X size={16} className="text-[#7C7C7C]" />
           </button>
         </div>
+
+        <FormErrorBanner message={bannerError} className="mx-6" />
 
         {loading ? (
           <div className="flex-1 flex items-center justify-center py-16">
@@ -397,11 +406,6 @@ export function EditMemberModal({
               </section>
             )}
 
-            {error && (
-              <div className="flex items-center gap-2 text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-[10px] p-3">
-                <AlertCircle size={14} className="shrink-0" /> {error}
-              </div>
-            )}
           </div>
         )}
 

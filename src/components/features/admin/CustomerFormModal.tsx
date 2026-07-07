@@ -8,7 +8,8 @@ import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { FORM } from '@/components/ui/form';
+import { FORM, FormErrorBanner, useFormFeedback } from '@/components/ui/form';
+import { parseJsonResponse } from '@/lib/apiError';
 import {
   CustomerProfileForm,
   type CustomerProfileValues,
@@ -36,10 +37,27 @@ interface Props {
 
 type Tab = 'overview' | 'other' | 'address' | 'contacts' | 'remarks';
 
+const CUSTOMER_FIELD_ORDER = [
+  'firstName', 'legalName', 'businessType', 'phone', 'email', 'password',
+  'gstin', 'pan', 'outletName', 'addressLine', 'pincode',
+];
+
+function tabForCustomerErrors(errors: Record<string, string>): Tab {
+  const keys = Object.keys(errors);
+  if (keys.some((k) => ['remarks', 'manualTags'].includes(k))) return 'remarks';
+  if (keys.some((k) => k.startsWith('contact'))) return 'contacts';
+  if (keys.some((k) => ['addressLine', 'pincode', 'city', 'state', 'outletName', 'billingPincode'].includes(k))) {
+    return 'address';
+  }
+  if (keys.some((k) => ['gstin', 'pan', 'customerType', 'gstTreatment', 'paymentTerms', 'creditLimit', 'taxPreference'].includes(k))) {
+    return 'other';
+  }
+  return 'overview';
+}
+
 export default function CustomerFormModal({ mode, userId, initial, onClose, onSaved }: Props) {
   const [tab, setTab] = useState<Tab>('overview');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showPwd, setShowPwd] = useState(false);
   const [password, setPassword] = useState('');
   const [profile, setProfile] = useState<CustomerProfileValues>({
@@ -48,23 +66,53 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
   });
   const [contacts, setContacts] = useState<ContactPerson[]>(initial?.contactPersons ?? []);
 
+  const {
+    bannerError,
+    fieldErrors,
+    clearErrors,
+    clearFieldError,
+    applyApiError,
+    applyValidationErrors,
+  } = useFormFeedback();
+
   const derivedName = derivedFullName(profile);
   const primaryPhone = primaryPhoneDigits(profile);
 
+  const switchTabForErrors = (errors: Record<string, string>) => {
+    setTab(tabForCustomerErrors(errors));
+  };
+
   const handleSubmit = async () => {
-    setError(null);
+    clearErrors();
     const validation = validateCustomerProfile(
       { ...profile, password: mode === 'create' ? password : undefined },
       mode === 'create' ? 'adminCreate' : 'adminCreate',
     );
     if (!validation.success) {
-      setError(validation.message ?? 'Please fix the highlighted fields');
-      if (validation.errors.legalName || validation.errors.firstName || validation.errors.phone) setTab('overview');
+      applyValidationErrors(validation.errors, validation.message, {
+        fieldOrder: CUSTOMER_FIELD_ORDER,
+        dataField: true,
+        onFieldError: () => switchTabForErrors(validation.errors),
+      });
       return;
     }
-    if (!derivedName) { setTab('overview'); setError('Enter a display name, company name, or contact name'); return; }
+    if (!derivedName) {
+      const errs = { firstName: 'Enter a display name, company name, or contact name' };
+      setTab('overview');
+      applyValidationErrors(errs, 'Enter a display name, company name, or contact name', {
+        fieldOrder: CUSTOMER_FIELD_ORDER,
+        dataField: true,
+      });
+      return;
+    }
     if (mode === 'create' && (!primaryPhone || primaryPhone.length !== 10)) {
-      setTab('overview'); setError('Enter a valid 10-digit mobile or work phone'); return;
+      const errs = { phone: 'Enter a valid 10-digit mobile or work phone' };
+      setTab('overview');
+      applyValidationErrors(errs, 'Enter a valid 10-digit mobile or work phone', {
+        fieldOrder: CUSTOMER_FIELD_ORDER,
+        dataField: true,
+      });
+      return;
     }
 
     setSubmitting(true);
@@ -93,12 +141,21 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
           body: JSON.stringify({ companyProfile }),
         });
       }
-      const json = await res.json();
-      if (!json.success) { setError(json.error?.message || json.error || 'Failed to save customer'); return; }
+      const json = await parseJsonResponse(res);
+      if (!json.success) {
+        applyApiError(json, {
+          fieldOrder: CUSTOMER_FIELD_ORDER,
+          dataField: true,
+          onFieldError: (_field, fields) => switchTabForErrors(fields),
+        });
+        return;
+      }
       toast.success(mode === 'create' ? 'Customer created' : 'Customer updated');
       onSaved();
-    } catch {
-      setError('Something went wrong');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong';
+      toast.error(msg);
+      applyValidationErrors({ _server: msg }, msg, { toast: false });
     } finally {
       setSubmitting(false);
     }
@@ -120,6 +177,16 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
     remarks: { remarks: true },
   };
 
+  const handleProfileChange = (patch: Partial<CustomerProfileValues>) => {
+    setProfile((prev) => {
+      const next = { ...prev, ...patch };
+      for (const key of Object.keys(patch)) {
+        if (fieldErrors[key]) clearFieldError(key);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-[10000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
       <div className="bg-white rounded-[18px] shadow-2xl w-full max-w-[820px] max-h-[94vh] flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
@@ -138,16 +205,17 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
           ))}
         </div>
 
-        <div className="p-6 overflow-y-auto flex-1 min-h-0">
-          {error && <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-[13px] text-red-600 font-medium">{error}</div>}
+        <FormErrorBanner message={bannerError} className="mx-7" />
 
+        <div className="p-6 overflow-y-auto flex-1 min-h-0">
           <CustomerProfileForm
             value={profile}
-            onChange={patch => setProfile(prev => ({ ...prev, ...patch }))}
+            onChange={handleProfileChange}
             visibleSections={tabSections[tab]}
+            errors={fieldErrors}
             showPassword={mode === 'create' && tab === 'overview'}
             password={password}
-            onPasswordChange={setPassword}
+            onPasswordChange={(v) => { setPassword(v); if (fieldErrors.password) clearFieldError('password'); }}
             showPasswordToggle
             passwordVisible={showPwd}
             onTogglePassword={() => setShowPwd(v => !v)}

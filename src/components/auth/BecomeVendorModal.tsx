@@ -15,7 +15,8 @@ import { X, Store, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSession } from 'next-auth/react';
 import { cn } from '@/lib/utils';
-import { FORM, TextField, FormField, FormTextarea } from '@/components/ui/form';
+import { FORM, TextField, FormField, FormTextarea, FormErrorBanner, useFormFeedback } from '@/components/ui/form';
+import { parseJsonResponse } from '@/lib/apiError';
 
 interface BecomeVendorModalProps {
   isOpen: boolean;
@@ -34,7 +35,14 @@ export function BecomeVendorModal({
   const [gstNumber, setGstNumber] = useState(defaultGstNumber);
   const [minOrderValue, setMinOrderValue] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    bannerError,
+    fieldErrors,
+    clearErrors,
+    clearFieldError,
+    applyApiError,
+    applyValidationErrors,
+  } = useFormFeedback();
 
   if (!isOpen) return null;
 
@@ -42,15 +50,19 @@ export function BecomeVendorModal({
 
   const handleSubmit = async () => {
     if (!activeAccountId) {
-      setError('No active business account. Please pick an account from the navbar switcher first.');
+      applyValidationErrors({}, 'No active business account. Please pick an account from the navbar switcher first.');
       return;
     }
     if (!businessName.trim() || businessName.trim().length < 2) {
-      setError('Business name is required (at least 2 characters)');
+      applyValidationErrors(
+        { businessName: 'Business name is required (at least 2 characters)' },
+        'Business name is required (at least 2 characters)',
+        { dataField: true },
+      );
       return;
     }
     setSubmitting(true);
-    setError(null);
+    clearErrors();
     try {
       const res = await fetch(`/api/v1/account/${activeAccountId}/become-vendor`, {
         method: 'POST',
@@ -62,9 +74,12 @@ export function BecomeVendorModal({
           minOrderValue: minOrderValue ? Number(minOrderValue) : undefined,
         }),
       });
-      const json = await res.json();
+      const json = await parseJsonResponse(res);
       if (!json.success) {
-        setError(json.error?.message ?? 'Could not submit application');
+        applyApiError(json, {
+          fieldOrder: ['businessName'],
+          dataField: true,
+        });
         setSubmitting(false);
         return;
       }
@@ -83,7 +98,7 @@ export function BecomeVendorModal({
       onClose();
       window.location.assign('/vendor/dashboard');
     } catch {
-      setError('Network error — try again');
+      applyValidationErrors({ _server: 'Network error — try again' }, 'Network error — try again');
       setSubmitting(false);
     }
   };
@@ -110,14 +125,19 @@ export function BecomeVendorModal({
           </button>
         </div>
 
+        <FormErrorBanner message={bannerError} className="mx-6 mt-0" />
+
         <div className="p-6 overflow-y-auto flex-1 space-y-4">
-          <Field
-            label="Legal Business Name"
-            required
-            value={businessName}
-            onChange={setBusinessName}
-            placeholder="e.g. Dairy Direct Wholesale"
-          />
+          <div data-field="businessName">
+            <TextField
+              label="Legal Business Name"
+              required
+              value={businessName}
+              onChange={v => { setBusinessName(v); if (fieldErrors.businessName) clearFieldError('businessName'); }}
+              placeholder="e.g. Dairy Direct Wholesale"
+              error={fieldErrors.businessName}
+            />
+          </div>
           <Field
             label="Short description"
             value={description}
@@ -152,9 +172,6 @@ export function BecomeVendorModal({
             </ol>
           </div>
 
-          {error && (
-            <p className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-lg p-2.5 leading-normal">{error}</p>
-          )}
         </div>
 
         <div className="p-5 border-t border-gray-100 flex items-center justify-end gap-3 bg-gray-50/50">

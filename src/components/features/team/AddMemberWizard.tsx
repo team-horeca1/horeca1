@@ -6,9 +6,11 @@ import {
   Loader2, AlertCircle, Store, ShoppingCart, CreditCard, Eye,
   Crown, Shield, Users, DollarSign, Package, Archive, Edit3,
 } from 'lucide-react';
-import { PasswordField } from '@/components/ui/form';
+import { PasswordField, FormErrorBanner, useFormFeedback } from '@/components/ui/form';
+import { parseJsonResponse } from '@/lib/apiError';
 import { InviteSuccessModal, type InviteMeta } from '@/components/features/team/InviteSuccessModal';
 import { PermissionMatrix, countMatrixPermissions } from '@/components/features/team/PermissionMatrix';
+import { toast } from 'sonner';
 import type { RoleScope } from '@/lib/permissions/portalFeatures';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -178,7 +180,14 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   const [sfPay, setSfPay] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    bannerError,
+    fieldErrors,
+    setFieldErrors,
+    clearErrors,
+    applyApiError,
+    applyValidationErrors,
+  } = useFormFeedback();
   const [inviteMeta, setInviteMeta] = useState<InviteMeta | null>(null);
   const [invitedMemberName, setInvitedMemberName] = useState('');
   const [savedMemberData, setSavedMemberData] = useState<unknown>(null);
@@ -247,29 +256,41 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
     });
   };
 
+  const goToStepForField = (field?: string) => {
+    if (!field) return;
+    if (['identifier', 'fullName', 'password', 'phone', 'email'].includes(field)) {
+      setStep(1);
+      return;
+    }
+    if (!skipOutletStep && field === 'outlets') setStep(2);
+  };
+
   const handleNext = () => {
-    setError(null);
+    clearErrors();
+    setIdentifierError(null);
     if (step === 1) {
       const trimmed = identifier.trim();
-      if (!trimmed) { setError('Email or phone is required'); return; }
-      const parsed = parseIdentifier(trimmed);
-      if (!parsed) {
-        setError('Enter a valid email address or 10-digit mobile number');
-        setIdentifierError('Enter a valid email address or 10-digit mobile number');
-        return;
+      const stepErrors: Record<string, string> = {};
+      if (!trimmed) stepErrors.identifier = 'Email or phone is required';
+      else if (!parseIdentifier(trimmed)) {
+        stepErrors.identifier = 'Enter a valid email address or 10-digit mobile number';
       }
-      if (fullName.trim().length < 2) {
-        setError('Full name is required (at least 2 characters)');
-        return;
-      }
-      if (password.length < 6) {
-        setError('Password is required for new team members (at least 6 characters)');
+      if (fullName.trim().length < 2) stepErrors.fullName = 'Full name is required (at least 2 characters)';
+      if (password.length < 6) stepErrors.password = 'Password is required for new team members (at least 6 characters)';
+      if (Object.keys(stepErrors).length > 0) {
+        if (stepErrors.identifier) setIdentifierError(stepErrors.identifier);
+        applyValidationErrors(stepErrors, 'Please fix the fields below', {
+          fieldOrder: ['identifier', 'fullName', 'password'],
+          dataField: true,
+        });
         return;
       }
       setStep(2);
     } else if (!skipOutletStep && step === 2) {
       if (!allOutlets && selectedOutletIds.size === 0) {
-        setError('Select at least one outlet, or choose "All outlets"');
+        applyValidationErrors({ outlets: 'Select at least one outlet, or choose "All outlets"' }, undefined, {
+          dataField: true,
+        });
         return;
       }
       setStep(3);
@@ -277,7 +298,8 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   };
 
   const handleBack = () => {
-    setError(null);
+    clearErrors();
+    setIdentifierError(null);
     setStep((prev) => (prev > 1 ? prev - 1 : prev));
   };
 
@@ -286,9 +308,13 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
 
   const handleSave = async () => {
     const hasPerms = Object.keys(permissions).length > 0;
-    if (!hasPerms) { setError('Select at least one permission'); return; }
+    if (!hasPerms) {
+      applyValidationErrors({}, 'Select at least one permission');
+      return;
+    }
     setSubmitting(true);
-    setError(null);
+    clearErrors();
+    setIdentifierError(null);
     try {
       const body: Record<string, unknown> = {
         identifier: identifier.trim(),
@@ -306,23 +332,22 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const raw = await res.text();
-      type InviteResponse = {
+      const json = await parseJsonResponse<{
         success?: boolean;
         data?: TeamMember & { inviteMeta?: InviteMeta };
-        error?: { message?: string };
-      };
-      let json: InviteResponse;
-      try {
-        json = JSON.parse(raw) as InviteResponse;
-      } catch {
-        throw new Error(
-          res.ok
-            ? 'Server returned an invalid response. Please try again.'
-            : `Request failed (${res.status}). The server may be busy — try again.`,
-        );
+        error?: { message?: string; details?: { field?: string } };
+      }>(res);
+      if (!json.success) {
+        applyApiError(json, {
+          fieldOrder: ['identifier', 'fullName', 'password'],
+          dataField: true,
+          onFieldError: (field, fields) => {
+            if (fields.identifier) setIdentifierError(fields.identifier);
+            goToStepForField(field);
+          },
+        });
+        return;
       }
-      if (!json.success) throw new Error(json.error?.message ?? 'Failed to add member');
 
       const meta = json.data?.inviteMeta;
       if (meta?.tempPassword) {
@@ -334,7 +359,9 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
         onClose();
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to add member');
+      const msg = err instanceof Error ? err.message : 'Failed to add member';
+      applyValidationErrors({ _server: msg }, msg, { toast: false });
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -387,14 +414,18 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
           </div>
         </div>
 
+        <FormErrorBanner message={bannerError} className="mx-6" />
+
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-5 min-h-0">
           {step === 1 && (
             <Step1UserInfo
               identifier={identifier} setIdentifier={setIdentifier}
-              identifierError={identifierError} setIdentifierError={setIdentifierError}
+              identifierError={identifierError ?? fieldErrors.identifier ?? null}
+              setIdentifierError={setIdentifierError}
               fullName={fullName} setFullName={setFullName}
               password={password} setPassword={setPassword}
+              fieldErrors={fieldErrors}
             />
           )}
           {isOutletStep && (
@@ -424,11 +455,6 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
             />
           )}
 
-          {error && (
-            <div className="mt-4 flex items-center gap-2 text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-[10px] p-3">
-              <AlertCircle size={14} className="shrink-0" /> {error}
-            </div>
-          )}
         </div>
 
         {/* Footer */}
@@ -475,12 +501,13 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
 
 function Step1UserInfo({
   identifier, setIdentifier, identifierError, setIdentifierError, fullName, setFullName,
-  password, setPassword,
+  password, setPassword, fieldErrors = {},
 }: {
   identifier: string; setIdentifier: (v: string) => void;
   identifierError: string | null; setIdentifierError: (v: string | null) => void;
   fullName: string; setFullName: (v: string) => void;
   password: string; setPassword: (v: string) => void;
+  fieldErrors?: Record<string, string>;
 }) {
   const handleBlur = () => {
     const trimmed = identifier.trim();
@@ -494,7 +521,7 @@ function Step1UserInfo({
 
   return (
     <div className="space-y-4 max-w-[520px]">
-      <div>
+      <div data-field="identifier">
         <label className="block text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-1.5">
           Email or Phone <span className="text-red-400">*</span>
         </label>
@@ -518,7 +545,7 @@ function Step1UserInfo({
         </p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
+        <div data-field="fullName">
           <label className="block text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-1.5">
             Full Name <span className="text-red-400">*</span>
           </label>
@@ -526,19 +553,22 @@ function Step1UserInfo({
             type="text" autoComplete="off"
             value={fullName} onChange={e => setFullName(e.target.value)}
             placeholder="e.g. Rahul Sharma"
-            className="w-full h-[46px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+            className={`w-full h-[46px] border rounded-[10px] px-4 text-[14px] outline-none focus:ring-2 bg-[#FAFAFA] focus:bg-white transition-all ${
+              fieldErrors.fullName ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-[#EEEEEE] focus:border-[#299E60]/40 focus:ring-[#299E60]/10'
+            }`}
           />
+          {fieldErrors.fullName && <p className="text-[11px] text-red-600 mt-1.5">{fieldErrors.fullName}</p>}
         </div>
-        <div>
+        <div data-field="password">
           <label className="block text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-1.5">
             Password <span className="text-red-400">*</span>
           </label>
           <PasswordField
             name="newMemberPassword" autoComplete="new-password"
             value={password} onChange={setPassword}
-            placeholder="At least 6 characters"
-            inputClassName="w-full h-[46px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+            inputClassName={fieldErrors.password ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : undefined}
           />
+          {fieldErrors.password && <p className="text-[11px] text-red-600 mt-1.5">{fieldErrors.password}</p>}
         </div>
       </div>
     </div>

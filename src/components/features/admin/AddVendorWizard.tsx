@@ -36,7 +36,8 @@ import {
 } from '@/lib/validators/vendor-profile';
 import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 import { cn } from '@/lib/utils';
-import { FORM, FormField as Field, FormInput, SectionLabel, selectClass, textareaClass } from '@/components/ui/form';
+import { FORM, FormField as Field, FormInput, SectionLabel, selectClass, textareaClass, FormErrorBanner, useFormFeedback } from '@/components/ui/form';
+import { parseJsonResponse } from '@/lib/apiError';
 
 interface Props {
   onClose: () => void;
@@ -67,10 +68,21 @@ const DELIVERY_LABEL: Record<DeliveryCapability, string> = {
   both:        'Both — own + third-party',
 };
 
+function vendorStepForField(field?: string): 1 | 2 | 3 {
+  if (!field) return 1;
+  if (['fullName', 'phone', 'email', 'password', 'businessName'].includes(field)) return 1;
+  if (
+    ['billingAddressLine', 'billingAddressCity', 'billingAddressState', 'billingAddressPincode',
+      'pickupAddressLine', 'pickupAddressCity', 'pickupAddressState', 'pickupAddressPincode',
+      'outletName', 'serviceablePincodes', 'deliveryCapability'].includes(field)
+  ) return 3;
+  return 2;
+}
+
 export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/admin/vendors' }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { bannerError, clearErrors, applyApiError, applyValidationErrors } = useFormFeedback();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const [vendorProfile, setVendorProfile] = useState<VendorProfileValues>({ ...EMPTY_VENDOR_PROFILE });
@@ -157,11 +169,11 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
   };
 
   const handleNext = () => {
-    setError(null);
+    clearErrors();
     const errors = validateStep(step);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      setError('Please complete the required fields and fix any errors.');
+      applyValidationErrors(errors, 'Please complete the required fields and fix any errors.', { toast: false });
       return;
     }
     setFieldErrors({});
@@ -171,7 +183,7 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
       setStep(3);
     }
   };
-  const handleBack = () => { setError(null); setStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s)); };
+  const handleBack = () => { clearErrors(); setStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s)); };
 
   const handleAddPincode = () => {
     const value = pincodeInput.trim();
@@ -192,21 +204,17 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
   };
 
   const handleSubmit = async () => {
-    setError(null);
+    clearErrors();
     const errors1 = validateStep(1);
     const errors2 = validateStep(2);
     const errors3 = validateStep(3);
     const allErrors = { ...errors1, ...errors2, ...errors3 };
     if (Object.keys(allErrors).length > 0) {
       setFieldErrors(allErrors);
-      if (Object.keys(errors1).length > 0) {
-        setStep(1);
-      } else if (Object.keys(errors2).length > 0) {
-        setStep(2);
-      } else {
-        setStep(3);
-      }
-      setError('Some fields are incomplete or invalid. Please check all steps.');
+      if (Object.keys(errors1).length > 0) setStep(1);
+      else if (Object.keys(errors2).length > 0) setStep(2);
+      else setStep(3);
+      applyValidationErrors(allErrors, 'Some fields are incomplete or invalid. Please check all steps.', { toast: false });
       return;
     }
     setFieldErrors({});
@@ -276,16 +284,29 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const json = await res.json();
+      const json = await parseJsonResponse<{
+        success: boolean;
+        data?: { vendor?: { id: string; businessName: string; slug: string; user: { id: string; fullName: string; email: string } }; businessName?: string };
+      }>(res);
       if (!json.success) {
-        setError(json.error?.message || json.error || 'Failed to create vendor');
+        applyApiError(json, {
+          onFieldError: (field, fields) => {
+            setFieldErrors((prev) => ({ ...prev, ...fields }));
+            setStep(vendorStepForField(field));
+          },
+        });
         return;
       }
       const created = json.data?.vendor ?? json.data;
+      if (!created || typeof created !== 'object' || !('businessName' in created)) {
+        applyValidationErrors({ _server: 'Unexpected server response' }, 'Unexpected server response');
+        return;
+      }
       toast.success(`${created.businessName} created`);
-      onCreated(created);
+      onCreated(created as { id: string; businessName: string; slug: string; user: { id: string; fullName: string; email: string } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create vendor');
+      const msg = err instanceof Error ? err.message : 'Failed to create vendor';
+      applyValidationErrors({ _server: msg }, msg);
     } finally {
       setSubmitting(false);
     }
@@ -320,6 +341,8 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
             ))}
           </div>
         </div>
+
+        <FormErrorBanner message={bannerError} className="mx-6" />
 
         {/* Body — autoComplete handled per-input (autoComplete on the outer
             <div> isn't a valid React prop and TS bails). */}
@@ -715,11 +738,6 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
             </div>
           )}
 
-          {error && (
-            <div className="mt-4 flex items-center gap-2 text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-[10px] p-3">
-              <AlertCircle size={14} className="shrink-0" /> {error}
-            </div>
-          )}
         </div>
 
         {/* Footer */}

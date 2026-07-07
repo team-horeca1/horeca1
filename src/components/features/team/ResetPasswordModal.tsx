@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { KeyRound, X, AlertCircle, Loader2, Shuffle, Copy, Check } from 'lucide-react';
-import { PasswordField } from '@/components/ui/form';
+import { PasswordField, FormErrorBanner, useFormFeedback } from '@/components/ui/form';
+import { parseJsonResponse } from '@/lib/apiError';
 
 interface Props {
   member: { user: { fullName: string; email: string | null; phone: string | null } };
@@ -24,7 +25,7 @@ function generatePassword(): string {
 export function ResetPasswordModal({ member, passwordEndpoint, accent, onClose, showGenerate = false }: Props) {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { bannerError, clearErrors, applyApiError, applyValidationErrors } = useFormFeedback();
   const [done, setDone] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -41,24 +42,32 @@ export function ResetPasswordModal({ member, passwordEndpoint, accent, onClose, 
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setError('Could not copy to clipboard');
+      applyValidationErrors({ _server: 'Could not copy to clipboard' }, 'Could not copy to clipboard');
     }
   };
 
   const handleSubmit = async () => {
-    if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
+    if (password.length < 6) {
+      applyValidationErrors({ password: 'Password must be at least 6 characters' }, 'Password must be at least 6 characters', { dataField: true });
+      return;
+    }
     try {
-      setSubmitting(true); setError(null);
+      setSubmitting(true);
+      clearErrors();
       const res = await fetch(passwordEndpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error?.message || 'Failed');
+      const json = await parseJsonResponse(res);
+      if (!json.success) {
+        applyApiError(json, { fieldOrder: ['password'], dataField: true });
+        return;
+      }
       setDone(true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed');
+      const msg = err instanceof Error ? err.message : 'Failed';
+      applyValidationErrors({ _server: msg }, msg);
     } finally { setSubmitting(false); }
   };
 
@@ -72,6 +81,7 @@ export function ResetPasswordModal({ member, passwordEndpoint, accent, onClose, 
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100"><X size={16} className="text-[#7C7C7C]" /></button>
         </div>
+        <FormErrorBanner message={bannerError} className="mb-4" />
         {done ? (
           <div className="text-center py-4">
             <p className="text-[14px] font-bold text-green-700 mb-1">Password updated</p>
@@ -112,11 +122,6 @@ export function ResetPasswordModal({ member, passwordEndpoint, accent, onClose, 
                 )}
               </div>
             </div>
-            {error && (
-              <div className="flex items-center gap-2 text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-[8px] p-2.5">
-                <AlertCircle size={14} /> {error}
-              </div>
-            )}
             <div className="flex gap-3 pt-1">
               <button onClick={handleSubmit} disabled={submitting || password.length < 6}
                 className="flex-1 h-[44px] text-white rounded-[10px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"

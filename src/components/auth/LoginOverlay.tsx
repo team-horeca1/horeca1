@@ -4,6 +4,8 @@ import React, { useState, useRef, useCallback } from 'react';
 import { X, AtSign, Mail, Loader2, ArrowLeft, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { FormErrorBanner } from '@/components/ui/form';
+import { toast } from 'sonner';
 import { signIn } from 'next-auth/react';
 import { markFreshLoginPendingPicker } from '@/lib/postLoginPicker';
 
@@ -28,6 +30,11 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
+
+  const showError = useCallback((msg: string) => {
+    setError(msg);
+    toast.error(msg);
+  }, []);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const otpRefs = [
     useRef<HTMLInputElement>(null),
@@ -86,11 +93,11 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!data.success) { setError(data.error || 'Failed to send OTP'); return; }
+      if (!data.success) { showError(data.error || 'Failed to send OTP'); return; }
       setStep('otp');
       startResendTimer();
       setTimeout(() => otpRefs[0].current?.focus(), 100);
-    } catch { setError('Failed to send OTP. Please try again.'); }
+    } catch { showError('Failed to send OTP. Please try again.'); }
     finally { setIsLoading(false); }
   };
 
@@ -135,7 +142,7 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
         redirect: false,
       });
       if (result?.error) {
-        setError('Invalid or expired OTP. Please try again.');
+        showError('Invalid or expired OTP. Please try again.');
         setOtp(['', '', '', '']);
         setTimeout(() => otpRefs[0].current?.focus(), 50);
       } else {
@@ -143,7 +150,7 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
         router.refresh();
         onLoginSuccess();
       }
-    } catch { setError('Something went wrong. Please try again.'); }
+    } catch { showError('Something went wrong. Please try again.'); }
     finally { setIsLoading(false); }
   };
 
@@ -172,11 +179,7 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
             </button>
           </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-[13px] text-red-600 font-medium text-center">
-              {error}
-            </div>
-          )}
+          <FormErrorBanner message={error || null} className="mb-4 text-center [&_span]:w-full" />
 
           {step === 'identifier' ? (
             <>

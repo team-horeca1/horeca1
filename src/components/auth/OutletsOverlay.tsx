@@ -6,6 +6,8 @@ import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { cn } from '@/lib/utils';
+import { FormErrorBanner } from '@/components/ui/form';
+import { toast } from 'sonner';
 
 interface Outlet {
   id: string;
@@ -258,7 +260,9 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
     const json = await res.json();
     setSubmitting(false);
     if (!json.success) {
-      setError(json.error?.message ?? 'Could not save outlet');
+      const msg = json.error?.message ?? 'Could not save outlet';
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -292,6 +296,8 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-gray-100"><X size={16} /></button>
         </div>
+
+        <FormErrorBanner message={error} className="mx-5" />
 
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
           <AddressAutocomplete
@@ -360,9 +366,6 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
             </div>
           )}
 
-          {error && (
-            <p className="text-[12px] text-red-600 bg-red-50 border border-red-100 rounded-lg p-2.5">{error}</p>
-          )}
         </div>
 
         <div className="p-4 border-t border-[#F0F0F0] flex items-center justify-end gap-2 shrink-0 bg-[#F9F9F9]">

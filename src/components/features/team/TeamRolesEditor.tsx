@@ -13,6 +13,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Copy, Trash2, X, ChevronLeft } from 'lucide-react';
 import { PermissionMatrix, countMatrixPermissions } from './PermissionMatrix';
+import { FormErrorBanner } from '@/components/ui/form';
+import { parseJsonResponse } from '@/lib/apiError';
+import { toast } from 'sonner';
 import type { RoleScope } from '@/lib/permissions/portalFeatures';
 
 type PermissionsJson = Record<string, Record<string, boolean>>;
@@ -231,11 +234,11 @@ function RoleEditorModal({
     const [description, setDescription] = useState(seed?.description ?? '');
     const [permissions, setPermissions] = useState<PermissionsJson>(() => structuredClone(seed?.permissions ?? {}));
     const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [bannerError, setBannerError] = useState<string | null>(null);
 
     const submit = async () => {
         setSubmitting(true);
-        setError(null);
+        setBannerError(null);
         const url = existing ? `${endpointBase}/${existing.id}` : endpointBase;
         const method = existing ? 'PATCH' : 'POST';
         const body = existing
@@ -246,10 +249,15 @@ function RoleEditorModal({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
         });
-        const json = await res.json();
+        const json = await parseJsonResponse(res);
         setSubmitting(false);
         if (json.success) onSaved();
-        else setError(json.error?.message ?? 'Could not save role');
+        else {
+            const err = json.error;
+            const msg = typeof err === 'string' ? err : err?.message ?? 'Could not save role';
+            setBannerError(msg);
+            toast.error(msg);
+        }
     };
 
     return (
@@ -264,6 +272,8 @@ function RoleEditorModal({
                     </div>
                     <button onClick={onClose} className="p-1 rounded hover:bg-gray-100"><X size={16} /></button>
                 </div>
+
+                <FormErrorBanner message={bannerError} className="mx-5" />
 
                 <div className="p-5 overflow-y-auto flex-1 space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -300,7 +310,6 @@ function RoleEditorModal({
                 <div className="p-4 border-t border-[#F0F0F0] flex items-center justify-between shrink-0 bg-[#F9F9F9]">
                     <p className="text-[11px] text-[#AEAEAE] font-semibold">{countMatrixPermissions(permissions, scope)} permission(s) selected</p>
                     <div className="flex items-center gap-2">
-                        {error && <p className="text-[12px] text-red-500 mr-2">{error}</p>}
                         <button onClick={onClose} className="px-4 py-2 text-[13px] font-semibold text-[#666] hover:bg-gray-100 rounded-xl">Cancel</button>
                         <button
                             onClick={submit}

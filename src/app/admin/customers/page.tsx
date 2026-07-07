@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import CustomerFormModal from '@/components/features/admin/CustomerFormModal';
+import { FormErrorBanner } from '@/components/ui/form';
 
 interface AdminUser {
     id: string;
@@ -785,9 +786,11 @@ function ImportCustomersModal({ onClose, onImported }: { onClose: () => void; on
                 onImported();
             } else {
                 setError(json.error?.message || json.error || 'Failed to import customers');
+                toast.error(json.error?.message || json.error || 'Failed to import customers');
             }
         } catch {
             setError('Failed to import customers');
+            toast.error('Failed to import customers');
         } finally {
             setLoading(false);
         }
@@ -795,20 +798,17 @@ function ImportCustomersModal({ onClose, onImported }: { onClose: () => void; on
 
     return (
         <div className="fixed inset-0 z-[10000] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-[640px] max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                <div className="px-6 py-4 border-b border-[#EEEEEE] flex items-center justify-between">
+            <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-[640px] max-h-[92vh] flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                <div className="px-6 py-4 border-b border-[#EEEEEE] flex items-center justify-between shrink-0">
                     <h2 className="text-[18px] font-[800] text-[#181725]">Bulk Import Customers</h2>
                     <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400">
                         <X size={18} />
                     </button>
                 </div>
 
-                <div className="p-6 space-y-4">
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-[13px] text-red-600 font-medium">
-                            {error}
-                        </div>
-                    )}
+                <FormErrorBanner message={error} className="mx-6" />
+
+                <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
 
                     <div className="space-y-1.5">
                         <label className="text-[12px] font-bold text-gray-700">Link mappings to Vendor (Optional)</label>

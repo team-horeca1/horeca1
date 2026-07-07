@@ -256,7 +256,7 @@ export function CustomerProfileForm({
             <>
               <SectionHeader icon={User} spanClass={SPAN_FULL}>Primary Contact</SectionHeader>
               <FormField label="Primary Contact" className={SPAN_FULL}>
-                <div className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
+                <div data-field="firstName" className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
                   <FormSelect value={value.salutation ?? ''} onChange={v => set({ salutation: v })}>
                     {SALUTATIONS.map(s => <option key={s || 'empty'} value={s}>{s || 'Salutation'}</option>)}
                   </FormSelect>
@@ -280,20 +280,24 @@ export function CustomerProfileForm({
           {visibleSections.business && (
             <>
               <SectionHeader icon={Building2} spanClass={SPAN_FULL}>Business Identity</SectionHeader>
-              <TextField label="Legal Business Name" required value={value.legalName ?? value.companyName ?? ''}
-                error={errors.legalName}
-                onChange={v => set({ legalName: v, companyName: v })}
-                placeholder="Restaurant / hotel / company" />
+              <div data-field="legalName">
+                <TextField label="Legal Business Name" required value={value.legalName ?? value.companyName ?? ''}
+                  error={errors.legalName}
+                  onChange={v => set({ legalName: v, companyName: v })}
+                  placeholder="Restaurant / hotel / company" />
+              </div>
               <TextField label="Trade Name / Display Name" hint="Shown on invoices & lists"
                 value={value.displayName ?? ''} onChange={v => set({ displayName: v })}
                 placeholder="e.g. Rockville Bar & Diner" />
-              <FormField label="Business Type" required>
-                <FormSelect value={value.businessType ?? ''} onChange={handleBusinessTypeChange} hasError={!!errors.businessType}>
-                  <option value="">Select type</option>
-                  {CUSTOMER_BUSINESS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </FormSelect>
-                {errors.businessType && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.businessType}</p>}
-              </FormField>
+              <div data-field="businessType">
+                <FormField label="Business Type" required>
+                  <FormSelect value={value.businessType ?? ''} onChange={handleBusinessTypeChange} hasError={!!errors.businessType}>
+                    <option value="">Select type</option>
+                    {CUSTOMER_BUSINESS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </FormSelect>
+                  {errors.businessType && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.businessType}</p>}
+                </FormField>
+              </div>
               <FormField label="Sub-Type">
                 <FormSelect value={value.subType ?? ''} onChange={handleSubTypeChange} disabled={!value.businessType}>
                   <option value="">Select sub-type</option>
@@ -316,18 +320,23 @@ export function CustomerProfileForm({
           {visibleSections.auth && (
             <>
               <SectionHeader icon={User} spanClass={SPAN_FULL}>Contact &amp; Login</SectionHeader>
-              <TextField label={relaxedContact ? 'Email (optional if mobile provided)' : 'Email (optional)'} type="email" value={value.email ?? ''}
-                error={errors.email} onChange={v => set({ email: v })} placeholder="you@example.com" />
-              <FormField label={relaxedContact ? 'Mobile (optional if email provided)' : 'Mobile'} required={!relaxedContact} error={errors.phone}>
-                <PhoneInput value={value.phone ?? value.mobilePhone ?? ''}
-                  onChange={v => set({ phone: v, mobilePhone: v })} />
-              </FormField>
+              <div data-field="email">
+                <TextField label={relaxedContact ? 'Email (optional if mobile provided)' : 'Email (optional)'} type="email" value={value.email ?? ''}
+                  error={errors.email} onChange={v => set({ email: v })} placeholder="you@example.com" />
+              </div>
+              <div data-field="phone">
+                <FormField label={relaxedContact ? 'Mobile (optional if email provided)' : 'Mobile'} required={!relaxedContact} error={errors.phone}>
+                  <PhoneInput value={value.phone ?? value.mobilePhone ?? ''}
+                    onChange={v => set({ phone: v, mobilePhone: v })} hasError={!!errors.phone} />
+                </FormField>
+              </div>
               <FormField label="Work Phone (optional)">
                 <PhoneInput value={value.workPhone ?? ''} onChange={v => set({ workPhone: v })} placeholder="Work phone" />
               </FormField>
               {showPassword && onPasswordChange && (
-                <FormField label="Password" hint="optional — skip OTP next time" className={SPAN_TWO}
-                  error={errors.password}>
+                <div data-field="password">
+                  <FormField label="Password" hint="optional — skip OTP next time" className={SPAN_TWO}
+                    error={errors.password}>
                   {showPasswordToggle ? (
                     <PasswordInput value={password} onChange={onPasswordChange}
                       placeholder="At least 6 characters" autoComplete="new-password"
@@ -342,6 +351,7 @@ export function CustomerProfileForm({
                       ) : undefined} />
                   )}
                 </FormField>
+                </div>
               )}
             </>
           )}

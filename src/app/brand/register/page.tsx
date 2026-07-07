@@ -8,7 +8,7 @@ import {
   ArrowLeft, ArrowRight, Loader2, CheckCircle2, Phone, Building2, Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { FORM } from '@/components/ui/form';
+import { FORM, FormErrorBanner } from '@/components/ui/form';
 import {
   BrandProfileForm,
   type BrandProfileValues,
@@ -22,6 +22,7 @@ import { buildBrandProfile, buildAddBusinessPayload } from '@/lib/brandProfileMa
 import { ExistingPhoneModal } from '@/components/auth/ExistingPhoneModal';
 import { accountLabelFromCheck } from '@/lib/auth/phoneCheckLabels';
 import type { PhoneCheckResult } from '@/lib/auth/checkPhoneLookup';
+import { toast } from 'sonner';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 
 const EMAIL_REGISTER_ALLOWED = isRegisterEmailOtpEnabled();
@@ -271,7 +272,9 @@ export default function BrandRegisterPage() {
     );
     if (!validation.success) {
       setFieldErrors(validation.errors);
-      setError(validation.message ?? 'Please fix the highlighted fields');
+      const msg = validation.message ?? 'Please fix the highlighted fields';
+      setError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -288,7 +291,9 @@ export default function BrandRegisterPage() {
         });
         const json = await res.json();
         if (!json.success) {
-          setError(json.error?.message ?? 'Could not create brand business.');
+          const msg = json.error?.message ?? 'Could not create brand business.';
+          setError(msg);
+          toast.error(msg);
           setSubmitting(false);
           return;
         }
@@ -324,13 +329,17 @@ export default function BrandRegisterPage() {
       });
       const json = await res.json();
       if (!json.success) {
-        setError(json.error?.message ?? 'Submission failed');
+        const msg = json.error?.message ?? 'Submission failed';
+        setError(msg);
+        toast.error(msg);
         setSubmitting(false);
         return;
       }
       setSubmitted({ hcid: json.data.hcidDisplay });
     } catch {
-      setError('Network error — please try again.');
+      const msg = 'Network error — please try again.';
+      setError(msg);
+      toast.error(msg);
       setSubmitting(false);
     }
   };
@@ -401,11 +410,7 @@ export default function BrandRegisterPage() {
         </div>
 
         <div className="bg-white rounded-[20px] border border-[#EEEEEE] p-6 shadow-sm">
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-100 text-red-600 text-[13px] font-medium px-4 py-3 rounded-xl">
-              {error}
-            </div>
-          )}
+          <FormErrorBanner message={error || null} sticky className="mb-4" />
 
           {step === 1 && !isAuthMode && (
             <div className="space-y-5">
