@@ -21,6 +21,13 @@ interface PromoPreview {
     totalGST: number;
     autoPromos: Array<{ vendorId: string; promotionId: string; promotionName: string; type: string; discount: number }>;
     totalPromoDiscount: number;
+    bxgyFreeItems?: Array<{
+        vendorId: string;
+        productId: string;
+        productName: string;
+        quantity: number;
+        promotionName: string;
+    }>;
 }
 
 function loadRazorpayScript(): Promise<void> {
@@ -61,6 +68,14 @@ import { toast } from 'sonner';
 import { useCart } from '@/context/CartContext';
 import { dal } from '@/lib/dal';
 import { cn } from '@/lib/utils';
+import {
+    VendorPromoBanner,
+    FreeGiftLine,
+    PaidLineWithBonus,
+    PromoSavingsSummary,
+    YourPriceChip,
+} from '@/components/features/promotions/PromotionBenefits';
+import type { VendorPromoSummary } from '@/types';
 
 export default function CartPage() {
     const [screen, setScreen] = useState<'cart' | 'payment' | 'success'>('cart');
@@ -116,43 +131,52 @@ export default function CartPage() {
     };
     const isVendorExpanded = (vendorId: string) => expandedVendors[vendorId] !== false;
 
-    type ShipmentItem = { id: string; name: string; size: string; pcs: number; price: number; image: string; minQty: number; tierLabel: string | null };
+    type ShipmentItem = {
+        id: string;
+        name: string;
+        size: string;
+        pcs: number;
+        price: number;
+        image: string;
+        minQty: number;
+        tierLabel: string | null;
+        isPromoFree?: boolean;
+        bxgyFreeQty?: number;
+        customerPriceApplied?: boolean;
+        originalPrice?: number;
+    };
 
     const shipments = useMemo(() => {
-        if (cart.length === 0) return [];
-        const grouped: Record<string, { vendor: string, vendorId: string, items: ShipmentItem[] }> = {};
-        cart.forEach(item => {
-            const vId = item.product.vendorId || 'general';
-            const vName = item.product.vendorName || 'General Store';
-            if (!grouped[vId]) {
-                grouped[vId] = { vendor: vName, vendorId: vId, items: [] };
-            }
-            // Find the active bulk tier for the current quantity (for the badge)
-            const bulkPrices = item.product.bulkPrices || [];
-            const activeTier = [...bulkPrices]
-                .sort((a, b) => b.minQty - a.minQty)
-                .find(t => item.quantity >= t.minQty);
-
-            grouped[vId].items.push({
-                id: String(item.productId),
-                name: item.product.name,
-                size: item.product.packSize || '1 pc',
-                pcs: item.quantity,
-                price: item.product.price,
-                image: item.product.images[0] || '/images/recom-product/product-img10.png',
-                minQty: item.product.minOrderQuantity || 1,
-                tierLabel: activeTier ? `Bulk ${activeTier.minQty}+ @ ₹${activeTier.price}/pc` : null,
-            });
-        });
-        return Object.values(grouped).map(group => ({
-            id: group.vendorId,
-            vendor: group.vendor,
-            items: group.items
+        return groups.map((g) => ({
+            id: g.vendorId,
+            vendor: g.vendorName,
+            promoSummary: g.promoSummary as VendorPromoSummary | null | undefined,
+            items: g.items.map((item) => {
+                const bulkPrices = item.product.bulkPrices || [];
+                const activeTier = [...bulkPrices]
+                    .sort((a, b) => b.minQty - a.minQty)
+                    .find((t) => item.quantity >= t.minQty);
+                return {
+                    id: String(item.productId),
+                    name: item.product.name,
+                    size: item.product.packSize || '1 pc',
+                    pcs: item.quantity,
+                    price: item.product.price,
+                    image: item.product.images[0] || '/images/recom-product/product-img10.png',
+                    minQty: item.product.minOrderQuantity || 1,
+                    tierLabel: activeTier ? `Bulk ${activeTier.minQty}+ @ ₹${activeTier.price}/pc` : null,
+                    isPromoFree: item.isPromoFree,
+                    bxgyFreeQty: item.bxgyFreeQty,
+                    customerPriceApplied: item.product.customerPriceApplied,
+                    originalPrice: item.product.originalPrice,
+                };
+            }),
         }));
-    }, [cart]);
+    }, [groups]);
 
-    const getShipmentTotal = (items: {price: number; pcs: number}[]) => items.reduce((sum, item) => sum + item.price * item.pcs, 0);
-    const getShipmentItemCount = (items: {pcs: number}[]) => items.reduce((sum, item) => sum + item.pcs, 0);
+    const getShipmentTotal = (items: ShipmentItem[]) =>
+        items.reduce((sum, item) => (item.isPromoFree ? sum : sum + item.price * item.pcs), 0);
+    const getShipmentItemCount = (items: ShipmentItem[]) => items.reduce((sum, item) => sum + item.pcs, 0);
 
     // Per-vendor (PO) selection — user picks which POs to pay for now.
     const [selectedVendors, setSelectedVendors] = useState<Set<string>>(new Set());
@@ -210,9 +234,11 @@ export default function CartPage() {
     const [promoPreview, setPromoPreview] = useState<PromoPreview | null>(null);
     React.useEffect(() => {
         if (selectedGroups.length === 0) { setPromoPreview(null); return; }
-        const items = selectedGroups.flatMap(g => g.items.map(i => ({
-            productId: i.productId, vendorId: g.vendorId, quantity: i.quantity,
-        })));
+        const items = selectedGroups.flatMap(g => g.items
+            .filter(i => !i.isPromoFree)
+            .map(i => ({
+                productId: i.productId, vendorId: g.vendorId, quantity: i.quantity,
+            })));
         let cancelled = false;
         const t = setTimeout(() => {
             fetch('/api/v1/promotions/preview', {
@@ -238,6 +264,15 @@ export default function CartPage() {
     const billGST = promoPreview ? promoPreview.totalGST : itemGST;
     const billSubtotal = promoPreview ? promoPreview.subtotal : itemTotal;
     const totalPay = Math.max(0, billSubtotal - promoDiscount);
+    const bxgyFreeItems = promoPreview?.bxgyFreeItems ?? [];
+    const freeItemsValue = bxgyFreeItems.reduce((sum, item) => {
+        const cartItem = cart.find((c) => c.productId === item.productId);
+        const unit = cartItem?.product?.price ?? 0;
+        return sum + unit * item.quantity;
+    }, 0);
+    const hasContractPricing = selectedGroups.some((g) =>
+        g.items.some((i) => i.product.customerPriceApplied),
+    );
 
     // --- SUCCESS SCREEN ---
     if (screen === 'success') {
@@ -811,10 +846,30 @@ export default function CartPage() {
                                         );
                                     })()}
 
+                                    {shipment.promoSummary && (
+                                        <div className="px-7 py-3 border-t border-purple-100/60">
+                                            <VendorPromoBanner summary={shipment.promoSummary} />
+                                        </div>
+                                    )}
+
                                     {/* Items List - Collapsible */}
                                     {isVendorExpanded(shipment.id) && (
                                         <div className="divide-y divide-[#F5F5F5] border-t border-[#F0F0F0]">
-                                            {shipment.items.map((item) => (
+                                            {shipment.items.map((item) => {
+                                                if (item.isPromoFree) {
+                                                    return (
+                                                        <div key={item.id} className="px-7 py-4">
+                                                            <FreeGiftLine
+                                                                name={item.name}
+                                                                quantity={item.pcs}
+                                                                image={item.image}
+                                                                packSize={item.size}
+                                                                unitValueSaved={item.price}
+                                                            />
+                                                        </div>
+                                                    );
+                                                }
+                                                return (
                                                 <div key={item.id} className="px-7 py-5 flex items-center gap-5 hover:bg-gray-50/40 transition-colors group">
                                                     {/* Product Image */}
                                                     <div className="w-[72px] h-[72px] rounded-2xl bg-[#F7F8F7] shrink-0 border border-gray-100 group-hover:border-primary/10 transition-colors relative overflow-hidden">
@@ -826,9 +881,13 @@ export default function CartPage() {
                                                         <h4 className="text-[15px] font-bold text-[#181725] leading-snug line-clamp-1">{item.name}</h4>
                                                         <p className="text-[13px] text-gray-400 font-medium mt-0.5">{item.size}</p>
                                                         <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                            {item.customerPriceApplied && <YourPriceChip />}
                                                             <div className="flex items-center gap-1.5">
                                                                 <div className="w-[6px] h-[6px] rounded-full bg-primary" />
                                                                 <span className="text-[12px] text-gray-400 font-medium">₹{item.price}/pc</span>
+                                                                {item.customerPriceApplied && item.originalPrice != null && item.originalPrice > item.price && (
+                                                                    <span className="text-[11px] text-gray-400 line-through">₹{item.originalPrice}</span>
+                                                                )}
                                                             </div>
                                                             {item.tierLabel && (
                                                                 <span className="text-[10px] font-black uppercase tracking-wide bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded-md">
@@ -836,6 +895,7 @@ export default function CartPage() {
                                                                 </span>
                                                             )}
                                                         </div>
+                                                        <PaidLineWithBonus freeQty={item.bxgyFreeQty ?? 0} />
                                                     </div>
 
                                                     {/* Quantity Controls */}
@@ -912,7 +972,8 @@ export default function CartPage() {
                                                         <Trash2 size={17} strokeWidth={2.2} />
                                                     </button>
                                                 </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -1030,12 +1091,13 @@ export default function CartPage() {
                                     <span className="text-[15px] text-[#4C4F4D] font-medium">GST (incl.)</span>
                                     <span className="text-[15px] font-bold text-[#181725]">₹{billGST.toFixed(2)}</span>
                                 </div>
-                                {promoDiscount > 0 && (
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[15px] text-[#53B175] font-medium">Store Offer{promoLabel ? ` (${promoLabel})` : ''}</span>
-                                        <span className="text-[15px] font-bold text-[#53B175]">−₹{promoDiscount.toFixed(2)}</span>
-                                    </div>
-                                )}
+                                <PromoSavingsSummary
+                                    bxgyFreeItems={bxgyFreeItems}
+                                    freeItemsValue={freeItemsValue}
+                                    promoDiscount={promoDiscount}
+                                    promoLabel={promoLabel ?? undefined}
+                                    contractPricing={hasContractPricing}
+                                />
                             </div>
 
                             {/* Total */}
@@ -1086,12 +1148,13 @@ export default function CartPage() {
                             <span className="text-[14px] text-[#4C4F4D] font-medium">GST (incl.)</span>
                             <span className="text-[14px] font-bold text-[#181725]">₹ {billGST.toFixed(2)}</span>
                         </div>
-                        {promoDiscount > 0 && (
-                            <div className="flex justify-between items-center">
-                                <span className="text-[14px] text-[#53B175] font-medium">Store Offer{promoLabel ? ` (${promoLabel})` : ''}</span>
-                                <span className="text-[14px] font-bold text-[#53B175]">−₹ {promoDiscount.toFixed(2)}</span>
-                            </div>
-                        )}
+                        <PromoSavingsSummary
+                            bxgyFreeItems={bxgyFreeItems}
+                            freeItemsValue={freeItemsValue}
+                            promoDiscount={promoDiscount}
+                            promoLabel={promoLabel ?? undefined}
+                            contractPricing={hasContractPricing}
+                        />
                     </div>
                     <div className="px-5 pb-5 pt-2">
                         <div className="border-t border-dashed border-[#D0D0D0] pt-4">

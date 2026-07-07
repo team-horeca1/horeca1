@@ -12,6 +12,14 @@ import { DeliverySlotPicker } from '@/components/features/checkout/DeliverySlotP
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { useAddress } from '@/context/AddressContext';
 import type { VendorCartGroup, CartItem, VendorProduct } from '@/types';
+import {
+    VendorPromoBanner,
+    FreeGiftLine,
+    PaidLineWithBonus,
+    PromoSavingsSummary,
+    YourPriceChip,
+    promoTotalCaption,
+} from '@/components/features/promotions/PromotionBenefits';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 // window.Razorpay is typed in src/types/razorpay.d.ts
@@ -102,6 +110,13 @@ interface PromoPreviewResponse {
     totalGST: number;
     autoPromos: Array<{ vendorId: string; promotionId: string; promotionName: string; type: string; discount: number }>;
     totalPromoDiscount: number;
+    bxgyFreeItems?: Array<{
+        vendorId: string;
+        productId: string;
+        productName: string;
+        quantity: number;
+        promotionName: string;
+    }>;
     coupon:
         | { valid: true; code: string; name: string; estimatedDiscount: number; stacksWithCashback: boolean }
         | { valid: false; message: string }
@@ -383,6 +398,7 @@ function CheckoutPageContent() {
     // are the EFFECTIVE values: a non-stacking coupon suppresses them server-side.
     const [autoPromoDiscount, setAutoPromoDiscount] = useState(0);
     const [autoPromos, setAutoPromos] = useState<PromoPreviewResponse['autoPromos']>([]);
+    const [bxgyFreeItems, setBxgyFreeItems] = useState<NonNullable<PromoPreviewResponse['bxgyFreeItems']>>([]);
     // Server-authoritative subtotal from the preview — the price the order will
     // actually use (a pricelist can differ from the optimistic client cart).
     const [previewSubtotal, setPreviewSubtotal] = useState<number | null>(null);
@@ -594,11 +610,13 @@ function CheckoutPageContent() {
     // The items the checkout will actually order — the same source the order is
     // placed from, so the promo/coupon preview matches the order exactly.
     const buildItemsPayload = () =>
-        selectedGroups.flatMap(g => g.items.map((i: CartItem) => ({
-            productId: i.productId,
-            vendorId: g.vendorId,
-            quantity: i.quantity,
-        })));
+        selectedGroups.flatMap(g => g.items
+            .filter((i: CartItem) => !i.isPromoFree)
+            .map((i: CartItem) => ({
+                productId: i.productId,
+                vendorId: g.vendorId,
+                quantity: i.quantity,
+            })));
 
     // Preview auto promos (+ optional coupon) against the cart items. Returns the
     // effective post-suppression values. Throws on transport/HTTP error.
@@ -625,7 +643,7 @@ function CheckoutPageContent() {
     );
     useEffect(() => {
         if (sessionStatus !== 'authenticated' || draftId) return;
-        if (selectedGroups.length === 0) { setPreviewSubtotal(null); setAutoPromoDiscount(0); setAutoPromos([]); return; }
+        if (selectedGroups.length === 0) { setPreviewSubtotal(null); setAutoPromoDiscount(0); setAutoPromos([]); setBxgyFreeItems([]); return; }
         let cancelled = false;
         const t = setTimeout(() => {
             fetchPromoPreview(appliedCoupon?.code)
@@ -634,6 +652,7 @@ function CheckoutPageContent() {
                     setPreviewSubtotal(Number(data.subtotal) || 0);
                     setAutoPromoDiscount(Number(data.totalPromoDiscount) || 0);
                     setAutoPromos(data.autoPromos || []);
+                    setBxgyFreeItems(data.bxgyFreeItems || []);
                 })
                 .catch(() => {});
         }, 300);
@@ -652,6 +671,7 @@ function CheckoutPageContent() {
             setPreviewSubtotal(Number(data.subtotal) || 0);
             setAutoPromoDiscount(Number(data.totalPromoDiscount) || 0);
             setAutoPromos(data.autoPromos || []);
+            setBxgyFreeItems(data.bxgyFreeItems || []);
             const c = data.coupon;
             if (c && c.valid) {
                 setAppliedCoupon({ code: c.code, name: c.name, estimatedDiscount: Number(c.estimatedDiscount) || 0 });
@@ -678,6 +698,7 @@ function CheckoutPageContent() {
             setPreviewSubtotal(Number(data.subtotal) || 0);
             setAutoPromoDiscount(Number(data.totalPromoDiscount) || 0);
             setAutoPromos(data.autoPromos || []);
+            setBxgyFreeItems(data.bxgyFreeItems || []);
         } catch { /* keep the prior estimate on failure */ }
     };
 
@@ -696,6 +717,27 @@ function CheckoutPageContent() {
         ? Math.min(rewardsBalance, Math.max(0, payableAfterCoupon - (selectedPayment === 'online' ? 1 : 0)))
         : 0;
     const estimatedPayable = Math.max(0, Math.round((payableAfterCoupon - walletUseEst) * 100) / 100);
+
+    const paidItemCount = useMemo(
+        () => selectedGroups.reduce((sum, g) => sum + g.items.filter((i) => !i.isPromoFree).reduce((a, i) => a + i.quantity, 0), 0),
+        [selectedGroups],
+    );
+    const freeItemCount = useMemo(
+        () => bxgyFreeItems.reduce((sum, item) => sum + item.quantity, 0),
+        [bxgyFreeItems],
+    );
+    const freeItemsValue = useMemo(
+        () => bxgyFreeItems.reduce((sum, item) => {
+            const cartItem = selectedGroups.flatMap((g) => g.items).find((c) => c.productId === item.productId);
+            const unit = cartItem?.product?.price ?? 0;
+            return sum + unit * item.quantity;
+        }, 0),
+        [bxgyFreeItems, selectedGroups],
+    );
+    const hasContractPricing = selectedGroups.some((g) =>
+        g.items.some((i) => i.product.customerPriceApplied),
+    );
+    const promoLabel = autoPromos.length === 1 ? autoPromos[0].promotionName : undefined;
 
     const walletEligibility = useMemo(() => {
         if (!creditWalletsLoaded) return { ok: false, loading: true, reason: 'Loading H1 Wallet details...' };
@@ -989,9 +1031,20 @@ function CheckoutPageContent() {
                                     )}
                                     <div className="flex-1 cursor-pointer" onClick={() => toggleVendorExpand(group.vendorId)}>
                                         <p className="text-[13px] font-bold text-[#181725]">{group.vendorName}</p>
-                                        <p className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
+                                        <p className="text-[10px] text-gray-400 font-medium flex items-center gap-1 flex-wrap">
                                             <Clock size={10} />
-                                            {group.items.length} item{group.items.length > 1 ? 's' : ''} · Min ₹{(group.minOrderValue || 0).toLocaleString('en-IN')}
+                                            {(() => {
+                                                const paid = group.items.filter((i) => !i.isPromoFree).reduce((a, i) => a + i.quantity, 0);
+                                                const free = group.promoSummary
+                                                    ? group.promoSummary.freeLines.reduce((s, l) => s + l.quantity, 0)
+                                                      + group.promoSummary.paidLines.reduce((s, l) => s + l.freeQty, 0)
+                                                    : group.items.filter((i) => i.isPromoFree).reduce((a, i) => a + i.quantity, 0)
+                                                      + group.items.reduce((a, i) => a + (i.bxgyFreeQty ?? 0), 0);
+                                                if (free > 0) {
+                                                    return `${paid} paid + ${free} free · ${group.promoSummary?.promotionName ?? 'Offer applied'}`;
+                                                }
+                                                return `${group.items.length} item${group.items.length > 1 ? 's' : ''} · Min ₹${(group.minOrderValue || 0).toLocaleString('en-IN')}`;
+                                            })()}
                                         </p>
                                     </div>
                                     <span className="text-[14px] font-bold text-[#181725] mr-1">₹{group.subtotal.toLocaleString('en-IN')}</span>
@@ -1010,22 +1063,53 @@ function CheckoutPageContent() {
                                     </div>
                                 )}
 
+                                {group.promoSummary && (
+                                    <div className="px-4 py-2 border-b border-purple-100/60">
+                                        <VendorPromoBanner summary={group.promoSummary} />
+                                    </div>
+                                )}
+
                                 {/* Collapsible item list + slot/notes */}
                                 {expandedVendors.has(group.vendorId) ? (
                                     <>
                                     {/* Items */}
-                                    {group.items.map((item) => (
+                                    {group.items.map((item) => {
+                                        if (item.isPromoFree) {
+                                            return (
+                                                <div key={item.productId} className="px-4 py-2 border-b border-gray-50">
+                                                    <FreeGiftLine
+                                                        name={item.product.name}
+                                                        quantity={item.quantity}
+                                                        image={item.product.images[0]}
+                                                        packSize={item.product.packSize}
+                                                        unitValueSaved={item.product.price}
+                                                        compact
+                                                    />
+                                                </div>
+                                            );
+                                        }
+                                        return (
                                         <div key={item.productId} className="flex items-center gap-3 px-4 py-2 border-b border-gray-50">
                                             <div className="w-8 h-8 bg-gray-50 rounded-md flex items-center justify-center p-0.5 shrink-0 relative overflow-hidden">
                                                 <Image src={item.product.images[0] || '/images/recom-product/product-img10.png'} alt={item.product.name} fill className="object-contain" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-[12px] font-bold text-[#181725] line-clamp-1">{item.product.name}</p>
-                                                <p className="text-[10px] text-gray-400">{item.product.packSize} × {item.quantity}</p>
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    {item.product.customerPriceApplied && <YourPriceChip />}
+                                                    <p className="text-[12px] font-bold text-[#181725] line-clamp-1">{item.product.name}</p>
+                                                </div>
+                                                <p className="text-[10px] text-gray-400">
+                                                    {item.product.packSize} × {item.quantity}
+                                                    {item.product.customerPriceApplied && item.product.originalPrice != null && item.product.originalPrice > item.product.price && (
+                                                        <span className="ml-1 line-through">₹{item.product.originalPrice}</span>
+                                                    )}
+                                                </p>
+                                                <PaidLineWithBonus freeQty={item.bxgyFreeQty ?? 0} />
                                             </div>
                                             <span className="text-[12px] font-bold text-[#181725]">₹{(item.product.price * item.quantity).toLocaleString('en-IN')}</span>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
 
                                     {/* Delivery slot picker + order notes */}
                                     {isSelected && (
@@ -1073,22 +1157,21 @@ function CheckoutPageContent() {
                                     <span className="text-gray-500 font-medium">Subtotal</span>
                                     <span className="font-bold text-[#181725]">₹{summarySubtotal.toLocaleString('en-IN')}</span>
                                 </div>
-                                {promoDiscountEst > 0 && (
-                                    <div className="flex items-center justify-between text-[13px]">
-                                        <span className="text-gray-500 font-medium">
-                                            Store Offer{autoPromos.length === 1 ? ` (${autoPromos[0].promotionName})` : ''}
-                                        </span>
-                                        <span className="font-bold text-[#53B175]">−₹{promoDiscountEst.toLocaleString('en-IN')}</span>
-                                    </div>
-                                )}
+                                <PromoSavingsSummary
+                                    bxgyFreeItems={bxgyFreeItems}
+                                    freeItemsValue={freeItemsValue}
+                                    promoDiscount={promoDiscountEst}
+                                    promoLabel={promoLabel}
+                                    contractPricing={hasContractPricing}
+                                />
                                 <div className="flex items-center justify-between border-t border-dashed border-gray-200 pt-2">
                                     <span className="text-[14px] font-bold text-[#181725]">Total Payable</span>
                                     <span className="text-[18px] font-bold text-[#53B175]">₹{afterPromo.toLocaleString('en-IN')}</span>
                                 </div>
                             </div>
                             <p className="text-[11px] text-gray-400 mt-2">
-                                {selectedItemCount} items from {selectedVendorCount} vendor{selectedVendorCount !== 1 ? 's' : ''}
-                                {promoDiscountEst > 0 ? ' · store offer applied' : ''}
+                                {promoTotalCaption({ paidItemCount, freeItemCount, totalPay: afterPromo })}
+                                {(promoDiscountEst > 0 || bxgyFreeItems.length > 0) ? ' · promotions applied' : ''}
                             </p>
                         </div>
 
@@ -1458,14 +1541,13 @@ function CheckoutPageContent() {
                                         <span className="text-gray-500 font-medium">Subtotal</span>
                                         <span className="font-bold text-[#181725]">₹{summarySubtotal.toLocaleString('en-IN')}</span>
                                     </div>
-                                    {promoDiscountEst > 0 && (
-                                        <div className="flex justify-between items-center text-[13px]">
-                                            <span className="text-gray-500 font-medium">
-                                                Store Offer{autoPromos.length === 1 ? ` (${autoPromos[0].promotionName})` : ''}
-                                            </span>
-                                            <span className="font-bold text-[#53B175]">−₹{promoDiscountEst.toLocaleString('en-IN')}</span>
-                                        </div>
-                                    )}
+                                    <PromoSavingsSummary
+                                        bxgyFreeItems={bxgyFreeItems}
+                                        freeItemsValue={freeItemsValue}
+                                        promoDiscount={promoDiscountEst}
+                                        promoLabel={promoLabel}
+                                        contractPricing={hasContractPricing}
+                                    />
                                     {couponDiscountEst > 0 && (
                                         <div className="flex justify-between items-center text-[13px]">
                                             <span className="text-gray-500 font-medium">Coupon ({appliedCoupon?.code})</span>
@@ -1483,7 +1565,7 @@ function CheckoutPageContent() {
                                         <span className="text-[22px] font-black text-[#53B175]">₹{estimatedPayable.toLocaleString('en-IN')}</span>
                                     </div>
                                     <p className="text-[10px] text-gray-400 leading-normal">
-                                        Checking out {selectedItemCount} items from {selectedVendorCount} vendor PO{selectedVendorCount > 1 ? 's' : ''}. Includes applicable GST and taxes.
+                                        {promoTotalCaption({ paidItemCount, freeItemCount, totalPay: estimatedPayable })}
                                         {(promoDiscountEst > 0 || couponDiscountEst > 0 || walletUseEst > 0) ? ' Discounts shown are estimates — exact amounts are confirmed at order placement.' : ''}
                                     </p>
                                 </div>
