@@ -51,6 +51,7 @@ export default function VendorStorePage() {
     const [prevOrderedProducts, setPrevOrderedProducts] = useState<VendorProduct[]>([]);
     const [prevOrderedLoading, setPrevOrderedLoading] = useState(false);
     const [vendorCredit, setVendorCredit] = useState<{ limit: number; available: number } | null>(null);
+    const [storePromos, setStorePromos] = useState<Array<{ id: string; name: string; badgeLabel: string; type: 'pct_discount' | 'flat_discount' }>>([]);
 
     // Grid (2-up) vs list (1-up) product layout. Persisted per-browser so power
     // buyers don't have to re-pick on every visit.
@@ -76,9 +77,13 @@ export default function VendorStorePage() {
         Promise.all([
             dal.vendors.getById(vendorId),
             dal.vendors.getProducts(vendorId, { limit: 200 }),
-        ]).then(([v, p]) => {
+            fetch(`/api/v1/vendors/${vendorId}/store-promotions`).then((r) => r.json()).catch(() => ({ success: false })),
+        ]).then(([v, p, promosRes]) => {
             setVendor(v);
             setProducts(p.products);
+            if (promosRes?.success && Array.isArray(promosRes.data)) {
+                setStorePromos(promosRes.data as Array<{ id: string; name: string; badgeLabel: string; type: 'pct_discount' | 'flat_discount' }>);
+            }
         }).catch(console.error).finally(() => setLoading(false));
     }, [vendorId]);
 
@@ -266,6 +271,7 @@ export default function VendorStorePage() {
                 vendor={vendor} 
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
+                storePromos={storePromos}
             />
 
             {vendorCredit && vendorCredit.limit > 0 && (

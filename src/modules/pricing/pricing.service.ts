@@ -93,7 +93,8 @@ export interface ResolutionResult {
 
 type ItemShape = Pick<
   PriceListItem,
-  'id' | 'productId' | 'customPrice' | 'pricingType' | 'discountPercent' | 'schemeMinQty' | 'schemeFreeQty'
+  | 'id' | 'productId' | 'customPrice' | 'pricingType' | 'discountPercent' | 'schemeMinQty' | 'schemeFreeQty'
+  | 'validFrom' | 'validTo' | 'scheduledPrice' | 'scheduledFrom' | 'scheduledTo'
 >;
 
 interface ListShape {
@@ -166,10 +167,11 @@ function applyListForProduct(
   basePrice: Prisma.Decimal,
   quantity: number,
   sourceKey: ResolutionSource,
+  now: Date = new Date(),
 ): ResolutionResult | null {
-  const item = list.items.find((i) => i.productId === productId);
+  const item = list.items.find((i) => i.productId === productId && itemIsLive(i, now));
   if (item) {
-    const result = applyPricingType(item, basePrice, quantity);
+    const result = applyPricingType(item, basePrice, quantity, now);
     if (result !== null) {
       return {
         unitPrice: result,
@@ -215,11 +217,12 @@ function evaluateAssignmentChain(
   quantity: number,
   customerTags: ReadonlySet<string>,
   customerGroups: ReadonlySet<string>,
+  now: Date = new Date(),
 ): ResolutionResult | null {
   for (const { type, key } of ORDERED_TYPES) {
     for (const a of assignments) {
       if (a.type !== type || !assignmentEligible(a, customer, product, customerTags, customerGroups)) continue;
-      const r = applyListForProduct(a.priceList, product.id, product.basePrice, quantity, key);
+      const r = applyListForProduct(a.priceList, product.id, product.basePrice, quantity, key, now);
       if (r) return r;
     }
   }
@@ -240,7 +243,18 @@ function priceListLiveWhere(now: Date) {
 const ITEM_SELECT = {
   id: true, productId: true, customPrice: true, pricingType: true,
   discountPercent: true, schemeMinQty: true, schemeFreeQty: true,
+  validFrom: true, validTo: true,
+  scheduledPrice: true, scheduledFrom: true, scheduledTo: true,
 } as const;
+
+function itemIsLive(
+  item: { validFrom?: Date | null; validTo?: Date | null },
+  now: Date,
+): boolean {
+  if (item.validFrom && item.validFrom > now) return false;
+  if (item.validTo && item.validTo < now) return false;
+  return true;
+}
 
 /**
  * Resolve the unit price the customer should see/pay right now.
@@ -288,7 +302,7 @@ export async function resolveUnitPrice(
       db.priceSlab.findMany({
         where: { productId: input.productId, vendorId: input.vendorId },
         orderBy: { minQty: 'desc' },
-        select: { minQty: true, maxQty: true, price: true },
+        select: { minQty: true, maxQty: true, price: true, promoPrice: true },
       }),
       // Every active, in-window assignment that COULD match this
       // customer/product pair. We filter in memory — way fewer rules in
@@ -351,7 +365,7 @@ export async function resolveUnitPrice(
   const customerGroups = new Set(groupMemberships.map((m) => m.groupId));
 
   // ── 1–7. Assignment-driven price lists ─────────────────────────────
-  const chained = evaluateAssignmentChain(assignments, input.customer, productInput, input.quantity, customerTags, customerGroups);
+  const chained = evaluateAssignmentChain(assignments, input.customer, productInput, input.quantity, customerTags, customerGroups, now);
   if (chained) return chained;
 
   // 8. Legacy VendorCustomer.priceListId
@@ -365,7 +379,7 @@ export async function resolveUnitPrice(
       },
     });
     if (list) {
-      const r = applyListForProduct(list, input.productId, basePrice, input.quantity, 'pricelist:legacy-customer-mapping');
+      const r = applyListForProduct(list, input.productId, basePrice, input.quantity, 'pricelist:legacy-customer-mapping', now);
       if (r) return r;
     }
   }
@@ -381,8 +395,9 @@ export async function resolveUnitPrice(
   // 9. Quantity slabs — pick the highest minQty ≤ requested quantity
   for (const slab of slabs) {
     if (input.quantity >= slab.minQty && (slab.maxQty == null || input.quantity <= slab.maxQty)) {
+      const slabRate = slab.promoPrice != null ? slab.promoPrice : slab.price;
       return {
-        unitPrice: round2(new Prisma.Decimal(slab.price)),
+        unitPrice: round2(new Prisma.Decimal(slabRate)),
         source: 'price-slab',
       };
     }
@@ -532,13 +547,14 @@ export async function resolveCatalogPrices(
       quantity,
       customerTags,
       customerGroups,
+      now,
     );
 
     // 7. Legacy mapping
     if (!result && vc?.priceListId) {
       const list = legacyById.get(vc.priceListId);
       if (list && list.vendorId === p.vendorId) {
-        result = applyListForProduct(list, p.id, productInput.basePrice, quantity, 'pricelist:legacy-customer-mapping');
+        result = applyListForProduct(list, p.id, productInput.basePrice, quantity, 'pricelist:legacy-customer-mapping', now);
       }
     }
 
@@ -569,23 +585,35 @@ export async function resolveCatalogPrices(
 // Returns null when the type doesn't yield a price (e.g. scheme miss
 // when qty < schemeMinQty), so the caller can fall through.
 function applyPricingType(
-  item: Pick<PriceListItem, 'customPrice' | 'pricingType' | 'discountPercent' | 'schemeMinQty'>,
+  item: Pick<PriceListItem, 'customPrice' | 'pricingType' | 'discountPercent' | 'schemeMinQty' | 'scheduledPrice' | 'scheduledFrom' | 'scheduledTo'>,
   basePrice: Prisma.Decimal,
   quantity: number,
+  now: Date = new Date(),
 ): Prisma.Decimal | null {
+  let customPrice = item.customPrice;
+  if (
+    item.scheduledPrice != null &&
+    item.scheduledFrom &&
+    item.scheduledTo &&
+    item.scheduledFrom <= now &&
+    item.scheduledTo >= now
+  ) {
+    customPrice = item.scheduledPrice;
+  }
+
   switch (item.pricingType) {
     case 'fixed':
     case 'special':
-      return item.customPrice != null ? round2(new Prisma.Decimal(item.customPrice)) : null;
+      return customPrice != null ? round2(new Prisma.Decimal(customPrice)) : null;
     case 'discount': {
       if (item.discountPercent == null) return null;
       const dp = new Prisma.Decimal(item.discountPercent);
       return round2(basePrice.mul(new Prisma.Decimal(1).minus(dp.div(100))));
     }
     case 'scheme': {
-      if (item.customPrice == null || item.schemeMinQty == null) return null;
+      if (customPrice == null || item.schemeMinQty == null) return null;
       if (quantity < item.schemeMinQty) return null;
-      return round2(new Prisma.Decimal(item.customPrice));
+      return round2(new Prisma.Decimal(customPrice));
     }
     default:
       return null;

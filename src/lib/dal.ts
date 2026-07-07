@@ -119,17 +119,25 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
   const grossMRP = toGrossOrNull(mrp);
 
   let effectivePrice = priceSlabs.length > 0
-    ? Number(priceSlabs[0].price)
+    ? Number(priceSlabs[0].promoPrice ?? priceSlabs[0].price)
     : (promoPrice != null && promoPrice < basePrice ? promoPrice : basePrice);
   
   let effectivePriceGross = priceSlabs.length > 0
-    ? toGross(Number(priceSlabs[0].price))
+    ? toGross(Number(priceSlabs[0].promoPrice ?? priceSlabs[0].price))
     : (grossPromoPrice != null && grossPromoPrice < grossBasePrice ? grossPromoPrice : grossBasePrice);
 
-  // Strike-through shows the higher reference price (MRP wins if present, else base when promo is active).
+  // Strike-through shows the higher reference price (MRP wins if present, else base/slab when promo is active).
+  const firstSlabRegular = priceSlabs.length > 0 ? Number(priceSlabs[0].price) : null;
+  const firstSlabPromo = priceSlabs.length > 0 && priceSlabs[0].promoPrice != null
+    ? Number(priceSlabs[0].promoPrice)
+    : null;
+  const slabHasPromo = firstSlabPromo != null && firstSlabRegular != null && firstSlabPromo < firstSlabRegular;
+
   let strikePriceGross = grossMRP && grossMRP > effectivePriceGross
     ? grossMRP
-    : (grossPromoPrice != null && grossPromoPrice < grossBasePrice ? grossBasePrice : undefined);
+    : (slabHasPromo && firstSlabRegular != null
+      ? toGross(firstSlabRegular)
+      : (grossPromoPrice != null && grossPromoPrice < grossBasePrice ? grossBasePrice : undefined));
 
   // V2.2 Phase 4 — server-resolved customer-specific price (price list /
   // per-customer override) attached by the catalog APIs for logged-in
@@ -216,16 +224,26 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
           })
           .filter((c) => c.id && c.name)
       : [],
-    bulkPrices: customerPriceApplied ? [] : priceSlabs.map((s): BulkPriceTier => ({
-      minQty: Number(s.minQty),
-      price: toGross(Number(s.price)),
-    })),
+    bulkPrices: customerPriceApplied ? [] : priceSlabs.map((s): BulkPriceTier => {
+      const regular = toGross(Number(s.price));
+      const promo = s.promoPrice != null ? toGross(Number(s.promoPrice)) : null;
+      const tierPrice = promo != null && promo < regular ? promo : regular;
+      return {
+        minQty: Number(s.minQty),
+        price: tierPrice,
+        originalPrice: promo != null && promo < regular ? regular : undefined,
+      };
+    }),
     creditBadge: (p.creditEligible as boolean) || false,
     minOrderQuantity: customerPriceApplied
       ? Number(p.minOrderQty) || 1
       : priceSlabs.length > 0 ? Number(priceSlabs[0].minQty) : 1,
     frequentlyOrdered: false,
-    isDeal: strikePriceGross !== undefined && strikePriceGross > effectivePriceGross,
+    storePromotion: p.storePromotion as VendorProduct['storePromotion'],
+    hasStorePromotion: !!(p.storePromotion),
+    isDeal:
+      (strikePriceGross !== undefined && strikePriceGross > effectivePriceGross) ||
+      !!(p.storePromotion && (p.storePromotion as { type?: string }).type === 'bxgy'),
     customerPriceApplied: customerPriceApplied || undefined,
     taxPercent,
     taxableRate: effectivePrice,

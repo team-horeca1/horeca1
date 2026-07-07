@@ -433,6 +433,7 @@ export default function VendorBulkGrid({
             minQty: parseInt(String(e.bulkQty1Quantity ?? existingSlab?.minQty ?? 1), 10) || 1,
             price: parseFloat(String(e.bulkQty1NetRate ?? existingSlab?.price ?? p.basePrice)) || p.basePrice,
           },
+          ...(p.priceSlabs?.slice(1) ?? []),
         ];
       }
 

@@ -1,13 +1,13 @@
 'use client';
 
 import React from 'react';
-import { Star, MapPin, Phone, Heart, Share2, ChevronLeft, Image as ImageIcon, Navigation, ClipboardList, CreditCard, Clock } from 'lucide-react';
+import { Star, MapPin, Phone, Heart, Share2, ChevronLeft, Image as ImageIcon, Navigation, ClipboardList, CreditCard, Clock, Megaphone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { useSession } from 'next-auth/react';
 import { cn } from '@/lib/utils';
-import type { Vendor } from '@/types';
+import type { Vendor, StorePromotion } from '@/types';
 import { VENDOR_COVERS } from '@/components/features/homepage/VendorCardShared';
 import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
 
@@ -15,9 +15,10 @@ interface VendorStoreHeaderProps {
     vendor: Vendor;
     activeTab: string;
     onTabChange: (tab: string) => void;
+    storePromos?: Array<Pick<StorePromotion, 'id' | 'name' | 'badgeLabel' | 'type'>>;
 }
 
-export function VendorStoreHeader({ vendor, activeTab, onTabChange }: VendorStoreHeaderProps) {
+export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos = [] }: VendorStoreHeaderProps) {
     const router = useRouter();
     const { status } = useSession();
     const isLoggedIn = status === 'authenticated';
@@ -127,6 +128,20 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange }: VendorStor
                         My Lists
                     </button>
                 </div>
+
+                {storePromos.length > 0 && (
+                    <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar">
+                        {storePromos.map((p) => (
+                            <div
+                                key={p.id}
+                                className="shrink-0 flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full text-[11px] font-bold"
+                            >
+                                <Megaphone size={12} className="text-emerald-600" />
+                                {p.badgeLabel}
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 {/* Mobile Tabs */}
                 <div className="flex items-center gap-6 border-b border-gray-100 mt-3 overflow-x-auto no-scrollbar">

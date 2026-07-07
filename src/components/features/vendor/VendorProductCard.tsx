@@ -104,8 +104,10 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         }
 
         toast.success(`${product.name} added to cart!`, {
-            description: `Quantity: ${currentQty + qty} ${product.packSize || ''}`,
-            duration: 2000,
+            description: product.storePromotion?.type === 'bxgy' || product.storePromotion?.type === 'bxgy_get'
+                ? `${product.storePromotion.badgeLabel} — you'll get free item(s) in your cart`
+                : `Quantity: ${currentQty + qty} ${product.packSize || ''}`,
+            duration: 2500,
         });
     };
 
@@ -385,6 +387,15 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             <span className="bg-gradient-to-r from-[#299E60] to-[#53B175] text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-green-500/20 tracking-wide">
                                 Your price
                             </span>
+                        ) : product.storePromotion ? (
+                            <span className={cn(
+                                'text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md tracking-wide max-w-[120px] truncate',
+                                product.storePromotion.type === 'bxgy' || product.storePromotion.type === 'bxgy_get'
+                                    ? 'bg-gradient-to-r from-[#7C3AED] to-[#A855F7] shadow-purple-500/20'
+                                    : 'bg-gradient-to-r from-[#FF4D4D] to-[#FF6B6B] shadow-red-500/20',
+                            )}>
+                                {product.storePromotion.badgeLabel}
+                            </span>
                         ) : product.isDeal && (
                             <span className="bg-gradient-to-r from-[#FF4D4D] to-[#FF6B6B] text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-red-500/20 tracking-wide">
                                 Deal
@@ -486,7 +497,11 @@ export const VendorProductCard = React.memo(function VendorProductCard({
 
                             {/* Trust/Popularity Tags in Left Column */}
                             <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                                {product.isDeal && (
+                                {product.storePromotion ? (
+                                    <span className="bg-purple-50 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                                        {product.storePromotion.badgeLabel}
+                                    </span>
+                                ) : product.isDeal && (
                                     <span className="bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-md">
                                         Deal
                                     </span>
