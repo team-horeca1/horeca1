@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Tag, Plus, Loader2, Pencil, Trash2, Package, X, Grid3x3, AlertCircle, ArrowRight, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type AssignmentType = 'customer' | 'outlet' | 'pincode' | 'area' | 'segment' | 'brand';
+type AssignmentType = 'customer' | 'outlet' | 'pincode' | 'area' | 'segment' | 'brand' | 'group';
 
 interface PriceListAssignment {
   type: AssignmentType;
@@ -29,6 +29,7 @@ const TYPE_LABELS: Record<AssignmentType, [string, string]> = {
   area: ['area', 'areas'],
   segment: ['segment', 'segments'],
   brand: ['brand', 'brands'],
+  group: ['group', 'groups'],
 };
 
 function whoSummary(assignments: PriceListAssignment[]): string {
@@ -209,6 +210,9 @@ export default function VendorPriceListsPage() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-[24px] font-bold text-[#181725]">Price Lists</h1>
+          <p className="text-[13px] text-[#7C7C7C] mt-1 max-w-2xl">
+            Customer-specific B2B pricing (fixed, discount, or scheme). Bulk quantity tiers on products apply to all buyers — use Store Offers for public BXGY deals everyone sees.
+          </p>
           <p className="text-[12px] text-[#AEAEAE]">Give specific customers, areas, or groups their own prices.</p>
         </div>
         <div className="flex items-center gap-2">

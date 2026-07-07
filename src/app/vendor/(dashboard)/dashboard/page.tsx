@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
+import { buildPromotionPayload, promotionPublishSuccessMessage } from '@/lib/promotionVendorUi';
 import { useVendorOutletScope } from '@/hooks/useVendorOutletScope';
 import { openAccountSwitcher } from '@/lib/accountSwitcherEvents';
 import { toast } from 'sonner';
@@ -352,25 +353,25 @@ function CreateSchemeModal({
             const response = await fetch('/api/v1/vendor/promotions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+                body: JSON.stringify(buildPromotionPayload({
                     name,
                     type,
-                    startDate: startDate ? new Date(startDate).toISOString() : null,
-                    endDate: endDate ? new Date(endDate).toISOString() : null,
-                    minOrderValue: minOrderValue ? parseFloat(minOrderValue) : null,
-                    minQty: minQty ? parseInt(minQty) : null,
+                    startDate,
+                    endDate,
+                    minOrderValue,
+                    minQty,
                     buyProductId: buyProductId || null,
-                    discountPct: discountPct ? parseFloat(discountPct) : null,
-                    discountFlat: discountFlat ? parseFloat(discountFlat) : null,
+                    discountPct,
+                    discountFlat,
                     getProductId: getProductId || null,
-                    getQty: getQty ? parseInt(getQty) : null,
-                    usageLimit: usageLimit ? parseInt(usageLimit) : null,
-                }),
+                    getQty,
+                    usageLimit,
+                })),
             });
 
             const json = await response.json();
             if (json.success) {
-                toast.success('Discount scheme published successfully!');
+                toast.success(promotionPublishSuccessMessage(type));
                 onSuccess();
                 onClose();
                 // Reset form

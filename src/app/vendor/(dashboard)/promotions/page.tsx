@@ -8,6 +8,12 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { VendorCouponsTab, VendorCashbackTab } from '@/components/features/vendor/promotions/PromoEngineTabs';
+import {
+  buildPromotionPayload,
+  promotionPublishSuccessMessage,
+  promotionStorefrontLabel,
+  promotionIsLive,
+} from '@/lib/promotionVendorUi';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,11 +76,7 @@ function promoDescription(p: Promotion) {
 }
 
 function isLive(p: Promotion) {
-  if (!p.isActive) return false;
-  const now = Date.now();
-  if (p.startDate && new Date(p.startDate).getTime() > now) return false;
-  if (p.endDate && new Date(p.endDate).getTime() < now) return false;
-  return true;
+  return promotionIsLive(p);
 }
 
 function fmt(d: string | null) {
@@ -147,28 +149,28 @@ function PromotionModal({
     if (!name.trim()) { toast.error('Name is required'); return; }
     setSaving(true);
     try {
-      const payload = {
-        name: name.trim(),
+      const payload = buildPromotionPayload({
+        name,
         type,
         isActive,
-        startDate: startDate ? new Date(startDate).toISOString() : null,
-        endDate: endDate ? new Date(endDate).toISOString() : null,
-        minOrderValue: minOrderValue ? parseFloat(minOrderValue) : null,
-        discountPct: type !== 'bxgy' ? (discountPct ? parseFloat(discountPct) : null) : null,
-        discountFlat: type === 'flat_discount' ? (discountFlat ? parseFloat(discountFlat) : null) : null,
-        minQty: type === 'bxgy' ? (parseInt(minQty) || 1) : null,
-        getQty: type === 'bxgy' ? (parseInt(getQty) || 1) : null,
-        buyProductId: type === 'bxgy' ? (buyProduct?.id ?? null) : null,
-        getProductId: type === 'bxgy' ? (getProduct?.id ?? null) : null,
-        usageLimit: usageLimit ? parseInt(usageLimit) : null,
-      };
+        startDate,
+        endDate,
+        minOrderValue,
+        discountPct,
+        discountFlat,
+        minQty,
+        getQty,
+        buyProductId: buyProduct?.id ?? null,
+        getProductId: getProduct?.id ?? null,
+        usageLimit,
+      });
 
       const url = isEdit ? `/api/v1/vendor/promotions/${existing!.id}` : '/api/v1/vendor/promotions';
       const method = isEdit ? 'PATCH' : 'POST';
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const json = await res.json();
       if (!json.success) throw new Error(json.error?.message ?? 'Failed');
-      toast.success(isEdit ? 'Promotion updated' : 'Promotion created');
+      toast.success(isEdit ? 'Promotion updated' : promotionPublishSuccessMessage(type));
       onSaved(json.data);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed');
@@ -530,8 +532,11 @@ function StoreOffersTab() {
       ) : (
         <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
           <div className="px-5 py-3 bg-[#FAFAFA] border-b border-[#F5F5F5] grid grid-cols-12 gap-3 text-[11px] font-semibold text-[#AEAEAE]">
-            <div className="col-span-4">Promotion</div>
-            <div className="col-span-3">Offer</div>
+            <div className="col-span-3">Promotion</div>
+            <div className="col-span-2">Offer</div>
+            <div className="col-span-2" title="Where customers see this: product badge, Deals tab, and free items in cart at checkout">
+              Storefront
+            </div>
             <div className="col-span-2 text-center">Date Range</div>
             <div className="col-span-1 text-center">Uses</div>
             <div className="col-span-2 text-right">Actions</div>
@@ -542,7 +547,7 @@ function StoreOffersTab() {
               return (
                 <div key={p.id} className="px-5 py-4 grid grid-cols-12 gap-3 items-center hover:bg-[#FAFAFA] transition-colors">
                   {/* Name + type */}
-                  <div className="col-span-4 min-w-0">
+                  <div className="col-span-3 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', TYPE_COLORS[p.type])}>
                         {TYPE_LABELS[p.type]}
@@ -559,8 +564,12 @@ function StoreOffersTab() {
                   </div>
 
                   {/* Description */}
-                  <div className="col-span-3 text-[12px] text-[#7C7C7C]">
+                  <div className="col-span-2 text-[12px] text-[#7C7C7C]">
                     {promoDescription(p)}
+                  </div>
+
+                  <div className="col-span-2 text-[11px] text-[#299E60] font-semibold" title="Customers see badge on product + free item in cart">
+                    {promotionStorefrontLabel(p.type, live)}
                   </div>
 
                   {/* Date range */}

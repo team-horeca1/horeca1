@@ -465,7 +465,11 @@ export default function PriceListDetailPage() {
           </button>
           <div>
             <h1 className="text-[22px] font-bold text-[#181725]">{name || priceList.name}</h1>
-            <p className="text-[12px] text-[#AEAEAE]">Two steps: choose <strong className="font-bold text-[#7C7C7C]">who</strong> gets this list, then <strong className="font-bold text-[#7C7C7C]">what</strong> they pay.</p>
+            <p className="text-[12px] text-[#AEAEAE]">
+              Customer-specific B2B pricing — assigned buyers see <strong className="font-bold text-[#7C7C7C]">Your price</strong> on products and in cart.
+              For public BXGY deals everyone sees, use <strong className="font-bold text-[#7C7C7C]">Store Offers</strong> instead.
+            </p>
+            <p className="text-[11px] text-[#AEAEAE] mt-0.5">Two steps: choose <strong className="font-bold text-[#7C7C7C]">who</strong> gets this list, then <strong className="font-bold text-[#7C7C7C]">what</strong> they pay.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
