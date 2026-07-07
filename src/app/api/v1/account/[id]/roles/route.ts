@@ -10,7 +10,7 @@ import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
 import { assertAccountMember, assertAccountPermission } from '@/lib/accountAccess';
-import { sanitizePermissions } from '@/lib/permissions/engine';
+import { sanitizePermissionsForScope } from '@/lib/permissions/engine';
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
@@ -40,7 +40,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const id = extractAccountId(req);
     await assertAccountPermission(ctx.userId, id, 'users.create', ctx.activeOutletId);
     const body = CreateBody.parse(await req.json());
-    const cleanedPerms = sanitizePermissions(body.permissions);
+    const cleanedPerms = sanitizePermissionsForScope(body.permissions, body.scope);
     const created = await prisma.accountRole.create({
       data: {
         businessAccountId: id,

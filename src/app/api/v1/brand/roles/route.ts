@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { brandOnly } from '@/middleware/rbac';
 import { resolveBrandContext } from '@/lib/resolveBrandId';
-import { requirePermission, sanitizePermissions } from '@/lib/permissions/engine';
+import { requirePermission, sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import type { AuthContext } from '@/middleware/auth';
@@ -66,7 +66,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
         name: body.name,
         description: body.description ?? null,
         scope: 'brand',
-        permissions: sanitizePermissions(body.permissions),
+        permissions: sanitizePermissionsForScope(body.permissions, 'brand'),
         isTemplate: false,
         createdBy: ctx.userId,
       },

@@ -10,7 +10,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { vendorOnly } from '@/middleware/rbac';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
-import { requirePermission, sanitizePermissions } from '@/lib/permissions/engine';
+import { requirePermission, sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { uniqueHcid } from '@/lib/hcid';
@@ -163,7 +163,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       if (!found || found.scope !== 'vendor') throw Errors.badRequest('roleId must reference a vendor-scope role');
       role = found;
     } else {
-      const sanitized = sanitizePermissions(input.permissions!);
+      const sanitized = sanitizePermissionsForScope(input.permissions!, 'vendor');
       const sanitizedStr = JSON.stringify(sortKeys(sanitized));
 
       const candidates = await prisma.accountRole.findMany({

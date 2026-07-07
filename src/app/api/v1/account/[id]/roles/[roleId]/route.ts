@@ -9,7 +9,7 @@ import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { assertAccountPermission } from '@/lib/accountAccess';
-import { sanitizePermissions } from '@/lib/permissions/engine';
+import { sanitizePermissionsForScope } from '@/lib/permissions/engine';
 
 const PatchBody = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -21,14 +21,16 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
   try {
     const { id, roleId } = extractIds(req);
     await assertAccountPermission(ctx.userId, id, 'users.edit', ctx.activeOutletId);
-    const role = await prisma.accountRole.findFirst({ where: { id: roleId, businessAccountId: id }, select: { id: true, isTemplate: true } });
+    const role = await prisma.accountRole.findFirst({ where: { id: roleId, businessAccountId: id }, select: { id: true, isTemplate: true, scope: true } });
     if (!role) throw Errors.notFound('Role');
     if (role.isTemplate) throw Errors.badRequest('System templates cannot be edited; duplicate and customize instead');
     const body = PatchBody.parse(await req.json());
     const data = {
       ...(body.name !== undefined && { name: body.name }),
       ...(body.description !== undefined && { description: body.description }),
-      ...(body.permissions !== undefined && { permissions: sanitizePermissions(body.permissions) }),
+      ...(body.permissions !== undefined && {
+        permissions: sanitizePermissionsForScope(body.permissions, role.scope as 'account' | 'vendor' | 'brand' | 'admin' | 'delivery'),
+      }),
     };
     const updated = await prisma.accountRole.update({ where: { id: roleId }, data });
     return NextResponse.json({ success: true, data: updated });

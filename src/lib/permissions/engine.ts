@@ -10,7 +10,8 @@
  */
 
 import { Errors } from '@/middleware/errorHandler';
-import { ALL_PERMISSION_KEYS, type PermissionKey, type PermissionsJson } from './registry';
+import { ALL_PERMISSION_KEYS, type PermissionKey, type PermissionsJson, type RoleScope } from './registry';
+import { modulesForPortalScope, scopeModuleKeys, type Module } from './portalFeatures';
 
 // ─── flatten ──────────────────────────────────────────────────────────────
 
@@ -101,4 +102,34 @@ export function sanitizePermissions(input: unknown): PermissionsJson {
     if (Object.keys(cleaned).length) (out as Record<string, Record<string, boolean>>)[m] = cleaned;
   }
   return out;
+}
+
+/** Strip permissions to modules/actions valid for a portal scope. */
+export function sanitizePermissionsForScope(input: unknown, scope: RoleScope): PermissionsJson {
+  const base = sanitizePermissions(input);
+  const allowedModules = new Set(scopeModuleKeys(scope));
+  const scopedActions = modulesForPortalScope(scope);
+  const out: PermissionsJson = {};
+  for (const [m, actions] of Object.entries(base)) {
+    if (!allowedModules.has(m as Module)) continue;
+    const validActions = new Set(scopedActions[m] ?? []);
+    const cleaned: Record<string, boolean> = {};
+    for (const [a, on] of Object.entries(actions ?? {})) {
+      if (on === true && validActions.has(a)) cleaned[a] = true;
+    }
+    if (Object.keys(cleaned).length) (out as Record<string, Record<string, boolean>>)[m] = cleaned;
+  }
+  return out;
+}
+
+/** Count enabled permissions within a scope (for matrix UI labels). */
+export function countScopedPermissions(
+  permissions: PermissionsJson | null | undefined,
+  scope: RoleScope,
+): number {
+  const scoped = sanitizePermissionsForScope(permissions, scope);
+  return Object.values(scoped).reduce(
+    (sum, actions) => sum + Object.values(actions ?? {}).filter((v) => v === true).length,
+    0,
+  );
 }

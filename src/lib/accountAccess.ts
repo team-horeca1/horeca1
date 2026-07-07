@@ -12,8 +12,7 @@ import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
 import { flatten, mergePermissions } from '@/lib/permissions/engine';
 import { ALL_PERMISSION_KEYS, type PermissionKey, type PermissionsJson } from '@/lib/permissions/registry';
-
-const OWNER_ROLE_NAMES = new Set(['Owner', 'Vendor Admin', 'Brand Admin']);
+import { isOwnerRoleName } from '@/lib/permissions/portalFeatures';
 
 export async function assertAccountMember(userId: string, businessAccountId: string): Promise<void> {
   const m = await prisma.businessAccountMember.findUnique({
@@ -44,8 +43,7 @@ export async function resolveAccountPermissions(
     select: { role: { select: { name: true, permissions: true } } },
   });
 
-  const isOwner =
-    membership.isPrimary || rows.some((r) => OWNER_ROLE_NAMES.has(r.role.name));
+  const isOwner = rows.some((r) => isOwnerRoleName(r.role.name));
 
   if (isOwner) {
     return new Set(ALL_PERMISSION_KEYS);

@@ -9,6 +9,7 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { sanitizePermissionsForScope } from '../src/lib/permissions/engine';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -103,7 +104,26 @@ async function main() {
   }
   if (brandGap === 0) note(`✓ all ${brandTeamRows.length} brand team members have a UserRole`);
 
-  console.log('\n7. Super Admin permission set sanity check');
+  console.log('\n7. Template permissions stay within portal scope');
+  const templates = await prisma.accountRole.findMany({
+    where: { isTemplate: true, businessAccountId: null },
+    select: { name: true, scope: true, permissions: true },
+  });
+  let scopeMismatch = 0;
+  for (const tpl of templates) {
+    const scope = tpl.scope as 'account' | 'vendor' | 'brand' | 'admin' | 'delivery';
+    const cleaned = sanitizePermissionsForScope(tpl.permissions, scope);
+    const before = JSON.stringify(tpl.permissions);
+    const after = JSON.stringify(cleaned);
+    if (before !== after) {
+      console.log(`  ✗ ${tpl.name} (${scope}): permissions include out-of-scope modules`);
+      scopeMismatch++;
+      failures++;
+    }
+  }
+  if (scopeMismatch === 0) note(`✓ ${templates.length} templates are scope-clean (run resync-role-templates.ts if stale)`);
+
+  console.log('\n8. Super Admin permission set sanity check');
   const superAdmin = await prisma.accountRole.findFirst({
     where: { name: 'Super Admin', scope: 'admin', isTemplate: true, businessAccountId: null },
     select: { permissions: true },

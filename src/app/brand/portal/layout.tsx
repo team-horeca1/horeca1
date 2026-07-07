@@ -26,24 +26,8 @@ import { defaultPortalPath } from '@/lib/portalRouting';
 import { signOut } from 'next-auth/react';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
 import { NotificationBell } from '@/components/features/NotificationBell';
-import type { PermissionKey } from '@/lib/permissions/registry';
-
-interface BrandSidebarLink {
-    name: string;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    href: string;
-    // ANY-match: array → user needs at least one perm. Omit → always visible.
-    requiredPerm?: PermissionKey | PermissionKey[];
-}
-
-const SIDEBAR_LINKS: BrandSidebarLink[] = [
-    { name: 'Dashboard', icon: LayoutDashboard, href: '/brand/portal', requiredPerm: 'dashboard.view' },
-    { name: 'My Products', icon: Package, href: '/brand/portal/products', requiredPerm: 'products.view' },
-    { name: 'Distributors', icon: Users, href: '/brand/portal/distributors', requiredPerm: 'vendors.view' },
-    { name: 'Analytics', icon: BarChart3, href: '/brand/portal/analytics', requiredPerm: 'analytics.view' },
-    { name: 'Team', icon: Users, href: '/brand/portal/team', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
-    { name: 'Settings', icon: Settings, href: '/brand/portal/settings', requiredPerm: 'settings.view' },
-];
+import { usePermissions } from '@/hooks/usePermissions';
+import { BRAND_NAV_LINKS, filterNavLinks } from '@/lib/permissions/portalNav';
 
 export default function BrandPortalLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -55,18 +39,8 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
     const [applicationBrandName, setApplicationBrandName] = useState<string | null>(null);
     const [checkingApplication, setCheckingApplication] = useState(true);
 
-    // Filter sidebar links by the user's permission set. Empty array means
-    // no restrictions yet (owner/legacy) — show all. Server-side RBAC still
-    // enforces actual page access.
-    const sessionPerms = ((session?.user as { permissions?: string[] } | undefined)?.permissions) ?? [];
-    const can = (need?: PermissionKey | PermissionKey[]): boolean => {
-        if (!need) return true;
-        if (sessionPerms.length === 0) return true;
-        return Array.isArray(need)
-            ? need.some((p) => sessionPerms.includes(p))
-            : sessionPerms.includes(need);
-    };
-    const visibleLinks = SIDEBAR_LINKS.filter((link) => can(link.requiredPerm));
+    const { can } = usePermissions();
+    const visibleLinks = filterNavLinks(BRAND_NAV_LINKS, can, 'brand');
 
     const userRole = (session?.user as { role?: string } | undefined)?.role;
     const activeAccountType = (session?.user as {

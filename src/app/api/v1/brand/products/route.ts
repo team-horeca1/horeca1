@@ -13,6 +13,7 @@ import type { AuthContext } from '@/middleware/auth';
 const brandService = new BrandService();
 
 export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
+  requirePermission(ctx, 'products.view');
   const userId = await resolveUserId(ctx, req);
   const products = await brandService.listMyProducts(userId);
   return NextResponse.json({ success: true, data: products });

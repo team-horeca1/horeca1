@@ -11,7 +11,9 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Copy, Trash2, X, Check, ChevronLeft } from 'lucide-react';
+import { Loader2, Plus, Copy, Trash2, X, ChevronLeft } from 'lucide-react';
+import { PermissionMatrix, countMatrixPermissions } from './PermissionMatrix';
+import type { RoleScope } from '@/lib/permissions/portalFeatures';
 
 type PermissionsJson = Record<string, Record<string, boolean>>;
 
@@ -35,7 +37,7 @@ interface TeamRolesEditorProps {
     onRolesChanged?: () => void;
     /** Role-scope; the permission matrix is narrowed to modules relevant for
      *  this scope (e.g. customer-team roles don't see GRN / dispatch). */
-    scope?: 'account' | 'vendor' | 'brand' | 'admin' | 'delivery';
+    scope?: RoleScope;
 }
 
 export function TeamRolesEditor({
@@ -46,6 +48,7 @@ export function TeamRolesEditor({
     onRolesChanged,
     scope,
 }: TeamRolesEditorProps) {
+    const effectiveScope = scope ?? 'admin';
     const [modules, setModules] = useState<Record<string, readonly string[]>>({});
     const [roles, setRoles] = useState<Role[]>([]);
     const [loading, setLoading] = useState(true);
@@ -55,9 +58,7 @@ export function TeamRolesEditor({
 
     const load = () => {
         Promise.resolve().then(() => setLoading(true));
-        const registryUrl = scope
-            ? `/api/v1/permissions/registry?scope=${scope}`
-            : '/api/v1/permissions/registry';
+        const registryUrl = `/api/v1/permissions/registry?scope=${effectiveScope}`;
         Promise.all([
             fetch(registryUrl).then((r) => r.json()),
             fetch(endpointBase).then((r) => r.json()),
@@ -133,7 +134,7 @@ export function TeamRolesEditor({
                                         <div className="min-w-0 flex-1">
                                             <p className="text-[13.5px] font-bold text-[#181725]">{r.name}</p>
                                             {r.description && <p className="text-[12px] text-[#7C7C7C] truncate">{r.description}</p>}
-                                            <p className="text-[11px] text-[#AEAEAE] mt-1">{countPermissions(r.permissions)} permissions · {r.scope}</p>
+                                            <p className="text-[11px] text-[#AEAEAE] mt-1">{countMatrixPermissions(r.permissions, effectiveScope)} permissions · {r.scope}</p>
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
                                             <button
@@ -181,7 +182,7 @@ export function TeamRolesEditor({
                                                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-purple-50 text-purple-600">{t.scope}</span>
                                             </div>
                                             {t.description && <p className="text-[12px] text-[#7C7C7C] mt-0.5">{t.description}</p>}
-                                            <p className="text-[11px] text-[#AEAEAE] mt-1">{countPermissions(t.permissions)} permissions</p>
+                                            <p className="text-[11px] text-[#AEAEAE] mt-1">{countMatrixPermissions(t.permissions, effectiveScope)} permissions</p>
                                         </div>
                                         <button
                                             onClick={() => setNewFromTemplate(t)}
@@ -200,7 +201,7 @@ export function TeamRolesEditor({
             {(editingRole || newFromTemplate || newBlank) && (
                 <RoleEditorModal
                     endpointBase={endpointBase}
-                    modules={modules}
+                    scope={effectiveScope}
                     accent={accent}
                     existing={editingRole}
                     template={newFromTemplate}
@@ -213,15 +214,11 @@ export function TeamRolesEditor({
     );
 }
 
-function countPermissions(p: PermissionsJson): number {
-    return Object.values(p ?? {}).reduce((sum, actions) => sum + Object.values(actions ?? {}).filter((v) => v === true).length, 0);
-}
-
 function RoleEditorModal({
-    endpointBase, modules, accent, existing, template, isBlank, onClose, onSaved,
+    endpointBase, scope, accent, existing, template, isBlank, onClose, onSaved,
 }: {
     endpointBase: string;
-    modules: Record<string, readonly string[]>;
+    scope: RoleScope;
     accent: string;
     existing: Role | null;
     template: Role | null;
@@ -235,19 +232,6 @@ function RoleEditorModal({
     const [permissions, setPermissions] = useState<PermissionsJson>(() => structuredClone(seed?.permissions ?? {}));
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    const toggle = (m: string, a: string) => {
-        setPermissions((prev) => {
-            const next: PermissionsJson = { ...prev, [m]: { ...(prev[m] ?? {}) } };
-            next[m][a] = !next[m][a];
-            if (!next[m][a]) delete next[m][a];
-            if (Object.keys(next[m]).length === 0) delete next[m];
-            return next;
-        });
-    };
-
-    const allActions = ['view', 'create', 'edit', 'delete', 'approve'] as const;
-    const moduleEntries = Object.entries(modules);
 
     const submit = async () => {
         setSubmitting(true);
@@ -305,50 +289,16 @@ function RoleEditorModal({
                     </div>
 
                     <h4 className="text-[13.5px] font-bold text-[#181725] pt-2 border-t border-[#F0F0F0]">Permissions Matrix</h4>
-                    <div className="border border-gray-100 rounded-xl overflow-x-auto">
-                        <table className="w-full text-[12px] min-w-[520px]">
-                            <thead className="bg-[#FAFAFA] text-gray-500">
-                                <tr>
-                                    <th className="text-left px-4 py-3 font-bold uppercase tracking-wider">Module</th>
-                                    {allActions.map((a) => (
-                                        <th key={a} className="text-center px-2 py-3 font-bold uppercase tracking-wider w-[80px] capitalize">{a}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {moduleEntries.map(([m, actions]) => (
-                                    <tr key={m} className="border-t border-gray-50 hover:bg-gray-50/50">
-                                        <td className="px-4 py-2.5 font-bold text-[#181725]">{m}</td>
-                                        {allActions.map((a) => {
-                                            const allowed = (actions as readonly string[]).includes(a);
-                                            const on = !!permissions[m]?.[a];
-                                            return (
-                                                <td key={a} className="text-center px-2 py-2.5">
-                                                    {allowed ? (
-                                                        <button
-                                                            onClick={() => toggle(m, a)}
-                                                            className="w-[24px] h-[24px] rounded-md border-2 flex items-center justify-center transition-colors mx-auto"
-                                                            style={on
-                                                                ? { borderColor: accent, backgroundColor: accent, color: 'white' }
-                                                                : { borderColor: '#E5E7EB', backgroundColor: 'white' }}
-                                                        >
-                                                            {on && <Check size={14} />}
-                                                        </button>
-                                                    ) : (
-                                                        <span className="text-gray-200">—</span>
-                                                    )}
-                                                </td>
-                                            );
-                                        })}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <PermissionMatrix
+                        scope={scope}
+                        permissions={permissions}
+                        onChange={setPermissions}
+                        accent={accent}
+                    />
                 </div>
 
                 <div className="p-4 border-t border-[#F0F0F0] flex items-center justify-between shrink-0 bg-[#F9F9F9]">
-                    <p className="text-[11px] text-[#AEAEAE] font-semibold">{countPermissions(permissions)} permission(s) selected</p>
+                    <p className="text-[11px] text-[#AEAEAE] font-semibold">{countMatrixPermissions(permissions, scope)} permission(s) selected</p>
                     <div className="flex items-center gap-2">
                         {error && <p className="text-[12px] text-red-500 mr-2">{error}</p>}
                         <button onClick={onClose} className="px-4 py-2 text-[13px] font-semibold text-[#666] hover:bg-gray-100 rounded-xl">Cancel</button>

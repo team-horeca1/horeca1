@@ -7,21 +7,37 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// V2.2 HCID + RBAC helpers. Every User needs a unique hcid_display and every
-// Vendor / Brand / customer User is backed by a BusinessAccount. Role templates
-// mirror prisma/_archive_migrations_pre_baseline/.../data_migrate.ts.
+// V2.2 HCID + RBAC helpers — templates aligned with portalFeatures.ts scopes.
 // ═══════════════════════════════════════════════════════════════════════════
 type PermissionsJson = Record<string, Record<string, boolean>>;
-const ALL_MODULES = [
-  'dashboard', 'products', 'brandStore', 'orders', 'repeatOrders', 'inventory',
-  'grn', 'dispatch', 'deliveries', 'payments', 'creditLine', 'customers',
-  'vendors', 'brands', 'users', 'outlets', 'analytics', 'promotions',
-  'support', 'logistics', 'auditLogs', 'settings',
-] as const;
-const ALL_ACTIONS = ['view', 'create', 'edit', 'delete', 'approve'] as const;
-function allPermissions(): PermissionsJson {
+
+const ACCOUNT_MODULES = ['dashboard', 'orders', 'repeatOrders', 'payments', 'creditLine', 'users', 'outlets', 'settings', 'storefront'] as const;
+const VENDOR_MODULES = ['dashboard', 'products', 'orders', 'repeatOrders', 'inventory', 'grn', 'dispatch', 'deliveries', 'payments', 'creditLine', 'customers', 'users', 'outlets', 'analytics', 'promotions', 'salespersons', 'commissions', 'settings'] as const;
+const BRAND_MODULES = ['dashboard', 'products', 'vendors', 'analytics', 'users', 'settings'] as const;
+const ADMIN_MODULES = ['dashboard', 'orders', 'customers', 'vendors', 'brands', 'products', 'payments', 'promotions', 'analytics', 'users', 'auditLogs', 'settings'] as const;
+
+const MODULE_ACTIONS: Record<string, readonly string[]> = {
+  dashboard: ['view'], products: ['view', 'create', 'edit', 'delete', 'approve'],
+  orders: ['view', 'create', 'edit', 'delete', 'approve'], repeatOrders: ['view', 'create', 'edit'],
+  inventory: ['view', 'create', 'edit', 'delete'], grn: ['view', 'create', 'edit'],
+  dispatch: ['view', 'create', 'edit'], deliveries: ['view', 'edit', 'approve'],
+  payments: ['view', 'create', 'approve'], creditLine: ['view', 'approve'],
+  customers: ['view', 'create', 'edit', 'delete'], vendors: ['view', 'create', 'edit', 'delete', 'approve'],
+  brands: ['view', 'create', 'edit', 'delete', 'approve'], users: ['view', 'create', 'edit', 'delete'],
+  outlets: ['view', 'create', 'edit', 'delete'], analytics: ['view'],
+  promotions: ['view', 'create', 'edit', 'delete'], auditLogs: ['view'], settings: ['view', 'edit'],
+  storefront: ['view', 'order', 'pay'], salespersons: ['view', 'create', 'edit', 'delete'],
+  commissions: ['view', 'edit', 'approve'],
+};
+
+function allScopePermissions(modules: readonly string[]): PermissionsJson {
   const out: PermissionsJson = {};
-  for (const m of ALL_MODULES) { out[m] = {}; for (const a of ALL_ACTIONS) out[m][a] = true; }
+  for (const m of modules) {
+    const actions = MODULE_ACTIONS[m];
+    if (!actions) continue;
+    out[m] = {};
+    for (const a of actions) out[m][a] = true;
+  }
   return out;
 }
 function viewOnly(modules: readonly string[]): PermissionsJson {
@@ -35,24 +51,24 @@ function perms(spec: Record<string, readonly string[]>): PermissionsJson {
   return out;
 }
 const SEED_TEMPLATES: Array<{ name: string; scope: 'account' | 'vendor' | 'brand' | 'admin' | 'delivery'; description: string; permissions: PermissionsJson }> = [
-  { name: 'Owner', scope: 'account', description: 'Account owner — full access', permissions: allPermissions() },
-  { name: 'Procurement Manager', scope: 'account', description: 'Manages procurement, orders, repeat orders', permissions: perms({ dashboard: ['view'], orders: ['view','create','edit','approve'], repeatOrders: ['view','create','edit'], products: ['view'], inventory: ['view'], grn: ['view','create'], payments: ['view'], vendors: ['view'], outlets: ['view'], analytics: ['view'] }) },
-  { name: 'Store Manager', scope: 'account', description: 'Operates a single outlet', permissions: perms({ dashboard: ['view'], orders: ['view','create','edit'], grn: ['view','create','edit'], inventory: ['view','edit'], deliveries: ['view'], outlets: ['view'] }) },
-  { name: 'Chef', scope: 'account', description: 'Creates orders from approved lists', permissions: perms({ orders: ['view','create'], repeatOrders: ['view','create'], products: ['view'], outlets: ['view'] }) },
-  { name: 'Accountant', scope: 'account', description: 'Finance + payments visibility', permissions: perms({ dashboard: ['view'], orders: ['view'], payments: ['view','approve'], creditLine: ['view','approve'], analytics: ['view'], auditLogs: ['view'] }) },
-  { name: 'Viewer', scope: 'account', description: 'Read-only across modules', permissions: viewOnly(ALL_MODULES) },
-  { name: 'Vendor Admin', scope: 'vendor', description: 'Full vendor portal access', permissions: allPermissions() },
-  { name: 'Sales Rep', scope: 'vendor', description: 'Customer-facing sales', permissions: perms({ dashboard: ['view'], orders: ['view','create','edit'], customers: ['view','create','edit'], products: ['view'], inventory: ['view'], promotions: ['view','create','edit'] }) },
+  { name: 'Owner', scope: 'account', description: 'Account owner — full access', permissions: allScopePermissions(ACCOUNT_MODULES) },
+  { name: 'Procurement Manager', scope: 'account', description: 'Manages procurement, orders, repeat orders', permissions: perms({ dashboard: ['view'], orders: ['view','create','edit','approve'], repeatOrders: ['view','create','edit'], payments: ['view'], outlets: ['view'] }) },
+  { name: 'Store Manager', scope: 'account', description: 'Operates a single outlet', permissions: perms({ dashboard: ['view'], orders: ['view','create','edit'], repeatOrders: ['view','create'], outlets: ['view','edit'], settings: ['view'] }) },
+  { name: 'Chef', scope: 'account', description: 'Creates orders from approved lists', permissions: perms({ orders: ['view','create'], repeatOrders: ['view','create'], outlets: ['view'], storefront: ['view','order'] }) },
+  { name: 'Accountant', scope: 'account', description: 'Finance + payments visibility', permissions: perms({ dashboard: ['view'], orders: ['view'], payments: ['view','approve'], creditLine: ['view','approve'] }) },
+  { name: 'Viewer', scope: 'account', description: 'Read-only across account modules', permissions: viewOnly(ACCOUNT_MODULES) },
+  { name: 'Vendor Admin', scope: 'vendor', description: 'Full vendor portal access', permissions: allScopePermissions(VENDOR_MODULES) },
+  { name: 'Sales Rep', scope: 'vendor', description: 'Customer-facing sales', permissions: perms({ dashboard: ['view'], orders: ['view','create','edit'], customers: ['view','create','edit'], products: ['view'], inventory: ['view'], promotions: ['view','create','edit'], salespersons: ['view'], commissions: ['view'] }) },
   { name: 'Order Manager', scope: 'vendor', description: 'Order processing + dispatch', permissions: perms({ dashboard: ['view'], orders: ['view','edit','approve'], dispatch: ['view','create','edit'], deliveries: ['view','edit'], grn: ['view'], inventory: ['view'] }) },
   { name: 'Warehouse Manager', scope: 'vendor', description: 'Inventory + GRN', permissions: perms({ inventory: ['view','create','edit','delete'], grn: ['view','create','edit'], dispatch: ['view','create'], products: ['view'] }) },
-  { name: 'Finance Executive', scope: 'vendor', description: 'Payments + ledgers', permissions: perms({ dashboard: ['view'], payments: ['view','create','approve'], creditLine: ['view','approve'], orders: ['view'], analytics: ['view'], auditLogs: ['view'] }) },
-  { name: 'Brand Admin', scope: 'brand', description: 'Full brand portal access', permissions: allPermissions() },
-  { name: 'Brand Manager', scope: 'brand', description: 'Catalog + mappings', permissions: perms({ dashboard: ['view'], brandStore: ['view','edit'], products: ['view','create','edit'], brands: ['view','edit'], analytics: ['view'] }) },
-  { name: 'Marketing Executive', scope: 'brand', description: 'Promotions + analytics', permissions: perms({ dashboard: ['view'], brandStore: ['view'], promotions: ['view','create','edit'], analytics: ['view'] }) },
-  { name: 'Super Admin', scope: 'admin', description: 'Full platform access', permissions: allPermissions() },
-  { name: 'Ops Admin', scope: 'admin', description: 'Operations: orders, vendors, customers', permissions: perms({ dashboard: ['view'], orders: ['view','edit','approve'], vendors: ['view','edit','approve'], customers: ['view','edit'], deliveries: ['view','edit','approve'], support: ['view','edit'], auditLogs: ['view'], settings: ['view'] }) },
-  { name: 'Finance Admin', scope: 'admin', description: 'Finance + credit oversight', permissions: perms({ dashboard: ['view'], payments: ['view','approve'], creditLine: ['view','approve'], analytics: ['view'], auditLogs: ['view'] }) },
-  { name: 'Support Agent', scope: 'admin', description: 'Customer support tickets', permissions: perms({ support: ['view','edit'], orders: ['view'], customers: ['view'], auditLogs: ['view'] }) },
+  { name: 'Finance Executive', scope: 'vendor', description: 'Payments + ledgers', permissions: perms({ dashboard: ['view'], payments: ['view','create','approve'], creditLine: ['view','approve'], orders: ['view'], analytics: ['view'] }) },
+  { name: 'Brand Admin', scope: 'brand', description: 'Full brand portal access', permissions: allScopePermissions(BRAND_MODULES) },
+  { name: 'Brand Manager', scope: 'brand', description: 'Catalog + distributors', permissions: perms({ dashboard: ['view'], products: ['view','create','edit'], vendors: ['view','edit'], analytics: ['view'] }) },
+  { name: 'Marketing Executive', scope: 'brand', description: 'Analytics + catalog view', permissions: perms({ dashboard: ['view'], products: ['view'], analytics: ['view'] }) },
+  { name: 'Super Admin', scope: 'admin', description: 'Full platform access', permissions: allScopePermissions(ADMIN_MODULES) },
+  { name: 'Ops Admin', scope: 'admin', description: 'Operations: orders, vendors, customers', permissions: perms({ dashboard: ['view'], orders: ['view','edit','approve'], vendors: ['view','edit','approve'], customers: ['view','edit'], brands: ['view','approve'], products: ['view','approve'], settings: ['view'] }) },
+  { name: 'Finance Admin', scope: 'admin', description: 'Finance + credit oversight', permissions: perms({ dashboard: ['view'], payments: ['view','approve'], analytics: ['view'], auditLogs: ['view'] }) },
+  { name: 'Support Agent', scope: 'admin', description: 'Customer support', permissions: perms({ orders: ['view'], customers: ['view'], auditLogs: ['view'] }) },
 ];
 function generateHcid(): string {
   const seg = () => Math.random().toString(36).substring(2, 6).toUpperCase().padEnd(4, '0');

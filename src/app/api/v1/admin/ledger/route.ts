@@ -5,8 +5,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 
-export const GET = adminOnly(async (req: NextRequest) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
+  requirePermission(ctx, 'payments.view');
   try {
     const url = new URL(req.url);
     const tab = url.searchParams.get('tab') ?? 'revenue';

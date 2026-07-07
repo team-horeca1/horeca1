@@ -1,13 +1,14 @@
 /**
  * Permission registry — the single source of truth for valid (module, action) pairs.
- *
- * Adding a new permission key:
- *   1. Add the action to the relevant module here.
- *   2. Update the seeded role templates in prisma/migrations/.../data_migrate.ts if needed.
- *   3. Reference the key via PermissionKey type — TypeScript will block typos at compile time.
- *
- * The matrix UI at /account/[id]/roles reads MODULES at runtime to render rows × columns.
  */
+
+import {
+  modulesForPortalScope,
+  scopeModuleKeys,
+  type RoleScope,
+} from './portalFeatures';
+
+export type { RoleScope };
 
 export const MODULES = {
   dashboard:    ['view'],
@@ -63,95 +64,16 @@ export function isValidPermissionKey(key: string): key is PermissionKey {
 /** Permissions JSON as stored on AccountRole.permissions. */
 export type PermissionsJson = Partial<Record<Module, Partial<Record<Action, boolean>>>>;
 
-// ─── Scope ↔ Module mapping ──────────────────────────────────────────────
-//
-// Each AccountRole has a scope (account / vendor / brand / admin / delivery).
-// The permission matrix shown when creating or editing a role of a given
-// scope must only include modules that make sense for that scope —
-// otherwise a customer-team admin sees vendor-only modules like GRN /
-// dispatch / inventory, which is confusing and lets them set permissions
-// that never apply.
-//
-// Membership rule of thumb:
-//   • account  — buying-side: orders, payments, credit, team, outlets, settings
-//   • vendor   — selling-side: full catalog/inventory/dispatch + everything
-//   • brand    — brand-store: catalog management + distributor relationships
-//   • admin    — platform staff: everything cross-tenant + audit trail
-//   • delivery — delivery operators (V2.3+): dispatch + deliveries + orders.view
-//
-// Keep this list aligned with what each portal's pages actually need.
-export type RoleScope = 'account' | 'vendor' | 'brand' | 'admin' | 'delivery';
-
+/** Module keys per scope — derived from PORTAL_FEATURES. */
 export const SCOPE_MODULES: Record<RoleScope, readonly Module[]> = {
-  account: [
-    'dashboard',
-    'orders',
-    'repeatOrders',
-    'payments',
-    'creditLine',
-    'users',
-    'outlets',
-    'settings',
-  ],
-  vendor: [
-    'dashboard',
-    'products',
-    'brandStore',
-    'orders',
-    'repeatOrders',
-    'inventory',
-    'grn',
-    'dispatch',
-    'deliveries',
-    'payments',
-    'creditLine',
-    'customers',
-    'users',
-    'outlets',
-    'analytics',
-    'promotions',
-    'salespersons',
-    'commissions',
-    'settings',
-  ],
-  brand: [
-    'dashboard',
-    'products',
-    'vendors',
-    'analytics',
-    'users',
-    'settings',
-  ],
-  admin: [
-    'dashboard',
-    'orders',
-    'customers',
-    'vendors',
-    'brands',
-    'products',
-    'payments',
-    'promotions',
-    'analytics',
-    'users',
-    'auditLogs',
-    'settings',
-    'support',
-    'logistics',
-  ],
-  delivery: [
-    'dashboard',
-    'orders',
-    'dispatch',
-    'deliveries',
-  ],
-} as const;
+  account: scopeModuleKeys('account'),
+  vendor: scopeModuleKeys('vendor'),
+  brand: scopeModuleKeys('brand'),
+  admin: scopeModuleKeys('admin'),
+  delivery: scopeModuleKeys('delivery'),
+};
 
-/** Filter MODULES down to just the ones a given role-scope can use. */
+/** Filter MODULES down to portal-relevant actions for a given role-scope. */
 export function modulesForScope(scope: RoleScope): Record<Module, readonly Action[]> {
-  const allowed = SCOPE_MODULES[scope];
-  const out: Partial<Record<Module, readonly Action[]>> = {};
-  for (const m of allowed) {
-    out[m] = MODULES[m];
-  }
-  return out as Record<Module, readonly Action[]>;
+  return modulesForPortalScope(scope) as Record<Module, readonly Action[]>;
 }

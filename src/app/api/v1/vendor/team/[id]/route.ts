@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { vendorOnly } from '@/middleware/rbac';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
-import { requirePermission, sanitizePermissions } from '@/lib/permissions/engine';
+import { requirePermission, sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { redis } from '@/lib/redis';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
@@ -183,7 +183,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       if (!found || found.scope !== 'vendor') throw Errors.badRequest('roleId must reference a vendor-scope role');
       role = found;
     } else if (input.permissions) {
-      const sanitized = sanitizePermissions(input.permissions);
+      const sanitized = sanitizePermissionsForScope(input.permissions, 'vendor');
       const sanitizedStr = JSON.stringify(sortKeys(sanitized));
       const candidates = await prisma.accountRole.findMany({
         where: { scope: 'vendor', OR: [{ isTemplate: true, businessAccountId: null }, { businessAccountId }] },

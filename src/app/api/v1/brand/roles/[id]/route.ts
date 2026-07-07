@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { brandOnly } from '@/middleware/rbac';
 import { resolveBrandContext } from '@/lib/resolveBrandId';
-import { requirePermission, sanitizePermissions } from '@/lib/permissions/engine';
+import { requirePermission, sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 
@@ -56,7 +56,7 @@ export const PATCH = brandOnly(async (req: NextRequest, ctx) => {
     const data = {
       ...(body.name !== undefined && { name: body.name }),
       ...(body.description !== undefined && { description: body.description }),
-      ...(body.permissions !== undefined && { permissions: sanitizePermissions(body.permissions) }),
+      ...(body.permissions !== undefined && { permissions: sanitizePermissionsForScope(body.permissions, 'brand') }),
     };
     const updated = await prisma.accountRole.update({ where: { id: roleId }, data });
     return NextResponse.json({ success: true, data: updated });

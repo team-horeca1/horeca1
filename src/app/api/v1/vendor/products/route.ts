@@ -78,6 +78,7 @@ const createProductSchema = z.object({
 
 // GET — list all vendor products (includes inactive for management)
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
+  requirePermission(ctx, 'products.view');
   try {
     const vendorId = await resolveVendorId(ctx, req);
 

@@ -6,9 +6,11 @@ import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorOutletContext, buildFulfillmentOutletWhere, buildInventoryOutletWhere } from '@/lib/resolveVendorOutletContext';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
+  requirePermission(ctx, 'dashboard.view');
   try {
     const allOutlets = req.nextUrl.searchParams.get('outletId') === 'all';
     const voc = await resolveVendorOutletContext(ctx, req, { allowAllOutlets: true });

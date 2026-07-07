@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 
 function periodStart(period: string | null): Date {
   const now = Date.now();
@@ -14,7 +15,8 @@ function periodStart(period: string | null): Date {
   }
 }
 
-export const GET = adminOnly(async (req: NextRequest) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
+  requirePermission(ctx, 'analytics.view');
   try {
     const url = new URL(req.url);
     const period = url.searchParams.get('period') ?? '30d';

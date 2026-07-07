@@ -8,8 +8,10 @@ import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId } from '@/lib/resolveVendorId';
+import { requirePermission } from '@/lib/permissions/engine';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
+  requirePermission(ctx, 'orders.view');
   try {
     const vendorId = await resolveVendorId(ctx, req);
     const { searchParams } = new URL(req.url);

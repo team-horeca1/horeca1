@@ -9,10 +9,12 @@ import { FORCE_PICKER_COOKIE } from '@/lib/postLoginPicker';
 import { redis } from '@/lib/redis';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
 import { uniqueHcid } from '@/lib/hcid';
-import { flatten } from '@/lib/permissions/engine';
 import { phoneLookupVariants } from '@/lib/phone';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 import type { PermissionKey, PermissionsJson } from '@/lib/permissions/registry';
+import { ALL_PERMISSION_KEYS } from '@/lib/permissions/registry';
+import { flatten } from '@/lib/permissions/engine';
+import { isOwnerRoleName } from '@/lib/permissions/portalFeatures';
 
 function vendorSlug(name: string): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
@@ -443,6 +445,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (token.activeOutletId) u.activeOutletId = token.activeOutletId as string;
         if (Array.isArray(token.accessibleOutletIds)) u.accessibleOutletIds = token.accessibleOutletIds as string[];
         if (token.permissions) u.permissions = token.permissions as string[];
+        if (typeof token.isPermissionOwner === 'boolean') u.isPermissionOwner = token.isPermissionOwner;
         if (token.availableAccounts) u.availableAccounts = token.availableAccounts as unknown[];
         if (typeof token.availableAccountsTruncated === 'boolean') u.availableAccountsTruncated = token.availableAccountsTruncated;
         if (typeof token.totalAccountCount === 'number') u.totalAccountCount = token.totalAccountCount;
@@ -475,16 +478,25 @@ async function applyAdminPermissions(token: Record<string, unknown>): Promise<vo
   try {
     const member = await prisma.adminTeamMember.findUnique({
       where: { userId: token.id as string },
-      select: { roleRef: { select: { permissions: true } } },
+      select: { roleRef: { select: { name: true, permissions: true } } },
     });
+
+    const roleName = member?.roleRef?.name;
+    const isAdminOwner = !member || (roleName && isOwnerRoleName(roleName));
+
+    if (isAdminOwner) {
+      const existing = new Set<PermissionKey>(
+        Array.isArray(token.permissions) ? (token.permissions as PermissionKey[]) : [],
+      );
+      for (const k of ALL_PERMISSION_KEYS) existing.add(k);
+      token.permissions = Array.from(existing);
+      token.isPermissionOwner = true;
+      return;
+    }
 
     let adminPerms = flatten(member?.roleRef?.permissions as PermissionsJson | null | undefined);
 
-    // Fallback: admin user with no AdminTeamMember row at all = seeded owner.
-    // Legacy semantics granted them full access; preserve that by loading the
-    // Super Admin template. Without this, the original platform admin loses
-    // every admin-route permission immediately after the migration.
-    if (adminPerms.size === 0 && !member) {
+    if (adminPerms.size === 0 && member && !member.roleRef) {
       const superAdmin = await prisma.accountRole.findFirst({
         where: { name: 'Super Admin', scope: 'admin', isTemplate: true, businessAccountId: null },
         select: { permissions: true },
@@ -500,7 +512,6 @@ async function applyAdminPermissions(token: Record<string, unknown>): Promise<vo
     token.permissions = Array.from(existing);
   } catch (err) {
     console.error('[auth.jwt] applyAdminPermissions failed:', err);
-    // Keep existing token.permissions unchanged on failure.
   }
 }
 
@@ -543,6 +554,7 @@ function applyActiveContext(token: Record<string, unknown>, active: ActiveContex
     delete token.activeOutletId;
     delete token.accessibleOutletIds;
     delete token.permissions;
+    delete token.isPermissionOwner;
     delete token.availableAccounts;
     delete token.availableAccountsTruncated;
     delete token.totalAccountCount;
@@ -554,6 +566,7 @@ function applyActiveContext(token: Record<string, unknown>, active: ActiveContex
   token.activeOutletId = active.activeOutletId;
   token.accessibleOutletIds = active.accessibleOutletIds;
   token.permissions = active.permissions;
+  token.isPermissionOwner = active.isPermissionOwner;
   token.availableAccounts = active.availableAccounts;
   token.availableAccountsTruncated = active.availableAccountsTruncated;
   token.totalAccountCount = active.totalAccountCount;

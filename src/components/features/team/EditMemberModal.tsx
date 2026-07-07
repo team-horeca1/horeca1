@@ -6,6 +6,7 @@ import {
   CreditCard, Eye, Crown, Shield, Users, DollarSign, Package, Archive, Edit3, Pencil,
 } from 'lucide-react';
 import type { RoleItem } from './AddMemberWizard';
+import { PermissionMatrix, countMatrixPermissions } from './PermissionMatrix';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ interface EditMemberModalProps {
   memberId: string;
   memberName: string;
   roles: RoleItem[];
+  scope?: 'vendor' | 'brand' | 'admin' | 'account';
   onClose: () => void;
   onSaved: () => void;
 }
@@ -37,24 +39,6 @@ type PermissionsMap = Record<string, Record<string, boolean>>;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const VENDOR_MODULES = [
-  { key: 'dashboard',    label: 'Dashboard' },
-  { key: 'products',     label: 'Products' },
-  { key: 'orders',       label: 'Orders' },
-  { key: 'repeatOrders', label: 'Repeat Orders' },
-  { key: 'inventory',    label: 'Inventory' },
-  { key: 'grn',          label: 'GRN' },
-  { key: 'dispatch',     label: 'Dispatch' },
-  { key: 'payments',     label: 'Payments' },
-  { key: 'creditLine',   label: 'Credit Line' },
-  { key: 'customers',    label: 'Customers' },
-  { key: 'users',        label: 'Team' },
-  { key: 'analytics',    label: 'Analytics' },
-  { key: 'promotions',   label: 'Promotions' },
-  { key: 'settings',     label: 'Settings' },
-] as const;
-
-const ACTIONS = ['view', 'create', 'edit', 'delete', 'approve'] as const;
 
 const ROLE_STYLES: Record<string, { color: string; bg: string; border: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
   'Vendor Admin':      { color: '#D97706', bg: '#FFF7E6', border: '#F59E0B', Icon: Crown },
@@ -73,10 +57,9 @@ function getRoleStyle(name: string) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function EditMemberModal({ memberId, memberName, roles, onClose, onSaved }: EditMemberModalProps) {
+export function EditMemberModal({ memberId, memberName, roles, scope = 'vendor', onClose, onSaved }: EditMemberModalProps) {
   const [loading, setLoading] = useState(true);
   const [outlets, setOutlets] = useState<OutletItem[]>([]);
-  const [registry, setRegistry] = useState<Record<string, readonly string[]>>({});
 
   // Editable state
   const [allOutlets, setAllOutlets] = useState(true);
@@ -95,10 +78,8 @@ export function EditMemberModal({ memberId, memberName, roles, onClose, onSaved 
     Promise.all([
       fetch(`/api/v1/vendor/team/${memberId}`).then(r => r.json()),
       fetch('/api/v1/vendor/outlets').then(r => r.json()),
-      fetch('/api/v1/permissions/registry').then(r => r.json()),
-    ]).then(([memberJson, outletsJson, regJson]) => {
+    ]).then(([memberJson, outletsJson]) => {
       if (outletsJson.success) setOutlets(outletsJson.data.outlets ?? []);
-      if (regJson.success) setRegistry(regJson.data.modules ?? {});
       if (memberJson.success) {
         const d = memberJson.data as MemberDetails;
         // Initialise outlet selection
@@ -136,19 +117,12 @@ export function EditMemberModal({ memberId, memberName, roles, onClose, onSaved 
     setPermissions(structuredClone(role.permissions));
   }, []);
 
-  const handleTogglePermission = useCallback((mod: string, action: string) => {
-    setPermissions(prev => {
-      const next: PermissionsMap = { ...prev, [mod]: { ...(prev[mod] ?? {}) } };
-      if (next[mod][action]) {
-        delete next[mod][action];
-        if (Object.keys(next[mod]).length === 0) delete next[mod];
-      } else {
-        next[mod][action] = true;
-      }
-      return next;
-    });
+  const handlePermissionsChange = useCallback((next: PermissionsMap) => {
+    setPermissions(next);
     setSelectedRoleId('');
   }, []);
+
+  const totalSelected = countMatrixPermissions(permissions, scope);
 
   const toggleOutlet = (id: string) => {
     setAllOutlets(false);
@@ -158,10 +132,6 @@ export function EditMemberModal({ memberId, memberName, roles, onClose, onSaved 
       return next;
     });
   };
-
-  const totalSelected = Object.values(permissions).reduce(
-    (sum, actions) => sum + Object.values(actions).filter(Boolean).length, 0,
-  );
 
   const handleSave = async () => {
     if (Object.keys(permissions).length === 0) { setError('Select at least one permission'); return; }
@@ -299,51 +269,12 @@ export function EditMemberModal({ memberId, memberName, roles, onClose, onSaved 
                   {totalSelected} selected
                 </span>
               </div>
-              <div className="border border-[#EEEEEE] rounded-[12px] overflow-x-auto">
-                <table className="w-full text-[11px] min-w-[520px]">
-                  <thead>
-                    <tr className="bg-[#FAFAFA]">
-                      <th className="text-left px-4 py-2.5 font-bold text-[#7C7C7C] uppercase tracking-wider text-[10px]">Module</th>
-                      {ACTIONS.map(a => (
-                        <th key={a} className="text-center px-2 py-2.5 font-bold text-[#7C7C7C] uppercase tracking-wider text-[10px] w-[72px] capitalize">{a}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {VENDOR_MODULES.map(({ key, label }) => {
-                      const rowPerms = permissions[key] ?? {};
-                      const validActions = (registry[key] as readonly string[] | undefined) ?? [];
-                      return (
-                        <tr key={key} className="border-t border-[#F5F5F5] hover:bg-[#FAFAFA]/60 transition-colors">
-                          <td className="px-4 py-2.5 font-bold text-[#181725] text-[12px]">{label}</td>
-                          {ACTIONS.map(a => {
-                            const isValid = validActions.length === 0 || validActions.includes(a);
-                            const checked = isValid && !!rowPerms[a];
-                            return (
-                              <td key={a} className="text-center px-2 py-2.5">
-                                {isValid ? (
-                                  <button
-                                    onClick={() => handleTogglePermission(key, a)}
-                                    className="w-[22px] h-[22px] rounded-[5px] border-2 flex items-center justify-center transition-all mx-auto hover:scale-110"
-                                    style={checked
-                                      ? { borderColor: '#299E60', backgroundColor: '#299E60' }
-                                      : { borderColor: '#DDDDDD', backgroundColor: 'white' }
-                                    }
-                                  >
-                                    {checked && <Check size={12} className="text-white" />}
-                                  </button>
-                                ) : (
-                                  <span className="text-[#EEEEEE]">—</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <PermissionMatrix
+                scope={scope}
+                permissions={permissions}
+                onChange={handlePermissionsChange}
+                accent="#299E60"
+              />
               <p className="text-[10px] text-[#AEAEAE] mt-1.5">
                 Click any checkbox to add or remove a permission. Templates above auto-fill this matrix.
               </p>

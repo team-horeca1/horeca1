@@ -9,6 +9,7 @@
 import { prisma } from '@/lib/prisma';
 import { flatten, mergePermissions } from '@/lib/permissions/engine';
 import { ALL_PERMISSION_KEYS, type PermissionKey, type PermissionsJson } from '@/lib/permissions/registry';
+import { isOwnerRoleName } from '@/lib/permissions/portalFeatures';
 
 const MAX_AVAILABLE_ACCOUNTS = 20;
 
@@ -28,6 +29,8 @@ export interface ActiveContext {
    * Empty array means the user has account-wide access and can switch to any outlet. */
   accessibleOutletIds: string[];
   permissions: PermissionKey[];
+  /** True when user holds an owner-class role on the active account (full portal access). */
+  isPermissionOwner: boolean;
   availableAccounts: AvailableAccountSummary[];
   availableAccountsTruncated: boolean;
   totalAccountCount: number;
@@ -176,9 +179,7 @@ export async function loadActiveContext(
     // account — these are the exact roles the account-creation paths
     // (provisionDefaultAccount / account POST) assign to the creator. This lets
     // a multi-account owner buy/manage on EVERY account they own.
-    const OWNER_ROLE_NAMES = new Set(['Owner', 'Vendor Admin', 'Brand Admin']);
-    const isOwner =
-      chosen.isPrimary || userRoles.some((ur) => OWNER_ROLE_NAMES.has(ur.role.name));
+    const isOwner = userRoles.some((ur) => isOwnerRoleName(ur.role.name));
 
     const permissions = isOwner
       ? [...ALL_PERMISSION_KEYS]
@@ -209,6 +210,7 @@ export async function loadActiveContext(
       activeOutletId,
       accessibleOutletIds,
       permissions,
+      isPermissionOwner: isOwner,
       availableAccounts,
       availableAccountsTruncated,
       totalAccountCount,

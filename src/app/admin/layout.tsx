@@ -32,61 +32,8 @@ import {
 import { cn } from '@/lib/utils';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
 import { NotificationBell } from '@/components/features/NotificationBell';
-import type { PermissionKey } from '@/lib/permissions/registry';
-
-interface AdminSidebarLink {
-    name: string;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    href: string;
-    // ANY-match: if array, user needs at least one of the listed perms.
-    // Omit → always visible (e.g. Dashboard).
-    requiredPerm?: PermissionKey | PermissionKey[];
-}
-
-const SIDEBAR_GROUPS: { label: string; links: AdminSidebarLink[] }[] = [
-    {
-        label: 'Operations',
-        links: [
-            { name: 'Dashboard', icon: LayoutDashboard, href: '/admin/dashboard', requiredPerm: 'dashboard.view' },
-            { name: 'Orders', icon: ShoppingBag, href: '/admin/orders', requiredPerm: 'orders.view' },
-            { name: 'Returns', icon: RotateCcw, href: '/admin/returns', requiredPerm: 'orders.edit' },
-            { name: 'Claims', icon: FileWarning, href: '/admin/claims', requiredPerm: 'orders.edit' },
-            { name: 'Approvals', icon: CheckSquare, href: '/admin/approvals', requiredPerm: ['vendors.approve', 'brands.approve', 'products.approve'] },
-        ],
-    },
-    {
-        label: 'Marketplace',
-        links: [
-            { name: 'Customers', icon: Users, href: '/admin/customers', requiredPerm: 'customers.view' },
-            { name: 'Vendors', icon: Store, href: '/admin/vendors', requiredPerm: 'vendors.view' },
-            { name: 'Products', icon: Package, href: '/admin/products', requiredPerm: 'products.view' },
-            { name: 'Categories', icon: Tag, href: '/admin/categories', requiredPerm: 'products.edit' },
-            { name: 'Brands', icon: Sparkles, href: '/admin/brands', requiredPerm: 'brands.view' },
-        ],
-    },
-    {
-        label: 'Finance',
-        links: [
-            { name: 'Overview', icon: Wallet, href: '/admin/finance', requiredPerm: 'payments.view' },
-            { name: 'Platform Ledger', icon: BookOpen, href: '/admin/ledger', requiredPerm: 'payments.view' },
-            { name: 'Reports', icon: BarChart3, href: '/admin/reports', requiredPerm: 'analytics.view' },
-        ],
-    },
-    {
-        label: 'Credit',
-        links: [
-            { name: 'Credit & Collections', icon: CreditCard, href: '/admin/credit', requiredPerm: 'payments.view' },
-        ],
-    },
-    {
-        label: 'Platform',
-        links: [
-            { name: 'Promotions', icon: Gift, href: '/admin/promotions', requiredPerm: 'promotions.view' },
-            { name: 'Team', icon: Users, href: '/admin/team', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
-            { name: 'Settings', icon: Settings, href: '/admin/settings', requiredPerm: 'settings.view' },
-        ],
-    },
-];
+import { usePermissions } from '@/hooks/usePermissions';
+import { ADMIN_NAV_GROUPS, filterNavLinks } from '@/lib/permissions/portalNav';
 
 export default function AdminLayout({
     children,
@@ -99,21 +46,10 @@ export default function AdminLayout({
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [pendingApprovals, setPendingApprovals] = useState(0);
 
-    // Hide sidebar links the current admin role cannot use. Server-side RBAC
-    // still enforces access; this keeps the sidebar honest with what UI is
-    // reachable. Empty permissions array means no restrictions yet (legacy /
-    // root admin) — show everything; otherwise filter by requiredPerm.
-    const sessionPerms = ((session?.user as { permissions?: string[] } | undefined)?.permissions) ?? [];
-    const can = (need?: PermissionKey | PermissionKey[]): boolean => {
-        if (!need) return true;
-        if (sessionPerms.length === 0) return true;
-        return Array.isArray(need)
-            ? need.some((p) => sessionPerms.includes(p))
-            : sessionPerms.includes(need);
-    };
-    const visibleGroups = SIDEBAR_GROUPS.map((g) => ({
+    const { can } = usePermissions();
+    const visibleGroups = ADMIN_NAV_GROUPS.map((g) => ({
         ...g,
-        links: g.links.filter((link) => can(link.requiredPerm)),
+        links: filterNavLinks(g.links, can, 'admin'),
     })).filter((g) => g.links.length > 0);
 
     // Poll the pending-approvals count so the sidebar badge reflects reality

@@ -8,9 +8,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import type { OrderStatus } from '@prisma/client';
 
-export const GET = adminOnly(async (req: NextRequest, _ctx) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
+  requirePermission(ctx, 'orders.view');
   try {
     const params = req.nextUrl.searchParams;
     const status = params.get('status') as OrderStatus | null;

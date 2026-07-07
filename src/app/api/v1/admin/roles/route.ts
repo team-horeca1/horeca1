@@ -12,7 +12,7 @@ import { adminOnly } from '@/middleware/rbac';
 import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
-import { sanitizePermissions } from '@/lib/permissions/engine';
+import { sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import type { TeamRoleDTO } from '@/lib/teamMemberShape';
 import type { Prisma } from '@prisma/client';
 
@@ -60,7 +60,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     });
     if (dup) throw Errors.conflict(`A role named "${body.name}" already exists`);
 
-    const cleaned = sanitizePermissions(body.permissions);
+    const cleaned = sanitizePermissionsForScope(body.permissions, 'admin');
     const created = await prisma.accountRole.create({
       data: {
         businessAccountId: null,

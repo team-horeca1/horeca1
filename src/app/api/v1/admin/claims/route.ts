@@ -5,8 +5,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 
-export const GET = adminOnly(async (req: NextRequest) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
+  requirePermission(ctx, 'orders.view');
   try {
     const status = new URL(req.url).searchParams.get('status');
     const claims = await prisma.vendorClaim.findMany({

@@ -6,8 +6,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 
-export const GET = adminOnly(async (_req: NextRequest, _ctx) => {
+export const GET = adminOnly(async (_req: NextRequest, ctx) => {
+  requirePermission(ctx, 'payments.view');
   try {
     const now = new Date();
     const eightMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 7, 1);

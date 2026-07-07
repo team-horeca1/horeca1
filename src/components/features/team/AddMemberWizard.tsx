@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { PasswordField } from '@/components/ui/form';
 import { InviteSuccessModal, type InviteMeta } from '@/components/features/team/InviteSuccessModal';
+import { PermissionMatrix, countMatrixPermissions } from '@/components/features/team/PermissionMatrix';
+import type { RoleScope } from '@/lib/permissions/portalFeatures';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -209,6 +211,11 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   }, []);
 
   // Toggle a single permission cell
+  const handlePermissionsChange = useCallback((next: PermissionsMap) => {
+    setPermissions(next);
+    setSelectedRoleId('');
+  }, []);
+
   const handleTogglePermission = useCallback((mod: string, action: string) => {
     setPermissions(prev => {
       const next: PermissionsMap = { ...prev, [mod]: { ...(prev[mod] ?? {}) } };
@@ -383,11 +390,10 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
               selectedRole={selectedRole}
               permissions={permissions}
               onSelectRole={handleSelectRole}
-              onTogglePermission={handleTogglePermission}
+              onPermissionsChange={handlePermissionsChange}
               sfView={sfView} setSfView={setSfView}
               sfOrder={sfOrder} setSfOrder={setSfOrder}
               sfPay={sfPay} setSfPay={setSfPay}
-              modules={modules}
               showStorefront={showStorefront}
               scope={scope}
             />
@@ -608,36 +614,23 @@ function Step2Outlets({
 
 function Step3Role({
   templates, selectedRoleId, selectedRole,
-  permissions, onSelectRole, onTogglePermission,
+  permissions, onSelectRole, onPermissionsChange,
   sfView, setSfView, sfOrder, setSfOrder, sfPay, setSfPay,
-  modules, showStorefront, scope,
+  showStorefront, scope,
 }: {
   templates: RoleItem[];
   selectedRoleId: string; selectedRole: RoleItem | undefined;
   permissions: PermissionsMap;
   onSelectRole: (role: RoleItem) => void;
-  onTogglePermission: (mod: string, action: string) => void;
+  onPermissionsChange: (next: PermissionsMap) => void;
   sfView: boolean; setSfView: (v: boolean) => void;
   sfOrder: boolean; setSfOrder: (v: boolean) => void;
   sfPay: boolean; setSfPay: (v: boolean) => void;
-  modules: ReadonlyArray<{ key: string; label: string }>;
   showStorefront: boolean;
   scope: Scope;
 }) {
-  // Fetch the scope-narrowed module/action registry so we know which cells
-  // are valid for THIS scope. Account scope drops vendor-only actions etc.
-  const [registry, setRegistry] = useState<Record<string, readonly string[]>>({});
-
-  useEffect(() => {
-    fetch(`/api/v1/permissions/registry?scope=${scope}`)
-      .then(r => r.json())
-      .then(j => { if (j.success) setRegistry(j.data.modules); })
-      .catch(() => {});
-  }, [scope]);
-
-  const totalSelected = Object.values(permissions).reduce(
-    (sum, actions) => sum + Object.values(actions).filter(Boolean).length, 0,
-  );
+  const matrixScope = scope as RoleScope;
+  const totalSelected = countMatrixPermissions(permissions, matrixScope);
 
   return (
     <div className="space-y-5">
@@ -682,51 +675,12 @@ function Step3Role({
             {totalSelected} selected
           </span>
         </div>
-        <div className="border border-[#EEEEEE] rounded-[12px] overflow-x-auto">
-          <table className="w-full text-[11px] min-w-[520px]">
-            <thead>
-              <tr className="bg-[#FAFAFA]">
-                <th className="text-left px-4 py-2.5 font-bold text-[#7C7C7C] uppercase tracking-wider text-[10px]">Module</th>
-                {ACTIONS.map(a => (
-                  <th key={a} className="text-center px-2 py-2.5 font-bold text-[#7C7C7C] uppercase tracking-wider text-[10px] w-[72px] capitalize">{a}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {modules.map(({ key, label }) => {
-                const rowPerms = permissions[key] ?? {};
-                const validActions = (registry[key] as readonly string[] | undefined) ?? [];
-                return (
-                  <tr key={key} className="border-t border-[#F5F5F5] hover:bg-[#FAFAFA]/60 transition-colors">
-                    <td className="px-4 py-2.5 font-bold text-[#181725] text-[12px]">{label}</td>
-                    {ACTIONS.map(a => {
-                      const isValid = validActions.length === 0 || validActions.includes(a);
-                      const checked = isValid && !!rowPerms[a];
-                      return (
-                        <td key={a} className="text-center px-2 py-2.5">
-                          {isValid ? (
-                            <button
-                              onClick={() => onTogglePermission(key, a)}
-                              className="w-[22px] h-[22px] rounded-[5px] border-2 flex items-center justify-center transition-all mx-auto hover:scale-110"
-                              style={checked
-                                ? { borderColor: '#299E60', backgroundColor: '#299E60' }
-                                : { borderColor: '#DDDDDD', backgroundColor: 'white' }
-                              }
-                            >
-                              {checked && <Check size={12} className="text-white" />}
-                            </button>
-                          ) : (
-                            <span className="text-[#EEEEEE]">—</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <PermissionMatrix
+          scope={matrixScope}
+          permissions={permissions}
+          onChange={onPermissionsChange}
+          accent="#299E60"
+        />
         <p className="text-[10px] text-[#AEAEAE] mt-1.5">
           Click any checkbox to add or remove a permission. Templates above auto-fill this matrix.
         </p>

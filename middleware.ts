@@ -1,41 +1,39 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 
-// Routes that require authentication
-const protectedRoutes = [
+const CUSTOMER_PROTECTED_PREFIXES = [
   '/checkout',
   '/orders',
   '/order-lists',
   '/profile',
   '/wishlist',
-  '/admin',
-  '/vendor/dashboard',
-  '/vendor/orders',
-  '/vendor/products',
-  '/vendor/inventory',
-  '/vendor/settings',
+  '/account',
 ];
 
-// Routes that only admins can access
-const adminRoutes = ['/admin'];
+const VENDOR_PORTAL_SEGMENTS = new Set([
+  'dashboard', 'orders', 'products', 'inventory', 'warehouse', 'returns', 'claims',
+  'brand-mappings', 'price-lists', 'promotions', 'customers', 'sales-team', 'credit',
+  'wallet', 'ledger', 'reports', 'notifications', 'account', 'team', 'outlets', 'settings',
+  'collections', 'customer-groups', 'setup', 'register',
+]);
 
-// Vendor dashboard routes (vendors + admins only)
-const vendorRoutes = [
-  '/vendor/dashboard',
-  '/vendor/orders',
-  '/vendor/products',
-  '/vendor/inventory',
-  '/vendor/settings',
-];
+function isVendorPortalRoute(pathname: string): boolean {
+  if (!pathname.startsWith('/vendor/')) return false;
+  const segment = pathname.split('/')[2];
+  return !!segment && VENDOR_PORTAL_SEGMENTS.has(segment);
+}
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
-  // Check if the route requires authentication
-  const isProtected = protectedRoutes.some(route => pathname.startsWith(route));
-  if (!isProtected) return NextResponse.next();
+  const isAdminRoute = pathname.startsWith('/admin');
+  const isBrandPortal = pathname.startsWith('/brand/portal');
+  const isVendorPortal = isVendorPortalRoute(pathname);
+  const isCustomerProtected = CUSTOMER_PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
 
-  // If not authenticated, send to login and return here after sign-in.
+  const needsAuth = isAdminRoute || isBrandPortal || isVendorPortal || isCustomerProtected;
+  if (!needsAuth) return NextResponse.next();
+
   if (!req.auth) {
     const returnTo = pathname + req.nextUrl.search;
     const url = req.nextUrl.clone();
@@ -45,22 +43,30 @@ export default auth((req) => {
     return NextResponse.redirect(url);
   }
 
-  const role = (req.auth.user as { role?: string })?.role;
+  const user = req.auth.user as {
+    role?: string;
+    activeBusinessAccountType?: { isVendor?: boolean; isBrand?: boolean };
+  };
+  const role = user?.role;
 
-  // Check admin access
-  const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route));
-  if (isAdminRoute) {
-    if (role !== 'admin') {
+  if (isAdminRoute && role !== 'admin') {
+    const url = req.nextUrl.clone();
+    url.pathname = '/';
+    return NextResponse.redirect(url);
+  }
+
+  if (isVendorPortal) {
+    const isVendorActor = role === 'vendor' || role === 'admin' || user?.activeBusinessAccountType?.isVendor === true;
+    if (!isVendorActor) {
       const url = req.nextUrl.clone();
       url.pathname = '/';
       return NextResponse.redirect(url);
     }
   }
 
-  // Check vendor dashboard access (vendors + admins allowed)
-  const isVendorRoute = vendorRoutes.some(route => pathname.startsWith(route));
-  if (isVendorRoute) {
-    if (role !== 'vendor' && role !== 'admin') {
+  if (isBrandPortal) {
+    const isBrandActor = role === 'brand' || role === 'admin' || user?.activeBusinessAccountType?.isBrand === true;
+    if (!isBrandActor) {
       const url = req.nextUrl.clone();
       url.pathname = '/';
       return NextResponse.redirect(url);
@@ -72,7 +78,6 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    // Match all routes except static files, api routes (handled by their own auth), _next, and Sentry tunnel
     '/((?!api|monitoring|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif)$).*)',
   ],
 };

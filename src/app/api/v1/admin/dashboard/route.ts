@@ -8,8 +8,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 
-export const GET = adminOnly(async (_req: NextRequest, _ctx) => {
+export const GET = adminOnly(async (_req: NextRequest, ctx) => {
+  requirePermission(ctx, 'dashboard.view');
   try {
     // Run all stat queries in parallel for performance
     const now = new Date();

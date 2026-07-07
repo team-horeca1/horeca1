@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { vendorOnly } from '@/middleware/rbac';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
-import { requirePermission, sanitizePermissions } from '@/lib/permissions/engine';
+import { requirePermission, sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import type { AuthContext } from '@/middleware/auth';
@@ -69,7 +69,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         name: body.name,
         description: body.description ?? null,
         scope: 'vendor',
-        permissions: sanitizePermissions(body.permissions),
+        permissions: sanitizePermissionsForScope(body.permissions, 'vendor'),
         isTemplate: false,
         createdBy: ctx.userId,
       },

@@ -8,7 +8,8 @@ import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { createDirectVendor, createDirectVendorSchema } from '@/modules/vendor/vendorOnboarding.service';
 
-export const GET = adminOnly(async (req: NextRequest, _ctx) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
+  requirePermission(ctx, 'vendors.view');
   try {
     const params = req.nextUrl.searchParams;
     const verified = params.has('verified') ? params.get('verified') === 'true' : undefined;

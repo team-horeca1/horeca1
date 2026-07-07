@@ -55,64 +55,8 @@ import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/B
 import { VendorOutletStrip } from '@/components/vendor/VendorOutletStrip';
 import { VendorNotificationBell } from '@/components/features/vendor/VendorNotificationBell';
 import { VendorGlobalSearch } from '@/components/vendor/VendorGlobalSearch';
-import type { PermissionKey } from '@/lib/permissions/registry';
-
-interface VendorSidebarLink {
-    name: string;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    href: string;
-    // ANY-match: array → user needs at least one perm. null/undefined → always visible.
-    requiredPerm?: PermissionKey | PermissionKey[] | null;
-}
-
-const SIDEBAR_GROUPS: { label: string; links: VendorSidebarLink[] }[] = [
-  {
-    label: 'Operations',
-    links: [
-      { name: 'Dashboard', icon: LayoutDashboard, href: '/vendor/dashboard', requiredPerm: 'dashboard.view' },
-      { name: 'Orders', icon: ShoppingBag, href: '/vendor/orders', requiredPerm: 'orders.view' },
-      { name: 'Inventory', icon: Warehouse, href: '/vendor/inventory', requiredPerm: 'inventory.view' },
-      { name: 'Warehouse', icon: Container, href: '/vendor/warehouse', requiredPerm: 'inventory.view' },
-      { name: 'Returns', icon: RotateCcw, href: '/vendor/returns', requiredPerm: 'orders.edit' },
-      { name: 'Claims', icon: ShieldAlert, href: '/vendor/claims', requiredPerm: 'orders.edit' },
-    ],
-  },
-  {
-    label: 'Catalog',
-    links: [
-      { name: 'Products', icon: Package, href: '/vendor/products', requiredPerm: 'products.view' },
-      { name: 'Brand Mappings', icon: GitMerge, href: '/vendor/brand-mappings', requiredPerm: 'products.view' },
-      { name: 'Price Lists', icon: Tag, href: '/vendor/price-lists', requiredPerm: 'products.edit' },
-      { name: 'Promotions', icon: Gift, href: '/vendor/promotions', requiredPerm: 'promotions.view' },
-    ],
-  },
-  {
-    label: 'Customers',
-    links: [
-      { name: 'Customers', icon: UserCircle, href: '/vendor/customers', requiredPerm: 'customers.view' },
-      { name: 'Sales Team', icon: BadgeIndianRupee, href: '/vendor/sales-team', requiredPerm: ['salespersons.view', 'commissions.view'] },
-    ],
-  },
-  {
-    label: 'Finance',
-    links: [
-      { name: 'Credit & Collections', icon: CreditCard, href: '/vendor/credit', requiredPerm: ['creditLine.view', 'creditLine.approve'] },
-      { name: 'Wallet', icon: Wallet, href: '/vendor/wallet', requiredPerm: 'payments.view' },
-      { name: 'Ledger', icon: BookOpen, href: '/vendor/ledger', requiredPerm: 'payments.view' },
-      { name: 'Reports', icon: BarChart3, href: '/vendor/reports', requiredPerm: 'analytics.view' },
-    ],
-  },
-  {
-    label: 'Account',
-    links: [
-      { name: 'Notifications', icon: Bell, href: '/vendor/notifications' },
-      { name: 'Business account', icon: Building2, href: '/vendor/account' },
-      { name: 'Team', icon: Users, href: '/vendor/team', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
-      { name: 'Outlets', icon: MapPin, href: '/vendor/outlets', requiredPerm: 'outlets.view' },
-      { name: 'Settings', icon: Settings, href: '/vendor/settings', requiredPerm: 'settings.view' },
-    ],
-  },
-];
+import { usePermissions } from '@/hooks/usePermissions';
+import { VENDOR_NAV_GROUPS, filterNavLinks } from '@/lib/permissions/portalNav';
 
 export default function VendorLayout({
     children,
@@ -159,22 +103,12 @@ export default function VendorLayout({
         return () => window.removeEventListener('focus', onFocus);
     }, [status, canUseVendorPortal, fetchBrandMappingAccess]);
 
-    // Filter sidebar links by the user's permission set.
-    // Empty array means no restrictions yet (owner/legacy) — show all.
-    const sessionPerms = ((session?.user as Record<string, unknown>)?.permissions as string[] | undefined) ?? [];
-    const can = (need?: PermissionKey | PermissionKey[] | null): boolean => {
-        if (!need) return true;
-        if (sessionPerms.length === 0) return true;
-        return Array.isArray(need)
-            ? need.some((p) => sessionPerms.includes(p))
-            : sessionPerms.includes(need);
-    };
-    const visibleGroups = SIDEBAR_GROUPS.map((g) => ({
+    const { can } = usePermissions();
+    const visibleGroups = VENDOR_NAV_GROUPS.map((g) => ({
       ...g,
-      links: g.links.filter((link) => {
-        if (link.href === '/vendor/brand-mappings' && !hasBrandMappings) return false;
-        return can(link.requiredPerm);
-      }),
+      links: filterNavLinks(g.links, can, 'vendor', (link) =>
+        link.href === '/vendor/brand-mappings' && !hasBrandMappings,
+      ),
     })).filter((g) => g.links.length > 0);
 
     // Only treat the impersonation cookie as authoritative when the current

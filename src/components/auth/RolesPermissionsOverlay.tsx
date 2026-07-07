@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, Loader2, Plus, Copy, Trash2, X, Check } from 'lucide-react';
+import { ChevronLeft, Loader2, Plus, Copy, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PermissionMatrix, countMatrixPermissions } from '@/components/features/team/PermissionMatrix';
+import type { RoleScope } from '@/lib/permissions/portalFeatures';
 
 type PermissionsJson = Record<string, Record<string, boolean>>;
 
@@ -22,7 +24,7 @@ interface RolesPermissionsOverlayProps {
 }
 
 export function RolesPermissionsOverlay({ isOpen, onClose, accountId }: RolesPermissionsOverlayProps) {
-  const [modules, setModules] = useState<Record<string, readonly string[]>>({});
+  const accountScope: RoleScope = 'account';
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
@@ -32,10 +34,9 @@ export function RolesPermissionsOverlay({ isOpen, onClose, accountId }: RolesPer
     if (!accountId) return;
     Promise.resolve().then(() => setLoading(true));
     Promise.all([
-      fetch('/api/v1/permissions/registry').then((r) => r.json()),
+      fetch(`/api/v1/permissions/registry?scope=${accountScope}`).then((r) => r.json()),
       fetch(`/api/v1/account/${accountId}/roles?templates=true`).then((r) => r.json()),
     ]).then(([m, r]) => {
-      if (m.success) setModules(m.data.modules);
       if (r.success) setRoles(r.data);
     }).finally(() => setLoading(false));
   };
@@ -89,7 +90,7 @@ export function RolesPermissionsOverlay({ isOpen, onClose, accountId }: RolesPer
                       <p className="text-[13.5px] font-bold text-[#181725]">{r.name}</p>
                       {r.description && <p className="text-[12px] text-[#7C7C7C] truncate">{r.description}</p>}
                       <p className="text-[11px] text-[#AEAEAE] mt-1">
-                        {countPermissions(r.permissions)} permissions · {r.scope}
+                        {countMatrixPermissions(r.permissions, accountScope)} permissions · {r.scope}
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -138,7 +139,7 @@ export function RolesPermissionsOverlay({ isOpen, onClose, accountId }: RolesPer
                         </span>
                       </div>
                       {t.description && <p className="text-[12px] text-[#7C7C7C] mt-0.5">{t.description}</p>}
-                      <p className="text-[11px] text-[#AEAEAE] mt-1">{countPermissions(t.permissions)} permissions</p>
+                      <p className="text-[11px] text-[#AEAEAE] mt-1">{countMatrixPermissions(t.permissions, accountScope)} permissions</p>
                     </div>
                     <button
                       onClick={() => setNewRoleFromTemplate(t)}
@@ -158,7 +159,7 @@ export function RolesPermissionsOverlay({ isOpen, onClose, accountId }: RolesPer
       {(editingRole || newRoleFromTemplate) && (
         <RoleEditorModal
           accountId={accountId}
-          modules={modules}
+          scope={accountScope}
           existing={editingRole}
           template={newRoleFromTemplate}
           onClose={() => { setEditingRole(null); setNewRoleFromTemplate(null); }}
@@ -169,15 +170,11 @@ export function RolesPermissionsOverlay({ isOpen, onClose, accountId }: RolesPer
   );
 }
 
-function countPermissions(p: PermissionsJson): number {
-  return Object.values(p).reduce((sum, actions) => sum + Object.values(actions).filter((v) => v === true).length, 0);
-}
-
 function RoleEditorModal({
-  accountId, modules, existing, template, onClose, onSaved,
+  accountId, scope, existing, template, onClose, onSaved,
 }: {
   accountId: string;
-  modules: Record<string, readonly string[]>;
+  scope: RoleScope;
   existing: Role | null;
   template: Role | null;
   onClose: () => void;
@@ -186,23 +183,12 @@ function RoleEditorModal({
   const seed = existing ?? template;
   const [name, setName] = useState(existing ? existing.name : template ? `${template.name} (copy)` : '');
   const [description, setDescription] = useState(seed?.description ?? '');
-  const [scope, setScope] = useState<string>(seed?.scope ?? 'account');
+  const [roleScope, setRoleScope] = useState<string>(seed?.scope ?? scope);
   const [permissions, setPermissions] = useState<PermissionsJson>(() => structuredClone(seed?.permissions ?? {}));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const toggle = (m: string, a: string) => {
-    setPermissions((prev) => {
-      const next = { ...prev, [m]: { ...(prev[m] ?? {}) } };
-      next[m][a] = !next[m]?.[a];
-      if (!next[m][a]) delete next[m][a];
-      if (Object.keys(next[m]).length === 0) delete next[m];
-      return next;
-    });
-  };
-
-  const allActions = ['view', 'create', 'edit', 'delete', 'approve'] as const;
-  const moduleEntries = Object.entries(modules);
+  const matrixScope = (existing?.scope ?? template?.scope ?? roleScope) as RoleScope;
 
   const submit = async () => {
     setSubmitting(true); setError(null);
@@ -212,7 +198,7 @@ function RoleEditorModal({
     const method = existing ? 'PATCH' : 'POST';
     const body = existing
       ? { name, description, permissions }
-      : { name, description, scope, permissions };
+      : { name, description, scope: roleScope, permissions };
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
@@ -253,8 +239,8 @@ function RoleEditorModal({
             <label className="block">
               <span className="text-[11px] font-semibold text-[#AEAEAE] uppercase tracking-wider">Scope</span>
               <select
-                value={scope}
-                onChange={(e) => setScope(e.target.value)}
+                value={roleScope}
+                onChange={(e) => setRoleScope(e.target.value)}
                 disabled={!!existing}
                 className="mt-1.5 w-full px-3.5 py-2.5 text-[13px] border border-[#EEEEEE] rounded-xl outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 text-gray-700 bg-white disabled:bg-gray-50 transition-all"
               >
@@ -278,52 +264,17 @@ function RoleEditorModal({
           </div>
 
           <h4 className="text-[13.5px] font-bold text-[#181725] pt-2 border-t border-[#F0F0F0]">Permissions Matrix</h4>
-          <div className="border border-gray-100 rounded-xl overflow-x-auto">
-            <table className="w-full text-[12px] min-w-[500px]">
-              <thead className="bg-[#FAFAFA] text-gray-500">
-                <tr>
-                  <th className="text-left px-4 py-3 font-bold uppercase tracking-wider">Module</th>
-                  {allActions.map((a) => (
-                    <th key={a} className="text-center px-2 py-3 font-bold uppercase tracking-wider w-[80px] capitalize">{a}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {moduleEntries.map(([m, actions]) => (
-                  <tr key={m} className="border-t border-gray-50 hover:bg-gray-50/50">
-                    <td className="px-4 py-2.5 font-bold text-[#181725]">{m}</td>
-                    {allActions.map((a) => {
-                      const allowed = (actions as readonly string[]).includes(a);
-                      const on = !!permissions[m]?.[a];
-                      return (
-                        <td key={a} className="text-center px-2 py-2.5">
-                          {allowed ? (
-                            <button
-                              onClick={() => toggle(m, a)}
-                              className={`w-[24px] h-[24px] rounded-md border-2 flex items-center justify-center transition-colors mx-auto ${
-                                on
-                                  ? 'border-[#53B175] bg-[#53B175] text-white'
-                                  : 'border-gray-200 bg-white hover:border-gray-400'
-                              }`}
-                            >
-                              {on && <Check size={14} />}
-                            </button>
-                          ) : (
-                            <span className="text-gray-200">—</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <PermissionMatrix
+            scope={matrixScope}
+            permissions={permissions}
+            onChange={setPermissions}
+            accent="#53B175"
+          />
         </div>
 
         <div className="p-4 border-t border-[#F0F0F0] flex items-center justify-between shrink-0 bg-[#F9F9F9]">
           <p className="text-[11px] text-[#AEAEAE] font-semibold">
-            {countPermissions(permissions)} permission(s) selected
+            {countMatrixPermissions(permissions, matrixScope)} permission(s) selected
           </p>
           <div className="flex items-center gap-2">
             {error && <p className="text-[12px] text-red-500 mr-2">{error}</p>}

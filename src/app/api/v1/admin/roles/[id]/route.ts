@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { adminOnly } from '@/middleware/rbac';
-import { requirePermission, sanitizePermissions } from '@/lib/permissions/engine';
+import { requirePermission, sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 
@@ -44,7 +44,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     const data = {
       ...(body.name !== undefined && { name: body.name }),
       ...(body.description !== undefined && { description: body.description }),
-      ...(body.permissions !== undefined && { permissions: sanitizePermissions(body.permissions) }),
+      ...(body.permissions !== undefined && { permissions: sanitizePermissionsForScope(body.permissions, 'admin') }),
     };
     const updated = await prisma.accountRole.update({ where: { id: roleId }, data });
     return NextResponse.json({ success: true, data: updated });
