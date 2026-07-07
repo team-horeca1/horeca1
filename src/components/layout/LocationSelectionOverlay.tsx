@@ -242,14 +242,14 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                     {isLoadingAddresses && (
                         <div className="flex items-center justify-center py-6">
                             <Loader2 size={20} className="animate-spin text-[#33a852]" />
-                            <span className="text-sm text-gray-400 ml-2">Loading saved addresses...</span>
+                            <span className="text-sm text-gray-400 ml-2">Loading delivery addresses...</span>
                         </div>
                     )}
 
                     {!isLoadingAddresses && savedAddresses.length > 0 && (
                         <>
                             <h3 className="text-[11px] font-extrabold text-gray-400 uppercase tracking-wider mb-3">
-                                Saved Addresses
+                                Delivery Addresses
                             </h3>
                             <div className="space-y-3 mb-6">
                                 {savedAddresses.map((addr) => {
@@ -310,7 +310,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                                                         e.stopPropagation();
                                                         const ok = await confirm({
                                                             title: 'Remove address?',
-                                                            message: `This will permanently remove "${addr.label || addr.shortAddress}" from your saved addresses.`,
+                                                            message: `This will permanently remove "${addr.label || addr.shortAddress}" from your delivery addresses.`,
                                                             confirmText: 'Remove',
                                                             tone: 'danger',
                                                         });
@@ -334,7 +334,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                             <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                 <Store size={28} className="text-gray-300" />
                             </div>
-                            <h3 className="text-sm font-bold text-gray-500 mb-1">No saved addresses yet</h3>
+                            <h3 className="text-sm font-bold text-gray-500 mb-1">No delivery addresses yet</h3>
                             <p className="text-xs text-gray-400">Search for your restaurant, hotel or cafe below</p>
                         </div>
                     )}

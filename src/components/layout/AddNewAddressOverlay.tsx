@@ -343,7 +343,7 @@ export function AddNewAddressOverlay({
         <>
             {/* Desktop backdrop — click-to-close only when dismissible */}
             <div
-                className="hidden md:block fixed inset-0 z-[12000] bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+                className="hidden md:block fixed inset-0 z-[16000] bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
                 onClick={dismissible ? onClose : undefined}
             />
 
@@ -353,7 +353,7 @@ export function AddNewAddressOverlay({
              *   Desktop — flex-row modal (business: 500px | map: 900px)
              */}
             <div className={cn(
-                'fixed inset-0 z-[12001] bg-white flex flex-col overflow-hidden',
+                'fixed inset-0 z-[16001] bg-white flex flex-col overflow-hidden',
                 'md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2',
                 'md:rounded-2xl md:shadow-2xl',
                 'animate-in fade-in slide-in-from-bottom md:zoom-in-95 duration-300',

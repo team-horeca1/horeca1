@@ -23,7 +23,6 @@ import {
     Building2,
     BadgeCheck,
     Mail,
-    Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -41,8 +40,6 @@ import { OutletsOverlay } from './OutletsOverlay';
 import { TeamMembersOverlay } from './TeamMembersOverlay';
 import { RolesPermissionsOverlay } from './RolesPermissionsOverlay';
 import { AccountOverviewOverlay } from './AccountOverviewOverlay';
-import { MyBusinessAccountsOverlay } from './MyBusinessAccountsOverlay';
-import { CreateBusinessAccountModal } from './CreateBusinessAccountModal';
 import { Sparkles } from 'lucide-react';
 
 interface ProfileScreenProps {
@@ -81,8 +78,6 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const [isTeamOpen, setIsTeamOpen] = useState(false);
     const [isRolesOpen, setIsRolesOpen] = useState(false);
     const [isOverviewOpen, setIsOverviewOpen] = useState(false);
-    const [isMyBusinessesOpen, setIsMyBusinessesOpen] = useState(false);
-    const [isCreateAccountOpen, setIsCreateAccountOpen] = useState(false);
     const [hasVendorApplication, setHasVendorApplication] = useState<boolean | null>(null);
     const [creditSummary, setCreditSummary] = useState<{
         totalLimit: number;
@@ -249,7 +244,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
 
     const yourInfoItems = [
         { id: 'edit-profile', label: 'Edit Profile', desc: 'Update your personal details', icon: Pencil, onClick: () => setIsEditProfileOpen(true) },
-        { id: 'saved-addresses', label: 'Saved Addresses', desc: 'Manage delivery locations', icon: MapPin, onClick: () => setIsSavedAddressesOpen(true) },
+        { id: 'saved-addresses', label: 'Delivery Addresses', desc: 'Manage delivery locations', icon: MapPin, onClick: () => setIsSavedAddressesOpen(true) },
         { id: 'payment', label: 'Payment Management', desc: 'Cards, UPI & banking', icon: CreditCard, onClick: () => setIsPaymentOpen(true) },
         {
             id: 'credit-wallet',
@@ -286,8 +281,6 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         ...(canSeeOutlets ? [{ id: 'outlets', label: 'Outlets', desc: 'Delivery locations & branches', icon: MapPin, onClick: () => setIsOutletsOpen(true) }] : []),
         ...(canSeeTeam ? [{ id: 'team-members', label: 'Team Members', desc: 'Invite users, manage roles & access', icon: Users, onClick: () => router.push('/profile/team') }] : []),
         { id: 'account-overview', label: 'Account Overview', desc: 'GST, business type, members', icon: Building2, onClick: () => setIsOverviewOpen(true) },
-        { id: 'my-businesses', label: 'My Businesses', desc: 'Switch, manage or delete any business', icon: BadgeCheck, onClick: () => setIsMyBusinessesOpen(true) },
-        { id: 'create-account', label: 'Register New Business', desc: 'Create a new business account', icon: Plus, onClick: () => setIsCreateAccountOpen(true) },
     ] : [];
 
     const otherInfoItems = [
@@ -903,7 +896,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                 }}
             />
 
-            {/* Saved Addresses Overlay */}
+            {/* Delivery Addresses Overlay */}
             <SavedAddressesOverlay
                 isOpen={isSavedAddressesOpen}
                 onClose={() => setIsSavedAddressesOpen(false)}
@@ -941,12 +934,6 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                 onSubmitted={() => setHasVendorApplication(true)}
             />
 
-            {/* Create Business Account Modal */}
-            <CreateBusinessAccountModal
-                isOpen={isCreateAccountOpen}
-                onClose={() => setIsCreateAccountOpen(false)}
-            />
-
             {/* Business Account Overlays */}
             {activeAccountIdForLinks && (
                 <>
@@ -978,13 +965,6 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                         // stale activeBusinessAccountId in case the user
                         // somehow deleted the BA they're viewing from.
                         onDeleted={() => { window.location.reload(); }}
-                    />
-                    <MyBusinessAccountsOverlay
-                        isOpen={isMyBusinessesOpen}
-                        onClose={() => setIsMyBusinessesOpen(false)}
-                        // Same rationale as AccountOverviewOverlay — refresh
-                        // so the navbar switcher reflects the removal.
-                        onAccountDeleted={() => { window.location.reload(); }}
                     />
                 </>
             )}

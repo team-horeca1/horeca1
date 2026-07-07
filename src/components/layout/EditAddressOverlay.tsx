@@ -71,7 +71,7 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                        <h2 className="text-[16px] font-bold text-gray-800">Edit Address</h2>
+                        <h2 className="text-[16px] font-bold text-gray-800">Edit delivery address</h2>
                         <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full">
                             <X size={18} className="text-gray-600" />
                         </button>
