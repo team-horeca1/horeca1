@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import BrandFormModal from '@/components/features/admin/BrandFormModal';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { toast } from 'sonner';
 
@@ -36,7 +36,8 @@ function getInitials(name: string) {
 
 export default function AdminBrandsPage() {
     const router = useRouter();
-    const perms = useAdminPermissions();
+    const { has } = usePermissions();
+    const canWriteSettings = has('settings.edit');
     const confirm = useConfirm();
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
@@ -151,7 +152,7 @@ export default function AdminBrandsPage() {
                     <h1 className="text-[28px] font-[900] text-[#181725] tracking-tight">Brands</h1>
                     <p className="text-[#7C7C7C] font-medium mt-1">Review brand applications and manage storefronts</p>
                 </div>
-                {perms.canWriteSettings && (
+                {canWriteSettings && (
                     <button
                         onClick={() => setShowCreate(true)}
                         className="h-[44px] px-5 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] transition-all shadow-sm flex items-center gap-2 shrink-0"

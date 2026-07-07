@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { flatten, mergePermissions } from '@/lib/permissions/engine';
 import { ALL_PERMISSION_KEYS, type PermissionKey, type PermissionsJson } from '@/lib/permissions/registry';
 import { isOwnerRoleName } from '@/lib/permissions/portalFeatures';
+import type { TeamRole } from '@prisma/client';
 
 const MAX_AVAILABLE_ACCOUNTS = 20;
 
@@ -34,6 +35,11 @@ export interface ActiveContext {
   availableAccounts: AvailableAccountSummary[];
   availableAccountsTruncated: boolean;
   totalAccountCount: number;
+  /** Cached tenant IDs — avoids per-request DB lookup on vendor/brand APIs. */
+  activeVendorId: string | null;
+  activeBrandId: string | null;
+  activeVendorTeamRole: TeamRole | 'owner' | null;
+  activeBrandTeamRole: TeamRole | 'owner' | null;
 }
 
 /**
@@ -93,18 +99,50 @@ export async function loadActiveContext(
     if (!chosen) chosen = memberships[0];
     const account = chosen.businessAccount;
 
-    // Determine which outlets this user can actually access by inspecting their
-    // UserRole rows for this account. Storefront-access roles (named "Storefront (*)")
-    // are intentionally excluded — they grant buyer privileges, not outlet scope.
-    const allUserRoles = await prisma.userRole.findMany({
-      where: { userId, businessAccountId: account.id, role: { name: { not: { startsWith: 'Storefront' } } } },
-      select: { outletId: true },
-    });
-    const hasAccountWideRole = allUserRoles.some(r => r.outletId === null);
+    const [allRoleRows, vendorTenant, brandTenant] = await Promise.all([
+      prisma.userRole.findMany({
+        where: {
+          userId,
+          businessAccountId: account.id,
+          role: { name: { not: { startsWith: 'Storefront' } } },
+        },
+        select: {
+          outletId: true,
+          role: { select: { name: true, permissions: true } },
+        },
+      }),
+      account.isVendor
+        ? prisma.vendor.findFirst({
+            where: { userId, businessAccountId: account.id },
+            select: { id: true },
+          }).then(async (own) => {
+            if (own) return { id: own.id, teamRole: 'owner' as const };
+            const m = await prisma.vendorTeamMember.findFirst({
+              where: { userId, vendor: { businessAccountId: account.id } },
+              select: { vendorId: true, role: true },
+            });
+            return m ? { id: m.vendorId, teamRole: m.role } : null;
+          })
+        : Promise.resolve(null),
+      account.isBrand
+        ? prisma.brand.findFirst({
+            where: { userId, businessAccountId: account.id },
+            select: { id: true },
+          }).then(async (own) => {
+            if (own) return { id: own.id, teamRole: 'owner' as const };
+            const m = await prisma.brandTeamMember.findFirst({
+              where: { userId, brand: { businessAccountId: account.id } },
+              select: { brandId: true, role: true },
+            });
+            return m ? { id: m.brandId, teamRole: m.role } : null;
+          })
+        : Promise.resolve(null),
+    ]);
+
+    const hasAccountWideRole = allRoleRows.some((r) => r.outletId === null);
     const outletScopedIds = [...new Set(
-      allUserRoles.filter(r => r.outletId !== null).map(r => r.outletId!)
+      allRoleRows.filter((r) => r.outletId !== null).map((r) => r.outletId!),
     )];
-    // accessibleOutletIds is empty when user has account-wide access.
     const accessibleOutletIds = hasAccountWideRole ? [] : outletScopedIds;
 
     // Pick the active outlet within the chosen account.
@@ -145,21 +183,9 @@ export async function loadActiveContext(
       }
     }
 
-    // Compute the flattened permission set: union of every UserRole row that applies.
-    // A UserRole applies if userId = current AND businessAccountId = active
-    // AND (outletId IS NULL OR outletId = activeOutletId).
-    const userRoles = await prisma.userRole.findMany({
-      where: {
-        userId,
-        businessAccountId: account.id,
-        OR: [{ outletId: null }, ...(activeOutletId ? [{ outletId: activeOutletId }] : [])],
-      },
-      select: {
-        role: { select: { name: true, permissions: true } },
-      },
-    });
-
-    // Account OWNER always gets the FULL current permission set, derived from
+    const userRoles = allRoleRows.filter(
+      (r) => r.outletId === null || (activeOutletId && r.outletId === activeOutletId),
+    );
     // ALL_PERMISSION_KEYS at session time so it can never go stale when new
     // modules (e.g. storefront.*) are added to the registry — stale role JSON
     // snapshots are what locked owners out of their own checkout before.
@@ -214,6 +240,10 @@ export async function loadActiveContext(
       availableAccounts,
       availableAccountsTruncated,
       totalAccountCount,
+      activeVendorId: vendorTenant?.id ?? null,
+      activeBrandId: brandTenant?.id ?? null,
+      activeVendorTeamRole: vendorTenant?.teamRole ?? null,
+      activeBrandTeamRole: brandTenant?.teamRole ?? null,
     };
   } catch (err) {
     console.error('[loadActiveContext] failed for userId=%s targetAccountId=%s targetOutletId=%s:', userId, targetAccountId, targetOutletId, err);

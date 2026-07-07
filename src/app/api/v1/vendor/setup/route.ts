@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 
 const SETUP_STEPS = [
@@ -18,6 +19,7 @@ const patchSchema = z.object({
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'dashboard.view');
     const vendorId = await resolveVendorId(ctx, req);
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
@@ -43,6 +45,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'dashboard.view');
     const vendorId = await resolveVendorId(ctx, req);
     const body = patchSchema.parse(await req.json());
     const vendor = await prisma.vendor.findUnique({

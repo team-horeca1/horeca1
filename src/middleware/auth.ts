@@ -5,23 +5,22 @@ import type { Role, TeamRole } from '@prisma/client';
 import type { PermissionKey } from '@/lib/permissions/registry';
 
 // Authenticated user context injected into API handlers.
-// V2.2: extended with the active BusinessAccount / Outlet / permission set
-// resolved at login by auth.ts (via loadActiveContext).
 export interface AuthContext {
   userId: string;
   email: string;
   role: Role;
-  // Only present for admin users — 'owner' for the original admin, or their AdminTeamMember role
   adminTeamRole: TeamRole | 'owner';
-  // V2.2 — HCID multi-account fields. Nullable during the transition window
-  // for legacy users whose BusinessAccountMember row isn't backfilled yet.
   hcidDisplay: string | null;
   activeBusinessAccountId: string | null;
   activeBusinessAccountType: { isCustomer: boolean; isVendor: boolean; isBrand: boolean } | null;
   activeOutletId: string | null;
-  /** Empty = account-wide access. Non-empty = only these outlet IDs are accessible. */
   accessibleOutletIds: string[];
   permissions: readonly PermissionKey[];
+  permissionSet: ReadonlySet<PermissionKey>;
+  activeVendorId: string | null;
+  activeBrandId: string | null;
+  activeVendorTeamRole: TeamRole | 'owner' | null;
+  activeBrandTeamRole: TeamRole | 'owner' | null;
 }
 
 // Validate session and extract user context
@@ -33,8 +32,10 @@ export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
     throw Errors.unauthorized();
   }
 
-  const u = session.user as Record<string, unknown>;
+  const u = session.user as unknown as Record<string, unknown>;
   const adminTeamRole = u.adminTeamRole as string | undefined;
+
+  const permissions = (u.permissions as PermissionKey[]) ?? [];
 
   return {
     userId: session.user.id,
@@ -47,7 +48,12 @@ export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
       (u.activeBusinessAccountType as { isCustomer: boolean; isVendor: boolean; isBrand: boolean }) ?? null,
     activeOutletId: (u.activeOutletId as string) ?? null,
     accessibleOutletIds: Array.isArray(u.accessibleOutletIds) ? (u.accessibleOutletIds as string[]) : [],
-    permissions: (u.permissions as PermissionKey[]) ?? [],
+    permissions,
+    permissionSet: new Set(permissions),
+    activeVendorId: (u.activeVendorId as string) ?? null,
+    activeBrandId: (u.activeBrandId as string) ?? null,
+    activeVendorTeamRole: (u.activeVendorTeamRole as TeamRole | 'owner') ?? null,
+    activeBrandTeamRole: (u.activeBrandTeamRole as TeamRole | 'owner') ?? null,
   };
 }
 

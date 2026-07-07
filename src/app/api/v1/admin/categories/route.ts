@@ -33,8 +33,9 @@ const createCategorySchema = z.object({
 });
 
 // GET — list all categories with children count and product count
-export const GET = adminOnly(async (req: NextRequest, _ctx) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'products.view');
     const params = req.nextUrl.searchParams;
     const approvalStatus = params.get('approvalStatus') || undefined;
     const search = params.get('search') || undefined;

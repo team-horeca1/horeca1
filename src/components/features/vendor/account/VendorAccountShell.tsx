@@ -3,6 +3,8 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Building2, MapPin, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { usePermissions } from '@/hooks/usePermissions';
+import { getVendorAccountTabPermission } from '@/lib/permissions/routePermissions';
 
 export type VendorAccountTabId = 'overview' | 'outlets' | 'team';
 
@@ -21,6 +23,12 @@ interface Props {
 export function VendorAccountShell({ activeTab, businessName, children }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { can } = usePermissions();
+
+  const visibleTabs = TABS.filter((t) => {
+    const need = getVendorAccountTabPermission(t.id);
+    return need ? can(need) : false;
+  });
 
   const setTab = (tab: VendorAccountTabId) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -40,7 +48,7 @@ export function VendorAccountShell({ activeTab, businessName, children }: Props)
       </div>
 
       <nav className="mb-4 flex gap-1 overflow-x-auto rounded-[12px] border border-[#EEEEEE] bg-white p-1">
-        {TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const Icon = t.icon;
           return (
             <button

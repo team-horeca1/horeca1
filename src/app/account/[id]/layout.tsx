@@ -4,6 +4,9 @@ import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useParams, useSearchParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Building2, MapPin, Users, ShieldCheck, Loader2 } from 'lucide-react';
+import { usePermissions } from '@/hooks/usePermissions';
+import { getAccountTabPermission } from '@/lib/permissions/routePermissions';
+import { RequirePermission } from '@/components/auth/RequirePermission';
 
 interface AccountHeader {
   id: string;
@@ -66,6 +69,9 @@ function AccountLayoutInner({ children }: { children: React.ReactNode }) {
   const [account, setAccount] = useState<AccountHeader | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { can, loading: permsLoading } = usePermissions();
+
+  const visibleTabs = TABS.filter((t) => can(getAccountTabPermission(t.href)));
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +91,10 @@ function AccountLayoutInner({ children }: { children: React.ReactNode }) {
   }, [id]);
 
   const basePath = `/account/${id}`;
+  const activeTab = TABS.find(
+    (t) => pathname === `${basePath}${t.href}` || (t.href === '' && pathname === basePath),
+  );
+  const pagePerm = getAccountTabPermission(activeTab?.href ?? '');
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
@@ -94,7 +104,7 @@ function AccountLayoutInner({ children }: { children: React.ReactNode }) {
           {backLabel}
         </Link>
 
-        {loading ? (
+        {loading || permsLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="animate-spin text-[#299E60]" />
           </div>
@@ -126,7 +136,7 @@ function AccountLayoutInner({ children }: { children: React.ReactNode }) {
 
             {/* Tabs */}
             <nav className="bg-white rounded-2xl border border-[#F0F0F0] p-1 mb-[clamp(1rem,2vw,1.5rem)] flex gap-1 overflow-x-auto">
-              {TABS.map((t) => {
+              {visibleTabs.map((t) => {
                 const href = `${basePath}${t.href}${fromQs}`;
                 const active = pathname === `${basePath}${t.href}` || (t.href === '' && pathname === basePath);
                 const Icon = t.icon;
@@ -145,7 +155,9 @@ function AccountLayoutInner({ children }: { children: React.ReactNode }) {
               })}
             </nav>
 
-            {children}
+            <RequirePermission perm={pagePerm}>
+              {children}
+            </RequirePermission>
           </>
         )}
       </div>

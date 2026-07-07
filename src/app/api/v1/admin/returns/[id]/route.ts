@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { logAction } from '@/lib/auditLog';
 import { returnService } from '@/modules/return/return.service';
 
@@ -17,6 +18,7 @@ const updateSchema = z.object({
 
 export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'orders.edit');
     const segments = req.nextUrl.pathname.split('/');
     const returnId = segments[segments.length - 1];
 

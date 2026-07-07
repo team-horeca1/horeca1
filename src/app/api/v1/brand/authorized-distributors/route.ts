@@ -21,6 +21,7 @@ const actionSchema = z.object({
 
 export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'vendors.view');
     const { brandId } = await resolveBrandContext(ctx, req);
     const status = req.nextUrl.searchParams.get('status') ?? undefined;
 

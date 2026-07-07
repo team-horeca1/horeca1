@@ -3,10 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'products.view');
     const vendorId = await resolveVendorId(ctx, req);
     const q = new URL(req.url).searchParams.get('q')?.trim() ?? '';
     if (q.length < 2) {

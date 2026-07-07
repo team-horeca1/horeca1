@@ -8,7 +8,7 @@ import { vendorOnly } from '@/middleware/rbac';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission, sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
-import { redis } from '@/lib/redis';
+import { markSessionStale } from '@/lib/sessionStale';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { toTeamMemberDTO, teamMemberInclude } from '@/lib/teamMemberShape';
 import type { AuthContext } from '@/middleware/auth';
@@ -276,7 +276,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     });
 
     // Mark the affected user's session stale so the next auth() call reloads permissions.
-    try { await redis.set(`session:stale:${userId}`, '1', 'EX', 3600); } catch { /* non-critical */ }
+    await markSessionStale(userId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

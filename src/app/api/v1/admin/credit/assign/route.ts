@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { adminOnly } from '@/middleware/rbac';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 
 const overrides = z.object({
   repaymentMode: z.enum(['REPAY_BEFORE_NEXT_USE', 'ALLOW_USAGE_TILL_DUE']).optional(),
@@ -28,6 +29,7 @@ const schema = z.object({
 
 export const POST = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'payments.create');
     const body = schema.parse(await req.json());
     const wallet = await creditWalletService.assignCredit(
       body.userId,

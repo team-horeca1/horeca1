@@ -3,9 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 
-export const GET = adminOnly(async (req: NextRequest) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'payments.view');
     const type = new URL(req.url).searchParams.get('type') || 'all';
     const data: Record<string, unknown> = {};
     const want = (t: string) => type === t || type === 'all';

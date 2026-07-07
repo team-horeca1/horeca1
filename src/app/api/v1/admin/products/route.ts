@@ -77,8 +77,9 @@ const createProductSchema = z.object({
 
 // GET — list catalog products (deduplicated by name)
 // Admin sees unique products with vendor count, not per-vendor copies
-export const GET = adminOnly(async (req: NextRequest, _ctx) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'products.view');
     const params = req.nextUrl.searchParams;
     const approvalStatus = params.get('approvalStatus') || undefined;
     const listingStatus = params.get('listingStatus') as 'draft' | 'submitted' | null;

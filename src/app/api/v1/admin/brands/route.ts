@@ -22,7 +22,8 @@ function slugify(name: string): string {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-export const GET = adminOnly(async (req: NextRequest, _ctx: AuthContext) => {
+export const GET = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
+  requirePermission(ctx, 'brands.view');
   const status = req.nextUrl.searchParams.get('status') ?? undefined;
   const brands = await brandService.adminListBrands(status);
   return NextResponse.json({ success: true, data: brands });

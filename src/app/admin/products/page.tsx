@@ -37,7 +37,7 @@ import ProductImportModal from '@/components/features/admin/ProductImportModal';
 import BulkProductToolbar from '@/components/features/shared/BulkProductToolbar';
 import VendorBulkGrid from '@/components/features/vendor/VendorBulkGrid';
 import AdminBulkEngine from '@/components/features/admin/AdminBulkEngine';
-import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { usePermissions } from '@/hooks/usePermissions';
 import { CategoryHierarchyPicker } from '@/components/features/brand/CategoryHierarchyPicker';
 import { BrandSinglePicker } from '@/components/features/brand/BrandSinglePicker';
 import { toast } from 'sonner';
@@ -397,7 +397,8 @@ function SubstituteProductPicker({
 // ---------------------------------------------------------------------------
 
 export default function ProductsPage() {
-    const perms = useAdminPermissions();
+    const perms = usePermissions();
+    const canWriteProducts = perms.has('products.edit');
     const searchParams = useSearchParams();
     const editIdParam = searchParams.get('editId');
     const autoOpenedRef = useRef(false);
@@ -1650,7 +1651,7 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap justify-end">
-                    {perms.canWriteProducts && (
+                    {canWriteProducts && (
                         <BulkProductToolbar
                             vendors={vendors}
                             gridVendorId={gridVendorId}
@@ -1665,7 +1666,7 @@ export default function ProductsPage() {
                         />
                     )}
 
-                    {perms.canWriteProducts && draftCount > 0 && (
+                    {canWriteProducts && draftCount > 0 && (
                         <button
                             type="button"
                             onClick={() => {
@@ -1680,7 +1681,7 @@ export default function ProductsPage() {
                     )}
 
                     {/* Add Product Button */}
-                    {perms.canWriteProducts && (
+                    {canWriteProducts && (
                         <button
                             onClick={openCreate}
                             className="h-[44px] px-6 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] transition-all flex items-center gap-2 shadow-sm shadow-[#299E60]/20"
@@ -2058,7 +2059,7 @@ export default function ProductsPage() {
                                                     ) : (
                                                         <>
                                                             {/* Edit */}
-                                                            {perms.canWriteProducts && (
+                                                            {canWriteProducts && (
                                                                 <button
                                                                     onClick={() => openEdit(product)}
                                                                     title="Edit product"
@@ -2069,7 +2070,7 @@ export default function ProductsPage() {
                                                             )}
 
                                                             {/* Toggle Active */}
-                                                            {perms.canWriteProducts && (
+                                                            {canWriteProducts && (
                                                             <button
                                                                 onClick={() => toggleActive(product)}
                                                                 disabled={actionLoading === product.id}
@@ -2095,7 +2096,7 @@ export default function ProductsPage() {
                                                             )}
 
                                                             {/* Delete */}
-                                                            {perms.canWriteProducts && (
+                                                            {canWriteProducts && (
                                                                 <button
                                                                     onClick={() => setDeleteTarget(product)}
                                                                     title="Delete product"
@@ -3063,7 +3064,7 @@ export default function ProductsPage() {
                     >
                         Cancel
                     </button>
-                    {perms.canWriteProducts && (
+                    {canWriteProducts && (
                         <button
                             type="button"
                             onClick={() => void handleSaveDraft()}
@@ -3175,7 +3176,7 @@ export default function ProductsPage() {
             {selectedIds.size > 0 && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[55] flex items-center gap-3 bg-[#181725] text-white rounded-[14px] shadow-2xl px-5 py-3 animate-in slide-in-from-bottom-4 duration-200">
                     <span className="text-[13px] font-bold">{selectedIds.size} selected</span>
-                    {perms.canWriteProducts && (
+                    {canWriteProducts && (
                         <button
                             type="button"
                             onClick={() => setBulkOpen(true)}

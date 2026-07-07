@@ -16,6 +16,7 @@ import { phoneLookupVariants, normalizePhone } from '@/lib/phone';
 import { sendEmailInBackground } from '@/lib/providers/email';
 import { buildInviteEmail, buildInviteSms } from '@/lib/email-templates/invite';
 import { deliverInviteCredentials } from '@/lib/inviteDelivery';
+import { markSessionStale } from '@/lib/sessionStale';
 import { sendSms } from '@/lib/providers/sms';
 import { runInBackground } from '@/lib/asyncBackground';
 
@@ -23,7 +24,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
     const id = extractAccountId(req);
     await assertAccountMember(ctx.userId, id);
-    // A BusinessAccount can have isCustomer=true AND isVendor=true simultaneously
+    await assertAccountPermission(ctx.userId, id, 'users.view', ctx.activeOutletId);
     // (V2.2 HCID model). In that case a single User on the account may hold both
     // 'account' (customer-side) UserRoles AND 'vendor' UserRoles. The customer
     // team page must surface ONLY the account-scope roles — otherwise vendor-
@@ -321,6 +322,8 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
         }
       });
     }
+
+    await markSessionStale(inviteeUser.id);
 
     return NextResponse.json({
       success: true,

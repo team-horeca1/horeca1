@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useSession } from 'next-auth/react';
 import { BadgeIndianRupee, Loader2, AlertCircle } from 'lucide-react';
 import { SalespersonsTab } from '@/components/features/sales-team/SalespersonsTab';
@@ -24,9 +25,10 @@ export default function SalesTeamPage() {
   const router = useRouter();
   const params = useSearchParams();
   const { data: session, status } = useSession();
-  const perms = (session?.user as { permissions?: string[] })?.permissions ?? [];
-  const canSeeSalespersons = perms.includes('salespersons.view');
-  const canSeeCommissions = perms.includes('commissions.view');
+  const { hasAny, loading: permsLoading, permissions } = usePermissions();
+  const perms = [...permissions];
+  const canSeeSalespersons = hasAny('salespersons.view');
+  const canSeeCommissions = hasAny('commissions.view');
   const canSeeAny = canSeeSalespersons || canSeeCommissions;
 
   // Default tab honours the URL; on first paint, fall back to whichever
@@ -73,7 +75,7 @@ export default function SalesTeamPage() {
 
   // Only block on initial load — a background session revalidation keeps
   // `session` populated and must not unmount any open salesperson modal.
-  if (status === 'loading' && !session) {
+  if ((status === 'loading' && !session) || permsLoading) {
     return (
       <div className="flex items-center justify-center py-24">
         <Loader2 size={28} className="animate-spin text-[#299E60]" />

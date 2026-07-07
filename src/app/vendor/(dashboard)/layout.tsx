@@ -57,6 +57,10 @@ import { VendorNotificationBell } from '@/components/features/vendor/VendorNotif
 import { VendorGlobalSearch } from '@/components/vendor/VendorGlobalSearch';
 import { usePermissions } from '@/hooks/usePermissions';
 import { VENDOR_NAV_GROUPS, filterNavLinks } from '@/lib/permissions/portalNav';
+import { getFirstAllowedRoute } from '@/lib/permissions/routePermissions';
+import { PortalPageGuard } from '@/components/auth/PortalPageGuard';
+import { PortalNoAccess } from '@/components/auth/PortalNoAccess';
+import { Suspense } from 'react';
 
 export default function VendorLayout({
     children,
@@ -104,12 +108,25 @@ export default function VendorLayout({
     }, [status, canUseVendorPortal, fetchBrandMappingAccess]);
 
     const { can } = usePermissions();
+    const firstAllowedRoute = getFirstAllowedRoute('vendor', can);
     const visibleGroups = VENDOR_NAV_GROUPS.map((g) => ({
       ...g,
       links: filterNavLinks(g.links, can, 'vendor', (link) =>
         link.href === '/vendor/brand-mappings' && !hasBrandMappings,
       ),
     })).filter((g) => g.links.length > 0);
+
+    React.useEffect(() => {
+        if (status !== 'authenticated') return;
+        if (isApplicationPending) return;
+        if (!isAdmin && !isActiveVendor) return;
+        if (visibleGroups.length === 0) return;
+        if (!firstAllowedRoute) return;
+        const allHrefs = visibleGroups.flatMap((g) => g.links.map((l) => l.href));
+        if (!allHrefs.some((h) => pathname === h || pathname.startsWith(`${h}/`))) {
+            router.replace(firstAllowedRoute);
+        }
+    }, [status, isApplicationPending, isAdmin, isActiveVendor, visibleGroups, firstAllowedRoute, pathname, router]);
 
     // Only treat the impersonation cookie as authoritative when the current
     // session is actually an admin. A vendor logging in fresh would otherwise
@@ -185,19 +202,17 @@ export default function VendorLayout({
             .catch(() => {});
     }, [status, isAdmin, isActiveVendor, pathname, router]);
 
-    // Refresh permissions automatically
-    // propagate to the browser without requiring logout/login.
+    // Refresh permissions on window focus (stale-session flag triggers reload in JWT).
     React.useEffect(() => {
         if (status !== 'authenticated') return;
-        const lastRef = { t: Date.now() };
+        const lastRef = { t: 0 };
         const refresh = () => {
-            if (Date.now() - lastRef.t < 30_000) return; // debounce
+            if (Date.now() - lastRef.t < 30_000) return;
             lastRef.t = Date.now();
             updateSession();
         };
         window.addEventListener('focus', refresh);
-        const interval = setInterval(() => { lastRef.t = Date.now(); updateSession(); }, 60_000);
-        return () => { window.removeEventListener('focus', refresh); clearInterval(interval); };
+        return () => window.removeEventListener('focus', refresh);
     }, [status, updateSession]);
 
     const handleExitAdminView = async () => {
@@ -334,6 +349,14 @@ export default function VendorLayout({
         );
     }
 
+    if (visibleGroups.length === 0) {
+        return (
+            <div className="flex flex-col min-h-screen bg-[#F8F9FB]">
+                <PortalNoAccess />
+            </div>
+        );
+    }
+
     const bannerHeight = 0; // Banner is now fixed/floating — no layout space needed
 
     return (
@@ -346,7 +369,7 @@ export default function VendorLayout({
                     "shrink-0 flex items-center gap-3 transition-all duration-300 ease-in-out",
                     isCollapsed ? "w-[60px]" : "w-[220px]"
                 )}>
-                    <Link href="/vendor/dashboard" className="flex items-center gap-3 overflow-hidden">
+                    <Link href={firstAllowedRoute ?? '/vendor/dashboard'} className="flex items-center gap-3 overflow-hidden">
                         <div className="w-[42px] h-[42px] shrink-0">
                             <img src="/images/admin/Ellipse 2.svg" alt="" className="w-full h-full object-contain" />
                         </div>
@@ -491,7 +514,9 @@ export default function VendorLayout({
 
                 {/* Main Content */}
                 <main className="flex-1 px-8 py-8 min-w-0">
-                    {children}
+                    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#299E60]" size={32} /></div>}>
+                        <PortalPageGuard scope="vendor">{children}</PortalPageGuard>
+                    </Suspense>
                 </main>
             </div>
 

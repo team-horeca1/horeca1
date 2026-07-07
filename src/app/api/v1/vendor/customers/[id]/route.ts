@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 
 function extractId(req: NextRequest) {
@@ -28,6 +29,7 @@ const patchSchema = z.object({
 
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'customers.edit');
     const vendorId = await resolveVendorId(ctx, req);
     const id = extractId(req);
     const body = patchSchema.parse(await req.json());
@@ -64,6 +66,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
 
 export const DELETE = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'customers.delete');
     const vendorId = await resolveVendorId(ctx, req);
     const id = extractId(req);
 

@@ -3,11 +3,13 @@ import { prisma } from '@/lib/prisma';
 import { brandOnly } from '@/middleware/rbac';
 import { resolveUserId } from '@/lib/resolveBrandId';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { exportBrandCatalogToXlsx } from '@/modules/import-export/brand-excel.service';
 import type { AuthContext } from '@/middleware/auth';
 
 export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'products.view');
     const userId = await resolveUserId(ctx, req);
     const brand = await prisma.brand.findFirst({
       where: { userId },

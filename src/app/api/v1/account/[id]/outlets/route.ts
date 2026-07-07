@@ -16,6 +16,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
     const id = extractAccountId(req);
     await assertAccountMember(ctx.userId, id);
+    await assertAccountPermission(ctx.userId, id, 'outlets.view', ctx.activeOutletId);
     const outlets = await prisma.outlet.findMany({
       where: { businessAccountId: id },
       orderBy: { createdAt: 'asc' },

@@ -4,14 +4,16 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 
 const patchSchema = z.object({
   status: z.enum(['approved', 'rejected', 'resolved']),
   notes: z.string().max(2000).optional(),
 });
 
-export const PATCH = adminOnly(async (req: NextRequest) => {
+export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'orders.edit');
     const id = new URL(req.url).pathname.split('/').filter(Boolean).at(-1) ?? '';
     const body = patchSchema.parse(await req.json());
 

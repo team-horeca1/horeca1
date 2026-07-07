@@ -6,6 +6,7 @@ import { BrandService } from '@/modules/brand/brand.service';
 import { brandOnly } from '@/middleware/rbac';
 import { resolveUserId } from '@/lib/resolveBrandId';
 import { errorResponse, friendlyErrorMessage } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import {
   parseBrandCatalogImport,
   generateBrandCatalogTemplate,
@@ -16,7 +17,8 @@ import type { AuthContext } from '@/middleware/auth';
 
 const brandService = new BrandService();
 
-export const GET = brandOnly(async (req: NextRequest) => {
+export const GET = brandOnly(async (req: NextRequest, ctx) => {
+  requirePermission(ctx, 'products.edit');
   if (req.nextUrl.searchParams.get('template') !== 'true') {
     return NextResponse.json({ success: false, error: { message: 'Use ?template=true' } }, { status: 400 });
   }
@@ -31,6 +33,7 @@ export const GET = brandOnly(async (req: NextRequest) => {
 
 export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'products.edit');
     const userId = await resolveUserId(ctx, req);
     const form = await req.formData();
     const file = form.get('file');

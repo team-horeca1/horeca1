@@ -18,6 +18,7 @@ const CreateBody = z.object({
 
 export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'users.view');
     const { brandId } = await resolveBrandContext(ctx, req);
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },

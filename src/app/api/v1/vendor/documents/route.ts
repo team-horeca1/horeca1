@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 
 const DOC_TYPES = ['fssai', 'gst', 'pan', 'bank_proof', 'other'] as const;
@@ -20,6 +21,7 @@ const uploadSchema = z.object({
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'settings.view');
     const vendorId = await resolveVendorId(ctx, req);
 
     const documents = await prisma.vendorDocument.findMany({
@@ -35,6 +37,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
 export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'settings.edit');
     const vendorId = await resolveVendorId(ctx, req);
 
     const body = await req.json();

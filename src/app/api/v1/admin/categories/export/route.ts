@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { exportCategoriesToXlsx, exportCategoriesToCsv } from '@/modules/import-export/excel.service';
 
-export const GET = adminOnly(async (req: NextRequest) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'products.view');
     const url = new URL(req.url);
     const format = url.searchParams.get('format') || 'xlsx';
 

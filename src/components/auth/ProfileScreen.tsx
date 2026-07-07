@@ -27,6 +27,7 @@ import {
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
+import { usePermissions } from '@/hooks/usePermissions';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { EditProfileOverlay } from './EditProfileOverlay';
@@ -87,18 +88,25 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         hasWallets: boolean;
     } | null>(null);
 
+    const { data: session, update: updateSession } = useSession();
+    const { has, hasAny } = usePermissions();
+
     useEffect(() => {
         const openParam = searchParams?.get('open');
         if (!openParam) return;
         Promise.resolve().then(() => {
-            if (openParam === 'outlets') setIsOutletsOpen(true);
-            else if (openParam === 'team' || openParam === 'team-members' || openParam === 'users') setIsTeamOpen(true);
-            else if (openParam === 'roles') setIsRolesOpen(true);
-            else if (openParam === 'overview' || openParam === 'account-overview') setIsOverviewOpen(true);
+            if (openParam === 'outlets') {
+                if (has('outlets.view')) setIsOutletsOpen(true);
+            } else if (openParam === 'team' || openParam === 'team-members' || openParam === 'users') {
+                if (hasAny('users.view', 'users.create', 'users.edit', 'users.delete')) setIsTeamOpen(true);
+            } else if (openParam === 'roles') {
+                if (hasAny('users.view', 'users.create', 'users.edit', 'users.delete')) setIsRolesOpen(true);
+            } else if (openParam === 'overview' || openParam === 'account-overview') {
+                if (has('settings.view')) setIsOverviewOpen(true);
+            }
         });
-    }, [searchParams]);
+    }, [searchParams, has, hasAny]);
 
-    const { data: session, update: updateSession } = useSession();
     // updateSession from useSession() is a new reference each render — keep it in a ref
     // so our role-sync effect doesn't refire and ping the session endpoint in a loop.
     const updateSessionRef = useRef(updateSession);
@@ -274,13 +282,13 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     // fallback, but isn't surfaced as a top-level item.
     // Gate each card by the perms attached to the current session so a teammate
     // with view-only Orders doesn't see Outlets or Team Members in the sidebar.
-    const sessionPerms = (session?.user as { permissions?: string[] } | undefined)?.permissions ?? [];
-    const canSeeOutlets = sessionPerms.includes('outlets.view');
-    const canSeeTeam = sessionPerms.some(p => p.startsWith('users.'));
+    const canSeeOutlets = has('outlets.view');
+    const canSeeTeam = hasAny('users.view', 'users.create', 'users.edit', 'users.delete');
+    const canSeeOverview = has('settings.view');
     const businessAccountItems = activeAccountIdForLinks ? [
         ...(canSeeOutlets ? [{ id: 'outlets', label: 'Outlets', desc: 'Delivery locations & branches', icon: MapPin, onClick: () => setIsOutletsOpen(true) }] : []),
         ...(canSeeTeam ? [{ id: 'team-members', label: 'Team Members', desc: 'Invite users, manage roles & access', icon: Users, onClick: () => router.push('/profile/team') }] : []),
-        { id: 'account-overview', label: 'Account Overview', desc: 'GST, business type, members', icon: Building2, onClick: () => setIsOverviewOpen(true) },
+        ...(canSeeOverview ? [{ id: 'account-overview', label: 'Account Overview', desc: 'GST, business type, members', icon: Building2, onClick: () => setIsOverviewOpen(true) }] : []),
     ] : [];
 
     const otherInfoItems = [

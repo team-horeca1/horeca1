@@ -7,7 +7,7 @@ import { brandOnly } from '@/middleware/rbac';
 import { resolveBrandContext } from '@/lib/resolveBrandId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
-import { redis } from '@/lib/redis';
+import { markSessionStale } from '@/lib/sessionStale';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import type { TeamRole } from '@prisma/client';
 
@@ -99,7 +99,7 @@ export const PATCH = brandOnly(async (req: NextRequest, ctx) => {
       });
     });
 
-    try { await redis.set(`session:stale:${userId}`, '1', 'EX', 3600); } catch { /* non-critical */ }
+    await markSessionStale(userId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

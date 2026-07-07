@@ -28,6 +28,10 @@ import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/B
 import { NotificationBell } from '@/components/features/NotificationBell';
 import { usePermissions } from '@/hooks/usePermissions';
 import { BRAND_NAV_LINKS, filterNavLinks } from '@/lib/permissions/portalNav';
+import { getFirstAllowedRoute } from '@/lib/permissions/routePermissions';
+import { PortalPageGuard } from '@/components/auth/PortalPageGuard';
+import { PortalNoAccess } from '@/components/auth/PortalNoAccess';
+import { Suspense } from 'react';
 
 export default function BrandPortalLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -40,6 +44,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
     const [checkingApplication, setCheckingApplication] = useState(true);
 
     const { can } = usePermissions();
+    const firstAllowedRoute = getFirstAllowedRoute('brand', can);
     const visibleLinks = filterNavLinks(BRAND_NAV_LINKS, can, 'brand');
 
     const userRole = (session?.user as { role?: string } | undefined)?.role;
@@ -49,6 +54,17 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
     const isActiveBrand = activeAccountType?.isBrand === true;
     const isActiveVendor = activeAccountType?.isVendor === true;
     const isAdmin = userRole === 'admin';
+
+    React.useEffect(() => {
+        if (status !== 'authenticated') return;
+        if (!isAdmin && !isActiveBrand) return;
+        if (applicationStatus === 'pending' || applicationStatus === 'rejected') return;
+        if (visibleLinks.length === 0) return;
+        if (!firstAllowedRoute) return;
+        if (!visibleLinks.some((l) => pathname === l.href || pathname.startsWith(`${l.href}/`))) {
+            router.replace(firstAllowedRoute);
+        }
+    }, [status, isAdmin, isActiveBrand, applicationStatus, visibleLinks, firstAllowedRoute, pathname, router]);
 
     // Only treat the impersonation cookie as authoritative when the current
     // session is actually an admin. A brand user logging in fresh would
@@ -259,6 +275,14 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
         );
     }
 
+    if (visibleLinks.length === 0) {
+        return (
+            <div className="flex flex-col min-h-screen bg-[#F8F9FB]">
+                <PortalNoAccess />
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col min-h-screen bg-[#F8F9FB]">
             {/* Top Header */}
@@ -267,7 +291,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                     'shrink-0 flex items-center gap-3 transition-all duration-300',
                     isCollapsed ? 'w-[52px]' : 'w-[210px]'
                 )}>
-                    <Link href="/brand/portal" className="flex items-center gap-2.5 overflow-hidden">
+                    <Link href={firstAllowedRoute ?? '/brand/portal'} className="flex items-center gap-2.5 overflow-hidden">
                         <div className="w-9 h-9 bg-[#53B175] rounded-[10px] flex items-center justify-center shrink-0">
                             <Package size={18} className="text-white" />
                         </div>
@@ -391,7 +415,9 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                 </aside>
 
                 <main className="flex-1 min-w-0 p-6">
-                    {children}
+                    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#299E60]" size={32} /></div>}>
+                        <PortalPageGuard scope="brand">{children}</PortalPageGuard>
+                    </Suspense>
                 </main>
             </div>
         </div>

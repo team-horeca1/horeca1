@@ -62,7 +62,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
       { name: 'Customers', icon: Users, href: '/admin/customers', feature: 'customers', requiredPerm: 'customers.view' },
       { name: 'Vendors', icon: Store, href: '/admin/vendors', feature: 'vendors', requiredPerm: 'vendors.view' },
       { name: 'Products', icon: Package, href: '/admin/products', feature: 'products', requiredPerm: 'products.view' },
-      { name: 'Categories', icon: Tag, href: '/admin/categories', feature: 'products', requiredPerm: 'products.edit' },
+      { name: 'Categories', icon: Tag, href: '/admin/categories', feature: 'products', requiredPerm: 'products.view' },
       { name: 'Brands', icon: Sparkles, href: '/admin/brands', feature: 'brands', requiredPerm: 'brands.view' },
     ],
   },
@@ -130,8 +130,8 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
   {
     label: 'Account',
     links: [
-      { name: 'Notifications', icon: Bell, href: '/vendor/notifications' },
-      { name: 'Business account', icon: Building2, href: '/vendor/account' },
+      { name: 'Notifications', icon: Bell, href: '/vendor/notifications', feature: 'settings', requiredPerm: 'settings.view' },
+      { name: 'Business account', icon: Building2, href: '/vendor/account', feature: 'dashboard', requiredPerm: 'dashboard.view' },
       { name: 'Team', icon: Users, href: '/vendor/team', feature: 'users', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
       { name: 'Outlets', icon: MapPin, href: '/vendor/outlets', feature: 'outlets', requiredPerm: 'outlets.view' },
       { name: 'Settings', icon: Settings, href: '/vendor/settings', feature: 'settings', requiredPerm: 'settings.view' },

@@ -5,6 +5,7 @@ import { BrandService } from '@/modules/brand/brand.service';
 import { brandOnly } from '@/middleware/rbac';
 import { resolveUserId } from '@/lib/resolveBrandId';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import type { AuthContext } from '@/middleware/auth';
 
 const brandService = new BrandService();
@@ -16,6 +17,7 @@ const bodySchema = z.object({
 
 export const PATCH = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'products.edit');
     const userId = await resolveUserId(ctx, req);
     const id = req.nextUrl.pathname.split('/').pop()!;
     const body = bodySchema.parse(await req.json());

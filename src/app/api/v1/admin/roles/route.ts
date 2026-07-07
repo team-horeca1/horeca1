@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { adminOnly } from '@/middleware/rbac';
-import { requirePermission } from '@/lib/permissions/engine';
+import { requirePermission, requireAnyPermissionInline } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { sanitizePermissionsForScope } from '@/lib/permissions/engine';
@@ -22,8 +22,9 @@ const CreateBody = z.object({
   permissions: z.record(z.string(), z.record(z.string(), z.boolean())),
 });
 
-export const GET = adminOnly(async (_req: NextRequest) => {
+export const GET = adminOnly(async (_req: NextRequest, ctx) => {
   try {
+    requireAnyPermissionInline(ctx, 'users.view', 'users.create', 'users.edit', 'users.delete');
     const roles = await prisma.accountRole.findMany({
       where: { scope: 'admin', businessAccountId: null },
       orderBy: [{ isTemplate: 'desc' }, { name: 'asc' }],

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { vendorOnly } from '@/middleware/rbac';
 import { withRateLimit } from '@/middleware/withRateLimit';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 import {
@@ -25,6 +26,7 @@ const DOC_TYPES = ['fssai', 'gst', 'pan', 'bank_proof', 'other'];
 export const POST = withRateLimit(
   vendorOnly(async (req: NextRequest, ctx) => {
     try {
+      requirePermission(ctx, 'settings.edit');
       const vendorId = await resolveVendorId(ctx, req);
 
       const form = await req.formData();

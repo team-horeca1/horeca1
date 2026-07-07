@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 
 const upsertSchema = z.object({
@@ -17,6 +18,7 @@ const upsertSchema = z.object({
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'customers.view');
     const vendorId = await resolveVendorId(ctx, req);
     const customerId = req.nextUrl.searchParams.get('customerId');
     if (!customerId) throw Errors.badRequest('customerId required');

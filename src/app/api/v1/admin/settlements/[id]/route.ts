@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { vendorSettlementService } from '@/modules/vendor/vendorSettlement.service';
 
 function extractId(req: NextRequest): string {
@@ -15,8 +16,9 @@ const patchSchema = z.object({
   bankReference: z.string().max(100).optional(),
 });
 
-export const PATCH = adminOnly(async (req: NextRequest) => {
+export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'payments.create');
     const id = extractId(req);
     const body = patchSchema.parse(await req.json());
 

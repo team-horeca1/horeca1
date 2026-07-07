@@ -26,7 +26,7 @@ import {
     ArrowUpRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const AddVendorWizard = dynamic(
     () => import('@/components/features/admin/AddVendorWizard').then((mod) => mod.AddVendorWizard),
@@ -66,7 +66,8 @@ interface AdminVendor {
 
 export default function VendorsPage() {
     const router = useRouter();
-    const perms = useAdminPermissions();
+    const { has: can } = usePermissions();
+    const canWriteSettings = can('settings.edit');
     const [searchQuery, setSearchQuery] = useState('');
     const [vendors, setVendors] = useState<AdminVendor[]>([]);
     const [loading, setLoading] = useState(true);
@@ -150,7 +151,7 @@ export default function VendorsPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {perms.canWriteSettings && (
+                    {canWriteSettings && (
                         <button
                             onClick={() => setShowCreate(true)}
                             className="h-[44px] px-5 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] active:scale-95 transition-all shadow-md shadow-[#299E60]/10 flex items-center gap-2 shrink-0"

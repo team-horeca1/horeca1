@@ -8,11 +8,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import type { AuthContext } from '@/middleware/auth';
 import { ADMIN_ONLY_NOTIFICATION_TITLES } from '@/lib/vendorNotifications';
 
 export const GET = vendorOnly(async (_req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'settings.view');
     const userId = ctx.userId;
 
     const notifications = await prisma.notification.findMany({
@@ -35,6 +37,7 @@ export const GET = vendorOnly(async (_req: NextRequest, ctx: AuthContext) => {
 
 export const PATCH = vendorOnly(async (_req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'settings.view');
     const userId = ctx.userId;
 
     await prisma.notification.updateMany({

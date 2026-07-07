@@ -24,6 +24,7 @@ import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { toTeamMemberDTO, teamMemberInclude, type TeamMemberDTO } from '@/lib/teamMemberShape';
 import { buildInviteEmail } from '@/lib/email-templates/invite';
 import { deliverInviteCredentials } from '@/lib/inviteDelivery';
+import { markSessionStale } from '@/lib/sessionStale';
 import type { AuthContext } from '@/middleware/auth';
 import type { TeamRole } from '@prisma/client';
 
@@ -219,6 +220,8 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
         emailContent: { subject, text, html },
       });
     }
+
+    await markSessionStale(user.id);
 
     return NextResponse.json({
       success: true,

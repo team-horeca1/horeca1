@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { resetPasswordByAdmin } from '@/modules/auth/admin-password.service';
 
 const schema = z.object({
@@ -17,6 +18,7 @@ function extractUserId(req: NextRequest): string {
 
 export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'users.edit');
     const userId = extractUserId(req);
     const { password } = schema.parse(await req.json());
     await resetPasswordByAdmin(ctx, userId, password, req);

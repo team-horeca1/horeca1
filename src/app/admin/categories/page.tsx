@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ImageUpload } from '@/components/ui/ImageUpload';
-import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
 
 const cellInput = 'bg-transparent border border-transparent hover:border-[#D1D5DB] focus:border-[#299E60] focus:bg-white focus:ring-1 focus:ring-[#299E60]/20 px-1.5 py-1 rounded-[4px] outline-none w-full text-[12.5px] tabular-nums transition-colors';
@@ -96,7 +96,8 @@ const INITIAL_FORM: CategoryFormData = {
 // ---------------------------------------------------------------------------
 
 export default function CategoriesPage() {
-    const perms = useAdminPermissions();
+    const { has } = usePermissions();
+    const canWriteProducts = has('products.edit');
     const searchParams = useSearchParams();
     const editIdParam = searchParams.get('editId');
     const autoOpenedRef = useRef(false);
@@ -638,7 +639,7 @@ export default function CategoriesPage() {
                     </div>
 
                     {/* Add Category */}
-                    {perms.canWriteProducts && (
+                    {canWriteProducts && (
                         <button
                             onClick={openCreateModal}
                             className="h-[44px] px-6 flex items-center gap-2 bg-[#299E60] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#238a54] shadow-sm shadow-[#299E60]/20 transition-all active:scale-[0.98]"
@@ -1314,7 +1315,8 @@ const CategoryRow = ({
     openDeleteModal: (cat: Category) => void;
     handleToggleActive: (cat: Category) => void;
 }) => {
-    const perms = useAdminPermissions();
+    const { has } = usePermissions();
+    const canWriteProducts = has('products.edit');
 
     return (
         <tr
@@ -1478,7 +1480,7 @@ const CategoryRow = ({
                         <Loader2 size={16} className="animate-spin text-[#299E60] mx-auto mr-4" />
                     ) : (
                         <>
-                            {perms.canWriteProducts && (
+                            {canWriteProducts && (
                                 <button
                                     type="button"
                                     onClick={(e) => {
@@ -1492,7 +1494,7 @@ const CategoryRow = ({
                                     <Edit2 size={14} />
                                 </button>
                             )}
-                            {perms.canWriteProducts && (
+                            {canWriteProducts && (
                                 <button
                                     type="button"
                                     onClick={(e) => {

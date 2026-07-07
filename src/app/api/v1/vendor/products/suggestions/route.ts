@@ -8,9 +8,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'products.view');
     const q = req.nextUrl.searchParams.get('q')?.trim();
     if (!q || q.length < 2) {
       return NextResponse.json({ success: true, data: { suggestions: [], ownMatches: [] } });

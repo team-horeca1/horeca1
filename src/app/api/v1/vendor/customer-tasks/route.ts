@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ const patchSchema = z.object({
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'customers.view');
     const vendorId = await resolveVendorId(ctx, req);
     const url = new URL(req.url);
     const customerId = url.searchParams.get('customerId');

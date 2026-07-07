@@ -19,6 +19,7 @@ import { toTeamMemberDTO, teamMemberInclude, type TeamMemberDTO } from '@/lib/te
 import { sendEmailInBackground } from '@/lib/providers/email';
 import { buildInviteEmail, buildInviteSms } from '@/lib/email-templates/invite';
 import { deliverInviteCredentials } from '@/lib/inviteDelivery';
+import { markSessionStale } from '@/lib/sessionStale';
 import { sendSms } from '@/lib/providers/sms';
 import { runInBackground } from '@/lib/asyncBackground';
 import type { AuthContext } from '@/middleware/auth';
@@ -410,6 +411,8 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         }
       });
     }
+
+    await markSessionStale(user.id);
 
     return NextResponse.json({
       success: true,

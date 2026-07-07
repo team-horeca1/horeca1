@@ -27,8 +27,9 @@ const createSchema = z.object({
   searchKeywords: z.array(z.string()).optional(),
 });
 
-export const GET = adminOnly(async (req: NextRequest) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'products.view');
     const params = req.nextUrl.searchParams;
     const search = params.get('search')?.trim() || undefined;
     const approvalStatus = params.get('approvalStatus')?.trim() || undefined;

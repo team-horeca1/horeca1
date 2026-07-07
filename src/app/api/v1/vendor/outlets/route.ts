@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { vendorOnly } from '@/middleware/rbac';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'outlets.view');
     const { vendorId } = await resolveVendorContext(ctx, req);
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },

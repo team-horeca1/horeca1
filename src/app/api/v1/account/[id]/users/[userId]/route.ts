@@ -11,6 +11,7 @@ import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { assertAccountPermission } from '@/lib/accountAccess';
+import { markSessionStale } from '@/lib/sessionStale';
 
 const PatchBody = z.object({
   assignments: z.array(z.object({
@@ -52,6 +53,7 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
         });
       }
     });
+    await markSessionStale(userId);
     return NextResponse.json({ success: true });
   } catch (err) { return errorResponse(err); }
 });
@@ -84,6 +86,7 @@ export const DELETE = withAuth(async (req: NextRequest, ctx) => {
         where: { userId_businessAccountId: { userId, businessAccountId: id } },
       });
     });
+    await markSessionStale(userId);
     return NextResponse.json({ success: true });
   } catch (err) { return errorResponse(err); }
 });

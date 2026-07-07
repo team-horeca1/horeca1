@@ -33,6 +33,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 
 const rowSchema = z.object({
@@ -57,6 +58,7 @@ function extractListId(req: NextRequest): string {
 
 export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'products.edit');
     const vendorId = await resolveVendorId(ctx, req);
     const listId = extractListId(req);
     const body = bodySchema.parse(await req.json());

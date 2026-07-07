@@ -6,11 +6,13 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { logAction } from '@/lib/auditLog';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 
-export const GET = adminOnly(async () => {
+export const GET = adminOnly(async (_req, ctx) => {
   try {
+    requirePermission(ctx, 'payments.view');
     const config = await creditWalletService.getGlobalConfig();
     return NextResponse.json({ success: true, data: config });
   } catch (error) {
@@ -35,6 +37,7 @@ const patchSchema = z.object({
 
 export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'payments.create');
     const body = patchSchema.parse(await req.json());
     const before = await creditWalletService.getGlobalConfig();
 

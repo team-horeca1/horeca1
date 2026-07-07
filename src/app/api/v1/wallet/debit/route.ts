@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { adminOnly } from '@/middleware/rbac';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 
 const schema = z.object({
   userId: z.string().uuid(),
@@ -14,8 +15,9 @@ const schema = z.object({
   orderId: z.string().min(1),
 });
 
-export const POST = adminOnly(async (req: NextRequest) => {
+export const POST = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'payments.create');
     const { userId, vendorId, amount, orderId } = schema.parse(await req.json());
     const wallet = await creditWalletService.debitWallet(userId, vendorId ?? null, amount, orderId);
     return NextResponse.json({ success: true, data: wallet });

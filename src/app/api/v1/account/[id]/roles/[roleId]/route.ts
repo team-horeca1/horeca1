@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { assertAccountPermission } from '@/lib/accountAccess';
 import { sanitizePermissionsForScope } from '@/lib/permissions/engine';
+import { markSessionStale } from '@/lib/sessionStale';
 
 const PatchBody = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -33,6 +34,12 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
       }),
     };
     const updated = await prisma.accountRole.update({ where: { id: roleId }, data });
+    const affected = await prisma.userRole.findMany({
+      where: { roleId },
+      select: { userId: true },
+      distinct: ['userId'],
+    });
+    await Promise.all(affected.map((r) => markSessionStale(r.userId)));
     return NextResponse.json({ success: true, data: updated });
   } catch (err) { return errorResponse(err); }
 });

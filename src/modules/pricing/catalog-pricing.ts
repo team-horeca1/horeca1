@@ -43,7 +43,7 @@ export async function getCatalogCustomerContext(): Promise<CustomerContext | nul
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const u = session.user as Record<string, unknown>;
+  const u = session.user as unknown as Record<string, unknown>;
   const outletId = (u.activeOutletId as string) ?? null;
   const outlet = outletId
     ? await prisma.outlet.findUnique({

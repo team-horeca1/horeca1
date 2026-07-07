@@ -3,5 +3,5 @@
 import { TeamPanel } from '@/components/features/team/TeamPanel';
 
 export default function BrandTeamPage() {
-  return <TeamPanel scope="brand" />;
+  return <TeamPanel scope="brand" blockWhenNoAccess />;
 }

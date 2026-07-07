@@ -450,6 +450,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (typeof token.availableAccountsTruncated === 'boolean') u.availableAccountsTruncated = token.availableAccountsTruncated;
         if (typeof token.totalAccountCount === 'number') u.totalAccountCount = token.totalAccountCount;
         if (token.forceAccountPicker === true) u.forceAccountPicker = true;
+        if (token.activeVendorId) u.activeVendorId = token.activeVendorId as string;
+        if (token.activeBrandId) u.activeBrandId = token.activeBrandId as string;
       }
       return session;
     },
@@ -558,6 +560,10 @@ function applyActiveContext(token: Record<string, unknown>, active: ActiveContex
     delete token.availableAccounts;
     delete token.availableAccountsTruncated;
     delete token.totalAccountCount;
+    delete token.activeVendorId;
+    delete token.activeBrandId;
+    delete token.activeVendorTeamRole;
+    delete token.activeBrandTeamRole;
     return;
   }
   token.hcidDisplay = active.hcidDisplay;
@@ -570,4 +576,8 @@ function applyActiveContext(token: Record<string, unknown>, active: ActiveContex
   token.availableAccounts = active.availableAccounts;
   token.availableAccountsTruncated = active.availableAccountsTruncated;
   token.totalAccountCount = active.totalAccountCount;
+  token.activeVendorId = active.activeVendorId;
+  token.activeBrandId = active.activeBrandId;
+  token.activeVendorTeamRole = active.activeVendorTeamRole;
+  token.activeBrandTeamRole = active.activeBrandTeamRole;
 }

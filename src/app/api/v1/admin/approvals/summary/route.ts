@@ -7,10 +7,12 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requireAnyPermissionInline } from '@/lib/permissions/engine';
 
 // GET — pending counts for vendors, products, and categories
-export const GET = adminOnly(async (_req, _ctx) => {
+export const GET = adminOnly(async (_req, ctx) => {
   try {
+    requireAnyPermissionInline(ctx, 'vendors.approve', 'brands.approve', 'products.approve');
     const [pendingVendors, pendingVendorProducts, pendingMasterProducts, pendingEditProducts, pendingCategories, pendingBrands] = await Promise.all([
       prisma.vendor.count({ where: { isVerified: false } }),
       prisma.product.count({ where: { approvalStatus: 'pending' } }),

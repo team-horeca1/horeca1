@@ -5,10 +5,12 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { vendorSettlementService } from '@/modules/vendor/vendorSettlement.service';
 
-export const GET = adminOnly(async (req: NextRequest) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'payments.view');
     const url = new URL(req.url);
     const status = url.searchParams.get('status');
     const vendorId = url.searchParams.get('vendorId');
@@ -67,8 +69,9 @@ const createSchema = z.object({
   periodEnd: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}/)),
 });
 
-export const POST = adminOnly(async (req: NextRequest) => {
+export const POST = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'payments.create');
     const body = createSchema.parse(await req.json());
     const periodStart = new Date(body.periodStart);
     const periodEnd = new Date(body.periodEnd);

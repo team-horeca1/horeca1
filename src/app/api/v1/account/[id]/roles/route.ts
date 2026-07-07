@@ -16,6 +16,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
     const id = extractAccountId(req);
     await assertAccountMember(ctx.userId, id);
+    await assertAccountPermission(ctx.userId, id, 'users.view', ctx.activeOutletId);
     const includeTemplates = new URL(req.url).searchParams.get('templates') === 'true';
     const roles = await prisma.accountRole.findMany({
       where: includeTemplates

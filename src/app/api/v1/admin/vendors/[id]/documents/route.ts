@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import type { AuthContext } from '@/middleware/auth';
 
-export const GET = adminOnly(async (req: NextRequest, _ctx: AuthContext) => {
+export const GET = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
     try {
+        requirePermission(ctx, 'vendors.view');
         const segments = req.nextUrl.pathname.split('/');
         const vendorId = segments[segments.indexOf('vendors') + 1];
 

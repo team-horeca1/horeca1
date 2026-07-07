@@ -6,7 +6,7 @@ import { Errors } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import type { PermissionKey } from '@/lib/permissions/registry';
 import { prisma } from '@/lib/prisma';
-import { redis } from '@/lib/redis';
+import { markSessionStale } from '@/lib/sessionStale';
 import { AUDIT_ACTIONS, logAction } from '@/lib/auditLog';
 
 const ENUM_RANK: Record<TeamRole, number> = { owner: 80, manager: 60, editor: 40, viewer: 20 };
@@ -71,7 +71,7 @@ export async function resetPasswordByAdmin(
   await prisma.user.update({ where: { id: targetUserId }, data: { password: hashed } });
 
   try {
-    await redis.set(`session:stale:${targetUserId}`, '1', 'EX', 3600);
+    await markSessionStale(targetUserId);
   } catch {
     /* non-critical */
   }

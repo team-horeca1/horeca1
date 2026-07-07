@@ -6,11 +6,13 @@ import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { approvedDistributorWhere } from '@/lib/brandAuthorizedDistributor';
 import type { AuthContext } from '@/middleware/auth';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'products.view');
     const { vendorId } = await resolveVendorContext(ctx, req);
 
     const rows = await prisma.brandAuthorizedDistributor.findMany({

@@ -24,8 +24,9 @@ function vendorSlug(name: string): string {
   return `${base}-${Date.now().toString(36)}`;
 }
 
-export const GET = adminOnly(async (req: NextRequest, _ctx) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'customers.view');
     const params = req.nextUrl.searchParams;
     const role = params.get('role') as Role | null;
     const search = params.get('search') || undefined;

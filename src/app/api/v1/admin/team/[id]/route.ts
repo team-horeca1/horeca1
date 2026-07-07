@@ -11,7 +11,7 @@ import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
-import { redis } from '@/lib/redis';
+import { markSessionStale } from '@/lib/sessionStale';
 import type { TeamRole } from '@prisma/client';
 
 const updateSchema = z.object({
@@ -102,7 +102,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       after: { roleId: role.id, role: legacyEnum, roleName: role.name },
     });
 
-    try { await redis.set(`session:stale:${userId}`, '1', 'EX', 3600); } catch { /* non-critical */ }
+    await markSessionStale(userId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

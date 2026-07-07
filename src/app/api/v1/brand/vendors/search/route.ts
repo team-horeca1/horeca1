@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { brandOnly } from '@/middleware/rbac';
 import { resolveBrandContext } from '@/lib/resolveBrandId';
 import { errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import type { AuthContext } from '@/middleware/auth';
 
 const querySchema = z.object({
@@ -18,6 +19,7 @@ const querySchema = z.object({
 
 export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'vendors.view');
     const { brandId } = await resolveBrandContext(ctx, req);
     const params = querySchema.parse(Object.fromEntries(req.nextUrl.searchParams));
 

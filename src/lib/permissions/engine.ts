@@ -47,21 +47,26 @@ export function mergePermissions(...sets: Array<Set<PermissionKey> | Permissions
 
 export interface SessionLike {
   permissions?: PermissionKey[] | readonly PermissionKey[];
+  /** Optional O(1) lookup — set by getAuthContext(). */
+  permissionSet?: ReadonlySet<PermissionKey>;
 }
 
 export function hasPermission(session: SessionLike | null | undefined, key: PermissionKey): boolean {
-  if (!session?.permissions) return false;
+  if (!session?.permissions && !session?.permissionSet) return false;
+  if (session.permissionSet) return session.permissionSet.has(key);
   return (session.permissions as readonly PermissionKey[]).includes(key);
 }
 
 export function hasAnyPermission(session: SessionLike | null | undefined, ...keys: PermissionKey[]): boolean {
-  if (!session?.permissions) return false;
+  if (!session?.permissions && !session?.permissionSet) return false;
+  if (session.permissionSet) return keys.some((k) => session.permissionSet!.has(k));
   const perms = session.permissions as readonly PermissionKey[];
   return keys.some((k) => perms.includes(k));
 }
 
 export function hasAllPermissions(session: SessionLike | null | undefined, ...keys: PermissionKey[]): boolean {
-  if (!session?.permissions) return false;
+  if (!session?.permissions && !session?.permissionSet) return false;
+  if (session.permissionSet) return keys.every((k) => session.permissionSet!.has(k));
   const perms = session.permissions as readonly PermissionKey[];
   return keys.every((k) => perms.includes(k));
 }

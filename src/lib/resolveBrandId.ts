@@ -31,6 +31,13 @@ export async function resolveBrandContext(ctx: AuthContext, req: NextRequest): P
     return { brandId: brand.id, teamRole: 'owner' };
   }
 
+  if (ctx.activeBrandId) {
+    return {
+      brandId: ctx.activeBrandId,
+      teamRole: ctx.activeBrandTeamRole ?? 'owner',
+    };
+  }
+
   // Check direct ownership first — scoped to the active business account
   // because Brand.userId is no longer unique (one User can own multiple
   // brand profiles, one per BusinessAccount).

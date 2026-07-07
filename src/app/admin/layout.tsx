@@ -34,6 +34,10 @@ import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/B
 import { NotificationBell } from '@/components/features/NotificationBell';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ADMIN_NAV_GROUPS, filterNavLinks } from '@/lib/permissions/portalNav';
+import { getFirstAllowedRoute } from '@/lib/permissions/routePermissions';
+import { PortalPageGuard } from '@/components/auth/PortalPageGuard';
+import { PortalNoAccess } from '@/components/auth/PortalNoAccess';
+import { Suspense } from 'react';
 
 export default function AdminLayout({
     children,
@@ -46,17 +50,30 @@ export default function AdminLayout({
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [pendingApprovals, setPendingApprovals] = useState(0);
 
-    const { can } = usePermissions();
+    const { can, hasAny } = usePermissions();
+    const userRole = (session?.user as { role?: string })?.role;
+    const firstAllowedRoute = getFirstAllowedRoute('admin', can);
     const visibleGroups = ADMIN_NAV_GROUPS.map((g) => ({
         ...g,
         links: filterNavLinks(g.links, can, 'admin'),
     })).filter((g) => g.links.length > 0);
 
-    // Poll the pending-approvals count so the sidebar badge reflects reality
+    useEffect(() => {
+        if (status !== 'authenticated' || userRole !== 'admin') return;
+        if (visibleGroups.length === 0) return;
+        if (!firstAllowedRoute) return;
+        const allHrefs = visibleGroups.flatMap((g) => g.links.map((l) => l.href));
+        if (!allHrefs.some((h) => pathname === h || pathname.startsWith(`${h}/`))) {
+            router.replace(firstAllowedRoute);
+        }
+    }, [status, userRole, visibleGroups, firstAllowedRoute, pathname, router]);
+
+    // Poll the pending-approvals count
     // without a full page reload. 60s cadence is friendly to the DB and good
     // enough for admins — the Approvals page itself shows live numbers.
     useEffect(() => {
         if (status !== 'authenticated') return;
+        if (!hasAny('vendors.approve', 'brands.approve', 'products.approve')) return;
         let cancelled = false;
         const fetchCount = () => {
             fetch('/api/v1/admin/approvals/summary', { credentials: 'include' })
@@ -71,7 +88,7 @@ export default function AdminLayout({
         fetchCount();
         const id = setInterval(fetchCount, 60_000);
         return () => { cancelled = true; clearInterval(id); };
-    }, [status, pathname]);
+    }, [status, pathname, hasAny]);
 
     // Show loading only on the genuine initial load (no session yet). A
     // background session revalidation (window-focus refetch) briefly flips
@@ -86,7 +103,6 @@ export default function AdminLayout({
     }
 
     // Block non-admin users
-    const userRole = (session?.user as { role?: string })?.role;
     if (status === 'unauthenticated' || userRole !== 'admin') {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-[#F8F9FB] gap-4">
@@ -103,6 +119,14 @@ export default function AdminLayout({
         );
     }
 
+    if (visibleGroups.length === 0) {
+        return (
+            <div className="flex flex-col min-h-screen bg-[#F8F9FB]">
+                <PortalNoAccess />
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col min-h-screen bg-[#F8F9FB]">
             {/* Full-width Top Header */}
@@ -112,7 +136,7 @@ export default function AdminLayout({
                     "shrink-0 flex items-center gap-3 transition-all duration-300 ease-in-out",
                     isCollapsed ? "w-[60px]" : "w-[220px]"
                 )}>
-                    <Link href="/admin/dashboard" className="flex items-center gap-3 overflow-hidden">
+                    <Link href={firstAllowedRoute ?? '/admin/dashboard'} className="flex items-center gap-3 overflow-hidden">
                         <div className="w-[42px] h-[42px] shrink-0">
                             <img src="/images/admin/Ellipse 2.svg" alt="" className="w-full h-full object-contain" />
                         </div>
@@ -256,7 +280,9 @@ export default function AdminLayout({
 
                 {/* Main Content */}
                 <main className="flex-1 px-8 py-8 min-w-0">
-                    {children}
+                    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#299E60]" size={32} /></div>}>
+                        <PortalPageGuard scope="admin">{children}</PortalPageGuard>
+                    </Suspense>
                 </main>
             </div>
         </div>

@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 
 function extractId(req: NextRequest) {
@@ -26,6 +27,7 @@ const patchSchema = z.object({
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'customers.view');
     const vendorId = await resolveVendorId(ctx, req);
     const id = extractId(req);
     const group = await prisma.customerGroup.findFirst({

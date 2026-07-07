@@ -39,6 +39,13 @@ export async function resolveVendorContext(ctx: AuthContext, req: NextRequest): 
     return { vendorId: vendor.id, teamRole: 'owner' };
   }
 
+  if (ctx.activeVendorId) {
+    return {
+      vendorId: ctx.activeVendorId,
+      teamRole: ctx.activeVendorTeamRole ?? 'owner',
+    };
+  }
+
   // Check direct ownership first. Vendor.userId is no longer unique (one User
   // can own multiple vendor profiles, one per BusinessAccount), so we look
   // for a vendor that BOTH matches the user AND the active business account.
