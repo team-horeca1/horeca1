@@ -9,6 +9,7 @@ import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
+import { findConflictingBxgyPromotion } from '@/modules/promotion/promotion.service';
 
 function extractId(req: NextRequest) {
   return new URL(req.url).pathname.split('/').at(-1) ?? '';
@@ -32,13 +33,29 @@ const updateSchema = z.object({
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
-    requirePermission(ctx, 'orders.edit');
+    requirePermission(ctx, 'promotions.create');
 
     const promoId = extractId(req);
     const body = updateSchema.parse(await req.json());
 
     const existing = await prisma.promotion.findFirst({ where: { id: promoId, vendorId } });
     if (!existing) throw Errors.notFound('Promotion');
+
+    const nextBuyProductId = body.buyProductId !== undefined ? body.buyProductId : existing.buyProductId;
+    if (existing.type === 'bxgy' && nextBuyProductId) {
+      const conflict = await findConflictingBxgyPromotion(prisma, vendorId, nextBuyProductId, promoId);
+      if (conflict) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              message: `Another live BXGY offer already targets this buy product ("${conflict.name}").`,
+            },
+          },
+          { status: 400 },
+        );
+      }
+    }
 
     const updated = await prisma.promotion.update({
       where: { id: promoId },
@@ -71,7 +88,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
 export const DELETE = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
-    requirePermission(ctx, 'orders.edit');
+    requirePermission(ctx, 'promotions.create');
 
     const promoId = extractId(req);
     const existing = await prisma.promotion.findFirst({ where: { id: promoId, vendorId } });

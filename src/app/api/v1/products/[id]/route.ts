@@ -7,6 +7,7 @@ import { filterProductBrandMappings } from '@/lib/brandAuthorizedDistributor';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { attachCustomerPricing } from '@/modules/pricing/catalog-pricing';
+import { attachActivePromotions } from '@/modules/promotion/promotion-catalog';
 import { withLegacyInventory } from '@/lib/inventoryHelpers';
 
 export async function GET(req: NextRequest) {
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
       where: { id: productId },
       select: {
         id: true,
+        vendorId: true,
         name: true,
         description: true,
         basePrice: true,
@@ -32,7 +34,7 @@ export async function GET(req: NextRequest) {
         isActive: true,
         category: { select: { id: true, name: true, slug: true } },
         vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true, rating: true, minOrderValue: true } },
-        priceSlabs: { orderBy: { minQty: 'asc' }, select: { minQty: true, maxQty: true, price: true } },
+        priceSlabs: { orderBy: { minQty: 'asc' }, select: { minQty: true, maxQty: true, price: true, promoPrice: true } },
         inventories: { select: { qtyAvailable: true, qtyReserved: true } },
         brandMappings: {
           where: { status: { in: ['verified', 'auto_mapped'] } },
@@ -57,9 +59,18 @@ export async function GET(req: NextRequest) {
 
     // Logged-in buyers see THEIR price (price lists / overrides) on the
     // detail page — same resolver the cart uses.
-    const [filtered] = await filterProductBrandMappings([withLegacyInventory(product)]);
-    const [withPricing] = await attachCustomerPricing([filtered]);
-    return NextResponse.json({ success: true, data: withPricing });
+    const [filtered] = await filterProductBrandMappings([{
+      ...withLegacyInventory(product),
+      vendorId: product.vendorId ?? undefined,
+    }]);
+    const priced = await attachCustomerPricing([{
+      ...filtered,
+      id: product.id,
+      basePrice: product.basePrice,
+      vendorId: product.vendorId ?? filtered.vendor?.id ?? undefined,
+    }]);
+    const withPromos = await attachActivePromotions(priced);
+    return NextResponse.json({ success: true, data: withPromos[0] });
   } catch (error) {
     return errorResponse(error);
   }

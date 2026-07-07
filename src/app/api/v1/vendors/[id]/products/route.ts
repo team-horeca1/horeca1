@@ -9,6 +9,7 @@ import { CatalogService } from '@/modules/catalog/catalog.service';
 import { vendorProductsSchema } from '@/modules/catalog/catalog.validator';
 import { errorResponse } from '@/middleware/errorHandler';
 import { attachCustomerPricing } from '@/modules/pricing/catalog-pricing';
+import { attachActivePromotions } from '@/modules/promotion/promotion-catalog';
 
 const catalogService = new CatalogService();
 
@@ -25,6 +26,7 @@ export async function GET(
     // Logged-in buyers see THEIR price (price lists / overrides) on the
     // store listing — same resolver the cart uses, so no checkout surprises.
     result.products = await attachCustomerPricing(result.products);
+    result.products = await attachActivePromotions(result.products);
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
     return errorResponse(error);

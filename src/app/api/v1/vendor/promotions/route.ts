@@ -11,6 +11,7 @@ import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId, resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
+import { livePromotionWhere, findConflictingBxgyPromotion } from '@/modules/promotion/promotion.service';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
@@ -21,7 +22,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     const promotions = await prisma.promotion.findMany({
       where: {
         vendorId,
-        ...(activeOnly ? { isActive: true } : {}),
+        ...(activeOnly ? { ...livePromotionWhere() } : {}),
       },
       include: {
         buyProduct: { select: { id: true, name: true } },
@@ -55,9 +56,24 @@ const createSchema = z.object({
 export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
-    requirePermission(ctx, 'orders.edit');
+    requirePermission(ctx, 'promotions.create');
 
     const body = createSchema.parse(await req.json());
+
+    if (body.type === 'bxgy' && body.buyProductId) {
+      const conflict = await findConflictingBxgyPromotion(prisma, vendorId, body.buyProductId);
+      if (conflict) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              message: `A live BXGY offer already exists for this buy product ("${conflict.name}"). Deactivate it first or edit the existing offer.`,
+            },
+          },
+          { status: 400 },
+        );
+      }
+    }
 
     const promotion = await prisma.promotion.create({
       data: {
