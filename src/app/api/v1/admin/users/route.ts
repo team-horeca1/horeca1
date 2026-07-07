@@ -31,6 +31,7 @@ export const GET = adminOnly(async (req: NextRequest, _ctx) => {
     const search = params.get('search') || undefined;
     const pincode = params.get('pincode') || undefined;
     const salesExecutive = params.get('salesExecutive') || undefined;
+    const salespersonId = params.get('salespersonId') || undefined;
     const creditStatus = params.get('creditStatus') || undefined;
     const area = params.get('area') || undefined;
     const tag = params.get('tag') || undefined;
@@ -75,6 +76,12 @@ export const GET = adminOnly(async (req: NextRequest, _ctx) => {
     if (salesExecutive) {
       andConditions.push({
         vendorCustomers: { some: { salesExecutive: { contains: salesExecutive, mode: 'insensitive' } } },
+      });
+    }
+
+    if (salespersonId) {
+      andConditions.push({
+        vendorCustomers: { some: { salespersonId } },
       });
     }
 

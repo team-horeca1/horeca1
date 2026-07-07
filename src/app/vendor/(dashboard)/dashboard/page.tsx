@@ -2407,12 +2407,23 @@ function FinancialDetailDrawer({
                         <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
                             <h4 className="text-[13.5px] font-black text-gray-900 border-b border-gray-50 pb-2">Platform Fees Accrued</h4>
                             <div className="flex justify-between text-[12px]">
-                                <span className="text-gray-500">Platform Commission Rate:</span>
-                                <span className="font-bold text-gray-700">1.8% per Order</span>
+                                <span className="text-gray-500">Platform fee rate:</span>
+                                <span className="font-bold text-gray-700">
+                                    {financeData.feeInfo?.effectivePlatformFeePct ?? '—'}%
+                                    {financeData.feeInfo?.isCustomRate ? ' (custom)' : ' (global)'}
+                                </span>
                             </div>
                             <div className="flex justify-between text-[12px]">
-                                <span className="text-gray-500">Aggregate Platform Fees Paid:</span>
-                                <span className="font-extrabold text-rose-500">{formatINR(Number(financeData.payouts?.reduce((s: number, p: any) => s + (p.platformFee || p.amount * 0.018), 0) || 0))}</span>
+                                <span className="text-gray-500">This month platform fees:</span>
+                                <span className="font-extrabold text-rose-500">
+                                    {formatINR(Number(financeData.feeInfo?.monthPlatformFees ?? 0))}
+                                </span>
+                            </div>
+                            <div className="flex justify-between text-[12px]">
+                                <span className="text-gray-500">All-time from settlements:</span>
+                                <span className="font-bold text-gray-700">
+                                    {formatINR(Number(financeData.payouts?.reduce((s: number, p: { platformFee?: number }) => s + Number(p.platformFee ?? 0), 0) ?? 0))}
+                                </span>
                             </div>
                             <p className="text-[11px] text-gray-400 font-medium">Platform fees are automatically deducted from order value during payout processing.</p>
                         </div>

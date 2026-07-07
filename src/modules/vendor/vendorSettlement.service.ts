@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 
-const GATEWAY_FEE_PCT = 2;
+export const GATEWAY_FEE_PCT = 2;
 const CREDIT_PAYMENTS = ['credit', 'vendor_credit', 'h1_wallet', 'wallet'];
 
 function roundMoney(n: number): number {
@@ -12,15 +12,30 @@ function isCreditPayment(method: string | null | undefined): boolean {
   return !!method && CREDIT_PAYMENTS.includes(method);
 }
 
-function isGatewayPayment(method: string | null | undefined): boolean {
+export function isGatewayPayment(method: string | null | undefined): boolean {
   return !!method && ['online', 'prepaid', 'razorpay'].includes(method);
 }
 
-async function getPlatformFeePct(): Promise<number> {
-  const settings = await prisma.platformSetting.findFirst({
+async function getDefaultPlatformFeePct(db: Prisma.TransactionClient | typeof prisma): Promise<number> {
+  const settings = await db.platformSetting.findFirst({
     select: { defaultCommissionPct: true },
   });
   return Number(settings?.defaultCommissionPct ?? 10);
+}
+
+/** Resolve effective platform fee % for a vendor (custom override or global default). */
+export async function resolvePlatformFeePct(
+  vendorId: string,
+  db: Prisma.TransactionClient | typeof prisma = prisma,
+): Promise<number> {
+  const vendor = await db.vendor.findUnique({
+    where: { id: vendorId },
+    select: { platformFeePct: true },
+  });
+  if (vendor?.platformFeePct != null) {
+    return Number(vendor.platformFeePct);
+  }
+  return getDefaultPlatformFeePct(db);
 }
 
 export function computeOrderSettlementAmounts(
@@ -74,6 +89,7 @@ export async function creditVendorOnDelivery(
       paymentMethod: true,
       paymentStatus: true,
       status: true,
+      settlementNetVendorAmount: true,
     },
   });
   if (!order || order.status !== 'delivered') return;
@@ -83,13 +99,24 @@ export async function creditVendorOnDelivery(
   const gross = Number(order.totalAmount);
   if (gross <= 0) return;
 
-  const platformFeePct = await getPlatformFeePct();
-  const { platformFee, gatewayFee, netAmount } = computeOrderSettlementAmounts(
+  const platformFeePct = await resolvePlatformFeePct(order.vendorId, tx);
+  const { grossAmount, platformFee, gatewayFee, netAmount } = computeOrderSettlementAmounts(
     gross,
     order.paymentMethod,
     platformFeePct,
   );
   if (netAmount <= 0) return;
+
+  await tx.order.update({
+    where: { id: order.id },
+    data: {
+      settlementGrossAmount: grossAmount,
+      settlementPlatformFeePct: platformFeePct,
+      settlementPlatformFee: platformFee,
+      settlementGatewayFee: gatewayFee,
+      settlementNetVendorAmount: netAmount,
+    },
+  });
 
   const wallet = await ensureWallet(order.vendorId, tx);
   const newBalance = roundMoney(Number(wallet.balance) + netAmount);
@@ -102,7 +129,11 @@ export async function creditVendorOnDelivery(
       balanceAfter: newBalance,
       referenceId: order.id,
       referenceType: 'order',
-      notes: `Order ${order.orderNumber} delivered — gross ₹${gross}, platform fee ₹${platformFee}${gatewayFee > 0 ? `, gateway ₹${gatewayFee}` : ''}`,
+      grossAmount,
+      platformFee,
+      gatewayFee,
+      netAmount,
+      notes: `Order ${order.orderNumber} delivered — gross ₹${grossAmount}, platform fee ₹${platformFee}${gatewayFee > 0 ? `, gateway ₹${gatewayFee}` : ''}`,
     },
   });
 
@@ -117,6 +148,7 @@ export async function creditVendorOnDelivery(
 
 /**
  * Debit vendor wallet when a prepaid/COD order refund is approved.
+ * Uses snapshotted net amount when available.
  */
 export async function debitVendorOnRefund(
   vendorId: string,
@@ -125,9 +157,20 @@ export async function debitVendorOnRefund(
   note: string,
   tx?: Prisma.TransactionClient,
 ): Promise<void> {
-  if (refundAmount <= 0) return;
-
   const run = async (client: Prisma.TransactionClient) => {
+    const order = await client.order.findUnique({
+      where: { id: orderId },
+      select: {
+        settlementNetVendorAmount: true,
+        settlementGrossAmount: true,
+        totalAmount: true,
+      },
+    });
+    const debitTarget = order?.settlementNetVendorAmount != null
+      ? Number(order.settlementNetVendorAmount)
+      : refundAmount;
+    if (debitTarget <= 0) return;
+
     const existing = await client.vendorWalletTxn.findFirst({
       where: {
         referenceId: orderId,
@@ -138,8 +181,12 @@ export async function debitVendorOnRefund(
     if (existing) return;
 
     const wallet = await ensureWallet(vendorId, client);
-    const debit = roundMoney(Math.min(refundAmount, Number(wallet.balance)));
+    const debit = roundMoney(Math.min(debitTarget, Number(wallet.balance)));
     if (debit <= 0) return;
+
+    const gross = order?.settlementNetVendorAmount != null
+      ? Number(order.settlementGrossAmount ?? order.totalAmount)
+      : refundAmount;
 
     const newBalance = roundMoney(Number(wallet.balance) - debit);
     await client.vendorWalletTxn.create({
@@ -150,6 +197,8 @@ export async function debitVendorOnRefund(
         balanceAfter: newBalance,
         referenceId: orderId,
         referenceType: 'order_refund',
+        grossAmount: gross,
+        netAmount: debit,
         notes: note,
       },
     });
@@ -187,7 +236,7 @@ export async function createSettlementBatch(
         referenceType: 'order',
         createdAt: { gte: periodStart, lte: periodEnd },
       },
-      select: { referenceId: true, amount: true, notes: true },
+      select: { referenceId: true, amount: true, grossAmount: true, platformFee: true, gatewayFee: true, netAmount: true },
     });
 
     if (creditedOrders.length === 0) return null;
@@ -206,12 +255,21 @@ export async function createSettlementBatch(
 
     const orders = await tx.order.findMany({
       where: { id: { in: unsettledOrderIds } },
-      select: { id: true, totalAmount: true, paymentMethod: true },
+      select: {
+        id: true,
+        totalAmount: true,
+        paymentMethod: true,
+        settlementGrossAmount: true,
+        settlementPlatformFee: true,
+        settlementGatewayFee: true,
+        settlementNetVendorAmount: true,
+      },
     });
 
-    const platformFeePct = await getPlatformFeePct();
+    const platformFeePct = await resolvePlatformFeePct(vendorId, tx);
     let grossTotal = 0;
     let platformTotal = 0;
+    let gatewayTotal = 0;
     let netTotal = 0;
     const orderRows: Array<{
       orderId: string;
@@ -221,14 +279,33 @@ export async function createSettlementBatch(
     }> = [];
 
     for (const order of orders) {
-      const gross = Number(order.totalAmount);
-      const { platformFee, netAmount } = computeOrderSettlementAmounts(
-        gross,
-        order.paymentMethod,
-        platformFeePct,
-      );
+      const txn = creditedOrders.find((t) => t.referenceId === order.id);
+      let gross: number;
+      let platformFee: number;
+      let gatewayFee: number;
+      let netAmount: number;
+
+      if (order.settlementNetVendorAmount != null) {
+        gross = Number(order.settlementGrossAmount ?? order.totalAmount);
+        platformFee = Number(order.settlementPlatformFee ?? 0);
+        gatewayFee = Number(order.settlementGatewayFee ?? 0);
+        netAmount = Number(order.settlementNetVendorAmount);
+      } else if (txn?.netAmount != null) {
+        gross = Number(txn.grossAmount ?? order.totalAmount);
+        platformFee = Number(txn.platformFee ?? 0);
+        gatewayFee = Number(txn.gatewayFee ?? 0);
+        netAmount = Number(txn.netAmount);
+      } else {
+        gross = Number(order.totalAmount);
+        const computed = computeOrderSettlementAmounts(gross, order.paymentMethod, platformFeePct);
+        platformFee = computed.platformFee;
+        gatewayFee = computed.gatewayFee;
+        netAmount = computed.netAmount;
+      }
+
       grossTotal += gross;
       platformTotal += platformFee;
+      gatewayTotal += gatewayFee;
       netTotal += netAmount;
       orderRows.push({
         orderId: order.id,
@@ -243,26 +320,13 @@ export async function createSettlementBatch(
     const settleAmount = roundMoney(Math.min(netTotal, balance));
     if (settleAmount <= 0) return null;
 
-    const gatewayFee = roundMoney(
-      orderRows.reduce((sum, o) => {
-        const order = orders.find((x) => x.id === o.orderId);
-        if (!order) return sum;
-        const { gatewayFee: gf } = computeOrderSettlementAmounts(
-          o.orderAmount,
-          order.paymentMethod,
-          platformFeePct,
-        );
-        return sum + gf;
-      }, 0),
-    );
-
     const settlement = await tx.vendorSettlement.create({
       data: {
         vendorId,
         walletId: wallet.id,
         grossAmount: roundMoney(grossTotal),
         platformFee: roundMoney(platformTotal),
-        gatewayFee,
+        gatewayFee: roundMoney(gatewayTotal),
         netAmount: settleAmount,
         status: 'pending',
         periodStart,
@@ -287,6 +351,10 @@ export async function createSettlementBatch(
         balanceAfter: newBalance,
         referenceId: settlement.id,
         referenceType: 'settlement',
+        grossAmount: roundMoney(grossTotal),
+        platformFee: roundMoney(platformTotal),
+        gatewayFee: roundMoney(gatewayTotal),
+        netAmount: settleAmount,
         notes: `Settlement batch ${periodStart.toISOString().split('T')[0]} – ${periodEnd.toISOString().split('T')[0]}`,
       },
     });
@@ -379,4 +447,6 @@ export const vendorSettlementService = {
   requestInstantPayout,
   runWeeklySettlements,
   computeOrderSettlementAmounts,
+  resolvePlatformFeePct,
+  isGatewayPayment,
 };

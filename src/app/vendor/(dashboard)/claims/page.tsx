@@ -33,27 +33,12 @@ export default function VendorClaimsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const review = async (id: string, status: 'approved' | 'rejected' | 'resolved') => {
-    const res = await fetch(`/api/v1/vendor/claims/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    const json = await res.json();
-    if (json.success) {
-      toast.success(`Claim ${status}`);
-      void load();
-    } else {
-      toast.error('Update failed');
-    }
-  };
-
   return (
     <div className="space-y-5 pb-10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-[24px] font-bold text-[#181725]">Delivery Claims</h1>
-          <p className="text-[12px] text-[#AEAEAE]">Shortage, damage, and quality disputes on delivered orders</p>
+          <h1 className="text-[24px] font-bold text-[#181725]">Delivery Disputes</h1>
+          <p className="text-[12px] text-[#AEAEAE]">File shortage or damage claims — HoReCa1 reviews and resolves</p>
         </div>
         <Link href="/vendor/orders" className="inline-flex items-center gap-2 h-[40px] px-4 bg-[#181725] text-white rounded-[10px] text-[13px] font-bold">
           <Plus size={14} /> File from order
@@ -79,17 +64,9 @@ export default function VendorClaimsPage() {
                   </div>
                   <p className="text-[12px] capitalize text-[#7C7C7C]">{c.type}</p>
                   {c.amount && <p className="text-[13px] font-bold">₹{c.amount}</p>}
-                  <div className="flex gap-3 pt-1">
-                    {c.status === 'pending' && (
-                      <>
-                        <button type="button" onClick={() => review(c.id, 'approved')} className="text-[#299E60] font-bold text-[12px]">Approve</button>
-                        <button type="button" onClick={() => review(c.id, 'rejected')} className="text-[#E74C3C] font-bold text-[12px]">Reject</button>
-                      </>
-                    )}
-                    {c.status === 'approved' && (
-                      <button type="button" onClick={() => review(c.id, 'resolved')} className="text-[#4F46E5] font-bold text-[12px]">Resolve</button>
-                    )}
-                  </div>
+                  {c.status === 'pending' && (
+                    <p className="text-[11px] text-amber-600 font-semibold">Awaiting platform review</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -101,7 +78,7 @@ export default function VendorClaimsPage() {
                     <th className="px-4 py-3 text-left">Type</th>
                     <th className="px-4 py-3 text-left">Status</th>
                     <th className="px-4 py-3 text-right">Amount</th>
-                    <th className="px-4 py-3 text-center">Actions</th>
+                    <th className="px-4 py-3 text-center">Review</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F5F5F5]">
@@ -111,16 +88,8 @@ export default function VendorClaimsPage() {
                       <td className="px-4 py-3 capitalize">{c.type}</td>
                       <td className="px-4 py-3 capitalize">{c.status}</td>
                       <td className="px-4 py-3 text-right">{c.amount ? `₹${c.amount}` : '—'}</td>
-                      <td className="px-4 py-3 text-center space-x-2">
-                        {c.status === 'pending' && (
-                          <>
-                            <button type="button" onClick={() => review(c.id, 'approved')} className="text-[#299E60] font-bold text-[12px]">Approve</button>
-                            <button type="button" onClick={() => review(c.id, 'rejected')} className="text-[#E74C3C] font-bold text-[12px]">Reject</button>
-                          </>
-                        )}
-                        {c.status === 'approved' && (
-                          <button type="button" onClick={() => review(c.id, 'resolved')} className="text-[#4F46E5] font-bold text-[12px]">Resolve</button>
-                        )}
+                      <td className="px-4 py-3 text-center text-[11px] text-[#7C7C7C]">
+                        {c.status === 'pending' ? 'Awaiting platform review' : c.status}
                       </td>
                     </tr>
                   ))}

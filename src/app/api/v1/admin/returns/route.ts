@@ -19,7 +19,7 @@ export const GET = adminOnly(async (req: NextRequest) => {
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { createdAt: 'desc' },
       include: {
-        order: { select: { orderNumber: true, totalAmount: true, paymentStatus: true } },
+        order: { select: { orderNumber: true, totalAmount: true, paymentStatus: true, paymentMethod: true } },
         customer: { select: { fullName: true, email: true, phone: true } },
       },
     });

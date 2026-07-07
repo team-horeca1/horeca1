@@ -5,7 +5,7 @@
 // approve / cancel / paid endpoints.
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Loader2, Check, X, AlertCircle, IndianRupee, Filter, Receipt } from 'lucide-react';
+import { Loader2, Check, X, AlertCircle, IndianRupee, Filter, Receipt, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Status = 'pending' | 'approved' | 'paid' | 'cancelled';
@@ -113,6 +113,35 @@ export function CommissionsTab({ salespersons, perms }: Props) {
     }
   };
 
+  const exportCsv = () => {
+    if (accruals.length === 0) {
+      toast.error('No accruals to export');
+      return;
+    }
+    const rows = [
+      ['Order', 'Customer', 'Salesperson', 'Order value (₹)', 'Commission (₹)', 'Rate', 'Status', 'Period', 'Created'],
+      ...accruals.map((a) => [
+        a.order.orderNumber,
+        a.order.user.businessName ?? a.order.user.fullName,
+        a.salesperson.name,
+        String(Number(a.order.totalAmount)),
+        String(Number(a.accruedAmount)),
+        a.ratePercent != null ? `${a.ratePercent}%` : `₹${a.rateFixed} flat`,
+        a.status,
+        a.period,
+        new Date(a.createdAt).toLocaleDateString('en-IN'),
+      ]),
+    ];
+    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `commissions-${period || 'all'}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-4">
       {/* Summary cards */}
@@ -159,6 +188,15 @@ export function CommissionsTab({ salespersons, perms }: Props) {
           <option value="paid">Paid</option>
           <option value="cancelled">Cancelled</option>
         </select>
+        <button
+          type="button"
+          onClick={exportCsv}
+          disabled={loading || accruals.length === 0}
+          className="ml-auto h-[36px] px-3 rounded-[10px] border border-[#EEEEEE] bg-white text-[12px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <Download size={13} />
+          Export CSV
+        </button>
       </div>
 
       {/* Accrual list */}

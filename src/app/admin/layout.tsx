@@ -23,9 +23,11 @@ import {
     Tag,
     Home,
     Sparkles,
+    BookOpen,
     RotateCcw,
     CreditCard,
     Gift,
+    FileWarning,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
@@ -41,22 +43,49 @@ interface AdminSidebarLink {
     requiredPerm?: PermissionKey | PermissionKey[];
 }
 
-const SIDEBAR_LINKS: AdminSidebarLink[] = [
-    { name: 'Dashboard', icon: LayoutDashboard, href: '/admin/dashboard', requiredPerm: 'dashboard.view' },
-    { name: 'Orders', icon: ShoppingBag, href: '/admin/orders', requiredPerm: 'orders.view' },
-    { name: 'Customers', icon: Users, href: '/admin/customers', requiredPerm: 'customers.view' },
-    { name: 'Vendors', icon: Store, href: '/admin/vendors', requiredPerm: 'vendors.view' },
-    { name: 'Products', icon: Package, href: '/admin/products', requiredPerm: 'products.view' },
-    { name: 'Categories', icon: Tag, href: '/admin/categories', requiredPerm: 'products.edit' },
-    { name: 'Approvals', icon: CheckSquare, href: '/admin/approvals', requiredPerm: ['vendors.approve', 'brands.approve', 'products.approve'] },
-    { name: 'Brands', icon: Sparkles, href: '/admin/brands', requiredPerm: 'brands.view' },
-    { name: 'Returns', icon: RotateCcw, href: '/admin/returns', requiredPerm: 'orders.edit' },
-    { name: 'Finance', icon: Wallet, href: '/admin/finance', requiredPerm: 'payments.view' },
-    { name: 'Credit & Wallet', icon: CreditCard, href: '/admin/credit', requiredPerm: 'payments.view' },
-    { name: 'Promotions', icon: Gift, href: '/admin/promotions', requiredPerm: 'promotions.view' },
-    { name: 'Reports', icon: BarChart3, href: '/admin/reports', requiredPerm: 'analytics.view' },
-    { name: 'Team', icon: Users, href: '/admin/team', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
-    { name: 'Settings', icon: Settings, href: '/admin/settings', requiredPerm: 'settings.view' },
+const SIDEBAR_GROUPS: { label: string; links: AdminSidebarLink[] }[] = [
+    {
+        label: 'Operations',
+        links: [
+            { name: 'Dashboard', icon: LayoutDashboard, href: '/admin/dashboard', requiredPerm: 'dashboard.view' },
+            { name: 'Orders', icon: ShoppingBag, href: '/admin/orders', requiredPerm: 'orders.view' },
+            { name: 'Returns', icon: RotateCcw, href: '/admin/returns', requiredPerm: 'orders.edit' },
+            { name: 'Claims', icon: FileWarning, href: '/admin/claims', requiredPerm: 'orders.edit' },
+            { name: 'Approvals', icon: CheckSquare, href: '/admin/approvals', requiredPerm: ['vendors.approve', 'brands.approve', 'products.approve'] },
+        ],
+    },
+    {
+        label: 'Marketplace',
+        links: [
+            { name: 'Customers', icon: Users, href: '/admin/customers', requiredPerm: 'customers.view' },
+            { name: 'Vendors', icon: Store, href: '/admin/vendors', requiredPerm: 'vendors.view' },
+            { name: 'Products', icon: Package, href: '/admin/products', requiredPerm: 'products.view' },
+            { name: 'Categories', icon: Tag, href: '/admin/categories', requiredPerm: 'products.edit' },
+            { name: 'Brands', icon: Sparkles, href: '/admin/brands', requiredPerm: 'brands.view' },
+        ],
+    },
+    {
+        label: 'Finance',
+        links: [
+            { name: 'Overview', icon: Wallet, href: '/admin/finance', requiredPerm: 'payments.view' },
+            { name: 'Platform Ledger', icon: BookOpen, href: '/admin/ledger', requiredPerm: 'payments.view' },
+            { name: 'Reports', icon: BarChart3, href: '/admin/reports', requiredPerm: 'analytics.view' },
+        ],
+    },
+    {
+        label: 'Credit',
+        links: [
+            { name: 'Credit & Collections', icon: CreditCard, href: '/admin/credit', requiredPerm: 'payments.view' },
+        ],
+    },
+    {
+        label: 'Platform',
+        links: [
+            { name: 'Promotions', icon: Gift, href: '/admin/promotions', requiredPerm: 'promotions.view' },
+            { name: 'Team', icon: Users, href: '/admin/team', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
+            { name: 'Settings', icon: Settings, href: '/admin/settings', requiredPerm: 'settings.view' },
+        ],
+    },
 ];
 
 export default function AdminLayout({
@@ -82,7 +111,10 @@ export default function AdminLayout({
             ? need.some((p) => sessionPerms.includes(p))
             : sessionPerms.includes(need);
     };
-    const visibleLinks = SIDEBAR_LINKS.filter((link) => can(link.requiredPerm));
+    const visibleGroups = SIDEBAR_GROUPS.map((g) => ({
+        ...g,
+        links: g.links.filter((link) => can(link.requiredPerm)),
+    })).filter((g) => g.links.length > 0);
 
     // Poll the pending-approvals count so the sidebar badge reflects reality
     // without a full page reload. 60s cadence is friendly to the DB and good
@@ -200,57 +232,63 @@ export default function AdminLayout({
                         isCollapsed ? "w-[80px]" : "w-[240px]"
                     )}>
                         <nav className="flex-1 px-4 py-6 space-y-2">
-                            {visibleLinks.map((link) => {
-                                const isActive = pathname === link.href;
-                                // Badge count only for the Approvals row (extend here if more rows need badges later).
-                                const badge = link.name === 'Approvals' ? pendingApprovals : 0;
-                                const badgeLabel = badge > 99 ? '99+' : String(badge);
-                                return (
-                                    <Link
-                                        key={link.name}
-                                        href={link.href}
-                                        title={isCollapsed ? (badge > 0 ? `${link.name} (${badgeLabel} pending)` : link.name) : ""}
-                                        className={cn(
-                                            "relative flex items-center rounded-[10px] transition-all group text-[14px] overflow-hidden leading-none",
-                                            isCollapsed ? "justify-center h-[48px] px-0" : "gap-3.5 px-5 py-3.5",
-                                            isActive
-                                                ? "bg-[#299E60] text-white shadow-md shadow-[#299E60]/20"
-                                                : "text-[#191919] hover:bg-[#F8F9FB]"
-                                        )}
-                                    >
-                                        <span className="relative shrink-0">
-                                            <link.icon size={22} className={cn(
-                                                "transition-colors",
-                                                isActive ? "text-white" : "text-[#000000] group-hover:text-[#000000]"
-                                            )} />
-                                            {/* Collapsed: small red dot on the icon corner with a ping ring */}
-                                            {isCollapsed && badge > 0 && (
-                                                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                                                    <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping" />
-                                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500 border border-white" />
-                                                </span>
-                                            )}
-                                        </span>
-                                        {!isCollapsed && (
-                                            <>
-                                                <span className="font-semibold whitespace-nowrap flex-1">{link.name}</span>
-                                                {/* Expanded: numeric pill on the right with a soft ping ring */}
-                                                {badge > 0 && (
-                                                    <span className="relative inline-flex items-center justify-center">
-                                                        <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60 animate-ping" />
-                                                        <span className={cn(
-                                                            "relative inline-flex min-w-[22px] h-[22px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold border",
-                                                            isActive ? "bg-white text-red-600 border-white" : "bg-red-500 text-white border-white"
-                                                        )}>
-                                                            {badgeLabel}
-                                                        </span>
+                            {visibleGroups.map((group) => (
+                                <div key={group.label} className="mb-4">
+                                    {!isCollapsed && (
+                                        <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-[#AEAEAE]">{group.label}</p>
+                                    )}
+                                    <div className="space-y-1">
+                                        {group.links.map((link) => {
+                                            const isActive = pathname === link.href;
+                                            const badge = link.name === 'Approvals' ? pendingApprovals : 0;
+                                            const badgeLabel = badge > 99 ? '99+' : String(badge);
+                                            return (
+                                                <Link
+                                                    key={link.name}
+                                                    href={link.href}
+                                                    title={isCollapsed ? (badge > 0 ? `${link.name} (${badgeLabel} pending)` : link.name) : ''}
+                                                    className={cn(
+                                                        'relative flex items-center rounded-[10px] transition-all group text-[14px] overflow-hidden leading-none',
+                                                        isCollapsed ? 'justify-center h-[48px] px-0' : 'gap-3.5 px-5 py-3.5',
+                                                        isActive
+                                                            ? 'bg-[#299E60] text-white shadow-md shadow-[#299E60]/20'
+                                                            : 'text-[#191919] hover:bg-[#F8F9FB]',
+                                                    )}
+                                                >
+                                                    <span className="relative shrink-0">
+                                                        <link.icon size={22} className={cn(
+                                                            'transition-colors',
+                                                            isActive ? 'text-white' : 'text-[#000000] group-hover:text-[#000000]',
+                                                        )} />
+                                                        {isCollapsed && badge > 0 && (
+                                                            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                                                                <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping" />
+                                                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500 border border-white" />
+                                                            </span>
+                                                        )}
                                                     </span>
-                                                )}
-                                            </>
-                                        )}
-                                    </Link>
-                                );
-                            })}
+                                                    {!isCollapsed && (
+                                                        <>
+                                                            <span className="font-semibold whitespace-nowrap flex-1">{link.name}</span>
+                                                            {badge > 0 && (
+                                                                <span className="relative inline-flex items-center justify-center">
+                                                                    <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60 animate-ping" />
+                                                                    <span className={cn(
+                                                                        'relative inline-flex min-w-[22px] h-[22px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold border',
+                                                                        isActive ? 'bg-white text-red-600 border-white' : 'bg-red-500 text-white border-white',
+                                                                    )}>
+                                                                        {badgeLabel}
+                                                                    </span>
+                                                                </span>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
                         </nav>
 
                         {/* View Storefront */}

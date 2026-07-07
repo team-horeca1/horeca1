@@ -10,6 +10,7 @@ import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { Errors } from '@/middleware/errorHandler';
+import { resolvePlatformFeePct } from '@/modules/vendor/vendorSettlement.service';
 
 const adjustmentSchema = z.object({
   amount: z.number().positive(),
@@ -93,6 +94,22 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     });
     const pendingPayout = Number(recentCredits._sum.amount ?? 0);
 
+    const [effectivePlatformFeePct, vendorRow, monthFees] = await Promise.all([
+      resolvePlatformFeePct(vendorId),
+      prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: { platformFeePct: true },
+      }),
+      prisma.order.aggregate({
+        _sum: { settlementPlatformFee: true, settlementGrossAmount: true },
+        where: {
+          vendorId,
+          status: 'delivered',
+          deliveredAt: { gte: new Date(now.getFullYear(), now.getMonth(), 1) },
+        },
+      }),
+    ]);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -101,7 +118,21 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
           pendingAmount: wallet.pendingAmount,
           nextSettlementDate: nextSettlement.toISOString().split('T')[0],
         },
-        transactions: items,
+        feeInfo: {
+          effectivePlatformFeePct,
+          isCustomRate: vendorRow?.platformFeePct != null,
+          monthGross: Number(monthFees._sum.settlementGrossAmount ?? 0),
+          monthPlatformFees: Number(monthFees._sum.settlementPlatformFee ?? 0),
+        },
+        transactions: items.map((t) => ({
+          ...t,
+          grossAmount: t.grossAmount != null ? Number(t.grossAmount) : null,
+          platformFee: t.platformFee != null ? Number(t.platformFee) : null,
+          gatewayFee: t.gatewayFee != null ? Number(t.gatewayFee) : null,
+          netAmount: t.netAmount != null ? Number(t.netAmount) : null,
+          amount: Number(t.amount),
+          balanceAfter: Number(t.balanceAfter),
+        })),
         nextCursor,
         payouts,
         pendingPayout,

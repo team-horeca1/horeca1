@@ -11,7 +11,6 @@ import {
     Clock,
     CreditCard,
     Building2,
-    Calendar,
     Download,
     CheckCircle,
     Archive,
@@ -84,22 +83,21 @@ export default function FinancePage() {
     const trendPositive = parseFloat(data?.stats.monthTrend || '0') >= 0;
 
     return (
-        <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500 pb-12 text-[#181725]">
+        <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500 pb-12 text-[#181725] p-[clamp(1rem,2.5vw,2rem)]">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-[28px] font-[900] tracking-tight">Finance Management</h1>
-                    <p className="text-[#7C7C7C] font-medium mt-1">Monitor revenue, platform earnings, and vendor payments</p>
+                    <h1 className="text-[clamp(1.5rem,3vw+0.75rem,1.75rem)] font-[900] tracking-tight">Finance Management</h1>
+                    <p className="text-[#7C7C7C] font-medium mt-1 text-[clamp(12px,1.5vw,14px)]">Monitor revenue, platform earnings, and vendor payments</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button className="h-[44px] px-6 bg-white border border-[#EEEEEE] rounded-[12px] text-[14px] font-bold hover:bg-gray-50 transition-all flex items-center gap-2">
-                        <Calendar size={18} />
-                        Select Date
-                    </button>
-                    <button className="h-[44px] px-6 bg-[#299E60] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#238a54] transition-all flex items-center gap-2 shadow-sm shadow-[#299E60]/20">
+                    <Link
+                        href="/admin/ledger"
+                        className="h-[44px] px-6 bg-[#299E60] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#238a54] transition-all flex items-center gap-2 shadow-sm shadow-[#299E60]/20"
+                    >
                         <Download size={18} />
-                        Export Ledger
-                    </button>
+                        Open Platform Ledger
+                    </Link>
                 </div>
             </div>
 
@@ -131,9 +129,9 @@ export default function FinancePage() {
                         bgColor: '#EFF6FF',
                     },
                     {
-                        label: 'Platform Commission (5%)',
+                        label: 'Platform Fees Collected',
                         value: formatINR(data?.stats.commission || 0),
-                        trend: 'on total revenue',
+                        trend: 'from delivered orders',
                         isPositive: true,
                         icon: Coins,
                         color: '#F59E0B',
@@ -166,6 +164,12 @@ export default function FinancePage() {
                     </div>
                 ))}
             </div>
+
+            {(data?.stats.totalRevenue ?? 0) > 0 && (data?.stats.commission ?? 0) === 0 && (
+                <p className="text-[12px] text-[#7C7C7C] bg-[#FFF7E6] border border-amber-100 rounded-[12px] px-4 py-3">
+                    Platform fees appear after COD/prepaid orders are delivered and settlement snapshots are written — credit orders do not accrue vendor wallet credits.
+                </p>
+            )}
 
             {/* Revenue Chart */}
             <div className="bg-white p-8 rounded-[32px] border border-[#EEEEEE] shadow-sm">
@@ -416,11 +420,14 @@ function VendorSettlementsPanel() {
 
     return (
         <div className="bg-white rounded-[24px] border border-[#EEEEEE] shadow-sm overflow-hidden mt-8">
-            <div className="px-8 py-6 border-b border-[#EEEEEE] flex items-center justify-between">
+            <div className="px-8 py-6 border-b border-[#EEEEEE] flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h2 className="text-[20px] font-[900] text-[#181725]">Vendor Settlement Batches</h2>
-                    <p className="text-[13px] text-[#7C7C7C] mt-1">Pending payouts to vendor bank accounts</p>
+                    <h2 className="text-[clamp(1rem,2vw+0.5rem,1.25rem)] font-[900] text-[#181725]">Bank payout batches</h2>
+                    <p className="text-[13px] text-[#7C7C7C] mt-1">Pending UTR transfers to vendor bank accounts</p>
                 </div>
+                <Link href="/admin/ledger" className="text-[12px] font-bold text-[#299E60] hover:underline">
+                    View all in Platform Ledger →
+                </Link>
             </div>
             {loading ? (
                 <div className="p-12 flex justify-center"><Loader2 className="animate-spin text-[#299E60]" /></div>

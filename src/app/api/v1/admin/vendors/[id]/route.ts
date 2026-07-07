@@ -140,6 +140,17 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     if (body.freeDeliveryAbove !== undefined) {
       allowedFields.freeDeliveryAbove = body.freeDeliveryAbove !== null ? Number(body.freeDeliveryAbove) : null;
     }
+    if (body.platformFeePct !== undefined) {
+      if (body.platformFeePct === null || body.platformFeePct === '') {
+        allowedFields.platformFeePct = null;
+      } else {
+        const pct = Number(body.platformFeePct);
+        if (!Number.isFinite(pct) || pct < 5 || pct > 25) {
+          throw Errors.badRequest('Platform fee must be between 5% and 25%');
+        }
+        allowedFields.platformFeePct = pct;
+      }
+    }
 
     const userUpdate: Record<string, string> = {};
     if (body.fullName !== undefined) userUpdate.fullName = body.fullName;

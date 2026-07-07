@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Home, Package, Store, Clock, CheckCircle2, XCircle, Truck, CreditCard, Star, Loader2, X, ShoppingCart, FileDown, ClipboardList } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, Package, Store, Clock, CheckCircle2, XCircle, Truck, CreditCard, Star, Loader2, X, ShoppingCart, FileDown, ClipboardList, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useCart } from '@/context/CartContext';
@@ -10,6 +10,13 @@ import { toast } from 'sonner';
 import { dal } from '@/lib/dal';
 import type { VendorProduct } from '@/types';
 import { cn } from '@/lib/utils';
+import {
+    StatusTimeline,
+    ORDER_STATUS_STEPS,
+    orderTimelineCurrentKey,
+    RETURN_TIMELINE_STEPS,
+    returnTimelineCurrentKey,
+} from '@/components/features/finance/StatusTimeline';
 
 interface ApiOrderItem {
     id: string;
@@ -55,7 +62,9 @@ const STATUS_CONFIG: Record<string, { label: string; textColor: string; bgColor:
     confirmed:  { label: 'Confirmed',            textColor: 'text-blue-700',   bgColor: 'bg-blue-50',    borderColor: 'border-blue-200',  icon: <CheckCircle2 size={14} /> },
     processing: { label: 'Being Processed',       textColor: 'text-purple-700', bgColor: 'bg-purple-50',  borderColor: 'border-purple-200',icon: <Loader2 size={14} /> },
     shipped:    { label: 'Out for Delivery',      textColor: 'text-indigo-700', bgColor: 'bg-indigo-50',  borderColor: 'border-indigo-200',icon: <Truck size={14} /> },
+    out_for_delivery: { label: 'Out for Delivery', textColor: 'text-indigo-700', bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200', icon: <Truck size={14} /> },
     delivered:  { label: 'Delivered',             textColor: 'text-green-700',  bgColor: 'bg-green-50',   borderColor: 'border-green-200', icon: <CheckCircle2 size={14} /> },
+    returned:   { label: 'Returned',              textColor: 'text-orange-700', bgColor: 'bg-orange-50',  borderColor: 'border-orange-200', icon: <RotateCcw size={14} /> },
     cancelled:  { label: 'Cancelled',             textColor: 'text-red-700',    bgColor: 'bg-red-50',     borderColor: 'border-red-200',   icon: <XCircle size={14} /> },
 };
 
@@ -272,6 +281,17 @@ export default function OrderDetailPage() {
                                 <p className="text-[12px] text-gray-400 mt-0.5">{fmtDate(order.createdAt)} · {fmtTime(order.createdAt)}</p>
                             </div>
                         </div>
+
+                        {/* Order progress */}
+                        {order.status !== 'cancelled' && (
+                            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                                <h2 className="text-[14px] font-black text-[#181725] mb-4">Order progress</h2>
+                                <StatusTimeline
+                                    steps={ORDER_STATUS_STEPS}
+                                    currentKey={orderTimelineCurrentKey(order.status)}
+                                />
+                            </div>
+                        )}
 
                         {/* Items */}
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -495,8 +515,12 @@ export default function OrderDetailPage() {
                                 </button>
                             )}
                             {returnRequest && (
-                                <div className="w-full py-3 text-center text-[13px] font-bold text-amber-600 bg-amber-50 rounded-2xl">
-                                    Return requested · {returnRequest.status}
+                                <div className="space-y-3 p-4 border-2 border-amber-100 bg-amber-50/40 rounded-2xl">
+                                    <p className="text-[13px] font-bold text-[#181725]">Return request</p>
+                                    <StatusTimeline
+                                        steps={RETURN_TIMELINE_STEPS}
+                                        currentKey={returnTimelineCurrentKey(returnRequest.status)}
+                                    />
                                 </div>
                             )}
                             {showReturnForm && (

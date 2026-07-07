@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { Settings, Bell, Building2, User, Save, Check, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PlatformFeeCalculator } from '@/components/features/vendor/finance/EarningsBreakdown';
 
 export default function SettingsPage() {
     const { data: session } = useSession();
@@ -14,7 +15,7 @@ export default function SettingsPage() {
     const [supportPhone, setSupportPhone] = useState('+91 98765 43210');
 
     // Business Settings
-    const [commissionRate, setCommissionRate] = useState('10');
+    const [platformFeePct, setPlatformFeePct] = useState('10');
     const [minOrderValue, setMinOrderValue] = useState('500');
     const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState('2000');
 
@@ -41,7 +42,7 @@ export default function SettingsPage() {
                 setPlatformName(d.platformName ?? '');
                 setContactEmail(d.contactEmail ?? '');
                 setSupportPhone(d.supportPhone ?? '');
-                setCommissionRate(String(d.defaultCommissionPct ?? ''));
+                setPlatformFeePct(String(d.defaultCommissionPct ?? ''));
                 setMinOrderValue(String(d.minOrderValue ?? ''));
                 setFreeDeliveryThreshold(String(d.freeDeliveryThreshold ?? ''));
                 setEmailNotifications(!!d.emailNotifications);
@@ -72,7 +73,7 @@ export default function SettingsPage() {
     const handleSaveBusiness = () =>
         patchSettings(
             {
-                defaultCommissionPct: Number(commissionRate) || 0,
+                defaultCommissionPct: Number(platformFeePct) || 0,
                 minOrderValue: Number(minOrderValue) || 0,
                 freeDeliveryThreshold: Number(freeDeliveryThreshold) || 0,
             },
@@ -151,21 +152,26 @@ export default function SettingsPage() {
                     </div>
                     <div>
                         <h2 className="text-[18px] font-bold text-[#181725]">Business Settings</h2>
-                        <p className="text-[12px] text-[#7C7C7C] font-medium">Order and commission configuration</p>
+                        <p className="text-[12px] text-[#7C7C7C] font-medium">Platform fee and order thresholds</p>
                     </div>
                 </div>
 
                 <div className="px-8 py-6 space-y-5">
                     <div>
-                        <label className="block text-[13px] font-bold text-[#4B4B4B] mb-1.5">Default Commission Rate (%)</label>
+                        <label className="block text-[13px] font-bold text-[#4B4B4B] mb-1.5">Default Platform Fee (%)</label>
                         <input
                             type="number"
                             min="0"
-                            max="100"
-                            value={commissionRate}
-                            onChange={(e) => setCommissionRate(e.target.value)}
+                            max="25"
+                            step="0.5"
+                            value={platformFeePct}
+                            onChange={(e) => setPlatformFeePct(e.target.value)}
                             className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#299E60]/40 focus:bg-white transition-all"
                         />
+                        <p className="text-[11px] text-[#AEAEAE] mt-1.5">
+                            Deducted from vendor earnings on each delivered order. Override per vendor on their detail page.
+                        </p>
+                        <PlatformFeeCalculator pct={Number(platformFeePct) || 10} />
                     </div>
                     <div>
                         <label className="block text-[13px] font-bold text-[#4B4B4B] mb-1.5">Minimum Order Value (&#8377;)</label>

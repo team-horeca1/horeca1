@@ -18,6 +18,7 @@ const patchSchema = z.object({
   priceListId: z.string().uuid().nullable().optional(),
   territory: z.string().max(100).nullable().optional(),
   salesExecutive: z.string().max(100).optional().nullable(),
+  salespersonId: z.string().uuid().nullable().optional(),
   deliveryRoute: z.string().max(100).optional().nullable(),
   tags: z.array(z.string()).optional(),
   notes: z.string().max(2000).nullable().optional(),
@@ -41,6 +42,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         ...(body.priceListId !== undefined && { priceListId: body.priceListId }),
         ...(body.territory !== undefined && { territory: body.territory }),
         ...(body.salesExecutive !== undefined && { salesExecutive: body.salesExecutive }),
+        ...(body.salespersonId !== undefined && { salespersonId: body.salespersonId }),
         ...(body.deliveryRoute !== undefined && { deliveryRoute: body.deliveryRoute }),
         ...(body.tags !== undefined && { tags: body.tags }),
         ...(body.notes !== undefined && { notes: body.notes }),
@@ -50,6 +52,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
       include: {
         user: { select: { id: true, fullName: true, businessName: true, email: true } },
         priceList: { select: { id: true, name: true } },
+        salesperson: { select: { id: true, name: true, code: true } },
       },
     });
 

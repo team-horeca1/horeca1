@@ -48,7 +48,8 @@ export default function CustomersPage() {
     const [showFilters, setShowFilters] = useState(false);
     const [filterRole, setFilterRole] = useState('customer'); // Default to customer
     const [filterPincode, setFilterPincode] = useState('');
-    const [filterSalesRep, setFilterSalesRep] = useState('');
+    const [filterSalespersonId, setFilterSalespersonId] = useState('');
+    const [salespersons, setSalespersons] = useState<Array<{ id: string; name: string; code: string | null; vendor: { businessName: string } }>>([]);
     const [filterCreditStatus, setFilterCreditStatus] = useState('');
     const [filterArea, setFilterArea] = useState('');
     const [filterTag, setFilterTag] = useState('');
@@ -69,7 +70,7 @@ export default function CustomersPage() {
         if (searchQuery.trim()) url.searchParams.set('search', searchQuery.trim());
         if (filterRole !== 'all') url.searchParams.set('role', filterRole);
         if (filterPincode.trim()) url.searchParams.set('pincode', filterPincode.trim());
-        if (filterSalesRep.trim()) url.searchParams.set('salesExecutive', filterSalesRep.trim());
+        if (filterSalespersonId) url.searchParams.set('salespersonId', filterSalespersonId);
         if (filterCreditStatus) url.searchParams.set('creditStatus', filterCreditStatus);
         if (filterArea.trim()) url.searchParams.set('area', filterArea.trim());
         if (filterTag.trim()) url.searchParams.set('tag', filterTag.trim());
@@ -99,7 +100,14 @@ export default function CustomersPage() {
                 toast.error('Network error loading users');
             })
             .finally(() => { setLoading(false); setInitialLoad(false); });
-    }, [searchQuery, filterRole, filterPincode, filterSalesRep, filterCreditStatus, filterArea, filterTag]);
+    }, [searchQuery, filterRole, filterPincode, filterSalespersonId, filterCreditStatus, filterArea, filterTag]);
+
+    useEffect(() => {
+        fetch('/api/v1/admin/salespersons')
+            .then((r) => r.json())
+            .then((json) => { if (json.success) setSalespersons(json.data ?? []); })
+            .catch(() => {});
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -379,14 +387,19 @@ export default function CustomersPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Sales Executive</label>
-                            <input
-                                type="text"
-                                placeholder="Name"
-                                value={filterSalesRep}
-                                onChange={(e) => setFilterSalesRep(e.target.value)}
+                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Salesperson</label>
+                            <select
+                                value={filterSalespersonId}
+                                onChange={(e) => setFilterSalespersonId(e.target.value)}
                                 className="h-[38px] w-full bg-white border border-[#DCDCDC] rounded-[8px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/40"
-                            />
+                            >
+                                <option value="">All salespersons</option>
+                                {salespersons.map((sp) => (
+                                    <option key={sp.id} value={sp.id}>
+                                        {sp.name}{sp.code ? ` (${sp.code})` : ''} — {sp.vendor.businessName}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Credit Status</label>

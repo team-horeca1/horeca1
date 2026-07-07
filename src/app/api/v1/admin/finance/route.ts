@@ -20,6 +20,8 @@ export const GET = adminOnly(async (_req: NextRequest, _ctx) => {
       thisMonthRevenue,
       monthlyData,
       recentPayments,
+      platformFeeAgg,
+      orderFeeAgg,
     ] = await Promise.all([
       // Total revenue from all confirmed/delivered orders
       prisma.order.aggregate({
@@ -70,13 +72,24 @@ export const GET = adminOnly(async (_req: NextRequest, _ctx) => {
           vendor: { select: { id: true, businessName: true } },
         },
       }),
+
+      prisma.vendorSettlement.aggregate({
+        _sum: { platformFee: true },
+      }),
+
+      prisma.order.aggregate({
+        _sum: { settlementPlatformFee: true },
+        where: { settlementPlatformFee: { not: null } },
+      }),
     ]);
 
     const total = Number(totalRevenue._sum?.totalAmount ?? 0);
     const thisMonth = Number(thisMonthRevenue._sum?.totalAmount ?? 0);
     const lastMonth = Number(lastMonthRevenue._sum?.totalAmount ?? 0);
     const monthTrend = lastMonth > 0 ? ((thisMonth - lastMonth) / lastMonth) * 100 : 0;
-    const commission = total * 0.05; // 5% platform commission
+    const commissionFromSettlements = Number(platformFeeAgg._sum.platformFee ?? 0);
+    const commissionFromOrders = Number(orderFeeAgg._sum.settlementPlatformFee ?? 0);
+    const commission = commissionFromOrders > 0 ? commissionFromOrders : commissionFromSettlements;
 
     return NextResponse.json({
       success: true,

@@ -1,4 +1,4 @@
-// PATCH /api/v1/vendor/claims/:id — approve/reject vendor claim
+// PATCH /api/v1/vendor/claims/:id — Vendors cannot self-approve; notes only while pending
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
@@ -12,7 +12,6 @@ function extractId(req: NextRequest): string {
 }
 
 const patchSchema = z.object({
-  status: z.enum(['approved', 'rejected', 'resolved']),
   notes: z.string().max(2000).optional(),
 });
 
@@ -25,13 +24,13 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
 
     const claim = await prisma.vendorClaim.findFirst({ where: { id, vendorId } });
     if (!claim) throw Errors.notFound('Claim');
+    if (claim.status !== 'pending') {
+      throw Errors.badRequest('Only pending claims can be updated. Platform reviews all disputes.');
+    }
 
     const updated = await prisma.vendorClaim.update({
       where: { id },
-      data: {
-        status: body.status,
-        notes: body.notes ?? claim.notes,
-      },
+      data: { notes: body.notes ?? claim.notes },
     });
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {

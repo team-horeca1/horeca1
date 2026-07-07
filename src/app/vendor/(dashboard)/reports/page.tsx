@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 
 type Period = '7d' | '30d' | '90d' | '6m';
 
-interface RevenuePoint { key: string; label: string; revenue: number; orders: number }
+interface RevenuePoint { key: string; label: string; revenue: number; orders: number; platformFees: number }
 interface TopProduct { productId: string; name: string; qty: number; revenue: number }
 interface TopCustomer { userId: string; fullName: string; businessName?: string | null; orderCount: number; totalSpend: number }
 interface DeadStockItem { productId: string; name: string; qty: number }
@@ -27,7 +27,7 @@ interface SalesByGroup { name: string; revenue: number; units: number }
 
 interface ReportsData {
     period: string;
-    totals: { revenue: number; orders: number };
+    totals: { revenue: number; orders: number; platformFees: number };
     revenueByPeriod: RevenuePoint[];
     topProducts: TopProduct[];
     statusBreakdown: Record<string, number>;
@@ -71,16 +71,63 @@ const PERIOD_LABELS: Record<Period, string> = {
 
 // Client-side CSV export from topProducts data
 function downloadCsv(data: ReportsData) {
+    const periodLabel = PERIOD_LABELS[data.period as Period] ?? data.period;
     const rows = [
+        [`HoReCa1 Vendor Report — ${periodLabel}`],
+        [],
+        ['Summary'],
+        ['Metric', 'Value'],
+        ['Revenue (₹)', String(data.totals.revenue)],
+        ['Orders', String(data.totals.orders)],
+        ['Platform fees (₹)', String(data.totals.platformFees ?? 0)],
+        [],
+        ['Top Products'],
         ['Product', 'Units Sold', 'Revenue (₹)'],
         ...data.topProducts.map(p => [p.name, String(p.qty), String(p.revenue)]),
         [],
         ['Status Breakdown'],
+        ['Status', 'Count'],
         ...Object.entries(data.statusBreakdown).map(([s, c]) => [s, String(c)]),
         [],
         ['Top Customers'],
         ['Customer', 'Business', 'Orders', 'Spend (₹)'],
         ...data.customerAnalytics.topCustomers.map(c => [c.fullName, c.businessName ?? '', String(c.orderCount), String(c.totalSpend)]),
+        [],
+        ['Credit Aging'],
+        ['Bucket', 'Outstanding (₹)'],
+        ...Object.entries(data.creditAnalytics.aging).map(([k, v]) => [k, String(v)]),
+        ['Total outstanding', String(data.creditAnalytics.totalOutstanding)],
+        ['Collection efficiency (%)', String(data.creditAnalytics.collectionEfficiency)],
+        [],
+        ['Credit risk customers'],
+        ['Name', 'Business', 'Credit used (₹)', 'Days overdue'],
+        ...data.creditAnalytics.riskCustomers.map(r => [r.name, r.businessName ?? '', String(r.creditUsed), String(r.daysOverdue)]),
+        [],
+        ['Inventory'],
+        ['Fill rate (%)', String(data.inventoryAnalytics.fillRate)],
+        ['Low stock SKUs', String(data.inventoryAnalytics.lowStockCount)],
+        ['Out of stock SKUs', String(data.inventoryAnalytics.outOfStockCount)],
+        ['Total SKUs', String(data.inventoryAnalytics.totalSkus)],
+        [],
+        ['Dead stock'],
+        ['Product', 'Qty on hand'],
+        ...data.inventoryAnalytics.deadStock.map(d => [d.name, String(d.qty)]),
+        [],
+        ['Slow movers (no sales in period)'],
+        ['Product', 'SKU', 'Stock', 'Base price (₹)'],
+        ...data.slowMovers.map(s => [s.name, s.sku ?? '', String(s.stock), String(s.basePrice)]),
+        [],
+        ['Category sales'],
+        ['Category', 'Revenue (₹)', 'Units'],
+        ...data.categorySales.map(c => [c.name, String(c.revenue), String(c.units)]),
+        [],
+        ['Brand sales'],
+        ['Brand', 'Revenue (₹)', 'Units'],
+        ...data.brandSales.map(b => [b.name, String(b.revenue), String(b.units)]),
+        [],
+        ['Revenue by period'],
+        ['Period', 'Revenue (₹)', 'Orders', 'Platform fees (₹)'],
+        ...data.revenueByPeriod.map(r => [r.label, String(r.revenue), String(r.orders), String(r.platformFees ?? 0)]),
     ];
     const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -118,7 +165,7 @@ export default function VendorReportsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-[24px] font-bold text-[#181725]">Reports</h1>
-                    <p className="text-[12px] text-[#AEAEAE]">Sales, customer, and inventory analytics</p>
+                    <p className="text-[12px] text-[#AEAEAE]">Sales, fees, and inventory for {PERIOD_LABELS[period]}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {/* Period tabs */}
@@ -166,11 +213,12 @@ export default function VendorReportsPage() {
             ) : (
                 <div className={cn('space-y-5 transition-opacity', loading && 'opacity-50 pointer-events-none')}>
                     {/* ─── Summary cards ─── */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                         {[
-                            { label: 'Total Revenue', value: fmt(data.totals.revenue), icon: IndianRupee, color: '#299E60' },
-                            { label: 'Total Orders', value: String(data.totals.orders), icon: ShoppingBag, color: '#3B82F6' },
-                            { label: 'Delivered', value: String(data.statusBreakdown['delivered'] ?? 0), icon: TrendingUp, color: '#10B981' },
+                            { label: `Revenue (${PERIOD_LABELS[period]})`, value: fmt(data.totals.revenue), icon: IndianRupee, color: '#299E60' },
+                            { label: 'Orders', value: String(data.totals.orders), icon: ShoppingBag, color: '#3B82F6' },
+                            { label: 'Platform fees', value: fmt(data.totals.platformFees ?? 0), icon: TrendingUp, color: '#F59E0B' },
+                            { label: 'Delivered', value: String(data.statusBreakdown['delivered'] ?? 0), icon: Package, color: '#10B981' },
                             { label: 'Cancelled', value: String(data.statusBreakdown['cancelled'] ?? 0), icon: Package, color: '#EF4444' },
                         ].map((s, i) => (
                             <div key={i} className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm p-5">
@@ -188,7 +236,7 @@ export default function VendorReportsPage() {
 
                     {/* ─── Revenue chart ─── */}
                     <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm p-6">
-                        <h2 className="text-[15px] font-bold text-[#181725] mb-5">Revenue Trend</h2>
+                        <h2 className="text-[15px] font-bold text-[#181725] mb-5">Revenue Trend ({PERIOD_LABELS[period]})</h2>
                         {data.revenueByPeriod.length === 0 ? (
                             <p className="text-[13px] text-[#AEAEAE] text-center py-12">No data for this period</p>
                         ) : (
@@ -209,6 +257,27 @@ export default function VendorReportsPage() {
                                     <Area type="monotone" dataKey="revenue" stroke="#299E60" strokeWidth={2.5}
                                         fill="url(#revGrad)" dot={{ fill: '#299E60', r: 3 }} activeDot={{ r: 5 }} />
                                 </AreaChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+
+                    {/* ─── Platform fees chart ─── */}
+                    <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm p-6">
+                        <h2 className="text-[15px] font-bold text-[#181725] mb-1">Platform Fees Paid</h2>
+                        <p className="text-[11px] text-[#AEAEAE] mb-5">Fees deducted from delivered orders in this period</p>
+                        {data.revenueByPeriod.length === 0 ? (
+                            <p className="text-[13px] text-[#AEAEAE] text-center py-12">No fee data for this period</p>
+                        ) : (
+                            <ResponsiveContainer width="100%" height={200}>
+                                <BarChart data={data.revenueByPeriod} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F5" vertical={false} />
+                                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#AEAEAE' }} axisLine={false} tickLine={false} />
+                                    <YAxis tick={{ fontSize: 11, fill: '#AEAEAE' }} axisLine={false} tickLine={false}
+                                        tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
+                                    <Tooltip formatter={(v) => [fmt(Number(v ?? 0)), 'Platform fees']}
+                                        contentStyle={{ borderRadius: 10, border: '1px solid #EEEEEE', fontSize: 12 }} />
+                                    <Bar dataKey="platformFees" fill="#F59E0B" radius={[5, 5, 0, 0]} maxBarSize={36} />
+                                </BarChart>
                             </ResponsiveContainer>
                         )}
                     </div>

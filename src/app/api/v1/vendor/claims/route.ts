@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
-import { errorResponse } from '@/middleware/errorHandler';
+import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 
@@ -40,10 +40,25 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
 
     const order = await prisma.order.findFirst({
       where: { id: body.orderId, vendorId },
-      select: { id: true },
+      select: { id: true, status: true },
     });
-    if (!order) {
-      return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
+    if (!order) throw Errors.notFound('Order');
+    if (!['delivered', 'partially_delivered'].includes(order.status)) {
+      throw Errors.badRequest('Claims can only be filed for delivered orders');
+    }
+
+    const existingPending = await prisma.vendorClaim.findFirst({
+      where: { vendorId, orderId: body.orderId, status: 'pending' },
+    });
+    if (existingPending) {
+      throw Errors.badRequest('A pending claim already exists for this order');
+    }
+
+    const duplicateType = await prisma.vendorClaim.findFirst({
+      where: { vendorId, orderId: body.orderId, type: body.type, status: { not: 'rejected' } },
+    });
+    if (duplicateType) {
+      throw Errors.badRequest(`A ${body.type} claim already exists for this order`);
     }
 
     const claim = await prisma.vendorClaim.create({

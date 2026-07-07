@@ -127,6 +127,7 @@ npx tsc --noEmit               # Type check (always run before commit)
 npx prisma migrate dev         # Apply migrations locally
 npx prisma studio              # DB browser
 npm run worker:notifications   # Run notification worker locally
+npx tsx prisma/scripts/seed-finance-demo.ts   # Finance demo orders/settlements (after db seed)
 ```
 
 **Deploy (prod):**

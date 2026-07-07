@@ -15,6 +15,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EarningsBreakdown } from '@/components/features/vendor/finance/EarningsBreakdown';
 
 interface BankSettings {
   bankName: string | null;
@@ -37,6 +38,17 @@ interface WalletTxn {
   referenceId: string | null;
   notes: string | null;
   createdAt: string;
+  grossAmount?: number | null;
+  platformFee?: number | null;
+  gatewayFee?: number | null;
+  netAmount?: number | null;
+}
+
+interface FeeInfo {
+  effectivePlatformFeePct: number;
+  isCustomRate: boolean;
+  monthGross: number;
+  monthPlatformFees: number;
 }
 
 interface Payout {
@@ -115,6 +127,8 @@ export default function VendorWalletPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [bankSettings, setBankSettings] = useState<BankSettings | null>(null);
+  const [feeInfo, setFeeInfo] = useState<FeeInfo | null>(null);
+  const [expandedTxnId, setExpandedTxnId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadBankSettings = async () => {
@@ -150,6 +164,7 @@ export default function VendorWalletPage() {
           nextCursor: string | null;
           payouts: Payout[];
           pendingPayout: number;
+          feeInfo?: FeeInfo;
         };
       };
       if (json.success) {
@@ -158,6 +173,7 @@ export default function VendorWalletPage() {
           setTxns(json.data.transactions);
           setPayouts(json.data.payouts);
           setPendingPayout(json.data.pendingPayout);
+          setFeeInfo(json.data.feeInfo ?? null);
         } else {
           setTxns((prev) => [...prev, ...json.data.transactions]);
         }
@@ -231,6 +247,35 @@ export default function VendorWalletPage() {
           <p className="text-[11px] text-[#AEAEAE] mt-0.5">Delivered orders credited within 2 days</p>
         </div>
       </div>
+
+      {feeInfo && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <EarningsBreakdown
+            gross={100000}
+            platformFee={Math.round(100000 * (feeInfo.effectivePlatformFeePct / 100))}
+            platformFeePct={feeInfo.effectivePlatformFeePct}
+            net={100000 - Math.round(100000 * (feeInfo.effectivePlatformFeePct / 100))}
+            isCustomRate={feeInfo.isCustomRate}
+          />
+          <div className="bg-white rounded-[14px] border border-[#EEEEEE] p-5">
+            <p className="text-[13px] font-bold text-[#181725] mb-3">This month</p>
+            <div className="space-y-2 text-[13px]">
+              <div className="flex justify-between">
+                <span className="text-[#7C7C7C]">Gross sales credited</span>
+                <span className="font-semibold">₹{feeInfo.monthGross.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#7C7C7C]">Platform fees</span>
+                <span className="font-semibold text-[#E74C3C]">−₹{feeInfo.monthPlatformFees.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+            <p className="text-[11px] text-[#AEAEAE] mt-3">
+              Your rate: {feeInfo.effectivePlatformFeePct}%
+              {feeInfo.isCustomRate ? ' (custom for your store)' : ' (platform default)'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Pending Payout Banner */}
       {!loading && pendingPayout > 0 && (
@@ -341,29 +386,59 @@ export default function VendorWalletPage() {
             <div className="divide-y divide-[#F5F5F5]">
               {txns.map((txn) => {
                 const isCredit = txn.type === 'order_credit' || txn.type === 'adjustment';
+                const hasBreakdown = txn.type === 'order_credit' && txn.grossAmount != null && txn.grossAmount > 0;
+                const isExpanded = expandedTxnId === txn.id;
                 return (
-                  <div key={txn.id} className="flex items-center gap-4 px-5 py-4 hover:bg-[#FAFAFA] transition-colors">
-                    <div className={cn(
-                      'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
-                      isCredit ? 'bg-[#EEF8F1]' : 'bg-[#FFF0F0]'
-                    )}>
-                      {isCredit
-                        ? <ArrowDownCircle size={16} className="text-[#299E60]" />
-                        : <ArrowUpCircle size={16} className="text-[#E74C3C]" />
-                      }
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-[#181725]">{txnLabel(txn.type)}</p>
-                      {txn.notes && (
-                        <p className="text-[11px] text-[#AEAEAE] truncate">{txn.notes}</p>
+                  <div key={txn.id}>
+                    <button
+                      type="button"
+                      onClick={() => hasBreakdown && setExpandedTxnId(isExpanded ? null : txn.id)}
+                      className={cn(
+                        'w-full flex items-center gap-4 px-5 py-4 hover:bg-[#FAFAFA] transition-colors text-left',
+                        hasBreakdown && 'cursor-pointer',
                       )}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={cn('text-[14px] font-bold', txnColor(txn.type))}>
-                        {isCredit ? '+' : '-'}₹{Number(txn.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-[11px] text-[#AEAEAE]">{relativeTime(txn.createdAt)}</p>
-                    </div>
+                    >
+                      <div className={cn(
+                        'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
+                        isCredit ? 'bg-[#EEF8F1]' : 'bg-[#FFF0F0]'
+                      )}>
+                        {isCredit
+                          ? <ArrowDownCircle size={16} className="text-[#299E60]" />
+                          : <ArrowUpCircle size={16} className="text-[#E74C3C]" />
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-[#181725]">{txnLabel(txn.type)}</p>
+                        {txn.notes && (
+                          <p className="text-[11px] text-[#AEAEAE] truncate">{txn.notes}</p>
+                        )}
+                        {hasBreakdown && (
+                          <p className="text-[10px] text-[#299E60] font-semibold mt-0.5">
+                            {isExpanded ? 'Hide breakdown' : 'Tap for fee breakdown'}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={cn('text-[14px] font-bold', txnColor(txn.type))}>
+                          {isCredit ? '+' : '-'}₹{Number(txn.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[11px] text-[#AEAEAE]">{relativeTime(txn.createdAt)}</p>
+                      </div>
+                    </button>
+                    {isExpanded && hasBreakdown && feeInfo && (
+                      <div className="px-5 pb-4">
+                        <EarningsBreakdown
+                          compact
+                          gross={txn.grossAmount!}
+                          platformFee={txn.platformFee ?? 0}
+                          platformFeePct={feeInfo.effectivePlatformFeePct}
+                          gatewayFee={txn.gatewayFee ?? 0}
+                          net={txn.netAmount ?? txn.amount}
+                          isCustomRate={feeInfo.isCustomRate}
+                          className="bg-[#F9FAFB] rounded-[10px] p-3"
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}

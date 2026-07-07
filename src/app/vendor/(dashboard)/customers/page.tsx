@@ -30,6 +30,8 @@ interface VendorCustomer {
   priceListId: string | null;
   territory: string | null;
   salesExecutive: string | null;
+  salespersonId: string | null;
+  salesperson?: { id: string; name: string; code: string | null } | null;
   deliveryRoute: string | null;
   tags: string[];
   notes: string | null;
@@ -312,7 +314,8 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
   const [status, setStatus] = useState(customer.status);
   const [priceListId, setPriceListId] = useState(customer.priceListId ?? '');
   const [territory, setTerritory] = useState(customer.territory ?? '');
-  const [salesExecutive, setSalesExecutive] = useState(customer.salesExecutive ?? '');
+  const [salespersonId, setSalespersonId] = useState(customer.salespersonId ?? '');
+  const [salespersons, setSalespersons] = useState<Array<{ id: string; name: string; code: string | null }>>([]);
   const [deliveryRoute, setDeliveryRoute] = useState(customer.deliveryRoute ?? '');
   const [paymentTerms, setPaymentTerms] = useState(customer.paymentTerms ?? '');
   const [allowedModes, setAllowedModes] = useState<string[]>(customer.allowedPaymentModes ?? ['cod', 'prepaid', 'credit', 'cheque']);
@@ -320,6 +323,13 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
   const [tags, setTags] = useState<string[]>(customer.tags ?? []);
   const [tagInput, setTagInput] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/v1/vendor/salespersons')
+      .then((r) => r.json())
+      .then((json) => { if (json.success) setSalespersons(json.data ?? []); })
+      .catch(() => {});
+  }, []);
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
@@ -346,7 +356,7 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
           status,
           priceListId: priceListId || null,
           territory: territory || null,
-          salesExecutive: salesExecutive || null,
+          salespersonId: salespersonId || null,
           deliveryRoute: deliveryRoute || null,
           paymentTerms: paymentTerms || null,
           allowedPaymentModes: allowedModes,
@@ -428,14 +438,19 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
               />
             </div>
             <div>
-              <label className="block text-[12px] font-semibold text-[#7C7C7C] mb-1">Sales Executive</label>
-              <input
-                type="text"
-                value={salesExecutive}
-                onChange={(e) => setSalesExecutive(e.target.value)}
-                placeholder="e.g. Ravi Sharma"
+              <label className="block text-[12px] font-semibold text-[#7C7C7C] mb-1">Salesperson</label>
+              <select
+                value={salespersonId}
+                onChange={(e) => setSalespersonId(e.target.value)}
                 className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
-              />
+              >
+                <option value="">Unassigned</option>
+                {salespersons.map((sp) => (
+                  <option key={sp.id} value={sp.id}>
+                    {sp.name}{sp.code ? ` (${sp.code})` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-[12px] font-semibold text-[#7C7C7C] mb-1">Delivery Route</label>

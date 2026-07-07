@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId } from '@/lib/resolveVendorId';
+import { requirePermission } from '@/lib/permissions/engine';
 import { totalStockQty } from '@/lib/inventoryHelpers';
 import type { AuthContext } from '@/middleware/auth';
 
@@ -26,40 +27,42 @@ function isoWeek(d: Date) {
 
 export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'analytics.view');
     const vendorId = await resolveVendorId(ctx, req);
     const period = new URL(req.url).searchParams.get('period');
     const { start, buckets } = parsePeriod(period);
 
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const periodDays = period === '7d' ? 7 : period === '90d' ? 90 : period === '30d' ? 30 : 180;
+    const periodAgo = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000);
 
     const [periodOrders, topProducts, orderStatusBreakdown, totals, customerStats, inventoryRows, creditData, slowMovers, brandSalesRaw] =
       await Promise.all([
         // Orders in period (non-cancelled)
         prisma.order.findMany({
           where: { vendorId, createdAt: { gte: start }, status: { notIn: ['cancelled'] } },
-          select: { totalAmount: true, createdAt: true, userId: true },
+          select: { totalAmount: true, createdAt: true, userId: true, settlementPlatformFee: true },
         }),
 
-        // Top 10 products by revenue (all time non-cancelled)
+        // Top 10 products by revenue (in period)
         prisma.orderItem.groupBy({
           by: ['productId'],
-          where: { order: { vendorId, status: { notIn: ['cancelled'] } } },
+          where: { order: { vendorId, createdAt: { gte: start }, status: { notIn: ['cancelled'] } } },
           _sum: { quantity: true, totalPrice: true },
           orderBy: { _sum: { totalPrice: 'desc' } },
           take: 10,
         }),
 
-        // Status breakdown (all time)
+        // Status breakdown (in period)
         prisma.order.groupBy({
           by: ['status'],
-          where: { vendorId },
+          where: { vendorId, createdAt: { gte: start } },
           _count: { id: true },
         }),
 
-        // All-time totals
+        // Period totals + platform fees
         prisma.order.aggregate({
-          where: { vendorId, status: { notIn: ['cancelled'] } },
-          _sum: { totalAmount: true },
+          where: { vendorId, createdAt: { gte: start }, status: { notIn: ['cancelled'] } },
+          _sum: { totalAmount: true, settlementPlatformFee: true },
           _count: { id: true },
         }),
 
@@ -94,22 +97,22 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
             vendorId,
             isActive: true,
             slug: { not: { startsWith: '_deleted_' } },
-            orderItems: { none: { order: { createdAt: { gte: thirtyDaysAgo }, status: { not: 'cancelled' } } } },
+            orderItems: { none: { order: { createdAt: { gte: periodAgo }, status: { not: 'cancelled' } } } },
           },
           select: { id: true, name: true, basePrice: true, sku: true, inventories: { select: { qtyAvailable: true } } },
           take: 10,
           orderBy: { createdAt: 'asc' },
         }),
 
-        // Brand + category sales: fetch order items with product details for last 30 days
+        // Brand + category sales for selected period
         prisma.orderItem.findMany({
-          where: { order: { vendorId, createdAt: { gte: thirtyDaysAgo }, status: { not: 'cancelled' } } },
+          where: { order: { vendorId, createdAt: { gte: start }, status: { not: 'cancelled' } } },
           select: { totalPrice: true, quantity: true, product: { select: { brand: true, category: { select: { name: true } } } } },
         }),
       ]);
 
     // ─── Revenue timeseries ─────────────────────────────────────────────────
-    const bucketMap: Record<string, { revenue: number; orders: number }> = {};
+    const bucketMap: Record<string, { revenue: number; orders: number; platformFees: number }> = {};
     for (const o of periodOrders) {
       let key: string;
       const d = new Date(o.createdAt);
@@ -120,9 +123,10 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       } else {
         key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       }
-      bucketMap[key] = bucketMap[key] ?? { revenue: 0, orders: 0 };
+      bucketMap[key] = bucketMap[key] ?? { revenue: 0, orders: 0, platformFees: 0 };
       bucketMap[key].revenue += Number(o.totalAmount);
       bucketMap[key].orders += 1;
+      bucketMap[key].platformFees += Number(o.settlementPlatformFee ?? 0);
     }
     const revenueByPeriod = Object.entries(bucketMap)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -133,6 +137,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
           : new Date(key + '-01').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
         revenue: Math.round(v.revenue),
         orders: v.orders,
+        platformFees: Math.round(v.platformFees),
       }));
 
     // ─── Top products ────────────────────────────────────────────────────────
@@ -294,6 +299,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         totals: {
           revenue: Math.round(Number(totals._sum.totalAmount ?? 0)),
           orders: totals._count.id,
+          platformFees: Math.round(Number(totals._sum.settlementPlatformFee ?? 0)),
         },
         revenueByPeriod,
         topProducts: topProductsHydrated,

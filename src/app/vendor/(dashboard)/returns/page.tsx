@@ -4,12 +4,17 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, RotateCcw, CheckCircle2, XCircle, Clock, X, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import {
+    StatusTimeline,
+    RETURN_TIMELINE_STEPS,
+    returnTimelineCurrentKey,
+} from '@/components/features/finance/StatusTimeline';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ReturnRequest {
     id: string;
-    status: 'pending' | 'approved' | 'rejected';
+    status: 'pending' | 'approved' | 'rejected' | 'refund_processing' | 'refunded';
     reason: string;
     adminNote: string | null;
     refundAmount: string | null;
@@ -214,18 +219,22 @@ function ReviewModal({
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
-type FilterTab = 'all' | 'pending' | 'approved' | 'rejected';
+type FilterTab = 'all' | 'pending' | 'approved' | 'rejected' | 'refunded';
 
 const STATUS_STYLE: Record<string, string> = {
     pending: 'bg-amber-50 text-amber-600',
     approved: 'bg-[#EEF8F1] text-[#299E60]',
     rejected: 'bg-[#FFF0F0] text-[#E74C3C]',
+    refund_processing: 'bg-blue-50 text-blue-600',
+    refunded: 'bg-[#EEF8F1] text-[#299E60]',
 };
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
     pending: <Clock size={11} />,
     approved: <CheckCircle2 size={11} />,
     rejected: <XCircle size={11} />,
+    refund_processing: <Loader2 size={11} />,
+    refunded: <CheckCircle2 size={11} />,
 };
 
 export default function VendorReturnsPage() {
@@ -233,6 +242,7 @@ export default function VendorReturnsPage() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<FilterTab>('all');
     const [reviewing, setReviewing] = useState<ReturnRequest | null>(null);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
 
     const fetchReturns = useCallback(async () => {
         setLoading(true);
@@ -258,19 +268,24 @@ export default function VendorReturnsPage() {
         { key: 'all', label: 'All' },
         { key: 'pending', label: 'Pending' },
         { key: 'approved', label: 'Approved' },
+        { key: 'refunded', label: 'Refunded' },
         { key: 'rejected', label: 'Rejected' },
     ];
 
     const pendingCount = returns.filter(r => r.status === 'pending').length;
-    const filtered = activeTab === 'all' ? returns : returns.filter(r => r.status === activeTab);
+    const filtered = activeTab === 'all'
+        ? returns
+        : activeTab === 'refunded'
+            ? returns.filter(r => r.status === 'refunded' || r.status === 'refund_processing')
+            : returns.filter(r => r.status === activeTab);
 
     return (
         <div className="space-y-5 pb-10">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-[24px] font-bold text-[#181725]">Returns & Claims</h1>
-                    <p className="text-[12px] text-[#AEAEAE]">Review customer return requests for your orders</p>
+                    <h1 className="text-[24px] font-bold text-[#181725]">Customer Returns</h1>
+                    <p className="text-[12px] text-[#AEAEAE]">Review return requests — refunds are processed by HoReCa1 after your approval</p>
                 </div>
                 {pendingCount > 0 && (
                     <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-[10px] px-4 py-2.5">
@@ -329,7 +344,9 @@ export default function VendorReturnsPage() {
                             </thead>
                             <tbody className="divide-y divide-[#F5F5F5]">
                                 {filtered.map(req => (
-                                    <tr key={req.id} className={cn('hover:bg-[#FAFAFA] transition-colors', req.status === 'pending' && 'bg-amber-50/20')}>
+                                    <React.Fragment key={req.id}>
+                                    <tr className={cn('hover:bg-[#FAFAFA] transition-colors cursor-pointer', req.status === 'pending' && 'bg-amber-50/20')}
+                                        onClick={() => setExpandedId(expandedId === req.id ? null : req.id)}>
                                         <td className="px-5 py-4">
                                             <p className="text-[13px] font-bold text-[#181725]">{req.order.orderNumber}</p>
                                             <p className="text-[11px] text-[#AEAEAE]">₹{Number(req.order.totalAmount).toLocaleString('en-IN')}</p>
@@ -385,16 +402,30 @@ export default function VendorReturnsPage() {
                                         <td className="px-5 py-4 text-center">
                                             {req.status === 'pending' ? (
                                                 <button
-                                                    onClick={() => setReviewing(req)}
+                                                    onClick={(e) => { e.stopPropagation(); setReviewing(req); }}
                                                     className="h-[30px] px-3 rounded-[7px] bg-[#181725] text-white text-[11px] font-bold hover:bg-[#2d2d40] transition-all"
                                                 >
                                                     Review
                                                 </button>
                                             ) : (
-                                                <span className="text-[12px] text-[#AEAEAE]">Done</span>
+                                                <span className="text-[12px] text-[#7C7C7C] font-bold">
+                                                    {expandedId === req.id ? 'Hide' : 'Timeline'}
+                                                </span>
                                             )}
                                         </td>
                                     </tr>
+                                    {expandedId === req.id && (
+                                        <tr className="bg-[#FAFAFA]">
+                                            <td colSpan={7} className="px-5 py-4">
+                                                <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide mb-3">Return progress</p>
+                                                <StatusTimeline
+                                                    steps={RETURN_TIMELINE_STEPS}
+                                                    currentKey={returnTimelineCurrentKey(req.status)}
+                                                />
+                                            </td>
+                                        </tr>
+                                    )}
+                                    </React.Fragment>
                                 ))}
                             </tbody>
                         </table>

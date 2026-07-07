@@ -12,7 +12,7 @@ interface ReturnRequest {
     refundAmount: string | number | null;
     adminNote: string | null;
     createdAt: string;
-    order: { orderNumber: string; totalAmount: string | number; paymentStatus: string };
+    order: { orderNumber: string; totalAmount: string | number; paymentStatus: string; paymentMethod: string | null };
     customer: { fullName: string; email: string; phone: string | null };
 }
 
@@ -20,6 +20,7 @@ const STATUS_STYLE: Record<string, string> = {
     pending:  'bg-amber-50 text-amber-700',
     approved: 'bg-green-50 text-green-700',
     rejected: 'bg-red-50 text-red-700',
+    refund_processing: 'bg-blue-50 text-blue-700',
     refunded: 'bg-blue-50 text-blue-700',
 };
 
@@ -52,31 +53,6 @@ export default function AdminReturnsPage() {
     useEffect(() => { fetchReturns(); }, [fetchReturns]);
 
     const selected = returns.find(r => r.id === selectedId) ?? null;
-
-    const handleAction = async () => {
-        if (!selectedId || !actionForm.status) return;
-        setSaving(true);
-        try {
-            const res = await fetch(`/api/v1/admin/returns/${selectedId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    status: actionForm.status,
-                    adminNote: actionForm.adminNote || undefined,
-                    refundAmount: actionForm.refundAmount ? parseFloat(actionForm.refundAmount) : undefined,
-                }),
-            });
-            const json = await res.json();
-            if (!json.success) throw new Error(json.error?.message || 'Failed');
-            toast.success('Return request updated');
-            setSelectedId(null);
-            await fetchReturns();
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to update');
-        } finally {
-            setSaving(false);
-        }
-    };
 
     const filtered = returns.filter(r =>
         r.customer.fullName.toLowerCase().includes(search.toLowerCase()) ||
@@ -113,6 +89,7 @@ export default function AdminReturnsPage() {
                         <option value="">All statuses</option>
                         <option value="pending">Pending</option>
                         <option value="approved">Approved</option>
+                        <option value="refund_processing">Refund processing</option>
                         <option value="rejected">Rejected</option>
                         <option value="refunded">Refunded</option>
                     </select>
@@ -167,7 +144,13 @@ export default function AdminReturnsPage() {
 
                         <div className="bg-[#F9F9F9] rounded-[10px] p-3 space-y-1">
                             <p className="text-[12px] font-bold text-[#181725]">Order #{selected.order.orderNumber}</p>
-                            <p className="text-[12px] text-[#7C7C7C]">Total: {fmt(selected.order.totalAmount)} · Payment: {selected.order.paymentStatus}</p>
+                            <p className="text-[12px] text-[#7C7C7C]">Total: {fmt(selected.order.totalAmount)}</p>
+                            <p className="text-[12px] text-[#7C7C7C]">Payment: {selected.order.paymentMethod ?? '—'} · {selected.order.paymentStatus}</p>
+                            {selected.status === 'approved' && (
+                                <p className="text-[12px] font-bold text-[#299E60] mt-1">
+                                    Amount due to customer: {fmt(selected.refundAmount ?? selected.order.totalAmount)}
+                                </p>
+                            )}
                         </div>
 
                         <div>
@@ -176,38 +159,66 @@ export default function AdminReturnsPage() {
                         </div>
 
                         <div className="space-y-3 border-t border-[#F5F5F5] pt-4">
-                            <div>
-                                <label className="block text-[12px] font-bold text-[#181725] mb-1">Update status</label>
-                                <div className="relative">
-                                    <select value={actionForm.status} onChange={e => setActionForm(f => ({ ...f, status: e.target.value }))}
-                                        className={cn(inputCls, 'appearance-none pr-8')}>
-                                        <option value="pending">Pending</option>
-                                        <option value="approved">Approved</option>
-                                        <option value="rejected">Rejected</option>
-                                        <option value="refunded">Refunded</option>
-                                    </select>
-                                    <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#AEAEAE] pointer-events-none" />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-[12px] font-bold text-[#181725] mb-1">Refund amount (₹)</label>
-                                <input type="number" value={actionForm.refundAmount}
-                                    onChange={e => setActionForm(f => ({ ...f, refundAmount: e.target.value }))}
-                                    placeholder="Leave blank if no refund" className={inputCls} />
-                            </div>
-                            <div>
-                                <label className="block text-[12px] font-bold text-[#181725] mb-1">Admin note</label>
-                                <textarea value={actionForm.adminNote}
-                                    onChange={e => setActionForm(f => ({ ...f, adminNote: e.target.value }))}
-                                    rows={3} placeholder="Internal note for this decision"
-                                    className="w-full border border-[#EEEEEE] rounded-[10px] px-3 py-2 text-[13px] outline-none focus:border-[#299E60]/40 resize-none" />
-                            </div>
+                            {selected.status === 'pending' && (
+                                <p className="text-[12px] text-amber-700 bg-amber-50 rounded-[8px] px-3 py-2">
+                                    Waiting for vendor approval before you can process a refund.
+                                </p>
+                            )}
+                            {selected.status === 'approved' && (
+                                <>
+                                    <div>
+                                        <label className="block text-[12px] font-bold text-[#181725] mb-1">Refund amount (₹)</label>
+                                        <input type="number" value={actionForm.refundAmount}
+                                            onChange={e => setActionForm(f => ({ ...f, refundAmount: e.target.value }))}
+                                            placeholder={String(selected.order.totalAmount)}
+                                            className={inputCls} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[12px] font-bold text-[#181725] mb-1">Admin note</label>
+                                        <textarea value={actionForm.adminNote}
+                                            onChange={e => setActionForm(f => ({ ...f, adminNote: e.target.value }))}
+                                            rows={3} placeholder="Internal note for this refund"
+                                            className="w-full border border-[#EEEEEE] rounded-[10px] px-3 py-2 text-[13px] outline-none focus:border-[#299E60]/40 resize-none" />
+                                    </div>
+                                </>
+                            )}
+                            {(selected.status === 'refunded' || selected.status === 'rejected' || selected.status === 'refund_processing') && (
+                                <p className="text-[12px] text-[#7C7C7C]">This return is closed — no further action needed.</p>
+                            )}
                             <div className="flex gap-2">
-                                <button onClick={handleAction} disabled={saving}
-                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#299E60] text-white text-[13px] font-bold rounded-[10px] disabled:opacity-50">
-                                    {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                                    Save
-                                </button>
+                                {selected.status === 'approved' && (
+                                    <button
+                                        onClick={async () => {
+                                            setActionForm(f => ({ ...f, status: 'refunded' }));
+                                            setSaving(true);
+                                            try {
+                                                const res = await fetch(`/api/v1/admin/returns/${selectedId}`, {
+                                                    method: 'PATCH',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({
+                                                        status: 'refunded',
+                                                        adminNote: actionForm.adminNote || undefined,
+                                                        refundAmount: actionForm.refundAmount ? parseFloat(actionForm.refundAmount) : undefined,
+                                                    }),
+                                                });
+                                                const json = await res.json();
+                                                if (!json.success) throw new Error(json.error?.message || 'Failed');
+                                                toast.success('Refund processed');
+                                                setSelectedId(null);
+                                                await fetchReturns();
+                                            } catch (err) {
+                                                toast.error(err instanceof Error ? err.message : 'Failed to update');
+                                            } finally {
+                                                setSaving(false);
+                                            }
+                                        }}
+                                        disabled={saving}
+                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#299E60] text-white text-[13px] font-bold rounded-[10px] disabled:opacity-50"
+                                    >
+                                        {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                                        Process refund
+                                    </button>
+                                )}
                                 <button onClick={() => setSelectedId(null)}
                                     className="px-4 py-2.5 border border-[#EEEEEE] text-[13px] font-bold rounded-[10px] text-[#7C7C7C] hover:bg-[#F9F9F9]">
                                     <XCircle size={14} />

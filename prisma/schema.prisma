@@ -198,6 +198,8 @@ model Vendor {
   state         String?  @db.VarChar(100)
   addressPincode String? @map("address_pincode") @db.VarChar(10)
   gstNumber     String?  @map("gst_number") @db.VarChar(20)
+  // Null = use PlatformSetting.defaultCommissionPct
+  platformFeePct Decimal? @map("platform_fee_pct") @db.Decimal(5, 2)
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -803,6 +805,12 @@ model Order {
   // V2.2 Phase 1 — salesman attribution. Snapshotted at order creation
   // so commission survives reassignment of the customer's salesperson later.
   salespersonId      String?      @map("salesperson_id") @db.Uuid
+  // Settlement snapshot — written once at delivery; never recomputed
+  settlementGrossAmount Decimal? @map("settlement_gross_amount") @db.Decimal(12, 2)
+  settlementPlatformFeePct Decimal? @map("settlement_platform_fee_pct") @db.Decimal(5, 2)
+  settlementPlatformFee Decimal? @map("settlement_platform_fee") @db.Decimal(12, 2)
+  settlementGatewayFee Decimal? @map("settlement_gateway_fee") @db.Decimal(12, 2)
+  settlementNetVendorAmount Decimal? @map("settlement_net_vendor_amount") @db.Decimal(12, 2)
   createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -1955,6 +1963,10 @@ model VendorWalletTxn {
   referenceId   String?             @map("reference_id") @db.Uuid
   referenceType String?             @map("reference_type") @db.VarChar(30)
   notes         String?             @db.Text
+  grossAmount   Decimal?            @map("gross_amount") @db.Decimal(12, 2)
+  platformFee   Decimal?            @map("platform_fee") @db.Decimal(12, 2)
+  gatewayFee    Decimal?            @map("gateway_fee") @db.Decimal(12, 2)
+  netAmount     Decimal?            @map("net_amount") @db.Decimal(12, 2)
   createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz
 
   wallet VendorWallet @relation(fields: [walletId], references: [id])

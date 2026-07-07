@@ -1380,7 +1380,7 @@ export class OrderService {
               fulfilledQty: true,
               // categoryId needed to resolve category-scoped commission rules
               // at delivery time. Tiny extra row; cheap to include.
-              product: { select: { categoryId: true } },
+              product: { select: { categoryId: true, brand: true } },
             },
           },
         },
@@ -1513,6 +1513,20 @@ export class OrderService {
               .filter((id): id is string => !!id),
           ),
         );
+        const brandNames = Array.from(
+          new Set(
+            order.items
+              .map((i) => i.product?.brand)
+              .filter((b): b is string => !!b && b.trim().length > 0),
+          ),
+        );
+        const brandRows = brandNames.length > 0
+          ? await tx.brand.findMany({
+              where: { name: { in: brandNames, mode: 'insensitive' } },
+              select: { id: true },
+            })
+          : [];
+        const brandIds = brandRows.map((b) => b.id);
         const rule = await findApplicableCommissionRule(
           {
             vendorId,
@@ -1524,7 +1538,7 @@ export class OrderService {
               userId: order.userId,
             },
             vendorCustomerId: vendorCustomer?.id ?? null,
-            brandIds: [],
+            brandIds,
             categoryIds,
           },
           tx,

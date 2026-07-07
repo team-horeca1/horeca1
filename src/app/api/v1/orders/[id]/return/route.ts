@@ -7,7 +7,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/middleware/auth';
-import { errorResponse, Errors } from '@/middleware/errorHandler';
+import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { returnService } from '@/modules/return/return.service';
 
 const returnSchema = z.object({
   reason: z.string().min(10, 'Please provide more detail (at least 10 characters)'),
@@ -63,6 +64,8 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
         reason,
       },
     });
+
+    await returnService.notifyReturnSubmitted(returnRequest.id);
 
     return NextResponse.json({ success: true, data: returnRequest }, { status: 201 });
   } catch (error) {

@@ -41,6 +41,7 @@ import {
 import { resolveVendorCode, formatVendorSku } from '@/lib/sku';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { AdminVendorPlatformFee } from '@/components/features/admin/AdminVendorPlatformFee';
 import { AdminPasswordResetButton } from '@/components/features/admin/AdminPasswordResetButton';
 import { AdminUserTeamPanel } from '@/components/features/admin/AdminUserTeamPanel';
 
@@ -141,6 +142,7 @@ interface VendorData {
     bankIfsc: string | null;
     bankName: string | null;
     bankAccountType: string | null;
+    platformFeePct: number | null;
     user: VendorUser;
     products: VendorProduct[];
     serviceAreas: ServiceArea[];
@@ -205,6 +207,7 @@ export default function VendorDetailsPage() {
     const [vendor, setVendor] = useState<VendorData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [globalDefaultFeePct, setGlobalDefaultFeePct] = useState(10);
     const [togglingVerification, setTogglingVerification] = useState(false);
     const [documents, setDocuments] = useState<VendorDocument[]>([]);
     const [updatingDoc, setUpdatingDoc] = useState<string | null>(null);
@@ -467,6 +470,13 @@ export default function VendorDetailsPage() {
             fetch(`/api/v1/admin/vendors/${vendorId}/documents`)
                 .then(r => r.json())
                 .then(json => { if (json.success) setDocuments(json.data ?? []); })
+                .catch(() => {});
+            fetch('/api/v1/admin/settings', { credentials: 'include' })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((json) => {
+                    const pct = json?.data?.defaultCommissionPct;
+                    if (pct != null) setGlobalDefaultFeePct(Number(pct));
+                })
                 .catch(() => {});
         }
     }, [vendorId, fetchVendor]);
@@ -888,6 +898,13 @@ export default function VendorDetailsPage() {
                     </div>
                 ))}
             </div>
+
+            <AdminVendorPlatformFee
+                vendorId={vendor.id}
+                platformFeePct={vendor.platformFeePct != null ? Number(vendor.platformFeePct) : null}
+                globalDefaultPct={globalDefaultFeePct}
+                onSaved={fetchVendor}
+            />
 
             {/* Elegant Tab System */}
             <div className="bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm overflow-hidden">
