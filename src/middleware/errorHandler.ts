@@ -165,6 +165,10 @@ export const Errors = {
   conflict: (message: string) =>
     new ApiError('CONFLICT', message, 409),
 
-  badRequest: (message: string) =>
-    new ApiError('BAD_REQUEST', message, 400),
+  badRequest: (message: string, details?: Record<string, unknown>) =>
+    new ApiError('BAD_REQUEST', message, 400, details),
+
+  /** Validation / duplicate with a target form field for client highlighting. */
+  fieldError: (field: string, message: string, statusCode: number = 400) =>
+    new ApiError(statusCode === 409 ? 'CONFLICT' : 'BAD_REQUEST', message, statusCode, { field }),
 };

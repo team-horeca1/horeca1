@@ -210,6 +210,8 @@ export function SectionLabel({ children, className }: { children: React.ReactNod
 }
 
 export { PasswordField, PasswordToggleButton } from './PasswordField';
+export { FormErrorBanner } from './FormErrorBanner';
+export { useFormFeedback, type ApplyErrorOptions } from './useFormFeedback';
 
 export function PasswordInput({ value, onChange, hasError, className, ...rest }: FormInputProps) {
   const [visible, setVisible] = useState(false);
