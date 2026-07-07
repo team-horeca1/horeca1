@@ -311,7 +311,6 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
       { key: 'intraStateTaxName', label: 'Intra State Tax Name', width: 'w-[165px]', type: 'text' },
       { key: 'intraStateTaxType', label: 'Intra State Tax Type', width: 'w-[150px]', type: 'text' },
       { key: 'interStateTaxName', label: 'Inter State Tax Name', width: 'w-[165px]', type: 'text' },
-      { key: 'interStateTaxRate', label: 'Inter State Tax Rate', width: 'w-[130px]', type: 'number' },
       { key: 'interStateTaxType', label: 'Inter State Tax Type', width: 'w-[150px]', type: 'text' },
       { key: 'platformCommission', label: 'Platform Commission', width: 'w-[140px]', type: 'number' },
       { key: 'inventoryAccount', label: 'Inventory Account', width: 'w-[160px]', type: 'text' },

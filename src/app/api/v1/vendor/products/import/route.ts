@@ -624,6 +624,13 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       };
       r.metadata = meta;
 
+      const acc = meta.accounting as Record<string, unknown> | undefined;
+      if (acc) {
+        const rate = r.taxPercent ?? 0;
+        acc.intraStateTaxRate = rate;
+        acc.interStateTaxRate = rate;
+      }
+
       // Edited slab tiers override the file's. Sheet uses GROSS rate/unit;
       // convert to the taxable rate updatePriceSlabs persists, using the row's tax%.
       if (e.slabs !== undefined) {

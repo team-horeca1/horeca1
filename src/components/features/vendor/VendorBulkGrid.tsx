@@ -47,7 +47,7 @@ type EditableField =
   // Metadata fields:
   | 'vendorId' | 'itemId' | 'itemStatus' | 'account' | 'accountCode'
   | 'taxable' | 'exemptionReason' | 'taxabilityType' | 'productType' | 'intraStateTaxName' | 'intraStateTaxType'
-  | 'interStateTaxName' | 'interStateTaxRate' | 'interStateTaxType' | 'source' | 'referenceId' | 'lastSyncTime'
+  | 'interStateTaxName' | 'interStateTaxType' | 'source' | 'referenceId' | 'lastSyncTime'
   | 'inventoryAccount' | 'inventoryAccountCode' | 'inventoryValuationMethod' | 'reorderPoint' | 'openingStock'
   | 'stockOnHand' | 'itemType' | 'sellable' | 'purchasable' | 'trackInventory' | 'platformCommission'
   | 'packageWeight' | 'packageLength' | 'packageWidth' | 'packageHeight' | 'dimensionUnit' | 'weightUnit'
@@ -94,7 +94,6 @@ const META_MAP: Partial<Record<string, [section: string, key: string]>> = {
   intraStateTaxName: ['accounting', 'intraStateTaxName'],
   intraStateTaxType: ['accounting', 'intraStateTaxType'],
   interStateTaxName: ['accounting', 'interStateTaxName'],
-  interStateTaxRate: ['accounting', 'interStateTaxRate'],
   interStateTaxType: ['accounting', 'interStateTaxType'],
   inventoryAccount: ['accounting', 'inventoryAccount'],
   inventoryAccountCode: ['accounting', 'inventoryAccountCode'],
@@ -183,10 +182,9 @@ export default function VendorBulkGrid({
     { key: 'taxabilityType', label: 'Taxability Type', width: 'w-[130px]', type: 'text' },
     { key: 'productType', label: 'Product Type', width: 'w-[110px]', type: 'text' },
     { key: 'intraStateTaxName', label: 'Intra State Tax Name', width: 'w-[150px]', type: 'text' },
-    { key: 'taxPercent', label: 'Intra State Tax Rate', width: 'w-[130px]', type: 'number' },
+    { key: 'taxPercent', label: 'Tax % (GST)', width: 'w-[130px]', type: 'number' },
     { key: 'intraStateTaxType', label: 'Intra State Tax Type', width: 'w-[140px]', type: 'text' },
     { key: 'interStateTaxName', label: 'Inter State Tax Name', width: 'w-[150px]', type: 'text' },
-    { key: 'interStateTaxRate', label: 'Inter State Tax Rate', width: 'w-[130px]', type: 'number' },
     { key: 'interStateTaxType', label: 'Inter State Tax Type', width: 'w-[140px]', type: 'text' },
     { key: 'source', label: 'Source', width: 'w-[110px]', type: 'text' },
     { key: 'referenceId', label: 'Reference ID', width: 'w-[130px]', type: 'text' },
@@ -282,8 +280,7 @@ export default function VendorBulkGrid({
     }
     if (field === 'basePrice') return p.basePrice;
     if (field === 'taxPercent') {
-      const metaRate = (p.metadata as Record<string, Record<string, unknown>> | undefined)?.accounting?.intraStateTaxRate;
-      return p.taxPercent ?? metaRate ?? 0;
+      return p.taxPercent ?? 0;
     }
     if (field === 'minOrderQty') return p.minOrderQty ?? 1;
     if (field === 'isActive') return p.isActive;
@@ -382,10 +379,12 @@ export default function VendorBulkGrid({
       if (e.brand !== undefined) body.brand = e.brand;
       if (e.basePrice !== undefined) body.basePrice = parseFloat(String(e.basePrice)) || 0;
       if (e.taxPercent !== undefined) {
-        body.taxPercent = parseFloat(String(e.taxPercent)) || 0;
+        const rate = parseFloat(String(e.taxPercent)) || 0;
+        body.taxPercent = rate;
         meta.accounting = {
           ...((meta.accounting as Record<string, unknown>) ?? {}),
-          intraStateTaxRate: parseFloat(String(e.taxPercent)) || 0,
+          intraStateTaxRate: rate,
+          interStateTaxRate: rate,
         };
       }
       if (e.minOrderQty !== undefined) body.minOrderQty = parseInt(String(e.minOrderQty), 10) || 1;

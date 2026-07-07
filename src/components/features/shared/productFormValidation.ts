@@ -10,11 +10,10 @@ export const PRODUCT_REQUIRED_FIELD_ORDER = [
   'categoryIds',
   'imageUrl',
   'basePrice',
+  'taxPercent',
   'intraStateTaxName',
-  'intraStateTaxRate',
   'intraStateTaxType',
   'interStateTaxName',
-  'interStateTaxRate',
   'interStateTaxType',
   'countryOfOrigin',
   'vegNonVeg',
@@ -22,7 +21,6 @@ export const PRODUCT_REQUIRED_FIELD_ORDER = [
   'shelfLifeDays',
   'minOrderQty',
   'variantMapping',
-  'substituteIds',
 ] as const;
 
 export type ProductValidationField = (typeof PRODUCT_REQUIRED_FIELD_ORDER)[number];
@@ -35,11 +33,10 @@ export interface ProductEssentialsForm {
   brand: string;
   categoryIds: string[];
   imageUrl: string;
+  taxPercent?: string;
   intraStateTaxName: string;
-  intraStateTaxRate: string;
   intraStateTaxType: string;
   interStateTaxName: string;
-  interStateTaxRate: string;
   interStateTaxType: string;
   countryOfOrigin: string;
   vegNonVeg: string;
@@ -108,16 +105,15 @@ export function validateProductEssentials(
     }
   }
 
-  req(errors, 'intraStateTaxName', form.intraStateTaxName, 'Intra state tax name is required');
-  if (!form.intraStateTaxRate?.trim() || Number.isNaN(Number(form.intraStateTaxRate))) {
-    errors.intraStateTaxRate = 'Intra state tax rate is required';
+  const taxPct = Number(form.taxPercent);
+  if (form.taxPercent?.trim() === '' || Number.isNaN(taxPct) || taxPct < 0 || taxPct > 100) {
+    errors.taxPercent = 'Tax % must be between 0 and 100';
   }
+
+  req(errors, 'intraStateTaxName', form.intraStateTaxName, 'Intra state tax name is required');
   req(errors, 'intraStateTaxType', form.intraStateTaxType, 'Intra state tax type is required');
 
   req(errors, 'interStateTaxName', form.interStateTaxName, 'Inter state tax name is required');
-  if (!form.interStateTaxRate?.trim() || Number.isNaN(Number(form.interStateTaxRate))) {
-    errors.interStateTaxRate = 'Inter state tax rate is required';
-  }
   req(errors, 'interStateTaxType', form.interStateTaxType, 'Inter state tax type is required');
 
   req(errors, 'countryOfOrigin', form.countryOfOrigin, 'Country of origin is required');
@@ -133,10 +129,6 @@ export function validateProductEssentials(
   }
 
   req(errors, 'variantMapping', form.variantMapping, 'Variant mapping is required');
-
-  if (!form.substituteIds.length) {
-    errors.substituteIds = 'Select at least one substitute product';
-  }
 
   return errors;
 }
