@@ -306,10 +306,25 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const json = await res.json();
+      const raw = await res.text();
+      type InviteResponse = {
+        success?: boolean;
+        data?: TeamMember & { inviteMeta?: InviteMeta };
+        error?: { message?: string };
+      };
+      let json: InviteResponse;
+      try {
+        json = JSON.parse(raw) as InviteResponse;
+      } catch {
+        throw new Error(
+          res.ok
+            ? 'Server returned an invalid response. Please try again.'
+            : `Request failed (${res.status}). The server may be busy — try again.`,
+        );
+      }
       if (!json.success) throw new Error(json.error?.message ?? 'Failed to add member');
 
-      const meta = json.data?.inviteMeta as InviteMeta | undefined;
+      const meta = json.data?.inviteMeta;
       if (meta?.tempPassword) {
         setInvitedMemberName(fullName.trim());
         setInviteMeta(meta);

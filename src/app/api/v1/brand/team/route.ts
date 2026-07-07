@@ -12,9 +12,10 @@ import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { uniqueHcid } from '@/lib/hcid';
 import { phoneLookupVariants } from '@/lib/phone';
 import { toTeamMemberDTO, teamMemberInclude, type TeamMemberDTO } from '@/lib/teamMemberShape';
-import { sendEmail } from '@/lib/providers/email';
+import { sendEmailInBackground } from '@/lib/providers/email';
 import { buildInviteEmail } from '@/lib/email-templates/invite';
 import { sendSms } from '@/lib/providers/sms';
+import { runInBackground } from '@/lib/asyncBackground';
 import type { AuthContext } from '@/middleware/auth';
 import type { TeamRole } from '@prisma/client';
 
@@ -223,54 +224,77 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
       roleRef: member.roleRef,
     });
 
-    // Notify the user.
-    if (user.email && tempPassword) {
-      try {
+    const loginUrl = (process.env.AUTH_URL ?? 'http://localhost:3000') + '/login';
+    const loginIdentifier = user.email ?? user.phone ?? identifierTrim;
+
+    // Notifications in background — never block the HTTP response on SMTP/SMS.
+    if (tempPassword && user.email) {
+      const inviterId = ctx.userId;
+      const recipientEmail = user.email;
+      const recipientName = user.fullName ?? '';
+      const brandName = brand.name;
+      runInBackground('invite-email', async () => {
         const inviter = await prisma.user.findUnique({
-          where: { id: ctx.userId },
+          where: { id: inviterId },
           select: { fullName: true },
         });
         const { subject, text, html } = buildInviteEmail({
-          recipientName: user.fullName ?? '',
-          recipientEmail: user.email,
+          recipientName,
+          recipientEmail,
           tempPassword,
           scope: 'brand',
-          businessName: brand.name,
-          loginUrl: (process.env.AUTH_URL ?? 'http://localhost:3000') + '/login',
+          businessName: brandName,
+          loginUrl,
           inviterName: inviter?.fullName ?? undefined,
         });
-        await sendEmail({ to: user.email, subject, text, html });
-      } catch (err) {
-        console.error('[invite-email] failed to send brand invite email', err);
-      }
-    } else {
-      // Existing user invited — send notification of access
-      try {
+        sendEmailInBackground({ to: recipientEmail, subject, text, html }, 'invite-email');
+      });
+    } else if (!tempPassword) {
+      const inviterId = ctx.userId;
+      const brandName = brand.name;
+      const recipientEmail = user.email;
+      const recipientPhone = user.phone;
+      const recipientName = user.fullName ?? '';
+      runInBackground('invite-notification', async () => {
         const inviter = await prisma.user.findUnique({
-          where: { id: ctx.userId },
+          where: { id: inviterId },
           select: { fullName: true },
         });
         const inviterName = inviter?.fullName?.trim() || 'Admin';
-        const loginUrl = (process.env.AUTH_URL ?? 'http://localhost:3000') + '/login';
         const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c));
 
-        if (user.email) {
-          const subject = `Access granted to brand team ${brand.name} on HoReCa Hub`;
-          const text = `Hello ${user.fullName ?? ''},\n\n${inviterName} has added you to the brand team "${brand.name}" on HoReCa Hub.\n\nYou can now log in and access the brand portal.\n\nLogin URL: ${loginUrl}\n\n— The HoReCa Hub team`;
-          const html = `<p>Hello <strong>${esc(user.fullName ?? '')}</strong>,</p><p>${esc(inviterName)} has added you to the brand team <strong>${esc(brand.name)}</strong> on HoReCa Hub.</p><p>You can now log in and access the brand portal.</p><p><a href="${esc(loginUrl)}">Sign in to HoReCa Hub</a></p><p>— The HoReCa Hub team</p>`;
-          await sendEmail({ to: user.email, subject, text, html });
+        if (recipientEmail) {
+          const subject = `Access granted to brand team ${brandName} on HoReCa Hub`;
+          const text = `Hello ${recipientName},\n\n${inviterName} has added you to the brand team "${brandName}" on HoReCa Hub.\n\nYou can now log in and access the brand portal.\n\nLogin URL: ${loginUrl}\n\n— The HoReCa Hub team`;
+          const html = `<p>Hello <strong>${esc(recipientName)}</strong>,</p><p>${esc(inviterName)} has added you to the brand team <strong>${esc(brandName)}</strong> on HoReCa Hub.</p><p>You can now log in and access the brand portal.</p><p><a href="${esc(loginUrl)}">Sign in to HoReCa Hub</a></p><p>— The HoReCa Hub team</p>`;
+          sendEmailInBackground({ to: recipientEmail, subject, text, html }, 'invite-notification');
         }
 
-        if (user.phone) {
-          const smsBody = `Hello ${user.fullName ?? ''}, you have been added to the brand team "${brand.name}" on HoReCa Hub by ${inviterName}. Log in to access: ${loginUrl}`;
-          await sendSms({ to: user.phone, body: smsBody, channel: 'sms' });
+        if (recipientPhone) {
+          const smsBody = `Hello ${recipientName}, you have been added to the brand team "${brandName}" on HoReCa Hub by ${inviterName}. Log in to access: ${loginUrl}`;
+          void sendSms({ to: recipientPhone, body: smsBody, channel: 'sms' }).catch((err) => {
+            console.error('[invite-notification]', err);
+          });
         }
-      } catch (err) {
-        console.error('[invite-notification] failed to send brand invite notification', err);
-      }
+      });
     }
 
-    return NextResponse.json({ success: true, data: dto }, { status: 201 });
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...dto,
+        ...(tempPassword
+          ? {
+              inviteMeta: {
+                tempPassword,
+                loginIdentifier,
+                loginUrl,
+                credentialsDelivered: { email: false, sms: false },
+              },
+            }
+          : {}),
+      },
+    }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
   }

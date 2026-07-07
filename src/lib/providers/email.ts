@@ -36,6 +36,10 @@ function getTransporter(): nodemailer.Transporter | null {
     port: Number(process.env.EMAIL_PORT ?? '465'),
     secure: true,
     auth: { user, pass },
+    // Fail fast — never block API responses on a hung SMTP connection.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   });
   return cachedTransporter;
 }
@@ -65,4 +69,9 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
     })),
   });
   return { sent: true };
+}
+
+/** Fire-and-forget — invite/credential emails must not block HTTP responses. */
+export function sendEmailInBackground(input: SendEmailInput, label = 'email'): void {
+  void sendEmail(input).catch((err) => console.error(`[${label}]`, err));
 }

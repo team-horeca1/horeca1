@@ -13,9 +13,10 @@ import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { assertAccountMember, assertAccountPermission } from '@/lib/accountAccess';
 import { uniqueHcid } from '@/lib/hcid';
 import { phoneLookupVariants, normalizePhone } from '@/lib/phone';
-import { sendEmail } from '@/lib/providers/email';
+import { sendEmailInBackground } from '@/lib/providers/email';
 import { buildInviteEmail, buildInviteSms } from '@/lib/email-templates/invite';
 import { sendSms } from '@/lib/providers/sms';
+import { runInBackground } from '@/lib/asyncBackground';
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
@@ -234,75 +235,93 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       return { membership, assignments };
     });
 
-    // Fire-and-forget invite notification. Never let notification-send failure roll back the user creation.
-    const credentialsDelivered = { email: false, sms: false };
     const loginUrl = (process.env.AUTH_URL ?? 'http://localhost:3000') + '/login';
     const loginIdentifier = inviteeUser.email ?? inviteeUser.phone ?? body.identifier.trim();
 
+    // Notifications in background — never block the HTTP response on SMTP/SMS.
     if (tempPassword) {
-      try {
+      const inviterId = ctx.userId;
+      const accountId = id;
+      const recipientEmail = inviteeUser.email;
+      const recipientPhone = inviteeUser.phone;
+      const recipientName = inviteeUser.fullName;
+      const newUser = isNewUser;
+      runInBackground('invite-email', async () => {
         const [account, inviter] = await Promise.all([
-          prisma.businessAccount.findUnique({ where: { id }, select: { legalName: true, displayName: true } }),
-          prisma.user.findUnique({ where: { id: ctx.userId }, select: { fullName: true } }),
+          prisma.businessAccount.findUnique({ where: { id: accountId }, select: { legalName: true, displayName: true } }),
+          prisma.user.findUnique({ where: { id: inviterId }, select: { fullName: true } }),
         ]);
         const businessName = account?.displayName || account?.legalName || 'your business';
         const inviterName = inviter?.fullName?.trim() || undefined;
 
-        if (inviteeUser.email) {
+        if (recipientEmail) {
           const { subject, text, html } = buildInviteEmail({
-            recipientName: inviteeUser.fullName,
-            recipientEmail: inviteeUser.email,
+            recipientName,
+            recipientEmail,
             tempPassword,
             scope: 'customer',
             businessName,
             loginUrl,
             inviterName,
           });
-          const emailResult = await sendEmail({ to: inviteeUser.email, subject, text, html, name: inviteeUser.fullName });
-          credentialsDelivered.email = emailResult.sent;
+          sendEmailInBackground({
+            to: recipientEmail,
+            subject,
+            text,
+            html,
+            name: recipientName,
+          }, 'invite-email');
         }
 
-        if (inviteeUser.phone && (isNewUser || !inviteeUser.email)) {
+        if (recipientPhone && (newUser || !recipientEmail)) {
           const smsBody = buildInviteSms({
-            recipientName: inviteeUser.fullName,
-            loginIdentifier: inviteeUser.phone,
+            recipientName,
+            loginIdentifier: recipientPhone,
             tempPassword,
             businessName,
             loginUrl,
             inviterName,
           });
-          await sendSms({ to: inviteeUser.phone, body: smsBody, channel: 'sms' });
-          credentialsDelivered.sms = true;
+          void sendSms({ to: recipientPhone, body: smsBody, channel: 'sms' }).catch((err) => {
+            console.error('[invite-email]', err);
+          });
         }
-      } catch (err) {
-        console.error('[invite-email]', err);
-      }
+      });
     } else {
-      // Existing user invited — send notification of access
-      try {
+      const inviterId = ctx.userId;
+      const accountId = id;
+      const recipientEmail = inviteeUser.email;
+      const recipientPhone = inviteeUser.phone;
+      const recipientName = inviteeUser.fullName;
+      runInBackground('invite-notification', async () => {
         const [account, inviter] = await Promise.all([
-          prisma.businessAccount.findUnique({ where: { id }, select: { legalName: true, displayName: true } }),
-          prisma.user.findUnique({ where: { id: ctx.userId }, select: { fullName: true } }),
+          prisma.businessAccount.findUnique({ where: { id: accountId }, select: { legalName: true, displayName: true } }),
+          prisma.user.findUnique({ where: { id: inviterId }, select: { fullName: true } }),
         ]);
         const businessName = account?.displayName || account?.legalName || 'your business';
         const inviterName = inviter?.fullName?.trim() || 'Admin';
         const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c));
 
-        if (inviteeUser.email) {
+        if (recipientEmail) {
           const subject = `Access granted to ${businessName} on HoReCa Hub`;
-          const text = `Hello ${inviteeUser.fullName},\n\n${inviterName} has added you to the business account "${businessName}" on HoReCa Hub.\n\nYou can now log in and access this account.\n\nLogin URL: ${loginUrl}\n\n— The HoReCa Hub team`;
-          const html = `<p>Hello <strong>${esc(inviteeUser.fullName)}</strong>,</p><p>${esc(inviterName)} has added you to the business account <strong>${esc(businessName)}</strong> on HoReCa Hub.</p><p>You can now log in and access this account.</p><p><a href="${esc(loginUrl)}">Sign in to HoReCa Hub</a></p><p>— The HoReCa Hub team</p>`;
-          const emailResult = await sendEmail({ to: inviteeUser.email, subject, text, html, name: inviteeUser.fullName });
-          credentialsDelivered.email = emailResult.sent;
+          const text = `Hello ${recipientName},\n\n${inviterName} has added you to the business account "${businessName}" on HoReCa Hub.\n\nYou can now log in and access this account.\n\nLogin URL: ${loginUrl}\n\n— The HoReCa Hub team`;
+          const html = `<p>Hello <strong>${esc(recipientName)}</strong>,</p><p>${esc(inviterName)} has added you to the business account <strong>${esc(businessName)}</strong> on HoReCa Hub.</p><p>You can now log in and access this account.</p><p><a href="${esc(loginUrl)}">Sign in to HoReCa Hub</a></p><p>— The HoReCa Hub team</p>`;
+          sendEmailInBackground({
+            to: recipientEmail,
+            subject,
+            text,
+            html,
+            name: recipientName,
+          }, 'invite-notification');
         }
 
-        if (inviteeUser.phone) {
-          const smsBody = `Hello ${inviteeUser.fullName}, you have been added to the business account "${businessName}" on HoReCa Hub by ${inviterName}. Log in to access: ${loginUrl}`;
-          await sendSms({ to: inviteeUser.phone, body: smsBody, channel: 'sms' });
+        if (recipientPhone) {
+          const smsBody = `Hello ${recipientName}, you have been added to the business account "${businessName}" on HoReCa Hub by ${inviterName}. Log in to access: ${loginUrl}`;
+          void sendSms({ to: recipientPhone, body: smsBody, channel: 'sms' }).catch((err) => {
+            console.error('[invite-notification]', err);
+          });
         }
-      } catch (err) {
-        console.error('[invite-notification]', err);
-      }
+      });
     }
 
     return NextResponse.json({
@@ -315,7 +334,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
                 tempPassword,
                 loginIdentifier,
                 loginUrl,
-                credentialsDelivered,
+                credentialsDelivered: { email: false, sms: false },
               },
             }
           : {}),

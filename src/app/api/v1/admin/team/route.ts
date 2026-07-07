@@ -22,8 +22,9 @@ import { uniqueHcid } from '@/lib/hcid';
 import { phoneLookupVariants } from '@/lib/phone';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { toTeamMemberDTO, teamMemberInclude, type TeamMemberDTO } from '@/lib/teamMemberShape';
-import { sendEmail } from '@/lib/providers/email';
+import { sendEmailInBackground } from '@/lib/providers/email';
 import { buildInviteEmail } from '@/lib/email-templates/invite';
+import { runInBackground } from '@/lib/asyncBackground';
 import type { AuthContext } from '@/middleware/auth';
 import type { TeamRole } from '@prisma/client';
 
@@ -195,29 +196,49 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
       roleRef: member.roleRef,
     });
 
-    // Send credential email if invitee has an email + a freshly-set password.
+    const loginUrl = (process.env.AUTH_URL ?? 'http://localhost:3000') + '/login';
+    const loginIdentifier = user.email ?? user.phone ?? identifierTrim;
+
+    // Send credential email in background — SMTP timeouts must not block the API
+    // response (nginx returns 504 HTML otherwise, breaking the Add Member wizard).
     if (user.email && tempPassword) {
-      try {
+      const inviterId = ctx.userId;
+      const recipientEmail = user.email;
+      const recipientName = user.fullName ?? '';
+      runInBackground('invite-email', async () => {
         const inviter = await prisma.user.findUnique({
-          where: { id: ctx.userId },
+          where: { id: inviterId },
           select: { fullName: true },
         });
         const { subject, text, html } = buildInviteEmail({
-          recipientName: user.fullName ?? '',
-          recipientEmail: user.email,
+          recipientName,
+          recipientEmail,
           tempPassword,
           scope: 'admin',
           businessName: 'HoReCa Hub Admin',
-          loginUrl: (process.env.AUTH_URL ?? 'http://localhost:3000') + '/login',
+          loginUrl,
           inviterName: inviter?.fullName ?? undefined,
         });
-        await sendEmail({ to: user.email, subject, text, html });
-      } catch (err) {
-        console.error('[invite-email] failed to send admin invite email', err);
-      }
+        sendEmailInBackground({ to: recipientEmail, subject, text, html }, 'invite-email');
+      });
     }
 
-    return NextResponse.json({ success: true, data: dto }, { status: 201 });
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...dto,
+        ...(tempPassword
+          ? {
+              inviteMeta: {
+                tempPassword,
+                loginIdentifier,
+                loginUrl,
+                credentialsDelivered: { email: false, sms: false },
+              },
+            }
+          : {}),
+      },
+    }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
   }
