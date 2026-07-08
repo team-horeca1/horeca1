@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -24,9 +25,20 @@ import {
     AlertCircle,
     Building2,
     ArrowUpRight,
+    MoreVertical,
+    Trash2,
+    UserCheck,
+    UserX,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useAdminImpersonate } from '@/hooks/useAdminImpersonate';
+import {
+  AdminStatusBadge,
+  AdminVerifyPartnerButton,
+} from '@/components/features/admin/entity';
 
 const AddVendorWizard = dynamic(
     () => import('@/components/features/admin/AddVendorWizard').then((mod) => mod.AddVendorWizard),
@@ -68,25 +80,91 @@ export default function VendorsPage() {
     const router = useRouter();
     const { has: can } = usePermissions();
     const canWriteSettings = can('settings.edit');
+    const canEditVendors = can('vendors.edit');
+    const canDeleteVendors = can('vendors.delete');
+    const confirm = useConfirm();
+    const { start: startVendorView, loading: impersonateLoading } = useAdminImpersonate('vendor');
     const [searchQuery, setSearchQuery] = useState('');
     const [vendors, setVendors] = useState<AdminVendor[]>([]);
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+    const [activeMenu, setActiveMenu] = useState<{ id: string; top: number; right: number } | null>(null);
 
     // Add-Vendor wizard modal open state
     const [showCreate, setShowCreate] = useState(false);
 
-    const viewDashboard = async (vendorId: string) => {
-        await fetch('/api/v1/admin/impersonate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ vendorId }),
-        });
-        router.push('/vendor/dashboard');
+    const openDetails = (vendorId: string) => router.push(`/admin/vendors/${vendorId}`);
+
+    const viewAsVendor = (e: React.MouseEvent, vendorId: string) => {
+        e.stopPropagation();
+        void startVendorView(vendorId);
     };
 
-    // Navigate to the vendor detail page (used by clickable card / table row)
-    const openDetails = (vendorId: string) => router.push(`/admin/vendors/${vendorId}`);
+    const handleVendorVerified = (vendorId: string) => {
+        setVendors((prev) => prev.map((v) => (v.id === vendorId ? { ...v, isVerified: true } : v)));
+    };
+
+    const deleteVendor = async (id: string, name: string) => {
+        setActiveMenu(null);
+        const ok = await confirm({
+            title: 'Delete permanently?',
+            message: `${name} will be removed completely along with products, orders, team memberships and vendor data. This cannot be undone.`,
+            confirmText: 'Delete permanently',
+            tone: 'danger',
+        });
+        if (!ok) return;
+        try {
+            const res = await fetch(`/api/v1/admin/vendors/${id}?force=true`, { method: 'DELETE' });
+            const json = await res.json();
+            if (!json.success) {
+                toast.error(json.error?.message || json.error || 'Failed to delete');
+                return;
+            }
+            setVendors((prev) => prev.filter((v) => v.id !== id));
+            toast.success(`${name} deleted permanently`);
+        } catch {
+            toast.error('Failed to delete');
+        }
+    };
+
+    const toggleVendorActive = async (id: string, currentlyActive: boolean) => {
+        setActiveMenu(null);
+        try {
+            const res = await fetch(`/api/v1/admin/vendors/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isActive: !currentlyActive }),
+            });
+            const json = await res.json();
+            if (json.success) {
+                setVendors((prev) => prev.map((v) => (v.id === id ? { ...v, isActive: !currentlyActive } : v)));
+                toast.success(currentlyActive ? 'Vendor deactivated' : 'Vendor activated');
+            } else {
+                toast.error(json.error?.message || 'Failed to update');
+            }
+        } catch {
+            toast.error('Failed to update');
+        }
+    };
+
+    useEffect(() => {
+        const handleClickOutside = () => setActiveMenu(null);
+        if (activeMenu !== null) {
+            window.addEventListener('click', handleClickOutside);
+        }
+        return () => window.removeEventListener('click', handleClickOutside);
+    }, [activeMenu]);
+
+    useEffect(() => {
+        if (!activeMenu) return;
+        const close = () => setActiveMenu(null);
+        window.addEventListener('scroll', close, true);
+        window.addEventListener('resize', close);
+        return () => {
+            window.removeEventListener('scroll', close, true);
+            window.removeEventListener('resize', close);
+        };
+    }, [activeMenu]);
 
     useEffect(() => {
         fetch('/api/v1/admin/vendors?limit=50')
@@ -105,22 +183,6 @@ export default function VendorsPage() {
             (vendor.user?.fullName || '').toLowerCase().includes(query)
         );
     }, [vendors, searchQuery]);
-
-    const toggleVerified = async (vendorId: string, isVerified: boolean) => {
-        try {
-            const res = await fetch(`/api/v1/admin/vendors/${vendorId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isVerified: !isVerified }),
-            });
-            const json = await res.json();
-            if (json.success) {
-                setVendors(prev => prev.map(v => v.id === vendorId ? { ...v, isVerified: !isVerified } : v));
-            }
-        } catch (err) {
-            console.error('Failed to toggle vendor verification:', err);
-        }
-    };
 
     // Calculate metrics for stats cards using useMemo to optimize re-renders
     const { totalVendors, pendingVerification, totalProducts, totalOrders } = React.useMemo(() => {
@@ -284,15 +346,11 @@ export default function VendorsPage() {
                             {/* Visual Logo Container */}
                             <div className="bg-[#F9FAFB] rounded-[12px] h-[120px] relative flex items-center justify-center p-4 border border-[#F3F4F6] mb-4">
                                 {/* Verification Status Pin */}
-                                <div className={cn(
-                                    "absolute top-2.5 left-2.5 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm border",
-                                    vendor.isVerified 
-                                        ? "bg-[#EEF8F1] border-[#299E60]/20 text-[#299E60]" 
-                                        : "bg-[#FFF8EB] border-[#D97706]/20 text-[#D97706]"
-                                )}>
-                                    {vendor.isVerified ? <CheckCircle size={10} /> : <AlertCircle size={10} />}
-                                    {vendor.isVerified ? 'Verified' : 'Pending Verification'}
-                                </div>
+                                <AdminStatusBadge
+                                    variant={vendor.isVerified ? 'verified' : 'pending'}
+                                    label={vendor.isVerified ? 'Verified' : 'Pending Verification'}
+                                    className="absolute top-2.5 left-2.5 shadow-sm normal-case"
+                                />
 
                                 {vendor.logoUrl ? (
                                     <Image
@@ -355,30 +413,31 @@ export default function VendorsPage() {
                         {/* Card Buttons */}
                         <div className="p-4 border-t border-[#EEEEEE] bg-white flex flex-col gap-2 rounded-b-[16px]">
                             <button
-                                onClick={() => viewDashboard(vendor.id)}
-                                className="w-full h-[38px] bg-[#299E60] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#238a54] active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-[#299E60]/10"
+                                type="button"
+                                disabled={impersonateLoading}
+                                onClick={(e) => viewAsVendor(e, vendor.id)}
+                                className="w-full h-[38px] bg-[#299E60] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#238a54] active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-[#299E60]/10 disabled:opacity-60"
                             >
                                 <LayoutDashboard size={13} />
-                                View Dashboard
+                                View as Vendor
                             </button>
                             <div className="flex items-center gap-2">
                                 <Link
                                     href={`/admin/vendors/${vendor.id}`}
                                     className={cn(
                                         "h-[36px] bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB] rounded-[10px] text-[12px] font-bold transition-all flex items-center justify-center border border-[#E5E7EB]",
-                                        !vendor.isVerified ? "flex-1" : "w-full"
+                                        !vendor.isVerified && canEditVendors ? "flex-1" : "w-full"
                                     )}
                                 >
                                     Details
                                 </Link>
-                                {!vendor.isVerified && (
-                                    <button
-                                        onClick={() => toggleVerified(vendor.id, vendor.isVerified)}
-                                        className="flex-1 h-[36px] bg-[#EEF8F1] text-[#299E60] border border-[#D1FAE5] hover:bg-[#D1FAE5] rounded-[10px] text-[12px] font-bold transition-all flex items-center justify-center gap-1"
-                                    >
-                                        <CheckCircle size={12} />
-                                        Verify
-                                    </button>
+                                {!vendor.isVerified && canEditVendors && (
+                                    <AdminVerifyPartnerButton
+                                        vendorId={vendor.id}
+                                        compact
+                                        className="flex-1"
+                                        onVerified={() => handleVendorVerified(vendor.id)}
+                                    />
                                 )}
                             </div>
                         </div>
@@ -445,14 +504,10 @@ export default function VendorsPage() {
                                                 </div>
                                                 <span className="w-1.5 h-1.5 rounded-full bg-[#E5E7EB]"></span>
                                                 {/* Verified badge */}
-                                                <span className={cn(
-                                                    "text-[10px] font-bold px-2 py-0.5 rounded-full border",
-                                                    vendor.isVerified 
-                                                        ? "bg-[#EEF8F1] border-[#299E60]/10 text-[#299E60]" 
-                                                        : "bg-[#FFF8EB] border-[#D97706]/10 text-[#D97706]"
-                                                )}>
-                                                    {vendor.isVerified ? 'Verified' : 'Pending'}
-                                                </span>
+                                                <AdminStatusBadge
+                                                    variant={vendor.isVerified ? 'verified' : 'pending'}
+                                                    className="normal-case"
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -487,11 +542,13 @@ export default function VendorsPage() {
                                 <td className="px-6 py-2.5 text-right">
                                     <div className="flex items-center justify-end gap-2">
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); viewDashboard(vendor.id); }}
-                                            className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] active:scale-97 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-[#299E60]/5 whitespace-nowrap"
+                                            type="button"
+                                            disabled={impersonateLoading}
+                                            onClick={(e) => viewAsVendor(e, vendor.id)}
+                                            className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] active:scale-97 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-[#299E60]/5 whitespace-nowrap disabled:opacity-60"
                                         >
                                             <LayoutDashboard size={12} />
-                                            <span>Dashboard</span>
+                                            <span>View as Vendor</span>
                                             <ArrowUpRight size={12} className="opacity-70" />
                                         </button>
                                         <Link
@@ -501,13 +558,37 @@ export default function VendorsPage() {
                                         >
                                             Details
                                         </Link>
-                                        {!vendor.isVerified && (
+                                        {!vendor.isVerified && canEditVendors && (
+                                            <AdminVerifyPartnerButton
+                                                vendorId={vendor.id}
+                                                compact
+                                                onVerified={() => handleVendorVerified(vendor.id)}
+                                            />
+                                        )}
+                                        {(canEditVendors || canDeleteVendors) && (
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); toggleVerified(vendor.id, vendor.isVerified); }}
-                                                className="h-[34px] px-3 bg-[#EEF8F1] text-[#299E60] border border-[#299E60]/10 rounded-[8px] text-[12px] font-bold hover:bg-[#D1FAE5] transition-all flex items-center justify-center gap-1 whitespace-nowrap"
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (activeMenu?.id === vendor.id) {
+                                                        setActiveMenu(null);
+                                                        return;
+                                                    }
+                                                    const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                                    setActiveMenu({
+                                                        id: vendor.id,
+                                                        top: rect.bottom + 6,
+                                                        right: window.innerWidth - rect.right,
+                                                    });
+                                                }}
+                                                className={cn(
+                                                    'w-[34px] h-[34px] flex items-center justify-center rounded-[10px] transition-all shadow-sm',
+                                                    activeMenu?.id === vendor.id
+                                                        ? 'bg-gray-100 text-gray-900 border border-gray-200'
+                                                        : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:bg-gray-50',
+                                                )}
                                             >
-                                                <CheckCircle size={12} />
-                                                Verify
+                                                <MoreVertical size={16} />
                                             </button>
                                         )}
                                     </div>
@@ -518,6 +599,42 @@ export default function VendorsPage() {
                 </table>
             </div>
             )
+            )}
+
+            {activeMenu && typeof window !== 'undefined' && createPortal(
+                <div
+                    style={{ position: 'fixed', top: activeMenu.top, right: activeMenu.right, zIndex: 12000 }}
+                    className="w-44 bg-white rounded-[8px] shadow-xl border border-gray-100 py-1 overflow-hidden animate-in fade-in zoom-in duration-200"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {(() => {
+                        const v = vendors.find((x) => x.id === activeMenu.id);
+                        if (!v) return null;
+                        return (
+                            <>
+                                {canEditVendors && (
+                                    <button
+                                        onClick={() => toggleVendorActive(v.id, v.isActive)}
+                                        className="w-full flex items-center gap-3 px-4 py-2 text-[13px] font-semibold text-[#4B4B4B] hover:bg-gray-50 transition-colors text-left"
+                                    >
+                                        {v.isActive ? <UserX size={14} className="text-red-400" /> : <UserCheck size={14} className="text-green-400" />}
+                                        {v.isActive ? 'Deactivate' : 'Activate'}
+                                    </button>
+                                )}
+                                {canDeleteVendors && (
+                                    <button
+                                        onClick={() => deleteVendor(v.id, v.businessName)}
+                                        className="w-full flex items-center gap-3 px-4 py-2 text-[13px] font-semibold text-red-500 hover:bg-red-50 transition-colors text-left"
+                                    >
+                                        <Trash2 size={14} />
+                                        Delete permanently
+                                    </button>
+                                )}
+                            </>
+                        );
+                    })()}
+                </div>,
+                document.body,
             )}
 
             {/* Add Vendor wizard modal overlay */}

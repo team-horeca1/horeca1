@@ -6,7 +6,6 @@ import Link from 'next/link';
 import {
     Users,
     Package,
-    Eye,
     Search,
     MoreVertical,
     Loader2,
@@ -17,12 +16,17 @@ import {
     X,
     SlidersHorizontal,
     Upload,
+    UserCircle,
+    ArrowUpRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import CustomerFormModal from '@/components/features/admin/CustomerFormModal';
 import { FormErrorBanner } from '@/components/ui/form';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useAdminImpersonate } from '@/hooks/useAdminImpersonate';
+import { AdminStatusBadge } from '@/components/features/admin/entity';
 
 interface AdminUser {
     id: string;
@@ -36,6 +40,9 @@ interface AdminUser {
 }
 
 export default function CustomersPage() {
+    const { has: can } = usePermissions();
+    const canEditCustomers = can('customers.edit');
+    const { start: startCustomerView, loading: impersonateLoading } = useAdminImpersonate('customer');
     const [searchQuery, setSearchQuery] = useState('');
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
@@ -504,22 +511,36 @@ export default function CustomersPage() {
                                             </td>
                                             <td className="p-4 text-[13px] font-medium text-[#7C7C7C]">{user.businessName || '—'}</td>
                                             <td className="p-4">
-                                                <span className={cn(
-                                                    "inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold",
-                                                    user.isActive ? "bg-[#EEF8F1] text-[#299E60]" : "bg-[#FFF0F0] text-[#E74C3C]"
-                                                )}>
-                                                    {user.isActive ? 'Active' : 'Inactive'}
-                                                </span>
+                                                <AdminStatusBadge
+                                                    variant={user.isActive ? 'active' : 'inactive'}
+                                                />
                                             </td>
                                             <td className="p-4 text-[13px] font-medium text-[#7C7C7C]">
                                                 {new Date(user.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                                             </td>
                                             <td className="p-4">
-                                                <div className="flex items-center justify-center gap-2 relative">
-                                                    <Link href={`/admin/customers/${user.id}`} className="w-[34px] h-[34px] flex items-center justify-center rounded-[10px] bg-[#EEF8F1] text-[#299E60] hover:bg-[#299E60] hover:text-white transition-all shadow-sm">
-                                                        <Eye size={16} />
+                                                <div className="flex items-center justify-end gap-2 relative">
+                                                    {canEditCustomers && user.role === 'customer' && (
+                                                        <button
+                                                            type="button"
+                                                            disabled={impersonateLoading}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                void startCustomerView(user.id);
+                                                            }}
+                                                            className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60"
+                                                        >
+                                                            <UserCircle size={12} />
+                                                            View as Customer
+                                                            <ArrowUpRight size={12} className="opacity-70" />
+                                                        </button>
+                                                    )}
+                                                    <Link
+                                                        href={`/admin/customers/${user.id}`}
+                                                        className="h-[34px] px-3 bg-white border border-[#E5E7EB] text-[#374151] rounded-[8px] text-[12px] font-bold hover:bg-[#F9FAFB] transition-all flex items-center justify-center whitespace-nowrap"
+                                                    >
+                                                        Details
                                                     </Link>
-
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();

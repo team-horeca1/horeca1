@@ -32,6 +32,7 @@ import {
     Image as ImageIcon,
     Copy,
     Check,
+    Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -41,9 +42,17 @@ import {
 import { resolveVendorCode, formatVendorSku } from '@/lib/sku';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { usePermissions } from '@/hooks/usePermissions';
 import { AdminVendorPlatformFee } from '@/components/features/admin/AdminVendorPlatformFee';
 import { AdminPasswordResetButton } from '@/components/features/admin/AdminPasswordResetButton';
 import { AdminUserTeamPanel } from '@/components/features/admin/AdminUserTeamPanel';
+import {
+    AdminEntityDetailHeader,
+    AdminEntityStatsRow,
+    AdminImpersonateButton,
+    AdminStatusBadge,
+} from '@/components/features/admin/entity';
 
 interface VendorProduct {
     id: string;
@@ -201,6 +210,9 @@ export default function VendorDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { has: can } = usePermissions();
+    const canDeleteVendors = can('vendors.delete');
+    const confirm = useConfirm();
     const vendorId = params.id as string;
     const isInitialEdit = searchParams.get('edit') === 'true';
 
@@ -464,6 +476,29 @@ export default function VendorDetailsPage() {
         }
     }, [vendorId]);
 
+    const deleteVendor = async () => {
+        if (!vendor) return;
+        const ok = await confirm({
+            title: 'Delete permanently?',
+            message: `${vendor.businessName} will be removed completely along with products, orders, team memberships and vendor data. This cannot be undone.`,
+            confirmText: 'Delete permanently',
+            tone: 'danger',
+        });
+        if (!ok) return;
+        try {
+            const res = await fetch(`/api/v1/admin/vendors/${vendor.id}?force=true`, { method: 'DELETE' });
+            const json = await res.json();
+            if (!json.success) {
+                toast.error(json.error?.message || json.error || 'Failed to delete');
+                return;
+            }
+            toast.success(`${vendor.businessName} deleted permanently`);
+            router.push('/admin/vendors');
+        } catch {
+            toast.error('Failed to delete');
+        }
+    };
+
     useEffect(() => {
         if (vendorId) {
             fetchVendor();
@@ -547,16 +582,6 @@ export default function VendorDetailsPage() {
         }
     };
 
-    const viewDashboard = async () => {
-        if (!vendor) return;
-        await fetch('/api/v1/admin/impersonate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ vendorId: vendor.id }),
-        });
-        router.push('/vendor/dashboard');
-    };
-
     // Small clickable icon shown beside a KYC field. If the vendor uploaded a
     // document of the matching type, clicking it opens the review popup scoped
     // to that document. Renders nothing when no such document exists.
@@ -629,45 +654,45 @@ export default function VendorDetailsPage() {
     return (
         <div className="space-y-6 pb-12 px-4 md:px-0">
             {/* Header Breadcrumbs Row */}
-            <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-4">
-                <div className="flex items-center gap-2 text-[13px] text-[#6B7280]">
-                    <button
-                        onClick={() => router.back()}
-                        className="hover:text-[#299E60] flex items-center gap-1 transition-colors font-bold text-[12px] uppercase tracking-wider"
-                    >
-                        <ChevronLeft size={14} />
-                        Back
-                    </button>
-                    <span className="text-gray-300">|</span>
-                    <Link href="/admin/vendors" className="hover:text-[#299E60] transition-colors font-semibold">
-                        Sellers Registry
-                    </Link>
-                    <span className="text-gray-300">{'>'}</span>
-                    <span className="font-extrabold text-[#111827]">{vendor.businessName}</span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={viewDashboard}
-                        className="h-[38px] px-4 bg-[#EEF8F1] border border-[#299E60]/20 text-[#299E60] rounded-[10px] text-[12px] font-bold hover:bg-[#D1FAE5] active:scale-97 transition-all flex items-center gap-1.5 shadow-sm"
-                    >
-                        <Globe size={14} />
-                        Impersonate Dashboard
-                    </button>
-                    <button
-                        onClick={() => setIsEditing(!isEditing)}
-                        className={cn(
-                            "h-[38px] px-4 rounded-[10px] text-[12px] font-bold border active:scale-97 transition-all flex items-center gap-1.5 shadow-sm",
-                            isEditing
-                                ? "bg-[#EF4444] border-[#EF4444] text-white hover:bg-[#DC2626]"
-                                : "bg-white border-[#D1D5DB] text-[#374151] hover:bg-[#F9FAFB]"
+            <AdminEntityDetailHeader
+                onBack={() => router.back()}
+                breadcrumbs={[
+                    { label: 'Sellers Registry', href: '/admin/vendors' },
+                    { label: vendor.businessName },
+                ]}
+                actions={
+                    <>
+                        <AdminImpersonateButton
+                            target="vendor"
+                            entityId={vendor.id}
+                            label="View as Vendor"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setIsEditing(!isEditing)}
+                            className={cn(
+                                "h-[38px] px-4 rounded-[10px] text-[12px] font-bold border active:scale-97 transition-all flex items-center gap-1.5 shadow-sm",
+                                isEditing
+                                    ? "bg-[#EF4444] border-[#EF4444] text-white hover:bg-[#DC2626]"
+                                    : "bg-white border-[#D1D5DB] text-[#374151] hover:bg-[#F9FAFB]"
+                            )}
+                        >
+                            <Edit2 size={13} />
+                            {isEditing ? "Cancel Editing" : "Edit Details"}
+                        </button>
+                        {canDeleteVendors && (
+                            <button
+                                type="button"
+                                onClick={() => void deleteVendor()}
+                                className="h-[38px] px-4 rounded-[10px] text-[12px] font-bold border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 active:scale-97 transition-all flex items-center gap-1.5 shadow-sm"
+                            >
+                                <Trash2 size={13} />
+                                Delete permanently
+                            </button>
                         )}
-                    >
-                        <Edit2 size={13} />
-                        {isEditing ? "Cancel Editing" : "Edit Details"}
-                    </button>
-                </div>
-            </div>
+                    </>
+                }
+            />
 
             {/* Editing Warning Banner */}
             {isEditing && (
@@ -740,10 +765,7 @@ export default function VendorDetailsPage() {
                                 {vendor.businessName}
                             </h2>
                             {vendor.isVerified && (
-                                <div className="self-center flex items-center gap-1 bg-[#EEF8F1] border border-[#D1FAE5] px-2.5 py-0.5 rounded-full text-[10px] font-bold text-[#299E60] uppercase tracking-wide">
-                                    <ShieldCheck size={11} fill="#299E60" className="text-white" />
-                                    Verified Vendor
-                                </div>
+                                <AdminStatusBadge variant="verified" label="Verified Vendor" className="normal-case" />
                             )}
                         </div>
 
@@ -855,7 +877,7 @@ export default function VendorDetailsPage() {
                             onClick={() => {
                                 const reason = window.prompt('Reason for rejection (will be sent to vendor):');
                                 if (!reason || !reason.trim()) return;
-                                fetch(`/api/v1/vendors/${vendor.id}`, {
+                                fetch(`/api/v1/admin/vendors/${vendor.id}`, {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ isActive: false, rejectionReason: reason.trim() }),
@@ -870,34 +892,7 @@ export default function VendorDetailsPage() {
                 </div>
             </div>
 
-            {/* Quick Metrics Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {stats.map((stat, idx) => (
-                    <div
-                        key={idx}
-                        className="bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm overflow-hidden hover:shadow-md transition-all group flex flex-col justify-between"
-                    >
-                        <div className="h-[3px] w-full" style={{ backgroundColor: stat.color }} />
-                        <div className="p-5 text-center">
-                            <div
-                                className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform"
-                                style={{
-                                    backgroundColor: `${stat.color}12`,
-                                    color: stat.color,
-                                }}
-                            >
-                                <stat.icon size={18} />
-                            </div>
-                            <h4 className="text-[20px] font-black text-[#111827] leading-none">
-                                {stat.value}
-                            </h4>
-                            <p className="text-[10px] font-bold text-[#9CA3AF] mt-2 uppercase tracking-widest">
-                                {stat.label}
-                            </p>
-                        </div>
-                    </div>
-                ))}
-            </div>
+            <AdminEntityStatsRow stats={stats} />
 
             <AdminVendorPlatformFee
                 vendorId={vendor.id}
