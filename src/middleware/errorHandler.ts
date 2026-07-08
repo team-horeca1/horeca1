@@ -46,7 +46,15 @@ export function friendlyErrorMessage(error: unknown, fallback = 'Something went 
       }
       return `${field} already exists`;
     }
-    if (code === 'P2003') return 'Linked record not found';
+    if (code === 'P2003') {
+      const field = (error as { meta?: { field_name?: string } }).meta?.field_name;
+      console.error('[API Error] P2003 foreign key constraint', field ?? error);
+      return 'Cannot delete — related records still exist. Contact support if this persists.';
+    }
+    if (code === 'P2028') {
+      console.error('[API Error] P2028 transaction timeout', error);
+      return 'Delete took too long and was rolled back. Please try again.';
+    }
     if (code === 'P2000') return 'A value is too long for its field';
   }
   if (error instanceof Error && error.name === 'PrismaClientValidationError') {

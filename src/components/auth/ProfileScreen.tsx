@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
+import { ACCOUNTS_REFRESH_EVENT } from '@/lib/addressUsability';
 import { usePermissions } from '@/hooks/usePermissions';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -130,16 +131,12 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         image: '',
     });
 
+    const sessionUserId = session?.user?.id;
+    const sessionRole = (session?.user as { role?: string } | undefined)?.role;
+
     // Fetch full profile from DB (session only carries name/email/role)
-    // Also pull the default saved address to fill address/city fields
-    // and the vendor-application status to decide whether to show "Become a vendor".
-    //
-    // ALSO: detect role drift. If DB says role='vendor' but the cached JWT still
-    // says 'customer' (happens when admin approves a vendor application while
-    // the user's session is open), force a JWT refresh once so the navbar's
-    // Dashboard link and the vendor portal actually become reachable.
     useEffect(() => {
-        if (!session?.user) return;
+        if (!sessionUserId) return;
         Promise.all([
             fetch('/api/v1/auth/me', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
             fetch('/api/v1/addresses', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
@@ -173,44 +170,9 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                         hasWallets: wallets.length > 0,
                     });
                 }
-                // One-shot role drift fix: DB role > session role?  Refresh JWT.
-                // Pass a non-empty payload so NextAuth definitely fires the jwt
-                // callback with trigger==='update' (a bare update() can no-op).
-                // After ~1.5s, re-check the session and if the role STILL doesn't
-                // match the DB, do a hard reload as a last-resort fallback. The
-                // hardReloadDoneRef guard makes sure this can't loop.
-                const dbRole = profileJson?.success ? profileJson.data?.role : null;
-                const sessionRole = (session.user as { role?: string }).role;
-                if (dbRole && sessionRole && dbRole !== sessionRole) {
-                    const key = `${sessionRole}->${dbRole}`;
-                    if (sessionRoleRefreshedRef.current !== key) {
-                        sessionRoleRefreshedRef.current = key;
-                        Promise.resolve(updateSessionRef.current({ refresh: Date.now() }))
-                            .catch(() => { /* silent — fallback below covers it */ })
-                            .finally(() => {
-                                window.setTimeout(() => {
-                                    if (hardReloadDoneRef.current) return;
-                                    // Re-fetch the DB role and compare against the latest session.
-                                    fetch('/api/v1/auth/me', { credentials: 'include' })
-                                        .then(r => r.ok ? r.json() : null)
-                                        .then(latest => {
-                                            const freshDbRole = latest?.success ? latest.data?.role : null;
-                                            // Read from the live session object captured by closure — by
-                                            // 1.5s the React tree will have re-rendered if update() worked.
-                                            const stillSessionRole = (session.user as { role?: string }).role;
-                                            if (freshDbRole && stillSessionRole && freshDbRole !== stillSessionRole) {
-                                                hardReloadDoneRef.current = true;
-                                                window.location.reload();
-                                            }
-                                        })
-                                        .catch(() => { /* network blip — leave UI as-is */ });
-                                }, 1500);
-                            });
-                    }
-                }
                 const p = profileJson?.success ? profileJson.data : null;
                 const addresses = addrJson?.success ? addrJson.data : [];
-                const defaultAddr = addresses?.[0]; // already sorted by isDefault desc, then createdAt desc
+                const defaultAddr = addresses?.[0];
                 setUserData(prev => ({
                     ...prev,
                     fullName: p?.fullName || prev.fullName || '',
@@ -225,7 +187,57 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                 }));
             })
             .catch(() => {});
-    }, [session]);
+    }, [sessionUserId]);
+
+    // One-shot role drift fix — separate from profile fetch so session.update()
+    // doesn't re-trigger four API calls and hammer /api/auth/session (429).
+    useEffect(() => {
+        if (!sessionUserId || !sessionRole) return;
+
+        let cancelled = false;
+        fetch('/api/v1/auth/me', { credentials: 'include' })
+            .then(r => r.ok ? r.json() : null)
+            .then((profileJson) => {
+                if (cancelled) return;
+                const dbRole = profileJson?.success ? profileJson.data?.role : null;
+                if (!dbRole || dbRole === sessionRole) {
+                    try { sessionStorage.removeItem(`horeca_role_reload_${sessionUserId}`); } catch { /* ignore */ }
+                    return;
+                }
+
+                const key = `${sessionRole}->${dbRole}`;
+                if (sessionRoleRefreshedRef.current === key) return;
+                sessionRoleRefreshedRef.current = key;
+
+                Promise.resolve(updateSessionRef.current({ refresh: Date.now() }))
+                    .catch(() => { /* silent — fallback below covers it */ })
+                    .finally(() => {
+                        window.setTimeout(() => {
+                            if (cancelled || hardReloadDoneRef.current) return;
+                            const reloadGuardKey = `horeca_role_reload_${sessionUserId}`;
+                            try {
+                                if (sessionStorage.getItem(reloadGuardKey)) return;
+                            } catch { /* ignore */ }
+
+                            fetch('/api/v1/auth/me', { credentials: 'include' })
+                                .then(r => r.ok ? r.json() : null)
+                                .then((latest) => {
+                                    if (cancelled || hardReloadDoneRef.current) return;
+                                    const freshDbRole = latest?.success ? latest.data?.role : null;
+                                    if (freshDbRole && freshDbRole !== sessionRole) {
+                                        hardReloadDoneRef.current = true;
+                                        try { sessionStorage.setItem(reloadGuardKey, key); } catch { /* ignore */ }
+                                        window.location.reload();
+                                    }
+                                })
+                                .catch(() => { /* network blip */ });
+                        }, 1500);
+                    });
+            })
+            .catch(() => {});
+
+        return () => { cancelled = true; };
+    }, [sessionUserId, sessionRole]);
 
     if (!isOpen) return null;
 
@@ -311,7 +323,6 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
 
     const isProfileComplete = !!(userData.fullName && userData.businessName && userData.pincode);
     const defaultLocation = [userData.city, userData.pincode].filter(Boolean).join(' · ');
-    const sessionRole = (session?.user as { role?: string } | undefined)?.role;
     // Show the "Become a vendor" CTA only for customers who haven't yet applied.
     // Admins, brands, and existing vendors (pending or approved) all skip it.
     const showBecomeVendorCta = hasVendorApplication === false && sessionRole !== 'admin' && sessionRole !== 'brand' && sessionRole !== 'vendor';
@@ -943,6 +954,10 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
             <SettingsOverlay
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
+                activeBusinessAccountId={activeAccountIdForLinks}
+                onBusinessAccountDeleted={() => {
+                    window.dispatchEvent(new CustomEvent(ACCOUNTS_REFRESH_EVENT));
+                }}
             />
 
             {/* Become a Vendor Modal */}
@@ -983,7 +998,9 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                         // unless we force a reload. Reload also resets any
                         // stale activeBusinessAccountId in case the user
                         // somehow deleted the BA they're viewing from.
-                        onDeleted={() => { window.location.reload(); }}
+                        onDeleted={() => {
+                            window.dispatchEvent(new CustomEvent(ACCOUNTS_REFRESH_EVENT));
+                        }}
                     />
                 </>
             )}

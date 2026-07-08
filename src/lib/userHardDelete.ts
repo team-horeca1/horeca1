@@ -6,20 +6,123 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { markSessionStale } from '@/lib/sessionStale';
 
+/** Hard deletes touch many tables; default Prisma interactive tx timeout (5s) is too low over SSH tunnel. */
+const HARD_DELETE_TX_OPTS = { maxWait: 15_000, timeout: 120_000 } as const;
+
 async function deleteSoloBusinessAccounts(
   tx: Prisma.TransactionClient,
   soloAccountIds: string[],
 ): Promise<void> {
   for (const businessAccountId of soloAccountIds) {
-    await tx.cart.deleteMany({ where: { businessAccountId } });
-    await tx.quickOrderList.deleteMany({ where: { businessAccountId } });
-    await tx.customerVendor.deleteMany({ where: { businessAccountId } });
-    await tx.businessAccount.update({
-      where: { id: businessAccountId },
-      data: { primaryOutletId: null },
-    });
-    await tx.businessAccount.delete({ where: { id: businessAccountId } });
+    await deleteVendorBusinessAccountInTransaction(tx, businessAccountId);
   }
+}
+
+/** Delete all marketplace data scoped to a single vendor (not the owner user). */
+async function hardDeleteVendorScopedDataInTransaction(
+  tx: Prisma.TransactionClient,
+  vendorId: string,
+): Promise<void> {
+  const orderRows = await tx.order.findMany({
+    where: { vendorId },
+    select: { id: true },
+  });
+  const orderIds = orderRows.map((o) => o.id);
+
+  await tx.commissionAccrual.deleteMany({
+    where: { OR: [{ orderId: { in: orderIds } }, { vendorId }] },
+  });
+  await tx.payment.deleteMany({
+    where: { OR: [{ orderId: { in: orderIds } }, { vendorId }] },
+  });
+  await tx.returnRequest.deleteMany({ where: { orderId: { in: orderIds } } });
+  await tx.creditTransaction.deleteMany({
+    where: {
+      OR: [
+        { orderId: { in: orderIds } },
+        { vendorId },
+        { creditAccount: { vendorId } },
+      ],
+    },
+  });
+  await tx.order.deleteMany({ where: { vendorId } });
+
+  await tx.cartItem.deleteMany({ where: { vendorId } });
+  await tx.quickOrderListItem.deleteMany({ where: { vendorId } });
+  await tx.quickOrderList.deleteMany({ where: { vendorId } });
+
+  await tx.product.deleteMany({ where: { vendorId } });
+
+  await tx.creditWallet.deleteMany({ where: { vendorId } });
+  await tx.creditAccount.deleteMany({ where: { vendorId } });
+  await tx.customerVendor.deleteMany({ where: { vendorId } }).catch(() => {});
+  await tx.vendorCustomer.deleteMany({ where: { vendorId } }).catch(() => {});
+
+  await tx.vendorDocument.deleteMany({ where: { vendorId } }).catch(() => {});
+  await tx.vendorSettlement.deleteMany({ where: { vendorId } }).catch(() => {});
+  await tx.vendorWalletTxn.deleteMany({ where: { wallet: { vendorId } } }).catch(() => {});
+  await tx.vendorWallet.deleteMany({ where: { vendorId } }).catch(() => {});
+  await tx.inventoryLog.deleteMany({ where: { vendorId } }).catch(() => {});
+  await tx.serviceArea.deleteMany({ where: { vendorId } }).catch(() => {});
+  await tx.deliverySlot.deleteMany({ where: { vendorId } }).catch(() => {});
+}
+
+async function deleteVendorBusinessAccountInTransaction(
+  tx: Prisma.TransactionClient,
+  businessAccountId: string,
+): Promise<void> {
+  await tx.cart.deleteMany({ where: { businessAccountId } });
+  await tx.quickOrderList.deleteMany({ where: { businessAccountId } });
+  await tx.customerVendor.deleteMany({ where: { businessAccountId } });
+  await tx.userRole.deleteMany({ where: { businessAccountId } });
+  await tx.businessAccountMember.deleteMany({ where: { businessAccountId } });
+
+  const outlets = await tx.outlet.findMany({
+    where: { businessAccountId },
+    select: { id: true },
+  });
+  const outletIds = outlets.map((o) => o.id);
+  if (outletIds.length > 0) {
+    await tx.stockTransfer.deleteMany({
+      where: {
+        OR: [
+          { fromOutletId: { in: outletIds } },
+          { toOutletId: { in: outletIds } },
+        ],
+      },
+    });
+    await tx.savedAddress.deleteMany({ where: { outletId: { in: outletIds } } }).catch(() => {});
+    await tx.outlet.deleteMany({ where: { id: { in: outletIds } } });
+  }
+
+  await tx.businessAccount.update({
+    where: { id: businessAccountId },
+    data: { primaryOutletId: null },
+  });
+  await tx.businessAccount.delete({ where: { id: businessAccountId } });
+}
+
+async function deleteOwnedVendorsInTransaction(
+  tx: Prisma.TransactionClient,
+  vendorIds: string[],
+): Promise<Set<string>> {
+  const deletedBusinessAccountIds = new Set<string>();
+  if (vendorIds.length === 0) return deletedBusinessAccountIds;
+
+  const vendors = await tx.vendor.findMany({
+    where: { id: { in: vendorIds } },
+    select: { id: true, businessAccountId: true },
+  });
+
+  for (const vendor of vendors) {
+    await tx.vendorTeamMember.deleteMany({ where: { vendorId: vendor.id } });
+    await hardDeleteVendorScopedDataInTransaction(tx, vendor.id);
+    await tx.vendor.delete({ where: { id: vendor.id } });
+    await deleteVendorBusinessAccountInTransaction(tx, vendor.businessAccountId);
+    deletedBusinessAccountIds.add(vendor.businessAccountId);
+  }
+
+  return deletedBusinessAccountIds;
 }
 
 export async function hardDeleteUserInTransaction(
@@ -27,18 +130,16 @@ export async function hardDeleteUserInTransaction(
   userId: string,
   vendorIds: string[],
 ): Promise<void> {
+  const deletedVendorBaIds = await deleteOwnedVendorsInTransaction(tx, vendorIds);
+
   const orderRows = await tx.order.findMany({
-    where: { OR: [{ userId }, { vendorId: { in: vendorIds } }] },
+    where: { userId },
     select: { id: true },
   });
   const orderIds = orderRows.map((o) => o.id);
 
-  await tx.commissionAccrual.deleteMany({
-    where: { OR: [{ orderId: { in: orderIds } }, { vendorId: { in: vendorIds } }] },
-  });
-  await tx.payment.deleteMany({
-    where: { OR: [{ orderId: { in: orderIds } }, { vendorId: { in: vendorIds } }] },
-  });
+  await tx.commissionAccrual.deleteMany({ where: { orderId: { in: orderIds } } });
+  await tx.payment.deleteMany({ where: { orderId: { in: orderIds } } });
   await tx.returnRequest.deleteMany({
     where: { OR: [{ orderId: { in: orderIds } }, { customerId: userId }] },
   });
@@ -46,48 +147,25 @@ export async function hardDeleteUserInTransaction(
     where: {
       OR: [
         { orderId: { in: orderIds } },
-        { vendorId: { in: vendorIds } },
         { creditAccount: { userId } },
-        { creditAccount: { vendorId: { in: vendorIds } } },
       ],
     },
   });
+  await tx.order.deleteMany({ where: { userId } });
 
-  await tx.order.deleteMany({
-    where: { OR: [{ userId }, { vendorId: { in: vendorIds } }] },
-  });
-
-  await tx.cartItem.deleteMany({
-    where: { OR: [{ vendorId: { in: vendorIds } }, { cart: { userId } }] },
-  });
-  await tx.quickOrderListItem.deleteMany({
-    where: { OR: [{ vendorId: { in: vendorIds } }, { list: { userId } }] },
-  });
-  await tx.quickOrderList.deleteMany({
-    where: { OR: [{ vendorId: { in: vendorIds } }, { userId }] },
-  });
-
-  if (vendorIds.length > 0) {
-    await tx.product.deleteMany({ where: { vendorId: { in: vendorIds } } });
-  }
+  await tx.cartItem.deleteMany({ where: { cart: { userId } } });
+  await tx.quickOrderListItem.deleteMany({ where: { list: { userId } } });
+  await tx.quickOrderList.deleteMany({ where: { userId } });
 
   await tx.notification.deleteMany({ where: { userId } });
   await tx.cart.deleteMany({ where: { userId } });
   await tx.walletTransaction.deleteMany({ where: { wallet: { userId } } }).catch(() => {});
   await tx.wallet.deleteMany({ where: { userId } }).catch(() => {});
   await tx.cashbackEntry.deleteMany({ where: { userId } });
-  await tx.creditWallet.deleteMany({
-    where: { OR: [{ userId }, { vendorId: { in: vendorIds } }] },
-  });
-  await tx.creditAccount.deleteMany({
-    where: { OR: [{ userId }, { vendorId: { in: vendorIds } }] },
-  });
-  await tx.customerVendor.deleteMany({
-    where: { OR: [{ userId }, { vendorId: { in: vendorIds } }] },
-  }).catch(() => {});
-  await tx.vendorCustomer.deleteMany({
-    where: { OR: [{ userId }, { vendorId: { in: vendorIds } }] },
-  }).catch(() => {});
+  await tx.creditWallet.deleteMany({ where: { userId } });
+  await tx.creditAccount.deleteMany({ where: { userId } });
+  await tx.customerVendor.deleteMany({ where: { userId } }).catch(() => {});
+  await tx.vendorCustomer.deleteMany({ where: { userId } }).catch(() => {});
 
   await tx.adminTeamMember.deleteMany({ where: { userId } });
   await tx.vendorTeamMember.deleteMany({ where: { userId } }).catch(() => {});
@@ -99,6 +177,7 @@ export async function hardDeleteUserInTransaction(
   });
   const soloAccountIds: string[] = [];
   for (const { businessAccountId } of memberships) {
+    if (deletedVendorBaIds.has(businessAccountId)) continue;
     const memberCount = await tx.businessAccountMember.count({
       where: { businessAccountId },
     });
@@ -120,14 +199,8 @@ export async function hardDeleteUserInTransaction(
   await tx.session.deleteMany({ where: { userId } });
   await tx.account.deleteMany({ where: { userId } });
 
-  if (vendorIds.length > 0) {
-    await tx.vendorDocument.deleteMany({ where: { vendorId: { in: vendorIds } } }).catch(() => {});
-    await tx.vendorSettlement.deleteMany({ where: { vendorId: { in: vendorIds } } }).catch(() => {});
-    await tx.vendorWalletTxn.deleteMany({ where: { wallet: { vendorId: { in: vendorIds } } } }).catch(() => {});
-    await tx.vendorWallet.deleteMany({ where: { vendorId: { in: vendorIds } } }).catch(() => {});
-    await tx.inventoryLog.deleteMany({ where: { vendorId: { in: vendorIds } } }).catch(() => {});
-    await tx.vendor.deleteMany({ where: { id: { in: vendorIds } } });
-  }
+  await tx.productAuditLog.deleteMany({ where: { changedBy: userId } }).catch(() => {});
+  await tx.masterProductRevision.deleteMany({ where: { createdBy: userId } }).catch(() => {});
 
   await tx.brand.deleteMany({ where: { userId } }).catch(() => {});
 
@@ -208,83 +281,7 @@ export async function hardDeleteUserById(userId: string): Promise<void> {
   const vendorIds = existing.vendors.map((v) => v.id);
   await prisma.$transaction(async (tx) => {
     await hardDeleteUserInTransaction(tx, userId, vendorIds);
-  });
-}
-
-/** Delete all marketplace data scoped to a single vendor (not the owner user). */
-async function hardDeleteVendorScopedDataInTransaction(
-  tx: Prisma.TransactionClient,
-  vendorId: string,
-): Promise<void> {
-  const orderRows = await tx.order.findMany({
-    where: { vendorId },
-    select: { id: true },
-  });
-  const orderIds = orderRows.map((o) => o.id);
-
-  await tx.commissionAccrual.deleteMany({
-    where: { OR: [{ orderId: { in: orderIds } }, { vendorId }] },
-  });
-  await tx.payment.deleteMany({
-    where: { OR: [{ orderId: { in: orderIds } }, { vendorId }] },
-  });
-  await tx.returnRequest.deleteMany({ where: { orderId: { in: orderIds } } });
-  await tx.creditTransaction.deleteMany({
-    where: {
-      OR: [
-        { orderId: { in: orderIds } },
-        { vendorId },
-        { creditAccount: { vendorId } },
-      ],
-    },
-  });
-  await tx.order.deleteMany({ where: { vendorId } });
-
-  await tx.cartItem.deleteMany({ where: { vendorId } });
-  await tx.quickOrderListItem.deleteMany({ where: { vendorId } });
-  await tx.quickOrderList.deleteMany({ where: { vendorId } });
-
-  await tx.product.deleteMany({ where: { vendorId } });
-
-  await tx.creditWallet.deleteMany({ where: { vendorId } });
-  await tx.creditAccount.deleteMany({ where: { vendorId } });
-  await tx.customerVendor.deleteMany({ where: { vendorId } }).catch(() => {});
-  await tx.vendorCustomer.deleteMany({ where: { vendorId } }).catch(() => {});
-
-  await tx.vendorDocument.deleteMany({ where: { vendorId } }).catch(() => {});
-  await tx.vendorSettlement.deleteMany({ where: { vendorId } }).catch(() => {});
-  await tx.vendorWalletTxn.deleteMany({ where: { wallet: { vendorId } } }).catch(() => {});
-  await tx.vendorWallet.deleteMany({ where: { vendorId } }).catch(() => {});
-  await tx.inventoryLog.deleteMany({ where: { vendorId } }).catch(() => {});
-  await tx.serviceArea.deleteMany({ where: { vendorId } }).catch(() => {});
-  await tx.deliverySlot.deleteMany({ where: { vendorId } }).catch(() => {});
-}
-
-async function deleteVendorBusinessAccountInTransaction(
-  tx: Prisma.TransactionClient,
-  businessAccountId: string,
-): Promise<void> {
-  await tx.cart.deleteMany({ where: { businessAccountId } });
-  await tx.quickOrderList.deleteMany({ where: { businessAccountId } });
-  await tx.customerVendor.deleteMany({ where: { businessAccountId } });
-  await tx.userRole.deleteMany({ where: { businessAccountId } });
-  await tx.businessAccountMember.deleteMany({ where: { businessAccountId } });
-
-  const outlets = await tx.outlet.findMany({
-    where: { businessAccountId },
-    select: { id: true },
-  });
-  const outletIds = outlets.map((o) => o.id);
-  if (outletIds.length > 0) {
-    await tx.savedAddress.deleteMany({ where: { outletId: { in: outletIds } } }).catch(() => {});
-    await tx.outlet.deleteMany({ where: { id: { in: outletIds } } });
-  }
-
-  await tx.businessAccount.update({
-    where: { id: businessAccountId },
-    data: { primaryOutletId: null },
-  });
-  await tx.businessAccount.delete({ where: { id: businessAccountId } });
+  }, HARD_DELETE_TX_OPTS);
 }
 
 export interface HardDeleteVendorResult {
@@ -311,9 +308,9 @@ export async function hardDeleteVendorById(vendorId: string): Promise<HardDelete
   await prisma.$transaction(async (tx) => {
     await tx.vendorTeamMember.deleteMany({ where: { vendorId } });
     await hardDeleteVendorScopedDataInTransaction(tx, vendorId);
-    await deleteVendorBusinessAccountInTransaction(tx, vendor.businessAccountId);
     await tx.vendor.delete({ where: { id: vendorId } });
-  });
+    await deleteVendorBusinessAccountInTransaction(tx, vendor.businessAccountId);
+  }, HARD_DELETE_TX_OPTS);
 
   const removal = await finalizeTeamMemberRemoval(ownerUserId);
 

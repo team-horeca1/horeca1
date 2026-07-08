@@ -13,7 +13,8 @@
     "migrate:prod": "npx prisma migrate deploy",
     "verify:order-snapshots": "npx tsx scripts/verify-order-snapshots.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke:auth": "node scripts/auth-smoke.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
