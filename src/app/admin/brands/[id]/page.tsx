@@ -32,6 +32,12 @@ import {
     AdminImpersonateButton,
     AdminLoginCredentialsPanel,
     AdminStatusBadge,
+    AdminEntityContactGrid,
+    AdminEntityTabBar,
+    AdminEntityTabPanel,
+    AdminEntityTabContent,
+    AdminRegistryLoadingState,
+    AdminEntityHeroCard,
 } from '@/components/features/admin/entity';
 
 interface BusinessAccountReview {
@@ -274,11 +280,7 @@ export default function AdminBrandEditPage() {
     };
 
     if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <Loader2 size={32} className="animate-spin text-[#53B175]" />
-            </div>
-        );
+        return <AdminRegistryLoadingState message="Loading brand profile..." />;
     }
 
     if (!brand) {
@@ -376,8 +378,8 @@ export default function AdminBrandEditPage() {
                 </div>
             )}
 
-            <div className="bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm overflow-hidden p-6 md:p-8 flex flex-col lg:flex-row items-center lg:items-stretch gap-6 md:gap-8">
-                <div className="flex flex-col items-center justify-center shrink-0 w-[180px]">
+            <AdminEntityHeroCard
+                avatar={
                     <div className="w-[140px] h-[140px] rounded-[16px] bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center p-4 shadow-inner">
                         {brand.logoUrl ? (
                             <img src={brand.logoUrl} alt={brand.name} className="w-full h-full object-contain" />
@@ -385,152 +387,97 @@ export default function AdminBrandEditPage() {
                             <span className="text-[42px] font-black text-[#7C3AED]">{getInitials(brand.name)}</span>
                         )}
                     </div>
-                    <div className="mt-3">
-                        <AdminStatusBadge variant={statusVariant} label={brand.approvalStatus} className="normal-case" />
-                    </div>
-                </div>
-
-                <div className="flex-1 min-w-0 flex flex-col justify-between text-center lg:text-left">
-                    <div>
-                        <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3 justify-center lg:justify-start">
-                            <h2 className="text-[24px] font-black text-[#111827] leading-tight">{brand.name}</h2>
-                            {brand.approvalStatus === 'approved' && (
-                                <AdminStatusBadge variant="verified" label="Verified Brand" className="normal-case" />
-                            )}
-                        </div>
-                        {brand.tagline && (
-                            <p className="text-[13px] text-[#6B7280] font-medium mt-2">{brand.tagline}</p>
+                }
+                avatarFooter={
+                    <AdminStatusBadge variant={statusVariant} label={brand.approvalStatus} className="normal-case" />
+                }
+                title={brand.name}
+                badges={
+                    brand.approvalStatus === 'approved' ? (
+                        <AdminStatusBadge variant="verified" label="Verified Brand" className="normal-case" />
+                    ) : undefined
+                }
+                subtitle={
+                    brand.tagline ? (
+                        <p className="text-[13px] text-[#6B7280] font-medium mt-2">{brand.tagline}</p>
+                    ) : undefined
+                }
+                contact={
+                    <AdminEntityContactGrid
+                        accent="#7C3AED"
+                        accentBg="#EDE9FE"
+                        className="mt-4"
+                        items={[
+                            ...(owner
+                                ? [
+                                    { icon: User, label: 'Owner', value: owner.fullName },
+                                    { icon: Mail, label: 'Email', value: owner.email },
+                                ]
+                                : [{ icon: User, label: 'Owner', value: 'No owner account linked' }]),
+                            ...(phone ? [{ icon: Phone, label: 'Phone', value: phone }] : []),
+                            ...(billingAddress ? [{ icon: MapPin, label: 'Registered Office', value: billingAddress }] : []),
+                        ]}
+                    />
+                }
+                sidebar={
+                    <>
+                        {owner && (
+                            <AdminLoginCredentialsPanel
+                                user={owner}
+                                adminPassword={ownerPassword}
+                                permission="brands.edit"
+                                accent="#7C3AED"
+                                onPasswordUpdated={setOwnerPassword}
+                            />
                         )}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 border-t border-[#F3F4F6] pt-4 text-left">
-                            {owner ? (
-                                <>
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-[30px] h-[30px] rounded-[8px] bg-[#EDE9FE] flex items-center justify-center text-[#7C3AED]">
-                                            <User size={13} />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <span className="text-[10px] text-[#9CA3AF] uppercase block font-bold">Owner</span>
-                                            <span className="text-[12px] font-bold text-[#374151] truncate block">{owner.fullName}</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2.5">
-                                        <div className="w-[30px] h-[30px] rounded-[8px] bg-[#EDE9FE] flex items-center justify-center text-[#7C3AED]">
-                                            <Mail size={13} />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <span className="text-[10px] text-[#9CA3AF] uppercase block font-bold">Email</span>
-                                            <span className="text-[12px] font-bold text-[#374151] truncate block">{owner.email}</span>
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="flex items-center gap-2.5 sm:col-span-2">
-                                    <div className="w-[30px] h-[30px] rounded-[8px] bg-[#F3F4F6] flex items-center justify-center text-[#9CA3AF]">
-                                        <User size={13} />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <span className="text-[10px] text-[#9CA3AF] uppercase block font-bold">Owner</span>
-                                        <span className="text-[12px] font-bold text-[#9CA3AF] block">No owner account linked</span>
-                                    </div>
-                                </div>
-                            )}
-                            {phone && (
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-[30px] h-[30px] rounded-[8px] bg-[#EDE9FE] flex items-center justify-center text-[#7C3AED]">
-                                        <Phone size={13} />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <span className="text-[10px] text-[#9CA3AF] uppercase block font-bold">Phone</span>
-                                        <span className="text-[12px] font-bold text-[#374151] block">{phone}</span>
-                                    </div>
-                                </div>
-                            )}
-                            {billingAddress && (
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-[30px] h-[30px] rounded-[8px] bg-[#EDE9FE] flex items-center justify-center text-[#7C3AED]">
-                                        <MapPin size={13} />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <span className="text-[10px] text-[#9CA3AF] uppercase block font-bold">Registered Office</span>
-                                        <span className="text-[12px] font-bold text-[#374151] truncate block">{billingAddress}</span>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="w-full lg:w-[260px] border-t lg:border-t-0 lg:border-l border-[#F3F4F6] pt-6 lg:pt-0 lg:pl-6 flex flex-col justify-center gap-4">
-                    {owner && (
-                        <AdminLoginCredentialsPanel
-                            user={owner}
-                            adminPassword={ownerPassword}
-                            permission="brands.edit"
-                            accent="#7C3AED"
-                            onPasswordUpdated={setOwnerPassword}
-                        />
-                    )}
-                    {canApprove && (
-                        <div className="flex flex-col gap-2.5">
-                            <span className="text-[11px] font-bold text-[#9CA3AF] uppercase">Verification Actions</span>
-                            {brand.approvalStatus !== 'approved' && (
-                                <button
-                                    onClick={() => void handleApprove()}
-                                    disabled={approvalLoading}
-                                    className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54] disabled:opacity-50"
-                                >
-                                    {approvalLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
-                                    Approve & Verify
-                                </button>
-                            )}
-                            {brand.approvalStatus === 'approved' && (
-                                <button
-                                    onClick={() => void handleRevoke()}
-                                    disabled={approvalLoading}
-                                    className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border bg-amber-500 border-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
-                                >
-                                    {approvalLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldX size={13} />}
-                                    Revoke Approval
-                                </button>
-                            )}
-                            {brand.approvalStatus !== 'rejected' && (
-                                <button
-                                    onClick={() => setShowRejectModal(true)}
-                                    disabled={approvalLoading}
-                                    className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 bg-[#EF4444] border border-[#EF4444] text-white hover:bg-[#DC2626] disabled:opacity-50"
-                                >
-                                    <XCircle size={13} />
-                                    Reject Application
-                                </button>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
+                        {canApprove && (
+                            <div className="flex flex-col gap-2.5">
+                                <span className="text-[11px] font-bold text-[#9CA3AF] uppercase">Verification Actions</span>
+                                {brand.approvalStatus !== 'approved' && (
+                                    <button
+                                        onClick={() => void handleApprove()}
+                                        disabled={approvalLoading}
+                                        className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54] disabled:opacity-50"
+                                    >
+                                        {approvalLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
+                                        Approve & Verify
+                                    </button>
+                                )}
+                                {brand.approvalStatus === 'approved' && (
+                                    <button
+                                        onClick={() => void handleRevoke()}
+                                        disabled={approvalLoading}
+                                        className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border bg-amber-500 border-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                                    >
+                                        {approvalLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldX size={13} />}
+                                        Revoke Approval
+                                    </button>
+                                )}
+                                {brand.approvalStatus !== 'rejected' && (
+                                    <button
+                                        onClick={() => setShowRejectModal(true)}
+                                        disabled={approvalLoading}
+                                        className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 bg-[#EF4444] border border-[#EF4444] text-white hover:bg-[#DC2626] disabled:opacity-50"
+                                    >
+                                        <XCircle size={13} />
+                                        Reject Application
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </>
+                }
+            />
 
             <AdminEntityStatsRow stats={stats} />
 
-            <div className="bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm overflow-hidden">
-                <div className="flex border-b border-[#EEEEEE] overflow-x-auto bg-[#F9FAFB]">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            onClick={() => setActiveTab(tab.id)}
-                            className={cn(
-                                'flex items-center gap-2 px-6 py-4 border-b-2 font-bold text-[12px] transition-all whitespace-nowrap outline-none',
-                                activeTab === tab.id
-                                    ? 'border-[#299E60] text-[#299E60] bg-white shadow-sm'
-                                    : 'border-transparent text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6]/50',
-                            )}
-                        >
-                            <tab.icon size={14} />
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="p-6 md:p-8">
+            <AdminEntityTabPanel>
+                <AdminEntityTabBar
+                    activeTab={activeTab}
+                    onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+                    tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }))}
+                />
+                <AdminEntityTabContent>
                     {activeTab === 'overview' && hasApplication && (isReviewMode || brand.approvalStatus === 'pending') && (
                         <div className="space-y-4">
                             <h2 className="text-[15px] font-black text-[#111827]">Application Review</h2>
@@ -560,24 +507,24 @@ export default function AdminBrandEditPage() {
                                         { key: 'website', label: 'Website', placeholder: 'https://amul.com', full: true },
                                     ].map(f => (
                                         <div key={f.key} className={cn('space-y-1', f.full && 'sm:col-span-2')}>
-                                            <label className="text-[13px] font-semibold text-gray-700">{f.label}</label>
+                                            <label className="text-[13px] font-semibold text-[#181725]">{f.label}</label>
                                             <input
                                                 type="text"
                                                 value={(form as Record<string, unknown>)[f.key] as string}
                                                 onChange={(e) => setForm(p => ({ ...p, [f.key]: e.target.value }))}
                                                 placeholder={f.placeholder}
-                                                className="w-full text-[13px] border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#299E60]/30"
+                                                className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#299E60]/30"
                                             />
                                         </div>
                                     ))}
                                     <div className="space-y-1 sm:col-span-2">
-                                        <label className="text-[13px] font-semibold text-gray-700">Description</label>
+                                        <label className="text-[13px] font-semibold text-[#181725]">Description</label>
                                         <textarea
                                             value={form.description}
                                             onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
                                             rows={3}
                                             placeholder="Short brand description…"
-                                            className="w-full text-[13px] border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#299E60]/30 resize-none"
+                                            className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#299E60]/30 resize-none"
                                         />
                                     </div>
                                 </div>
@@ -618,30 +565,30 @@ export default function AdminBrandEditPage() {
                                 <h2 className="text-[15px] font-black text-[#111827]">Admin Operations</h2>
                                 <div className="grid sm:grid-cols-2 gap-4">
                                     <div className="space-y-1">
-                                        <label className="text-[13px] font-semibold text-gray-700">Brand Tier</label>
+                                        <label className="text-[13px] font-semibold text-[#181725]">Brand Tier</label>
                                         <select value={form.brandTier} onChange={e => setForm(p => ({ ...p, brandTier: e.target.value }))}
-                                            className="w-full text-[13px] border border-gray-200 rounded-xl px-3 py-2.5">
+                                            className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5">
                                             <option value="">Select tier</option>
                                             {['Premium', 'Mid', 'Mass'].map(t => <option key={t} value={t}>{t}</option>)}
                                         </select>
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[13px] font-semibold text-gray-700">Marketplace Visibility</label>
+                                        <label className="text-[13px] font-semibold text-[#181725]">Marketplace Visibility</label>
                                         <select value={form.marketplaceVisibility} onChange={e => setForm(p => ({ ...p, marketplaceVisibility: e.target.value }))}
-                                            className="w-full text-[13px] border border-gray-200 rounded-xl px-3 py-2.5">
+                                            className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5">
                                             <option value="">Select visibility</option>
                                             {['Public', 'Restricted'].map(t => <option key={t} value={t}>{t}</option>)}
                                         </select>
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[13px] font-semibold text-gray-700">Lead Status</label>
+                                        <label className="text-[13px] font-semibold text-[#181725]">Lead Status</label>
                                         <select value={form.leadStatus} onChange={e => setForm(p => ({ ...p, leadStatus: e.target.value }))}
-                                            className="w-full text-[13px] border border-gray-200 rounded-xl px-3 py-2.5">
+                                            className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5">
                                             <option value="">Select status</option>
                                             {['Lead', 'Contacted', 'Active'].map(t => <option key={t} value={t}>{t}</option>)}
                                         </select>
                                     </div>
-                                    <label className="flex items-center gap-2 text-[13px] font-semibold text-gray-700 pt-6">
+                                    <label className="flex items-center gap-2 text-[13px] font-semibold text-[#181725] pt-6">
                                         <input type="checkbox" checked={form.creditSupport}
                                             onChange={e => setForm(p => ({ ...p, creditSupport: e.target.checked }))}
                                             className="accent-[#299E60] w-4 h-4" />
@@ -666,8 +613,8 @@ export default function AdminBrandEditPage() {
                             accent="#7C3AED"
                         />
                     )}
-                </div>
-            </div>
+                </AdminEntityTabContent>
+            </AdminEntityTabPanel>
 
             {showRejectModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowRejectModal(false)}>

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-    ChevronLeft,
     Mail,
     Phone,
     CheckCircle2,
@@ -23,6 +22,8 @@ import {
     Wallet,
     Copy,
     Check,
+    LayoutDashboard,
+    Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useParams, useRouter } from 'next/navigation';
@@ -34,6 +35,11 @@ import {
     AdminImpersonateButton,
     AdminStatusBadge,
     AdminLoginCredentialsPanel,
+    AdminEntityHeroCard,
+    AdminEntityContactGrid,
+    AdminEntityTabBar,
+    AdminEntityTabPanel,
+    AdminEntityTabContent,
 } from '@/components/features/admin/entity';
 
 interface VendorProfile {
@@ -305,10 +311,10 @@ export default function CustomerDetailsPage() {
     ];
 
     const tabs = [
-        { id: 'overview' as const, label: 'Overview' },
-        { id: 'business' as const, label: 'Business Profile' },
-        { id: 'credit' as const, label: 'Credit & Orders' },
-        { id: 'team' as const, label: 'Team' },
+        { id: 'overview' as const, label: 'Overview', icon: LayoutDashboard },
+        { id: 'business' as const, label: 'Business Profile', icon: Building2 },
+        { id: 'credit' as const, label: 'Credit & Orders', icon: Wallet },
+        { id: 'team' as const, label: 'Team', icon: Users },
     ];
 
     return (
@@ -372,85 +378,74 @@ export default function CustomerDetailsPage() {
                 </div>
             )}
 
-            <div className="bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm overflow-hidden p-6 md:p-8 flex flex-col lg:flex-row items-center lg:items-stretch gap-6 md:gap-8">
-                <div className="flex flex-col items-center justify-center shrink-0 w-[180px]">
-                    <div className="w-[120px] h-[120px] rounded-full border-4 border-[#F3F4F6] overflow-hidden bg-white shadow-inner">
+            <AdminEntityHeroCard
+                avatar={
+                    <div className="w-[140px] h-[140px] rounded-[16px] bg-[#F9FAFB] border border-[#E5E7EB] overflow-hidden shadow-inner">
                         <img src={avatarUrl} alt={user.fullName} className="w-full h-full object-cover" />
                     </div>
-                    <div className="mt-3">
-                        <AdminStatusBadge variant={user.isActive ? 'active' : 'inactive'} label={user.isActive ? 'Active' : 'Inactive'} />
-                    </div>
-                </div>
-                <div className="flex-1 min-w-0 flex flex-col justify-between text-center lg:text-left">
-                    <div>
-                        <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3 justify-center lg:justify-start">
-                            <h2 className="text-[24px] font-black text-[#111827] leading-tight">{user.fullName}</h2>
-                            <span className={cn('text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider border capitalize', getRoleBadgeStyles(user.role))}>
-                                {user.role}
-                            </span>
-                        </div>
-                        {user.businessName && (
-                            <p className="text-[13px] text-[#6B7280] font-medium mt-2">{user.businessName}</p>
-                        )}
-                        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mt-4 justify-center lg:justify-start">
-                            <div className="flex items-center gap-2 text-[13px] text-[#374151]">
-                                <Mail size={14} className="text-[#9CA3AF]" />
-                                <span className="font-bold truncate">{user.email}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-[13px] text-[#374151]">
-                                <Phone size={14} className="text-[#9CA3AF]" />
-                                <span className="font-bold">{user.phone || '—'}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="w-full lg:w-[260px] border-t lg:border-t-0 lg:border-l border-[#F3F4F6] pt-6 lg:pt-0 lg:pl-6 flex flex-col justify-center gap-4">
-                    <span className="text-[11px] font-bold text-[#9CA3AF] uppercase text-center lg:text-left">Account Actions</span>
-                    <AdminLoginCredentialsPanel
-                        user={user}
-                        adminPassword={ownerPassword}
-                        permission="customers.edit"
+                }
+                avatarFooter={
+                    <AdminStatusBadge variant={user.isActive ? 'active' : 'inactive'} label={user.isActive ? 'Active' : 'Inactive'} />
+                }
+                title={user.fullName}
+                badges={
+                    <span className={cn('text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider border capitalize', getRoleBadgeStyles(user.role))}>
+                        {user.role}
+                    </span>
+                }
+                subtitle={
+                    user.businessName ? (
+                        <p className="text-[13px] text-[#6B7280] font-medium mt-2">{user.businessName}</p>
+                    ) : undefined
+                }
+                contact={
+                    <AdminEntityContactGrid
                         accent="#299E60"
-                        onPasswordUpdated={setOwnerPassword}
+                        accentBg="#EEF8F1"
+                        className="mt-4"
+                        items={[
+                            { icon: Mail, label: 'Email', value: user.email || '—' },
+                            { icon: Phone, label: 'Phone', value: user.phone || '—' },
+                        ]}
                     />
-                    <button
-                        type="button"
-                        onClick={handleToggleActive}
-                        disabled={toggling}
-                        className={cn(
-                            'w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border',
-                            user.isActive
-                                ? 'bg-white border-red-200 text-red-600 hover:bg-red-50'
-                                : 'bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54]',
-                        )}
-                    >
-                        {toggling ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />}
-                        {user.isActive ? 'Deactivate User' : 'Activate User'}
-                    </button>
-                </div>
-            </div>
+                }
+                sidebarTitle="Account Actions"
+                sidebar={
+                    <>
+                        <AdminLoginCredentialsPanel
+                            user={user}
+                            adminPassword={ownerPassword}
+                            permission="customers.edit"
+                            accent="#299E60"
+                            onPasswordUpdated={setOwnerPassword}
+                        />
+                        <button
+                            type="button"
+                            onClick={handleToggleActive}
+                            disabled={toggling}
+                            className={cn(
+                                'w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border',
+                                user.isActive
+                                    ? 'bg-white border-red-200 text-red-600 hover:bg-red-50'
+                                    : 'bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54]',
+                            )}
+                        >
+                            {toggling ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />}
+                            {user.isActive ? 'Deactivate User' : 'Activate User'}
+                        </button>
+                    </>
+                }
+            />
 
             <AdminEntityStatsRow stats={stats} />
 
-            <div className="bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm overflow-hidden">
-                <div className="flex overflow-x-auto border-b border-[#EEEEEE] bg-[#FAFAFA]">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            onClick={() => setActiveTab(tab.id)}
-                            className={cn(
-                                'px-6 py-3.5 text-[13px] font-bold whitespace-nowrap transition-all border-b-2 -mb-px',
-                                activeTab === tab.id
-                                    ? 'border-[#299E60] text-[#299E60] bg-white'
-                                    : 'border-transparent text-[#6B7280] hover:text-[#111827]',
-                            )}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-                <div className="p-6 md:p-8">
+            <AdminEntityTabPanel>
+                <AdminEntityTabBar
+                    activeTab={activeTab}
+                    onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+                    tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }))}
+                />
+                <AdminEntityTabContent>
                     {activeTab === 'overview' && (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -552,10 +547,12 @@ export default function CustomerDetailsPage() {
 
                     {activeTab === 'credit' && (
                         <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <StatCard label="Total Orders" value={String(user._count.orders)} icon={Package} />
-                                <StatCard label="Quick Order Lists" value={String(user._count.quickOrderLists)} icon={ListOrdered} />
-                            </div>
+                            <AdminEntityStatsRow
+                                stats={[
+                                    { label: 'Total Orders', value: user._count.orders, icon: Package, color: '#299E60' },
+                                    { label: 'Quick Order Lists', value: user._count.quickOrderLists, icon: ListOrdered, color: '#F59E0B' },
+                                ]}
+                            />
                             {user.creditWallets && user.creditWallets.length > 0 ? (
                                 <div className="divide-y divide-[#EEEEEE] border border-[#EEEEEE] rounded-[14px] overflow-hidden">
                                     {user.creditWallets.map((w) => (
@@ -601,8 +598,8 @@ export default function CustomerDetailsPage() {
                     {activeTab === 'team' && !primaryBa?.id && (
                         <p className="text-[14px] text-[#6B7280] font-medium">No business account team to display.</p>
                     )}
-                </div>
-            </div>
+                </AdminEntityTabContent>
+            </AdminEntityTabPanel>
         </div>
     );
 }
@@ -679,28 +676,6 @@ function EditRow({ label, children }: { label: string; children: React.ReactNode
         <div className="px-6 py-3 flex items-center justify-between text-[13px] gap-3">
             <span className="font-[800] text-[#4B4B4B] shrink-0">{label} :</span>
             <div className="max-w-[60%] w-full">{children}</div>
-        </div>
-    );
-}
-
-function StatCard({
-    label,
-    value,
-    icon: Icon,
-}: {
-    label: string;
-    value: string;
-    icon: React.ComponentType<{ size?: number }>;
-}) {
-    return (
-        <div className="bg-white p-5 rounded-[14px] border border-[#EEEEEE] flex items-center justify-between shadow-sm">
-            <div className="space-y-1">
-                <p className="text-[13px] font-[800] text-[#7C7C7C]">{label}</p>
-                <h4 className="text-[22px] font-[800] text-[#181725]">{value}</h4>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-[#299E60]/10 flex items-center justify-center text-[#299E60]">
-                <Icon size={20} />
-            </div>
         </div>
     );
 }

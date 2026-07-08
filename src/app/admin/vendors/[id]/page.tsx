@@ -52,6 +52,11 @@ import {
     AdminImpersonateButton,
     AdminStatusBadge,
     AdminLoginCredentialsPanel,
+    AdminEntityContactGrid,
+    AdminEntityTabBar,
+    AdminEntityTabPanel,
+    AdminEntityTabContent,
+    AdminEntityHeroCard,
 } from '@/components/features/admin/entity';
 
 interface VendorProduct {
@@ -729,10 +734,8 @@ export default function VendorDetailsPage() {
                 </div>
             )}
 
-            {/* Profile Overview Header Card */}
-            <div className="bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm overflow-hidden p-6 md:p-8 flex flex-col lg:flex-row items-center lg:items-stretch gap-6 md:gap-8">
-                {/* Logo Section */}
-                <div className="flex flex-col items-center justify-center shrink-0 w-[180px]">
+            <AdminEntityHeroCard
+                avatar={
                     <div className="w-[140px] h-[140px] rounded-[16px] bg-[#F9FAFB] border border-[#E5E7EB] flex items-center justify-center p-4 shadow-inner">
                         {vendor.logoUrl ? (
                             <img
@@ -746,156 +749,112 @@ export default function VendorDetailsPage() {
                             </span>
                         )}
                     </div>
-                    
-                    {/* Active Status Tag */}
-                    <div className="mt-3">
-                        <span className={cn(
-                            "text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider border",
-                            vendor.isActive 
-                                ? "bg-[#EEF8F1] border-[#299E60]/10 text-[#299E60]"
-                                : "bg-[#FDF2F2] border-[#EF4444]/10 text-[#EF4444]"
-                        )}>
-                            Account: {vendor.isActive ? 'Active' : 'Inactive'}
+                }
+                avatarFooter={
+                    <AdminStatusBadge
+                        variant={vendor.isActive ? 'active' : 'inactive'}
+                        label={vendor.isActive ? 'Active' : 'Inactive'}
+                    />
+                }
+                title={vendor.businessName}
+                badges={
+                    vendor.isVerified ? (
+                        <AdminStatusBadge variant="verified" label="Verified Vendor" className="normal-case" />
+                    ) : undefined
+                }
+                subtitle={
+                    vendor.description ? (
+                        <p className="text-[13px] text-[#6B7280] font-medium mt-2 leading-relaxed max-w-[600px] mx-auto lg:mx-0">
+                            {vendor.description}
+                        </p>
+                    ) : undefined
+                }
+                meta={
+                    <div className="flex items-center justify-center lg:justify-start gap-1.5 mt-3">
+                        <div className="flex items-center">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                    key={star}
+                                    size={14}
+                                    fill={star <= Math.round(vendor.rating) ? '#F59E0B' : 'none'}
+                                    className={star <= Math.round(vendor.rating) ? 'text-[#F59E0B]' : 'text-[#D1D5DB]'}
+                                />
+                            ))}
+                        </div>
+                        <span className="text-[12px] font-extrabold text-[#111827]">
+                            {Number(vendor.rating).toFixed(1)} / 5.0 Rating
                         </span>
                     </div>
-                </div>
-
-                {/* Info summary */}
-                <div className="flex-1 min-w-0 flex flex-col justify-between text-center lg:text-left">
-                    <div>
-                        <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3 justify-center lg:justify-start">
-                            <h2 className="text-[24px] font-black text-[#111827] leading-tight">
-                                {vendor.businessName}
-                            </h2>
-                            {vendor.isVerified && (
-                                <AdminStatusBadge variant="verified" label="Verified Vendor" className="normal-case" />
+                }
+                contact={
+                    <AdminEntityContactGrid
+                        accent="#299E60"
+                        accentBg="#EEF8F1"
+                        items={[
+                            { icon: User, label: 'Authorized Owner', value: vendor.user.fullName },
+                            { icon: Mail, label: 'Billing Email', value: vendor.user.email },
+                            ...(vendor.user.phone ? [{ icon: Phone, label: 'Mobile Phone', value: vendor.user.phone }] : []),
+                            ...(fullAddress ? [{ icon: MapPin, label: 'Registered Office', value: fullAddress }] : []),
+                        ]}
+                    />
+                }
+                sidebar={
+                    <>
+                        {vendor.user && (
+                            <AdminLoginCredentialsPanel
+                                user={vendor.user}
+                                adminPassword={ownerPassword}
+                                permission="vendors.edit"
+                                accent="#299E60"
+                                onPasswordUpdated={setOwnerPassword}
+                            />
+                        )}
+                        <div className="flex flex-col gap-2.5">
+                            <span className="text-[11px] font-bold text-[#9CA3AF] uppercase text-center lg:text-left">Verification Actions</span>
+                            <button
+                                onClick={handleToggleVerification}
+                                disabled={togglingVerification}
+                                className={cn(
+                                    'w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border',
+                                    vendor.isVerified
+                                        ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
+                                        : 'bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54]'
+                                )}
+                            >
+                                {togglingVerification ? (
+                                    <Loader2 size={13} className="animate-spin" />
+                                ) : vendor.isVerified ? (
+                                    <ShieldX size={13} />
+                                ) : (
+                                    <ShieldCheck size={13} />
+                                )}
+                                {togglingVerification
+                                    ? 'Updating State...'
+                                    : vendor.isVerified
+                                      ? 'Revoke Verification'
+                                      : 'Approve & Verify'}
+                            </button>
+                            {!vendor.isVerified && (
+                                <button
+                                    onClick={() => {
+                                        const reason = window.prompt('Reason for rejection (will be sent to vendor):');
+                                        if (!reason || !reason.trim()) return;
+                                        fetch(`/api/v1/admin/vendors/${vendor.id}`, {
+                                            method: 'PATCH',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ isActive: false, rejectionReason: reason.trim() }),
+                                        }).then(r => { if (r.ok) window.location.reload(); });
+                                    }}
+                                    className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 bg-[#EF4444] border border-[#EF4444] text-white hover:bg-[#DC2626]"
+                                >
+                                    <XCircle size={13} />
+                                    Reject Partner
+                                </button>
                             )}
                         </div>
-
-                        {vendor.description && (
-                            <p className="text-[13px] text-[#6B7280] font-medium mt-2 leading-relaxed max-w-[600px] mx-auto lg:mx-0">
-                                {vendor.description}
-                            </p>
-                        )}
-
-                        <div className="flex items-center justify-center lg:justify-start gap-1.5 mt-3">
-                            <div className="flex items-center">
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                    <Star
-                                        key={star}
-                                        size={14}
-                                        fill={star <= Math.round(vendor.rating) ? '#F59E0B' : 'none'}
-                                        className={star <= Math.round(vendor.rating) ? 'text-[#F59E0B]' : 'text-[#D1D5DB]'}
-                                    />
-                                ))}
-                            </div>
-                            <span className="text-[12px] font-extrabold text-[#111827]">
-                                {Number(vendor.rating).toFixed(1)} / 5.0 Rating
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* Contacts checklist banner */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6 border-t border-[#F3F4F6] pt-4 text-left">
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-[30px] h-[30px] rounded-[8px] bg-[#EEF8F1] flex items-center justify-center text-[#299E60]">
-                                <User size={13} />
-                            </div>
-                            <div className="min-w-0">
-                                <span className="text-[10px] text-[#9CA3AF] uppercase block leading-none font-bold">Authorized Owner</span>
-                                <span className="text-[12px] font-bold text-[#374151] truncate block">{vendor.user.fullName}</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-[30px] h-[30px] rounded-[8px] bg-[#EEF8F1] flex items-center justify-center text-[#299E60]">
-                                <Mail size={13} />
-                            </div>
-                            <div className="min-w-0">
-                                <span className="text-[10px] text-[#9CA3AF] uppercase block leading-none font-bold">Billing Email</span>
-                                <span className="text-[12px] font-bold text-[#374151] truncate block">{vendor.user.email}</span>
-                            </div>
-                        </div>
-                        {vendor.user.phone && (
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-[30px] h-[30px] rounded-[8px] bg-[#EEF8F1] flex items-center justify-center text-[#299E60]">
-                                    <Phone size={13} />
-                                </div>
-                                <div className="min-w-0">
-                                    <span className="text-[10px] text-[#9CA3AF] uppercase block leading-none font-bold">Mobile Phone</span>
-                                    <span className="text-[12px] font-bold text-[#374151] block">{vendor.user.phone}</span>
-                                </div>
-                            </div>
-                        )}
-                        {fullAddress && (
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-[30px] h-[30px] rounded-[8px] bg-[#EEF8F1] flex items-center justify-center text-[#299E60]">
-                                    <MapPin size={13} />
-                                </div>
-                                <div className="min-w-0">
-                                    <span className="text-[10px] text-[#9CA3AF] uppercase block leading-none font-bold">Registered Office</span>
-                                    <span className="text-[12px] font-bold text-[#374151] truncate block">{fullAddress}</span>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Right side account + verification */}
-                <div className="w-full lg:w-[260px] border-t lg:border-t-0 lg:border-l border-[#F3F4F6] pt-6 lg:pt-0 lg:pl-6 flex flex-col justify-center gap-4">
-                    {vendor.user && (
-                        <AdminLoginCredentialsPanel
-                            user={vendor.user}
-                            adminPassword={ownerPassword}
-                            permission="vendors.edit"
-                            accent="#299E60"
-                            onPasswordUpdated={setOwnerPassword}
-                        />
-                    )}
-                    <div className="flex flex-col gap-2.5">
-                    <span className="text-[11px] font-bold text-[#9CA3AF] uppercase text-center lg:text-left">Verification Actions</span>
-                    <button
-                        onClick={handleToggleVerification}
-                        disabled={togglingVerification}
-                        className={cn(
-                            'w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border',
-                            vendor.isVerified
-                                ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
-                                : 'bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54]'
-                        )}
-                    >
-                        {togglingVerification ? (
-                            <Loader2 size={13} className="animate-spin" />
-                        ) : vendor.isVerified ? (
-                            <ShieldX size={13} />
-                        ) : (
-                            <ShieldCheck size={13} />
-                        )}
-                        {togglingVerification
-                            ? 'Updating State...'
-                            : vendor.isVerified
-                              ? 'Revoke Verification'
-                              : 'Approve & Verify'}
-                    </button>
-                    {!vendor.isVerified && (
-                        <button
-                            onClick={() => {
-                                const reason = window.prompt('Reason for rejection (will be sent to vendor):');
-                                if (!reason || !reason.trim()) return;
-                                fetch(`/api/v1/admin/vendors/${vendor.id}`, {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ isActive: false, rejectionReason: reason.trim() }),
-                                }).then(r => { if (r.ok) window.location.reload(); });
-                            }}
-                            className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 bg-[#EF4444] border border-[#EF4444] text-white hover:bg-[#DC2626]"
-                        >
-                            <XCircle size={13} />
-                            Reject Partner
-                        </button>
-                    )}
-                    </div>
-                </div>
-            </div>
+                    </>
+                }
+            />
 
             <AdminEntityStatsRow stats={stats} />
 
@@ -906,45 +865,37 @@ export default function VendorDetailsPage() {
                 onSaved={fetchVendor}
             />
 
-            {/* Elegant Tab System */}
-            <div className="bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm overflow-hidden">
-                {/* Tabs Selector Bar */}
-                <div className="flex border-b border-[#EEEEEE] overflow-x-auto bg-[#F9FAFB]">
-                    {([
+            <AdminEntityTabPanel>
+                <AdminEntityTabBar
+                    activeTab={activeTab}
+                    onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+                    tabs={[
                         { id: 'overview', label: 'Company Overview', icon: Building2 },
                         { id: 'kyc_bank', label: 'KYC & Settlement Bank', icon: Landmark },
-                        { id: 'documents', label: 'Verification Records', icon: FileCheck2 },
-                        { id: 'products', label: 'Catalog Products', icon: Package },
-                        { id: 'delivery', label: 'Slots & Coverage', icon: Truck },
-                    ] as const).map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={cn(
-                                "flex items-center gap-2 px-6 py-4 border-b-2 font-bold text-[12px] transition-all whitespace-nowrap outline-none",
-                                activeTab === tab.id
-                                    ? "border-[#299E60] text-[#299E60] bg-white shadow-sm"
-                                    : "border-transparent text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F4F6]/50"
-                            )}
-                        >
-                            <tab.icon size={14} />
-                            {tab.label}
-                            {tab.id === 'documents' && documents.length > 0 && (
+                        {
+                            id: 'documents',
+                            label: 'Verification Records',
+                            icon: FileCheck2,
+                            badge: documents.length > 0 ? (
                                 <span className="ml-1 bg-gray-200 text-gray-700 text-[10px] px-1.5 py-0.5 rounded-full font-black">
                                     {documents.length}
                                 </span>
-                            )}
-                            {tab.id === 'products' && vendor.products.length > 0 && (
+                            ) : undefined,
+                        },
+                        {
+                            id: 'products',
+                            label: 'Catalog Products',
+                            icon: Package,
+                            badge: vendor.products.length > 0 ? (
                                 <span className="ml-1 bg-[#EEF8F1] text-[#299E60] text-[10px] px-1.5 py-0.5 rounded-full font-black border border-[#299E60]/10">
                                     {vendor.products.length}
                                 </span>
-                            )}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Tab Content Panels */}
-                <div className="p-6 md:p-8">
+                            ) : undefined,
+                        },
+                        { id: 'delivery', label: 'Slots & Coverage', icon: Truck },
+                    ]}
+                />
+                <AdminEntityTabContent>
                     {/* TAB 1: COMPANY OVERVIEW */}
                     {activeTab === 'overview' && (
                         <div className="space-y-8">
@@ -2005,7 +1956,7 @@ export default function VendorDetailsPage() {
                             </div>
                         </div>
                     )}
-                </div>
+                </AdminEntityTabContent>
 
                 {/* Save edits bottom actions toolbar */}
                 {isEditing && (
@@ -2032,7 +1983,7 @@ export default function VendorDetailsPage() {
                         </button>
                     </div>
                 )}
-            </div>
+            </AdminEntityTabPanel>
 
             <AdminUserTeamPanel
                 teamEndpoint={`/api/v1/admin/vendors/${vendorId}/team`}
