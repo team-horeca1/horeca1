@@ -1,4 +1,5 @@
 import { redis } from '@/lib/redis';
+import { prisma } from '@/lib/prisma';
 
 const STALE_TTL_SEC = 3600;
 
@@ -9,4 +10,19 @@ export async function markSessionStale(userId: string): Promise<void> {
   } catch {
     /* non-critical */
   }
+}
+
+/** Invalidate sessions for every user assigned this role (team tables + UserRole). */
+export async function markSessionStaleForRole(roleId: string): Promise<void> {
+  const [userRoles, adminMembers, vendorMembers, brandMembers] = await Promise.all([
+    prisma.userRole.findMany({ where: { roleId }, select: { userId: true }, distinct: ['userId'] }),
+    prisma.adminTeamMember.findMany({ where: { roleId }, select: { userId: true } }),
+    prisma.vendorTeamMember.findMany({ where: { roleId }, select: { userId: true } }),
+    prisma.brandTeamMember.findMany({ where: { roleId }, select: { userId: true } }),
+  ]);
+  const userIds = new Set<string>();
+  for (const row of [...userRoles, ...adminMembers, ...vendorMembers, ...brandMembers]) {
+    userIds.add(row.userId);
+  }
+  await Promise.all([...userIds].map((id) => markSessionStale(id)));
 }

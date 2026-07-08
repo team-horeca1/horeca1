@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import type { PermissionKey } from '@/lib/permissions/registry';
 
@@ -13,16 +14,27 @@ export interface SessionPermissions {
 }
 
 export function usePermissions(): SessionPermissions {
+  const pathname = usePathname() ?? '';
   const { data: session, status } = useSession();
   const u = session?.user as {
     permissions?: string[];
+    adminPermissions?: string[];
     isPermissionOwner?: boolean;
+    isAdminPermissionOwner?: boolean;
     role?: string;
   } | undefined;
 
-  const permissions = u?.permissions ?? [];
-  const isPermissionOwner = u?.isPermissionOwner === true
-    || (u?.role === 'admin' && permissions.length === 0);
+  const onAdminPortal = pathname === '/admin' || pathname.startsWith('/admin/');
+  const useAdminScope = onAdminPortal && u?.role === 'admin';
+
+  const permissions = useAdminScope
+    ? (u?.adminPermissions ?? [])
+    : (u?.permissions ?? []);
+
+  const isPermissionOwner = useAdminScope
+    ? u?.isAdminPermissionOwner === true
+    : u?.isPermissionOwner === true
+      || (u?.role === 'admin' && (u?.permissions ?? []).length === 0);
 
   const has = (key: PermissionKey) => isPermissionOwner || permissions.includes(key);
   const hasAny = (...keys: PermissionKey[]) =>

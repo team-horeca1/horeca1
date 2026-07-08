@@ -32,7 +32,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: 'jwt',
     maxAge: 7 * 24 * 60 * 60,
-    updateAge: 24 * 60 * 60,
+    // Re-run the jwt callback frequently so permission changes apply on refresh
+    // without requiring logout (default 24h kept sessions stale too long).
+    updateAge: 60,
   },
 
   providers: [
@@ -344,27 +346,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
 
-      // Stale-session check: after any permission change the write path sets
-      // a short-lived Redis key for this user. On the next auth() call (including
-      // periodic updateSession() calls from the layout) we detect it and reload
-      // permissions immediately — no logout/login required.
+      // Reload permissions from DB on every session check (page load, update(),
+      // focus refresh). markSessionStale() clears the Redis hint once consumed.
       if (token.id && !user) {
         try {
           const staleKey = `session:stale:${token.id as string}`;
           const isStale = await redis.get(staleKey);
-          if (isStale) {
-            await redis.del(staleKey);
-            const active = await loadOrProvisionActiveContext(
-              token.id as string,
-              (token.role as string) ?? 'customer',
-              (token.activeBusinessAccountId as string | null) ?? null,
-              (token.activeOutletId as string | null) ?? null,
-            );
-            applyActiveContext(token, active);
-            if (token.role === 'admin') await applyAdminPermissions(token);
+          if (isStale) await redis.del(staleKey);
+
+          const freshRole = await refreshUserRoleFromDb(token);
+
+          const active = await loadOrProvisionActiveContext(
+            token.id as string,
+            freshRole ?? (token.role as string) ?? 'customer',
+            (token.activeBusinessAccountId as string | null) ?? null,
+            (token.activeOutletId as string | null) ?? null,
+          );
+          applyActiveContext(token, active);
+          if (token.role === 'admin') {
+            await applyAdminPermissions(token);
+          } else {
+            clearAdminTokenFields(token);
           }
         } catch (err) {
-          console.error('[auth.jwt] stale-session check failed:', err);
+          console.error('[auth.jwt] permission refresh failed:', err);
         }
       }
 
@@ -386,10 +391,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const targetAccountId = u.activeBusinessAccountId ?? (token.activeBusinessAccountId as string | undefined) ?? null;
         const targetOutletId = u.activeOutletId ?? (token.activeOutletId as string | undefined) ?? null;
 
+        let freshRole: string | null = null;
+        try {
+          freshRole = await refreshUserRoleFromDb(token);
+        } catch (err) {
+          console.error('[auth.jwt] user role refresh failed on update:', err);
+        }
+
         try {
           const active = await loadOrProvisionActiveContext(
             token.id as string,
-            (token.role as string) ?? 'customer',
+            freshRole ?? (token.role as string) ?? 'customer',
             targetAccountId,
             targetOutletId,
           );
@@ -399,31 +411,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           // Keep existing context fields rather than wiping them on a transient DB blip.
         }
 
-        // Refresh role + adminTeamRole on update too. Wrapped separately so that
-        // a failure here does not undo the loadActiveContext result above, and so
-        // that a failure in loadActiveContext does not prevent the role refresh.
         try {
-          const freshUser = await prisma.user.findUnique({
-            where: { id: token.id as string },
-            select: { role: true },
-          });
-          if (freshUser) {
-            token.role = freshUser.role;
-            if (freshUser.role === 'admin') {
-              try {
-                const adminMembership = await prisma.adminTeamMember.findUnique({
-                  where: { userId: token.id as string },
-                  select: { role: true },
-                });
-                token.adminTeamRole = adminMembership?.role ?? 'owner';
-              } catch (err) {
-                console.error('[auth.jwt] adminTeamMember lookup failed on update:', err);
-                token.adminTeamRole = 'owner';
-              }
-              await applyAdminPermissions(token);
-            } else {
-              token.adminTeamRole = undefined;
+          if (freshRole === 'admin') {
+            try {
+              const adminMembership = await prisma.adminTeamMember.findUnique({
+                where: { userId: token.id as string },
+                select: { role: true },
+              });
+              token.adminTeamRole = adminMembership?.role ?? 'owner';
+            } catch (err) {
+              console.error('[auth.jwt] adminTeamMember lookup failed on update:', err);
+              token.adminTeamRole = 'owner';
             }
+            await applyAdminPermissions(token);
+          } else {
+            clearAdminTokenFields(token);
           }
         } catch (err) {
           console.error('[auth.jwt] user role refresh failed on update:', err);
@@ -446,6 +448,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (Array.isArray(token.accessibleOutletIds)) u.accessibleOutletIds = token.accessibleOutletIds as string[];
         if (token.permissions) u.permissions = token.permissions as string[];
         if (typeof token.isPermissionOwner === 'boolean') u.isPermissionOwner = token.isPermissionOwner;
+        u.adminPermissions = Array.isArray(token.adminPermissions) ? (token.adminPermissions as string[]) : [];
+        u.isAdminPermissionOwner = token.isAdminPermissionOwner === true;
         if (token.availableAccounts) u.availableAccounts = token.availableAccounts as unknown[];
         if (typeof token.availableAccountsTruncated === 'boolean') u.availableAccountsTruncated = token.availableAccountsTruncated;
         if (typeof token.totalAccountCount === 'number') u.totalAccountCount = token.totalAccountCount;
@@ -478,8 +482,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
  */
 async function applyAdminPermissions(token: Record<string, unknown>): Promise<void> {
   try {
+    const userId = token.id as string;
+    const dbUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (dbUser?.role !== 'admin') {
+      clearAdminTokenFields(token);
+      return;
+    }
+
     const member = await prisma.adminTeamMember.findUnique({
-      where: { userId: token.id as string },
+      where: { userId },
       select: { roleRef: { select: { name: true, permissions: true } } },
     });
 
@@ -493,6 +507,8 @@ async function applyAdminPermissions(token: Record<string, unknown>): Promise<vo
       for (const k of ALL_PERMISSION_KEYS) existing.add(k);
       token.permissions = Array.from(existing);
       token.isPermissionOwner = true;
+      token.adminPermissions = [...ALL_PERMISSION_KEYS];
+      token.isAdminPermissionOwner = true;
       return;
     }
 
@@ -505,13 +521,14 @@ async function applyAdminPermissions(token: Record<string, unknown>): Promise<vo
       });
       adminPerms = flatten(superAdmin?.permissions as PermissionsJson | null | undefined);
     }
-    if (adminPerms.size === 0) return;
+    if (adminPerms.size === 0) {
+      token.adminPermissions = [];
+      token.isAdminPermissionOwner = false;
+      return;
+    }
 
-    const existing = new Set<PermissionKey>(
-      Array.isArray(token.permissions) ? (token.permissions as PermissionKey[]) : [],
-    );
-    for (const k of adminPerms) existing.add(k);
-    token.permissions = Array.from(existing);
+    token.adminPermissions = Array.from(adminPerms);
+    token.isAdminPermissionOwner = false;
   } catch (err) {
     console.error('[auth.jwt] applyAdminPermissions failed:', err);
   }
@@ -580,4 +597,21 @@ function applyActiveContext(token: Record<string, unknown>, active: ActiveContex
   token.activeBrandId = active.activeBrandId;
   token.activeVendorTeamRole = active.activeVendorTeamRole;
   token.activeBrandTeamRole = active.activeBrandTeamRole;
+}
+
+function clearAdminTokenFields(token: Record<string, unknown>): void {
+  delete token.adminTeamRole;
+  token.adminPermissions = [];
+  token.isAdminPermissionOwner = false;
+}
+
+/** Sync JWT role from DB — returns the fresh role or null if lookup failed. */
+async function refreshUserRoleFromDb(token: Record<string, unknown>): Promise<string | null> {
+  const freshUser = await prisma.user.findUnique({
+    where: { id: token.id as string },
+    select: { role: true },
+  });
+  if (!freshUser) return null;
+  token.role = freshUser.role;
+  return freshUser.role;
 }

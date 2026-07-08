@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server';
 import type { Role } from '@prisma/client';
+import { auth } from '@/auth';
 import { type AuthContext, getAuthContext } from './auth';
 import { Errors, errorResponse } from './errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import type { PermissionKey } from '@/lib/permissions/registry';
+import { ALL_PERMISSION_KEYS } from '@/lib/permissions/registry';
 
 /**
  * Decide whether the caller may use a role-restricted route.
@@ -57,7 +59,22 @@ export function withRole(
 
 // Convenience wrappers for common role checks
 export function adminOnly(handler: (req: NextRequest, ctx: AuthContext) => Promise<Response>) {
-  return withRole(['admin'], handler);
+  return withRole(['admin'], async (req, ctx) => {
+    const session = await auth();
+    const u = (session?.user ?? {}) as Record<string, unknown>;
+    const adminPerms = u.adminPermissions as PermissionKey[] | undefined;
+    if (adminPerms !== undefined || u.isAdminPermissionOwner === true) {
+      const isAdminOwner = u.isAdminPermissionOwner === true;
+      const effective = isAdminOwner ? [...ALL_PERMISSION_KEYS] : adminPerms ?? [];
+      const adminCtx: AuthContext = {
+        ...ctx,
+        permissions: effective,
+        permissionSet: new Set(effective),
+      };
+      return handler(req, adminCtx);
+    }
+    return handler(req, ctx);
+  });
 }
 
 export function vendorOnly(handler: (req: NextRequest, ctx: AuthContext) => Promise<Response>) {

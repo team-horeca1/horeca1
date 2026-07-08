@@ -15,6 +15,8 @@ declare module 'next-auth' {
       accessibleOutletIds?: string[];
       permissions?: PermissionKey[];
       isPermissionOwner?: boolean;
+      adminPermissions?: PermissionKey[];
+      isAdminPermissionOwner?: boolean;
       activeVendorId?: string | null;
       activeBrandId?: string | null;
       forceAccountPicker?: boolean;
@@ -34,6 +36,8 @@ declare module 'next-auth/jwt' {
     accessibleOutletIds?: string[];
     permissions?: PermissionKey[];
     isPermissionOwner?: boolean;
+    adminPermissions?: PermissionKey[];
+    isAdminPermissionOwner?: boolean;
     activeVendorId?: string | null;
     activeBrandId?: string | null;
     activeVendorTeamRole?: TeamRole | 'owner' | null;
