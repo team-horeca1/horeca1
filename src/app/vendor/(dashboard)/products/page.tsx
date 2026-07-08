@@ -597,7 +597,7 @@ export default function VendorProductsPage() {
                 setCategories(flat);
             })
             .catch(console.error);
-        fetch('/api/v1/brands?limit=200')
+        fetch('/api/v1/brands?limit=200&scope=picker')
             .then(r => r.json())
             .then(json => { if (json.success) setBrands((json.data?.brands ?? json.data ?? []).map((b: { id: string; name: string }) => ({ id: b.id, name: b.name }))); })
             .catch(console.error);

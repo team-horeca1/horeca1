@@ -585,7 +585,7 @@ export default function ProductsPage() {
             })
             .catch(console.error);
 
-        fetch('/api/v1/brands?limit=200')
+        fetch('/api/v1/brands?limit=200&scope=picker')
             .then(res => res.json())
             .then(json => {
                 if (json.success) {

@@ -12,11 +12,22 @@ function slugify(str: string): string {
   return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-/** Approved brands shown in vendor/admin product pickers (label-only + real storefronts). */
-export function productPickerBrandWhere() {
+function approvedActiveBrandWhere() {
   return {
     isActive: true,
     approvalStatus: 'approved' as const,
+  };
+}
+
+/** All approved active brands — vendor/admin product pickers (includes admin-managed labels). */
+export function productPickerBrandWhere() {
+  return approvedActiveBrandWhere();
+}
+
+/** Public brand store / homepage carousel — hides internal admin placeholder accounts. */
+export function publicStorefrontBrandWhere() {
+  return {
+    ...approvedActiveBrandWhere(),
     OR: [
       { userId: null },
       {
@@ -91,11 +102,12 @@ export class BrandService {
   }
 
   // ── Public: list approved brands (product picker) ───────
-  async list(input: { limit?: number; cursor?: string }) {
-    const { limit = 20, cursor } = input;
+  async list(input: { limit?: number; cursor?: string; scope?: 'public' | 'picker' }) {
+    const { limit = 20, cursor, scope = 'public' } = input;
+    const where = scope === 'picker' ? productPickerBrandWhere() : publicStorefrontBrandWhere();
 
     const brands = await prisma.brand.findMany({
-      where: productPickerBrandWhere(),
+      where,
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { name: 'asc' },

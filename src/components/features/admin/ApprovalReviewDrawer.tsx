@@ -237,7 +237,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                     categoryName: p.category?.name ?? '',
                     imageUrl: p.imageUrl ?? '',
                 });
-                const bRes = await fetch('/api/v1/brands?limit=100');
+                const bRes = await fetch('/api/v1/brands?limit=100&scope=picker');
                 const bJson = await bRes.json();
                 if (bJson.success) {
                     const list = bJson.data?.brands ?? bJson.data ?? [];
@@ -246,7 +246,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
             } else if (t.type === 'product' && t.kind === 'vendor') {
                 const [res, bRes, cRes] = await Promise.all([
                     fetch(`/api/v1/admin/products/${t.id}`),
-                    fetch('/api/v1/brands?limit=100'),
+                    fetch('/api/v1/brands?limit=100&scope=picker'),
                     fetch('/api/v1/admin/categories'),
                 ]);
                 const json = await res.json();

@@ -30,8 +30,10 @@ export const createBrandProductSchema = z.object({
 export const updateBrandProductSchema = createBrandProductSchema.partial();
 
 export const listBrandsSchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce.number().int().min(1).max(200).default(20),
   cursor: z.string().uuid().optional(),
+  /** `picker` = all approved brands for product forms; `public` = storefront listing (excludes admin placeholders). */
+  scope: z.enum(['public', 'picker']).default('public'),
 });
 
 export const reviewMappingSchema = z.object({

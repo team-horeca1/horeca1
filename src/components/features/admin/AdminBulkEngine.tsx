@@ -43,7 +43,7 @@ export default function AdminBulkEngine({ open, onClose, onComplete, products, s
         setCategories(flat);
       })
       .catch(() => {});
-    fetch('/api/v1/brands?limit=100')
+    fetch('/api/v1/brands?limit=100&scope=picker')
       .then((r) => r.json())
       .then((j) => {
         if (!j.success) return;
