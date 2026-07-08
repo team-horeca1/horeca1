@@ -32,6 +32,7 @@ export const API_PERMISSION_RULES: readonly ApiPermissionRule[] = [
   { methods: ['GET'], pattern: /^admin\/promotions(?:\/|$)/, permission: 'promotions.view' },
   { methods: ['GET'], pattern: /^admin\/team(?:\/|$)/, permission: 'users.view' },
   { methods: ['GET'], pattern: /^admin\/settings(?:\/|$)/, permission: 'settings.view' },
+  { methods: ['GET'], pattern: /^admin\/audit-logs(?:\/|$)/, permission: 'auditLogs.view' },
   { methods: ['GET'], pattern: /^admin\/returns(?:\/|$)/, permission: 'orders.view' },
   { methods: ['GET'], pattern: /^admin\/claims(?:\/|$)/, permission: 'orders.view' },
   { methods: ['PATCH'], pattern: /^admin\/claims\/[^/]+$/, permission: 'orders.edit' },

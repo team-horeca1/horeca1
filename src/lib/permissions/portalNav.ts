@@ -28,6 +28,7 @@ import {
   BadgeIndianRupee,
   MapPin,
   ShieldAlert,
+  ScrollText,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions/registry';
 import type { Module, RoleScope } from '@/lib/permissions/portalFeatures';
@@ -84,6 +85,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
     label: 'Platform',
     links: [
       { name: 'Promotions', icon: Gift, href: '/admin/promotions', feature: 'promotions', requiredPerm: 'promotions.view' },
+      { name: 'Audit Logs', icon: ScrollText, href: '/admin/audit-logs', feature: 'auditLogs', requiredPerm: 'auditLogs.view' },
       { name: 'Team', icon: Users, href: '/admin/team', feature: 'users', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
       { name: 'Settings', icon: Settings, href: '/admin/settings', feature: 'settings', requiredPerm: 'settings.view' },
     ],
