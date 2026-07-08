@@ -17,6 +17,7 @@ import { sendEmailInBackground } from '@/lib/providers/email';
 import { buildInviteEmail, buildInviteSms } from '@/lib/email-templates/invite';
 import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import { markSessionStale } from '@/lib/sessionStale';
+import { resolveTeamMemberRoleFromPermissions } from '@/lib/teamRoleWrites';
 import { sendSms } from '@/lib/providers/sms';
 import { runInBackground } from '@/lib/asyncBackground';
 
@@ -79,24 +80,11 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     //     a template.
     let roleIdToUse: string;
     if (body.permissions && Object.keys(body.permissions).length > 0) {
-      const ALLOWED_ACTIONS = ['view', 'create', 'edit', 'delete', 'approve'];
-      const sanitized: Record<string, Record<string, boolean>> = {};
-      for (const [mod, actions] of Object.entries(body.permissions)) {
-        sanitized[mod] = {};
-        for (const [a, v] of Object.entries(actions)) {
-          if (ALLOWED_ACTIONS.includes(a) && typeof v === 'boolean' && v) sanitized[mod][a] = true;
-        }
-      }
-      const customRole = await prisma.accountRole.create({
-        data: {
-          businessAccountId: id,
-          name: `Custom-${Date.now().toString(36)}`,
-          scope: 'account',
-          permissions: sanitized,
-          isTemplate: false,
-          createdBy: ctx.userId,
-        },
-        select: { id: true },
+      const customRole = await resolveTeamMemberRoleFromPermissions({
+        scope: 'account',
+        permissions: body.permissions,
+        businessAccountId: id,
+        createdBy: ctx.userId,
       });
       roleIdToUse = customRole.id;
     } else {

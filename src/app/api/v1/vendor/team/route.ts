@@ -10,7 +10,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { vendorOnly } from '@/middleware/rbac';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
-import { requirePermission, sanitizePermissionsForScope } from '@/lib/permissions/engine';
+import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { uniqueHcid } from '@/lib/hcid';
@@ -20,6 +20,7 @@ import { sendEmailInBackground } from '@/lib/providers/email';
 import { buildInviteEmail, buildInviteSms } from '@/lib/email-templates/invite';
 import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import { markSessionStale } from '@/lib/sessionStale';
+import { resolveTeamMemberRoleFromPermissions } from '@/lib/teamRoleWrites';
 import { sendSms } from '@/lib/providers/sms';
 import { runInBackground } from '@/lib/asyncBackground';
 import type { AuthContext } from '@/middleware/auth';
@@ -45,17 +46,6 @@ const VENDOR_ROLE_TO_ENUM: Record<string, TeamRole> = {
   'Vendor Editor': 'editor',
   'Vendor Viewer': 'viewer',
 };
-
-// Normalise a JSON object for stable comparison (sorts keys at every level).
-function sortKeys(v: unknown): unknown {
-  if (Array.isArray(v)) return v.map(sortKeys);
-  if (v && typeof v === 'object') {
-    return Object.fromEntries(
-      Object.entries(v as Record<string, unknown>).sort().map(([k, val]) => [k, sortKeys(val)]),
-    );
-  }
-  return v;
-}
 
 export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
@@ -166,37 +156,12 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       if (!found || found.scope !== 'vendor') throw Errors.badRequest('roleId must reference a vendor-scope role');
       role = found;
     } else {
-      const sanitized = sanitizePermissionsForScope(input.permissions!, 'vendor');
-      const sanitizedStr = JSON.stringify(sortKeys(sanitized));
-
-      const candidates = await prisma.accountRole.findMany({
-        where: {
-          scope: 'vendor',
-          OR: [{ isTemplate: true, businessAccountId: null }, { businessAccountId }],
-        },
-        select: { id: true, name: true, scope: true, description: true, permissions: true },
+      role = await resolveTeamMemberRoleFromPermissions({
+        scope: 'vendor',
+        permissions: input.permissions!,
+        businessAccountId,
+        createdBy: ctx.userId,
       });
-
-      const match = candidates.find(
-        r => JSON.stringify(sortKeys(r.permissions as Record<string, unknown>)) === sanitizedStr,
-      );
-
-      if (match) {
-        role = { id: match.id, name: match.name, scope: match.scope, description: match.description };
-      } else {
-        const created = await prisma.accountRole.create({
-          data: {
-            businessAccountId,
-            name: `Custom (${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })})`,
-            scope: 'vendor',
-            permissions: sanitized,
-            isTemplate: false,
-            createdBy: ctx.userId,
-          },
-          select: { id: true, name: true, scope: true, description: true },
-        });
-        role = created;
-      }
     }
 
     // ── Resolve / create the user ──────────────────────────────────────────────

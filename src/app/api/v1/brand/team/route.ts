@@ -16,6 +16,7 @@ import { sendEmailInBackground } from '@/lib/providers/email';
 import { buildInviteEmail } from '@/lib/email-templates/invite';
 import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import { markSessionStale } from '@/lib/sessionStale';
+import { resolveTeamMemberRoleFromPermissions } from '@/lib/teamRoleWrites';
 import { sendSms } from '@/lib/providers/sms';
 import { runInBackground } from '@/lib/asyncBackground';
 import type { AuthContext } from '@/middleware/auth';
@@ -106,20 +107,11 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
 
     let role: { id: string; name: string; scope: string; description: string | null };
     if (input.permissions && Object.keys(input.permissions).length > 0) {
-      const ALLOWED = ['view', 'create', 'edit', 'delete', 'approve'];
-      const sanitized: Record<string, Record<string, boolean>> = {};
-      for (const [mod, actions] of Object.entries(input.permissions)) {
-        sanitized[mod] = {};
-        for (const [a, v] of Object.entries(actions)) {
-          if (ALLOWED.includes(a) && typeof v === 'boolean') sanitized[mod][a] = v;
-        }
-      }
-      const customName = `Custom (${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })})`;
-      role = await prisma.accountRole.upsert({
-        where: { businessAccountId_name: { businessAccountId: brand.businessAccountId, name: customName } },
-        create: { businessAccountId: brand.businessAccountId, name: customName, scope: 'brand', permissions: sanitized, isTemplate: false, createdBy: ctx.userId },
-        update: { permissions: sanitized },
-        select: { id: true, name: true, scope: true, description: true },
+      role = await resolveTeamMemberRoleFromPermissions({
+        scope: 'brand',
+        permissions: input.permissions,
+        businessAccountId: brand.businessAccountId,
+        createdBy: ctx.userId,
       });
     } else {
       const found = await prisma.accountRole.findUnique({

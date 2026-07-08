@@ -25,6 +25,7 @@ import { toTeamMemberDTO, teamMemberInclude, type TeamMemberDTO } from '@/lib/te
 import { buildInviteEmail } from '@/lib/email-templates/invite';
 import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import { markSessionStale } from '@/lib/sessionStale';
+import { resolveTeamMemberRoleFromPermissions } from '@/lib/teamRoleWrites';
 import type { AuthContext } from '@/middleware/auth';
 import type { TeamRole } from '@prisma/client';
 
@@ -99,17 +100,11 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
     // Resolve or create the role for this member.
     let role: { id: string; name: string; scope: string; description: string | null };
     if (input.permissions && Object.keys(input.permissions).length > 0) {
-      const ALLOWED = ['view', 'create', 'edit', 'delete', 'approve'];
-      const sanitized: Record<string, Record<string, boolean>> = {};
-      for (const [mod, actions] of Object.entries(input.permissions)) {
-        sanitized[mod] = {};
-        for (const [a, v] of Object.entries(actions)) {
-          if (ALLOWED.includes(a) && typeof v === 'boolean') sanitized[mod][a] = v;
-        }
-      }
-      role = await prisma.accountRole.create({
-        data: { businessAccountId: null, name: `Custom-${Date.now().toString(36)}`, scope: 'admin', permissions: sanitized, isTemplate: false, createdBy: ctx.userId },
-        select: { id: true, name: true, scope: true, description: true },
+      role = await resolveTeamMemberRoleFromPermissions({
+        scope: 'admin',
+        permissions: input.permissions,
+        businessAccountId: null,
+        createdBy: ctx.userId,
       });
     } else {
       const found = await prisma.accountRole.findUnique({
