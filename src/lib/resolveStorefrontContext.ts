@@ -12,6 +12,10 @@ import { Errors } from '@/middleware/errorHandler';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
 import { DELIVERY_COOKIE } from '@/lib/deliveryLocation';
 import type { CartContext } from '@/modules/cart/cart.service';
+import {
+  effectiveCustomerBusinessAccountId,
+  effectiveCustomerUserId,
+} from '@/lib/resolveCustomerImpersonation';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -158,10 +162,11 @@ async function findOrCreateOutletForAddress(
  * Throws if no delivery location can be determined.
  */
 export async function resolveStorefrontContext(ctx: AuthContext): Promise<StorefrontContext> {
-  const { userId, role } = ctx;
+  const userId = effectiveCustomerUserId(ctx);
+  const { role } = ctx;
 
-  let businessAccountId = ctx.activeBusinessAccountId;
-  let outletId = ctx.activeOutletId;
+  let businessAccountId = effectiveCustomerBusinessAccountId(ctx);
+  let outletId = ctx.impersonatedCustomer ? null : ctx.activeOutletId;
 
   if (businessAccountId && outletId) {
     const ok = await prisma.outlet.findFirst({

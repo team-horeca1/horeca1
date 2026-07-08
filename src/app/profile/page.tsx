@@ -2,6 +2,7 @@
 
 import React, { Suspense } from 'react';
 import { ProfileScreen } from '@/components/auth/ProfileScreen';
+import { AdminCustomerImpersonationBanner } from '@/components/features/admin/AdminCustomerImpersonationBanner';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 function ProfilePageContent() {
@@ -17,6 +18,9 @@ function ProfilePageContent() {
 
   return (
     <main className="min-h-screen bg-[#F2F3F2]">
+      <div className="max-w-4xl mx-auto px-4 pt-4">
+        <AdminCustomerImpersonationBanner />
+      </div>
       <ProfileScreen isOpen={true} onClose={onClose} />
     </main>
   );

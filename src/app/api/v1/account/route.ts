@@ -21,11 +21,18 @@ import {
 } from '@/lib/constants/vendorProfile';
 import type { Prisma } from '@prisma/client';
 import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
   try {
+    const targetUserId = effectiveCustomerUserId(ctx);
+    const impersonatedBaId = ctx.impersonatedCustomer?.businessAccountId;
+
     const memberships = await prisma.businessAccountMember.findMany({
-      where: { userId: ctx.userId },
+      where: {
+        userId: targetUserId,
+        ...(impersonatedBaId ? { businessAccountId: impersonatedBaId } : {}),
+      },
       orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
       select: {
         isPrimary: true,

@@ -3,6 +3,10 @@ import { auth } from '@/auth';
 import { Errors, errorResponse } from './errorHandler';
 import type { Role, TeamRole } from '@prisma/client';
 import type { PermissionKey } from '@/lib/permissions/registry';
+import {
+  readCustomerImpersonationFromRequest,
+  type CustomerImpersonation,
+} from '@/lib/resolveCustomerImpersonation';
 
 // Authenticated user context injected into API handlers.
 export interface AuthContext {
@@ -21,11 +25,12 @@ export interface AuthContext {
   activeBrandId: string | null;
   activeVendorTeamRole: TeamRole | 'owner' | null;
   activeBrandTeamRole: TeamRole | 'owner' | null;
+  /** Set when an admin is viewing the storefront/profile as a customer. */
+  impersonatedCustomer: CustomerImpersonation | null;
 }
 
 // Validate session and extract user context
 export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
-  void req;
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -36,11 +41,15 @@ export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
   const adminTeamRole = u.adminTeamRole as string | undefined;
 
   const permissions = (u.permissions as PermissionKey[]) ?? [];
+  const role = (u.role as Role) ?? 'customer';
+
+  const impersonatedCustomer =
+    role === 'admin' ? readCustomerImpersonationFromRequest(req) : null;
 
   return {
     userId: session.user.id,
     email: session.user.email!,
-    role: (u.role as Role) ?? 'customer',
+    role,
     adminTeamRole: (adminTeamRole as TeamRole | 'owner') ?? 'owner',
     hcidDisplay: (u.hcidDisplay as string) ?? null,
     activeBusinessAccountId: (u.activeBusinessAccountId as string) ?? null,
@@ -54,6 +63,7 @@ export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
     activeBrandId: (u.activeBrandId as string) ?? null,
     activeVendorTeamRole: (u.activeVendorTeamRole as TeamRole | 'owner') ?? null,
     activeBrandTeamRole: (u.activeBrandTeamRole as TeamRole | 'owner') ?? null,
+    impersonatedCustomer,
   };
 }
 

@@ -21,6 +21,7 @@ import { withAuth } from '@/middleware/auth';
 import { requireStorefrontAccess } from '@/middleware/rbac';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const orderService = new OrderService();
 
@@ -30,7 +31,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
     const queryParams = Object.fromEntries(req.nextUrl.searchParams);
     const options = listOrdersSchema.parse(queryParams);
 
-    const result = await orderService.list(ctx.userId, options);
+    const result = await orderService.list(effectiveCustomerUserId(ctx), options);
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
     return errorResponse(error);

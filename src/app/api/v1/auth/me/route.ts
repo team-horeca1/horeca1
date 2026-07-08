@@ -8,19 +8,26 @@ import { AuthService } from '@/modules/auth/auth.service';
 import { updateProfileSchema } from '@/modules/auth/auth.validator';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const authService = new AuthService();
 
 // GET — fetch profile
 export const GET = withAuth(async (_req, ctx) => {
-  // ctx.userId comes from the JWT token — guaranteed to be the logged-in user
-  const profile = await authService.getProfile(ctx.userId);
+  const userId = effectiveCustomerUserId(ctx);
+  const profile = await authService.getProfile(userId);
   return NextResponse.json({ success: true, data: profile });
 });
 
-// PATCH — update profile fields
+// PATCH — update profile fields (never while impersonating)
 export const PATCH = withAuth(async (req: NextRequest, ctx) => {
   try {
+    if (ctx.impersonatedCustomer) {
+      return NextResponse.json(
+        { success: false, error: { message: 'Cannot edit profile while in admin view mode' } },
+        { status: 403 },
+      );
+    }
     const body = await req.json();
     const data = updateProfileSchema.parse(body);
     const profile = await authService.updateProfile(ctx.userId, data);

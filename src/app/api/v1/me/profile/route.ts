@@ -5,12 +5,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/middleware/auth';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 export const dynamic = 'force-dynamic';
 
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
+  const userId = effectiveCustomerUserId(ctx);
   const user = await prisma.user.findUnique({
-    where: { id: ctx.userId },
+    where: { id: userId },
     select: {
       fullName: true,
       phone: true,
@@ -27,7 +29,7 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
 
   // Find their business accounts and outlets to see if they resolved pincode/businessName there
   const member = await prisma.businessAccountMember.findFirst({
-    where: { userId: ctx.userId },
+    where: { userId },
     include: {
       businessAccount: {
         include: {

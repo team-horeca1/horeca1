@@ -8,6 +8,10 @@ import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
 import { adoptOrCreateOutlet } from '@/lib/outletWrites';
 import { mapOutletToUnifiedAddress } from '@/lib/addressOutletBridge';
+import {
+  effectiveCustomerBusinessAccountId,
+  effectiveCustomerUserId,
+} from '@/lib/resolveCustomerImpersonation';
 
 const createSchema = z.object({
   label: z.string().min(1).max(50).default('Other'),
@@ -30,18 +34,21 @@ const ALL_ROLES = ['customer', 'vendor', 'brand', 'admin'] as const;
 
 export const GET = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
   try {
-    if (ctx.activeBusinessAccountId) {
+    const userId = effectiveCustomerUserId(ctx);
+    const businessAccountId = effectiveCustomerBusinessAccountId(ctx);
+
+    if (businessAccountId) {
       const activeAccount = await prisma.businessAccount.findUnique({
-        where: { id: ctx.activeBusinessAccountId },
+        where: { id: businessAccountId },
         select: { primaryOutletId: true },
       });
       const outlets = await prisma.outlet.findMany({
-        where: { businessAccountId: ctx.activeBusinessAccountId, isActive: true },
+        where: { businessAccountId, isActive: true },
         orderBy: { createdAt: 'asc' },
       });
       const savedRows = await prisma.savedAddress.findMany({
         where: {
-          userId: ctx.userId,
+          userId,
           outletId: { in: outlets.map((o) => o.id) },
         },
       });
@@ -55,7 +62,7 @@ export const GET = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
     }
 
     const addresses = await prisma.savedAddress.findMany({
-      where: { userId: ctx.userId },
+      where: { userId },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
     });
     return NextResponse.json({ success: true, data: addresses });
