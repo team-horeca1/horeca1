@@ -18,6 +18,20 @@ function str(v: string | undefined | null): string | null {
   return t || null;
 }
 
+/** Omit empty optional strings from JSON — Zod `.optional()` rejects explicit `null`. */
+function optionalField(v: string | undefined | null): string | undefined {
+  const t = (v ?? '').trim();
+  return t || undefined;
+}
+
+function omitEmptyFields(obj: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (val !== null && val !== undefined) out[key] = val;
+  }
+  return out;
+}
+
 function slugify(name: string): string {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
@@ -193,40 +207,40 @@ export function buildAdminBrandPayload(
 export function buildBrandProfilePayload(p: BrandProfileInput): Record<string, unknown> {
   const legalName = derivedLegalName(p);
   const displayName = derivedDisplayName(p);
-  return {
+  return omitEmptyFields({
     name: displayName || legalName,
     legalName,
     displayName,
-    brandType: str(p.brandType),
-    subType: str(p.subType),
-    productCategories: p.productCategories,
-    businessSize: str(p.businessSize),
-    distributionPresence: str(p.distributionPresence),
-    targetSegments: p.targetSegments,
-    horecaFocused: parseBool(p.horecaFocused),
-    retailFocused: parseBool(p.retailFocused),
-    salutation: str(p.salutation),
-    firstName: str(p.firstName),
-    lastName: str(p.lastName),
-    designation: str(p.designation),
-    phone: primaryPhoneDigits(p),
-    mobilePhone: primaryPhoneDigits(p) || str(p.mobilePhone),
-    gstin: str(p.gstin)?.toUpperCase(),
-    city: str(p.city || p.billingCity),
-    state: str(p.state || p.billingState),
-    billingAddressLine: str(p.addressLine || p.billingAddressLine),
-    billingPincode: str(p.pincode || p.billingPincode),
-    website: str(p.website),
-    tagline: str(p.tagline),
-    description: str(p.description),
-    logoUrl: str(p.logoUrl),
-    brandTier: str(p.brandTier),
-    marketplaceVisibility: str(p.marketplaceVisibility),
-    creditSupport: parseBool(p.creditSupport),
-    leadStatus: str(p.leadStatus),
-    manualTags: p.manualTags,
-    remarks: str(p.remarks),
-  };
+    brandType: optionalField(p.brandType),
+    subType: optionalField(p.subType),
+    productCategories: p.productCategories?.length ? p.productCategories : undefined,
+    businessSize: optionalField(p.businessSize),
+    distributionPresence: optionalField(p.distributionPresence),
+    targetSegments: p.targetSegments?.length ? p.targetSegments : undefined,
+    horecaFocused: parseBool(p.horecaFocused) ?? undefined,
+    retailFocused: parseBool(p.retailFocused) ?? undefined,
+    salutation: optionalField(p.salutation),
+    firstName: optionalField(p.firstName),
+    lastName: optionalField(p.lastName),
+    designation: optionalField(p.designation),
+    phone: primaryPhoneDigits(p) || undefined,
+    mobilePhone: primaryPhoneDigits(p) || optionalField(p.mobilePhone),
+    gstin: optionalField(p.gstin)?.toUpperCase(),
+    city: optionalField(p.city || p.billingCity),
+    state: optionalField(p.state || p.billingState),
+    billingAddressLine: optionalField(p.addressLine || p.billingAddressLine),
+    billingPincode: optionalField(p.pincode || p.billingPincode),
+    website: optionalField(p.website),
+    tagline: optionalField(p.tagline),
+    description: optionalField(p.description),
+    logoUrl: optionalField(p.logoUrl),
+    brandTier: optionalField(p.brandTier),
+    marketplaceVisibility: optionalField(p.marketplaceVisibility),
+    creditSupport: parseBool(p.creditSupport) ?? undefined,
+    leadStatus: optionalField(p.leadStatus),
+    manualTags: p.manualTags?.length ? p.manualTags : undefined,
+    remarks: optionalField(p.remarks),
+  });
 }
 
 export function brandProfileToBusinessAccountUpdate(
@@ -249,32 +263,32 @@ export const mapToBrandProfileFields = mapToBrandFields;
 /** Flat payload for POST /api/v1/brand/onboarding/submit from /brand/register. */
 export function buildBrandProfile(p: BrandProfileInput & { password?: string }): Record<string, unknown> {
   const fields = mapToBrandFields(p);
-  return {
+  return omitEmptyFields({
     legalName: derivedLegalName(p),
     displayName: derivedDisplayName(p),
-    name: fields.name,
+    name: fields.name as string | undefined,
     fullName: derivedFullName(p),
-    salutation: str(p.salutation),
-    firstName: str(p.firstName),
-    lastName: str(p.lastName),
-    designation: str(p.designation),
-    brandType: fields.brandType,
-    subType: fields.subType,
-    productCategories: fields.categories,
-    businessSize: fields.businessSize,
-    distributionPresence: fields.distributionPresence,
-    targetSegments: fields.targetSegments,
-    horecaFocused: fields.horecaFocused,
-    retailFocused: fields.retailFocused,
-    email: str(p.email),
-    gstin: str(p.gstin)?.toUpperCase(),
-    billingAddressLine: str(p.addressLine || p.billingAddressLine),
-    city: str(p.city || p.billingCity),
-    state: str(p.state || p.billingState),
-    pincode: str(p.pincode || p.billingPincode),
-    website: fields.website,
-    tagline: fields.tagline,
-    description: fields.description,
+    salutation: optionalField(p.salutation),
+    firstName: optionalField(p.firstName),
+    lastName: optionalField(p.lastName),
+    designation: optionalField(p.designation),
+    brandType: optionalField(p.brandType),
+    subType: optionalField(p.subType),
+    productCategories: fields.categories as string[] | undefined,
+    businessSize: optionalField(p.businessSize),
+    distributionPresence: optionalField(p.distributionPresence),
+    targetSegments: fields.targetSegments as string[] | undefined,
+    horecaFocused: fields.horecaFocused as boolean | undefined,
+    retailFocused: fields.retailFocused as boolean | undefined,
+    email: optionalField(p.email),
+    gstin: optionalField(p.gstin)?.toUpperCase(),
+    billingAddressLine: optionalField(p.addressLine || p.billingAddressLine),
+    city: optionalField(p.city || p.billingCity),
+    state: optionalField(p.state || p.billingState),
+    pincode: optionalField(p.pincode || p.billingPincode),
+    website: optionalField(p.website),
+    tagline: optionalField(p.tagline),
+    description: optionalField(p.description),
     password: p.password?.trim() || undefined,
-  };
+  });
 }

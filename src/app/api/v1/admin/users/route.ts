@@ -15,6 +15,7 @@ import { provisionDefaultAccount } from '@/lib/provisionAccount';
 import { companyProfileToBusinessAccountUpdate, contactPersonsFromCompanyProfile } from '@/lib/customerProfileMapper';
 import { uniqueHcid } from '@/lib/hcid';
 import { normalizePhone, phoneLookupVariants } from '@/lib/phone';
+import { encryptAdminPassword } from '@/lib/adminPasswordCipher';
 import type { Role, CreditStatus, Prisma } from '@prisma/client';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -295,6 +296,7 @@ export const POST = withRateLimit(adminOnly(async (req: NextRequest, ctx) => {
     }
 
     const passwordHash = password ? await bcrypt.hash(password, 10) : null;
+    const adminPasswordCipher = password ? encryptAdminPassword(password) : null;
     const hcidDisplay = await uniqueHcid();
 
     const user = await prisma.user.create({
@@ -306,6 +308,7 @@ export const POST = withRateLimit(adminOnly(async (req: NextRequest, ctx) => {
         gstNumber,
         pincode,
         password: passwordHash,
+        adminPasswordCipher,
         role,
         isActive: true,
         hcidDisplay,

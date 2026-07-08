@@ -36,7 +36,7 @@ function tabForBrandErrors(errors: Record<string, string>): Tab {
     return 'admin';
   }
   if (keys.some(k => ['website', 'tagline', 'description'].includes(k))) return 'marketing';
-  if (keys.some(k => ['gstin', 'pincode', 'addressLine', 'outletName', 'city', 'state', 'legalName', 'name'].includes(k))) {
+  if (keys.some(k => ['gstin', 'pincode', 'addressLine', 'outletName', 'city', 'state'].includes(k))) {
     return 'location';
   }
   if (keys.some(k => ['businessSize', 'distributionPresence', 'targetSegments', 'horecaFocused', 'retailFocused'].includes(k))) {
@@ -45,7 +45,10 @@ function tabForBrandErrors(errors: Record<string, string>): Tab {
   return 'overview';
 }
 
-const BRAND_FIELD_ORDER = ['email', 'password', 'legalName', 'name', 'gstin', 'pincode', 'addressLine'];
+const BRAND_FIELD_ORDER = [
+  'email', 'password', 'legalName', 'displayName', 'brandType', 'subType', 'firstName', 'phone',
+  'gstin', 'outletName', 'addressLine', 'pincode',
+];
 
 export default function BrandFormModal({ onClose, onCreated }: Props) {
   const [mode, setMode] = useState<Mode>('quick');
@@ -199,6 +202,7 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
               <TextField
                 label="Brand Name"
                 required
+                dataField="name"
                 value={quickName}
                 onChange={v => { setQuickName(v); if (fieldErrors.name) clearFieldError('name'); }}
                 placeholder="e.g., Everest"
@@ -248,8 +252,17 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
               {tab === 'overview' && (
                 <TextField label="Owner Email" required type="email" value={profile.email ?? ''}
+                  dataField="email"
                   error={fieldErrors.email}
                   onChange={v => { setProfile(p => ({ ...p, email: v })); if (fieldErrors.email) clearFieldError('email'); }}
+                  onBlur={() => {
+                    const msg = validateFieldBlur('email', profile.email ?? '');
+                    setFieldErrors(prev => {
+                      const next = { ...prev };
+                      if (msg) next.email = msg; else delete next.email;
+                      return next;
+                    });
+                  }}
                   placeholder="brand@company.com" />
               )}
               <BrandProfileForm
@@ -269,6 +282,7 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
                     return next;
                   });
                 }}
+                requireLocationFields={false}
                 visibleSections={tabSections[tab]}
                 showPassword={tab === 'overview'}
                 password={password}

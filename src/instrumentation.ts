@@ -8,12 +8,14 @@ import * as Sentry from "@sentry/nextjs";
  * The `register` function runs once when a new Next.js server instance is created.
  */
 export async function register() {
-  // Initialize Sentry for the appropriate runtime
-  if (process.env.NEXT_RUNTIME === "nodejs") {
+  const hasSentryDsn = Boolean(process.env.SENTRY_DSN);
+
+  // Initialize Sentry for the appropriate runtime (skip when DSN unset in dev)
+  if (hasSentryDsn && process.env.NEXT_RUNTIME === "nodejs") {
     await import("../sentry.server.config");
   }
 
-  if (process.env.NEXT_RUNTIME === "edge") {
+  if (hasSentryDsn && process.env.NEXT_RUNTIME === "edge") {
     await import("../sentry.edge.config");
   }
 
@@ -22,8 +24,14 @@ export async function register() {
 
   // Only register event listeners on the Node.js server runtime (not Edge)
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    const { registerEventListeners } = await import("@/events/listeners");
-    registerEventListeners();
+    const shouldRegisterListeners =
+      process.env.NODE_ENV === "production" ||
+      process.env.REGISTER_EVENT_LISTENERS === "true";
+
+    if (shouldRegisterListeners) {
+      const { registerEventListeners } = await import("@/events/listeners");
+      registerEventListeners();
+    }
 
     // Catch unhandled promise rejections to prevent silent crashes
     process.on("unhandledRejection", (reason) => {

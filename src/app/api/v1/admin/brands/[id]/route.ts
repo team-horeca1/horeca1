@@ -10,6 +10,8 @@ import { adminOnly } from '@/middleware/rbac';
 import { requirePermission } from '@/lib/permissions/engine';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import type { AuthContext } from '@/middleware/auth';
+import { getAdminRevealedPasswordForRole } from '@/lib/adminPasswordReveal';
+import { hardDeleteBrandById } from '@/lib/userHardDelete';
 
 // Lenient — admin should be able to save partial/legacy data.
 // Empty strings → null (frontend already does this). URLs not strictly validated
@@ -42,7 +44,7 @@ function slugify(name: string) {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-export const GET = adminOnly(async (req: NextRequest, _ctx: AuthContext) => {
+export const GET = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
     const id = req.nextUrl.pathname.split('/').at(-1)!;
     const brand = await prisma.brand.findUnique({
@@ -71,7 +73,14 @@ export const GET = adminOnly(async (req: NextRequest, _ctx: AuthContext) => {
       },
     });
     if (!brand) return NextResponse.json({ success: false, error: { message: 'Brand not found' } }, { status: 404 });
-    return NextResponse.json({ success: true, data: brand });
+
+    let userWithPassword: (typeof brand.user & { adminPassword?: string | null }) | null = brand.user;
+    if (brand.user) {
+      const adminPassword = await getAdminRevealedPasswordForRole(ctx, brand.user.id, 'brand');
+      userWithPassword = { ...brand.user, adminPassword };
+    }
+
+    return NextResponse.json({ success: true, data: { ...brand, user: userWithPassword } });
   } catch (error) {
     return errorResponse(error);
   }
@@ -97,17 +106,22 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
   }
 });
 
-// Hard delete. BrandMasterProduct, BrandProductMapping, BrandTeamMember, and
-// BrandDistributorInvite all cascade on brandId — one delete wipes the lot.
-// The owning User row is untouched (FK is non-cascading from User side).
+// Hard delete brand row + business account + owner user when invite-only (mirrors vendor delete).
 export const DELETE = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
     requirePermission(ctx, 'brands.delete');
     const id = req.nextUrl.pathname.split('/').at(-1)!;
     const existing = await prisma.brand.findUnique({ where: { id }, select: { id: true } });
     if (!existing) throw Errors.notFound('Brand');
-    await prisma.brand.delete({ where: { id } });
-    return NextResponse.json({ success: true, data: { id, deleted: true } });
+    const result = await hardDeleteBrandById(id);
+    return NextResponse.json({
+      success: true,
+      data: {
+        id,
+        deleted: true,
+        ownerHardDeleted: result.ownerHardDeleted,
+      },
+    });
   } catch (error) {
     return errorResponse(error);
   }

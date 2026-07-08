@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+const isDev = process.env.NODE_ENV === "development";
+
 const nextConfig: NextConfig = {
   output: 'standalone',
 
@@ -10,7 +12,17 @@ const nextConfig: NextConfig = {
   // pdfkit ships .afm font metric files alongside its JS that webpack cannot bundle.
   // Marking it external means Next loads it from node_modules at runtime, so
   // PDFDocument can resolve `js/data/Helvetica.afm` and friends.
-  serverExternalPackages: ['pdfkit'],
+  serverExternalPackages: ['pdfkit', 'bullmq', 'ioredis'],
+
+  // Dev-only: evict idle route modules sooner to stay under Next 16 memory auto-restart.
+  ...(isDev
+    ? {
+        onDemandEntries: {
+          maxInactiveAge: 60_000,
+          pagesBufferLength: 2,
+        },
+      }
+    : {}),
 
   // The .afm files are not detected by Next's static analysis (they're loaded via
   // fs.readFileSync at runtime). Force-include them so the standalone build copies

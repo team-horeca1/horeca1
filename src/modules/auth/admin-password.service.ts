@@ -8,6 +8,7 @@ import type { PermissionKey } from '@/lib/permissions/registry';
 import { prisma } from '@/lib/prisma';
 import { markSessionStale } from '@/lib/sessionStale';
 import { AUDIT_ACTIONS, logAction } from '@/lib/auditLog';
+import { encryptAdminPassword } from '@/lib/adminPasswordCipher';
 
 const ENUM_RANK: Record<TeamRole, number> = { owner: 80, manager: 60, editor: 40, viewer: 20 };
 const SEEDED_OWNER_RANK = 100;
@@ -68,7 +69,11 @@ export async function resetPasswordByAdmin(
   }
 
   const hashed = await bcrypt.hash(password, 12);
-  await prisma.user.update({ where: { id: targetUserId }, data: { password: hashed } });
+  const adminPasswordCipher = encryptAdminPassword(password);
+  await prisma.user.update({
+    where: { id: targetUserId },
+    data: { password: hashed, adminPasswordCipher },
+  });
 
   try {
     await markSessionStale(targetUserId);

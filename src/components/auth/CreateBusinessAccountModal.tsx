@@ -383,6 +383,7 @@ export function CreateBusinessAccountModal({
               onChange={patch => setBrandProfile(prev => ({ ...prev, ...patch }))}
               errors={fieldErrors}
               onFieldBlur={(field, value) => setFE(field, validateBrandFieldBlur(field, value))}
+              requireLocationFields
               visibleSections={{
                 contact: true,
                 identity: true,

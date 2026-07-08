@@ -1,11 +1,17 @@
 import { eventBus } from './emitter';
-import { NotificationService } from '@/modules/notification/notification.service';
 import { prisma } from '@/lib/prisma';
-import { creditWalletService } from '@/modules/credit/creditWallet.service';
-import { orderService } from '@/modules/order/order.service';
 import { SMS_TEMPLATES } from '@/lib/providers/smsTemplates';
+import type { NotificationService } from '@/modules/notification/notification.service';
 
-const notifications = new NotificationService();
+let notificationsPromise: Promise<NotificationService> | null = null;
+function getNotifications(): Promise<NotificationService> {
+  if (!notificationsPromise) {
+    notificationsPromise = import('@/modules/notification/notification.service').then(
+      ({ NotificationService }) => new NotificationService(),
+    );
+  }
+  return notificationsPromise;
+}
 
 // Idempotency lives on globalThis (not a module-scoped boolean): the bus is a
 // process-wide singleton, so its listeners must be registered exactly once even
@@ -28,6 +34,10 @@ export function registerEventListeners(): void {
 
   eventBus.on('OrderCreated', async (payload) => {
     try {
+      const [notifications, { orderService }] = await Promise.all([
+        getNotifications(),
+        import('@/modules/order/order.service'),
+      ]);
       // Vendor's owning user gets the in-app + email alert
       const vendor = await prisma.vendor.findUnique({
         where: { id: payload.vendorId },
@@ -106,6 +116,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('OrderConfirmed', async (payload) => {
     try {
+      const notifications = await getNotifications();
       await Promise.all([
         notifications.send({
           userId: payload.userId,
@@ -133,6 +144,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('OrderShipped', async (payload) => {
     try {
+      const notifications = await getNotifications();
       await notifications.send({
         userId: payload.userId,
         type: 'order',
@@ -149,6 +161,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('OrderDelivered', async (payload) => {
     try {
+      const notifications = await getNotifications();
       await notifications.send({
         userId: payload.userId,
         type: 'order',
@@ -160,6 +173,7 @@ export function registerEventListeners(): void {
       });
       // Credit unlock: a delivered order may push the customer over the
       // "X successful orders" threshold → auto-provision their H1 wallet.
+      const { creditWalletService } = await import('@/modules/credit/creditWallet.service');
       await creditWalletService.maybeAutoUnlockH1Wallet(payload.userId).catch(() => {});
     } catch (error) {
       console.error('[Events] OrderDelivered listener failed:', error);
@@ -170,6 +184,7 @@ export function registerEventListeners(): void {
   // customer was never told. Each now sends an in-app update.
   eventBus.on('OrderProcessing', async (payload) => {
     try {
+      const notifications = await getNotifications();
       await notifications.send({
         userId: payload.userId, type: 'order', channel: 'in_app',
         title: 'Order Being Packed',
@@ -181,6 +196,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('OrderReadyForDispatch', async (payload) => {
     try {
+      const notifications = await getNotifications();
       await notifications.send({
         userId: payload.userId, type: 'order', channel: 'in_app',
         title: 'Order Ready for Dispatch',
@@ -192,6 +208,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('OrderPartiallyDelivered', async (payload) => {
     try {
+      const notifications = await getNotifications();
       await notifications.send({
         userId: payload.userId, type: 'order', channel: 'in_app',
         title: 'Order Partially Delivered',
@@ -203,6 +220,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('OrderReturned', async (payload) => {
     try {
+      const notifications = await getNotifications();
       await notifications.send({
         userId: payload.userId, type: 'order', channel: 'in_app',
         title: 'Order Returned',
@@ -214,6 +232,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('OrderCancelled', async (payload) => {
     try {
+      const notifications = await getNotifications();
       const reasonSuffix = payload.reason ? ` Reason: ${payload.reason}` : '';
 
       // Notify customer
@@ -244,6 +263,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('OrderDeliveryOtp', async (payload) => {
     try {
+      const notifications = await getNotifications();
       const body = `Your delivery code for order ${payload.orderNumber} is ${payload.otp}. Share it with the delivery agent only when you receive your order.`;
       await Promise.all([
         notifications.send({
@@ -285,6 +305,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('PaymentReceived', async (payload) => {
     try {
+      const notifications = await getNotifications();
       await notifications.send({
         userId: payload.vendorId,
         type: 'payment',
@@ -301,6 +322,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('PaymentFailed', async (payload) => {
     try {
+      const notifications = await getNotifications();
       await notifications.send({
         userId: payload.userId,
         type: 'payment',
@@ -321,6 +343,7 @@ export function registerEventListeners(): void {
     try {
       console.log(`[Listener] UserRegistered — ${payload.email} (role: ${payload.role})`);
 
+      const notifications = await getNotifications();
       await notifications.send({
         userId: payload.userId,
         type: 'account',
@@ -337,6 +360,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('VendorOnboarded', async (payload) => {
     try {
+      const notifications = await getNotifications();
       await notifications.send({
         userId: payload.userId,
         type: 'account',
@@ -355,6 +379,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('CreditApplied', async (payload) => {
     try {
+      const notifications = await getNotifications();
       await notifications.send({
         userId: payload.userId,
         type: 'credit',
@@ -375,6 +400,7 @@ export function registerEventListeners(): void {
     try {
       if (payload.qtyAvailable > payload.lowStockThreshold) return;
 
+      const notifications = await getNotifications();
       await notifications.send({
         userId: payload.vendorId,
         type: 'inventory',
@@ -393,6 +419,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('ProductSubmitted', async (payload) => {
     try {
+      const notifications = await getNotifications();
       const admins = await prisma.user.findMany({ where: { role: 'admin' } });
       await Promise.all(
         admins.map((admin) =>
@@ -419,6 +446,7 @@ export function registerEventListeners(): void {
         select: { userId: true },
       });
       if (vendor) {
+        const notifications = await getNotifications();
         await notifications.send({
           userId: vendor.userId,
           type: 'approval',
@@ -438,6 +466,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('ProductEditSubmitted', async (payload) => {
     try {
+      const notifications = await getNotifications();
       const admins = await prisma.user.findMany({ where: { role: 'admin' } });
       await Promise.all(
         admins.map((admin) =>
@@ -464,6 +493,7 @@ export function registerEventListeners(): void {
         select: { userId: true },
       });
       if (vendor) {
+        const notifications = await getNotifications();
         await notifications.send({
           userId: vendor.userId,
           type: 'approval',
@@ -486,6 +516,7 @@ export function registerEventListeners(): void {
         select: { userId: true },
       });
       if (vendor) {
+        const notifications = await getNotifications();
         await notifications.send({
           userId: vendor.userId,
           type: 'approval',
@@ -510,6 +541,7 @@ export function registerEventListeners(): void {
         select: { userId: true },
       });
       if (vendor) {
+        const notifications = await getNotifications();
         await notifications.send({
           userId: vendor.userId,
           type: 'catalog',
@@ -529,6 +561,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('CategorySuggested', async (payload) => {
     try {
+      const notifications = await getNotifications();
       const admins = await prisma.user.findMany({ where: { role: 'admin' } });
       await Promise.all(
         admins.map((admin) =>
@@ -551,6 +584,7 @@ export function registerEventListeners(): void {
   eventBus.on('CategoryApproved', async (payload) => {
     try {
       if (payload.suggestedBy) {
+        const notifications = await getNotifications();
         await notifications.send({
           userId: payload.suggestedBy,
           type: 'approval',
@@ -570,6 +604,7 @@ export function registerEventListeners(): void {
     try {
       if (payload.suggestedBy) {
         const reasonSuffix = payload.reason ? `: ${payload.reason}` : '';
+        const notifications = await getNotifications();
         await notifications.send({
           userId: payload.suggestedBy,
           type: 'approval',
@@ -589,6 +624,7 @@ export function registerEventListeners(): void {
 
   eventBus.on('BrandSuggested', async (payload) => {
     try {
+      const notifications = await getNotifications();
       const admins = await prisma.user.findMany({ where: { role: 'admin' }, select: { id: true } });
       await Promise.all(
         admins.map((admin) =>
@@ -615,6 +651,7 @@ export function registerEventListeners(): void {
         select: { userId: true },
       });
       if (!brand?.userId) return;
+      const notifications = await getNotifications();
       await Promise.all([
         notifications.send({
           userId: brand.userId,
@@ -648,6 +685,7 @@ export function registerEventListeners(): void {
       });
       if (!brand?.userId) return;
       const reasonSuffix = payload.reason?.trim() ? ` Reason: ${payload.reason.trim()}` : '';
+      const notifications = await getNotifications();
       await Promise.all([
         notifications.send({
           userId: brand.userId,

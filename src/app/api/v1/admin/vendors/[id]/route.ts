@@ -16,6 +16,7 @@ import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { validateVendorCode } from '@/lib/sku';
 import { hardDeleteVendorById } from '@/lib/userHardDelete';
 import { Prisma } from '@prisma/client';
+import { getAdminRevealedPasswordForRole } from '@/lib/adminPasswordReveal';
 
 const VENDOR_ID_COOKIE = 'admin_impersonate_vendor_id';
 const VENDOR_NAME_COOKIE = 'admin_impersonate_vendor_name';
@@ -27,7 +28,7 @@ function extractId(req: NextRequest): string {
 }
 
 // GET — full vendor details with products, service areas, delivery slots
-export const GET = adminOnly(async (req: NextRequest, _ctx) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
     const id = extractId(req);
 
@@ -95,7 +96,13 @@ export const GET = adminOnly(async (req: NextRequest, _ctx) => {
       throw Errors.notFound('Vendor');
     }
 
-    return NextResponse.json({ success: true, data: vendor });
+    const adminPassword = await getAdminRevealedPasswordForRole(ctx, vendor.user.id, 'vendor');
+    const data = {
+      ...vendor,
+      user: { ...vendor.user, adminPassword },
+    };
+
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     return errorResponse(error);
   }

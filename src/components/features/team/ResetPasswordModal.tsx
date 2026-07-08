@@ -11,6 +11,7 @@ interface Props {
   accent: string;
   onClose: () => void;
   showGenerate?: boolean;
+  onSuccess?: (password: string) => void;
 }
 
 function generatePassword(): string {
@@ -22,7 +23,7 @@ function generatePassword(): string {
   return out;
 }
 
-export function ResetPasswordModal({ member, passwordEndpoint, accent, onClose, showGenerate = false }: Props) {
+export function ResetPasswordModal({ member, passwordEndpoint, accent, onClose, showGenerate = false, onSuccess }: Props) {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const { bannerError, clearErrors, applyApiError, applyValidationErrors } = useFormFeedback();
@@ -64,6 +65,7 @@ export function ResetPasswordModal({ member, passwordEndpoint, accent, onClose, 
         applyApiError(json, { fieldOrder: ['password'], dataField: true });
         return;
       }
+      onSuccess?.(password);
       setDone(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed';

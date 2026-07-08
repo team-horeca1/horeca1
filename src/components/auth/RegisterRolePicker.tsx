@@ -22,14 +22,16 @@ const ROLES = [
   },
   {
     id: 'vendor' as const,
-    href: () => '/vendor/register',
+    href: (redirect: string | null) =>
+      redirect ? `/vendor/register?redirect=${encodeURIComponent(redirect)}` : '/vendor/register',
     icon: Store,
     title: 'Onboard as Vendor',
     subtitle: 'Sell on Horeca1 — full KYC, about 5 minutes',
   },
   {
     id: 'brand' as const,
-    href: () => '/brand/register',
+    href: (redirect: string | null) =>
+      redirect ? `/brand/register?redirect=${encodeURIComponent(redirect)}` : '/brand/register',
     icon: Sparkles,
     title: 'Onboard as Brand',
     subtitle: 'Register your brand on the marketplace',

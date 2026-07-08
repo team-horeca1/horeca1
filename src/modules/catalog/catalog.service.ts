@@ -7,7 +7,6 @@ import { emitEvent } from '@/events/emitter';
 import { runMappingForVendorProduct, embedDistributorProduct } from '@/modules/brand/brand-mapper';
 import { formatVendorSku, nextMasterSku, resolveVendorCode, validateMasterSku } from '@/lib/sku';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
-import { sendProductRejectedNotifications } from '@/lib/productRejectionNotifications';
 import {
   detectMaterialChanges,
   isTaxPercentMaterial,
@@ -1751,6 +1750,7 @@ export class CatalogService {
       },
       source: 'admin_edit',
     });
+    const { sendProductRejectedNotifications } = await import('@/lib/productRejectionNotifications');
     await sendProductRejectedNotifications({
       productId: product.id,
       vendorId: product.vendorId,

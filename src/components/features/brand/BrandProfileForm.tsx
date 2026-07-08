@@ -60,6 +60,8 @@ export interface BrandProfileFormProps {
   onTogglePassword?: () => void;
   className?: string;
   layout?: 'default' | 'wide';
+  /** When true, outlet/address/pincode show required markers (add-business flow). */
+  requireLocationFields?: boolean;
 }
 
 function SectionHeader({
@@ -141,6 +143,7 @@ export function BrandProfileForm({
   onTogglePassword,
   className,
   layout = 'default',
+  requireLocationFields = false,
 }: BrandProfileFormProps) {
   const set = (patch: Partial<BrandProfileValues>) => onChange(patch);
   const blur = (field: string, v: string) => onFieldBlur?.(field, v);
@@ -206,16 +209,21 @@ export function BrandProfileForm({
         hint="Selecting a place auto-fills city, state, and pincode."
         onPick={handleAddressPick}
       />
-      <TextField label="Primary Outlet / HQ name" required value={value.outletName ?? ''}
+      <TextField label="Primary Outlet / HQ name" required={requireLocationFields} value={value.outletName ?? ''}
+        dataField="outletName"
         error={errors.outletName}
         onChange={v => set({ outletName: v })}
+        onBlur={() => blur('outletName', value.outletName ?? '')}
         placeholder="e.g. Mumbai HQ" />
-      <TextField label="Address Line" required value={value.addressLine ?? value.billingAddressLine ?? ''}
+      <TextField label="Address Line" required={requireLocationFields} value={value.addressLine ?? value.billingAddressLine ?? ''}
+        dataField="addressLine"
         error={errors.addressLine}
         onChange={v => set({ addressLine: v, billingAddressLine: v })}
+        onBlur={() => blur('addressLine', value.addressLine ?? value.billingAddressLine ?? '')}
         placeholder="Building, street, area" />
       <div className={GRID}>
-        <TextField label="Pincode" required value={value.pincode ?? value.billingPincode ?? ''} maxLength={6}
+        <TextField label="Pincode" required={requireLocationFields} value={value.pincode ?? value.billingPincode ?? ''} maxLength={6}
+          dataField="pincode"
           error={errors.pincode} placeholder="6-digit PIN" inputMode="numeric"
           onChange={v => {
             const n = v.replace(/\D/g, '').slice(0, 6);
@@ -247,22 +255,26 @@ export function BrandProfileForm({
           <>
             <SectionHeader icon={Building2} spanClass={SPAN_FULL}>Brand Identity</SectionHeader>
             <TextField label="Legal Brand Name" required value={value.legalName ?? value.companyName ?? ''}
+              dataField="legalName"
               error={errors.legalName}
               onChange={v => set({ legalName: v, companyName: v })}
+              onBlur={() => blur('legalName', value.legalName ?? value.companyName ?? '')}
               placeholder="Kissan Foods Pvt Ltd" />
             <TextField label="Display Name" required value={value.displayName ?? value.name ?? ''}
+              dataField="displayName"
               error={errors.displayName}
               onChange={v => set({ displayName: v, name: v })}
+              onBlur={() => blur('displayName', value.displayName ?? value.name ?? '')}
               placeholder="Kissan" />
-            <FormField label="Brand Type" required>
+            <FormField label="Brand Type" required dataField="brandType">
               <FormSelect value={value.brandType ?? ''} onChange={handleBrandTypeChange} hasError={!!errors.brandType}>
                 <option value="">Select brand type</option>
                 {BRAND_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </FormSelect>
               {errors.brandType && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.brandType}</p>}
             </FormField>
-            <FormField label="Sub-Type">
-              <FormSelect value={value.subType ?? ''} onChange={handleSubTypeChange} disabled={!value.brandType}>
+            <FormField label="Sub-Type" error={errors.subType} dataField="subType">
+              <FormSelect value={value.subType ?? ''} onChange={handleSubTypeChange} disabled={!value.brandType} hasError={!!errors.subType}>
                 <option value="">Select sub-type</option>
                 {subTypes.map(s => <option key={s} value={s}>{s}</option>)}
               </FormSelect>
@@ -349,7 +361,7 @@ export function BrandProfileForm({
         {visibleSections.contact && (
           <>
             <SectionHeader icon={User} spanClass={SPAN_FULL}>Primary Contact</SectionHeader>
-            <FormField label="Contact Name" className={SPAN_FULL}>
+            <FormField label="Contact Name" className={SPAN_FULL} dataField="firstName">
               <div className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
                 <FormSelect value={value.salutation ?? ''} onChange={v => set({ salutation: v })}>
                   <option value="">Salutation</option>
@@ -359,7 +371,8 @@ export function BrandProfileForm({
                   <option value="Dr.">Dr.</option>
                 </FormSelect>
                 <FormInput value={value.firstName ?? ''} onChange={v => set({ firstName: v })}
-                  placeholder="First Name" hasError={!!errors.firstName} />
+                  placeholder="First Name" hasError={!!errors.firstName}
+                  onBlur={() => blur('firstName', value.firstName ?? '')} />
                 <FormInput value={value.lastName ?? ''} onChange={v => set({ lastName: v })}
                   placeholder="Last Name" />
                 {isWide && (
@@ -373,17 +386,20 @@ export function BrandProfileForm({
               <TextField label="Designation (optional)" value={value.designation ?? ''}
                 onChange={v => set({ designation: v })} placeholder="e.g. Brand Manager" />
             )}
-            <FormField label="Mobile" required error={errors.phone}>
+            <FormField label="Mobile" required error={errors.phone} dataField="phone">
               <PhoneInput
                 value={value.phone ?? value.mobilePhone ?? ''}
                 onChange={v => set({ phone: v, mobilePhone: v })}
                 hasError={!!errors.phone}
+                onBlur={() => blur('phone', value.phone ?? value.mobilePhone ?? '')}
               />
             </FormField>
             {visibleSections.contactEmail !== false && (
               <TextField label="Email" value={value.email ?? ''}
+                dataField="email"
                 error={errors.email}
                 onChange={v => set({ email: v })}
+                onBlur={() => blur('email', value.email ?? '')}
                 placeholder="brand@company.com" />
             )}
           </>
@@ -392,13 +408,14 @@ export function BrandProfileForm({
         {visibleSections.auth && showPassword && onPasswordChange && (
           <>
             <SectionHeader icon={User} spanClass={SPAN_FULL}>Owner Account</SectionHeader>
-            <FormField label="Password" required error={errors.password}>
+            <FormField label="Password" required error={errors.password} dataField="password">
               <PasswordInput
                 value={password}
                 onChange={onPasswordChange}
                 placeholder="Min 6 characters"
                 hasError={!!errors.password}
                 autoComplete="new-password"
+                onBlur={() => blur('password', password)}
               />
             </FormField>
           </>
@@ -408,6 +425,7 @@ export function BrandProfileForm({
           <>
             <SectionHeader icon={Building2} spanClass={SPAN_FULL}>Tax</SectionHeader>
             <TextField label="GSTIN (optional)" value={value.gstin ?? ''} maxLength={15}
+              dataField="gstin"
               placeholder="22ABCDE1234F1Z5" error={errors.gstin}
               onChange={v => set({ gstin: v.toUpperCase().slice(0, 15) })}
               onBlur={() => blur('gstin', value.gstin ?? '')} />

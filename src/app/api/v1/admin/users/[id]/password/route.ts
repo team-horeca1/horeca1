@@ -22,7 +22,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     const userId = extractUserId(req);
     const { password } = schema.parse(await req.json());
     await resetPasswordByAdmin(ctx, userId, password, req);
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, data: { password } });
   } catch (error) {
     return errorResponse(error);
   }

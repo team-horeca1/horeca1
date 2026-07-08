@@ -4,5 +4,5 @@ Sentry.init({
   dsn: process.env.SENTRY_DSN,
 
   sendDefaultPii: true,
-  tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
+  tracesSampleRate: process.env.NODE_ENV === "development" ? 0 : 0.1,
 });

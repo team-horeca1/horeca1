@@ -11,6 +11,7 @@ import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { hardDeleteUserById } from '@/lib/userHardDelete';
+import { getAdminRevealedPasswordForRole } from '@/lib/adminPasswordReveal';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -21,7 +22,7 @@ function extractId(req: NextRequest): string {
 }
 
 // GET — full user details
-export const GET = adminOnly(async (req: NextRequest, _ctx) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
     const id = extractId(req);
 
@@ -176,7 +177,9 @@ export const GET = adminOnly(async (req: NextRequest, _ctx) => {
       throw Errors.notFound('User');
     }
 
-    return NextResponse.json({ success: true, data: user });
+    const adminPassword = await getAdminRevealedPasswordForRole(ctx, user.id, user.role);
+
+    return NextResponse.json({ success: true, data: { ...user, adminPassword } });
   } catch (error) {
     return errorResponse(error);
   }

@@ -290,6 +290,65 @@ export interface HardDeleteVendorResult {
   businessName: string;
 }
 
+export interface HardDeleteBrandResult {
+  ownerUserId: string | null;
+  ownerHardDeleted: boolean;
+  brandName: string;
+}
+
+/**
+ * Permanently remove a brand and its scoped data. The owner user is hard-deleted
+ * when they have no marketplace footprint; otherwise they are kept and demoted.
+ */
+export async function hardDeleteBrandById(brandId: string): Promise<HardDeleteBrandResult> {
+  const brand = await prisma.brand.findUnique({
+    where: { id: brandId },
+    select: { id: true, userId: true, businessAccountId: true, name: true },
+  });
+  if (!brand) {
+    throw new Error('Brand not found');
+  }
+
+  const ownerUserId = brand.userId;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.brandTeamMember.deleteMany({ where: { brandId } });
+    await tx.brand.delete({ where: { id: brandId } });
+    if (brand.businessAccountId) {
+      await deleteVendorBusinessAccountInTransaction(tx, brand.businessAccountId);
+    }
+  }, HARD_DELETE_TX_OPTS);
+
+  if (!ownerUserId) {
+    return { ownerUserId: null, ownerHardDeleted: false, brandName: brand.name };
+  }
+
+  const removal = await finalizeTeamMemberRemoval(ownerUserId);
+
+  if (removal.preserved) {
+    const [vendorCount, brandCount] = await Promise.all([
+      prisma.vendor.count({ where: { userId: ownerUserId } }),
+      prisma.brand.count({ where: { userId: ownerUserId } }),
+    ]);
+    if (vendorCount === 0 && brandCount === 0) {
+      const user = await prisma.user.findUnique({
+        where: { id: ownerUserId },
+        select: { role: true },
+      });
+      if (user?.role === 'brand') {
+        await prisma.user.update({ where: { id: ownerUserId }, data: { role: 'customer' } });
+      }
+    }
+    await markSessionStale(ownerUserId);
+  }
+
+  return {
+    ownerUserId,
+    ownerHardDeleted: removal.hardDeleted,
+    brandName: brand.name,
+  };
+}
+
 /**
  * Permanently remove a vendor and its scoped data. The owner user is hard-deleted
  * when they have no marketplace footprint; otherwise they are kept and demoted.

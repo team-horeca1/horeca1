@@ -27,13 +27,13 @@ import {
 import { cn } from '@/lib/utils';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { AdminPasswordResetButton } from '@/components/features/admin/AdminPasswordResetButton';
 import { AdminAccountTeamPanel } from '@/components/features/admin/AdminAccountTeamPanel';
 import {
     AdminEntityDetailHeader,
     AdminEntityStatsRow,
     AdminImpersonateButton,
     AdminStatusBadge,
+    AdminLoginCredentialsPanel,
 } from '@/components/features/admin/entity';
 
 interface VendorProfile {
@@ -57,6 +57,7 @@ interface UserData {
     isActive: boolean;
     createdAt: string;
     updatedAt: string;
+    adminPassword?: string | null;
     vendor: VendorProfile | null;
     accountMemberships?: Array<{
         isPrimary: boolean;
@@ -146,6 +147,7 @@ export default function CustomerDetailsPage() {
     const userId = params.id as string;
 
     const [user, setUser] = useState<UserData | null>(null);
+    const [ownerPassword, setOwnerPassword] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [toggling, setToggling] = useState(false);
@@ -173,6 +175,7 @@ export default function CustomerDetailsPage() {
                     throw new Error(json.message || 'Failed to fetch user');
                 }
                 setUser(json.data);
+                setOwnerPassword(json.data.adminPassword ?? null);
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'An unexpected error occurred');
             } finally {
@@ -401,9 +404,15 @@ export default function CustomerDetailsPage() {
                         </div>
                     </div>
                 </div>
-                <div className="w-full lg:w-[220px] border-t lg:border-t-0 lg:border-l border-[#F3F4F6] pt-6 lg:pt-0 lg:pl-6 flex flex-col justify-center gap-2.5">
+                <div className="w-full lg:w-[260px] border-t lg:border-t-0 lg:border-l border-[#F3F4F6] pt-6 lg:pt-0 lg:pl-6 flex flex-col justify-center gap-4">
                     <span className="text-[11px] font-bold text-[#9CA3AF] uppercase text-center lg:text-left">Account Actions</span>
-                    <AdminPasswordResetButton user={user} permission="customers.edit" accent="#299E60" className="w-full justify-center" />
+                    <AdminLoginCredentialsPanel
+                        user={user}
+                        adminPassword={ownerPassword}
+                        permission="customers.edit"
+                        accent="#299E60"
+                        onPasswordUpdated={setOwnerPassword}
+                    />
                     <button
                         type="button"
                         onClick={handleToggleActive}

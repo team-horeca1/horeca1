@@ -86,8 +86,13 @@ export function derivedLegalName(p: BrandProfileInput): string {
   return trim(p.legalName) || trim(p.companyName) || trim(p.name);
 }
 
+/** Trimmed display name only — no fallback (use for validation). */
+export function rawDisplayName(p: BrandProfileInput): string {
+  return trim(p.displayName) || trim(p.name);
+}
+
 export function derivedDisplayName(p: BrandProfileInput): string {
-  return trim(p.displayName) || derivedLegalName(p);
+  return rawDisplayName(p) || derivedLegalName(p);
 }
 
 export function derivedBrandName(p: BrandProfileInput): string {
@@ -122,9 +127,6 @@ export function validateBrandProfile(
   context: BrandValidationContext,
 ): ValidationResult {
   const errors: Record<string, string> = {};
-  const legalName = derivedLegalName(data);
-  const displayName = derivedDisplayName(data);
-  const fullName = derivedFullName(data);
   const phone = primaryPhoneDigits(data);
   const gstin = trim(data.gstin).toUpperCase();
   const email = trim(data.email);
@@ -134,9 +136,12 @@ export function validateBrandProfile(
   const outletName = trim(data.outletName);
 
   if (context === 'publicRegister' || context === 'adminCreate') {
-    if (!fullName || fullName.length < 2) errors.firstName = 'Contact name is required';
-    if (!legalName || legalName.length < 2) errors.legalName = 'Legal brand name is required';
-    if (!displayName || displayName.length < 2) errors.displayName = 'Display name is required';
+    const rawLegal = trim(data.legalName);
+    const rawDisplay = rawDisplayName(data);
+    const rawFirst = trim(data.firstName);
+    if (!rawLegal || rawLegal.length < 2) errors.legalName = 'Legal brand name is required';
+    if (!rawDisplay || rawDisplay.length < 2) errors.displayName = 'Display name is required';
+    if (!rawFirst || rawFirst.length < 2) errors.firstName = 'First name is required';
     if (!trim(data.brandType)) errors.brandType = 'Brand type is required';
     else if (!(BRAND_TYPES as readonly string[]).includes(trim(data.brandType))) {
       errors.brandType = 'Select a valid brand type';
@@ -178,7 +183,8 @@ export function validateBrandProfile(
   }
 
   if (context === 'addBusiness') {
-    if (!legalName || legalName.length < 2) errors.legalName = 'Legal brand name is required';
+    const rawLegal = trim(data.legalName);
+    if (!rawLegal || rawLegal.length < 2) errors.legalName = 'Legal brand name is required';
     if (!trim(data.brandType)) errors.brandType = 'Brand type is required';
     if (!outletName || outletName.length < 2) errors.outletName = 'Outlet name is required';
     if (!addressLine || addressLine.length < 5) errors.addressLine = 'Enter the full address';
@@ -199,6 +205,25 @@ export function validateBrandProfile(
 export function validateFieldBlur(field: string, value: string): string {
   const v = value.trim();
   switch (field) {
+    case 'legalName':
+      return v.length > 0 && v.length < 2 ? 'Legal brand name is required' : v.length === 0 ? 'Legal brand name is required' : '';
+    case 'displayName':
+    case 'name':
+      return v.length > 0 && v.length < 2 ? 'Display name is required' : v.length === 0 ? 'Display name is required' : '';
+    case 'firstName':
+      return v.length > 0 && v.length < 2 ? 'First name is required' : v.length === 0 ? 'First name is required' : '';
+    case 'brandType':
+      return v.length === 0 ? 'Brand type is required' : '';
+    case 'subType':
+      return v.length === 0 ? 'Sub-type is required' : '';
+    case 'phone':
+      return v.length > 0 && v.replace(/\D/g, '').slice(-10).length !== 10
+        ? 'Enter a valid 10-digit mobile number'
+        : v.length === 0 ? 'Enter a valid 10-digit mobile number' : '';
+    case 'email':
+      return v.length > 0 && !EMAIL_RE.test(v) ? 'Enter a valid email address' : '';
+    case 'password':
+      return v.length > 0 && v.length < 6 ? 'Password must be at least 6 characters' : '';
     case 'gstin':
       return v && !GST_RE.test(v.toUpperCase()) ? 'Format: 22ABCDE1234F1Z5' : '';
     case 'pincode':

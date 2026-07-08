@@ -45,13 +45,13 @@ import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { usePermissions } from '@/hooks/usePermissions';
 import { AdminVendorPlatformFee } from '@/components/features/admin/AdminVendorPlatformFee';
-import { AdminPasswordResetButton } from '@/components/features/admin/AdminPasswordResetButton';
 import { AdminUserTeamPanel } from '@/components/features/admin/AdminUserTeamPanel';
 import {
     AdminEntityDetailHeader,
     AdminEntityStatsRow,
     AdminImpersonateButton,
     AdminStatusBadge,
+    AdminLoginCredentialsPanel,
 } from '@/components/features/admin/entity';
 
 interface VendorProduct {
@@ -85,6 +85,7 @@ interface VendorUser {
     gstNumber: string | null;
     isActive: boolean;
     createdAt: string;
+    adminPassword?: string | null;
 }
 
 interface VendorDocument {
@@ -217,6 +218,7 @@ export default function VendorDetailsPage() {
     const isInitialEdit = searchParams.get('edit') === 'true';
 
     const [vendor, setVendor] = useState<VendorData | null>(null);
+    const [ownerPassword, setOwnerPassword] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [globalDefaultFeePct, setGlobalDefaultFeePct] = useState(10);
@@ -469,6 +471,7 @@ export default function VendorDetailsPage() {
                 throw new Error(json.message || 'Failed to fetch vendor');
             }
             setVendor(json.data);
+            setOwnerPassword(json.data.user?.adminPassword ?? null);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Something went wrong');
         } finally {
@@ -835,19 +838,20 @@ export default function VendorDetailsPage() {
                             </div>
                         )}
                     </div>
-                    {vendor.user && (
-                        <div className="mt-4 flex justify-start">
-                            <AdminPasswordResetButton
-                                user={vendor.user}
-                                permission="vendors.edit"
-                                accent="#299E60"
-                            />
-                        </div>
-                    )}
                 </div>
 
-                {/* Right side status togglers */}
-                <div className="w-full lg:w-[220px] border-t lg:border-t-0 lg:border-l border-[#F3F4F6] pt-6 lg:pt-0 lg:pl-6 flex flex-col justify-center gap-2.5">
+                {/* Right side account + verification */}
+                <div className="w-full lg:w-[260px] border-t lg:border-t-0 lg:border-l border-[#F3F4F6] pt-6 lg:pt-0 lg:pl-6 flex flex-col justify-center gap-4">
+                    {vendor.user && (
+                        <AdminLoginCredentialsPanel
+                            user={vendor.user}
+                            adminPassword={ownerPassword}
+                            permission="vendors.edit"
+                            accent="#299E60"
+                            onPasswordUpdated={setOwnerPassword}
+                        />
+                    )}
+                    <div className="flex flex-col gap-2.5">
                     <span className="text-[11px] font-bold text-[#9CA3AF] uppercase text-center lg:text-left">Verification Actions</span>
                     <button
                         onClick={handleToggleVerification}
@@ -889,6 +893,7 @@ export default function VendorDetailsPage() {
                             Reject Partner
                         </button>
                     )}
+                    </div>
                 </div>
             </div>
 

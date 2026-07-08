@@ -14,6 +14,7 @@ import {
   legacyScalarsFromSelections,
 } from '@/lib/constants/vendorProfile';
 import type { Prisma } from '@prisma/client';
+import { encryptAdminPassword } from '@/lib/adminPasswordCipher';
 
 function slugify(name: string, userId: string): string {
   const base = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
@@ -81,6 +82,7 @@ export async function createDirectVendor(
   if (!vendorAdminTemplate) throw Errors.badRequest('Vendor Admin role template missing. Run data backfill first.');
 
   const hashedPassword = await bcrypt.hash(input.password, 12);
+  const adminPasswordCipher = encryptAdminPassword(input.password);
   const hcidDisplay = await uniqueHcid();
   const vd = input.vendorDetails;
   const typeSelections = normalizeVendorTypeSelections(vd.vendorTypeSelections);
@@ -95,6 +97,7 @@ export async function createDirectVendor(
         fullName: input.fullName,
         email: normalizedEmail,
         password: hashedPassword,
+        adminPasswordCipher,
         role: 'vendor',
         phone: phoneDigits,
         isActive: true,

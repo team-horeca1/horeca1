@@ -10,11 +10,13 @@ import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { prisma } from '@/lib/prisma';
 import { uniqueHcid } from '@/lib/hcid';
 import { validateBrandProfile, BrandProfileSchema, derivedFullName } from '@/lib/validators/brand-profile';
+import { stripNulls } from '@/lib/stripNulls';
 import {
   mapToBusinessAccount,
   mapToBrandFields,
 } from '@/lib/brandProfileMapper';
 import type { AuthContext } from '@/middleware/auth';
+import { encryptAdminPassword } from '@/lib/adminPasswordCipher';
 
 const brandService = new BrandService();
 
@@ -52,6 +54,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
       if (password.length < 6) throw Errors.badRequest('Password must be at least 6 characters');
 
       const hashedPassword = await bcrypt.hash(password, 12);
+      const adminPasswordCipher = encryptAdminPassword(password);
       const hcidDisplay = await uniqueHcid();
 
       const result = await prisma.$transaction(async (tx) => {
@@ -60,6 +63,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
             fullName: name,
             email,
             password: hashedPassword,
+            adminPasswordCipher,
             role: 'brand',
             isActive: true,
             hcidDisplay,
@@ -107,7 +111,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
       return NextResponse.json({ success: true, data: result }, { status: 201 });
     }
 
-    const input = BrandProfileSchema.passthrough().parse(body);
+    const input = BrandProfileSchema.passthrough().parse(stripNulls(body as Record<string, unknown>));
 
     const validation = validateBrandProfile(
       { ...input, password: body.password },
@@ -137,6 +141,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
+    const adminPasswordCipher = encryptAdminPassword(password);
     const hcidDisplay = await uniqueHcid();
     const baData = mapToBusinessAccount(input) as Record<string, unknown>;
 
@@ -146,6 +151,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
           fullName,
           email,
           password: hashedPassword,
+          adminPasswordCipher,
           role: 'brand',
           isActive: true,
           hcidDisplay,

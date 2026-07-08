@@ -939,7 +939,7 @@ export class BrandService {
       where: status ? { approvalStatus: status as 'pending' | 'approved' | 'rejected' } : undefined,
       orderBy: { createdAt: 'desc' },
       include: {
-        user: { select: { id: true, email: true, fullName: true } },
+        user: { select: { id: true, email: true, fullName: true, phone: true } },
         _count: { select: { masterProducts: true, productMappings: true } },
       },
     });

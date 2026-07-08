@@ -19,6 +19,8 @@ import {
   validateFieldBlur,
 } from '@/lib/validators/brand-profile';
 import { buildBrandProfile, buildAddBusinessPayload } from '@/lib/brandProfileMapper';
+import { focusFirstFormError } from '@/lib/formErrorFocus';
+import { extractApiError, parseJsonResponse } from '@/lib/apiError';
 import { ExistingPhoneModal } from '@/components/auth/ExistingPhoneModal';
 import { accountLabelFromCheck } from '@/lib/auth/phoneCheckLabels';
 import type { PhoneCheckResult } from '@/lib/auth/checkPhoneLookup';
@@ -35,6 +37,11 @@ const STEP_TITLES = [
 const PHONE_RE = /^\d{10}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESEND_COOLDOWN = 60;
+
+const BRAND_FIELD_ORDER = [
+  'legalName', 'displayName', 'brandType', 'subType', 'firstName', 'phone', 'email', 'password',
+  'outletName', 'addressLine', 'pincode', 'gstin',
+];
 
 export default function BrandRegisterPage() {
   const { data: session, status: sessionStatus } = useSession();
@@ -264,6 +271,21 @@ export default function BrandRegisterPage() {
     if (digit && next.every(d => d)) verifyOtp(next.join(''));
   };
 
+  const applySubmitError = (apiErr: unknown) => {
+    const parsed = extractApiError(
+      typeof apiErr === 'object' && apiErr !== null && 'success' in apiErr
+        ? apiErr
+        : { success: false, error: apiErr },
+      'Failed to submit. Please check the highlighted fields.',
+    );
+    setError(parsed.message);
+    toast.error(parsed.message);
+    if (parsed.fields && Object.keys(parsed.fields).length > 0) {
+      setFieldErrors(parsed.fields);
+      focusFirstFormError(parsed.fields, { fieldOrder: BRAND_FIELD_ORDER, dataField: true });
+    }
+  };
+
   const handleSubmit = async () => {
     const validationContext = isAuthMode ? 'addBusiness' : 'publicRegister';
     const validation = validateBrandProfile(
@@ -275,6 +297,7 @@ export default function BrandRegisterPage() {
       const msg = validation.message ?? 'Please fix the highlighted fields';
       setError(msg);
       toast.error(msg);
+      focusFirstFormError(validation.errors, { fieldOrder: BRAND_FIELD_ORDER, dataField: true });
       return;
     }
 
@@ -289,11 +312,9 @@ export default function BrandRegisterPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(buildAddBusinessPayload(profile)),
         });
-        const json = await res.json();
-        if (!json.success) {
-          const msg = json.error?.message ?? 'Could not create brand business.';
-          setError(msg);
-          toast.error(msg);
+        const json = await parseJsonResponse<{ success: boolean; data?: { account: { id: string }; outlet: { id: string } } }>(res);
+        if (!json.success || !json.data) {
+          applySubmitError(json);
           setSubmitting(false);
           return;
         }
@@ -327,15 +348,13 @@ export default function BrandRegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const json = await res.json();
+      const json = await parseJsonResponse<{ success: boolean; data?: { hcidDisplay: string } }>(res);
       if (!json.success) {
-        const msg = json.error?.message ?? 'Submission failed';
-        setError(msg);
-        toast.error(msg);
+        applySubmitError(json);
         setSubmitting(false);
         return;
       }
-      setSubmitted({ hcid: json.data.hcidDisplay });
+      setSubmitted({ hcid: json.data!.hcidDisplay });
     } catch {
       const msg = 'Network error — please try again.';
       setError(msg);
@@ -527,6 +546,7 @@ export default function BrandRegisterPage() {
                     return next;
                   });
                 }}
+                requireLocationFields={isAuthMode}
                 visibleSections={{
                   contact: true,
                   identity: true,

@@ -12,6 +12,7 @@ import { uniqueHcid } from '@/lib/hcid';
 import { emitEvent } from '@/events/emitter';
 import { BrandProfileSchema, validateBrandProfile, derivedLegalName } from '@/lib/validators/brand-profile';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
+import { stripNulls } from '@/lib/stripNulls';
 import {
   mapToBusinessAccount,
   mapToBrandFields,
@@ -36,7 +37,7 @@ function slugify(name: string, suffix: string): string {
 
 function parseBody(raw: unknown) {
   const relaxed = isRegisterEmailOtpEnabled();
-  const parsed = BodyBase.parse(raw);
+  const parsed = BodyBase.parse(stripNulls((raw ?? {}) as Record<string, unknown>));
 
   const phoneRaw = (parsed.phone ?? '').replace(/\D/g, '');
   const phone = phoneRaw.length === 12 ? phoneRaw.replace(/^91/, '') : phoneRaw;

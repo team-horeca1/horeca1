@@ -2,10 +2,18 @@ import { Prisma, CreditRepaymentMode, BillingModelType, CreditWalletStatus, Cred
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
-import { NotificationService } from '@/modules/notification/notification.service';
 import { SMS_TEMPLATES } from '@/lib/providers/smsTemplates';
+import type { NotificationService } from '@/modules/notification/notification.service';
 
-const notifications = new NotificationService();
+let notificationsPromise: Promise<NotificationService> | null = null;
+async function getNotifications(): Promise<NotificationService> {
+  if (!notificationsPromise) {
+    notificationsPromise = import('@/modules/notification/notification.service').then(
+      ({ NotificationService }) => new NotificationService(),
+    );
+  }
+  return notificationsPromise;
+}
 
 type Tx = Prisma.TransactionClient;
 
@@ -639,6 +647,7 @@ export class CreditWalletService {
 
       const amount = num(w.outstandingAmount);
       const body = `Your Horeca1 credit payment of ₹${amount} ${phrase}. Pay now from your wallet: /wallet`;
+      const notifications = await getNotifications();
       for (const channel of ['in_app', 'sms', 'whatsapp'] as const) {
         await notifications.send({
           userId: w.userId,
