@@ -346,27 +346,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       }
 
-      // Reload permissions from DB on every session check (page load, update(),
-      // focus refresh). markSessionStale() clears the Redis hint once consumed.
-      if (token.id && !user) {
+      // Reload permissions from DB only when markSessionStale() was called — not on
+      // every passive getSession() / refetchInterval tick.
+      if (token.id && !user && trigger !== 'update') {
         try {
           const staleKey = `session:stale:${token.id as string}`;
           const isStale = await redis.get(staleKey);
-          if (isStale) await redis.del(staleKey);
+          if (isStale) {
+            await redis.del(staleKey);
 
-          const freshRole = await refreshUserRoleFromDb(token);
+            const freshRole = await refreshUserRoleFromDb(token);
 
-          const active = await loadOrProvisionActiveContext(
-            token.id as string,
-            freshRole ?? (token.role as string) ?? 'customer',
-            (token.activeBusinessAccountId as string | null) ?? null,
-            (token.activeOutletId as string | null) ?? null,
-          );
-          applyActiveContext(token, active);
-          if (token.role === 'admin') {
-            await applyAdminPermissions(token);
-          } else {
-            clearAdminTokenFields(token);
+            const active = await loadOrProvisionActiveContext(
+              token.id as string,
+              freshRole ?? (token.role as string) ?? 'customer',
+              (token.activeBusinessAccountId as string | null) ?? null,
+              (token.activeOutletId as string | null) ?? null,
+            );
+            applyActiveContext(token, active);
+            if (token.role === 'admin') {
+              await applyAdminPermissions(token);
+            } else {
+              clearAdminTokenFields(token);
+            }
           }
         } catch (err) {
           console.error('[auth.jwt] permission refresh failed:', err);

@@ -30,6 +30,7 @@ import { NotificationBell } from '../features/NotificationBell';
 import { dal } from '@/lib/dal';
 import type { Category } from '@/types';
 import { NavDeliverySelector } from './NavDeliverySelector';
+import { isAdminCustomerImpersonationActive } from '@/lib/clearImpersonation';
 
 const CATEGORY_STYLE: Record<string, { image: string; bgColor: string }> = {
     'vegetables': { image: '/images/category/vegitable.png', bgColor: '#e8f9e9' },
@@ -52,8 +53,46 @@ const DESKTOP_NAV = [
     { name: 'Lists', href: '/order-lists', Icon: ClipboardList },
 ];
 
+interface NavbarSearchBarProps {
+    value: string;
+    onChange: (value: string) => void;
+    onSubmit: () => void;
+}
+
+const NavbarSearchBar = React.memo(function NavbarSearchBar({
+    value,
+    onChange,
+    onSubmit,
+}: NavbarSearchBarProps) {
+    return (
+        <div className="flex flex-1 items-center min-w-0">
+            <div className="flex items-center gap-2 pl-5 pr-2 py-2.5 bg-gray-50 border-2 border-gray-100 rounded-full w-full focus-within:border-primary/50 focus-within:bg-white transition-all duration-300 shadow-sm">
+                <Search size={17} className="text-gray-400 shrink-0" />
+                <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && value.trim()) onSubmit();
+                    }}
+                    placeholder="Search for a product or brand..."
+                    className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-gray-400 min-w-0"
+                />
+                <button
+                    type="button"
+                    onClick={onSubmit}
+                    className="bg-primary hover:bg-primary-dark px-5 py-2 rounded-full text-white font-bold text-[13px] transition-all shadow-sm cursor-pointer shrink-0"
+                >
+                    Search
+                </button>
+            </div>
+        </div>
+    );
+});
+
 export function Navbar() {
     const router = useRouter();
+    const pathname = usePathname();
     const [isCategoriesSidebarOpen, setIsCategoriesSidebarOpen] = React.useState(false);
     const [isCategoriesExpanded, setIsCategoriesExpanded] = React.useState(false);
     const [isSearchOverlayOpen, setIsSearchOverlayOpen] = React.useState(false);
@@ -80,6 +119,11 @@ export function Navbar() {
     const { selectedAddress, setSelectedAddress } = useAddress();
 
     const [apiCategories, setApiCategories] = React.useState<(Category & { image: string; bgColor: string })[]>([]);
+    const [isCustomerImpersonating, setIsCustomerImpersonating] = React.useState(false);
+
+    React.useEffect(() => {
+        setIsCustomerImpersonating(isAdminCustomerImpersonationActive());
+    }, [pathname, sessionStatus]);
 
     React.useEffect(() => {
         dal.categories.list().then((cats) => {
@@ -91,31 +135,33 @@ export function Navbar() {
         }).catch((err) => console.error('[Navbar] Failed to load categories:', err));
     }, []);
 
-    const openSearch = (tab: 'items' | 'stores' | 'vendors' = 'vendors', initialQuery = '') => {
+    const openSearch = React.useCallback((tab: 'items' | 'stores' | 'vendors' = 'vendors', initialQuery = '') => {
         setSearchTab(tab === 'vendors' ? 'stores' : tab as 'items' | 'stores');
         setNavSearchQuery(initialQuery);
         setIsSearchOverlayOpen(true);
-    };
+    }, []);
 
+    const submitDesktopSearch = React.useCallback(() => {
+        if (navSearchQuery.trim()) openSearch('items', navSearchQuery);
+    }, [navSearchQuery, openSearch]);
 
-
-    const pathname = usePathname();
     const isShipmentPage = pathname?.includes('/cart/shipment/');
     const isAdminPage = pathname?.startsWith('/admin');
     const isVendorDashboard = isVendorPortalPath(pathname);
     const isBrandPortal = pathname?.startsWith('/brand/portal');
     const isAccountPage = pathname?.startsWith('/account');
 
-    if (isAdminPage || isVendorDashboard || isBrandPortal || isShipmentPage || isAccountPage) return null;
-
-    // Build iconized nav items — prepend dashboard shortcut based on active business account
-    const desktopNavItems = [
+    const desktopNavItems = React.useMemo(() => [
         ...(isLoggedIn && activeAccountType?.isVendor ? [{ name: 'Dashboard', href: '/vendor/dashboard', Icon: LayoutDashboard }] : []),
-        ...(isLoggedIn && userRole === 'admin' ? [{ name: 'Dashboard', href: '/admin/dashboard', Icon: LayoutDashboard }] : []),
+        ...(isLoggedIn && userRole === 'admin' && !isCustomerImpersonating
+            ? [{ name: 'Dashboard', href: '/admin/dashboard', Icon: LayoutDashboard }]
+            : []),
         ...(isLoggedIn && activeAccountType?.isBrand ? [{ name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard }] : []),
         ...DESKTOP_NAV,
         ...(isLoggedIn ? [{ name: 'Rewards', href: '/rewards', Icon: Gift }] : []),
-    ];
+    ], [isLoggedIn, activeAccountType?.isVendor, activeAccountType?.isBrand, userRole, isCustomerImpersonating]);
+
+    if (isAdminPage || isVendorDashboard || isBrandPortal || isShipmentPage || isAccountPage) return null;
 
     return (
         <>
@@ -213,28 +259,11 @@ export function Navbar() {
                             </Link>
 
                             {/* Search Bar — flex-1, fills available space. Always visible. */}
-                            <div className="flex flex-1 items-center min-w-0">
-                                <div className="flex items-center gap-2 pl-5 pr-2 py-2.5 bg-gray-50 border-2 border-gray-100 rounded-full w-full focus-within:border-primary/50 focus-within:bg-white transition-all duration-300 shadow-sm">
-                                    <Search size={17} className="text-gray-400 shrink-0" />
-                                    <input
-                                        type="text"
-                                        value={navSearchQuery}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            setNavSearchQuery(val);
-                                            if (val.trim()) openSearch('items', val);
-                                        }}
-                                        placeholder="Search for a product or brand..."
-                                        className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-gray-400 min-w-0"
-                                    />
-                                    <button
-                                        onClick={() => { if (navSearchQuery.trim()) openSearch('items', navSearchQuery); }}
-                                        className="bg-primary hover:bg-primary-dark px-5 py-2 rounded-full text-white font-bold text-[13px] transition-all shadow-sm cursor-pointer shrink-0"
-                                    >
-                                        Search
-                                    </button>
-                                </div>
-                            </div>
+                            <NavbarSearchBar
+                                value={navSearchQuery}
+                                onChange={setNavSearchQuery}
+                                onSubmit={submitDesktopSearch}
+                            />
 
                             {/* Deliver to — account + outlet selector for logged-in users */}
                             <NavDeliverySelector
