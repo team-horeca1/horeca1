@@ -105,6 +105,8 @@ jobs:
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             export DEPLOY_IMAGE DEPLOY_SHA
             cd /opt/horeca1
+            git fetch origin master
+            git reset --hard origin/master
             bash deploy.sh
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}

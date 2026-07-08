@@ -12,6 +12,26 @@ function slugify(str: string): string {
   return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+/** Approved brands shown in vendor/admin product pickers (label-only + real storefronts). */
+export function productPickerBrandWhere() {
+  return {
+    isActive: true,
+    approvalStatus: 'approved' as const,
+    OR: [
+      { userId: null },
+      {
+        user: {
+          email: {
+            not: {
+              contains: 'brand.internal.horeca1',
+            },
+          },
+        },
+      },
+    ],
+  };
+}
+
 // ── Types ────────────────────────────────────────────────────
 
 interface CreateBrandInput {
@@ -70,22 +90,12 @@ export class BrandService {
     return brand.id;
   }
 
-  // ── Public: list approved brands ──────────────────────────
+  // ── Public: list approved brands (product picker) ───────
   async list(input: { limit?: number; cursor?: string }) {
     const { limit = 20, cursor } = input;
 
     const brands = await prisma.brand.findMany({
-      where: {
-        isActive: true,
-        approvalStatus: 'approved',
-        user: {
-          email: {
-            not: {
-              contains: 'brand.internal.horeca1',
-            },
-          },
-        },
-      },
+      where: productPickerBrandWhere(),
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { name: 'asc' },

@@ -23,7 +23,6 @@ import {
     FileDown,
     ImageIcon,
     Info,
-    DollarSign,
     Tag,
     BoxIcon,
     Settings as SettingsIcon,
@@ -38,9 +37,8 @@ import BulkProductToolbar from '@/components/features/shared/BulkProductToolbar'
 import VendorBulkGrid from '@/components/features/vendor/VendorBulkGrid';
 import AdminBulkEngine from '@/components/features/admin/AdminBulkEngine';
 import { usePermissions } from '@/hooks/usePermissions';
-import { CategoryHierarchyPicker } from '@/components/features/brand/CategoryHierarchyPicker';
-import { BrandSinglePicker } from '@/components/features/brand/BrandSinglePicker';
 import { toast } from 'sonner';
+import { ProductEssentialsFields } from '@/components/features/shared/productForm/ProductEssentialsFields';
 import FormSection, {
     FieldLabel,
     SectionHeader,
@@ -587,7 +585,7 @@ export default function ProductsPage() {
             })
             .catch(console.error);
 
-        fetch('/api/v1/brands?limit=100')
+        fetch('/api/v1/brands?limit=200')
             .then(res => res.json())
             .then(json => {
                 if (json.success) {
@@ -2265,87 +2263,61 @@ export default function ProductsPage() {
                                     </div>
                                 )}
 
-                                <FormSection title="Product essentials" icon={<Info size={16} />} requiredBadge sectionId="essentials">
-                                    <div id="ff-name">
-                                        <FieldLabel required>Item Name</FieldLabel>
-                                        <input
-                                            type="text"
-                                            value={formData.name}
-                                            onChange={e => updateField('name', e.target.value)}
-                                            placeholder="Enter product name"
-                                            className={cn(inputCls, formErrors.name && 'border-[#E74C3C] focus:border-[#E74C3C]')}
-                                        />
-                                        {formErrors.name && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.name}</p>}
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div id="ff-sku">
-                                            <FieldLabel required>SKU</FieldLabel>
+                                <ProductEssentialsFields
+                                    portal="admin"
+                                    identityMode="standalone"
+                                    nameField={
+                                        <div id="ff-name" className="sm:col-span-2 xl:col-span-5">
+                                            <FieldLabel required>Item Name</FieldLabel>
                                             <input
                                                 type="text"
-                                                value={formData.sku}
-                                                onChange={e => updateField('sku', e.target.value.toUpperCase())}
-                                                placeholder="RIC-BAS-001"
-                                                readOnly={!!editingProduct?.isMasterRow}
-                                                className={cn(inputCls, editingProduct?.isMasterRow && 'bg-[#F8F9FB] cursor-not-allowed', formErrors.sku && 'border-[#E74C3C]')}
+                                                value={formData.name}
+                                                onChange={e => updateField('name', e.target.value)}
+                                                placeholder="Enter product name"
+                                                className={cn(inputCls, formErrors.name && 'border-[#E74C3C] focus:border-[#E74C3C]')}
                                             />
-                                            {formErrors.sku && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.sku}</p>}
+                                            {formErrors.name && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.name}</p>}
                                         </div>
-                                        <div id="ff-hsn">
-                                            <FieldLabel required>HSN Code</FieldLabel>
-                                            <input
-                                                type="text"
-                                                value={formData.hsn}
-                                                onChange={e => updateField('hsn', e.target.value)}
-                                                placeholder="e.g. 1006"
-                                                className={cn(inputCls, formErrors.hsn && 'border-[#E74C3C]')}
-                                            />
-                                            {formErrors.hsn && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.hsn}</p>}
-                                        </div>
-                                    </div>
-
-                                    <div id="ff-brand">
-                                        <FieldLabel required>Brand</FieldLabel>
-                                        <BrandSinglePicker
-                                            value={formData.brand}
-                                            onChange={val => updateField('brand', val)}
-                                            brands={brands}
-                                            placeholder="Select brand"
-                                            hasError={!!formErrors.brand}
-                                            onSuggest={(name) => suggestBrand(name)}
-                                            suggesting={brandSuggesting}
-                                        />
-                                        {formErrors.brand && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.brand}</p>}
-                                    </div>
-
-                                    <div id="ff-categoryIds">
-                                        <CategoryHierarchyPicker
-                                            key={`cat-${editingProduct?.id ?? (panelOpen ? 'open' : 'closed')}`}
-                                            value={formData.categoryIds}
-                                            onChange={(ids) => setFormData(prev => ({ ...prev, categoryIds: ids }))}
-                                            maxAdditional={4}
-                                            endpoint="/api/v1/admin/categories"
-                                            label="Categories"
-                                            helper="Pick a parent category, then a sub-category."
-                                        />
-                                        {formErrors.categoryIds && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.categoryIds}</p>}
-                                    </div>
-
-                                    <div id="ff-imageUrl">
-                                        <FieldLabel required>Image URL</FieldLabel>
-                                        <ImageUpload
-                                            value={formData.imageUrl}
-                                            onChange={(url) => updateField('imageUrl', url)}
-                                            folder="products"
-                                            label="Primary Image"
-                                            size="lg"
-                                        />
-                                        {formErrors.imageUrl && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.imageUrl}</p>}
-                                    </div>
-
-                                    <div className="space-y-3 pt-2 border-t border-[#EEEEEE]">
+                                    }
+                                    sku={formData.sku}
+                                    hsn={formData.hsn}
+                                    brand={formData.brand}
+                                    skuReadOnly={!!editingProduct?.isMasterRow}
+                                    onSkuChange={(v) => updateField('sku', v)}
+                                    onHsnChange={(v) => updateField('hsn', v)}
+                                    onBrandChange={(v) => updateField('brand', v)}
+                                    categoryIds={formData.categoryIds}
+                                    onCategoryIdsChange={(ids) => setFormData(prev => ({ ...prev, categoryIds: ids }))}
+                                    categoryEndpoint="/api/v1/admin/categories"
+                                    categoryPickerKey={editingProduct?.id ?? (panelOpen ? 'open' : 'closed')}
+                                    maxAdditionalCategories={4}
+                                    imageUrl={formData.imageUrl}
+                                    onImageUrlChange={(url) => updateField('imageUrl', url)}
+                                    imageFolder="products"
+                                    pricing={{
+                                        basePrice: formData.basePrice,
+                                        originalPrice: formData.originalPrice,
+                                        taxPercent: formData.taxPercent,
+                                        taxabilityType: formData.taxabilityType,
+                                        exemptionReason: formData.exemptionReason,
+                                        taxable: formData.taxable,
+                                    }}
+                                    onBasePriceChange={(v) => updateField('basePrice', v)}
+                                    onOriginalPriceChange={(v) => updateField('originalPrice', v)}
+                                    onTaxPercentChange={(v) => updateField('taxPercent', v)}
+                                    onTaxabilityTypeChange={(v) => updateField('taxabilityType', v)}
+                                    onExemptionReasonChange={(v) => updateField('exemptionReason', v)}
+                                    onTaxableChange={(v) => updateField('taxable', v)}
+                                    brands={brands}
+                                    onSuggestBrand={suggestBrand}
+                                    brandSuggesting={brandSuggesting}
+                                    errors={formErrors}
+                                    basePriceRequired={!!formData.vendorId}
+                                    taxPercentOptions={TAX_OPTIONS}
+                                >
+                                    <div className="space-y-3 pt-1 border-t border-[#EEEEEE]">
                                         <h4 className="text-[13px] font-bold text-[#181725]">Tax details</h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                                             <div id="ff-intraStateTaxName">
                                                 <FieldLabel required>Intra State Tax Name</FieldLabel>
                                                 <input type="text" value={formData.intraStateTaxName} onChange={e => updateField('intraStateTaxName', e.target.value)} placeholder="e.g. SGST+CGST" className={cn(inputCls, formErrors.intraStateTaxName && 'border-[#E74C3C]')} />
@@ -2361,8 +2333,6 @@ export default function ProductsPage() {
                                                 <input type="text" value={formData.intraStateTaxType} onChange={e => updateField('intraStateTaxType', e.target.value)} placeholder="Tax Group" className={cn(inputCls, formErrors.intraStateTaxType && 'border-[#E74C3C]')} />
                                                 {formErrors.intraStateTaxType && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.intraStateTaxType}</p>}
                                             </div>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div id="ff-interStateTaxName">
                                                 <FieldLabel required>Inter State Tax Name</FieldLabel>
                                                 <input type="text" value={formData.interStateTaxName} onChange={e => updateField('interStateTaxName', e.target.value)} placeholder="e.g. IGST" className={cn(inputCls, formErrors.interStateTaxName && 'border-[#E74C3C]')} />
@@ -2381,7 +2351,7 @@ export default function ProductsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                                         <div id="ff-countryOfOrigin">
                                             <FieldLabel required>Country of Origin</FieldLabel>
                                             <input type="text" value={formData.countryOfOrigin} onChange={e => updateField('countryOfOrigin', e.target.value)} placeholder="e.g. India" className={cn(inputCls, formErrors.countryOfOrigin && 'border-[#E74C3C]')} />
@@ -2436,7 +2406,7 @@ export default function ProductsPage() {
                                         />
                                         {formErrors.substituteIds && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.substituteIds}</p>}
                                     </div>
-                                </FormSection>
+                                </ProductEssentialsFields>
 
                                 <FormSection title="Vendor assignment" sectionId="vendor">
                                     <FieldLabel>
@@ -2485,124 +2455,6 @@ export default function ProductsPage() {
                                         </div>
                                 </FormSection>
 
-                                <FormSection title="Pricing & tax" icon={<DollarSign size={16} />} sectionId="pricing">
-                                        
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div id="ff-basePrice">
-                                                <FieldLabel required={!!formData.vendorId}>Taxable Rate (ex-GST)</FieldLabel>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEAEAE] font-medium">₹</span>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.01"
-                                                        value={formData.basePrice}
-                                                        onChange={e => {
-                                                            const base = e.target.value;
-                                                            updateField('basePrice', base);
-                                                            const tp = parseFloat(formData.taxPercent || '0');
-                                                            const b = parseFloat(base);
-                                                            if (!isNaN(b) && !isNaN(tp)) {
-                                                                updateField('originalPrice', (b * (1 + tp / 100)).toFixed(2));
-                                                            }
-                                                        }}
-                                                        placeholder="0.00"
-                                                        className={cn(inputCls, 'pl-7', formErrors.basePrice && 'border-[#E74C3C] focus:border-[#E74C3C]')}
-                                                    />
-                                                </div>
-                                                {formErrors.basePrice && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.basePrice}</p>}
-                                            </div>
-
-                                            <div>
-                                                <FieldLabel>Tax % (GST)</FieldLabel>
-                                                <select
-                                                    value={formData.taxPercent}
-                                                    onChange={e => {
-                                                        const tp = e.target.value;
-                                                        updateField('taxPercent', tp);
-                                                        const base = parseFloat(formData.basePrice);
-                                                        const percent = parseFloat(tp);
-                                                        if (!isNaN(base) && !isNaN(percent)) {
-                                                            updateField('originalPrice', (base * (1 + percent / 100)).toFixed(2));
-                                                        }
-                                                    }}
-                                                    className={selectCls}
-                                                >
-                                                    {TAX_OPTIONS.map(t => (
-                                                        <option key={t} value={t}>{t}%</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <FieldLabel>Gross Rate (incl. GST)</FieldLabel>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#299E60] font-bold">₹</span>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.01"
-                                                        value={formData.originalPrice}
-                                                        onChange={e => {
-                                                            const gross = e.target.value;
-                                                            updateField('originalPrice', gross);
-                                                            const tp = parseFloat(formData.taxPercent || '0');
-                                                            const g = parseFloat(gross);
-                                                            if (!isNaN(g) && !isNaN(tp)) {
-                                                                updateField('basePrice', (g / (1 + tp / 100)).toFixed(2));
-                                                            }
-                                                        }}
-                                                        placeholder="0.00"
-                                                        className={cn(inputCls, 'pl-7 font-bold text-[#299E60] bg-[#EEF8F1]/10')}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <FieldLabel>Taxability Type</FieldLabel>
-                                                <select
-                                                    value={formData.taxabilityType}
-                                                    onChange={e => updateField('taxabilityType', e.target.value)}
-                                                    className={selectCls}
-                                                >
-                                                    <option value="taxable">Taxable</option>
-                                                    <option value="exempt">Exempt</option>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#EEEEEE]">
-                                            <div className="flex items-center">
-                                                <label className="flex items-center gap-3 cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={formData.taxable}
-                                                        onChange={(e) => updateField('taxable', e.target.checked)}
-                                                        className="w-5 h-5 accent-[#299E60]"
-                                                    />
-                                                    <div>
-                                                        <span className="text-[13.5px] font-bold text-[#181725]">Taxable Item</span>
-                                                        <p className="text-[11px] text-[#AEAEAE]">Uncheck if item is exempt from all taxes</p>
-                                                    </div>
-                                                </label>
-                                            </div>
-
-                                            {!formData.taxable && (
-                                                <div>
-                                                    <FieldLabel>Exemption Reason</FieldLabel>
-                                                    <input
-                                                        type="text"
-                                                        value={formData.exemptionReason}
-                                                        onChange={e => updateField('exemptionReason', e.target.value)}
-                                                        placeholder="Enter exemption reason"
-                                                        className={inputCls}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                </FormSection>
 
                                 <FormSection title="Accounting" icon={<SettingsIcon size={16} />} sectionId="accounting">
                                         

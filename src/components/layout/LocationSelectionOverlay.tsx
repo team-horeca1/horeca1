@@ -49,7 +49,6 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
     const [searchQuery, setSearchQuery] = useState('');
     const [isAddNewOpen, setIsAddNewOpen] = useState(false);
     const [initialCoords, setInitialCoords] = useState<{ lat?: number; lng?: number }>({});
-    const [defaultMode, setDefaultMode] = useState<'business' | 'map'>('business');
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
 
     // ─── Google Places autocomplete (address search in main overlay) ─────
@@ -102,7 +101,6 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
 
         if (details.isAreaLevel || !details.pincodeReliable) {
             setInitialCoords({ lat: details.latitude, lng: details.longitude });
-            setDefaultMode('map');
             setIsAddNewOpen(true);
             return;
         }
@@ -345,7 +343,6 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                     <button
                         onClick={() => {
                             setInitialCoords({});
-                            setDefaultMode('business');
                             setIsAddNewOpen(true);
                         }}
                         className="w-full bg-[#33a852] hover:bg-[#2d9548] text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
@@ -363,7 +360,6 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                 onSave={handleSaveNewAddress}
                 initialLat={initialCoords.lat}
                 initialLng={initialCoords.lng}
-                defaultMode={defaultMode}
             />
 
             {/* Edit Address Overlay */}

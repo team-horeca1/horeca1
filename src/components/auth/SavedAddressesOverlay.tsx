@@ -269,7 +269,6 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
                 isOpen={isAddNewOpen}
                 onClose={() => setIsAddNewOpen(false)}
                 onSave={handleSaveNewAddress}
-                defaultMode="business"
             />
 
             <EditAddressOverlay

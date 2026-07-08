@@ -106,7 +106,6 @@ export function MandatoryAddressGate() {
       isOpen={open}
       onClose={handleSkip}
       onSave={handleSave}
-      defaultMode="map"
       dismissible={false}
       allowSkip
     />

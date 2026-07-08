@@ -67,6 +67,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
   const accName = currentAccount.displayName ?? currentAccount.legalName;
   const outletName = currentOutlet.name;
   const needsAddress = currentOutlet.requiresAddressUpdate;
+  const showAccountSwitcher = accounts.length > 1;
 
   const handleSwitchAccount = async (id: string) => {
     setPickingId(id);
@@ -85,7 +86,8 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
   if (variant === 'mobile') {
     return (
       <div ref={ref} className="flex items-center gap-1.5 flex-1 justify-center min-w-0">
-        {/* Account button — mobile */}
+        {/* Account button — mobile, only when multiple accounts */}
+        {showAccountSwitcher && (
         <div className="relative">
           <button
             onClick={() => { setAccOpen(!accOpen); setOutletOpen(false); }}
@@ -114,6 +116,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
             </div>
           )}
         </div>
+        )}
 
         {/* Outlet button — mobile */}
         <div className="relative">
@@ -165,7 +168,8 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
   // Desktop two-part selector
   return (
     <div ref={ref} className="flex items-center gap-1.5 shrink-0">
-      {/* Account Switcher — desktop */}
+      {/* Account Switcher — desktop, only when multiple accounts */}
+      {showAccountSwitcher && (
       <div className="relative">
         <button
           onClick={() => { setAccOpen(!accOpen); setOutletOpen(false); }}
@@ -202,6 +206,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
           </div>
         )}
       </div>
+      )}
 
       {/* Outlet Switcher — desktop */}
       <div className="relative">
