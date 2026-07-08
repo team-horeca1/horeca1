@@ -7,6 +7,7 @@ import { withRole } from '@/middleware/rbac';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
 import { adoptOrCreateOutlet } from '@/lib/outletWrites';
+import { mapOutletToUnifiedAddress } from '@/lib/addressOutletBridge';
 
 const createSchema = z.object({
   label: z.string().min(1).max(50).default('Other'),
@@ -38,22 +39,18 @@ export const GET = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
         where: { businessAccountId: ctx.activeBusinessAccountId, isActive: true },
         orderBy: { createdAt: 'asc' },
       });
-      const addresses = outlets.map((o) => ({
-        id: o.id,
-        label: o.name,
-        businessName: o.name,
-        fullAddress: o.addressLine,
-        shortAddress: o.addressLine.split(',').slice(0, 2).join(', '),
-        flatInfo: o.flatInfo || undefined,
-        landmark: o.landmark || undefined,
-        pincode: o.pincode || undefined,
-        city: o.city || undefined,
-        state: o.state || undefined,
-        latitude: o.latitude ?? 0,
-        longitude: o.longitude ?? 0,
-        placeId: o.placeId || undefined,
-        isDefault: o.id === activeAccount?.primaryOutletId,
-      }));
+      const savedRows = await prisma.savedAddress.findMany({
+        where: {
+          userId: ctx.userId,
+          outletId: { in: outlets.map((o) => o.id) },
+        },
+      });
+      const savedByOutlet = new Map(
+        savedRows.filter((s) => s.outletId).map((s) => [s.outletId!, s]),
+      );
+      const addresses = outlets.map((o) =>
+        mapOutletToUnifiedAddress(o, savedByOutlet.get(o.id), activeAccount?.primaryOutletId ?? null),
+      );
       return NextResponse.json({ success: true, data: addresses });
     }
 

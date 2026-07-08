@@ -83,6 +83,13 @@ export const DELETE = withAuth(async (req: NextRequest, ctx) => {
     const existing = await prisma.outlet.findFirst({ where: { id: outletId, businessAccountId: id }, select: { id: true } });
     if (!existing) throw Errors.notFound('Outlet');
 
+    const activeCount = await prisma.outlet.count({
+      where: { businessAccountId: id, isActive: true },
+    });
+    if (activeCount <= 1) {
+      throw Errors.badRequest('Cannot remove your only delivery outlet — edit it instead');
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.outlet.update({ where: { id: outletId }, data: { isActive: false } });
       // Delete corresponding SavedAddress as well to keep it clean

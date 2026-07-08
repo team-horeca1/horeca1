@@ -4,11 +4,14 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useSession } from 'next-auth/react';
 import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 import { toast } from 'sonner';
+import { notifyAccountsRefresh } from '@/lib/addressUsability';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface Address {
     id: string;
+    /** Present when this row is backed by a business-account Outlet. */
+    outletId?: string;
     label: string;
     businessName?: string;  // Auto-filled from Google Places (restaurant/hotel/cafe name)
     fullAddress: string;
@@ -67,6 +70,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             const json = await res.json();
             return (json.data || []).map((a: Record<string, unknown>): Address => ({
                 id: a.id as string,
+                outletId: (a.outletId as string | undefined) ?? undefined,
                 label: a.label as string,
                 businessName: a.businessName as string | undefined,
                 fullAddress: a.fullAddress as string,
@@ -188,6 +192,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                 const json = await res.json();
                 const saved: Address = {
                     id: json.data.id,
+                    outletId: json.data.outletId ?? undefined,
                     label: json.data.label,
                     businessName: json.data.businessName ?? undefined,
                     fullAddress: json.data.fullAddress,
@@ -206,6 +211,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                     const filtered = address.isDefault ? prev.map(a => ({ ...a, isDefault: false })) : prev;
                     return [saved, ...filtered];
                 });
+                notifyAccountsRefresh();
                 return saved;
             } catch {
                 toast.error('Failed to save address');
@@ -227,7 +233,12 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
 
     const removeAddress = useCallback(async (id: string): Promise<void> => {
         if (status === 'authenticated') {
-            await fetch(`/api/v1/addresses/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/api/v1/addresses/${id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                toast.error((json as { error?: { message?: string } }).error?.message ?? 'Failed to remove address');
+                return;
+            }
         }
         setSavedAddresses(prev => {
             const updated = prev.filter(a => a.id !== id);
@@ -244,17 +255,23 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             }
             return prev;
         });
+        notifyAccountsRefresh();
     }, [status]);
 
     // ─── updateAddress ───────────────────────────────────────────────────
 
     const updateAddress = useCallback(async (id: string, updates: Partial<Address>): Promise<void> => {
         if (status === 'authenticated') {
-            await fetch(`/api/v1/addresses/${id}`, {
+            const res = await fetch(`/api/v1/addresses/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updates),
             });
+            if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                toast.error((json as { error?: { message?: string } }).error?.message ?? 'Failed to update address');
+                return;
+            }
         }
         setSavedAddresses(prev => {
             const updated = prev.map(a => a.id === id ? { ...a, ...updates } : a);
@@ -263,6 +280,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             }
             return updated;
         });
+        notifyAccountsRefresh();
     }, [status]);
 
     // ─── Reverse Geocode ─────────────────────────────────────────────────

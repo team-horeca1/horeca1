@@ -104,13 +104,15 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
         setMenuOpenId(null);
         const ok = await confirm({
             title: 'Remove delivery address?',
-            message: `This will permanently remove "${addr.businessName || addr.label || addr.shortAddress}" from your delivery addresses.`,
+            message: `This will permanently remove "${addr.businessName || addr.shortAddress}" from your delivery locations.`,
             confirmText: 'Remove',
             tone: 'danger',
         });
         if (!ok) return;
         try {
             await removeAddress(addr.id);
+            await refreshAddresses();
+            refreshAccounts();
             toast.success('Address removed');
         } catch {
             toast.error('Could not remove address');
@@ -179,7 +181,7 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
                                                             <span className="text-[9px] md:text-[10px] font-[700] text-[#53B175] bg-[#E8F5E9] px-2 py-0.5 rounded-full uppercase tracking-wide">Default</span>
                                                         )}
                                                     </div>
-                                                    {addr.businessName && addr.label && (
+                                                    {addr.businessName && addr.label && addr.label !== addr.businessName && (
                                                         <p className="text-[11px] font-semibold text-[#AEAEAE] mb-0.5">{addr.label}</p>
                                                     )}
                                                     <p className="text-[12px] md:text-[13px] text-[#7C7C7C] leading-relaxed">{displayLine(addr)}</p>

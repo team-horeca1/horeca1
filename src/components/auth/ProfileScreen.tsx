@@ -95,7 +95,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         const openParam = searchParams?.get('open');
         if (!openParam) return;
         Promise.resolve().then(() => {
-            if (openParam === 'outlets') {
+            if (openParam === 'outlets' || openParam === 'addresses' || openParam === 'saved-addresses') {
                 if (has('outlets.view')) setIsOutletsOpen(true);
             } else if (openParam === 'team' || openParam === 'team-members' || openParam === 'users') {
                 if (hasAny('users.view', 'users.create', 'users.edit', 'users.delete')) setIsTeamOpen(true);
@@ -250,9 +250,17 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         { id: 'orders', label: 'Your Orders', sub: 'Track & history', icon: ShoppingBag, onClick: () => router.push('/orders') },
     ];
 
+    const activeAccountIdForLinks = (session?.user as { activeBusinessAccountId?: string } | undefined)?.activeBusinessAccountId;
+
     const yourInfoItems = [
         { id: 'edit-profile', label: 'Edit Profile', desc: 'Update your personal details', icon: Pencil, onClick: () => setIsEditProfileOpen(true) },
-        { id: 'saved-addresses', label: 'Delivery Addresses', desc: 'Manage delivery locations', icon: MapPin, onClick: () => setIsSavedAddressesOpen(true) },
+        ...(!activeAccountIdForLinks ? [{
+            id: 'saved-addresses',
+            label: 'Delivery Addresses',
+            desc: 'Manage delivery locations',
+            icon: MapPin,
+            onClick: () => setIsSavedAddressesOpen(true),
+        }] : []),
         { id: 'payment', label: 'Payment Management', desc: 'Cards, UPI & banking', icon: CreditCard, onClick: () => setIsPaymentOpen(true) },
         {
             id: 'credit-wallet',
@@ -275,7 +283,6 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     // Business Account management (V2.2) — only show when the user has an active account
     // resolved on the session. Each card jumps straight into the matching tab on
     // /account/[id]/... so this profile screen acts as the customer's dashboard.
-    const activeAccountIdForLinks = (session?.user as { activeBusinessAccountId?: string } | undefined)?.activeBusinessAccountId;
     // Roles & Permissions used to be its own sidebar entry; folded into the
     // Team page's "Manage Roles" button so there's one entry per concept.
     // RolesPermissionsOverlay still mounts below for the ?open=roles deep-link
@@ -286,7 +293,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const canSeeTeam = hasAny('users.view', 'users.create', 'users.edit', 'users.delete');
     const canSeeOverview = has('settings.view');
     const businessAccountItems = activeAccountIdForLinks ? [
-        ...(canSeeOutlets ? [{ id: 'outlets', label: 'Outlets', desc: 'Delivery locations & branches', icon: MapPin, onClick: () => setIsOutletsOpen(true) }] : []),
+        ...(canSeeOutlets ? [{ id: 'outlets', label: 'Outlets & Delivery', desc: 'Branches and where orders are delivered', icon: MapPin, onClick: () => setIsOutletsOpen(true) }] : []),
         ...(canSeeTeam ? [{ id: 'team-members', label: 'Team Members', desc: 'Invite users, manage roles & access', icon: Users, onClick: () => router.push('/profile/team') }] : []),
         ...(canSeeOverview ? [{ id: 'account-overview', label: 'Account Overview', desc: 'GST, business type, members', icon: Building2, onClick: () => setIsOverviewOpen(true) }] : []),
     ] : [];

@@ -7,6 +7,7 @@ import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { clearForcePickerCookie, clearDismissFlag } from '@/lib/postLoginPicker';
 import { redirectIfPortalMismatch } from '@/lib/portalRouting';
+import { ACCOUNTS_REFRESH_EVENT } from '@/lib/addressUsability';
 
 /**
  * V2.2 — Multi-account + multi-outlet switcher hook.
@@ -70,6 +71,12 @@ export function useBusinessAccountSwitcher() {
   useEffect(() => {
     if (userId) fetchAccounts();
   }, [userId, fetchAccounts]);
+
+  useEffect(() => {
+    const onRefresh = () => { void fetchAccounts(); };
+    window.addEventListener(ACCOUNTS_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(ACCOUNTS_REFRESH_EVENT, onRefresh);
+  }, [fetchAccounts]);
 
   const currentAccount = accounts.find((a) => a.id === activeBusinessAccountId) ?? null;
   const currentOutlet = currentAccount?.outlets.find((o) => o.id === activeOutletId) ?? null;

@@ -15,6 +15,7 @@
 
 import type { Prisma, Outlet } from '@prisma/client';
 import { PLACEHOLDER_OUTLET_ADDRESS } from '@/lib/constants/customerProfile';
+import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 
 export interface OutletAddressFields {
   name: string;
@@ -28,10 +29,6 @@ export interface OutletAddressFields {
   latitude?: number | null;
   longitude?: number | null;
   placeId?: string | null;
-}
-
-function isUsablePincode(pincode?: string | null): boolean {
-  return !!pincode && /^\d{6}$/.test(pincode);
 }
 
 /**
@@ -59,7 +56,7 @@ export async function adoptOrCreateOutlet(
     latitude: fields.latitude ?? null,
     longitude: fields.longitude ?? null,
     placeId: fields.placeId ?? null,
-    requiresAddressUpdate: !isUsablePincode(fields.pincode),
+    requiresAddressUpdate: !hasUsableDeliveryLocation(fields),
   };
 
   const account = await tx.businessAccount.findUnique({

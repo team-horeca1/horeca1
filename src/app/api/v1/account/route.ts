@@ -20,6 +20,7 @@ import {
   legacyScalarsFromSelections,
 } from '@/lib/constants/vendorProfile';
 import type { Prisma } from '@prisma/client';
+import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
   try {
@@ -36,7 +37,16 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
             billingState: true, billingPincode: true, businessType: true,
             isCustomer: true, isVendor: true, isBrand: true, status: true,
             primaryOutletId: true,
-            outlets: { select: { id: true, name: true, pincode: true, requiresAddressUpdate: true } },
+            outlets: {
+              select: {
+                id: true,
+                name: true,
+                pincode: true,
+                latitude: true,
+                longitude: true,
+                requiresAddressUpdate: true,
+              },
+            },
           },
         },
       },
@@ -45,6 +55,12 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
       success: true,
       data: memberships.map((m) => ({
         ...m.businessAccount,
+        outlets: m.businessAccount.outlets.map((o) => ({
+          id: o.id,
+          name: o.name,
+          pincode: o.pincode,
+          requiresAddressUpdate: !hasUsableDeliveryLocation(o),
+        })),
         isPrimary: m.isPrimary,
         joinedAt: m.createdAt,
       })),

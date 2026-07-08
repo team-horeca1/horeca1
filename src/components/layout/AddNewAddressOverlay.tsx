@@ -21,6 +21,8 @@ interface AddNewAddressOverlayProps {
     /** When false the overlay cannot be dismissed (no back button, no backdrop
      *  close) — used by the mandatory first-address gate. Defaults to true. */
     dismissible?: boolean;
+    /** Show a top-right close / "Skip for now" escape hatch without enabling full dismissible mode. */
+    allowSkip?: boolean;
 }
 
 const DEFAULT_CENTER = { lat: 19.076, lng: 72.8777 };
@@ -45,6 +47,7 @@ export function AddNewAddressOverlay({
     initialLng,
     defaultMode = 'business',
     dismissible = true,
+    allowSkip = false,
 }: AddNewAddressOverlayProps) {
     const { isLoaded, google } = useGoogleMaps();
     const { reverseGeocode } = useAddress();
@@ -375,7 +378,7 @@ export function AddNewAddressOverlay({
                                     <ArrowLeft size={22} className="text-gray-700" />
                                 </button>
                             )}
-                            <div>
+                            <div className="flex-1 min-w-0">
                                 <h2 className="text-[16px] font-bold text-gray-800">
                                     {dismissible ? 'Add Delivery Address' : 'Set your delivery address'}
                                 </h2>
@@ -385,6 +388,15 @@ export function AddNewAddressOverlay({
                                     </p>
                                 )}
                             </div>
+                            {allowSkip && !dismissible && (
+                                <button
+                                    onClick={onClose}
+                                    className="p-1.5 hover:bg-gray-100 rounded-full transition-colors shrink-0"
+                                    aria-label="Skip for now"
+                                >
+                                    <X size={20} className="text-gray-500" />
+                                </button>
+                            )}
                         </div>
                         <div className="flex px-4 gap-1">
                             {([
@@ -617,6 +629,15 @@ export function AddNewAddressOverlay({
                                         ? <span className="flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" />Finding address...</span>
                                         : 'Confirm This Location'}
                                 </button>
+                                {allowSkip && !dismissible && (
+                                    <button
+                                        type="button"
+                                        onClick={onClose}
+                                        className="w-full mt-2 py-2.5 text-[13px] font-semibold text-gray-500 hover:text-gray-700 transition-colors"
+                                    >
+                                        Skip for now
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
@@ -771,6 +792,15 @@ export function AddNewAddressOverlay({
                                         ? <span className="flex items-center justify-center gap-2"><Loader2 size={16} className="animate-spin" />Finding address...</span>
                                         : 'Confirm This Location'}
                                 </button>
+                                {allowSkip && !dismissible && (
+                                    <button
+                                        type="button"
+                                        onClick={onClose}
+                                        className="w-full mt-2 py-2.5 text-[13px] font-semibold text-gray-500 hover:text-gray-700 transition-colors"
+                                    >
+                                        Skip for now
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

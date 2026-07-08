@@ -5,6 +5,7 @@ import { ChevronLeft, Loader2, MapPin, Plus, AlertCircle, X, Trash2, Pencil } fr
 import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
+import { notifyAccountsRefresh } from '@/lib/addressUsability';
 import { cn } from '@/lib/utils';
 import { FormErrorBanner } from '@/components/ui/form';
 import { toast } from 'sonner';
@@ -73,6 +74,14 @@ export function OutletsOverlay({ isOpen, onClose, accountId }: OutletsOverlayPro
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<OutletDraft | null>(null); // null = closed, has .id = editing, no .id = creating
   const { refresh: refreshAccounts } = useBusinessAccountSwitcher();
+  const { refreshAddresses } = useAddress();
+
+  const afterMutation = () => {
+    load();
+    void refreshAccounts();
+    void refreshAddresses();
+    notifyAccountsRefresh();
+  };
 
   const load = () => {
     if (!accountId) return;
@@ -89,9 +98,14 @@ export function OutletsOverlay({ isOpen, onClose, accountId }: OutletsOverlayPro
 
   const handleDelete = async (outletId: string) => {
     if (!confirm('Deactivate this outlet?')) return;
-    await fetch(`/api/v1/account/${accountId}/outlets/${outletId}`, { method: 'DELETE' });
-    load();
-    refreshAccounts();
+    const res = await fetch(`/api/v1/account/${accountId}/outlets/${outletId}`, { method: 'DELETE' });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error((json as { error?: { message?: string } }).error?.message ?? 'Could not remove outlet');
+      return;
+    }
+    toast.success('Outlet removed');
+    afterMutation();
   };
 
   if (!isOpen) return null;
@@ -106,7 +120,7 @@ export function OutletsOverlay({ isOpen, onClose, accountId }: OutletsOverlayPro
           <button onClick={onClose} className="p-1 hover:bg-gray-50 rounded-full transition-colors absolute left-4 md:hidden z-10">
             <ChevronLeft size={20} className="text-[#181725]" />
           </button>
-          <h2 className="w-full text-center md:text-left text-[17px] md:text-[20px] font-[700] text-[#181725]">Outlets</h2>
+          <h2 className="w-full text-center md:text-left text-[17px] md:text-[20px] font-[700] text-[#181725]">Outlets &amp; Delivery</h2>
           <button onClick={onClose} className="hidden md:flex p-2 hover:bg-gray-100 rounded-full transition-colors absolute right-4 z-10">
             <X size={20} className="text-gray-500" />
           </button>
@@ -180,7 +194,7 @@ export function OutletsOverlay({ isOpen, onClose, accountId }: OutletsOverlayPro
           accountId={accountId}
           draft={editing}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); load(); refreshAccounts(); }}
+          onSaved={() => { setEditing(null); afterMutation(); }}
         />
       )}
     </div>
