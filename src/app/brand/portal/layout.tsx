@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { defaultPortalPath } from '@/lib/portalRouting';
+import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
 import { signOut } from 'next-auth/react';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
 import { NotificationBell } from '@/components/features/NotificationBell';
@@ -135,8 +136,9 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
     }, [status, isAdmin, isActiveBrand, activeAccountType, router]);
 
     const handleExitAdminView = async () => {
-        await fetch('/api/v1/admin/impersonate/brand', { method: 'DELETE' });
+        await clearAllAdminImpersonation();
         router.push('/admin/brands');
+        router.refresh();
     };
 
     // Only gate on the genuine initial load (no session yet). A background

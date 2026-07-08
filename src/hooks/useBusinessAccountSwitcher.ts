@@ -8,6 +8,7 @@ import { useWishlist } from '@/context/WishlistContext';
 import { clearForcePickerCookie, clearDismissFlag } from '@/lib/postLoginPicker';
 import { redirectIfPortalMismatch } from '@/lib/portalRouting';
 import { ACCOUNTS_REFRESH_EVENT } from '@/lib/addressUsability';
+import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
 
 /**
  * V2.2 — Multi-account + multi-outlet switcher hook.
@@ -172,6 +173,9 @@ export function useBusinessAccountSwitcher() {
     clearWishlist();
     clearForcePickerCookie();
     clearDismissFlag();
+    try {
+      await clearAllAdminImpersonation();
+    } catch { /* ignore */ }
     try {
       localStorage.removeItem('horeca_order_lists_all');
       localStorage.removeItem('horeca_orders');

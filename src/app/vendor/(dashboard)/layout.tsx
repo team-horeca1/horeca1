@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { defaultPortalPath } from '@/lib/portalRouting';
+import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
 import { VendorOutletStrip } from '@/components/vendor/VendorOutletStrip';
 import { VendorNotificationBell } from '@/components/features/vendor/VendorNotificationBell';
@@ -203,8 +204,9 @@ export default function VendorLayout({
     }, [status, isAdmin, isActiveVendor, pathname, router]);
 
     const handleExitAdminView = async () => {
-        await fetch('/api/v1/admin/impersonate', { method: 'DELETE' });
+        await clearAllAdminImpersonation();
         router.push('/admin/vendors');
+        router.refresh();
     };
 
     React.useEffect(() => {

@@ -27,6 +27,7 @@ import {
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
+import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
 import { usePermissions } from '@/hooks/usePermissions';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -229,6 +230,9 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     if (!isOpen) return null;
 
     const handleLogout = async () => {
+        try {
+            await clearAllAdminImpersonation();
+        } catch { /* ignore */ }
         await signOut({ redirect: false });
         // Clear user-scoped caches so the next user on this browser doesn't inherit them
         try {
