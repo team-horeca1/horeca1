@@ -15,13 +15,17 @@ const VENDOR_PORTAL_SEGMENTS = new Set([
   'dashboard', 'orders', 'products', 'inventory', 'warehouse', 'returns', 'claims',
   'brand-mappings', 'price-lists', 'promotions', 'customers', 'sales-team', 'credit',
   'wallet', 'ledger', 'reports', 'notifications', 'account', 'team', 'outlets', 'settings',
-  'collections', 'customer-groups', 'setup', 'register',
+  'collections', 'customer-groups', 'setup',
 ]);
+
+/** Public onboarding — must stay reachable without a session. */
+const PUBLIC_VENDOR_ROUTES = new Set(['register']);
 
 function isVendorPortalRoute(pathname: string): boolean {
   if (!pathname.startsWith('/vendor/')) return false;
   const segment = pathname.split('/')[2];
-  return !!segment && VENDOR_PORTAL_SEGMENTS.has(segment);
+  if (!segment || PUBLIC_VENDOR_ROUTES.has(segment)) return false;
+  return VENDOR_PORTAL_SEGMENTS.has(segment);
 }
 
 type TokenUser = {

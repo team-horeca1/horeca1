@@ -63,7 +63,7 @@ export function VendorTypeMatrix({ value, onChange, error, className }: VendorTy
   };
 
   return (
-    <FormField label="Vendor Type & Sub-types" required className={className}>
+    <FormField label="Vendor Type & Sub-types" required className={className} dataField="vendorTypeSelections">
       <div className="rounded-xl border border-[#EEEEEE] overflow-hidden">
         <div className="hidden sm:grid sm:grid-cols-[minmax(140px,1fr)_2fr] bg-[#FAFAFA] border-b border-[#EEEEEE] px-3 py-2">
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Vendor Type</span>

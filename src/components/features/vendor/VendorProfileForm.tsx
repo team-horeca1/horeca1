@@ -134,12 +134,16 @@ export function VendorProfileForm({
           <>
             <SectionHeader icon={Building2} spanClass={SPAN_FULL}>Business Identity</SectionHeader>
             <TextField label="Legal Business Name" required value={value.legalName ?? value.businessName ?? ''}
+              dataField="legalName"
               error={errors.legalName}
               onChange={v => set({ legalName: v, businessName: v })}
+              onBlur={() => blur('legalName', value.legalName ?? value.businessName ?? '')}
               placeholder="Registered company name" />
             <TextField label="Trade / Display Name" required value={value.tradeName ?? value.displayName ?? ''}
+              dataField="tradeName"
               error={errors.tradeName}
               onChange={v => set({ tradeName: v, displayName: v })}
+              onBlur={() => blur('tradeName', value.tradeName ?? value.displayName ?? '')}
               placeholder="Storefront name" />
             <VendorTypeMatrix
               value={value}
@@ -170,13 +174,17 @@ export function VendorProfileForm({
         {visibleSections.contact && (
           <>
             <SectionHeader icon={User} spanClass={SPAN_FULL}>Authorized Contact</SectionHeader>
-            <FormField label="Contact Person" className={SPAN_FULL}>
+            <FormField label="Contact Person" className={SPAN_FULL} dataField="firstName" error={errors.firstName}>
               <div className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
                 <FormSelect value={value.salutation ?? ''} onChange={v => set({ salutation: v })}>
                   {SALUTATIONS.map(s => <option key={s || 'empty'} value={s}>{s || 'Salutation'}</option>)}
                 </FormSelect>
-                <FormInput value={value.firstName ?? ''} onChange={v => set({ firstName: v })} placeholder="First Name" />
-                <FormInput value={value.lastName ?? ''} onChange={v => set({ lastName: v })} placeholder="Last Name" />
+                <FormInput value={value.firstName ?? ''} onChange={v => set({ firstName: v })} placeholder="First Name"
+                  hasError={!!errors.firstName}
+                  onBlur={() => blur('firstName', value.firstName ?? '')} />
+                <FormInput value={value.lastName ?? ''} onChange={v => set({ lastName: v })} placeholder="Last Name"
+                  hasError={!!errors.lastName}
+                  onBlur={() => blur('lastName', value.lastName ?? '')} />
                 {isWide && (
                   <FormInput value={value.designation ?? ''} onChange={v => set({ designation: v })}
                     placeholder="Designation" />
@@ -184,6 +192,7 @@ export function VendorProfileForm({
               </div>
             </FormField>
             <TextField label="Authorized Person Name" required
+              dataField="authorizedPersonName"
               value={value.authorizedPersonName ?? ''}
               error={errors.authorizedPersonName}
               onChange={v => set({ authorizedPersonName: v, fullName: v })}
@@ -193,6 +202,7 @@ export function VendorProfileForm({
                 onChange={v => set({ designation: v })} placeholder="e.g. Director" />
             )}
             <TextField
+              dataField="authorizedPersonPhone"
               label={relaxedContact ? 'Mobile (optional if email provided)' : 'Mobile'}
               required={!relaxedContact}
               value={value.phone ?? value.mobilePhone ?? value.authorizedPersonPhone ?? ''}
@@ -203,6 +213,7 @@ export function VendorProfileForm({
               }}
               placeholder="10-digit mobile" inputMode="numeric" />
             <TextField
+              dataField="email"
               label={relaxedContact ? 'Email (optional if mobile provided)' : 'Email'}
               required={false}
               value={value.email ?? value.authorizedPersonEmail ?? ''}
@@ -215,7 +226,7 @@ export function VendorProfileForm({
         {visibleSections.auth && showPassword && onPasswordChange && (
           <>
             <SectionHeader icon={ShieldCheck} spanClass={SPAN_FULL}>Account Access</SectionHeader>
-            <FormField label="Password (optional)" className={SPAN_FULL}>
+            <FormField label="Password (optional)" className={SPAN_FULL} dataField="password">
               <PasswordField
                 value={password}
                 onChange={onPasswordChange}

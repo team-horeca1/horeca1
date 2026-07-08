@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { focusFirstFormError } from '@/lib/formErrorFocus';
 import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 import { FORM, FormField as Field, FormInput, inputClass, selectClass, FormErrorBanner } from '@/components/ui/form';
 import {
@@ -76,6 +77,14 @@ type Address = { addressLine: string; city: string; state: string; pincode: stri
 const blankAddress = (): Address => ({ addressLine: '', city: '', state: '', pincode: '' });
 
 const RESEND_COOLDOWN = 60;
+
+/** Omit empty optional strings from JSON — Zod `.optional()` rejects explicit `null`. */
+function optionalSubmitField(v: string | undefined | null): string | undefined {
+  const t = (v ?? '').trim();
+  return t || undefined;
+}
+
+type StepValidationFailure = { message: string; errors: Record<string, string> };
 
 type ApiErrorPayload = {
   message?: string;
@@ -219,8 +228,8 @@ export default function VendorRegisterPage() {
     authorizedPersonName: vendorProfile.authorizedPersonName || authorizedPersonName,
     legalName: derivedLegalName(vendorProfile) || businessName,
     businessName: derivedLegalName(vendorProfile) || businessName,
-    tradeName: derivedTradeName(vendorProfile) || tradeName,
-    displayName: derivedTradeName(vendorProfile) || tradeName,
+    tradeName: vendorProfile.tradeName ?? vendorProfile.displayName ?? tradeName,
+    displayName: vendorProfile.displayName ?? vendorProfile.tradeName ?? tradeName,
   }), [
     vendorProfile, fullName, email, password, phone, authorizedPersonPhone,
     authorizedPersonEmail, authorizedPersonName, businessName, tradeName,
@@ -268,6 +277,28 @@ export default function VendorRegisterPage() {
   // Set by onBlur on each input. Continue button reads these to block
   // forward navigation when the current step has any active error.
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const pendingFocusRef = useRef(false);
+
+  const showValidationFailure = useCallback((
+    failure: StepValidationFailure,
+    targetStep?: number,
+  ) => {
+    setError(failure.message);
+    setFieldErrors(failure.errors);
+    if (targetStep !== undefined && targetStep !== step) {
+      pendingFocusRef.current = true;
+      setStep(targetStep);
+      return;
+    }
+    focusFirstFormError(failure.errors, { dataField: true });
+  }, [step]);
+
+  useEffect(() => {
+    if (!pendingFocusRef.current) return;
+    if (Object.keys(fieldErrors).length === 0) return;
+    pendingFocusRef.current = false;
+    focusFirstFormError(fieldErrors, { dataField: true });
+  }, [step, fieldErrors]);
   const setFE = useCallback((key: string, msg: string) => {
     setFieldErrors(prev => {
       if (msg && prev[key] === msg) return prev;
@@ -535,18 +566,23 @@ export default function VendorRegisterPage() {
   // calls — it re-runs the validators for the active step, flushes any
   // missed errors into fieldErrors, and returns a single banner-level
   // message when the step can't advance.
-  const validateStepAt = useCallback((s: number): string | null => {
+  const validateStepAt = useCallback((s: number): StepValidationFailure | null => {
     if (s === 1) {
       if (phoneVerified || emailVerified) return null;
-      return EMAIL_REGISTER_ALLOWED
+      const message = EMAIL_REGISTER_ALLOWED
         ? 'Please verify your mobile number or email first'
         : 'Please verify your mobile number first';
+      return {
+        message,
+        errors: verifyChannel === 'email'
+          ? { email: message }
+          : { phone: message },
+      };
     }
     if (s === 2) {
-      const v = validateVendorProfile(getMergedVendorProfile(), 'selfRegister', 'identity');
+      const v = validateVendorProfile(vendorProfile, 'selfRegister', 'identity');
       if (!v.success) {
-        setFieldErrors(v.errors);
-        return v.message ?? 'Please fix the highlighted fields before continuing';
+        return { message: v.message ?? 'Please fix the highlighted fields before continuing', errors: v.errors };
       }
       return null;
     }
@@ -555,41 +591,48 @@ export default function VendorRegisterPage() {
       const errors = { ...v.errors };
       if (isAuthMode) delete errors.password;
       if (Object.keys(errors).length > 0) {
-        setFieldErrors(errors);
-        return v.message ?? 'Please fix the highlighted fields before continuing';
+        return { message: v.message ?? 'Please fix the highlighted fields before continuing', errors };
       }
       return null;
     }
     if (s === 7) {
-      if (pincodes.length === 0) return 'Add at least one serviceable pincode';
-      if (!deliveryCapability) return 'Select your delivery capability';
+      const errors: Record<string, string> = {};
+      if (pincodes.length === 0) errors.serviceablePincodes = 'Add at least one serviceable pincode';
+      if (!deliveryCapability) errors.deliveryCapability = 'Select your delivery capability';
+      if (Object.keys(errors).length > 0) {
+        return { message: 'Please fix the highlighted fields before continuing', errors };
+      }
       return null;
     }
     const stepErrors = validateAllForStep(s);
     if (Object.keys(stepErrors).length > 0) {
-      setFieldErrors(prev => ({ ...prev, ...stepErrors }));
-      return 'Please fix the highlighted fields before continuing';
+      return { message: 'Please fix the highlighted fields before continuing', errors: stepErrors };
     }
     return null;
   }, [
-    phoneVerified, emailVerified, getMergedVendorProfile, isAuthMode, validateAllForStep,
+    phoneVerified, emailVerified, verifyChannel, vendorProfile, getMergedVendorProfile, isAuthMode, validateAllForStep,
     pincodes.length, deliveryCapability,
   ]);
 
-  const validateStepsRange = useCallback((from: number, to: number): { ok: true } | { ok: false; step: number; message: string } => {
+  const validateStepsRange = useCallback((from: number, to: number):
+    { ok: true } | { ok: false; step: number; failure: StepValidationFailure } => {
     for (let s = from; s <= to; s++) {
-      const err = validateStepAt(s);
-      if (err) return { ok: false, step: s, message: err };
+      const failure = validateStepAt(s);
+      if (failure) return { ok: false, step: s, failure };
     }
     return { ok: true };
   }, [validateStepAt]);
 
-  const validateStep = (s: number): string | null => validateStepAt(s);
+  const validateStep = (s: number): StepValidationFailure | null => validateStepAt(s);
 
   const handleNext = () => {
-    const err = validateStep(step);
-    if (err) { setError(err); return; }
+    const failure = validateStep(step);
+    if (failure) {
+      showValidationFailure(failure);
+      return;
+    }
     setError('');
+    setFieldErrors({});
     if (step < 7) setStep(step + 1);
     else handleSubmit();
   };
@@ -661,14 +704,14 @@ export default function VendorRegisterPage() {
       for (const issue of issues) {
         formErrors[formFieldKeyFromApiPath(issue.path)] = issue.message;
       }
-      setFieldErrors(prev => ({ ...prev, ...formErrors }));
-      setStep(stepForApiField(issues[0].path));
+      const targetStep = stepForApiField(issues[0].path);
+      showValidationFailure({ message, errors: formErrors }, targetStep);
       return;
     }
 
     const hinted = inferStepFromMessage(message);
     if (hinted) setStep(hinted);
-  }, []);
+  }, [showValidationFailure]);
 
   const resolveTypeSlug = useCallback((profile: VendorProfileValues) => {
     const selections = getEffectiveVendorTypeSelections(profile);
@@ -679,8 +722,7 @@ export default function VendorRegisterPage() {
     setError('');
     const range = validateStepsRange(2, 7);
     if (!range.ok) {
-      setStep(range.step);
-      setError(range.message);
+      showValidationFailure(range.failure, range.step);
       return;
     }
 
@@ -793,10 +835,10 @@ export default function VendorRegisterPage() {
         authorizedPersonEmail: authEmail || '',
         gstNumber: (gstNumber || vendorProfile.gstin || vendorProfile.gstNumber || '').toUpperCase().trim(),
         panNumber: (panNumber || vendorProfile.pan || vendorProfile.panNumber || '').toUpperCase().trim(),
-        salutation: vendorProfile.salutation || null,
-        firstName: vendorProfile.firstName || null,
-        lastName: vendorProfile.lastName || null,
-        designation: vendorProfile.designation || null,
+        salutation: optionalSubmitField(vendorProfile.salutation),
+        firstName: optionalSubmitField(vendorProfile.firstName),
+        lastName: optionalSubmitField(vendorProfile.lastName),
+        designation: optionalSubmitField(vendorProfile.designation),
         fssaiNumber: (fssaiNumber || vendorProfile.fssaiNumber || '').trim(),
         bankAccountName: bankAccountName.trim(),
         bankAccountNumber: bankAccountNumber.trim(),
@@ -1020,7 +1062,7 @@ export default function VendorRegisterPage() {
               )}
 
               {(!EMAIL_REGISTER_ALLOWED || verifyChannel === 'phone') ? (
-              <Field label="Mobile number" required>
+              <Field label="Mobile number" required dataField="phone">
                 <div className="relative flex items-center">
                   <span className="absolute left-4 text-[13px] font-bold text-gray-500 z-10">+91</span>
                   <input type="tel" inputMode="numeric" maxLength={10}
@@ -1038,7 +1080,7 @@ export default function VendorRegisterPage() {
                 </div>
               </Field>
               ) : (
-              <Field label="Email address" required>
+              <Field label="Email address" required dataField="email">
                 <input
                   type="email"
                   value={registerEmail}
@@ -1170,7 +1212,7 @@ export default function VendorRegisterPage() {
               <h2 className="text-[22px] font-[800] text-gray-800 mb-1">GST & PAN</h2>
               <p className="text-[13px] text-gray-500 mb-6">Optional — add them now or leave blank and provide later.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field label="GSTIN (optional)" error={fieldErrors.gstNumber}>
+                <Field label="GSTIN (optional)" error={fieldErrors.gstNumber} dataField="gstNumber">
                   <Input value={gstNumber}
                     onChange={v => {
                       const val = v.toUpperCase().slice(0, 15);
@@ -1183,7 +1225,7 @@ export default function VendorRegisterPage() {
                     hasError={!!fieldErrors.gstNumber}
                     placeholder="22ABCDE1234F1Z5" />
                 </Field>
-                <Field label="PAN (optional)" error={fieldErrors.panNumber}>
+                <Field label="PAN (optional)" error={fieldErrors.panNumber} dataField="panNumber">
                   <Input value={panNumber}
                     onChange={v => {
                       const val = v.toUpperCase().slice(0, 10);
@@ -1216,25 +1258,25 @@ export default function VendorRegisterPage() {
               <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Bank Details</h2>
               <p className="text-[13px] text-gray-500 mb-6">For settlement of your orders. Your account will be verified via a ₹1 penny-drop.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field label="Account holder name" required className="md:col-span-2" error={fieldErrors.bankAccountName}>
+                <Field label="Account holder name" required className="md:col-span-2" error={fieldErrors.bankAccountName} dataField="bankAccountName">
                   <Input value={bankAccountName} onChange={v => { setBankAccountName(v); if (fieldErrors.bankAccountName) setFE('bankAccountName', V.minLen(v, 'Account holder name', 2)); }}
                     onBlur={() => setFE('bankAccountName', V.minLen(bankAccountName, 'Account holder name', 2))}
                     hasError={!!fieldErrors.bankAccountName}
                     placeholder="As per bank records" />
                 </Field>
-                <Field label="Account number" required error={fieldErrors.bankAccountNumber}>
+                <Field label="Account number" required error={fieldErrors.bankAccountNumber} dataField="bankAccountNumber">
                   <Input value={bankAccountNumber} onChange={v => { const n = v.replace(/\D/g, '').slice(0, 18); setBankAccountNumber(n); if (fieldErrors.bankAccountNumber) setFE('bankAccountNumber', n.length < 8 ? 'Enter a valid account number' : ''); }}
                     onBlur={() => setFE('bankAccountNumber', bankAccountNumber.length < 8 ? 'Enter a valid account number' : '')}
                     hasError={!!fieldErrors.bankAccountNumber}
                     placeholder="123456789012" />
                 </Field>
-                <Field label="IFSC code" required error={fieldErrors.bankIfsc}>
+                <Field label="IFSC code" required error={fieldErrors.bankIfsc} dataField="bankIfsc">
                   <Input value={bankIfsc} onChange={v => { const n = v.toUpperCase().slice(0, 11); setBankIfsc(n); if (fieldErrors.bankIfsc) setFE('bankIfsc', V.ifsc(n)); }}
                     onBlur={() => setFE('bankIfsc', V.ifsc(bankIfsc))}
                     hasError={!!fieldErrors.bankIfsc}
                     placeholder="HDFC0001234" />
                 </Field>
-                <Field label="Bank name" required error={fieldErrors.bankName}>
+                <Field label="Bank name" required error={fieldErrors.bankName} dataField="bankName">
                   <Input value={bankName} onChange={v => { setBankName(v); if (fieldErrors.bankName) setFE('bankName', V.minLen(v, 'Bank name', 2)); }}
                     onBlur={() => setFE('bankName', V.minLen(bankName, 'Bank name', 2))}
                     hasError={!!fieldErrors.bankName}
@@ -1288,7 +1330,7 @@ export default function VendorRegisterPage() {
                     }}
                     className="mb-2"
                   />
-                  <Field label="Address Line" required error={fieldErrors.billingAddressLine}>
+                  <Field label="Address Line" required error={fieldErrors.billingAddressLine} dataField="billingAddressLine">
                     <Input value={billingAddress.addressLine}
                       onChange={v => { setBillingAddress({ ...billingAddress, addressLine: v }); if (fieldErrors.billingAddressLine) setFE('billingAddressLine', v.trim().length < 5 ? 'Enter the full address' : ''); }}
                       onBlur={() => setFE('billingAddressLine', billingAddress.addressLine.trim().length < 5 ? 'Enter the full address' : '')}
@@ -1296,20 +1338,20 @@ export default function VendorRegisterPage() {
                       placeholder="Building, street, area" />
                   </Field>
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label="City" required error={fieldErrors.billingCity}>
+                    <Field label="City" required error={fieldErrors.billingCity} dataField="billingCity">
                       <Input value={billingAddress.city}
                         onChange={v => { setBillingAddress({ ...billingAddress, city: v }); if (fieldErrors.billingCity) setFE('billingCity', v.trim() ? '' : 'City is required'); }}
                         onBlur={() => setFE('billingCity', billingAddress.city.trim() ? '' : 'City is required')}
                         hasError={!!fieldErrors.billingCity} />
                     </Field>
-                    <Field label="State" required error={fieldErrors.billingState}>
+                    <Field label="State" required error={fieldErrors.billingState} dataField="billingState">
                       <Input value={billingAddress.state}
                         onChange={v => { setBillingAddress({ ...billingAddress, state: v }); if (fieldErrors.billingState) setFE('billingState', v.trim() ? '' : 'State is required'); }}
                         onBlur={() => setFE('billingState', billingAddress.state.trim() ? '' : 'State is required')}
                         hasError={!!fieldErrors.billingState} />
                     </Field>
                   </div>
-                  <Field label="Pincode" required error={fieldErrors.billingPincode}>
+                  <Field label="Pincode" required error={fieldErrors.billingPincode} dataField="billingPincode">
                     <Input value={billingAddress.pincode}
                       onChange={v => { const n = v.replace(/\D/g, '').slice(0, 6); setBillingAddress({ ...billingAddress, pincode: n }); if (fieldErrors.billingPincode) setFE('billingPincode', V.pincode(n)); }}
                       onBlur={() => setFE('billingPincode', V.pincode(billingAddress.pincode))}
@@ -1355,7 +1397,7 @@ export default function VendorRegisterPage() {
                       className="mb-2"
                     />
                   )}
-                  <Field label="Address Line" required error={!pickupSameAsBilling ? fieldErrors.pickupAddressLine : undefined}>
+                  <Field label="Address Line" required error={!pickupSameAsBilling ? fieldErrors.pickupAddressLine : undefined} dataField="pickupAddressLine">
                     <Input value={pickupAddress.addressLine} disabled={pickupSameAsBilling}
                       onChange={v => { setPickupAddress({ ...pickupAddress, addressLine: v }); if (fieldErrors.pickupAddressLine) setFE('pickupAddressLine', v.trim().length < 5 ? 'Enter the full address' : ''); }}
                       onBlur={() => setFE('pickupAddressLine', pickupAddress.addressLine.trim().length < 5 ? 'Enter the full address' : '')}
@@ -1363,20 +1405,20 @@ export default function VendorRegisterPage() {
                       placeholder="Warehouse / godown address" />
                   </Field>
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label="City" required error={!pickupSameAsBilling ? fieldErrors.pickupCity : undefined}>
+                    <Field label="City" required error={!pickupSameAsBilling ? fieldErrors.pickupCity : undefined} dataField="pickupCity">
                       <Input value={pickupAddress.city} disabled={pickupSameAsBilling}
                         onChange={v => { setPickupAddress({ ...pickupAddress, city: v }); if (fieldErrors.pickupCity) setFE('pickupCity', v.trim() ? '' : 'City is required'); }}
                         onBlur={() => setFE('pickupCity', pickupAddress.city.trim() ? '' : 'City is required')}
                         hasError={!pickupSameAsBilling && !!fieldErrors.pickupCity} />
                     </Field>
-                    <Field label="State" required error={!pickupSameAsBilling ? fieldErrors.pickupState : undefined}>
+                    <Field label="State" required error={!pickupSameAsBilling ? fieldErrors.pickupState : undefined} dataField="pickupState">
                       <Input value={pickupAddress.state} disabled={pickupSameAsBilling}
                         onChange={v => { setPickupAddress({ ...pickupAddress, state: v }); if (fieldErrors.pickupState) setFE('pickupState', v.trim() ? '' : 'State is required'); }}
                         onBlur={() => setFE('pickupState', pickupAddress.state.trim() ? '' : 'State is required')}
                         hasError={!pickupSameAsBilling && !!fieldErrors.pickupState} />
                     </Field>
                   </div>
-                  <Field label="Pincode" required error={!pickupSameAsBilling ? fieldErrors.pickupPincode : undefined}>
+                  <Field label="Pincode" required error={!pickupSameAsBilling ? fieldErrors.pickupPincode : undefined} dataField="pickupPincode">
                     <Input value={pickupAddress.pincode} disabled={pickupSameAsBilling}
                       onChange={v => { const n = v.replace(/\D/g, '').slice(0, 6); setPickupAddress({ ...pickupAddress, pincode: n }); if (fieldErrors.pickupPincode) setFE('pickupPincode', V.pincode(n)); }}
                       onBlur={() => setFE('pickupPincode', V.pincode(pickupAddress.pincode))}
@@ -1393,7 +1435,7 @@ export default function VendorRegisterPage() {
               <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Service Area & KYC</h2>
               <p className="text-[13px] text-gray-500 mb-6">Where can you deliver, and any additional certifications.</p>
 
-              <Field label="Serviceable pincodes" required>
+              <Field label="Serviceable pincodes" required dataField="serviceablePincodes" error={fieldErrors.serviceablePincodes}>
                 <div className="flex gap-2">
                   <input value={pincodeInput}
                     onChange={e => setPincodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -1420,7 +1462,7 @@ export default function VendorRegisterPage() {
               </Field>
 
               <div className="mt-6">
-                <Field label="Delivery capability" required>
+                <Field label="Delivery capability" required dataField="deliveryCapability" error={fieldErrors.deliveryCapability}>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     {([
                       { id: 'own_fleet', label: 'Own fleet', desc: 'I deliver using my own vehicles' },

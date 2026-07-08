@@ -76,7 +76,7 @@ export function FormLabel({
 
 // ─── Field wrapper (label + control + error) ────────────────────────────────
 export function FormField({
-  label, required, hint, error, htmlFor, className, children,
+  label, required, hint, error, htmlFor, className, dataField, children,
 }: {
   label?: React.ReactNode;
   required?: boolean;
@@ -84,10 +84,12 @@ export function FormField({
   error?: string;
   htmlFor?: string;
   className?: string;
+  /** Used by focusFirstFormError — scroll target for validation errors. */
+  dataField?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className={className}>
+    <div className={className} data-field={dataField}>
       {label && <FormLabel required={required} hint={hint} htmlFor={htmlFor}>{label}</FormLabel>}
       {children}
       {error && <p className="text-[11px] text-red-600 font-medium mt-1">{error}</p>}
@@ -129,16 +131,17 @@ export function FormInput({
 
 // ─── Self-contained text field (label + input + error) ──────────────────────
 export function TextField({
-  label, required, hint, error, className, ...inputProps
+  label, required, hint, error, className, dataField, ...inputProps
 }: {
   label?: React.ReactNode;
   required?: boolean;
   hint?: string;
   error?: string;
   className?: string;
+  dataField?: string;
 } & FormInputProps) {
   return (
-    <FormField label={label} required={required} hint={hint} error={error} className={className}>
+    <FormField label={label} required={required} hint={hint} error={error} className={className} dataField={dataField}>
       <FormInput hasError={!!error} {...inputProps} />
     </FormField>
   );

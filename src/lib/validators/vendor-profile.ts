@@ -120,8 +120,13 @@ export function derivedLegalName(p: VendorProfileInput): string {
   return trim(p.legalName) || trim(p.businessName);
 }
 
+/** User-entered trade/display name only — no fallback to legal name (used for form validation). */
+export function rawTradeName(p: VendorProfileInput): string {
+  return trim(p.tradeName) || trim(p.displayName);
+}
+
 export function derivedTradeName(p: VendorProfileInput): string {
-  return trim(p.tradeName) || trim(p.displayName) || derivedLegalName(p);
+  return rawTradeName(p) || derivedLegalName(p);
 }
 
 export function derivedFullName(p: VendorProfileInput): string {
@@ -251,8 +256,6 @@ export function validateVendorProfile(
   step?: 'identity' | 'contact' | 'full',
 ): ValidationResult {
   const errors: Record<string, string> = {};
-  const legalName = derivedLegalName(data);
-  const tradeName = derivedTradeName(data);
   const authName = derivedAuthorizedPersonName(data);
   const gstin = trim(data.gstin || data.gstNumber).toUpperCase();
   const pan = trim(data.pan || data.panNumber).toUpperCase();
@@ -265,16 +268,16 @@ export function validateVendorProfile(
 
   if (checkIdentity) {
     Object.assign(errors, validateVendorTypeSelections(data));
-    if (context !== 'addBusiness') {
-      if (!legalName || legalName.length < 2) errors.legalName = 'Legal business name is required';
-      if (!tradeName || tradeName.length < 2) errors.tradeName = 'Trade / display name is required';
-    }
+    const enteredLegal = derivedLegalName(data);
+    const enteredTrade = rawTradeName(data);
+    if (!enteredLegal || enteredLegal.length < 2) errors.legalName = 'Legal business name is required';
+    if (!enteredTrade || enteredTrade.length < 2) errors.tradeName = 'Trade / display name is required';
   }
 
   if (checkContact) {
     if (context === 'selfRegister' || context === 'adminCreate') {
-      const ownerName = derivedFullName(data);
-      if (!ownerName || ownerName.length < 2) errors.firstName = 'Contact name is required';
+      const rawFirst = trim(data.firstName);
+      if (!rawFirst || rawFirst.length < 2) errors.firstName = 'First name is required';
       if (!authName || authName.length < 2) errors.authorizedPersonName = 'Authorized person name is required';
       Object.assign(errors, contactChannelErrors(data, context));
       if (context === 'selfRegister' && (step === 'contact' || step === 'full' || !step)) {
@@ -287,7 +290,6 @@ export function validateVendorProfile(
   }
 
   if (context === 'addBusiness' && !step) {
-    if (!legalName || legalName.length < 2) errors.legalName = 'Legal business name is required';
     if (!vendorSlug && selections.length === 0) errors.vendorBusinessType = 'Vendor type is required';
   }
 
@@ -307,6 +309,16 @@ export function validateVendorProfile(
 export function validateFieldBlur(field: string, value: string): string {
   const v = value.trim();
   switch (field) {
+    case 'legalName':
+    case 'businessName':
+      return v.length > 0 && v.length < 2 ? 'Legal business name is required' : v.length === 0 ? 'Legal business name is required' : '';
+    case 'tradeName':
+    case 'displayName':
+      return v.length > 0 && v.length < 2 ? 'Trade / display name is required' : v.length === 0 ? 'Trade / display name is required' : '';
+    case 'firstName':
+      return v.length > 0 && v.length < 2 ? 'First name is required' : v.length === 0 ? 'First name is required' : '';
+    case 'authorizedPersonName':
+      return v.length > 0 && v.length < 2 ? 'Authorized person name is required' : v.length === 0 ? 'Authorized person name is required' : '';
     case 'gstin':
     case 'gstNumber':
       return v && !GST_RE.test(v.toUpperCase()) ? 'Format: 22ABCDE1234F1Z5' : '';
