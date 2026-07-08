@@ -70,6 +70,7 @@ export function adminOnly(handler: (req: NextRequest, ctx: AuthContext) => Promi
         ...ctx,
         permissions: effective,
         permissionSet: new Set(effective),
+        isPermissionOwner: isAdminOwner,
       };
       return handler(req, adminCtx);
     }

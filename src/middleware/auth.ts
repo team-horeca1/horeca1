@@ -21,6 +21,7 @@ export interface AuthContext {
   accessibleOutletIds: string[];
   permissions: readonly PermissionKey[];
   permissionSet: ReadonlySet<PermissionKey>;
+  isPermissionOwner: boolean;
   activeVendorId: string | null;
   activeBrandId: string | null;
   activeVendorTeamRole: TeamRole | 'owner' | null;
@@ -59,6 +60,7 @@ export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
     accessibleOutletIds: Array.isArray(u.accessibleOutletIds) ? (u.accessibleOutletIds as string[]) : [],
     permissions,
     permissionSet: new Set(permissions),
+    isPermissionOwner: u.isPermissionOwner === true,
     activeVendorId: (u.activeVendorId as string) ?? null,
     activeBrandId: (u.activeBrandId as string) ?? null,
     activeVendorTeamRole: (u.activeVendorTeamRole as TeamRole | 'owner') ?? null,

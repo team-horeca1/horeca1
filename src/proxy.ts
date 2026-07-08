@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/auth';
+import type { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
 const CUSTOMER_PROTECTED_PREFIXES = [
   '/checkout',
@@ -23,7 +24,12 @@ function isVendorPortalRoute(pathname: string): boolean {
   return !!segment && VENDOR_PORTAL_SEGMENTS.has(segment);
 }
 
-export default auth((req) => {
+type TokenUser = {
+  role?: string;
+  activeBusinessAccountType?: { isVendor?: boolean; isBrand?: boolean };
+};
+
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   const isAdminRoute = pathname.startsWith('/admin');
@@ -34,7 +40,13 @@ export default auth((req) => {
   const needsAuth = isAdminRoute || isBrandPortal || isVendorPortal || isCustomerProtected;
   if (!needsAuth) return NextResponse.next();
 
-  if (!req.auth) {
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET,
+    secureCookie: process.env.NODE_ENV === 'production',
+  }) as (TokenUser & { sub?: string }) | null;
+
+  if (!token) {
     const returnTo = pathname + req.nextUrl.search;
     const url = req.nextUrl.clone();
     url.pathname = '/login';
@@ -43,11 +55,7 @@ export default auth((req) => {
     return NextResponse.redirect(url);
   }
 
-  const user = req.auth.user as {
-    role?: string;
-    activeBusinessAccountType?: { isVendor?: boolean; isBrand?: boolean };
-  };
-  const role = user?.role;
+  const role = token.role;
 
   if (isAdminRoute && role !== 'admin') {
     const url = req.nextUrl.clone();
@@ -56,7 +64,7 @@ export default auth((req) => {
   }
 
   if (isVendorPortal) {
-    const isVendorActor = role === 'vendor' || role === 'admin' || user?.activeBusinessAccountType?.isVendor === true;
+    const isVendorActor = role === 'vendor' || role === 'admin' || token.activeBusinessAccountType?.isVendor === true;
     if (!isVendorActor) {
       const url = req.nextUrl.clone();
       url.pathname = '/';
@@ -65,7 +73,7 @@ export default auth((req) => {
   }
 
   if (isBrandPortal) {
-    const isBrandActor = role === 'brand' || role === 'admin' || user?.activeBusinessAccountType?.isBrand === true;
+    const isBrandActor = role === 'brand' || role === 'admin' || token.activeBusinessAccountType?.isBrand === true;
     if (!isBrandActor) {
       const url = req.nextUrl.clone();
       url.pathname = '/';
@@ -74,7 +82,7 @@ export default auth((req) => {
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: [

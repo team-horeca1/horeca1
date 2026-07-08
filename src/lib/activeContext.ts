@@ -205,7 +205,15 @@ export async function loadActiveContext(
     // account — these are the exact roles the account-creation paths
     // (provisionDefaultAccount / account POST) assign to the creator. This lets
     // a multi-account owner buy/manage on EVERY account they own.
-    const isOwner = userRoles.some((ur) => isOwnerRoleName(ur.role.name));
+    // Legacy seed / pre-RBAC vendors & brands: the User row linked on
+    // Vendor.userId / Brand.userId is the account owner but may have no
+    // UserRole row yet. Team APIs already surface them as isOwner — grant
+    // full scoped permissions here so requirePermission() works for them too.
+    const isLegacyPortalOwner =
+      vendorTenant?.teamRole === 'owner' || brandTenant?.teamRole === 'owner';
+    const isOwner =
+      isLegacyPortalOwner ||
+      userRoles.some((ur) => isOwnerRoleName(ur.role.name));
 
     const permissions = isOwner
       ? [...ALL_PERMISSION_KEYS]

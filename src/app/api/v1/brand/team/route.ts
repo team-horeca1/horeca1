@@ -207,7 +207,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
       }
 
       return m;
-    });
+    }, { timeout: 30_000 });
 
     const dto = toTeamMemberDTO({
       id: member.id,
