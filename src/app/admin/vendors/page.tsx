@@ -38,6 +38,17 @@ import { useAdminImpersonate } from '@/hooks/useAdminImpersonate';
 import {
   AdminStatusBadge,
   AdminVerifyPartnerButton,
+  AdminRegistryPageHeader,
+  AdminRegistryStatsGrid,
+  AdminRegistryFilterBar,
+  AdminRegistryLoadingState,
+  AdminRegistryEmptyState,
+  AdminRegistryTableShell,
+  AdminRegistryTableHead,
+  AdminRegistryTableBody,
+  AdminRegistryRowActions,
+  AdminRegistryOverflowMenu,
+  AdminRegistryOverflowMenuItem,
 } from '@/components/features/admin/entity';
 
 const AddVendorWizard = dynamic(
@@ -193,27 +204,24 @@ export default function VendorsPage() {
         return { totalVendors, pendingVerification, totalProducts, totalOrders };
     }, [vendors]);
 
-    // Show full-page spinner while loading to prevent layout shifts and flash of 0 stats
     if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3 bg-white rounded-[24px] border border-[#EEEEEE] shadow-sm py-24 m-8">
-                <Loader2 className="animate-spin text-[#299E60]" size={40} />
-                <span className="text-[13px] font-bold text-[#6B7280]">Loading vendors registry...</span>
-            </div>
-        );
+        return <AdminRegistryLoadingState message="Loading vendors registry..." />;
     }
+
+    const registryStats = [
+        { label: 'Total Sellers', value: totalVendors, icon: Users, iconBg: 'bg-[#EEF8F1]', iconColor: 'text-[#299E60]' },
+        { label: 'Pending Approval', value: pendingVerification, icon: ShieldCheck, iconBg: 'bg-[#FFF8EB]', iconColor: 'text-[#D97706]' },
+        { label: 'Total Products', value: totalProducts, icon: Boxes, iconBg: 'bg-[#EFF6FF]', iconColor: 'text-[#3B82F6]' },
+        { label: 'Orders Placed', value: totalOrders, icon: ShoppingBag, iconBg: 'bg-[#FDF2F2]', iconColor: 'text-[#EF4444]' },
+    ];
 
     return (
         <div className="space-y-8 pb-10 px-4 md:px-0">
-            {/* Page Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-[#EEEEEE] pb-5">
-                <div>
-                    <h1 className="text-[30px] font-extrabold text-[#111827] tracking-tight mb-1">Vendors Registry</h1>
-                    <p className="text-[#6B7280] text-[14px] font-medium">Manage and audit commercial supplier profiles, catalog size, and onboarding verification</p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    {canWriteSettings && (
+            <AdminRegistryPageHeader
+                title="Vendors Registry"
+                subtitle="Manage and audit commercial supplier profiles, catalog size, and onboarding verification"
+                actions={
+                    canWriteSettings ? (
                         <button
                             onClick={() => setShowCreate(true)}
                             className="h-[44px] px-5 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] active:scale-95 transition-all shadow-md shadow-[#299E60]/10 flex items-center gap-2 shrink-0"
@@ -221,117 +229,56 @@ export default function VendorsPage() {
                             <Plus size={16} />
                             Add Vendor
                         </button>
-                    )}
-                </div>
-            </div>
+                    ) : undefined
+                }
+            />
 
-            {/* Dashboard Mini Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {/* Stat 1: Total Sellers */}
-                <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-5 shadow-sm hover:shadow-md transition-all flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-[12px] bg-[#EEF8F1] flex items-center justify-center text-[#299E60]">
-                        <Users size={22} />
-                    </div>
-                    <div>
-                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-wider block">Total Sellers</span>
-                        <span className="text-[22px] font-black text-[#1F2937] leading-none mt-1 inline-block">{totalVendors}</span>
-                    </div>
-                </div>
+            <AdminRegistryStatsGrid stats={registryStats} />
 
-                {/* Stat 2: Pending Approval */}
-                <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-5 shadow-sm hover:shadow-md transition-all flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-[12px] bg-[#FFF8EB] flex items-center justify-center text-[#D97706]">
-                        <ShieldCheck size={22} className="text-[#D97706] opacity-60" />
+            <AdminRegistryFilterBar
+                searchValue={searchQuery}
+                onSearchChange={setSearchQuery}
+                searchPlaceholder="Search by vendor, owner, email..."
+                trailingSlot={
+                    <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase mr-1 hidden md:inline">View:</span>
+                        <div className="flex items-center bg-[#F3F4F6] border border-[#E5E7EB] rounded-[10px] p-1">
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={cn(
+                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
+                                    viewMode === 'grid' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
+                                )}
+                            >
+                                <LayoutGrid size={15} />
+                                <span className="hidden sm:inline">Cards</span>
+                            </button>
+                            <button
+                                onClick={() => setViewMode('table')}
+                                className={cn(
+                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
+                                    viewMode === 'table' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
+                                )}
+                            >
+                                <List size={15} />
+                                <span className="hidden sm:inline">Table</span>
+                            </button>
+                        </div>
                     </div>
-                    <div>
-                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-wider block">Pending Approval</span>
-                        <span className="text-[22px] font-black text-[#1F2937] leading-none mt-1 inline-block">{pendingVerification}</span>
-                    </div>
-                </div>
-
-                {/* Stat 3: Products Catalog */}
-                <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-5 shadow-sm hover:shadow-md transition-all flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-[12px] bg-[#EFF6FF] flex items-center justify-center text-[#3B82F6]">
-                        <Boxes size={22} />
-                    </div>
-                    <div>
-                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-wider block">Total Products</span>
-                        <span className="text-[22px] font-black text-[#1F2937] leading-none mt-1 inline-block">{totalProducts}</span>
-                    </div>
-                </div>
-
-                {/* Stat 4: Total Orders */}
-                <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-5 shadow-sm hover:shadow-md transition-all flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-[12px] bg-[#FDF2F2] flex items-center justify-center text-[#EF4444]">
-                        <ShoppingBag size={22} />
-                    </div>
-                    <div>
-                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-wider block">Orders Placed</span>
-                        <span className="text-[22px] font-black text-[#1F2937] leading-none mt-1 inline-block">{totalOrders}</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Filter Panel */}
-            <div className="bg-white p-4 rounded-[16px] border border-[#EEEEEE] shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-                {/* Search Bar */}
-                <div className="relative group w-full sm:w-[320px]">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={16} />
-                    <input
-                        type="text"
-                        placeholder="Search by vendor, owner, email..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] pl-10 pr-4 text-[13px] outline-none transition-all placeholder:text-[#9CA3AF] font-medium focus:border-[#299E60]/50 focus:bg-white focus:shadow-sm"
-                    />
-                </div>
-
-                {/* View Toggler */}
-                <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
-                    <span className="text-[12px] font-bold text-[#9CA3AF] uppercase mr-1 hidden md:inline">View:</span>
-                    <div className="flex items-center bg-[#F3F4F6] border border-[#E5E7EB] rounded-[10px] p-1">
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={cn(
-                                "p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold",
-                                viewMode === 'grid' ? "bg-white text-[#111827] shadow-sm" : "text-[#6B7280] hover:text-[#111827]"
-                            )}
-                        >
-                            <LayoutGrid size={15} />
-                            <span className="hidden sm:inline">Cards</span>
-                        </button>
-                        <button
-                            onClick={() => setViewMode('table')}
-                            className={cn(
-                                "p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold",
-                                viewMode === 'table' ? "bg-white text-[#111827] shadow-sm" : "text-[#6B7280] hover:text-[#111827]"
-                            )}
-                        >
-                            <List size={15} />
-                            <span className="hidden sm:inline">Table</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
+                }
+            />
 
             {filteredVendors.length === 0 ? (
-                <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-24 text-center text-[#6B7280] font-medium shadow-sm">
-                    <Building2 className="mx-auto text-[#D1D5DB] mb-3" size={40} />
-                    {searchQuery ? (
-                        <>
-                            <h4 className="text-[15px] font-bold text-[#374151]">No matched results</h4>
-                            <p className="text-[13px] text-[#9CA3AF] mt-1">We couldn&apos;t find any vendor matching &quot;{searchQuery}&quot;</p>
-                        </>
-                    ) : (
-                        <>
-                            <h4 className="text-[15px] font-bold text-[#374151]">No vendors registered yet</h4>
-                            <p className="text-[13px] text-[#9CA3AF] mt-1">Click the &quot;Add Vendor&quot; button to register your first seller partner.</p>
-                        </>
-                    )}
-                </div>
-            ) : (
-            /* Vendors Display Area */
-            viewMode === 'grid' ? (
+                <AdminRegistryEmptyState
+                    icon={Building2}
+                    title={searchQuery ? 'No matched results' : 'No vendors registered yet'}
+                    subtitle={
+                        searchQuery
+                            ? `We couldn't find any vendor matching "${searchQuery}"`
+                            : 'Click the "Add Vendor" button to register your first seller partner.'
+                    }
+                />
+            ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredVendors.map((vendor) => (
                     <div
@@ -445,21 +392,17 @@ export default function VendorsPage() {
                 ))}
             </div>
             ) : (
-            /* Table View - Semantic Premium Table */
-            <div className="w-full overflow-x-auto rounded-[16px] border border-[#EEEEEE] bg-white shadow-sm">
-                <table className="w-full border-collapse text-left text-[13px] min-w-[1000px]">
-                    <thead>
-                        <tr className="bg-[#F9FAFB] border-b border-[#EEEEEE] text-[11px] font-bold text-[#6B7280] uppercase tracking-wider">
-                            <th className="px-6 py-2.5 font-bold text-center w-[60px]">#</th>
-                            <th className="px-6 py-2.5 font-bold min-w-[280px]">Vendor Partner</th>
-                            <th className="px-6 py-2.5 font-bold min-w-[150px]">Owner</th>
-                            <th className="px-6 py-2.5 font-bold min-w-[220px]">Contact Information</th>
-                            <th className="px-6 py-2.5 font-bold text-center w-[100px]">Products</th>
-                            <th className="px-6 py-2.5 font-bold text-center w-[100px]">Orders</th>
-                            <th className="px-6 py-2.5 font-bold text-right pr-4">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#F3F4F6]">
+            <AdminRegistryTableShell>
+                <AdminRegistryTableHead>
+                    <th className="px-6 py-2.5 font-bold text-center w-[60px]">#</th>
+                    <th className="px-6 py-2.5 font-bold min-w-[280px]">Vendor Partner</th>
+                    <th className="px-6 py-2.5 font-bold min-w-[150px]">Owner</th>
+                    <th className="px-6 py-2.5 font-bold min-w-[220px]">Contact Information</th>
+                    <th className="px-6 py-2.5 font-bold text-center w-[100px]">Products</th>
+                    <th className="px-6 py-2.5 font-bold text-center w-[100px]">Orders</th>
+                    <th className="px-6 py-2.5 font-bold text-right pr-4">Actions</th>
+                </AdminRegistryTableHead>
+                <AdminRegistryTableBody>
                         {filteredVendors.map((vendor, i) => (
                             <tr
                                 key={vendor.id}
@@ -538,104 +481,79 @@ export default function VendorsPage() {
                                     {vendor._count.orders}
                                 </td>
 
-                                {/* Action buttons */}
                                 <td className="px-6 py-2.5 text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        <button
-                                            type="button"
-                                            disabled={impersonateLoading}
-                                            onClick={(e) => viewAsVendor(e, vendor.id)}
-                                            className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] active:scale-97 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-[#299E60]/5 whitespace-nowrap disabled:opacity-60"
-                                        >
-                                            <LayoutDashboard size={12} />
-                                            <span>View as Vendor</span>
-                                            <ArrowUpRight size={12} className="opacity-70" />
-                                        </button>
-                                        <Link
-                                            href={`/admin/vendors/${vendor.id}`}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="h-[34px] px-3 bg-white border border-[#E5E7EB] text-[#374151] rounded-[8px] text-[12px] font-bold hover:bg-[#F9FAFB] transition-all flex items-center justify-center whitespace-nowrap"
-                                        >
-                                            Details
-                                        </Link>
-                                        {!vendor.isVerified && canEditVendors && (
-                                            <AdminVerifyPartnerButton
-                                                vendorId={vendor.id}
-                                                compact
-                                                onVerified={() => handleVendorVerified(vendor.id)}
-                                            />
-                                        )}
-                                        {(canEditVendors || canDeleteVendors) && (
+                                    <AdminRegistryRowActions
+                                        detailsHref={`/admin/vendors/${vendor.id}`}
+                                        onDetailsClick={(e) => e.stopPropagation()}
+                                        impersonateButton={
                                             <button
                                                 type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (activeMenu?.id === vendor.id) {
-                                                        setActiveMenu(null);
-                                                        return;
-                                                    }
-                                                    const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                                                    setActiveMenu({
-                                                        id: vendor.id,
-                                                        top: rect.bottom + 6,
-                                                        right: window.innerWidth - rect.right,
-                                                    });
-                                                }}
-                                                className={cn(
-                                                    'w-[34px] h-[34px] flex items-center justify-center rounded-[10px] transition-all shadow-sm',
-                                                    activeMenu?.id === vendor.id
-                                                        ? 'bg-gray-100 text-gray-900 border border-gray-200'
-                                                        : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:bg-gray-50',
-                                                )}
+                                                disabled={impersonateLoading}
+                                                onClick={(e) => viewAsVendor(e, vendor.id)}
+                                                className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] active:scale-97 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-[#299E60]/5 whitespace-nowrap disabled:opacity-60"
                                             >
-                                                <MoreVertical size={16} />
+                                                <LayoutDashboard size={12} />
+                                                <span>View as Vendor</span>
+                                                <ArrowUpRight size={12} className="opacity-70" />
                                             </button>
-                                        )}
-                                    </div>
+                                        }
+                                        extraActions={
+                                            !vendor.isVerified && canEditVendors ? (
+                                                <AdminVerifyPartnerButton
+                                                    vendorId={vendor.id}
+                                                    compact
+                                                    onVerified={() => handleVendorVerified(vendor.id)}
+                                                />
+                                            ) : undefined
+                                        }
+                                        menuOpen={activeMenu?.id === vendor.id}
+                                        showMenu={canEditVendors || canDeleteVendors}
+                                        onMenuToggle={(e) => {
+                                            e.stopPropagation();
+                                            if (activeMenu?.id === vendor.id) {
+                                                setActiveMenu(null);
+                                                return;
+                                            }
+                                            const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                            setActiveMenu({
+                                                id: vendor.id,
+                                                top: rect.bottom + 6,
+                                                right: window.innerWidth - rect.right,
+                                            });
+                                        }}
+                                    />
                                 </td>
                             </tr>
                         ))}
-                    </tbody>
-                </table>
-            </div>
-            )
+                </AdminRegistryTableBody>
+            </AdminRegistryTableShell>
             )}
 
-            {activeMenu && typeof window !== 'undefined' && createPortal(
-                <div
-                    style={{ position: 'fixed', top: activeMenu.top, right: activeMenu.right, zIndex: 12000 }}
-                    className="w-44 bg-white rounded-[8px] shadow-xl border border-gray-100 py-1 overflow-hidden animate-in fade-in zoom-in duration-200"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {(() => {
-                        const v = vendors.find((x) => x.id === activeMenu.id);
-                        if (!v) return null;
-                        return (
-                            <>
-                                {canEditVendors && (
-                                    <button
-                                        onClick={() => toggleVendorActive(v.id, v.isActive)}
-                                        className="w-full flex items-center gap-3 px-4 py-2 text-[13px] font-semibold text-[#4B4B4B] hover:bg-gray-50 transition-colors text-left"
-                                    >
-                                        {v.isActive ? <UserX size={14} className="text-red-400" /> : <UserCheck size={14} className="text-green-400" />}
-                                        {v.isActive ? 'Deactivate' : 'Activate'}
-                                    </button>
-                                )}
-                                {canDeleteVendors && (
-                                    <button
-                                        onClick={() => deleteVendor(v.id, v.businessName)}
-                                        className="w-full flex items-center gap-3 px-4 py-2 text-[13px] font-semibold text-red-500 hover:bg-red-50 transition-colors text-left"
-                                    >
-                                        <Trash2 size={14} />
-                                        Delete permanently
-                                    </button>
-                                )}
-                            </>
-                        );
-                    })()}
-                </div>,
-                document.body,
-            )}
+            <AdminRegistryOverflowMenu active={activeMenu}>
+                {(() => {
+                    const v = vendors.find((x) => x.id === activeMenu?.id);
+                    if (!v) return null;
+                    return (
+                        <>
+                            {canEditVendors && (
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => toggleVendorActive(v.id, v.isActive)}
+                                    icon={v.isActive ? <UserX size={14} className="text-red-400" /> : <UserCheck size={14} className="text-green-400" />}
+                                    label={v.isActive ? 'Deactivate' : 'Activate'}
+                                />
+                            )}
+                            {canDeleteVendors && (
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => deleteVendor(v.id, v.businessName)}
+                                    icon={<Trash2 size={14} />}
+                                    label="Delete permanently"
+                                    danger
+                                />
+                            )}
+                        </>
+                    );
+                })()}
+            </AdminRegistryOverflowMenu>
 
             {/* Add Vendor wizard modal overlay */}
             {showCreate && (

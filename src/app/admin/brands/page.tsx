@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -29,6 +28,17 @@ import { toast } from 'sonner';
 import {
     AdminStatusBadge,
     AdminImpersonateButton,
+    AdminRegistryPageHeader,
+    AdminRegistryStatsGrid,
+    AdminRegistryFilterBar,
+    AdminRegistryLoadingState,
+    AdminRegistryEmptyState,
+    AdminRegistryTableShell,
+    AdminRegistryTableHead,
+    AdminRegistryTableBody,
+    AdminRegistryRowActions,
+    AdminRegistryOverflowMenu,
+    AdminRegistryOverflowMenuItem,
 } from '@/components/features/admin/entity';
 
 interface Brand {
@@ -189,136 +199,88 @@ export default function AdminBrandsPage() {
     const totalProducts = brands.reduce((sum, b) => sum + (b._count?.masterProducts || 0), 0);
 
     if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3 bg-white rounded-[24px] border border-[#EEEEEE] shadow-sm py-24 m-8">
-                <Loader2 className="animate-spin text-[#299E60]" size={40} />
-                <span className="text-[13px] font-bold text-[#6B7280]">Loading brands registry...</span>
-            </div>
-        );
+        return <AdminRegistryLoadingState message="Loading brands registry..." />;
     }
+
+    const registryStats = [
+        { label: 'Total Brands', value: brands.length, icon: Store, iconBg: 'bg-[#EFF6FF]', iconColor: 'text-[#3B82F6]' },
+        { label: 'Pending Approval', value: pendingBrandsCount, icon: Clock, iconBg: 'bg-[#FFF8EB]', iconColor: 'text-[#D97706]' },
+        { label: 'Approved Brands', value: approvedCount, icon: CheckCircle, iconBg: 'bg-[#EEF8F1]', iconColor: 'text-[#299E60]' },
+        { label: 'Master Products', value: totalProducts, icon: Boxes, iconBg: 'bg-[#FDF2F2]', iconColor: 'text-[#8B5CF6]' },
+    ];
 
     return (
         <div className="space-y-8 pb-10 px-4 md:px-0">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-[#EEEEEE] pb-5">
-                <div>
-                    <h1 className="text-[30px] font-extrabold text-[#111827] tracking-tight mb-1">Brands Registry</h1>
-                    <p className="text-[#6B7280] text-[14px] font-medium">Review brand applications, manage storefronts, and audit catalog mappings</p>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                    <Link
-                        href="/admin/brand-distributor-invites"
-                        className="h-[44px] px-4 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#374151] rounded-[12px] text-[13px] font-bold flex items-center gap-2 transition-colors shadow-sm"
-                    >
-                        <MessageSquare size={16} /> Distributor Invites
-                    </Link>
-                    {canCreateBrand && (
-                        <button
-                            onClick={() => setShowCreate(true)}
-                            className="h-[44px] px-5 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] active:scale-95 transition-all shadow-md shadow-[#299E60]/10 flex items-center gap-2 shrink-0"
+            <AdminRegistryPageHeader
+                title="Brands Registry"
+                subtitle="Review brand applications, manage storefronts, and audit catalog mappings"
+                actions={
+                    <>
+                        <Link
+                            href="/admin/brand-distributor-invites"
+                            className="h-[44px] px-4 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#374151] rounded-[12px] text-[13px] font-bold flex items-center gap-2 transition-colors shadow-sm"
                         >
-                            <Plus size={16} />
-                            Add Brand
-                        </button>
-                    )}
-                </div>
-            </div>
+                            <MessageSquare size={16} /> Distributor Invites
+                        </Link>
+                        {canCreateBrand && (
+                            <button
+                                onClick={() => setShowCreate(true)}
+                                className="h-[44px] px-5 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] active:scale-95 transition-all shadow-md shadow-[#299E60]/10 flex items-center gap-2 shrink-0"
+                            >
+                                <Plus size={16} />
+                                Add Brand
+                            </button>
+                        )}
+                    </>
+                }
+            />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-5 shadow-sm hover:shadow-md transition-all flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-[12px] bg-[#EFF6FF] flex items-center justify-center text-[#3B82F6]">
-                        <Store size={22} />
-                    </div>
-                    <div>
-                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-wider block">Total Brands</span>
-                        <span className="text-[22px] font-black text-[#1F2937] leading-none mt-1 inline-block">{brands.length}</span>
-                    </div>
-                </div>
-                <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-5 shadow-sm hover:shadow-md transition-all flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-[12px] bg-[#FFF8EB] flex items-center justify-center text-[#D97706]">
-                        <Clock size={22} />
-                    </div>
-                    <div>
-                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-wider block">Pending Approval</span>
-                        <span className="text-[22px] font-black text-[#1F2937] leading-none mt-1 inline-block">{pendingBrandsCount}</span>
-                    </div>
-                </div>
-                <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-5 shadow-sm hover:shadow-md transition-all flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-[12px] bg-[#EEF8F1] flex items-center justify-center text-[#299E60]">
-                        <CheckCircle size={22} />
-                    </div>
-                    <div>
-                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-wider block">Approved Brands</span>
-                        <span className="text-[22px] font-black text-[#1F2937] leading-none mt-1 inline-block">{approvedCount}</span>
-                    </div>
-                </div>
-                <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-5 shadow-sm hover:shadow-md transition-all flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-[12px] bg-[#FDF2F2] flex items-center justify-center text-[#8B5CF6]">
-                        <Boxes size={22} />
-                    </div>
-                    <div>
-                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-wider block">Master Products</span>
-                        <span className="text-[22px] font-black text-[#1F2937] leading-none mt-1 inline-block">{totalProducts}</span>
-                    </div>
-                </div>
-            </div>
+            <AdminRegistryStatsGrid stats={registryStats} />
 
-            <div className="bg-white p-4 rounded-[16px] border border-[#EEEEEE] shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-1 flex-wrap">
-                    {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
-                        <button
-                            key={f}
-                            onClick={() => setBrandFilter(f)}
-                            className={cn(
-                                'px-3 py-1.5 rounded-[8px] text-[12px] font-bold transition-all capitalize',
-                                brandFilter === f ? 'bg-[#299E60] text-white' : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#111827]',
-                            )}
-                        >
-                            {f}
-                        </button>
-                    ))}
-                </div>
-                <div className="relative group w-full sm:w-[320px]">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={16} />
-                    <input
-                        type="text"
-                        placeholder="Search by brand, owner, email..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] pl-10 pr-4 text-[13px] outline-none transition-all placeholder:text-[#9CA3AF] font-medium focus:border-[#299E60]/50 focus:bg-white focus:shadow-sm"
-                    />
-                </div>
-            </div>
+            <AdminRegistryFilterBar
+                searchValue={searchQuery}
+                onSearchChange={setSearchQuery}
+                searchPlaceholder="Search by brand, owner, email..."
+                leftSlot={
+                    <>
+                        {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
+                            <button
+                                key={f}
+                                onClick={() => setBrandFilter(f)}
+                                className={cn(
+                                    'px-3 py-1.5 rounded-[8px] text-[12px] font-bold transition-all capitalize',
+                                    brandFilter === f ? 'bg-[#299E60] text-white' : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#111827]',
+                                )}
+                            >
+                                {f}
+                            </button>
+                        ))}
+                    </>
+                }
+            />
 
             {filteredBrands.length === 0 ? (
-                <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-24 text-center text-[#6B7280] font-medium shadow-sm">
-                    <ClipboardList className="mx-auto text-[#D1D5DB] mb-3" size={40} />
-                    {searchQuery || brandFilter !== 'all' ? (
-                        <>
-                            <h4 className="text-[15px] font-bold text-[#374151]">No matched results</h4>
-                            <p className="text-[13px] text-[#9CA3AF] mt-1">Try adjusting your search or filter.</p>
-                        </>
-                    ) : (
-                        <>
-                            <h4 className="text-[15px] font-bold text-[#374151]">No brands registered yet</h4>
-                            <p className="text-[13px] text-[#9CA3AF] mt-1">Click &quot;Add Brand&quot; to register your first brand partner.</p>
-                        </>
-                    )}
-                </div>
+                <AdminRegistryEmptyState
+                    icon={ClipboardList}
+                    title={searchQuery || brandFilter !== 'all' ? 'No matched results' : 'No brands registered yet'}
+                    subtitle={
+                        searchQuery || brandFilter !== 'all'
+                            ? 'Try adjusting your search or filter.'
+                            : 'Click "Add Brand" to register your first brand partner.'
+                    }
+                />
             ) : (
-                <div className="w-full overflow-x-auto rounded-[16px] border border-[#EEEEEE] bg-white shadow-sm">
-                    <table className="w-full border-collapse text-left text-[13px] min-w-[1100px]">
-                        <thead>
-                            <tr className="bg-[#F9FAFB] border-b border-[#EEEEEE] text-[11px] font-bold text-[#6B7280] uppercase tracking-wider">
-                                <th className="px-6 py-2.5 font-bold text-center w-[60px]">#</th>
-                                <th className="px-6 py-2.5 font-bold min-w-[280px]">Brand Partner</th>
-                                <th className="px-6 py-2.5 font-bold min-w-[150px]">Owner</th>
-                                <th className="px-6 py-2.5 font-bold min-w-[220px]">Contact Information</th>
-                                <th className="px-6 py-2.5 font-bold text-center w-[100px]">Products</th>
-                                <th className="px-6 py-2.5 font-bold text-center w-[100px]">Mappings</th>
-                                <th className="px-6 py-2.5 font-bold text-right pr-4">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#F3F4F6]">
+                <AdminRegistryTableShell minWidth="1100px">
+                    <AdminRegistryTableHead>
+                        <th className="px-6 py-2.5 font-bold text-center w-[60px]">#</th>
+                        <th className="px-6 py-2.5 font-bold min-w-[280px]">Brand Partner</th>
+                        <th className="px-6 py-2.5 font-bold min-w-[150px]">Owner</th>
+                        <th className="px-6 py-2.5 font-bold min-w-[220px]">Contact Information</th>
+                        <th className="px-6 py-2.5 font-bold text-center w-[100px]">Products</th>
+                        <th className="px-6 py-2.5 font-bold text-center w-[100px]">Mappings</th>
+                        <th className="px-6 py-2.5 font-bold text-right pr-4">Actions</th>
+                    </AdminRegistryTableHead>
+                    <AdminRegistryTableBody>
                             {filteredBrands.map((brand, i) => {
                                 const isDummyEmail = brand.user?.email?.includes('brand.internal.horeca1') || !brand.user;
                                 const statusVariant = STATUS_VARIANT[brand.approvalStatus] ?? 'pending';
@@ -374,105 +336,82 @@ export default function AdminBrandsPage() {
                                         <td className="px-6 py-2.5 text-center font-bold text-[#111827] text-[14px]">{brand._count.masterProducts}</td>
                                         <td className="px-6 py-2.5 text-center font-bold text-[#111827] text-[14px]">{brand._count.productMappings}</td>
                                         <td className="px-6 py-2.5 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <div onClick={(e) => e.stopPropagation()}>
-                                                    <AdminImpersonateButton
-                                                        target="brand"
-                                                        entityId={brand.id}
-                                                        label="View as Brand"
-                                                        variant="primary"
-                                                        className="h-[34px] px-3 text-[12px] whitespace-nowrap"
-                                                    />
-                                                </div>
-                                                <Link
-                                                    href={`/admin/brands/${brand.id}`}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="h-[34px] px-3 bg-white border border-[#E5E7EB] text-[#374151] rounded-[8px] text-[12px] font-bold hover:bg-[#F9FAFB] transition-all flex items-center justify-center whitespace-nowrap"
-                                                >
-                                                    Details
-                                                </Link>
-                                                {brand.approvalStatus !== 'approved' && canEditBrands && (
-                                                    <button
-                                                        type="button"
-                                                        disabled={actionLoading === brand.id}
-                                                        onClick={(e) => void handleApproveBrand(brand, e)}
-                                                        className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60"
-                                                    >
-                                                        {actionLoading === brand.id ? (
-                                                            <Loader2 size={12} className="animate-spin" />
-                                                        ) : (
-                                                            <ShieldCheck size={12} />
-                                                        )}
-                                                        Approve
-                                                    </button>
-                                                )}
-                                                {(canEditBrands || canDeleteBrands) && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (activeMenu?.id === brand.id) {
-                                                                setActiveMenu(null);
-                                                                return;
-                                                            }
-                                                            const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                                                            setActiveMenu({ id: brand.id, top: rect.bottom + 6, right: window.innerWidth - rect.right });
-                                                        }}
-                                                        className={cn(
-                                                            'w-[34px] h-[34px] flex items-center justify-center rounded-[10px] transition-all shadow-sm',
-                                                            activeMenu?.id === brand.id
-                                                                ? 'bg-gray-100 text-gray-900 border border-gray-200'
-                                                                : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:bg-gray-50',
-                                                        )}
-                                                    >
-                                                        <MoreVertical size={16} />
-                                                    </button>
-                                                )}
-                                            </div>
+                                            <AdminRegistryRowActions
+                                                detailsHref={`/admin/brands/${brand.id}`}
+                                                onDetailsClick={(e) => e.stopPropagation()}
+                                                impersonateButton={
+                                                    <div onClick={(e) => e.stopPropagation()}>
+                                                        <AdminImpersonateButton
+                                                            target="brand"
+                                                            entityId={brand.id}
+                                                            label="View as Brand"
+                                                            variant="primary"
+                                                            className="h-[34px] px-3 text-[12px] whitespace-nowrap"
+                                                        />
+                                                    </div>
+                                                }
+                                                extraActions={
+                                                    brand.approvalStatus !== 'approved' && canEditBrands ? (
+                                                        <button
+                                                            type="button"
+                                                            disabled={actionLoading === brand.id}
+                                                            onClick={(e) => void handleApproveBrand(brand, e)}
+                                                            className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60"
+                                                        >
+                                                            {actionLoading === brand.id ? (
+                                                                <Loader2 size={12} className="animate-spin" />
+                                                            ) : (
+                                                                <ShieldCheck size={12} />
+                                                            )}
+                                                            Approve
+                                                        </button>
+                                                    ) : undefined
+                                                }
+                                                menuOpen={activeMenu?.id === brand.id}
+                                                showMenu={canEditBrands || canDeleteBrands}
+                                                onMenuToggle={(e) => {
+                                                    e.stopPropagation();
+                                                    if (activeMenu?.id === brand.id) {
+                                                        setActiveMenu(null);
+                                                        return;
+                                                    }
+                                                    const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                                    setActiveMenu({ id: brand.id, top: rect.bottom + 6, right: window.innerWidth - rect.right });
+                                                }}
+                                            />
                                         </td>
                                     </tr>
                                 );
                             })}
-                        </tbody>
-                    </table>
-                </div>
+                    </AdminRegistryTableBody>
+                </AdminRegistryTableShell>
             )}
 
-            {activeMenu && typeof window !== 'undefined' && createPortal(
-                <div
-                    style={{ position: 'fixed', top: activeMenu.top, right: activeMenu.right, zIndex: 12000 }}
-                    className="w-44 bg-white rounded-[8px] shadow-xl border border-gray-100 py-1 overflow-hidden animate-in fade-in zoom-in duration-200"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {(() => {
-                        const b = brands.find(x => x.id === activeMenu.id);
-                        if (!b) return null;
-                        return (
-                            <>
-                                {canEditBrands && b.approvalStatus !== 'rejected' && (
-                                    <button
-                                        onClick={() => { setActiveMenu(null); setRejectTarget({ id: b.id, name: b.name }); }}
-                                        className="w-full flex items-center gap-3 px-4 py-2 text-[13px] font-semibold text-[#4B4B4B] hover:bg-gray-50 transition-colors text-left"
-                                    >
-                                        <X size={14} className="text-red-400" />
-                                        Reject
-                                    </button>
-                                )}
-                                {canDeleteBrands && (
-                                    <button
-                                        onClick={() => void handleDeleteBrand(b)}
-                                        className="w-full flex items-center gap-3 px-4 py-2 text-[13px] font-semibold text-red-500 hover:bg-red-50 transition-colors text-left"
-                                    >
-                                        <Trash2 size={14} />
-                                        Delete permanently
-                                    </button>
-                                )}
-                            </>
-                        );
-                    })()}
-                </div>,
-                document.body,
-            )}
+            <AdminRegistryOverflowMenu active={activeMenu}>
+                {(() => {
+                    const b = brands.find(x => x.id === activeMenu?.id);
+                    if (!b) return null;
+                    return (
+                        <>
+                            {canEditBrands && b.approvalStatus !== 'rejected' && (
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => { setActiveMenu(null); setRejectTarget({ id: b.id, name: b.name }); }}
+                                    icon={<X size={14} className="text-red-400" />}
+                                    label="Reject"
+                                />
+                            )}
+                            {canDeleteBrands && (
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => void handleDeleteBrand(b)}
+                                    icon={<Trash2 size={14} />}
+                                    label="Delete permanently"
+                                    danger
+                                />
+                            )}
+                        </>
+                    );
+                })()}
+            </AdminRegistryOverflowMenu>
 
             {showCreate && (
                 <BrandFormModal
