@@ -12,6 +12,8 @@ import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { markSessionStale } from '@/lib/sessionStale';
+import { resolveTeamMemberRoleFromPermissions } from '@/lib/teamRoleWrites';
+import { finalizeTeamMemberRemoval } from '@/lib/userHardDelete';
 import type { TeamRole } from '@prisma/client';
 
 const updateSchema = z.object({
@@ -66,17 +68,12 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
 
     let role: { id: string; name: string; scope: string };
     if (input.permissions && Object.keys(input.permissions).length > 0) {
-      const ALLOWED = ['view', 'create', 'edit', 'delete', 'approve'];
-      const sanitized: Record<string, Record<string, boolean>> = {};
-      for (const [mod, actions] of Object.entries(input.permissions)) {
-        sanitized[mod] = {};
-        for (const [a, v] of Object.entries(actions)) {
-          if (ALLOWED.includes(a) && typeof v === 'boolean') sanitized[mod][a] = v;
-        }
-      }
-      role = await prisma.accountRole.create({
-        data: { businessAccountId: null, name: `Custom-${Date.now().toString(36)}`, scope: 'admin', permissions: sanitized, isTemplate: false, createdBy: ctx.userId },
-        select: { id: true, name: true, scope: true },
+      role = await resolveTeamMemberRoleFromPermissions({
+        scope: 'admin',
+        permissions: input.permissions,
+        businessAccountId: null,
+        createdBy: ctx.userId,
+        existingRoleId: member.roleId,
       });
     } else {
       const found = await prisma.accountRole.findUnique({
@@ -145,17 +142,18 @@ export const DELETE = adminOnly(async (req: NextRequest, ctx) => {
     }
 
     await prisma.adminTeamMember.delete({ where: { id: member.id } });
-    // Demote user role so they can't access admin routes
-    await prisma.user.update({ where: { id: userId }, data: { role: 'customer' } });
+
+    const removal = await finalizeTeamMemberRemoval(userId, { demoteFromAdmin: true });
 
     logAction(ctx, req, {
       action: AUDIT_ACTIONS.adminTeamRemove,
       entity: 'AdminTeamMember',
       entityId: userId,
       before: { roleId: member.roleId, role: member.role },
+      after: removal.hardDeleted ? { hardDeleted: true } : { role: 'customer', preserved: true },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, data: removal });
   } catch (error) {
     return errorResponse(error);
   }

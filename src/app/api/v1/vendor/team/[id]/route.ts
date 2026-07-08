@@ -6,9 +6,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { vendorOnly } from '@/middleware/rbac';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
-import { requirePermission, sanitizePermissionsForScope } from '@/lib/permissions/engine';
+import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { markSessionStale } from '@/lib/sessionStale';
+import { resolveTeamMemberRoleFromPermissions } from '@/lib/teamRoleWrites';
+import { finalizeTeamMemberRemoval } from '@/lib/userHardDelete';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { toTeamMemberDTO, teamMemberInclude } from '@/lib/teamMemberShape';
 import type { AuthContext } from '@/middleware/auth';
@@ -58,16 +60,6 @@ async function vendorMemberRank(ctx: AuthContext, vendorId: string): Promise<num
     select: { role: true },
   });
   return m ? ENUM_RANK[m.role] : 0;
-}
-
-function sortKeys(v: unknown): unknown {
-  if (Array.isArray(v)) return v.map(sortKeys);
-  if (v && typeof v === 'object') {
-    return Object.fromEntries(
-      Object.entries(v as Record<string, unknown>).sort().map(([k, val]) => [k, sortKeys(val)]),
-    );
-  }
-  return v;
 }
 
 function extractId(req: NextRequest): string {
@@ -183,31 +175,13 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       if (!found || found.scope !== 'vendor') throw Errors.badRequest('roleId must reference a vendor-scope role');
       role = found;
     } else if (input.permissions) {
-      const sanitized = sanitizePermissionsForScope(input.permissions, 'vendor');
-      const sanitizedStr = JSON.stringify(sortKeys(sanitized));
-      const candidates = await prisma.accountRole.findMany({
-        where: { scope: 'vendor', OR: [{ isTemplate: true, businessAccountId: null }, { businessAccountId }] },
-        select: { id: true, name: true, scope: true, description: true, permissions: true },
+      role = await resolveTeamMemberRoleFromPermissions({
+        scope: 'vendor',
+        permissions: input.permissions,
+        businessAccountId,
+        createdBy: ctx.userId,
+        existingRoleId: member.roleId,
       });
-      const match = candidates.find(r => JSON.stringify(sortKeys(r.permissions as Record<string, unknown>)) === sanitizedStr);
-      if (match) {
-        role = { id: match.id, name: match.name, scope: match.scope, description: match.description };
-      } else {
-        const customName = `Custom (${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })})`;
-        role = await prisma.accountRole.upsert({
-          where: { businessAccountId_name: { businessAccountId, name: customName } },
-          create: {
-            businessAccountId,
-            name: customName,
-            scope: 'vendor',
-            permissions: sanitized,
-            isTemplate: false,
-            createdBy: ctx.userId,
-          },
-          update: { permissions: sanitized },
-          select: { id: true, name: true, scope: true, description: true },
-        });
-      }
     }
 
     const outletTargets: (string | null)[] | null =
@@ -326,7 +300,9 @@ export const DELETE = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       });
     });
 
-    return NextResponse.json({ success: true });
+    const removal = await finalizeTeamMemberRemoval(member.userId);
+
+    return NextResponse.json({ success: true, data: removal });
   } catch (error) {
     return errorResponse(error);
   }

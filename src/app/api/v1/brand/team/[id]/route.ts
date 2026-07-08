@@ -8,6 +8,8 @@ import { resolveBrandContext } from '@/lib/resolveBrandId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { markSessionStale } from '@/lib/sessionStale';
+import { finalizeTeamMemberRemoval } from '@/lib/userHardDelete';
+import { resolveTeamMemberRoleFromPermissions } from '@/lib/teamRoleWrites';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import type { TeamRole } from '@prisma/client';
 
@@ -52,20 +54,12 @@ export const PATCH = brandOnly(async (req: NextRequest, ctx) => {
 
     let role: { id: string; name: string; scope: string };
     if (input.permissions && Object.keys(input.permissions).length > 0) {
-      const ALLOWED = ['view', 'create', 'edit', 'delete', 'approve'];
-      const sanitized: Record<string, Record<string, boolean>> = {};
-      for (const [mod, actions] of Object.entries(input.permissions)) {
-        sanitized[mod] = {};
-        for (const [a, v] of Object.entries(actions)) {
-          if (ALLOWED.includes(a) && typeof v === 'boolean') sanitized[mod][a] = v;
-        }
-      }
-      const customName = `Custom (${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })})`;
-      role = await prisma.accountRole.upsert({
-        where: { businessAccountId_name: { businessAccountId: brand.businessAccountId, name: customName } },
-        create: { businessAccountId: brand.businessAccountId, name: customName, scope: 'brand', permissions: sanitized, isTemplate: false, createdBy: ctx.userId },
-        update: { permissions: sanitized },
-        select: { id: true, name: true, scope: true },
+      role = await resolveTeamMemberRoleFromPermissions({
+        scope: 'brand',
+        permissions: input.permissions,
+        businessAccountId: brand.businessAccountId,
+        createdBy: ctx.userId,
+        existingRoleId: member.roleId,
       });
     } else {
       const found = await prisma.accountRole.findUnique({
@@ -145,7 +139,9 @@ export const DELETE = brandOnly(async (req: NextRequest, ctx) => {
       });
     });
 
-    return NextResponse.json({ success: true });
+    const removal = await finalizeTeamMemberRemoval(member.userId);
+
+    return NextResponse.json({ success: true, data: removal });
   } catch (error) {
     return errorResponse(error);
   }

@@ -10,6 +10,7 @@ import { adminOnly } from '@/middleware/rbac';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
+import { hardDeleteUserById } from '@/lib/userHardDelete';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -525,96 +526,7 @@ export const DELETE = adminOnly(async (req: NextRequest, ctx) => {
     // even for pure customers. catch(()=>{}) only on rows whose table may not
     // exist on every environment (legacy) — never to mask a real FK failure
     // on the critical path.
-    const vendorIds = existing.vendors.map(v => v.id);
-
-    await prisma.$transaction(async (tx) => {
-      // Orders the user placed (as buyer) OR their vendor(s) received.
-      const orderRows = await tx.order.findMany({
-        where: { OR: [{ userId: id }, { vendorId: { in: vendorIds } }] },
-        select: { id: true },
-      });
-      const orderIds = orderRows.map(o => o.id);
-
-      // ── 1. Rows whose FK → Order has no cascade (would block order delete) ─
-      await tx.commissionAccrual.deleteMany({ where: { OR: [{ orderId: { in: orderIds } }, { vendorId: { in: vendorIds } }] } });
-      await tx.payment.deleteMany({ where: { OR: [{ orderId: { in: orderIds } }, { vendorId: { in: vendorIds } }] } });
-      await tx.returnRequest.deleteMany({ where: { OR: [{ orderId: { in: orderIds } }, { customerId: id }] } });
-      await tx.creditTransaction.deleteMany({ where: { OR: [
-        { orderId: { in: orderIds } },
-        { vendorId: { in: vendorIds } },
-        { creditAccount: { userId: id } },
-        { creditAccount: { vendorId: { in: vendorIds } } },
-      ] } });
-
-      // ── 2. Orders — cascades order_items, reviews, coupon_redemptions;
-      //       nulls cashback_entries.order_id. ──────────────────────────────
-      await tx.order.deleteMany({ where: { OR: [{ userId: id }, { vendorId: { in: vendorIds } }] } });
-
-      // ── 3. Rows whose FK → Product has no cascade (would block product
-      //       delete). Order items already went with the orders above. ──────
-      await tx.cartItem.deleteMany({ where: { OR: [{ vendorId: { in: vendorIds } }, { cart: { userId: id } }] } });
-      await tx.quickOrderListItem.deleteMany({ where: { OR: [{ vendorId: { in: vendorIds } }, { list: { userId: id } }] } });
-      await tx.quickOrderList.deleteMany({ where: { OR: [{ vendorId: { in: vendorIds } }, { userId: id }] } });
-
-      // ── 4. Vendor's products — cascades price slabs, inventory, product-
-      //       categories, collection links, brand mappings, price-list items
-      //       and customer prices; nulls promotion buy/get refs. ────────────
-      if (vendorIds.length > 0) {
-        await tx.product.deleteMany({ where: { vendorId: { in: vendorIds } } });
-      }
-
-      // ── 5. User-owned rows user.delete() can't cascade ─────────────────
-      await tx.notification.deleteMany({ where: { userId: id } });
-      await tx.cart.deleteMany({ where: { userId: id } });
-      await tx.walletTransaction.deleteMany({ where: { wallet: { userId: id } } }).catch(() => {});
-      await tx.wallet.deleteMany({ where: { userId: id } }).catch(() => {});
-      await tx.cashbackEntry.deleteMany({ where: { userId: id } });
-      // CreditWallet cascades its txns/repayments/penalties/audit logs.
-      await tx.creditWallet.deleteMany({ where: { OR: [{ userId: id }, { vendorId: { in: vendorIds } }] } });
-      await tx.creditAccount.deleteMany({ where: { OR: [{ userId: id }, { vendorId: { in: vendorIds } }] } });
-      await tx.customerVendor.deleteMany({ where: { OR: [{ userId: id }, { vendorId: { in: vendorIds } }] } }).catch(() => {});
-      await tx.vendorCustomer.deleteMany({ where: { OR: [{ userId: id }, { vendorId: { in: vendorIds } }] } }).catch(() => {});
-
-      // ── 6. Team / RBAC rows ────────────────────────────────────────────
-      await tx.adminTeamMember.deleteMany({ where: { userId: id } });
-      await tx.vendorTeamMember.deleteMany({ where: { userId: id } }).catch(() => {});
-      await tx.brandTeamMember.deleteMany({ where: { userId: id } }).catch(() => {});
-      await tx.userRole.deleteMany({ where: { userId: id } });
-      await tx.businessAccountMember.deleteMany({ where: { userId: id } });
-
-      // ── 7. Null inviter back-references on rows we keep (point at a row
-      //       that's about to disappear). ───────────────────────────────────
-      await tx.vendorTeamMember.updateMany({ where: { invitedBy: id }, data: { invitedBy: null } }).catch(() => {});
-      await tx.brandTeamMember.updateMany({ where: { invitedBy: id }, data: { invitedBy: null } }).catch(() => {});
-      await tx.adminTeamMember.updateMany({ where: { invitedBy: id }, data: { invitedBy: null } }).catch(() => {});
-      await tx.businessAccountMember.updateMany({ where: { invitedBy: id }, data: { invitedBy: null } }).catch(() => {});
-
-      // ── 8. Auth-adapter + misc personal data ───────────────────────────
-      await tx.linkedAccount.deleteMany({ where: { OR: [{ userId: id }, { linkedUserId: id }] } });
-      await tx.savedAddress.deleteMany({ where: { userId: id } });
-      await tx.pushSubscription.deleteMany({ where: { userId: id } });
-      await tx.session.deleteMany({ where: { userId: id } });
-      await tx.account.deleteMany({ where: { userId: id } });
-
-      // ── 9. Vendor-owned rows whose FK → Vendor has no cascade. The vendor
-      //       delete then cascades the rest (service areas, delivery slots,
-      //       team members, price lists, promotions, coupons, cashback
-      //       campaigns, salespersons, commission rules, customer tasks). ────
-      if (vendorIds.length > 0) {
-        await tx.vendorDocument.deleteMany({ where: { vendorId: { in: vendorIds } } }).catch(() => {});
-        await tx.vendorSettlement.deleteMany({ where: { vendorId: { in: vendorIds } } }).catch(() => {}); // cascades settlement orders
-        await tx.vendorWalletTxn.deleteMany({ where: { wallet: { vendorId: { in: vendorIds } } } }).catch(() => {});
-        await tx.vendorWallet.deleteMany({ where: { vendorId: { in: vendorIds } } }).catch(() => {});
-        await tx.inventoryLog.deleteMany({ where: { vendorId: { in: vendorIds } } }).catch(() => {});
-        await tx.vendor.deleteMany({ where: { id: { in: vendorIds } } });
-      }
-
-      // ── 10. Brand rows (cascades brand products, mappings, invites, team) ─
-      await tx.brand.deleteMany({ where: { userId: id } }).catch(() => {});
-
-      // ── 11. Finally the user ───────────────────────────────────────────
-      await tx.user.delete({ where: { id } });
-    });
+    await hardDeleteUserById(id);
 
     return NextResponse.json({ success: true, data: { id, hardDeleted: true } });
   } catch (error) {
