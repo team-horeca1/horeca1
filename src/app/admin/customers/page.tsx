@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
     Users,
     Package,
@@ -26,7 +26,20 @@ import CustomerFormModal from '@/components/features/admin/CustomerFormModal';
 import { FormErrorBanner } from '@/components/ui/form';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useAdminImpersonate } from '@/hooks/useAdminImpersonate';
-import { AdminStatusBadge } from '@/components/features/admin/entity';
+import {
+    AdminStatusBadge,
+    AdminRegistryPageHeader,
+    AdminRegistryStatsGrid,
+    AdminRegistryFilterBar,
+    AdminRegistryLoadingState,
+    AdminRegistryEmptyState,
+    AdminRegistryTableShell,
+    AdminRegistryTableHead,
+    AdminRegistryTableBody,
+    AdminRegistryRowActions,
+    AdminRegistryOverflowMenu,
+    AdminRegistryOverflowMenuItem,
+} from '@/components/features/admin/entity';
 
 interface AdminUser {
     id: string;
@@ -40,6 +53,7 @@ interface AdminUser {
 }
 
 export default function CustomersPage() {
+    const router = useRouter();
     const { has: can } = usePermissions();
     const canEditCustomers = can('customers.edit');
     const { start: startCustomerView, loading: impersonateLoading } = useAdminImpersonate('customer');
@@ -139,15 +153,18 @@ export default function CustomersPage() {
     const filteredUsers = users;
 
     const totalCustomers = users.filter(u => u.role === 'customer').length;
+    const activeCustomers = users.filter(u => u.role === 'customer' && u.isActive).length;
     const totalVendors = users.filter(u => u.role === 'vendor').length;
     const inactiveUsers = users.filter(u => !u.isActive).length;
 
-    const stats = [
-        { label: 'All Users', value: users.length.toString(), icon: Users, bgColor: 'bg-[#299E60]/10', iconColor: 'text-[#299E60]' },
-        { label: 'Customers', value: totalCustomers.toString(), icon: UserCheck, bgColor: 'bg-blue-50', iconColor: 'text-blue-600' },
-        { label: 'Vendors', value: totalVendors.toString(), icon: Package, bgColor: 'bg-purple-50', iconColor: 'text-purple-600' },
-        { label: 'Inactive', value: inactiveUsers.toString(), icon: UserX, bgColor: 'bg-red-50', iconColor: 'text-red-500' },
+    const registryStats = [
+        { label: 'Total Customers', value: totalCustomers, icon: UserCheck, iconBg: 'bg-[#EEF8F1]', iconColor: 'text-[#299E60]' },
+        { label: 'Active Customers', value: activeCustomers, icon: Users, iconBg: 'bg-[#EFF6FF]', iconColor: 'text-[#3B82F6]' },
+        { label: 'Inactive Users', value: inactiveUsers, icon: UserX, iconBg: 'bg-[#FDF2F2]', iconColor: 'text-[#EF4444]' },
+        { label: 'All Users', value: users.length, icon: Package, iconBg: 'bg-[#FFF8EB]', iconColor: 'text-[#D97706]' },
     ];
+
+    const openDetails = (userId: string) => router.push(`/admin/customers/${userId}`);
 
     const deleteUser = async (userId: string, name: string) => {
         setActiveMenu(null);
@@ -299,291 +316,254 @@ export default function CustomersPage() {
         setSelectedIds(next);
     };
 
+    if (initialLoad) {
+        return <AdminRegistryLoadingState message="Loading customers registry..." />;
+    }
+
     return (
-        <div className="space-y-8 pb-24">
-            {/* Page Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-[28px] font-bold text-[#000000] leading-none mb-1">Customers</h1>
-                    <p className="text-[#000000] text-[13px] font-medium opacity-70">Whole data about your Customers</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setShowImportModal(true)}
-                        className="h-[40px] px-4 bg-white border border-[#DCDCDC] hover:bg-gray-50 text-[#4B4B4B] rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 transition-colors shadow-sm"
-                    >
-                        <Upload size={16} /> Import Customers
-                    </button>
-                    <button
-                        onClick={() => setShowAddModal(true)}
-                        className="h-[40px] px-4 bg-[#299E60] hover:bg-[#238a53] text-white rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 transition-colors shadow-sm shrink-0"
-                    >
-                        <Plus size={16} /> Add User
-                    </button>
-                </div>
-            </div>
-
-            {/* Stat Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat, idx) => (
-                    <div key={idx} className="bg-white p-6 rounded-[14px] border border-[#EEEEEE] shadow-sm hover:shadow-md transition-all h-[130px] flex flex-col justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center shrink-0", stat.bgColor)}>
-                                <stat.icon size={20} className={stat.iconColor} />
-                            </div>
-                            <span className="text-[14px] font-bold text-[#4B4B4B]">{stat.label}</span>
-                        </div>
-                        <h4 className="text-[22px] font-[800] text-[#181725] leading-none">{stat.value}</h4>
-                    </div>
-                ))}
-            </div>
-
-            {/* Users Table Section */}
-            <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-[#EEEEEE] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <h3 className="text-[18px] font-bold text-[#181725]">All Users List</h3>
-                    <div className="flex items-center gap-3">
+        <div className={cn('space-y-8 px-4 md:px-0', selectedIds.size > 0 ? 'pb-24' : 'pb-10')}>
+            <AdminRegistryPageHeader
+                title="Customers Registry"
+                subtitle="Manage buyer accounts, audit profiles, and bulk-update customer mappings"
+                actions={
+                    <>
                         <button
-                            onClick={() => setShowFilters(!showFilters)}
-                            className={cn(
-                                "h-[40px] px-3 border rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 transition-colors shadow-sm",
-                                showFilters ? "border-[#299E60] bg-[#299E60]/5 text-[#299E60]" : "border-[#DCDCDC] bg-white text-[#4B4B4B] hover:bg-gray-50"
-                            )}
+                            onClick={() => setShowImportModal(true)}
+                            className="h-[44px] px-4 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#374151] rounded-[12px] text-[13px] font-bold flex items-center gap-2 transition-colors shadow-sm"
                         >
-                            <SlidersHorizontal size={16} /> Filters
+                            <Upload size={16} /> Import Customers
                         </button>
-                        <div className="relative group w-full md:w-[240px]">
-                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#AEAEAE]" size={16} />
-                            <input
-                                type="text"
-                                placeholder="Search name, email, phone, business"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="h-[40px] w-full bg-white border border-[#DCDCDC] rounded-[10px] pl-10 pr-9 text-[13px] outline-none transition-all placeholder:text-[#AEAEAE] font-medium focus:border-[#299E60]/40 shadow-sm"
-                            />
-                            {loading && !initialLoad && (
-                                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-[#AEAEAE] animate-spin" size={14} />
-                            )}
-                        </div>
+                        <button
+                            onClick={() => setShowAddModal(true)}
+                            className="h-[44px] px-5 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] active:scale-95 transition-all shadow-md shadow-[#299E60]/10 flex items-center gap-2 shrink-0"
+                        >
+                            <Plus size={16} /> Add Customer
+                        </button>
+                    </>
+                }
+            />
+
+            <AdminRegistryStatsGrid stats={registryStats} />
+
+            <AdminRegistryFilterBar
+                searchValue={searchQuery}
+                onSearchChange={setSearchQuery}
+                searchPlaceholder="Search name, email, phone, business..."
+                searching={loading && !initialLoad}
+                leftSlot={
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={cn(
+                            'h-[42px] px-3 border rounded-[10px] text-[12px] font-bold flex items-center gap-1.5 transition-colors shadow-sm',
+                            showFilters ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]' : 'border-[#E5E7EB] bg-[#F9FAFB] text-[#6B7280] hover:text-[#111827]',
+                        )}
+                    >
+                        <SlidersHorizontal size={16} /> Filters
+                    </button>
+                }
+            />
+
+            {showFilters && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 p-4 bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm animate-in slide-in-from-top-4 duration-200">
+                    <div>
+                        <label className="block text-[11px] font-bold text-[#9CA3AF] uppercase mb-1">Role</label>
+                        <select
+                            value={filterRole}
+                            onChange={(e) => setFilterRole(e.target.value)}
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                        >
+                            <option value="all">All Roles</option>
+                            <option value="customer">Customer</option>
+                            <option value="vendor">Vendor</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[11px] font-bold text-[#9CA3AF] uppercase mb-1">Pincode</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. 560001"
+                            value={filterPincode}
+                            onChange={(e) => setFilterPincode(e.target.value)}
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[11px] font-bold text-[#9CA3AF] uppercase mb-1">Salesperson</label>
+                        <select
+                            value={filterSalespersonId}
+                            onChange={(e) => setFilterSalespersonId(e.target.value)}
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                        >
+                            <option value="">All salespersons</option>
+                            {salespersons.map((sp) => (
+                                <option key={sp.id} value={sp.id}>
+                                    {sp.name}{sp.code ? ` (${sp.code})` : ''} — {sp.vendor.businessName}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[11px] font-bold text-[#9CA3AF] uppercase mb-1">Credit Status</label>
+                        <select
+                            value={filterCreditStatus}
+                            onChange={(e) => setFilterCreditStatus(e.target.value)}
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                        >
+                            <option value="">All Statuses</option>
+                            <option value="active">Active</option>
+                            <option value="pending">Pending</option>
+                            <option value="suspended">Suspended</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[11px] font-bold text-[#9CA3AF] uppercase mb-1">Area/City</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. Bangalore"
+                            value={filterArea}
+                            onChange={(e) => setFilterArea(e.target.value)}
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[11px] font-bold text-[#9CA3AF] uppercase mb-1">Tag</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. VIP"
+                            value={filterTag}
+                            onChange={(e) => setFilterTag(e.target.value)}
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                        />
                     </div>
                 </div>
+            )}
 
-                {/* Collapsible Filter Panel */}
-                {showFilters && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 p-6 bg-gray-50 border-b border-[#EEEEEE] animate-in slide-in-from-top-4 duration-200">
-                        <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Role</label>
-                            <select
-                                value={filterRole}
-                                onChange={(e) => setFilterRole(e.target.value)}
-                                className="h-[38px] w-full bg-white border border-[#DCDCDC] rounded-[8px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/40"
-                            >
-                                <option value="all">All Roles</option>
-                                <option value="customer">Customer</option>
-                                <option value="vendor">Vendor</option>
-                                <option value="admin">Admin</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Pincode</label>
+            {filteredUsers.length === 0 ? (
+                <AdminRegistryEmptyState
+                    icon={Users}
+                    title={searchQuery ? 'No matched results' : 'No customers registered yet'}
+                    subtitle={
+                        searchQuery
+                            ? `We couldn't find any user matching "${searchQuery}"`
+                            : 'Click "Add Customer" to register your first buyer account.'
+                    }
+                />
+            ) : (
+                <AdminRegistryTableShell minWidth="1100px">
+                    <AdminRegistryTableHead>
+                        <th className="px-6 py-2.5 font-bold text-center w-[52px]">
                             <input
-                                type="text"
-                                placeholder="e.g. 560001"
-                                value={filterPincode}
-                                onChange={(e) => setFilterPincode(e.target.value)}
-                                className="h-[38px] w-full bg-white border border-[#DCDCDC] rounded-[8px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/40"
+                                type="checkbox"
+                                checked={filteredUsers.length > 0 && selectedIds.size === filteredUsers.length}
+                                onChange={handleSelectAll}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
                             />
-                        </div>
-                        <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Salesperson</label>
-                            <select
-                                value={filterSalespersonId}
-                                onChange={(e) => setFilterSalespersonId(e.target.value)}
-                                className="h-[38px] w-full bg-white border border-[#DCDCDC] rounded-[8px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/40"
+                        </th>
+                        <th className="px-6 py-2.5 font-bold min-w-[240px]">Customer</th>
+                        <th className="px-6 py-2.5 font-bold min-w-[180px]">Email</th>
+                        <th className="px-6 py-2.5 font-bold min-w-[120px]">Phone</th>
+                        <th className="px-6 py-2.5 font-bold min-w-[100px]">Business</th>
+                        <th className="px-6 py-2.5 font-bold text-center w-[100px]">Status</th>
+                        <th className="px-6 py-2.5 font-bold text-center w-[100px]">Joined</th>
+                        <th className="px-6 py-2.5 font-bold text-right pr-4">Actions</th>
+                    </AdminRegistryTableHead>
+                    <AdminRegistryTableBody>
+                        {filteredUsers.map((user) => (
+                            <tr
+                                key={user.id}
+                                onClick={() => openDetails(user.id)}
+                                className="group hover:bg-[#F9FAFB]/60 transition-colors cursor-pointer"
                             >
-                                <option value="">All salespersons</option>
-                                {salespersons.map((sp) => (
-                                    <option key={sp.id} value={sp.id}>
-                                        {sp.name}{sp.code ? ` (${sp.code})` : ''} — {sp.vendor.businessName}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Credit Status</label>
-                            <select
-                                value={filterCreditStatus}
-                                onChange={(e) => setFilterCreditStatus(e.target.value)}
-                                className="h-[38px] w-full bg-white border border-[#DCDCDC] rounded-[8px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/40"
-                            >
-                                <option value="">All Statuses</option>
-                                <option value="active">Active</option>
-                                <option value="pending">Pending</option>
-                                <option value="suspended">Suspended</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Area/City</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. Bangalore"
-                                value={filterArea}
-                                onChange={(e) => setFilterArea(e.target.value)}
-                                className="h-[38px] w-full bg-white border border-[#DCDCDC] rounded-[8px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/40"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Tag</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. VIP"
-                                value={filterTag}
-                                onChange={(e) => setFilterTag(e.target.value)}
-                                className="h-[38px] w-full bg-white border border-[#DCDCDC] rounded-[8px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/40"
-                            />
-                        </div>
-                    </div>
-                )}
-
-                <div className="overflow-x-auto relative">
-                    {initialLoad && (
-                        <div className="flex items-center justify-center py-20">
-                            <Loader2 className="animate-spin text-[#299E60]" size={32} />
-                        </div>
-                    )}
-                    {!initialLoad && (
-                        <table className="w-full">
-                            <thead>
-                                <tr className="bg-white">
-                                    <th className="p-4 w-12 text-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={filteredUsers.length > 0 && selectedIds.size === filteredUsers.length}
-                                            onChange={handleSelectAll}
-                                            className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
-                                        />
-                                    </th>
-                                    <th className="p-4 text-left text-[14px] font-[800] text-[#4B4B4B]">Name</th>
-                                    <th className="p-4 text-left text-[14px] font-[800] text-[#4B4B4B]">Email</th>
-                                    <th className="p-4 text-left text-[14px] font-[800] text-[#4B4B4B]">Phone</th>
-                                    <th className="p-4 text-left text-[14px] font-[800] text-[#4B4B4B]">Role</th>
-                                    <th className="p-4 text-left text-[14px] font-[800] text-[#4B4B4B]">Business</th>
-                                    <th className="p-4 text-left text-[14px] font-[800] text-[#4B4B4B]">Status</th>
-                                    <th className="p-4 text-left text-[14px] font-[800] text-[#4B4B4B]">Joined</th>
-                                    <th className="p-4 text-center text-[14px] font-[800] text-[#4B4B4B]">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[#EEEEEE]">
-                                {filteredUsers.length > 0 ? (
-                                    filteredUsers.map((user) => (
-                                        <tr key={user.id} className="hover:bg-gray-50/50 transition-colors group">
-                                            <td className="p-4 w-12 text-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedIds.has(user.id)}
-                                                    onChange={(e) => handleSelectRow(user.id, e.target.checked)}
-                                                    className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
-                                                />
-                                            </td>
-                                            <td className="p-4">
-                                                <Link href={`/admin/customers/${user.id}`} className="flex items-center gap-3 group/name cursor-pointer w-fit">
-                                                    <div className="w-9 h-9 rounded-full overflow-hidden bg-[#53B175]/10 shrink-0 border border-transparent group-hover/name:border-[#299E60]/30 transition-all flex items-center justify-center">
-                                                        <span className="text-[13px] font-black text-[#299E60]">
-                                                            {(user.fullName || 'U').charAt(0).toUpperCase()}
-                                                        </span>
-                                                    </div>
-                                                    <span className="text-[14px] font-[800] text-[#181725] tracking-tight hover:text-[#299E60] transition-colors">
-                                                        {user.fullName}
-                                                    </span>
-                                                </Link>
-                                            </td>
-                                            <td className="p-4 text-[13px] font-medium text-[#7C7C7C]">{user.email}</td>
-                                            <td className="p-4 text-[13px] font-medium text-[#7C7C7C]">{user.phone || '—'}</td>
-                                            <td className="p-4">
+                                <td className="px-6 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedIds.has(user.id)}
+                                        onChange={(e) => handleSelectRow(user.id, e.target.checked)}
+                                        className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
+                                    />
+                                </td>
+                                <td className="px-6 py-2.5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-[42px] h-[42px] rounded-[10px] bg-[#F3F4F6] overflow-hidden shrink-0 border border-[#E5E7EB] flex items-center justify-center">
+                                            <span className="text-[15px] font-black text-[#299E60]">
+                                                {(user.fullName || 'U').charAt(0).toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-[14px] font-bold text-[#111827] truncate group-hover:text-[#299E60] transition-colors">
+                                                {user.fullName}
+                                            </p>
+                                            <div className="flex items-center gap-2 mt-0.5">
                                                 <span className={cn(
-                                                    "inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold capitalize",
-                                                    user.role === 'admin' ? "bg-purple-50 text-purple-600" :
-                                                    user.role === 'vendor' ? "bg-blue-50 text-blue-600" :
-                                                    "bg-[#EEF8F1] text-[#299E60]"
+                                                    'inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold capitalize',
+                                                    user.role === 'admin' ? 'bg-purple-50 text-purple-600' :
+                                                    user.role === 'vendor' ? 'bg-blue-50 text-blue-600' :
+                                                    'bg-[#EEF8F1] text-[#299E60]',
                                                 )}>
                                                     {user.role}
                                                 </span>
-                                            </td>
-                                            <td className="p-4 text-[13px] font-medium text-[#7C7C7C]">{user.businessName || '—'}</td>
-                                            <td className="p-4">
-                                                <AdminStatusBadge
-                                                    variant={user.isActive ? 'active' : 'inactive'}
-                                                />
-                                            </td>
-                                            <td className="p-4 text-[13px] font-medium text-[#7C7C7C]">
-                                                {new Date(user.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="flex items-center justify-end gap-2 relative">
-                                                    {canEditCustomers && user.role === 'customer' && (
-                                                        <button
-                                                            type="button"
-                                                            disabled={impersonateLoading}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                void startCustomerView(user.id);
-                                                            }}
-                                                            className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60"
-                                                        >
-                                                            <UserCircle size={12} />
-                                                            View as Customer
-                                                            <ArrowUpRight size={12} className="opacity-70" />
-                                                        </button>
-                                                    )}
-                                                    <Link
-                                                        href={`/admin/customers/${user.id}`}
-                                                        className="h-[34px] px-3 bg-white border border-[#E5E7EB] text-[#374151] rounded-[8px] text-[12px] font-bold hover:bg-[#F9FAFB] transition-all flex items-center justify-center whitespace-nowrap"
-                                                    >
-                                                        Details
-                                                    </Link>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (activeMenu?.id === user.id) {
-                                                                setActiveMenu(null);
-                                                                return;
-                                                            }
-                                                            const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                                                            setActiveMenu({
-                                                                id: user.id,
-                                                                top: rect.bottom + 6,
-                                                                right: window.innerWidth - rect.right,
-                                                            });
-                                                        }}
-                                                        className={cn(
-                                                            "w-[34px] h-[34px] flex items-center justify-center rounded-[10px] transition-all shadow-sm",
-                                                            activeMenu?.id === user.id ? "bg-gray-100 text-gray-900 border border-gray-200" : "bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:bg-gray-50"
-                                                        )}
-                                                    >
-                                                        <MoreVertical size={16} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={9} className="py-20 text-center text-[#AEAEAE] font-medium">
-                                            {searchQuery ? `No users found matching "${searchQuery}"` : 'No users yet'}
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-            </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-2.5 text-[13px] font-medium text-[#4B5563] truncate max-w-[200px]">{user.email}</td>
+                                <td className="px-6 py-2.5 text-[11px] text-[#9CA3AF] font-semibold font-mono">{user.phone || '—'}</td>
+                                <td className="px-6 py-2.5 text-[13px] font-medium text-[#4B5563] truncate max-w-[160px]">{user.businessName || '—'}</td>
+                                <td className="px-6 py-2.5 text-center">
+                                    <AdminStatusBadge variant={user.isActive ? 'active' : 'inactive'} />
+                                </td>
+                                <td className="px-6 py-2.5 text-center text-[12px] font-bold text-[#6B7280]">
+                                    {new Date(user.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </td>
+                                <td className="px-6 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                                    <AdminRegistryRowActions
+                                        detailsHref={`/admin/customers/${user.id}`}
+                                        onDetailsClick={(e) => e.stopPropagation()}
+                                        impersonateButton={
+                                            canEditCustomers && user.role === 'customer' ? (
+                                                <button
+                                                    type="button"
+                                                    disabled={impersonateLoading}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        void startCustomerView(user.id);
+                                                    }}
+                                                    className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60"
+                                                >
+                                                    <UserCircle size={12} />
+                                                    View as Customer
+                                                    <ArrowUpRight size={12} className="opacity-70" />
+                                                </button>
+                                            ) : undefined
+                                        }
+                                        menuOpen={activeMenu?.id === user.id}
+                                        onMenuToggle={(e) => {
+                                            e.stopPropagation();
+                                            if (activeMenu?.id === user.id) {
+                                                setActiveMenu(null);
+                                                return;
+                                            }
+                                            const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                            setActiveMenu({
+                                                id: user.id,
+                                                top: rect.bottom + 6,
+                                                right: window.innerWidth - rect.right,
+                                            });
+                                        }}
+                                    />
+                                </td>
+                            </tr>
+                        ))}
+                    </AdminRegistryTableBody>
+                </AdminRegistryTableShell>
+            )}
 
-            {/* Sticky Bottom Bulk Action Bar */}
             {selectedIds.size > 0 && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white border border-gray-200 shadow-2xl rounded-[16px] px-6 py-4 flex flex-wrap items-center gap-4 z-[9999] max-w-[92%] animate-in slide-in-from-bottom-8 duration-200">
-                    <div className="flex items-center gap-2 border-r pr-4 border-gray-100 shrink-0">
-                        <span className="bg-[#299E60]/10 text-[#299E60] font-black text-[12px] px-2.5 py-1 rounded-full">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white border border-[#EEEEEE] shadow-lg rounded-[16px] px-6 py-4 flex flex-wrap items-center gap-4 z-[9999] max-w-[92%] animate-in slide-in-from-bottom-8 duration-200">
+                    <div className="flex items-center gap-2 border-r pr-4 border-[#F3F4F6] shrink-0">
+                        <span className="bg-[#EEF8F1] text-[#299E60] font-black text-[12px] px-2.5 py-1 rounded-full">
                             {selectedIds.size} Selected
                         </span>
                     </div>
@@ -591,26 +571,25 @@ export default function CustomersPage() {
                     <div className="flex items-center gap-2 shrink-0">
                         <button
                             onClick={() => handleBulkActiveToggle(true)}
-                            className="h-[36px] px-3 bg-green-50 hover:bg-green-100 text-green-700 font-bold rounded-lg text-[12px] transition-colors"
+                            className="h-[36px] px-4 bg-[#299E60] hover:bg-[#238a54] text-white font-bold rounded-[10px] text-[12px] transition-colors"
                         >
                             Activate
                         </button>
                         <button
                             onClick={() => handleBulkActiveToggle(false)}
-                            className="h-[36px] px-3 bg-red-50 hover:bg-red-100 text-red-700 font-bold rounded-lg text-[12px] transition-colors"
+                            className="h-[36px] px-4 bg-white border border-[#E5E7EB] hover:bg-[#F9FAFB] text-[#374151] font-bold rounded-[10px] text-[12px] transition-colors"
                         >
                             Deactivate
                         </button>
                     </div>
 
-                    <div className="h-6 w-px bg-gray-200 shrink-0 hidden sm:block" />
+                    <div className="h-6 w-px bg-[#EEEEEE] shrink-0 hidden sm:block" />
 
-                    {/* Vendor specific mappings */}
                     <div className="flex items-center gap-2.5 flex-wrap">
                         <select
                             value={bulkVendorId}
                             onChange={(e) => setBulkVendorId(e.target.value)}
-                            className="h-[36px] px-3 bg-gray-50 border border-gray-200 rounded-lg text-[12px] font-bold outline-none cursor-pointer focus:border-[#299E60]"
+                            className="h-[36px] px-3 bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] text-[12px] font-bold outline-none cursor-pointer focus:border-[#299E60]/50"
                         >
                             <option value="">Vendor Mappings</option>
                             {vendors.map(v => (
@@ -625,22 +604,20 @@ export default function CustomersPage() {
                                     placeholder="Sales Exec"
                                     value={bulkSalesExecutive}
                                     onChange={(e) => setBulkSalesExecutive(e.target.value)}
-                                    className="h-[36px] px-3 bg-white border border-gray-200 rounded-lg text-[12px] outline-none w-28 focus:border-[#299E60]"
+                                    className="h-[36px] px-3 bg-white border border-[#E5E7EB] rounded-[10px] text-[12px] outline-none w-28 focus:border-[#299E60]/50"
                                 />
-
                                 <input
                                     type="text"
                                     placeholder="Territory"
                                     value={bulkTerritory}
                                     onChange={(e) => setBulkTerritory(e.target.value)}
-                                    className="h-[36px] px-3 bg-white border border-gray-200 rounded-lg text-[12px] outline-none w-28 focus:border-[#299E60]"
+                                    className="h-[36px] px-3 bg-white border border-[#E5E7EB] rounded-[10px] text-[12px] outline-none w-28 focus:border-[#299E60]/50"
                                 />
-
-                                <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden h-[36px]">
+                                <div className="flex items-center border border-[#E5E7EB] rounded-[10px] bg-white overflow-hidden h-[36px]">
                                     <select
                                         value={bulkTagsAction}
                                         onChange={(e) => setBulkTagsAction(e.target.value as 'add' | 'remove' | 'set')}
-                                        className="h-full px-2 bg-gray-50 text-[11px] font-bold border-r border-gray-200 outline-none"
+                                        className="h-full px-2 bg-[#F9FAFB] text-[11px] font-bold border-r border-[#E5E7EB] outline-none"
                                     >
                                         <option value="add">Add Tag</option>
                                         <option value="remove">Del Tag</option>
@@ -654,10 +631,9 @@ export default function CustomersPage() {
                                         className="h-full px-3 text-[12px] outline-none w-24 border-none"
                                     />
                                 </div>
-
                                 <button
                                     onClick={handleBulkSubmit}
-                                    className="h-[36px] px-4 bg-[#299E60] hover:bg-[#238a53] text-white font-bold rounded-lg text-[12px] transition-colors"
+                                    className="h-[36px] px-4 bg-[#299E60] hover:bg-[#238a53] text-white font-bold rounded-[10px] text-[12px] transition-colors"
                                 >
                                     Apply
                                 </button>
@@ -667,45 +643,34 @@ export default function CustomersPage() {
 
                     <button
                         onClick={() => setSelectedIds(new Set())}
-                        className="text-gray-400 hover:text-gray-600 transition-colors ml-auto p-1.5 shrink-0"
+                        className="text-[#9CA3AF] hover:text-[#374151] transition-colors ml-auto p-1.5 shrink-0"
                     >
                         <X size={16} />
                     </button>
                 </div>
             )}
 
-            {/* Action menu rendered as a portal */}
-            {activeMenu && typeof window !== 'undefined' && createPortal(
-                <div
-                    style={{ position: 'fixed', top: activeMenu.top, right: activeMenu.right, zIndex: 12000 }}
-                    className="w-44 bg-white rounded-[8px] shadow-xl border border-gray-100 py-1 overflow-hidden animate-in fade-in zoom-in duration-200"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {(() => {
-                        const u = users.find(x => x.id === activeMenu.id);
-                        if (!u) return null;
-                        return (
-                            <>
-                                <button
-                                    onClick={() => toggleUserActive(u.id, u.isActive)}
-                                    className="w-full flex items-center gap-3 px-4 py-2 text-[13px] font-semibold text-[#4B4B4B] hover:bg-gray-50 transition-colors text-left"
-                                >
-                                    {u.isActive ? <UserX size={14} className="text-red-400" /> : <UserCheck size={14} className="text-green-400" />}
-                                    {u.isActive ? 'Deactivate' : 'Activate'}
-                                </button>
-                                <button
-                                    onClick={() => deleteUser(u.id, u.fullName)}
-                                    className="w-full flex items-center gap-3 px-4 py-2 text-[13px] font-semibold text-red-500 hover:bg-red-50 transition-colors text-left"
-                                >
-                                    <Trash2 size={14} />
-                                    Delete permanently
-                                </button>
-                            </>
-                        );
-                    })()}
-                </div>,
-                document.body,
-            )}
+            <AdminRegistryOverflowMenu active={activeMenu}>
+                {(() => {
+                    const u = users.find(x => x.id === activeMenu?.id);
+                    if (!u) return null;
+                    return (
+                        <>
+                            <AdminRegistryOverflowMenuItem
+                                onClick={() => toggleUserActive(u.id, u.isActive)}
+                                icon={u.isActive ? <UserX size={14} className="text-red-400" /> : <UserCheck size={14} className="text-green-400" />}
+                                label={u.isActive ? 'Deactivate' : 'Activate'}
+                            />
+                            <AdminRegistryOverflowMenuItem
+                                onClick={() => deleteUser(u.id, u.fullName)}
+                                icon={<Trash2 size={14} />}
+                                label="Delete permanently"
+                                danger
+                            />
+                        </>
+                    );
+                })()}
+            </AdminRegistryOverflowMenu>
 
             {showAddModal && (
                 <CustomerFormModal
