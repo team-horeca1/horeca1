@@ -123,7 +123,7 @@ const ADMIN_FEATURES: PortalFeatureMap = {
   promotions: { label: 'Promotions', actions: MODULE_ACTIONS.promotions, routes: ['/admin/promotions'] },
   analytics:  { label: 'Reports', actions: MODULE_ACTIONS.analytics, routes: ['/admin/reports'] },
   users:      { label: 'Team', actions: MODULE_ACTIONS.users, routes: ['/admin/team'] },
-  auditLogs:  { label: 'Audit Logs', actions: MODULE_ACTIONS.auditLogs, routes: [] },
+  auditLogs:  { label: 'Audit Logs', actions: MODULE_ACTIONS.auditLogs, routes: ['/admin/audit-logs'] },
   settings:   { label: 'Settings', actions: MODULE_ACTIONS.settings, routes: ['/admin/settings'] },
 };
 

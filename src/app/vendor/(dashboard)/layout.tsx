@@ -69,7 +69,7 @@ export default function VendorLayout({
 }) {
     const pathname = usePathname();
     const router = useRouter();
-    const { data: session, status, update: updateSession } = useSession();
+    const { data: session, status } = useSession();
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [adminVendorName, setAdminVendorName] = useState<string | null>(null);
     const [isApplicationPending, setIsApplicationPending] = useState(false);
@@ -201,25 +201,6 @@ export default function VendorLayout({
             })
             .catch(() => {});
     }, [status, isAdmin, isActiveVendor, pathname, router]);
-
-    // Refresh permissions on window focus and on a 60s cadence so Redis
-    // session:stale:{userId} is picked up after role changes without requiring
-    // the user to tab away. Debounced to at most one updateSession per 30s.
-    React.useEffect(() => {
-        if (status !== 'authenticated') return;
-        const lastRef = { t: 0 };
-        const refresh = () => {
-            if (Date.now() - lastRef.t < 30_000) return;
-            lastRef.t = Date.now();
-            updateSession();
-        };
-        window.addEventListener('focus', refresh);
-        const intervalId = setInterval(refresh, 60_000);
-        return () => {
-            window.removeEventListener('focus', refresh);
-            clearInterval(intervalId);
-        };
-    }, [status, updateSession]);
 
     const handleExitAdminView = async () => {
         await fetch('/api/v1/admin/impersonate', { method: 'DELETE' });
