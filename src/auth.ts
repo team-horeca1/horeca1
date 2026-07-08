@@ -15,6 +15,7 @@ import type { PermissionKey, PermissionsJson } from '@/lib/permissions/registry'
 import { ALL_PERMISSION_KEYS } from '@/lib/permissions/registry';
 import { flatten } from '@/lib/permissions/engine';
 import { isOwnerRoleName } from '@/lib/permissions/portalFeatures';
+import type { Role } from '@prisma/client';
 
 function vendorSlug(name: string): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
@@ -292,7 +293,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       // First sign-in or fresh login
       if (user) {
         token.id = user.id;
-        token.role = (user as { role?: string }).role || 'customer';
+        token.role = ((user as { role?: Role }).role) ?? 'customer';
         if (token.role === 'admin') {
           try {
             const adminMembership = await prisma.adminTeamMember.findUnique({
