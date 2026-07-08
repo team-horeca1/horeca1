@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import type { TeamRoleDTO } from '@/lib/teamMemberShape';
+import { filterRolesForDisplay } from '@/lib/teamRoleWrites';
 import type { Prisma } from '@prisma/client';
 
 const CreateBody = z.object({
@@ -33,7 +34,15 @@ export const GET = adminOnly(async (_req: NextRequest, ctx) => {
         isTemplate: true, permissions: true,
       },
     });
-    const data: (TeamRoleDTO & { permissions: Prisma.JsonValue })[] = roles.map((r) => ({
+    const assigned = await prisma.adminTeamMember.findMany({
+      where: { roleId: { not: null } },
+      select: { roleId: true },
+    });
+    const assignedIds = new Set(
+      assigned.map((m) => m.roleId).filter((id): id is string => !!id),
+    );
+    const visible = filterRolesForDisplay(roles, assignedIds);
+    const data: (TeamRoleDTO & { permissions: Prisma.JsonValue })[] = visible.map((r) => ({
       id: r.id,
       name: r.name,
       scope: 'admin',

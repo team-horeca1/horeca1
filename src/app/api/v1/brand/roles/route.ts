@@ -8,6 +8,7 @@ import { resolveBrandContext } from '@/lib/resolveBrandId';
 import { requirePermission, sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { filterRolesForDisplay } from '@/lib/teamRoleWrites';
 import type { AuthContext } from '@/middleware/auth';
 
 const CreateBody = z.object({
@@ -37,7 +38,14 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
         isTemplate: true, permissions: true,
       },
     });
-    return NextResponse.json({ success: true, data: roles });
+    const assigned = await prisma.brandTeamMember.findMany({
+      where: { brandId, roleId: { not: null } },
+      select: { roleId: true },
+    });
+    const assignedIds = new Set(
+      assigned.map((m) => m.roleId).filter((id): id is string => !!id),
+    );
+    return NextResponse.json({ success: true, data: filterRolesForDisplay(roles, assignedIds) });
   } catch (error) {
     return errorResponse(error);
   }

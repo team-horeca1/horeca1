@@ -157,9 +157,11 @@ export function EditMemberModal({
   }, [hasMemberGet, memberId, teamMemberEndpoint, outletsEndpoint, roles]);
 
   const templates = roles.filter((r) => !r.name.startsWith('Storefront'));
-  const selectedRole = roles.find((r) => r.id === selectedRoleId);
+  const selectedRole = selectedRoleId ? roles.find((r) => r.id === selectedRoleId) : null;
   const isDirty =
-    selectedRole && JSON.stringify(permissions) !== JSON.stringify(selectedRole.permissions);
+    !selectedRoleId
+    || !selectedRole
+    || JSON.stringify(permissions) !== JSON.stringify(selectedRole.permissions);
 
   const handleSelectRole = useCallback((role: RoleItem) => {
     setSelectedRoleId(role.id);
@@ -204,7 +206,7 @@ export function EditMemberModal({
           setSubmitting(false);
           return;
         }
-        body = isDirty ? { permissions } : { roleId: selectedRoleId };
+        body = isDirty || !selectedRoleId ? { permissions } : { roleId: selectedRoleId };
       } else {
         if (Object.keys(permissions).length === 0) {
           applyValidationErrors({}, 'Select at least one permission');

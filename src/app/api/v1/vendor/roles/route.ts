@@ -11,6 +11,7 @@ import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission, sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { filterRolesForDisplay } from '@/lib/teamRoleWrites';
 import type { AuthContext } from '@/middleware/auth';
 
 const CreateBody = z.object({
@@ -39,7 +40,21 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         isTemplate: true, permissions: true,
       },
     });
-    return NextResponse.json({ success: true, data: roles });
+    const [teamAssigned, userAssigned] = await Promise.all([
+      prisma.vendorTeamMember.findMany({
+        where: { vendorId, roleId: { not: null } },
+        select: { roleId: true },
+      }),
+      prisma.userRole.findMany({
+        where: { businessAccountId: vendor.businessAccountId, role: { scope: 'vendor' } },
+        select: { roleId: true },
+      }),
+    ]);
+    const assignedIds = new Set([
+      ...teamAssigned.map((m) => m.roleId).filter((id): id is string => !!id),
+      ...userAssigned.map((r) => r.roleId),
+    ]);
+    return NextResponse.json({ success: true, data: filterRolesForDisplay(roles, assignedIds) });
   } catch (error) {
     return errorResponse(error);
   }

@@ -7,6 +7,7 @@ import { adminOnly } from '@/middleware/rbac';
 import { requirePermission, sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { markSessionStaleForRole } from '@/lib/sessionStale';
 
 const PatchBody = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -47,6 +48,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       ...(body.permissions !== undefined && { permissions: sanitizePermissionsForScope(body.permissions, 'admin') }),
     };
     const updated = await prisma.accountRole.update({ where: { id: roleId }, data });
+    if (body.permissions !== undefined) await markSessionStaleForRole(roleId);
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     return errorResponse(error);

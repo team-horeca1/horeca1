@@ -11,6 +11,7 @@ import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
 import { assertAccountMember, assertAccountPermission } from '@/lib/accountAccess';
 import { sanitizePermissionsForScope } from '@/lib/permissions/engine';
+import { filterRolesForDisplay } from '@/lib/teamRoleWrites';
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
@@ -24,7 +25,12 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
         : { businessAccountId: id },
       orderBy: [{ isTemplate: 'desc' }, { name: 'asc' }],
     });
-    return NextResponse.json({ success: true, data: roles });
+    const assigned = await prisma.userRole.findMany({
+      where: { businessAccountId: id },
+      select: { roleId: true },
+    });
+    const assignedIds = new Set(assigned.map((r) => r.roleId));
+    return NextResponse.json({ success: true, data: filterRolesForDisplay(roles, assignedIds) });
   } catch (err) { return errorResponse(err); }
 });
 
