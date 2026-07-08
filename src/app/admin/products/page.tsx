@@ -158,12 +158,6 @@ interface ProductFormData {
     exemptionReason: string;
     taxabilityType: string;
     productType: string;
-    intraStateTaxName: string;
-    intraStateTaxRate: string;
-    intraStateTaxType: string;
-    interStateTaxName: string;
-    interStateTaxRate: string;
-    interStateTaxType: string;
     source: string;
     referenceId: string;
     lastSync: string;
@@ -241,12 +235,6 @@ const EMPTY_FORM: ProductFormData = {
     exemptionReason: '',
     taxabilityType: 'taxable',
     productType: 'goods',
-    intraStateTaxName: '',
-    intraStateTaxRate: '',
-    intraStateTaxType: '',
-    interStateTaxName: '',
-    interStateTaxRate: '',
-    interStateTaxType: '',
     source: '',
     referenceId: '',
     lastSync: '',
@@ -1062,12 +1050,6 @@ export default function ProductsPage() {
                     exemptionReason: acc.exemptionReason || '',
                     taxabilityType: acc.taxabilityType || 'taxable',
                     productType: att.productType || 'goods',
-                    intraStateTaxName: acc.intraStateTaxName || '',
-                    intraStateTaxRate: acc.intraStateTaxRate != null ? String(acc.intraStateTaxRate) : '',
-                    intraStateTaxType: acc.intraStateTaxType || '',
-                    interStateTaxName: acc.interStateTaxName || '',
-                    interStateTaxRate: acc.interStateTaxRate != null ? String(acc.interStateTaxRate) : '',
-                    interStateTaxType: acc.interStateTaxType || '',
                     source: att.source || '',
                     referenceId: att.referenceId || '',
                     lastSync: att.lastSync || '',
@@ -1143,12 +1125,6 @@ export default function ProductsPage() {
                 exemptionReason: acc.exemptionReason || '',
                 taxabilityType: acc.taxabilityType || 'taxable',
                 productType: att.productType || 'goods',
-                intraStateTaxName: acc.intraStateTaxName || '',
-                intraStateTaxRate: acc.intraStateTaxRate != null ? String(acc.intraStateTaxRate) : '',
-                intraStateTaxType: acc.intraStateTaxType || '',
-                interStateTaxName: acc.interStateTaxName || '',
-                interStateTaxRate: acc.interStateTaxRate != null ? String(acc.interStateTaxRate) : '',
-                interStateTaxType: acc.interStateTaxType || '',
                 source: att.source || '',
                 referenceId: att.referenceId || '',
                 lastSync: att.lastSync || '',
@@ -1245,12 +1221,6 @@ export default function ProductsPage() {
             taxable: formData.taxable,
             exemptionReason: formData.exemptionReason.trim(),
             taxabilityType: formData.taxabilityType.trim(),
-            intraStateTaxName: formData.intraStateTaxName.trim(),
-            intraStateTaxRate: formData.intraStateTaxRate ? Number(formData.intraStateTaxRate) : undefined,
-            intraStateTaxType: formData.intraStateTaxType.trim(),
-            interStateTaxName: formData.interStateTaxName.trim(),
-            interStateTaxRate: formData.interStateTaxRate ? Number(formData.interStateTaxRate) : undefined,
-            interStateTaxType: formData.interStateTaxType.trim(),
             inventoryAccount: formData.inventoryAccount.trim(),
             inventoryAccountCode: formData.inventoryAccountCode.trim(),
             platformCommission: formData.platformCommission ? Number(formData.platformCommission) : undefined,
@@ -2315,42 +2285,6 @@ export default function ProductsPage() {
                                     basePriceRequired={!!formData.vendorId}
                                     taxPercentOptions={TAX_OPTIONS}
                                 >
-                                    <div className="space-y-3 pt-1 border-t border-[#EEEEEE]">
-                                        <h4 className="text-[13px] font-bold text-[#181725]">Tax details</h4>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-                                            <div id="ff-intraStateTaxName">
-                                                <FieldLabel required>Intra State Tax Name</FieldLabel>
-                                                <input type="text" value={formData.intraStateTaxName} onChange={e => updateField('intraStateTaxName', e.target.value)} placeholder="e.g. SGST+CGST" className={cn(inputCls, formErrors.intraStateTaxName && 'border-[#E74C3C]')} />
-                                                {formErrors.intraStateTaxName && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.intraStateTaxName}</p>}
-                                            </div>
-                                            <div id="ff-intraStateTaxRate">
-                                                <FieldLabel required>Intra State Tax Rate</FieldLabel>
-                                                <input type="number" step="0.01" value={formData.intraStateTaxRate} onChange={e => updateField('intraStateTaxRate', e.target.value)} placeholder="18" className={cn(inputCls, formErrors.intraStateTaxRate && 'border-[#E74C3C]')} />
-                                                {formErrors.intraStateTaxRate && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.intraStateTaxRate}</p>}
-                                            </div>
-                                            <div id="ff-intraStateTaxType">
-                                                <FieldLabel required>Intra State Tax Type</FieldLabel>
-                                                <input type="text" value={formData.intraStateTaxType} onChange={e => updateField('intraStateTaxType', e.target.value)} placeholder="Tax Group" className={cn(inputCls, formErrors.intraStateTaxType && 'border-[#E74C3C]')} />
-                                                {formErrors.intraStateTaxType && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.intraStateTaxType}</p>}
-                                            </div>
-                                            <div id="ff-interStateTaxName">
-                                                <FieldLabel required>Inter State Tax Name</FieldLabel>
-                                                <input type="text" value={formData.interStateTaxName} onChange={e => updateField('interStateTaxName', e.target.value)} placeholder="e.g. IGST" className={cn(inputCls, formErrors.interStateTaxName && 'border-[#E74C3C]')} />
-                                                {formErrors.interStateTaxName && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.interStateTaxName}</p>}
-                                            </div>
-                                            <div id="ff-interStateTaxRate">
-                                                <FieldLabel required>Inter State Tax Rate</FieldLabel>
-                                                <input type="number" step="0.01" value={formData.interStateTaxRate} onChange={e => updateField('interStateTaxRate', e.target.value)} placeholder="18" className={cn(inputCls, formErrors.interStateTaxRate && 'border-[#E74C3C]')} />
-                                                {formErrors.interStateTaxRate && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.interStateTaxRate}</p>}
-                                            </div>
-                                            <div id="ff-interStateTaxType">
-                                                <FieldLabel required>Inter State Tax Type</FieldLabel>
-                                                <input type="text" value={formData.interStateTaxType} onChange={e => updateField('interStateTaxType', e.target.value)} placeholder="Tax" className={cn(inputCls, formErrors.interStateTaxType && 'border-[#E74C3C]')} />
-                                                {formErrors.interStateTaxType && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.interStateTaxType}</p>}
-                                            </div>
-                                        </div>
-                                    </div>
-
                                     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                                         <div id="ff-countryOfOrigin">
                                             <FieldLabel required>Country of Origin</FieldLabel>

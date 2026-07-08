@@ -11,10 +11,6 @@ export const PRODUCT_REQUIRED_FIELD_ORDER = [
   'imageUrl',
   'basePrice',
   'taxPercent',
-  'intraStateTaxName',
-  'intraStateTaxType',
-  'interStateTaxName',
-  'interStateTaxType',
   'countryOfOrigin',
   'vegNonVeg',
   'storageType',
@@ -34,10 +30,6 @@ export interface ProductEssentialsForm {
   categoryIds: string[];
   imageUrl: string;
   taxPercent?: string;
-  intraStateTaxName: string;
-  intraStateTaxType: string;
-  interStateTaxName: string;
-  interStateTaxType: string;
   countryOfOrigin: string;
   vegNonVeg: string;
   storageType: string;
@@ -109,12 +101,6 @@ export function validateProductEssentials(
   if (form.taxPercent?.trim() === '' || Number.isNaN(taxPct) || taxPct < 0 || taxPct > 100) {
     errors.taxPercent = 'Tax % must be between 0 and 100';
   }
-
-  req(errors, 'intraStateTaxName', form.intraStateTaxName, 'Intra state tax name is required');
-  req(errors, 'intraStateTaxType', form.intraStateTaxType, 'Intra state tax type is required');
-
-  req(errors, 'interStateTaxName', form.interStateTaxName, 'Inter state tax name is required');
-  req(errors, 'interStateTaxType', form.interStateTaxType, 'Inter state tax type is required');
 
   req(errors, 'countryOfOrigin', form.countryOfOrigin, 'Country of origin is required');
   req(errors, 'vegNonVeg', form.vegNonVeg, 'Veg / non-veg is required');

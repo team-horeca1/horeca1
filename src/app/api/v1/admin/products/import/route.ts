@@ -373,8 +373,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       parentCategory: string; subCategory: string; additionalSubCategories: string[];
       vegNonVeg: string; storageType: string; moq: number; aliasName: string; upc: string;
       account: string; accountCode: string; taxable: boolean; exemptionReason: string; taxabilityType: string;
-      productType: string; intraStateTaxName: string; intraStateTaxType: string; interStateTaxName: string;
-      interStateTaxRate: number; interStateTaxType: string; platformCommission: number;
+      productType: string; platformCommission: number;
       inventoryAccount: string; inventoryAccountCode: string; valuationMethod: string; trackInventory: boolean;
       reorderPoint: number; openingStock: number; packageWeight: number; packageLength: number;
       packageWidth: number; packageHeight: number; dimensionUnit: string; weightUnit: string;
@@ -430,11 +429,6 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           if (typeof v.exemptionReason === 'string') safe.exemptionReason = v.exemptionReason.trim();
           if (typeof v.taxabilityType === 'string') safe.taxabilityType = v.taxabilityType.trim();
           if (typeof v.productType === 'string') safe.productType = v.productType.trim();
-          if (typeof v.intraStateTaxName === 'string') safe.intraStateTaxName = v.intraStateTaxName.trim();
-          if (typeof v.intraStateTaxType === 'string') safe.intraStateTaxType = v.intraStateTaxType.trim();
-          if (typeof v.interStateTaxName === 'string') safe.interStateTaxName = v.interStateTaxName.trim();
-          if (typeof v.interStateTaxRate === 'number') safe.interStateTaxRate = v.interStateTaxRate;
-          if (typeof v.interStateTaxType === 'string') safe.interStateTaxType = v.interStateTaxType.trim();
           if (typeof v.platformCommission === 'number') safe.platformCommission = v.platformCommission;
 
           if (typeof v.inventoryAccount === 'string') safe.inventoryAccount = v.inventoryAccount.trim();
@@ -557,11 +551,6 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
         ...(e.taxable !== undefined ? { taxable: e.taxable } : {}),
         ...(e.exemptionReason !== undefined ? { exemptionReason: e.exemptionReason } : {}),
         ...(e.taxabilityType !== undefined ? { taxabilityType: e.taxabilityType } : {}),
-        ...(e.intraStateTaxName !== undefined ? { intraStateTaxName: e.intraStateTaxName } : {}),
-        ...(e.intraStateTaxType !== undefined ? { intraStateTaxType: e.intraStateTaxType } : {}),
-        ...(e.interStateTaxName !== undefined ? { interStateTaxName: e.interStateTaxName } : {}),
-        ...(e.interStateTaxRate !== undefined ? { interStateTaxRate: e.interStateTaxRate } : {}),
-        ...(e.interStateTaxType !== undefined ? { interStateTaxType: e.interStateTaxType } : {}),
         ...(e.platformCommission !== undefined ? { platformCommission: e.platformCommission } : {}),
       };
       meta.inventory = {
@@ -601,13 +590,6 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
         ...(e.activeOnlineStore !== undefined ? { activeOnlineStore: e.activeOnlineStore } : {}),
       };
       r.metadata = meta;
-
-      const acc = meta.accounting as Record<string, unknown> | undefined;
-      if (acc) {
-        const rate = r.taxPercent ?? 0;
-        acc.intraStateTaxRate = rate;
-        acc.interStateTaxRate = rate;
-      }
 
       // Edited slab tiers override the file's. Sheet uses GROSS rate/unit;
       // convert to the taxable rate updatePriceSlabs persists, using the row's tax%.

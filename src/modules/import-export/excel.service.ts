@@ -126,8 +126,6 @@ function cleanRow(raw: Record<string, any>): Record<string, unknown> {
     'Taxable Rate (Amt)',
     'Net Rate',
     'Tax %',
-    'Intra State Tax Rate',
-    'Inter State Tax Rate',
     'Gross Rate 1Pc (visible to the Customer)',
     'Bulk Rates 1 - Qty',
     'Bulk Rates 1 - Gross Rate / Unit',
@@ -222,8 +220,6 @@ const productImportRowSchema = z
     'Taxable Rate (Amt)': z.coerce.number().positive().optional(),
     'Net Rate': z.coerce.number().positive().optional(),
     'Tax %': z.coerce.number().min(0).max(100).optional(),
-    'Intra State Tax Rate': z.coerce.number().min(0).max(100).optional(),
-    'Inter State Tax Rate': z.coerce.number().min(0).max(100).optional(),
     'Gross Rate 1Pc (visible to the Customer)': z.coerce.number().optional(),
     'Bulk Rates 1 - Qty': z.coerce.number().int().min(1).optional(),
     'Bulk Rates 1 - Gross Rate / Unit': z.coerce.number().positive().optional(),
@@ -263,10 +259,6 @@ const productImportRowSchema = z
     'Exemption Reason': z.coerce.string().optional(),
     'Taxability Type': z.coerce.string().optional(),
     'Product Type': z.coerce.string().optional(),
-    'Intra State Tax Name': z.coerce.string().optional(),
-    'Intra State Tax Type': z.coerce.string().optional(),
-    'Inter State Tax Name': z.coerce.string().optional(),
-    'Inter State Tax Type': z.coerce.string().optional(),
     'Source': z.coerce.string().optional(),
     'Reference ID': z.coerce.string().optional(),
     'Last Sync': z.coerce.string().optional(),
@@ -333,8 +325,6 @@ const HEADER_MAP: Record<string, string> = (() => {
     'stock on hand': 'Stock On Hand',
     'usage unit': 'Usage unit',
     'unit name': 'Unit Name',
-    'intra state tax rate': 'Intra State Tax Rate',
-    'inter state tax rate': 'Inter State Tax Rate',
     'bulk qty 1 - quantity': 'Bulk Qty 1 - Quantity',
     'bulk qty 1 - net rate / pc': 'Bulk Qty 1 - Net Rate / Pc',
     'additional sub-category': 'Additional Sub-Category',
@@ -446,7 +436,7 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
 
     const r = result.data;
     const name = (r['Product Name'] || r['Item Name'] || '').trim();
-    const taxPercent = r['Tax %'] ?? r['Intra State Tax Rate'] ?? r['Inter State Tax Rate'] ?? 0;
+    const taxPercent = r['Tax %'] ?? 0;
     const taxableRate = (r['Taxable Rate (Amt)'] ?? r['Net Rate'])!;
     const grossRate = r['Gross Rate 1Pc (visible to the Customer)'] ?? toGross(taxableRate, taxPercent);
 
@@ -565,12 +555,6 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
           taxable: r['Taxable'],
           exemptionReason: r['Exemption Reason'],
           taxabilityType: r['Taxability Type'],
-          intraStateTaxName: r['Intra State Tax Name'],
-          intraStateTaxRate: r['Intra State Tax Rate'] ?? taxPercent,
-          intraStateTaxType: r['Intra State Tax Type'],
-          interStateTaxName: r['Inter State Tax Name'],
-          interStateTaxRate: r['Inter State Tax Rate'] ?? taxPercent,
-          interStateTaxType: r['Inter State Tax Type'],
           inventoryAccount: r['Inventory Account'],
           inventoryAccountCode: r['Inventory Account Code'],
           platformCommission: r['Platform Commission'],
@@ -722,7 +706,6 @@ function mapProductToImportColumns(p: ProductExportRow): Record<string, string |
     'Net Rate': Number(p.basePrice),
     'Taxable Rate (Amt)': Number(p.basePrice),
     'Tax %': tax,
-    'Intra State Tax Rate': tax,
     'Gross Rate 1Pc (visible to the Customer)': toGross(Number(p.basePrice), tax),
     'Bulk Qty 1 - Quantity': slab1?.minQty ?? '',
     'Bulk Qty 1 - Net Rate / Pc': slab1 ? Number(slab1.price) : '',
@@ -746,11 +729,6 @@ function mapProductToImportColumns(p: ProductExportRow): Record<string, string |
     'Exemption Reason': String(acc.exemptionReason || ''),
     'Taxability Type': String(acc.taxabilityType || ''),
     'Product Type': String(att.productType || ''),
-    'Intra State Tax Name': String(acc.intraStateTaxName || ''),
-    'Intra State Tax Type': String(acc.intraStateTaxType || ''),
-    'Inter State Tax Name': String(acc.interStateTaxName || ''),
-    'Inter State Tax Rate': exportCell(acc.interStateTaxRate),
-    'Inter State Tax Type': String(acc.interStateTaxType || ''),
     'Source': String(att.source || ''),
     'Reference ID': String(att.referenceId || ''),
     'Last Sync': String(att.lastSync || ''),
@@ -867,7 +845,7 @@ export function generateImportTemplate(): Buffer {
     'Parent Category': 'Dairy',
     'Sub-Category': 'Milk',
     'Net Rate': 100,
-    'Intra State Tax Rate': 5,
+    'Tax %': 5,
     'Usage unit': 'Pc',
     'Stock On Hand': 500,
     'MOQ': 1,

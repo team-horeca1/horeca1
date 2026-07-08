@@ -73,11 +73,6 @@ type EditRow = Partial<{
   exemptionReason: string;
   taxabilityType: string;
   productType: string;
-  intraStateTaxName: string;
-  intraStateTaxType: string;
-  interStateTaxName: string;
-  interStateTaxRate: number;
-  interStateTaxType: string;
   platformCommission: number;
   inventoryAccount: string;
   inventoryAccountCode: string;
@@ -308,10 +303,6 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
       { key: 'exemptionReason', label: 'Exemption Reason', width: 'w-[160px]', type: 'text' },
       { key: 'taxabilityType', label: 'Taxability Type', width: 'w-[130px]', type: 'text' },
       { key: 'productType', label: 'Product Type', width: 'w-[110px]', type: 'text' },
-      { key: 'intraStateTaxName', label: 'Intra State Tax Name', width: 'w-[165px]', type: 'text' },
-      { key: 'intraStateTaxType', label: 'Intra State Tax Type', width: 'w-[150px]', type: 'text' },
-      { key: 'interStateTaxName', label: 'Inter State Tax Name', width: 'w-[165px]', type: 'text' },
-      { key: 'interStateTaxType', label: 'Inter State Tax Type', width: 'w-[150px]', type: 'text' },
       { key: 'platformCommission', label: 'Platform Commission', width: 'w-[140px]', type: 'number' },
       { key: 'inventoryAccount', label: 'Inventory Account', width: 'w-[160px]', type: 'text' },
       { key: 'inventoryAccountCode', label: 'Inventory Account Code', width: 'w-[160px]', type: 'text' },
@@ -393,12 +384,6 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
     if (field === 'exemptionReason') return acc.exemptionReason ?? '';
     if (field === 'taxabilityType') return acc.taxabilityType ?? '';
     if (field === 'productType') return att.productType ?? '';
-    if (field === 'intraStateTaxName') return acc.intraStateTaxName ?? '';
-    if (field === 'intraStateTaxRate') return acc.intraStateTaxRate ?? '';
-    if (field === 'intraStateTaxType') return acc.intraStateTaxType ?? '';
-    if (field === 'interStateTaxName') return acc.interStateTaxName ?? '';
-    if (field === 'interStateTaxRate') return acc.interStateTaxRate ?? '';
-    if (field === 'interStateTaxType') return acc.interStateTaxType ?? '';
     if (field === 'source') return att.source ?? '';
     if (field === 'referenceId') return att.referenceId ?? '';
     if (field === 'lastSync') return att.lastSync ?? '';

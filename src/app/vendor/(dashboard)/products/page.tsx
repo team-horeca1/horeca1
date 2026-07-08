@@ -127,12 +127,6 @@ interface ProductForm {
     exemptionReason: string;
     taxabilityType: string;
     productType: string;
-    intraStateTaxName: string;
-    intraStateTaxRate: string;
-    intraStateTaxType: string;
-    interStateTaxName: string;
-    interStateTaxRate: string;
-    interStateTaxType: string;
     source: string;
     referenceId: string;
     lastSync: string;
@@ -201,12 +195,6 @@ const EMPTY_FORM: ProductForm = {
     exemptionReason: '',
     taxabilityType: 'taxable',
     productType: 'goods',
-    intraStateTaxName: '',
-    intraStateTaxRate: '',
-    intraStateTaxType: '',
-    interStateTaxName: '',
-    interStateTaxRate: '',
-    interStateTaxType: '',
     source: '',
     referenceId: '',
     lastSync: '',
@@ -1017,7 +1005,6 @@ export default function VendorProductsPage() {
     const buildProductBody = useCallback((opts: { isDraft: boolean }) => {
         const isNewSubmission = !editingProduct && !masterProductId && !basedOnProductId;
         const parsedBase = form.basePrice ? parseFloat(form.basePrice) : 0;
-        const taxRate = form.taxPercent ? parseFloat(form.taxPercent) : 0;
 
         const metadata = {
             accounting: {
@@ -1026,12 +1013,6 @@ export default function VendorProductsPage() {
                 taxable: form.taxable,
                 exemptionReason: form.exemptionReason.trim(),
                 taxabilityType: form.taxabilityType.trim(),
-                intraStateTaxName: form.intraStateTaxName.trim(),
-                intraStateTaxRate: taxRate,
-                intraStateTaxType: form.intraStateTaxType.trim(),
-                interStateTaxName: form.interStateTaxName.trim(),
-                interStateTaxRate: taxRate,
-                interStateTaxType: form.interStateTaxType.trim(),
                 inventoryAccount: form.inventoryAccount.trim(),
                 inventoryAccountCode: form.inventoryAccountCode.trim(),
                 platformCommission: form.platformCommission ? Number(form.platformCommission) : undefined,
@@ -1445,12 +1426,6 @@ export default function VendorProductsPage() {
                 exemptionReason: acc.exemptionReason || '',
                 taxabilityType: acc.taxabilityType || 'taxable',
                 productType: att.productType || 'goods',
-                intraStateTaxName: acc.intraStateTaxName || '',
-                intraStateTaxRate: acc.intraStateTaxRate != null ? String(acc.intraStateTaxRate) : '',
-                intraStateTaxType: acc.intraStateTaxType || '',
-                interStateTaxName: acc.interStateTaxName || '',
-                interStateTaxRate: acc.interStateTaxRate != null ? String(acc.interStateTaxRate) : '',
-                interStateTaxType: acc.interStateTaxType || '',
                 source: att.source || '',
                 referenceId: att.referenceId || '',
                 lastSync: att.lastSync || '',
@@ -2590,28 +2565,6 @@ export default function VendorProductsPage() {
                                         taxAmount={taxAmount}
                                         savings={savings}
                                     >
-                                            <div className="space-y-3 pt-1 border-t border-[#EEEEEE]">
-                                                <h4 className="text-[13px] font-bold text-[#181725]">Tax details</h4>
-                                                <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-                                                    <div id="ff-intraStateTaxName">
-                                                        <FieldLabel required>Intra State Tax Name</FieldLabel>
-                                                        <input type="text" value={form.intraStateTaxName} onChange={e => updateField('intraStateTaxName', e.target.value)} className={cn(inputCls, fieldErrors.intraStateTaxName && 'border-[#E74C3C]')} />
-                                                    </div>
-                                                    <div id="ff-intraStateTaxType">
-                                                        <FieldLabel required>Intra State Tax Type</FieldLabel>
-                                                        <input type="text" value={form.intraStateTaxType} onChange={e => updateField('intraStateTaxType', e.target.value)} className={cn(inputCls, fieldErrors.intraStateTaxType && 'border-[#E74C3C]')} />
-                                                    </div>
-                                                    <div id="ff-interStateTaxName">
-                                                        <FieldLabel required>Inter State Tax Name</FieldLabel>
-                                                        <input type="text" value={form.interStateTaxName} onChange={e => updateField('interStateTaxName', e.target.value)} className={cn(inputCls, fieldErrors.interStateTaxName && 'border-[#E74C3C]')} />
-                                                    </div>
-                                                    <div id="ff-interStateTaxType">
-                                                        <FieldLabel required>Inter State Tax Type</FieldLabel>
-                                                        <input type="text" value={form.interStateTaxType} onChange={e => updateField('interStateTaxType', e.target.value)} className={cn(inputCls, fieldErrors.interStateTaxType && 'border-[#E74C3C]')} />
-                                                    </div>
-                                                </div>
-                                            </div>
-
                                             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                                                 <div id="ff-countryOfOrigin">
                                                     <FieldLabel required>Country of Origin</FieldLabel>
