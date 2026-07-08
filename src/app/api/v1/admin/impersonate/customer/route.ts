@@ -11,6 +11,7 @@ import {
   CUSTOMER_NAME_COOKIE,
   CUSTOMER_USER_COOKIE,
 } from '@/lib/resolveCustomerImpersonation';
+import { clearAllImpersonationCookies } from '@/lib/adminImpersonationCookies';
 
 const COOKIE_MAX_AGE = 60 * 60 * 4;
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -51,6 +52,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       || 'Customer';
 
     const res = NextResponse.json({ success: true });
+    clearAllImpersonationCookies(res);
     res.cookies.set(CUSTOMER_USER_COOKIE, user.id, {
       httpOnly: true,
       secure: IS_PROD,
@@ -81,9 +83,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
 export const DELETE = adminOnly(async (_req: NextRequest, _ctx) => {
   try {
     const res = NextResponse.json({ success: true });
-    res.cookies.set(CUSTOMER_USER_COOKIE, '', { maxAge: 0, path: '/' });
-    res.cookies.set(CUSTOMER_BA_COOKIE, '', { maxAge: 0, path: '/' });
-    res.cookies.set(CUSTOMER_NAME_COOKIE, '', { maxAge: 0, path: '/' });
+    clearAllImpersonationCookies(res);
     return res;
   } catch (error) {
     return errorResponse(error);

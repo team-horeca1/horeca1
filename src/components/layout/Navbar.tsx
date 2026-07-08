@@ -30,7 +30,7 @@ import { NotificationBell } from '../features/NotificationBell';
 import { dal } from '@/lib/dal';
 import type { Category } from '@/types';
 import { NavDeliverySelector } from './NavDeliverySelector';
-import { isAdminCustomerImpersonationActive } from '@/lib/clearImpersonation';
+import { isAnyAdminImpersonationActive } from '@/lib/clearImpersonation';
 
 const CATEGORY_STYLE: Record<string, { image: string; bgColor: string }> = {
     'vegetables': { image: '/images/category/vegitable.png', bgColor: '#e8f9e9' },
@@ -119,10 +119,10 @@ export function Navbar() {
     const { selectedAddress, setSelectedAddress } = useAddress();
 
     const [apiCategories, setApiCategories] = React.useState<(Category & { image: string; bgColor: string })[]>([]);
-    const [isCustomerImpersonating, setIsCustomerImpersonating] = React.useState(false);
+    const [isAdminImpersonating, setIsAdminImpersonating] = React.useState(false);
 
     React.useEffect(() => {
-        setIsCustomerImpersonating(isAdminCustomerImpersonationActive());
+        setIsAdminImpersonating(isAnyAdminImpersonationActive());
     }, [pathname, sessionStatus]);
 
     React.useEffect(() => {
@@ -152,14 +152,18 @@ export function Navbar() {
     const isAccountPage = pathname?.startsWith('/account');
 
     const desktopNavItems = React.useMemo(() => [
-        ...(isLoggedIn && activeAccountType?.isVendor ? [{ name: 'Dashboard', href: '/vendor/dashboard', Icon: LayoutDashboard }] : []),
-        ...(isLoggedIn && userRole === 'admin' && !isCustomerImpersonating
+        ...(isLoggedIn && activeAccountType?.isVendor && !isAdminImpersonating
+            ? [{ name: 'Dashboard', href: '/vendor/dashboard', Icon: LayoutDashboard }]
+            : []),
+        ...(isLoggedIn && userRole === 'admin' && !isAdminImpersonating
             ? [{ name: 'Dashboard', href: '/admin/dashboard', Icon: LayoutDashboard }]
             : []),
-        ...(isLoggedIn && activeAccountType?.isBrand ? [{ name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard }] : []),
+        ...(isLoggedIn && activeAccountType?.isBrand && !isAdminImpersonating
+            ? [{ name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard }]
+            : []),
         ...DESKTOP_NAV,
         ...(isLoggedIn ? [{ name: 'Rewards', href: '/rewards', Icon: Gift }] : []),
-    ], [isLoggedIn, activeAccountType?.isVendor, activeAccountType?.isBrand, userRole, isCustomerImpersonating]);
+    ], [isLoggedIn, activeAccountType?.isVendor, activeAccountType?.isBrand, userRole, isAdminImpersonating]);
 
     if (isAdminPage || isVendorDashboard || isBrandPortal || isShipmentPage || isAccountPage) return null;
 

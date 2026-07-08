@@ -9,9 +9,12 @@ import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { requirePermission } from '@/lib/permissions/engine';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import {
+  clearAllImpersonationCookies,
+  VENDOR_ID_COOKIE,
+  VENDOR_NAME_COOKIE,
+} from '@/lib/adminImpersonationCookies';
 
-const VENDOR_ID_COOKIE = 'admin_impersonate_vendor_id';
-const VENDOR_NAME_COOKIE = 'admin_impersonate_vendor_name';
 const COOKIE_MAX_AGE = 60 * 60 * 4; // 4 hours
 const IS_PROD = process.env.NODE_ENV === 'production';
 
@@ -32,6 +35,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     if (!vendor) throw Errors.notFound('Vendor not found');
 
     const res = NextResponse.json({ success: true });
+    clearAllImpersonationCookies(res);
     // The id cookie is read SERVER-SIDE only (resolveVendorId,
     // resolveBusinessAccountContext). Making it httpOnly stops XSS from
     // hijacking the impersonation token. The name cookie remains
@@ -59,8 +63,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
 export const DELETE = adminOnly(async (_req: NextRequest, _ctx) => {
   try {
     const res = NextResponse.json({ success: true });
-    res.cookies.set(VENDOR_ID_COOKIE, '', { maxAge: 0, path: '/' });
-    res.cookies.set(VENDOR_NAME_COOKIE, '', { maxAge: 0, path: '/' });
+    clearAllImpersonationCookies(res);
     return res;
   } catch (error) {
     return errorResponse(error);

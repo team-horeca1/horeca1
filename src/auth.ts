@@ -344,16 +344,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (token.role === 'admin') {
           await applyAdminPermissions(token);
         }
+        await stampUserSyncedAt(token);
       }
 
-      // Reload permissions from DB only when markSessionStale() was called — not on
-      // every passive getSession() / refetchInterval tick.
+      // Reload permissions from DB when markSessionStale() fired or the user row
+      // changed (e.g. team removal demoted role) — not on every passive tick.
       if (token.id && !user && trigger !== 'update') {
         try {
           const staleKey = `session:stale:${token.id as string}`;
-          const isStale = await redis.get(staleKey);
-          if (isStale) {
-            await redis.del(staleKey);
+          const redisStale = await redis.get(staleKey);
+          let needsReload = !!redisStale;
+          if (!needsReload) {
+            const dbUser = await prisma.user.findUnique({
+              where: { id: token.id as string },
+              select: { updatedAt: true },
+            });
+            if (!dbUser) {
+              needsReload = true;
+            } else {
+              const syncedAt = (token.userSyncedAt as number | undefined) ?? 0;
+              needsReload = dbUser.updatedAt.getTime() > syncedAt;
+            }
+          }
+          if (needsReload) {
+            if (redisStale) await redis.del(staleKey);
 
             const freshRole = await refreshUserRoleFromDb(token);
 
@@ -369,6 +383,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             } else {
               clearAdminTokenFields(token);
             }
+            await stampUserSyncedAt(token);
           }
         } catch (err) {
           console.error('[auth.jwt] permission refresh failed:', err);
@@ -433,6 +448,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           console.error('[auth.jwt] user role refresh failed on update:', err);
           // Keep the previous role rather than returning an unparseable token.
         }
+        await stampUserSyncedAt(token);
       }
       return token;
     },
@@ -616,4 +632,13 @@ async function refreshUserRoleFromDb(token: Record<string, unknown>): Promise<st
   if (!freshUser) return null;
   token.role = freshUser.role;
   return freshUser.role;
+}
+
+async function stampUserSyncedAt(token: Record<string, unknown>): Promise<void> {
+  if (!token.id) return;
+  const dbUser = await prisma.user.findUnique({
+    where: { id: token.id as string },
+    select: { updatedAt: true },
+  });
+  if (dbUser) token.userSyncedAt = dbUser.updatedAt.getTime();
 }
