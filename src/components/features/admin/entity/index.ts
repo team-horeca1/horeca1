@@ -8,3 +8,28 @@ export { AdminImpersonateButton } from './AdminImpersonateButton';
 export { AdminVerifyPartnerButton } from './AdminVerifyPartnerButton';
 export { AdminCopyField } from './AdminCopyField';
 export { AdminLoginCredentialsPanel } from './AdminLoginCredentialsPanel';
+export { AdminRegistryPageHeader } from './AdminRegistryPageHeader';
+export { AdminRegistryStatsGrid } from './AdminRegistryStatsGrid';
+export type { AdminRegistryStat } from './AdminRegistryStatsGrid';
+export { AdminRegistryFilterBar } from './AdminRegistryFilterBar';
+export { AdminRegistryLoadingState } from './AdminRegistryLoadingState';
+export { AdminRegistryEmptyState } from './AdminRegistryEmptyState';
+export {
+  AdminRegistryTableShell,
+  AdminRegistryTableHead,
+  AdminRegistryTableBody,
+} from './AdminRegistryTableShell';
+export { AdminRegistryRowActions } from './AdminRegistryRowActions';
+export {
+  AdminRegistryOverflowMenu,
+  AdminRegistryOverflowMenuItem,
+} from './AdminRegistryOverflowMenu';
+export { AdminEntityHeroCard } from './AdminEntityHeroCard';
+export { AdminEntityContactGrid } from './AdminEntityContactGrid';
+export type { AdminEntityContactItem } from './AdminEntityContactGrid';
+export {
+  AdminEntityTabBar,
+  AdminEntityTabPanel,
+  AdminEntityTabContent,
+} from './AdminEntityTabBar';
+export type { AdminEntityTab } from './AdminEntityTabBar';
