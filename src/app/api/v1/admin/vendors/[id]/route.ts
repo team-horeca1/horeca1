@@ -1,10 +1,12 @@
-// GET  /api/v1/admin/vendors/:id — Get full vendor detail
-// PATCH /api/v1/admin/vendors/:id — Approve/reject vendor (update isVerified, isActive)
+// GET    /api/v1/admin/vendors/:id — Get full vendor detail
+// PATCH  /api/v1/admin/vendors/:id — Approve/reject vendor (update isVerified, isActive)
+// DELETE /api/v1/admin/vendors/:id?force=true — Permanently delete vendor
 // WHY: Admin reviews vendor applications, approves them for the marketplace,
 //      or deactivates misbehaving vendors. Emits VendorOnboarded on first verification.
 // PROTECTED: Admin only
 
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
@@ -12,7 +14,11 @@ import { emitEvent } from '@/events/emitter';
 import { requirePermission } from '@/lib/permissions/engine';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { validateVendorCode } from '@/lib/sku';
+import { hardDeleteVendorById } from '@/lib/userHardDelete';
 import { Prisma } from '@prisma/client';
+
+const VENDOR_ID_COOKIE = 'admin_impersonate_vendor_id';
+const VENDOR_NAME_COOKIE = 'admin_impersonate_vendor_name';
 
 // Helper: extract the [id] segment from /api/v1/admin/vendors/{id}
 function extractId(req: NextRequest): string {
@@ -456,6 +462,65 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     ) {
       return errorResponse(Errors.conflict('This vendor code is already assigned to another vendor.'));
     }
+    return errorResponse(error);
+  }
+});
+
+// DELETE /api/v1/admin/vendors/[id]?force=true — irreversible vendor removal
+export const DELETE = adminOnly(async (req: NextRequest, ctx) => {
+  try {
+    requirePermission(ctx, 'vendors.delete');
+    const id = extractId(req);
+    const force = req.nextUrl.searchParams.get('force') === 'true';
+    if (!force) {
+      throw Errors.badRequest('Permanent delete requires ?force=true');
+    }
+
+    const existing = await prisma.vendor.findUnique({
+      where: { id },
+      select: { id: true, userId: true, businessName: true, isActive: true, isVerified: true },
+    });
+    if (!existing) throw Errors.notFound('Vendor');
+
+    if (existing.userId === ctx.userId) {
+      throw Errors.badRequest('You cannot delete your own vendor account');
+    }
+
+    const before = {
+      id: existing.id,
+      businessName: existing.businessName,
+      userId: existing.userId,
+      isActive: existing.isActive,
+      isVerified: existing.isVerified,
+    };
+
+    const result = await hardDeleteVendorById(id);
+
+    await logAction(ctx, req, {
+      action: AUDIT_ACTIONS.vendorDelete,
+      entity: 'vendor',
+      entityId: id,
+      before,
+      after: null,
+      metadata: {
+        ownerUserId: result.ownerUserId,
+        ownerHardDeleted: result.ownerHardDeleted,
+      },
+    });
+
+    const res = NextResponse.json({
+      success: true,
+      data: { id, hardDeleted: true, ownerHardDeleted: result.ownerHardDeleted },
+    });
+
+    const cookieStore = await cookies();
+    if (cookieStore.get(VENDOR_ID_COOKIE)?.value === id) {
+      res.cookies.set(VENDOR_ID_COOKIE, '', { maxAge: 0, path: '/' });
+      res.cookies.set(VENDOR_NAME_COOKIE, '', { maxAge: 0, path: '/' });
+    }
+
+    return res;
+  } catch (error) {
     return errorResponse(error);
   }
 });

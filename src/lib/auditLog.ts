@@ -7,6 +7,7 @@ import type { AuthContext } from '@/middleware/auth';
 export const AUDIT_ACTIONS = {
   vendorApprove: 'vendor.approve',
   vendorUpdate: 'vendor.update',
+  vendorDelete: 'vendor.delete',
   productApprove: 'product.approve',
   productReject: 'product.reject',
   adminTeamInvite: 'admin_team.invite',
