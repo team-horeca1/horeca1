@@ -5,8 +5,18 @@
 
 export const GUEST_STORAGE_SUFFIX = 'guest';
 
-export function cartStorageKey(userId?: string | null): string {
-  return userId ? `horeca_cart:${userId}` : 'horeca_cart:guest';
+/** Cart mirror key — include BA + outlet so switches don't bleed local cache. */
+export function cartStorageKey(
+  userId?: string | null,
+  businessAccountId?: string | null,
+  outletId?: string | null,
+): string {
+  if (!userId) return 'horeca_cart:guest';
+  if (businessAccountId && outletId) {
+    return `horeca_cart:${userId}:${businessAccountId}:${outletId}`;
+  }
+  // Fallback while session still hydrating BA/outlet
+  return `horeca_cart:${userId}`;
 }
 
 export function wishlistStorageKey(userId?: string | null): string {
@@ -44,6 +54,14 @@ export function clearUserClientStores(userId?: string | null): void {
       localStorage.removeItem(wishlistStorageKey(userId));
       localStorage.removeItem(addressSelectedKey(userId));
       localStorage.removeItem(addressSavedKey(userId));
+      // BA/outlet-scoped cart mirrors: horeca_cart:<userId>:<baId>:<outletId>
+      const prefix = `horeca_cart:${userId}:`;
+      const keys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith(prefix)) keys.push(k);
+      }
+      for (const k of keys) localStorage.removeItem(k);
     }
     localStorage.removeItem('horeca_cart');
     localStorage.removeItem('wishlist');

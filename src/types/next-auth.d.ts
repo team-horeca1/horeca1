@@ -61,5 +61,7 @@ declare module 'next-auth/jwt' {
     totalAccountCount?: number;
     /** ms timestamp of User.updatedAt when permissions were last synced into this JWT */
     userSyncedAt?: number;
+    /** Set when the account was deleted/deactivated/revoked — session callback drops user */
+    invalidated?: boolean;
   }
 }

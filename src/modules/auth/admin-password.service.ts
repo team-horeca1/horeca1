@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import type { NextRequest } from 'next/server';
 import type { TeamRole } from '@prisma/client';
 import type { AuthContext } from '@/middleware/auth';
@@ -8,7 +7,7 @@ import type { PermissionKey } from '@/lib/permissions/registry';
 import { prisma } from '@/lib/prisma';
 import { markSessionStale } from '@/lib/sessionStale';
 import { AUDIT_ACTIONS, logAction } from '@/lib/auditLog';
-import { encryptAdminPassword } from '@/lib/adminPasswordCipher';
+import { setUserPasswordWithReveal } from '@/lib/adminPasswordCipher';
 
 const ENUM_RANK: Record<TeamRole, number> = { owner: 80, manager: 60, editor: 40, viewer: 20 };
 const SEEDED_OWNER_RANK = 100;
@@ -68,12 +67,7 @@ export async function resetPasswordByAdmin(
     requirePermission(ctx, perm);
   }
 
-  const hashed = await bcrypt.hash(password, 12);
-  const adminPasswordCipher = encryptAdminPassword(password);
-  await prisma.user.update({
-    where: { id: targetUserId },
-    data: { password: hashed, adminPasswordCipher },
-  });
+  await setUserPasswordWithReveal(targetUserId, password, 12);
 
   try {
     await markSessionStale(targetUserId);

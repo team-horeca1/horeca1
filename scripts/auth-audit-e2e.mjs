@@ -1,14 +1,27 @@
 /**
  * Comprehensive auth E2E audit — admin, vendor, brand, customer.
+ * Expects auth-e2e-seed.ts users (e2e-auth-*@horeca.test). Env overrides allowed.
  * Run: node scripts/auth-audit-e2e.mjs
  */
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
 
 const CREDS = {
-  admin: { email: 'admin@horeca1.com', password: 'admin123' },
-  vendor: { email: 'owner@spicetrail.in', password: 'vendor123' },
-  customer: { email: 'chef@tajpalace.com', password: 'customer123' },
-  brand: { email: 'brand@kitchensmith.com', password: 'brand123' },
+  admin: {
+    email: process.env.E2E_ADMIN_EMAIL || 'admin@horeca1.com',
+    password: process.env.E2E_ADMIN_PASSWORD || 'admin123',
+  },
+  vendor: {
+    email: process.env.E2E_VENDOR_EMAIL || 'e2e-auth-vendor@horeca.test',
+    password: process.env.E2E_VENDOR_PASSWORD || 'e2eVendor123!',
+  },
+  customer: {
+    email: process.env.E2E_CUSTOMER_EMAIL || 'e2e-auth-customer@horeca.test',
+    password: process.env.E2E_CUSTOMER_PASSWORD || 'e2eCustomer123!',
+  },
+  brand: {
+    email: process.env.E2E_BRAND_EMAIL || 'e2e-auth-brand@horeca.test',
+    password: process.env.E2E_BRAND_PASSWORD || 'e2eBrand123!',
+  },
 };
 
 const results = [];
@@ -42,31 +55,45 @@ function jarHeader(jar) {
   return [...jar.entries()].map(([k, v]) => `${k}=${v}`).join('; ');
 }
 
-async function loginAs({ email, password }) {
-  const jar = new Map();
-  const csrfRes = await fetch(`${BASE}/api/auth/csrf`);
-  mergeCookies(jar, csrfRes.headers.get('set-cookie'));
-  const { csrfToken } = await csrfRes.json();
+async function loginAs({ email, password }, retries = 4) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const jar = new Map();
+    const csrfRes = await fetch(`${BASE}/api/auth/csrf`);
+    if (csrfRes.status === 429 && attempt < retries) {
+      await new Promise((r) => setTimeout(r, 65_000));
+      continue;
+    }
+    mergeCookies(jar, csrfRes.headers.get('set-cookie'));
+    const { csrfToken } = await csrfRes.json();
 
-  const loginRes = await fetch(`${BASE}/api/auth/callback/credentials?`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Cookie: jarHeader(jar),
-    },
-    body: new URLSearchParams({ csrfToken, email, password, callbackUrl: BASE, json: 'true' }),
-    redirect: 'manual',
-  });
-  mergeCookies(jar, loginRes.headers.get('set-cookie'));
+    const loginRes = await fetch(`${BASE}/api/auth/callback/credentials?`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Cookie: jarHeader(jar),
+      },
+      body: new URLSearchParams({ csrfToken, email, password, callbackUrl: BASE, json: 'true' }),
+      redirect: 'manual',
+    });
+    mergeCookies(jar, loginRes.headers.get('set-cookie'));
 
-  const hasSession = [...jar.keys()].some((k) => k.includes('authjs.session-token'));
-  if (!hasSession) {
+    const hasSession = [...jar.keys()].some((k) => k.includes('authjs.session-token'));
+    if (hasSession) {
+      const sessionRes = await fetch(`${BASE}/api/auth/session`, { headers: { Cookie: jarHeader(jar) } });
+      const session = await sessionRes.json();
+      return { jar, session, loginStatus: loginRes.status };
+    }
+    if (loginRes.status === 429 && attempt < retries) {
+      await new Promise((r) => setTimeout(r, 65_000));
+      continue;
+    }
+    if (attempt < retries) {
+      await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+      continue;
+    }
     throw new Error(`Login failed for ${email}: HTTP ${loginRes.status}`);
   }
-
-  const sessionRes = await fetch(`${BASE}/api/auth/session`, { headers: { Cookie: jarHeader(jar) } });
-  const session = await sessionRes.json();
-  return { jar, session, loginStatus: loginRes.status };
+  throw new Error(`Login failed for ${email}: exhausted retries`);
 }
 
 async function api(jar, path, init = {}) {
@@ -75,8 +102,27 @@ async function api(jar, path, init = {}) {
     headers: { Cookie: jarHeader(jar), ...(init.headers || {}) },
     redirect: 'manual',
   });
+  mergeCookies(jar, res.headers.get('set-cookie'));
   const json = await res.json().catch(() => null);
   return { status: res.status, json, headers: res.headers };
+}
+
+/** Mirror useSession().update() — POST /api/auth/session with csrf + data. */
+async function updateSession(jar, data) {
+  const csrfRes = await fetch(`${BASE}/api/auth/csrf`, { headers: { Cookie: jarHeader(jar) } });
+  mergeCookies(jar, csrfRes.headers.get('set-cookie'));
+  const { csrfToken } = await csrfRes.json();
+  const res = await fetch(`${BASE}/api/auth/session`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Cookie: jarHeader(jar),
+    },
+    body: JSON.stringify({ csrfToken, data }),
+  });
+  mergeCookies(jar, res.headers.get('set-cookie'));
+  const json = await res.json().catch(() => null);
+  return { status: res.status, json };
 }
 
 async function logout(jar) {
@@ -109,12 +155,7 @@ async function testRoleLogin(role) {
     pass(`${role.toUpperCase()}_LOGIN`, { status: loginStatus, role: user.role, email: user.email });
     return { jar, session };
   } catch (e) {
-    // Cleaned DBs often lack seed vendor/customer/brand — skip, don't fail the suite.
-    if (role !== 'admin') {
-      pass(`${role.toUpperCase()}_LOGIN_SKIPPED`, { reason: String(e), email: cred.email });
-      return null;
-    }
-    fail(`${role.toUpperCase()}_LOGIN`, { error: String(e) });
+    fail(`${role.toUpperCase()}_LOGIN`, { error: String(e), email: cred.email });
     return null;
   }
 }
@@ -233,23 +274,44 @@ async function testSessionStale(adminJar) {
   }
 }
 
-async function testAccountSwitch(customerJar, customerSession) {
+async function testAccountSwitch(customerJar) {
   const accounts = await api(customerJar, '/api/v1/account');
   const list = accounts.json?.data ?? [];
-  if (list.length < 1) {
-    fail('ACCOUNT_LIST', { count: 0 });
+  if (list.length < 2) {
+    fail('ACCOUNT_LIST', { count: list.length, expectedMin: 2 });
     return;
   }
   pass('ACCOUNT_LIST', { count: list.length });
 
-  const target = list[0];
+  const sessionBefore = await api(customerJar, '/api/auth/session');
+  const activeBefore = sessionBefore.json?.user?.activeBusinessAccountId;
+  const target = list.find((a) => a.id !== activeBefore) ?? list[1];
   const sw = await api(customerJar, '/api/v1/auth/switch-business-account', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ businessAccountId: target.id, outletId: target.primaryOutletId ?? null }),
   });
-  if (sw.json?.success) pass('ACCOUNT_SWITCH', { accountId: target.id });
-  else fail('ACCOUNT_SWITCH', { status: sw.status, json: sw.json });
+  if (!sw.json?.success) {
+    fail('ACCOUNT_SWITCH', { status: sw.status, json: sw.json });
+    return;
+  }
+  pass('ACCOUNT_SWITCH', { accountId: target.id });
+
+  // JWT only rotates via Auth.js session.update (same as the browser switcher).
+  const updated = await updateSession(customerJar, {
+    activeBusinessAccountId: target.id,
+    activeOutletId: target.primaryOutletId ?? undefined,
+  });
+  const activeAfter = updated.json?.user?.activeBusinessAccountId;
+  if (activeAfter === target.id) {
+    pass('HCID_SESSION_ACTIVE_BA', { activeBusinessAccountId: activeAfter });
+  } else {
+    fail('HCID_SESSION_ACTIVE_BA', {
+      expected: target.id,
+      session: activeAfter,
+      updateStatus: updated.status,
+    });
+  }
 }
 
 async function main() {
@@ -261,7 +323,7 @@ async function main() {
     const ctx = await testRoleLogin(role);
     if (!ctx) continue;
     await testProtectedRoutes(role, ctx.jar);
-    if (role === 'customer') await testAccountSwitch(ctx.jar, ctx.session);
+    if (role === 'customer') await testAccountSwitch(ctx.jar);
     if (role === 'admin') {
       await testSessionStale(ctx.jar);
       await testImpersonationMutex(ctx.jar);

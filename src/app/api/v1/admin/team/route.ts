@@ -12,7 +12,6 @@
 //     one release to keep any unmigrated read path working.
 
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { adminOnly } from '@/middleware/rbac';
 import { requirePermission } from '@/lib/permissions/engine';
@@ -26,6 +25,7 @@ import { buildInviteEmail } from '@/lib/email-templates/invite';
 import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import { markSessionStale } from '@/lib/sessionStale';
 import { resolveTeamMemberRoleFromPermissions } from '@/lib/teamRoleWrites';
+import { passwordFieldsWithReveal, setUserPasswordWithReveal } from '@/lib/adminPasswordCipher';
 import type { AuthContext } from '@/middleware/auth';
 import type { TeamRole } from '@prisma/client';
 
@@ -134,13 +134,14 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
         throw Errors.badRequest('fullName and password are required when the invitee is a new user');
       }
       tempPassword = input.password;
-      const hashedPassword = await bcrypt.hash(input.password, 12);
+      const pwd = await passwordFieldsWithReveal(input.password, 12);
       const hcidDisplay = await uniqueHcid();
       user = await prisma.user.create({
         data: {
           fullName: input.fullName,
           email: identifierTrim.toLowerCase(),
-          password: hashedPassword,
+          password: pwd.password,
+          adminPasswordCipher: pwd.adminPasswordCipher,
           role: 'admin',
           isActive: true,
           hcidDisplay,
@@ -148,14 +149,14 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
       });
     } else {
       // Existing user — promote to admin if needed, and update password if supplied.
-      const updateData: Record<string, unknown> = {};
-      if (user.role !== 'admin') updateData.role = 'admin';
       if (input.password) {
         tempPassword = input.password;
-        updateData.password = await bcrypt.hash(input.password, 12);
+        await setUserPasswordWithReveal(user.id, input.password, 12);
       }
-      if (Object.keys(updateData).length > 0) {
-        user = await prisma.user.update({ where: { id: user.id }, data: updateData });
+      if (user.role !== 'admin') {
+        user = await prisma.user.update({ where: { id: user.id }, data: { role: 'admin' } });
+      } else if (input.password) {
+        user = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
       }
     }
 

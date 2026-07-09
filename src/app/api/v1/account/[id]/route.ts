@@ -18,6 +18,7 @@ import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { assertAccountMember, assertAccountPermission } from '@/lib/accountAccess';
+import { markSessionStale } from '@/lib/sessionStale';
 
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
   try {
@@ -133,10 +134,15 @@ export const DELETE = withAuth(async (req: NextRequest, ctx) => {
     // rows before deleting the parent. Schema cascades members, outlets,
     // accountRoles, userRoles automatically, but Vendor / Brand and their
     // children do NOT cascade through BA — we wipe them by hand.
-    const [vendor, brand] = await Promise.all([
+    const [vendor, brand, members] = await Promise.all([
       ba.isVendor ? prisma.vendor.findFirst({ where: { businessAccountId: id }, select: { id: true } }) : null,
       ba.isBrand ? prisma.brand.findFirst({ where: { businessAccountId: id }, select: { id: true } }) : null,
+      prisma.businessAccountMember.findMany({
+        where: { businessAccountId: id },
+        select: { userId: true },
+      }),
     ]);
+    const memberUserIds = [...new Set(members.map((m) => m.userId))];
 
     await prisma.$transaction(async (tx) => {
       if (vendor) {
@@ -173,6 +179,9 @@ export const DELETE = withAuth(async (req: NextRequest, ctx) => {
       // BA delete cascades: members, outlets, accountRoles, userRoles.
       await tx.businessAccount.delete({ where: { id } });
     });
+
+    // Force permission reload for every former member (JWT may still point at this BA).
+    await Promise.all(memberUserIds.map((userId) => markSessionStale(userId)));
 
     return NextResponse.json({ success: true });
   } catch (err) { return errorResponse(err); }

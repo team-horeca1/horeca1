@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { loadActiveContext, type ActiveContext } from '@/lib/activeContext';
 import { FORCE_PICKER_COOKIE } from '@/lib/postLoginPicker';
 import { redis } from '@/lib/redis';
+import { clearSessionRevoked, isSessionRevoked } from '@/lib/sessionStale';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
 import { uniqueHcid } from '@/lib/hcid';
 import { phoneLookupVariants } from '@/lib/phone';
@@ -16,6 +17,7 @@ import { ALL_PERMISSION_KEYS } from '@/lib/permissions/registry';
 import { flatten } from '@/lib/permissions/engine';
 import { isOwnerRoleName } from '@/lib/permissions/portalFeatures';
 import type { Role } from '@prisma/client';
+import { backfillAdminPasswordCipherIfMissing } from '@/lib/adminPasswordCipher';
 
 function vendorSlug(name: string): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
@@ -266,15 +268,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const phoneRawDigits = identifier.replace(/\D/g, '');
         const phoneDigits = phoneRawDigits.length === 12 ? phoneRawDigits.replace(/^91/, '') : phoneRawDigits;
 
+        const userSelect = {
+          id: true,
+          email: true,
+          password: true,
+          adminPasswordCipher: true,
+          fullName: true,
+          role: true,
+          image: true,
+          isActive: true,
+        } as const;
+
         const user = looksEmail
           ? await prisma.user.findUnique({
               where: { email: identifier.toLowerCase() },
-              select: { id: true, email: true, password: true, fullName: true, role: true, image: true, isActive: true },
+              select: userSelect,
             })
           : (phoneDigits.length === 10
               ? await prisma.user.findFirst({
                   where: { phone: { in: phoneLookupVariants(phoneDigits) } },
-                  select: { id: true, email: true, password: true, fullName: true, role: true, image: true, isActive: true },
+                  select: userSelect,
                 })
               : null);
 
@@ -282,6 +295,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const isValid = await bcrypt.compare(password, user.password);
         if (!isValid) return null;
+
+        // Capture plaintext for admin Login Access when cipher is missing (self-signup, etc.).
+        void backfillAdminPasswordCipherIfMissing(user.id, password, user.adminPasswordCipher);
 
         return { id: user.id, email: user.email ?? undefined, name: user.fullName, role: user.role, image: user.image ?? undefined };
       },
@@ -294,6 +310,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = ((user as { role?: Role }).role) ?? 'customer';
+        delete token.invalidated;
+        // Clear any leftover revoke flag from a prior delete of a recycled id (defensive).
+        if (user.id) void clearSessionRevoked(user.id);
         if (token.role === 'admin') {
           try {
             const adminMembership = await prisma.adminTeamMember.findUnique({
@@ -348,6 +367,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         await stampUserSyncedAt(token);
       }
 
+      // Force-logout path: deleted, deactivated, or explicitly revoked users.
+      // Returning null clears the Auth.js session cookie (see @auth/core session action).
+      if (token.id && !user) {
+        const dead = await isTokenUserDead(token.id as string);
+        if (dead) {
+          return null;
+        }
+      }
+
       // Reload permissions from DB when markSessionStale() fired or the user row
       // changed (e.g. team removal demoted role) — not on every passive tick.
       if (token.id && !user && trigger !== 'update') {
@@ -358,23 +386,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           if (!needsReload) {
             const dbUser = await prisma.user.findUnique({
               where: { id: token.id as string },
-              select: { updatedAt: true },
+              select: { updatedAt: true, isActive: true },
             });
-            if (!dbUser) {
-              needsReload = true;
-            } else {
-              const syncedAt = (token.userSyncedAt as number | undefined) ?? 0;
-              needsReload = dbUser.updatedAt.getTime() > syncedAt;
+            if (!dbUser || !dbUser.isActive) {
+              return null;
             }
+            const syncedAt = (token.userSyncedAt as number | undefined) ?? 0;
+            needsReload = dbUser.updatedAt.getTime() > syncedAt;
           }
           if (needsReload) {
             if (redisStale) await redis.del(staleKey);
 
             const freshRole = await refreshUserRoleFromDb(token);
+            if (freshRole === null) {
+              return null;
+            }
 
             const active = await loadOrProvisionActiveContext(
               token.id as string,
-              freshRole ?? (token.role as string) ?? 'customer',
+              freshRole,
               (token.activeBusinessAccountId as string | null) ?? null,
               (token.activeOutletId as string | null) ?? null,
             );
@@ -455,6 +485,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
 
     async session({ session, token }) {
+      // jwt callback returned null / cleared identity → unauthenticated client session
+      if (!token?.id || token.invalidated === true) {
+        return { ...session, user: undefined as unknown as typeof session.user };
+      }
       if (session.user) {
         const u = session.user as unknown as Record<string, unknown>;
         u.id = token.id as string;
@@ -486,6 +520,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 });
 
 // ─── helpers ────────────────────────────────────────────────────────────
+
+/** True when the JWT subject must be signed out (deleted / inactive / revoked). */
+async function isTokenUserDead(userId: string): Promise<boolean> {
+  try {
+    if (await isSessionRevoked(userId)) return true;
+    const dbUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { isActive: true },
+    });
+    return !dbUser || !dbUser.isActive;
+  } catch (err) {
+    console.error('[auth.jwt] isTokenUserDead failed:', err);
+    return false;
+  }
+}
 
 /**
  * Load the AccountRole assigned to an admin user via AdminTeamMember.roleId

@@ -14,7 +14,11 @@
     "verify:order-snapshots": "npx tsx scripts/verify-order-snapshots.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke:auth": "node scripts/auth-smoke.mjs"
+    "smoke:auth": "node scripts/auth-smoke.mjs",
+    "test:auth:seed": "npx tsx scripts/auth-e2e-seed.ts",
+    "test:auth:cleanup": "npx tsx scripts/auth-e2e-cleanup.ts",
+    "test:auth:revoke": "npx tsx scripts/auth-session-revoke.ts",
+    "test:auth": "node scripts/run-auth-e2e.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

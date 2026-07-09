@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
+import { clearSessionRevoked, markSessionRevoked } from '@/lib/sessionStale';
 
 export const POST = adminOnly(async (req: NextRequest, ctx) => {
   try {
@@ -21,7 +22,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       // 1. General user updates (active/inactive status)
       if (typeof isActive === 'boolean') {
         await tx.user.updateMany({
-          where: { id: { in: userIds } },
+          where: { id: { in: userIds as string[] } },
           data: { isActive },
         });
       }
@@ -98,6 +99,15 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
         }
       }
     });
+
+    if (typeof isActive === 'boolean') {
+      const ids = userIds as string[];
+      if (isActive === false) {
+        await Promise.all(ids.map((id) => markSessionRevoked(id)));
+      } else {
+        await Promise.all(ids.map((id) => clearSessionRevoked(id)));
+      }
+    }
 
     return NextResponse.json({ success: true, message: `Successfully updated ${userIds.length} users.` });
   } catch (error) {

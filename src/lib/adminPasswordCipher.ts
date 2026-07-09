@@ -1,4 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
+import bcrypt from 'bcryptjs';
+import { prisma } from '@/lib/prisma';
 
 const ALGO = 'aes-256-gcm';
 const IV_LEN = 12;
@@ -36,5 +38,52 @@ export function decryptAdminPassword(cipherText: string | null | undefined): str
     return plain || null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Hash password for login and store AES-GCM cipher for admin Login Access reveal.
+ * Use for admin-initiated create/reset paths.
+ */
+export async function setUserPasswordWithReveal(
+  userId: string,
+  plain: string,
+  rounds = 12,
+): Promise<{ hashed: string; adminPasswordCipher: string }> {
+  const hashed = await bcrypt.hash(plain, rounds);
+  const adminPasswordCipher = encryptAdminPassword(plain);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password: hashed, adminPasswordCipher },
+  });
+  return { hashed, adminPasswordCipher };
+}
+
+/** Prisma create/update payload: bcrypt hash + reveal cipher (no DB write). */
+export async function passwordFieldsWithReveal(
+  plain: string,
+  rounds = 12,
+): Promise<{ password: string; adminPasswordCipher: string }> {
+  const password = await bcrypt.hash(plain, rounds);
+  return { password, adminPasswordCipher: encryptAdminPassword(plain) };
+}
+
+/**
+ * After a successful password login, store reveal cipher if missing/unreadable.
+ * Fire-and-forget safe — never throws to the caller.
+ */
+export async function backfillAdminPasswordCipherIfMissing(
+  userId: string,
+  plain: string,
+  existingCipher: string | null | undefined,
+): Promise<void> {
+  try {
+    if (decryptAdminPassword(existingCipher)) return;
+    await prisma.user.update({
+      where: { id: userId },
+      data: { adminPasswordCipher: encryptAdminPassword(plain) },
+    });
+  } catch (err) {
+    console.error('[adminPasswordCipher] backfill failed', userId, err);
   }
 }

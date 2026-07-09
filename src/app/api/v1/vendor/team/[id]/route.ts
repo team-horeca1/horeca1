@@ -298,6 +298,16 @@ export const DELETE = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
           role: { scope: 'vendor' },
         },
       });
+
+      // Drop BA membership so invite-only agents become hard-deletable and
+      // cannot keep a ghost JWT scoped to this vendor account.
+      await tx.businessAccountMember.deleteMany({
+        where: {
+          userId: member.userId,
+          businessAccountId: vendor.businessAccountId,
+          isPrimary: false,
+        },
+      });
     });
 
     const removal = await finalizeTeamMemberRemoval(member.userId);

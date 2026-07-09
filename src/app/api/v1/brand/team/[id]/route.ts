@@ -137,6 +137,14 @@ export const DELETE = brandOnly(async (req: NextRequest, ctx) => {
           role: { scope: 'brand' },
         },
       });
+
+      await tx.businessAccountMember.deleteMany({
+        where: {
+          userId: member.userId,
+          businessAccountId,
+          isPrimary: false,
+        },
+      });
     });
 
     const removal = await finalizeTeamMemberRemoval(member.userId);

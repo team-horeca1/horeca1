@@ -12,6 +12,7 @@ import { requirePermission } from '@/lib/permissions/engine';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { hardDeleteUserById } from '@/lib/userHardDelete';
 import { getAdminRevealedPasswordForRole } from '@/lib/adminPasswordReveal';
+import { clearSessionRevoked, markSessionRevoked } from '@/lib/sessionStale';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -24,6 +25,7 @@ function extractId(req: NextRequest): string {
 // GET — full user details
 export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'customers.view');
     const id = extractId(req);
 
     const user = await prisma.user.findUnique({
@@ -269,6 +271,15 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       throw Errors.badRequest('No valid fields to update');
     }
 
+    const deactivating =
+      typeof allowedFields.isActive === 'boolean'
+      && allowedFields.isActive === false
+      && existing.isActive;
+    const reactivating =
+      typeof allowedFields.isActive === 'boolean'
+      && allowedFields.isActive === true
+      && !existing.isActive;
+
     const updated = await prisma.$transaction(async (tx) => {
       // 1. Update user if user fields are specified
       let user = existing;
@@ -468,6 +479,9 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       return user;
     });
 
+    if (deactivating) await markSessionRevoked(id);
+    if (reactivating) await clearSessionRevoked(id);
+
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     return errorResponse(error);
@@ -518,6 +532,7 @@ export const DELETE = adminOnly(async (req: NextRequest, ctx) => {
         return NextResponse.json({ success: true, data: { id, alreadyDeactivated: true } });
       }
       await prisma.user.update({ where: { id }, data: { isActive: false } });
+      await markSessionRevoked(id);
       return NextResponse.json({ success: true, data: { id, deactivated: true } });
     }
 

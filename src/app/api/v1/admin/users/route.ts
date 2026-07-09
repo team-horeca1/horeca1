@@ -5,7 +5,6 @@
 // SUPPORTS: ?role=customer|vendor|admin&search=&cursor=&limit=20
 
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
@@ -15,7 +14,7 @@ import { provisionDefaultAccount } from '@/lib/provisionAccount';
 import { companyProfileToBusinessAccountUpdate, contactPersonsFromCompanyProfile } from '@/lib/customerProfileMapper';
 import { uniqueHcid } from '@/lib/hcid';
 import { normalizePhone, phoneLookupVariants } from '@/lib/phone';
-import { encryptAdminPassword } from '@/lib/adminPasswordCipher';
+import { passwordFieldsWithReveal } from '@/lib/adminPasswordCipher';
 import type { Role, CreditStatus, Prisma } from '@prisma/client';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -295,8 +294,7 @@ export const POST = withRateLimit(adminOnly(async (req: NextRequest, ctx) => {
       }
     }
 
-    const passwordHash = password ? await bcrypt.hash(password, 10) : null;
-    const adminPasswordCipher = password ? encryptAdminPassword(password) : null;
+    const pwd = password ? await passwordFieldsWithReveal(password, 10) : null;
     const hcidDisplay = await uniqueHcid();
 
     const user = await prisma.user.create({
@@ -307,8 +305,8 @@ export const POST = withRateLimit(adminOnly(async (req: NextRequest, ctx) => {
         businessName,
         gstNumber,
         pincode,
-        password: passwordHash,
-        adminPasswordCipher,
+        password: pwd?.password ?? null,
+        adminPasswordCipher: pwd?.adminPasswordCipher ?? null,
         role,
         isActive: true,
         hcidDisplay,

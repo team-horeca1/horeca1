@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
+import { isSessionRevoked } from '@/lib/sessionStale';
 import { Errors, errorResponse } from './errorHandler';
 import type { Role, TeamRole } from '@prisma/client';
 import type { PermissionKey } from '@/lib/permissions/registry';
@@ -38,6 +40,21 @@ export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
     throw Errors.unauthorized();
   }
 
+  const userId = session.user.id;
+
+  // Reject ghost JWTs after admin delete / deactivate / revoke.
+  // Postgres is authoritative (works if Redis is down). Redis revoke is a fast path.
+  const [dbUser, revoked] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, isActive: true },
+    }),
+    isSessionRevoked(userId),
+  ]);
+  if (!dbUser || !dbUser.isActive || revoked) {
+    throw Errors.unauthorized();
+  }
+
   const u = session.user as unknown as Record<string, unknown>;
   const adminTeamRole = u.adminTeamRole as string | undefined;
 
@@ -48,7 +65,7 @@ export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
     role === 'admin' ? readCustomerImpersonationFromRequest(req) : null;
 
   return {
-    userId: session.user.id,
+    userId,
     email: session.user.email!,
     role,
     adminTeamRole: (adminTeamRole as TeamRole | 'owner') ?? 'owner',

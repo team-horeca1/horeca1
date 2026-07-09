@@ -4,7 +4,7 @@
  */
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { markSessionStale } from '@/lib/sessionStale';
+import { markSessionRevoked, markSessionStale } from '@/lib/sessionStale';
 
 /** Hard deletes touch many tables; default Prisma interactive tx timeout (5s) is too low over SSH tunnel. */
 const HARD_DELETE_TX_OPTS = { maxWait: 15_000, timeout: 120_000 } as const;
@@ -267,6 +267,9 @@ export async function finalizeTeamMemberRemoval(
 
   if (opts?.demoteFromAdmin && user.role === 'admin') {
     await prisma.user.update({ where: { id: userId }, data: { role: 'customer' } });
+  } else {
+    // Bump updatedAt so JWT reload fires even if Redis stale flag is missed.
+    await prisma.user.update({ where: { id: userId }, data: { updatedAt: new Date() } });
   }
   await markSessionStale(userId);
   return { hardDeleted: false, preserved: true };
@@ -278,6 +281,8 @@ export async function hardDeleteUserById(userId: string): Promise<void> {
     select: { vendors: { select: { id: true } } },
   });
   if (!existing) return;
+  // Revoke before wipe so any in-flight JWT is rejected immediately.
+  await markSessionRevoked(userId);
   const vendorIds = existing.vendors.map((v) => v.id);
   await prisma.$transaction(async (tx) => {
     await hardDeleteUserInTransaction(tx, userId, vendorIds);
