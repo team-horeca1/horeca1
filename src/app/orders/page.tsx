@@ -413,7 +413,7 @@ function OrdersPageContent() {
                                                             </>
                                                         ) : (
                                                             <>
-                                                                {!hasReview && (
+                                                                {order.status === 'delivered' && !hasReview && (
                                                                     <button onClick={(e) => openRatingModal(order.id, e)} title="Rate order"
                                                                         className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 transition-colors">
                                                                         <Star size={14} />
@@ -499,7 +499,7 @@ function OrdersPageContent() {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        {!hasReview && (
+                                                        {order.status === 'delivered' && !hasReview && (
                                                             <button onClick={(e) => openRatingModal(order.id, e)}
                                                                 className="p-1.5 rounded-lg text-gray-400 active:text-yellow-500">
                                                                 <Star size={15} />

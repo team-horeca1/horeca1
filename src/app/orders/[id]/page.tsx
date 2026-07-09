@@ -14,8 +14,8 @@ import {
     StatusTimeline,
     ORDER_STATUS_STEPS,
     orderTimelineCurrentKey,
-    RETURN_TIMELINE_STEPS,
     returnTimelineCurrentKey,
+    returnTimelineStepsForStatus,
 } from '@/components/features/finance/StatusTimeline';
 
 interface ApiOrderItem {
@@ -126,9 +126,22 @@ export default function OrderDetailPage() {
         if (sessionStatus !== 'authenticated') return;
         setLoading(true);
         dal.orders.getById(orderId)
-            .then((result: unknown) => {
+            .then(async (result: unknown) => {
                 const r = result as { data?: ApiOrder } & ApiOrder;
-                setOrder(r.data ?? r);
+                const loaded = r.data ?? r;
+                // Fallback if order payload omitted review (older caches / race).
+                if (!loaded.review?.rating) {
+                    try {
+                        const existing = await dal.reviews.getOrderReview(orderId);
+                        if (existing?.rating) {
+                            loaded.review = {
+                                rating: existing.rating,
+                                comment: existing.comment,
+                            };
+                        }
+                    } catch { /* ignore */ }
+                }
+                setOrder(loaded);
             })
             .catch(() => { toast.error('Order not found'); router.push('/orders'); })
             .finally(() => setLoading(false));
@@ -501,7 +514,7 @@ export default function OrderDetailPage() {
                                 <ClipboardList size={16} />
                                 Save as Order List
                             </button>
-                            {!order.review?.rating && !showRating && (
+                            {order.status === 'delivered' && !order.review?.rating && !showRating && (
                                 <button onClick={() => setShowRating(true)}
                                     className="w-full py-3.5 border-2 border-gray-200 text-[14px] font-black text-gray-600 rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
                                     <Star size={16} />
@@ -518,7 +531,7 @@ export default function OrderDetailPage() {
                                 <div className="space-y-3 p-4 border-2 border-amber-100 bg-amber-50/40 rounded-2xl">
                                     <p className="text-[13px] font-bold text-[#181725]">Return request</p>
                                     <StatusTimeline
-                                        steps={RETURN_TIMELINE_STEPS}
+                                        steps={returnTimelineStepsForStatus(returnRequest.status)}
                                         currentKey={returnTimelineCurrentKey(returnRequest.status)}
                                     />
                                 </div>

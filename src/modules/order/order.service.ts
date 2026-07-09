@@ -9,7 +9,11 @@ import {
   createAccrual as createCommissionAccrual,
   findApplicableRule as findApplicableCommissionRule,
 } from '@/modules/commission/commission.service';
-import { resolveUnitPrice, type CustomerContext } from '@/modules/pricing/pricing.service';
+import {
+  resolveUnitPrice,
+  computeSchemeBilledQty,
+  type CustomerContext,
+} from '@/modules/pricing/pricing.service';
 import { getDeliveryGeo } from '@/lib/deliveryLocation';
 import { CartService, type CartContext } from '@/modules/cart/cart.service';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
@@ -328,11 +332,11 @@ export class OrderService {
           const taxPercent = Number(product.taxPercent) || 0;
           const grossUnitPrice = Math.round(taxableUnitPrice * (1 + taxPercent / 100) * 100) / 100;
 
-          let billedQty = item.quantity;
-          if (resolved.schemeMinQty && resolved.schemeFreeQty && item.quantity >= resolved.schemeMinQty) {
-            const freeQty = Math.floor(item.quantity / resolved.schemeMinQty) * resolved.schemeFreeQty;
-            billedQty = Math.max(0, item.quantity - freeQty);
-          }
+          const billedQty = computeSchemeBilledQty(
+            item.quantity,
+            resolved.schemeMinQty,
+            resolved.schemeFreeQty,
+          );
           const totalPrice = Math.round(grossUnitPrice * billedQty * 100) / 100;
           subtotal += totalPrice;
 
@@ -487,8 +491,8 @@ export class OrderService {
           });
         }
 
-        // Generate order number
-        const orderNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+        // Unique per PO in a multi-vendor checkout (Date.now() alone can collide in a tight loop).
+        const orderNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}-${String(orders.length + 1).padStart(2, '0')}`;
 
         // Create order — salespersonId snapshotted from VendorCustomer
         // (null if no rep assigned) so commission attribution survives later
@@ -566,13 +570,17 @@ export class OrderService {
         await promotionService.debitWalletForCheckout(tx, { userId, rows: walletRows });
       }
 
-      // 7. Clear the (user, account, outlet)-scoped cart.
+      // 7. Clear only cart lines for vendors that were placed (partial checkout
+      // must not wipe unselected vendor groups).
       const cart = await tx.cart.findFirst({
         where: { userId, businessAccountId, outletId },
         select: { id: true },
       });
       if (cart) {
-        await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+        const placedVendorIds = [...new Set(input.vendorOrders.map((v) => v.vendorId))];
+        await tx.cartItem.deleteMany({
+          where: { cartId: cart.id, vendorId: { in: placedVendorIds } },
+        });
       }
 
       // 8. Emit events after transaction (not for drafts — nothing to notify yet)
@@ -613,6 +621,7 @@ export class OrderService {
             product: { select: { imageUrl: true, images: true } },
           },
         },
+        review: { select: { rating: true, comment: true, createdAt: true } },
       },
     });
 
@@ -636,6 +645,7 @@ export class OrderService {
         },
         vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true } },
         payments: true,
+        review: { select: { rating: true, comment: true, createdAt: true } },
       },
     });
     if (!order) throw Errors.notFound('Order');
@@ -757,11 +767,11 @@ export class OrderService {
     const taxableUnitPrice = Number(resolved.unitPrice);
     const taxPercent = Number(product?.taxPercent) || 0;
     const grossUnitPrice = Math.round(taxableUnitPrice * (1 + taxPercent / 100) * 100) / 100;
-    let billedQty = quantity;
-    if (resolved.schemeMinQty && resolved.schemeFreeQty && quantity >= resolved.schemeMinQty) {
-      const freeQty = Math.floor(quantity / resolved.schemeMinQty) * resolved.schemeFreeQty;
-      billedQty = Math.max(0, quantity - freeQty);
-    }
+    const billedQty = computeSchemeBilledQty(
+      quantity,
+      resolved.schemeMinQty,
+      resolved.schemeFreeQty,
+    );
     return { grossUnitPrice, totalPrice: Math.round(grossUnitPrice * billedQty * 100) / 100 };
   }
 

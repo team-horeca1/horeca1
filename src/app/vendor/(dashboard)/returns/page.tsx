@@ -6,15 +6,15 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
     StatusTimeline,
-    RETURN_TIMELINE_STEPS,
     returnTimelineCurrentKey,
+    returnTimelineStepsForStatus,
 } from '@/components/features/finance/StatusTimeline';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ReturnRequest {
     id: string;
-    status: 'pending' | 'approved' | 'rejected' | 'refund_processing' | 'refunded';
+    status: 'pending' | 'approved' | 'rejected' | 'refund_processing' | 'refunded' | 'resolved';
     reason: string;
     adminNote: string | null;
     refundAmount: string | null;
@@ -219,7 +219,7 @@ function ReviewModal({
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
-type FilterTab = 'all' | 'pending' | 'approved' | 'rejected' | 'refunded';
+type FilterTab = 'all' | 'pending' | 'approved' | 'rejected' | 'refunded' | 'resolved';
 
 const STATUS_STYLE: Record<string, string> = {
     pending: 'bg-amber-50 text-amber-600',
@@ -227,6 +227,7 @@ const STATUS_STYLE: Record<string, string> = {
     rejected: 'bg-[#FFF0F0] text-[#E74C3C]',
     refund_processing: 'bg-blue-50 text-blue-600',
     refunded: 'bg-[#EEF8F1] text-[#299E60]',
+    resolved: 'bg-blue-50 text-blue-600',
 };
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
@@ -235,6 +236,7 @@ const STATUS_ICON: Record<string, React.ReactNode> = {
     rejected: <XCircle size={11} />,
     refund_processing: <Loader2 size={11} />,
     refunded: <CheckCircle2 size={11} />,
+    resolved: <CheckCircle2 size={11} />,
 };
 
 export default function VendorReturnsPage() {
@@ -269,6 +271,7 @@ export default function VendorReturnsPage() {
         { key: 'pending', label: 'Pending' },
         { key: 'approved', label: 'Approved' },
         { key: 'refunded', label: 'Refunded' },
+        { key: 'resolved', label: 'Resolved' },
         { key: 'rejected', label: 'Rejected' },
     ];
 
@@ -419,7 +422,7 @@ export default function VendorReturnsPage() {
                                             <td colSpan={7} className="px-5 py-4">
                                                 <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide mb-3">Return progress</p>
                                                 <StatusTimeline
-                                                    steps={RETURN_TIMELINE_STEPS}
+                                                    steps={returnTimelineStepsForStatus(req.status)}
                                                     currentKey={returnTimelineCurrentKey(req.status)}
                                                 />
                                             </td>

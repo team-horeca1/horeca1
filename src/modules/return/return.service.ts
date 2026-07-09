@@ -6,7 +6,14 @@ import { debitVendorOnRefund } from '@/modules/vendor/vendorSettlement.service';
 import { promotionService } from '@/modules/promotion/promotion.service';
 import { orderService } from '@/modules/order/order.service';
 
-export type ReturnStatus = 'pending' | 'approved' | 'rejected' | 'refund_processing' | 'refunded';
+export type ReturnStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'refund_processing'
+  | 'refunded'
+  /** Terminal for credit_note / replacement (no Razorpay refund). */
+  | 'resolved';
 
 const CREDIT_METHODS = ['credit', 'vendor_credit'];
 const WALLET_METHODS = ['h1_wallet', 'wallet'];
@@ -63,17 +70,23 @@ export async function vendorReviewReturn(
     },
   });
   if (!returnReq) throw Errors.notFound('Return request');
-  if (!['pending', 'refund_processing'].includes(returnReq.status)) {
+  if (returnReq.status !== 'pending') {
     throw Errors.badRequest(`Return is already ${returnReq.status}`);
   }
 
+  const resolutionType = input.resolutionType ?? 'refund';
   const resolutionData: Record<string, unknown> = {};
+  let nextStatus: ReturnStatus = input.status;
+
   if (input.status === 'approved') {
-    const resolutionType = input.resolutionType ?? 'refund';
     resolutionData.resolutionType = resolutionType;
     if (resolutionType === 'credit_note') {
       resolutionData.creditNoteNumber = `CN-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
       if (input.creditNoteAmount != null) resolutionData.creditNoteAmount = input.creditNoteAmount;
+      // No admin Razorpay step — close the return now.
+      nextStatus = 'resolved';
+    } else if (resolutionType === 'replacement') {
+      nextStatus = 'resolved';
     } else if (resolutionType === 'refund' && input.refundAmount != null) {
       resolutionData.refundAmount = input.refundAmount;
     }
@@ -82,7 +95,7 @@ export async function vendorReviewReturn(
   const updated = await prisma.returnRequest.update({
     where: { id: returnId },
     data: {
-      status: input.status,
+      status: nextStatus,
       adminNote: input.vendorNote,
       ...resolutionData,
     },
@@ -94,7 +107,7 @@ export async function vendorReviewReturn(
     });
     if (wallet && Number(wallet.outstandingAmount) > 0) {
       if (
-        input.resolutionType === 'refund' &&
+        resolutionType === 'refund' &&
         input.refundAmount &&
         input.refundAmount > 0 &&
         returnReq.order.paymentMethod &&
@@ -110,7 +123,7 @@ export async function vendorReviewReturn(
           `Return approved — credit reversal ₹${refund.toFixed(2)}`,
         );
       } else if (
-        input.resolutionType === 'credit_note' &&
+        resolutionType === 'credit_note' &&
         input.creditNoteAmount &&
         input.creditNoteAmount > 0
       ) {
@@ -165,8 +178,20 @@ export async function adminProcessReturnRefund(
   if (!existing) throw Errors.notFound('Return request');
   if (existing.status === 'refunded') throw Errors.badRequest('Return already refunded');
   if (existing.status === 'rejected') throw Errors.badRequest('Cannot refund a rejected return');
+  if (existing.status === 'resolved') {
+    throw Errors.badRequest('This return was closed with credit note / replacement — no money refund');
+  }
   if (existing.status === 'pending') {
     throw Errors.badRequest('Vendor must approve the return before processing refund');
+  }
+  const resolution = existing.resolutionType ?? 'refund';
+  if (resolution !== 'refund') {
+    throw Errors.badRequest(
+      `Cannot process a money refund for resolution type "${resolution}". Only refund resolutions are eligible.`,
+    );
+  }
+  if (existing.status !== 'approved' && existing.status !== 'refund_processing') {
+    throw Errors.badRequest(`Cannot refund a return in status "${existing.status}"`);
   }
 
   await prisma.returnRequest.update({

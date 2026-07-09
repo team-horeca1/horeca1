@@ -10,6 +10,7 @@ interface ReturnRequest {
     status: string;
     reason: string;
     refundAmount: string | number | null;
+    resolutionType?: string | null;
     adminNote: string | null;
     createdAt: string;
     order: { orderNumber: string; totalAmount: string | number; paymentStatus: string; paymentMethod: string | null };
@@ -22,6 +23,7 @@ const STATUS_STYLE: Record<string, string> = {
     rejected: 'bg-red-50 text-red-700',
     refund_processing: 'bg-blue-50 text-blue-700',
     refunded: 'bg-blue-50 text-blue-700',
+    resolved: 'bg-indigo-50 text-indigo-700',
 };
 
 function fmt(v: string | number | null): string {
@@ -90,6 +92,7 @@ export default function AdminReturnsPage() {
                         <option value="pending">Pending</option>
                         <option value="approved">Approved</option>
                         <option value="refund_processing">Refund processing</option>
+                        <option value="resolved">Resolved</option>
                         <option value="rejected">Rejected</option>
                         <option value="refunded">Refunded</option>
                     </select>
@@ -146,9 +149,14 @@ export default function AdminReturnsPage() {
                             <p className="text-[12px] font-bold text-[#181725]">Order #{selected.order.orderNumber}</p>
                             <p className="text-[12px] text-[#7C7C7C]">Total: {fmt(selected.order.totalAmount)}</p>
                             <p className="text-[12px] text-[#7C7C7C]">Payment: {selected.order.paymentMethod ?? '—'} · {selected.order.paymentStatus}</p>
-                            {selected.status === 'approved' && (
+                            {selected.status === 'approved' && (selected.resolutionType ?? 'refund') === 'refund' && (
                                 <p className="text-[12px] font-bold text-[#299E60] mt-1">
                                     Amount due to customer: {fmt(selected.refundAmount ?? selected.order.totalAmount)}
+                                </p>
+                            )}
+                            {selected.resolutionType && selected.resolutionType !== 'refund' && (
+                                <p className="text-[12px] font-bold text-indigo-700 mt-1">
+                                    Resolution: {selected.resolutionType.replace('_', ' ')}
                                 </p>
                             )}
                         </div>
@@ -164,7 +172,7 @@ export default function AdminReturnsPage() {
                                     Waiting for vendor approval before you can process a refund.
                                 </p>
                             )}
-                            {selected.status === 'approved' && (
+                            {selected.status === 'approved' && (selected.resolutionType ?? 'refund') === 'refund' && (
                                 <>
                                     <div>
                                         <label className="block text-[12px] font-bold text-[#181725] mb-1">Refund amount (₹)</label>
@@ -182,11 +190,11 @@ export default function AdminReturnsPage() {
                                     </div>
                                 </>
                             )}
-                            {(selected.status === 'refunded' || selected.status === 'rejected' || selected.status === 'refund_processing') && (
+                            {(selected.status === 'refunded' || selected.status === 'rejected' || selected.status === 'refund_processing' || selected.status === 'resolved') && (
                                 <p className="text-[12px] text-[#7C7C7C]">This return is closed — no further action needed.</p>
                             )}
                             <div className="flex gap-2">
-                                {selected.status === 'approved' && (
+                                {selected.status === 'approved' && (selected.resolutionType ?? 'refund') === 'refund' && (
                                     <button
                                         onClick={async () => {
                                             setActionForm(f => ({ ...f, status: 'refunded' }));
