@@ -48,8 +48,8 @@ export function AdminVendorPlatformFee({ vendorId, platformFeePct, globalDefault
   };
 
   return (
-    <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-[#EEEEEE]">
+    <div className="bg-white rounded-[14px] border border-[#D1D5DB] shadow-sm overflow-hidden">
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-[#D1D5DB]">
         <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
           <Percent size={20} />
         </div>
@@ -64,7 +64,7 @@ export function AdminVendorPlatformFee({ vendorId, platformFeePct, globalDefault
             type="button"
             onClick={() => setUseCustom(false)}
             className={`flex-1 py-2.5 rounded-[10px] text-[12px] font-bold border transition-colors ${
-              !useCustom ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]' : 'border-[#EEEEEE] text-[#7C7C7C]'
+              !useCustom ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]' : 'border-[#D1D5DB] text-[#7C7C7C]'
             }`}
           >
             Global default ({globalDefaultPct}%)
@@ -73,7 +73,7 @@ export function AdminVendorPlatformFee({ vendorId, platformFeePct, globalDefault
             type="button"
             onClick={() => setUseCustom(true)}
             className={`flex-1 py-2.5 rounded-[10px] text-[12px] font-bold border transition-colors ${
-              useCustom ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]' : 'border-[#EEEEEE] text-[#7C7C7C]'
+              useCustom ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]' : 'border-[#D1D5DB] text-[#7C7C7C]'
             }`}
           >
             Custom rate
@@ -89,7 +89,7 @@ export function AdminVendorPlatformFee({ vendorId, platformFeePct, globalDefault
               step="0.5"
               value={customPct}
               onChange={(e) => setCustomPct(e.target.value)}
-              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50"
+              className="w-full h-[40px] px-3 rounded-[10px] border border-[#D1D5DB] text-[13px] outline-none focus:border-[#299E60]/50"
             />
           </div>
         )}
