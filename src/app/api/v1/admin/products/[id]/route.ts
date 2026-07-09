@@ -156,13 +156,22 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
             : [];
       if (cats.length === 0) throw Errors.badRequest('Product must be mapped to at least one sub-category.');
       await assertLeafCategory(cats);
+    }
 
-      if (!existing.masterProductId && cats[0]) {
+    // Ensure masterProductId exists on publish / active listings
+    const isCurrentlySubmitted = !isDraftSave && (existing.listingStatus === 'submitted' || reqListingStatus === 'submitted');
+    if (isCurrentlySubmitted && !existing.masterProductId && !updatePayload.masterProductId) {
+      const activeCategoryId = primaryId 
+        ?? existing.categoryId 
+        ?? (await prisma.productCategory.findFirst({ where: { productId: id, isPrimary: true } }))?.categoryId;
+      
+      if (activeCategoryId) {
         const publishName = (typeof updatePayload.name === 'string' ? updatePayload.name : existing.name).trim();
+        const publishBrand = (typeof updatePayload.brand === 'string' ? updatePayload.brand : existing.brand) ?? null;
         updatePayload.masterProductId = await findOrCreateMaster({
           name: publishName,
-          brand: (typeof updatePayload.brand === 'string' ? updatePayload.brand : existing.brand) ?? null,
-          categoryId: cats[0],
+          brand: publishBrand,
+          categoryId: activeCategoryId,
         });
       }
     }
