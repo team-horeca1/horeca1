@@ -20,6 +20,8 @@ import {
     Building2,
     Image as ImageIcon,
     AlertCircle,
+    Copy,
+    Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -418,202 +420,291 @@ export default function AdminBrandEditPage() {
                         ]}
                     />
                 }
-                sidebar={
-                    <>
-                        {owner && (
-                            <AdminLoginCredentialsPanel
-                                user={owner}
-                                adminPassword={ownerPassword}
-                                permission="brands.edit"
-                                accent="#7C3AED"
-                                onPasswordUpdated={setOwnerPassword}
-                            />
-                        )}
-                        {canApprove && (
-                            <div className="flex flex-col gap-2.5">
-                                <span className="text-[11px] font-bold text-[#9CA3AF] uppercase text-center lg:text-left">Verification Actions</span>
-                                {brand.approvalStatus !== 'approved' && (
-                                    <button
-                                        onClick={() => void handleApprove()}
-                                        disabled={approvalLoading}
-                                        className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54] disabled:opacity-50"
-                                    >
-                                        {approvalLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
-                                        Approve & Verify
-                                    </button>
-                                )}
-                                {brand.approvalStatus === 'approved' && (
-                                    <button
-                                        onClick={() => void handleRevoke()}
-                                        disabled={approvalLoading}
-                                        className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border bg-amber-500 border-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
-                                    >
-                                        {approvalLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldX size={13} />}
-                                        Revoke Approval
-                                    </button>
-                                )}
-                                {brand.approvalStatus !== 'rejected' && (
-                                    <button
-                                        onClick={() => setShowRejectModal(true)}
-                                        disabled={approvalLoading}
-                                        className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 bg-[#EF4444] border border-[#EF4444] text-white hover:bg-[#DC2626] disabled:opacity-50"
-                                    >
-                                        <XCircle size={13} />
-                                        Reject Application
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </>
-                }
             />
 
             <AdminEntityStatsRow stats={stats} />
 
-            <AdminEntityTabPanel>
-                <AdminEntityTabBar
-                    activeTab={activeTab}
-                    onTabChange={(id) => setActiveTab(id as typeof activeTab)}
-                    tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }))}
-                />
-                <AdminEntityTabContent>
-                    {activeTab === 'overview' && hasApplication && (isReviewMode || brand.approvalStatus === 'pending') && (
-                        <div className="space-y-4">
-                            <h2 className="text-[15px] font-black text-[#111827]">Application Review</h2>
-                            <p className="text-[12px] text-[#6B7280] -mt-2">Submitted onboarding profile — review before approving.</p>
-                            <div className="grid sm:grid-cols-2 gap-4">
-                                {reviewFields.map((f) => (
-                                    <div key={f.label} className="border border-[#F3F4F6] rounded-xl px-4 py-3">
-                                        <p className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">{f.label}</p>
-                                        <p className="text-[13px] font-semibold text-[#181725] mt-1 break-words">{f.value}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                {/* Left Column: Tab panels */}
+                <div className="lg:col-span-8 space-y-6">
+                    <AdminEntityTabPanel>
+                        <AdminEntityTabBar
+                            activeTab={activeTab}
+                            onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+                            tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }))}
+                        />
+                        <AdminEntityTabContent>
+                            {activeTab === 'overview' && hasApplication && (isReviewMode || brand.approvalStatus === 'pending') && (
+                                <div className="space-y-6 animate-in fade-in duration-300">
+                                    {/* Business Identity Card */}
+                                    <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                        <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                            <Building2 size={16} className="text-[#7C3AED]" />
+                                            Business Identity
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                            <InfoCardField label="Brand Type" value={brand.brandType ?? ba?.businessType} />
+                                            <InfoCardField label="Sub Type" value={brand.subType ?? ba?.subType} />
+                                            <InfoCardField label="Business Size" value={brand.businessSize ?? ba?.businessSize} />
+                                            <InfoCardField label="Distribution Presence" value={brand.distributionPresence} />
+                                            <InfoCardField label="Website" value={brand.website} />
+                                            <InfoCardField label="Designation" value={ba?.designation} />
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    {activeTab === 'overview' && !(hasApplication && (isReviewMode || brand.approvalStatus === 'pending')) && (
-                        <p className="text-[14px] text-[#6B7280] font-medium">No application review data for this brand. Use the Storefront tab to edit brand profile and media.</p>
-                    )}
 
-                    {activeTab === 'storefront' && (
-                        <div className="space-y-8">
-                            <div className="space-y-4">
-                                <h2 className="text-[15px] font-black text-[#111827]">Brand Info</h2>
-                                <div className="grid sm:grid-cols-2 gap-4">
-                                    {[
-                                        { key: 'name', label: 'Brand Name', placeholder: 'e.g. Amul', full: false },
-                                        { key: 'tagline', label: 'Tagline', placeholder: 'e.g. The Taste of India', full: false },
-                                        { key: 'website', label: 'Website', placeholder: 'https://amul.com', full: true },
-                                    ].map(f => (
-                                        <div key={f.key} className={cn('space-y-1', f.full && 'sm:col-span-2')}>
-                                            <label className="text-[13px] font-semibold text-[#181725]">{f.label}</label>
-                                            <input
-                                                type="text"
-                                                value={(form as Record<string, unknown>)[f.key] as string}
-                                                onChange={(e) => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                                                placeholder={f.placeholder}
-                                                className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#299E60]/30"
+                                    {/* Market & Segments Card */}
+                                    <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                        <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                            <Package size={16} className="text-[#7C3AED]" />
+                                            Market & Segments
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                            <InfoCardField label="Target Segments" value={brand.targetSegments?.length ? brand.targetSegments.join(', ') : null} />
+                                            <InfoCardField label="HoReCa Focused" value={formatBool(brand.horecaFocused)} />
+                                            <InfoCardField label="Retail Focused" value={formatBool(brand.retailFocused)} />
+                                            <div className="sm:col-span-2">
+                                                <InfoCardField label="Product Categories" value={brand.categories?.length ? brand.categories.join(', ') : null} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Compliance & Contact Card */}
+                                    <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                        <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                            <ShieldCheck size={16} className="text-[#7C3AED]" />
+                                            Compliance & Contact
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                            <InfoCardField label="GSTIN" value={gst} copyable />
+                                            <InfoCardField label="Mobile Phone" value={phone} copyable />
+                                            <InfoCardField label="Work Phone" value={ba?.workPhone} copyable />
+                                            <div className="sm:col-span-2">
+                                                <InfoCardField label="Registered Address" value={billingAddress} />
+                                            </div>
+                                            {ba?.remarks && (
+                                                <div className="sm:col-span-3">
+                                                    <InfoCardField label="Remarks" value={ba.remarks} />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {activeTab === 'overview' && !(hasApplication && (isReviewMode || brand.approvalStatus === 'pending')) && (
+                                <div className="p-8 text-center bg-[#F9FAFB] rounded-[16px] border border-dashed border-[#D1D5DB]">
+                                    <Building2 size={36} className="text-[#AEAEAE] mx-auto mb-3" />
+                                    <h4 className="text-[14px] font-bold text-[#374151]">No Application Data</h4>
+                                    <p className="text-[12px] text-[#9CA3AF] mt-1">Use the Storefront tab to edit brand profile and media.</p>
+                                </div>
+                            )}
+
+                            {activeTab === 'storefront' && (
+                                <div className="space-y-8">
+                                    <div className="space-y-4">
+                                        <h2 className="text-[15px] font-black text-[#111827]">Brand Info</h2>
+                                        <div className="grid sm:grid-cols-2 gap-4">
+                                            {[
+                                                { key: 'name', label: 'Brand Name', placeholder: 'e.g. Amul', full: false },
+                                                { key: 'tagline', label: 'Tagline', placeholder: 'e.g. The Taste of India', full: false },
+                                                { key: 'website', label: 'Website', placeholder: 'https://amul.com', full: true },
+                                            ].map(f => (
+                                                <div key={f.key} className={cn('space-y-1', f.full && 'sm:col-span-2')}>
+                                                    <label className="text-[13px] font-semibold text-[#181725]">{f.label}</label>
+                                                    <input
+                                                        type="text"
+                                                        value={(form as Record<string, unknown>)[f.key] as string}
+                                                        onChange={(e) => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                                                        placeholder={f.placeholder}
+                                                        className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#299E60]/30"
+                                                    />
+                                                </div>
+                                            ))}
+                                            <div className="space-y-1 sm:col-span-2">
+                                                <label className="text-[13px] font-semibold text-[#181725]">Description</label>
+                                                <textarea
+                                                    value={form.description}
+                                                    onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
+                                                    rows={3}
+                                                    placeholder="Short brand description…"
+                                                    className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#299E60]/30 resize-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        <h2 className="text-[15px] font-black text-[#111827]">Images</h2>
+                                        <p className="text-[12px] text-gray-500 -mt-4">After upload, an editor opens so you can set the focal point and zoom.</p>
+                                        <div className="grid md:grid-cols-2 gap-6">
+                                            <ImageUploadField
+                                                label="Brand Logo"
+                                                value={form.logoUrl}
+                                                onChange={(url) => setForm(p => ({ ...p, logoUrl: url }))}
+                                                folder="brands"
+                                                aspectHint="Square PNG/WebP recommended (200×200 px)"
+                                                variant="brand-logo"
+                                            />
+                                            <ImageUploadField
+                                                label="Banner / Store Header"
+                                                value={form.bannerUrl}
+                                                onChange={(url) => setForm(p => ({ ...p, bannerUrl: url }))}
+                                                folder="brands"
+                                                aspectHint="Wide hero — 1600×400 px recommended (4:1 ratio)."
+                                                variant="brand-banner"
                                             />
                                         </div>
-                                    ))}
-                                    <div className="space-y-1 sm:col-span-2">
-                                        <label className="text-[13px] font-semibold text-[#181725]">Description</label>
-                                        <textarea
-                                            value={form.description}
-                                            onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
-                                            rows={3}
-                                            placeholder="Short brand description…"
-                                            className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#299E60]/30 resize-none"
+                                        <ImageUploadField
+                                            label="Card Banner Image"
+                                            value={form.showcaseImages[0] ?? null}
+                                            onChange={(url) => setForm(p => ({ ...p, showcaseImages: url ? [url] : [] }))}
+                                            folder="brands"
+                                            aspectHint="Shows on the brand card top section (220×160 area)"
+                                            variant="brand-card-top"
                                         />
                                     </div>
-                                </div>
-                            </div>
 
-                            <div className="space-y-6">
-                                <h2 className="text-[15px] font-black text-[#111827]">Images</h2>
-                                <p className="text-[12px] text-gray-500 -mt-4">After upload, an editor opens so you can set the focal point and zoom.</p>
-                                <div className="grid md:grid-cols-2 gap-6">
-                                    <ImageUploadField
-                                        label="Brand Logo"
-                                        value={form.logoUrl}
-                                        onChange={(url) => setForm(p => ({ ...p, logoUrl: url }))}
-                                        folder="brands"
-                                        aspectHint="Square PNG/WebP recommended (200×200 px)"
-                                        variant="brand-logo"
-                                    />
-                                    <ImageUploadField
-                                        label="Banner / Store Header"
-                                        value={form.bannerUrl}
-                                        onChange={(url) => setForm(p => ({ ...p, bannerUrl: url }))}
-                                        folder="brands"
-                                        aspectHint="Wide hero — 1600×400 px recommended (4:1 ratio)."
-                                        variant="brand-banner"
+                                    <div className="space-y-4">
+                                        <h2 className="text-[15px] font-black text-[#111827]">Admin Operations</h2>
+                                        <div className="grid sm:grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <label className="text-[13px] font-semibold text-[#181725]">Brand Tier</label>
+                                                <select value={form.brandTier} onChange={e => setForm(p => ({ ...p, brandTier: e.target.value }))}
+                                                    className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5">
+                                                    <option value="">Select tier</option>
+                                                    {['Premium', 'Mid', 'Mass'].map(t => <option key={t} value={t}>{t}</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[13px] font-semibold text-[#181725]">Marketplace Visibility</label>
+                                                <select value={form.marketplaceVisibility} onChange={e => setForm(p => ({ ...p, marketplaceVisibility: e.target.value }))}
+                                                    className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5">
+                                                    <option value="">Select visibility</option>
+                                                    {['Public', 'Restricted'].map(t => <option key={t} value={t}>{t}</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[13px] font-semibold text-[#181725]">Lead Status</label>
+                                                <select value={form.leadStatus} onChange={e => setForm(p => ({ ...p, leadStatus: e.target.value }))}
+                                                    className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5">
+                                                    <option value="">Select status</option>
+                                                    {['Lead', 'Contacted', 'Active'].map(t => <option key={t} value={t}>{t}</option>)}
+                                                </select>
+                                            </div>
+                                            <label className="flex items-center gap-2 text-[13px] font-semibold text-[#181725] pt-6">
+                                                <input type="checkbox" checked={form.creditSupport}
+                                                    onChange={e => setForm(p => ({ ...p, creditSupport: e.target.checked }))}
+                                                    className="accent-[#299E60] w-4 h-4" />
+                                                Credit support enabled
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <CategoryMultiPicker
+                                        value={form.categories}
+                                        onChange={(cats) => setForm(p => ({ ...p, categories: cats }))}
+                                        endpoint="/api/v1/admin/categories"
+                                        helper="Pick from existing categories. New ones added here are auto-approved (admin)."
                                     />
                                 </div>
-                                <ImageUploadField
-                                    label="Card Banner Image"
-                                    value={form.showcaseImages[0] ?? null}
-                                    onChange={(url) => setForm(p => ({ ...p, showcaseImages: url ? [url] : [] }))}
-                                    folder="brands"
-                                    aspectHint="Shows on the brand card top section (220×160 area)"
-                                    variant="brand-card-top"
+                            )}
+
+                            {activeTab === 'team' && !isDraftStorefront && (
+                                <AdminUserTeamPanel
+                                    teamEndpoint={`/api/v1/admin/brands/${id}/team`}
+                                    editPermission="brands.edit"
+                                    accent="#7C3AED"
                                 />
-                            </div>
+                            )}
+                        </AdminEntityTabContent>
+                    </AdminEntityTabPanel>
+                </div>
 
-                            <div className="space-y-4">
-                                <h2 className="text-[15px] font-black text-[#111827]">Admin Operations</h2>
-                                <div className="grid sm:grid-cols-2 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[13px] font-semibold text-[#181725]">Brand Tier</label>
-                                        <select value={form.brandTier} onChange={e => setForm(p => ({ ...p, brandTier: e.target.value }))}
-                                            className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5">
-                                            <option value="">Select tier</option>
-                                            {['Premium', 'Mid', 'Mass'].map(t => <option key={t} value={t}>{t}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[13px] font-semibold text-[#181725]">Marketplace Visibility</label>
-                                        <select value={form.marketplaceVisibility} onChange={e => setForm(p => ({ ...p, marketplaceVisibility: e.target.value }))}
-                                            className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5">
-                                            <option value="">Select visibility</option>
-                                            {['Public', 'Restricted'].map(t => <option key={t} value={t}>{t}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[13px] font-semibold text-[#181725]">Lead Status</label>
-                                        <select value={form.leadStatus} onChange={e => setForm(p => ({ ...p, leadStatus: e.target.value }))}
-                                            className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5">
-                                            <option value="">Select status</option>
-                                            {['Lead', 'Contacted', 'Active'].map(t => <option key={t} value={t}>{t}</option>)}
-                                        </select>
-                                    </div>
-                                    <label className="flex items-center gap-2 text-[13px] font-semibold text-[#181725] pt-6">
-                                        <input type="checkbox" checked={form.creditSupport}
-                                            onChange={e => setForm(p => ({ ...p, creditSupport: e.target.checked }))}
-                                            className="accent-[#299E60] w-4 h-4" />
-                                        Credit support enabled
-                                    </label>
-                                </div>
-                            </div>
+                {/* Right Sidebar Column */}
+                <div className="lg:col-span-4 space-y-6">
+                    {/* Login Credentials */}
+                    {owner && (
+                        <AdminLoginCredentialsPanel
+                            user={owner}
+                            adminPassword={ownerPassword}
+                            permission="brands.edit"
+                            accent="#7C3AED"
+                            onPasswordUpdated={setOwnerPassword}
+                        />
+                    )}
 
-                            <CategoryMultiPicker
-                                value={form.categories}
-                                onChange={(cats) => setForm(p => ({ ...p, categories: cats }))}
-                                endpoint="/api/v1/admin/categories"
-                                helper="Pick from existing categories. New ones added here are auto-approved (admin)."
-                            />
+                    {/* Verification Actions */}
+                    {canApprove && (
+                        <div className="bg-white rounded-[16px] border border-[#D1D5DB] p-5 shadow-sm space-y-4">
+                            <h4 className="text-[12px] font-black text-[#9CA3AF] uppercase tracking-wider">Verification & Approval</h4>
+                            {brand.approvalStatus !== 'approved' && (
+                                <button
+                                    onClick={() => void handleApprove()}
+                                    disabled={approvalLoading}
+                                    className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54] disabled:opacity-50"
+                                >
+                                    {approvalLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
+                                    Approve & Verify
+                                </button>
+                            )}
+                            {brand.approvalStatus === 'approved' && (
+                                <button
+                                    onClick={() => void handleRevoke()}
+                                    disabled={approvalLoading}
+                                    className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border bg-amber-500 border-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                                >
+                                    {approvalLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldX size={13} />}
+                                    Revoke Approval
+                                </button>
+                            )}
+                            {brand.approvalStatus !== 'rejected' && (
+                                <button
+                                    onClick={() => setShowRejectModal(true)}
+                                    disabled={approvalLoading}
+                                    className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 bg-[#EF4444] border border-[#EF4444] text-white hover:bg-[#DC2626] disabled:opacity-50"
+                                >
+                                    <XCircle size={13} />
+                                    Reject Application
+                                </button>
+                            )}
                         </div>
                     )}
 
-                    {activeTab === 'team' && !isDraftStorefront && (
-                        <AdminUserTeamPanel
-                            teamEndpoint={`/api/v1/admin/brands/${id}/team`}
-                            editPermission="brands.edit"
-                            accent="#7C3AED"
-                        />
-                    )}
-                </AdminEntityTabContent>
-            </AdminEntityTabPanel>
+                    {/* Quick Summary */}
+                    <div className="bg-white rounded-[16px] border border-[#D1D5DB] p-5 shadow-sm space-y-3">
+                        <h4 className="text-[12px] font-black text-[#9CA3AF] uppercase tracking-wider">Quick Summary</h4>
+                        <div className="space-y-2.5">
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-[#6B7280] font-medium">Master Products</span>
+                                <span className="font-extrabold text-[#111827]">{brand._count.masterProducts}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-[#6B7280] font-medium">Mapped Products</span>
+                                <span className="font-extrabold text-[#111827]">{brand._count.productMappings}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-[#6B7280] font-medium">Status</span>
+                                <AdminStatusBadge
+                                    variant={brand.isActive ? 'active' : 'inactive'}
+                                    label={brand.isActive ? 'Active' : 'Inactive'}
+                                />
+                            </div>
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-[#6B7280] font-medium">Approval</span>
+                                <AdminStatusBadge
+                                    variant={statusVariant}
+                                    label={brand.approvalStatus}
+                                />
+                            </div>
+                            {brand.brandTier && (
+                                <div className="flex items-center justify-between text-[12px]">
+                                    <span className="text-[#6B7280] font-medium">Brand Tier</span>
+                                    <span className="font-bold text-[#374151]">{brand.brandTier}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {showRejectModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowRejectModal(false)}>
@@ -653,6 +744,56 @@ export default function AdminBrandEditPage() {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+function InfoCardField({
+    label,
+    value,
+    copyable,
+}: {
+    label: string;
+    value: string | null | undefined;
+    copyable?: boolean;
+}) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = async () => {
+        if (!value) return;
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopied(true);
+            toast.success(`${label} copied`);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            toast.error('Failed to copy');
+        }
+    };
+
+    const displayValue = value && value.trim() !== '' ? value : '—';
+
+    return (
+        <div className="flex flex-col gap-1 p-3.5 bg-[#F9FAFB] rounded-[10px] border border-[#F0F2F5] transition-all hover:bg-gray-50/60 relative group min-w-0">
+            <span className="text-[10px] font-extrabold text-[#9CA3AF] uppercase tracking-wider">{label}</span>
+            <div className="flex items-center gap-1.5 justify-between min-w-0">
+                <span className="text-[13px] font-extrabold text-[#181725] truncate">
+                    {displayValue}
+                </span>
+                {copyable && value && (
+                    <button
+                        onClick={handleCopy}
+                        className="p-1 rounded hover:bg-white hover:shadow-sm text-[#9CA3AF] hover:text-[#7C3AED] transition-all cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title={`Copy ${label}`}
+                    >
+                        {copied ? (
+                            <Check size={11} className="text-[#7C3AED]" />
+                        ) : (
+                            <Copy size={11} />
+                        )}
+                    </button>
+                )}
+            </div>
         </div>
     );
 }

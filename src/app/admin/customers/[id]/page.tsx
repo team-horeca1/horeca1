@@ -24,6 +24,8 @@ import {
     Check,
     LayoutDashboard,
     Users,
+    SlidersHorizontal,
+    MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useParams, useRouter } from 'next/navigation';
@@ -328,7 +330,7 @@ export default function CustomerDetailsPage() {
                             <AdminImpersonateButton
                                 target="customer"
                                 entityId={user.id}
-                                label="View as Customer"
+                                label="Impersonate"
                             />
                         )}
                         <button
@@ -377,7 +379,7 @@ export default function CustomerDetailsPage() {
 
             <AdminEntityHeroCard
                 avatar={
-                    <div className="w-[140px] h-[140px] rounded-[16px] bg-[#F9FAFB] border border-[#E5E7EB] overflow-hidden shadow-inner">
+                    <div className="w-[140px] h-[140px] rounded-[16px] bg-[#F9FAFB] border border-[#E5E7EB] overflow-hidden shadow-inner flex items-center justify-center">
                         <img src={avatarUrl} alt={user.fullName} className="w-full h-full object-cover" />
                     </div>
                 }
@@ -405,277 +407,316 @@ export default function CustomerDetailsPage() {
                         ]}
                     />
                 }
-                sidebar={
-                    <>
-                        <AdminLoginCredentialsPanel
-                            user={user}
-                            adminPassword={ownerPassword}
-                            permission="customers.edit"
-                            accent="#299E60"
-                            onPasswordUpdated={setOwnerPassword}
-                        />
-                        <div className="flex flex-col gap-2.5">
-                            <span className="text-[11px] font-bold text-[#9CA3AF] uppercase text-center lg:text-left">
-                                Account Actions
-                            </span>
-                            <button
-                                type="button"
-                                onClick={handleToggleActive}
-                                disabled={toggling}
-                                className={cn(
-                                    'w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border',
-                                    user.isActive
-                                        ? 'bg-white border-red-200 text-red-600 hover:bg-red-50'
-                                        : 'bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54]',
-                                )}
-                            >
-                                {toggling ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />}
-                                {user.isActive ? 'Deactivate User' : 'Activate User'}
-                            </button>
-                        </div>
-                    </>
-                }
             />
 
             <AdminEntityStatsRow stats={stats} />
 
-            <AdminEntityTabPanel>
-                <AdminEntityTabBar
-                    activeTab={activeTab}
-                    onTabChange={(id) => setActiveTab(id as typeof activeTab)}
-                    tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }))}
-                />
-                <AdminEntityTabContent>
-                    {activeTab === 'overview' && (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-11 h-11 rounded-[10px] bg-[#EAF7EF] flex items-center justify-center text-[#299E60]">
-                                        <Calendar size={20} />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                {/* Left/Middle Column: Tab panels */}
+                <div className="lg:col-span-8 space-y-6">
+                    <AdminEntityTabPanel>
+                        <AdminEntityTabBar
+                            activeTab={activeTab}
+                            onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+                            tabs={tabs.map((tab) => ({ id: tab.id, label: tab.label, icon: tab.icon }))}
+                        />
+                        <AdminEntityTabContent>
+                            {activeTab === 'overview' && (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-[#F9FAFB] p-6 rounded-[14px] border border-[#F0F2F5]">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-11 h-11 rounded-[10px] bg-[#EAF7EF] flex items-center justify-center text-[#299E60]">
+                                                <Calendar size={20} />
+                                            </div>
+                                            <div>
+                                                <p className="text-[12px] font-bold text-[#7C7C7C]">Account Created</p>
+                                                <p className="text-[14px] font-bold text-[#181725]">{formatDateIndian(user.createdAt)}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-11 h-11 rounded-[10px] bg-[#EAF7EF] flex items-center justify-center text-[#299E60]">
+                                                <FileText size={20} />
+                                            </div>
+                                            <div>
+                                                <p className="text-[12px] font-bold text-[#7C7C7C]">Last Updated</p>
+                                                <p className="text-[14px] font-bold text-[#181725]">{formatDateIndian(user.updatedAt)}</p>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-[12px] font-bold text-[#7C7C7C]">Account Created</p>
-                                        <p className="text-[14px] font-bold text-[#181725]">{formatDateIndian(user.createdAt)}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <div className="w-11 h-11 rounded-[10px] bg-[#EAF7EF] flex items-center justify-center text-[#299E60]">
-                                        <FileText size={20} />
-                                    </div>
-                                    <div>
-                                        <p className="text-[12px] font-bold text-[#7C7C7C]">Last Updated</p>
-                                        <p className="text-[14px] font-bold text-[#181725]">{formatDateIndian(user.updatedAt)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            {user.vendor && (
-                                <div className="rounded-[14px] border border-[#EEEEEE] p-5">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="font-bold text-[16px] flex items-center gap-2">
-                                            <Building2 size={18} className="text-[#299E60]" />
-                                            Linked Vendor Profile
-                                        </h3>
-                                        <AdminStatusBadge variant={user.vendor.isVerified ? 'verified' : 'pending'} />
-                                    </div>
-                                    <p className="text-[14px] font-bold text-[#181725]">{user.vendor.businessName}</p>
+                                    {user.vendor && (
+                                        <div className="rounded-[14px] border border-[#D1D5DB] p-5 bg-white">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="font-bold text-[16px] flex items-center gap-2">
+                                                    <Building2 size={18} className="text-[#299E60]" />
+                                                    Linked Vendor Profile
+                                                </h3>
+                                                <AdminStatusBadge variant={user.vendor.isVerified ? 'verified' : 'pending'} />
+                                            </div>
+                                            <p className="text-[14px] font-bold text-[#181725]">{user.vendor.businessName}</p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-                        </div>
-                    )}
 
-                    {activeTab === 'business' && (
-                        <div className="bg-white rounded-[14px] border border-[#EEEEEE] overflow-hidden max-w-3xl">
-                            <div className="divide-y divide-[#EEEEEE]">
-                                <DetailRow label="Account ID" value={truncateId(user.id)} copyText={user.id} />
-                                {editing ? (
-                                    <>
-                                        <EditRow label="Full name">
-                                            <input value={draft.fullName} onChange={e => setDraft(d => ({ ...d, fullName: e.target.value }))}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-[13px] outline-none focus:border-[#299E60]" />
-                                        </EditRow>
-                                        <EditRow label="Email">
-                                            <input type="email" value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-[13px] outline-none focus:border-[#299E60]" />
-                                        </EditRow>
-                                        <EditRow label="Phone">
-                                            <input type="tel" inputMode="numeric" maxLength={10}
-                                                value={draft.phone} onChange={e => setDraft(d => ({ ...d, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-[13px] outline-none focus:border-[#299E60]" />
-                                        </EditRow>
-                                        <EditRow label="Pincode">
-                                            <input value={draft.pincode} onChange={e => setDraft(d => ({ ...d, pincode: e.target.value }))}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-[13px] outline-none focus:border-[#299E60]" />
-                                        </EditRow>
-                                        <EditRow label="Business name">
-                                            <input value={draft.businessName} onChange={e => setDraft(d => ({ ...d, businessName: e.target.value }))}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-[13px] outline-none focus:border-[#299E60]" />
-                                        </EditRow>
-                                        <EditRow label="GST number">
-                                            <input value={draft.gstNumber} onChange={e => setDraft(d => ({ ...d, gstNumber: e.target.value }))}
-                                                className="w-full px-2 py-1.5 border border-gray-200 rounded text-[13px] outline-none focus:border-[#299E60]" />
-                                        </EditRow>
-                                        {([
-                                            ['pan', 'PAN'], ['fssaiNumber', 'FSSAI'],
-                                            ['billingAddressLine', 'Billing address'], ['billingCity', 'Billing city'],
-                                            ['billingState', 'Billing state'], ['billingPincode', 'Billing pincode'],
-                                            ['businessType', 'Business type'], ['subType', 'Sub-type'],
-                                            ['cuisine', 'Cuisine / category'], ['businessSize', 'Business size'],
-                                            ['businessStructure', 'Business structure'], ['serviceModel', 'Service model'],
-                                            ['monthlyPurchaseBand', 'Monthly purchase band'], ['procurementFrequency', 'Procurement frequency'],
-                                            ['designation', 'Designation'], ['leadStatus', 'Lead status'], ['creditType', 'Credit type'],
-                                        ] as [string, string][]).map(([key, label]) => (
-                                            <EditRow key={key} label={label}>
-                                                <input value={draft.cp[key] ?? ''} onChange={e => setDraft(d => ({ ...d, cp: { ...d.cp, [key]: e.target.value } }))}
-                                                    className="w-full px-2 py-1.5 border border-gray-200 rounded text-[13px] outline-none focus:border-[#299E60]" />
-                                            </EditRow>
-                                        ))}
-                                    </>
-                                ) : (
-                                    <>
-                                        <DetailRow label="Full name" value={user.fullName} />
-                                        <DetailRow label="Email" value={user.email || '--'} />
-                                        <DetailRow label="Phone" value={user.phone || '--'} />
-                                        <DetailRow label="Pincode" value={user.pincode || '--'} />
-                                        <DetailRow label="Business Name" value={user.businessName || primaryBa?.displayName || primaryBa?.legalName || '--'} />
-                                        <DetailRow label="GST Number" value={user.gstNumber || primaryBa?.gstin || '--'} />
-                                        <DetailRow label="Joined" value={formatDateIndian(user.createdAt)} />
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'credit' && (
-                        <div className="space-y-6">
-                            <AdminEntityStatsRow
-                                stats={[
-                                    { label: 'Total Orders', value: user._count.orders, icon: Package, color: '#299E60' },
-                                    { label: 'Quick Order Lists', value: user._count.quickOrderLists, icon: ListOrdered, color: '#F59E0B' },
-                                ]}
-                            />
-                            {user.creditWallets && user.creditWallets.length > 0 ? (
-                                <div className="divide-y divide-[#EEEEEE] border border-[#EEEEEE] rounded-[14px] overflow-hidden">
-                                    {user.creditWallets.map((w) => (
-                                        <div key={w.id} className="p-6">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <p className="text-[14px] font-bold text-[#181725]">
-                                                    {w.vendorId ? (w.vendor?.businessName ?? 'Vendor credit line') : 'Horeca1 (platform)'}
-                                                </p>
-                                                <span className={cn('inline-block text-[11px] font-bold px-2.5 py-1 rounded-md', getWalletStatusStyles(w.status))}>
-                                                    {w.status}
-                                                </span>
+                            {activeTab === 'business' && (
+                                <div className="space-y-6">
+                                    {editing ? (
+                                        <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                            <h3 className="font-extrabold text-[15px] text-[#181725] mb-4">Edit Profile Details</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <EditField label="Full Name">
+                                                    <input value={draft.fullName} onChange={e => setDraft(d => ({ ...d, fullName: e.target.value }))}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                </EditField>
+                                                <EditField label="Email">
+                                                    <input type="email" value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                </EditField>
+                                                <EditField label="Phone">
+                                                    <input type="tel" inputMode="numeric" maxLength={10}
+                                                        value={draft.phone} onChange={e => setDraft(d => ({ ...d, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                </EditField>
+                                                <EditField label="Pincode">
+                                                    <input value={draft.pincode} onChange={e => setDraft(d => ({ ...d, pincode: e.target.value }))}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                </EditField>
+                                                <EditField label="Business name">
+                                                    <input value={draft.businessName} onChange={e => setDraft(d => ({ ...d, businessName: e.target.value }))}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                </EditField>
+                                                <EditField label="GST number">
+                                                    <input value={draft.gstNumber} onChange={e => setDraft(d => ({ ...d, gstNumber: e.target.value }))}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                </EditField>
+                                                {([
+                                                    ['pan', 'PAN'], ['fssaiNumber', 'FSSAI'],
+                                                    ['billingAddressLine', 'Billing address'], ['billingCity', 'Billing city'],
+                                                    ['billingState', 'Billing state'], ['billingPincode', 'Billing pincode'],
+                                                    ['businessType', 'Business type'], ['subType', 'Sub-type'],
+                                                    ['cuisine', 'Cuisine / category'], ['businessSize', 'Business size'],
+                                                    ['businessStructure', 'Business structure'], ['serviceModel', 'Service model'],
+                                                    ['monthlyPurchaseBand', 'Monthly purchase band'], ['procurementFrequency', 'Procurement frequency'],
+                                                    ['designation', 'Designation'], ['leadStatus', 'Lead status'], ['creditType', 'Credit type'],
+                                                ] as [string, string][]).map(([key, label]) => (
+                                                    <EditField key={key} label={label}>
+                                                        <input value={draft.cp[key] ?? ''} onChange={e => setDraft(d => ({ ...d, cp: { ...d.cp, [key]: e.target.value } }))}
+                                                            className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                    </EditField>
+                                                ))}
                                             </div>
-                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                                                <div>
-                                                    <p className="text-[12px] font-bold text-[#7C7C7C] mb-1">Credit Limit</p>
-                                                    <p className="text-[14px] font-bold">{INR(w.creditLimit)}</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6 animate-in fade-in duration-300">
+                                            {/* Personal Info Grid */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                                    <Users size={16} className="text-[#299E60]" />
+                                                    Personal Information
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <InfoCardField label="Full Name" value={user.fullName} />
+                                                    <InfoCardField label="Email" value={user.email} copyable />
+                                                    <InfoCardField label="Phone" value={user.phone} copyable />
+                                                    <InfoCardField label="Joined Date" value={formatDateIndian(user.createdAt)} />
+                                                    <InfoCardField label="Pincode" value={user.pincode} />
                                                 </div>
-                                                <div>
-                                                    <p className="text-[12px] font-bold text-[#7C7C7C] mb-1">Available</p>
-                                                    <p className="text-[14px] font-bold text-[#299E60]">{INR(w.availableCredit)}</p>
+                                            </div>
+
+                                            {/* Company Profile Info */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                                    <Building2 size={16} className="text-[#299E60]" />
+                                                    Company Registration Details
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <InfoCardField label="Business Name" value={user.businessName || primaryBa?.displayName || primaryBa?.legalName} />
+                                                    <InfoCardField label="GSTIN / GST Number" value={user.gstNumber || primaryBa?.gstin} copyable />
+                                                    <InfoCardField label="FSSAI License Number" value={primaryBa?.fssaiNumber} copyable />
+                                                    <InfoCardField label="PAN Card" value={primaryBa?.pan} copyable />
+                                                    <InfoCardField label="Designation" value={primaryBa?.designation} />
+                                                    <InfoCardField label="Lead Status" value={primaryBa?.leadStatus} />
                                                 </div>
-                                                <div>
-                                                    <p className="text-[12px] font-bold text-[#7C7C7C] mb-1">Outstanding</p>
-                                                    <p className="text-[14px] font-bold">{INR(w.outstandingAmount)}</p>
+                                            </div>
+
+                                            {/* Billing & Address */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                                    <MapPin size={16} className="text-[#299E60]" />
+                                                    Billing Address & Location
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <div className="sm:col-span-2">
+                                                        <InfoCardField label="Billing Address" value={primaryBa?.billingAddressLine} />
+                                                    </div>
+                                                    <InfoCardField label="Billing City" value={primaryBa?.billingCity} />
+                                                    <InfoCardField label="Billing State" value={primaryBa?.billingState} />
+                                                    <InfoCardField label="Billing Pincode" value={primaryBa?.billingPincode} />
                                                 </div>
-                                                <div>
-                                                    <p className="text-[12px] font-bold text-[#7C7C7C] mb-1">Due Date</p>
-                                                    <p className="text-[14px] font-bold">{w.currentDueDate ? formatDateIndian(w.currentDueDate) : '--'}</p>
+                                            </div>
+
+                                            {/* Business Profile Details */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                                    <SlidersHorizontal size={16} className="text-[#299E60]" />
+                                                    Business Profile Attributes
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <InfoCardField label="Business Type" value={primaryBa?.businessType} />
+                                                    <InfoCardField label="Sub Type" value={primaryBa?.subType} />
+                                                    <InfoCardField label="Cuisine / Category" value={primaryBa?.cuisine} />
+                                                    <InfoCardField label="Business Size" value={primaryBa?.businessSize} />
+                                                    <InfoCardField label="Business Structure" value={primaryBa?.businessStructure} />
+                                                    <InfoCardField label="Service Model" value={primaryBa?.serviceModel} />
+                                                    <InfoCardField label="Monthly Purchase Band" value={primaryBa?.monthlyPurchaseBand} />
+                                                    <InfoCardField label="Procurement Frequency" value={primaryBa?.procurementFrequency} />
+                                                    <InfoCardField label="Credit Type" value={primaryBa?.creditType} />
                                                 </div>
                                             </div>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
-                            ) : (
-                                <p className="text-[14px] text-[#6B7280] font-medium">No credit wallets assigned.</p>
                             )}
-                        </div>
-                    )}
 
-                    {activeTab === 'team' && primaryBa?.id && (
-                        <AdminAccountTeamPanel businessAccountId={primaryBa.id} />
-                    )}
-                    {activeTab === 'team' && !primaryBa?.id && (
-                        <p className="text-[14px] text-[#6B7280] font-medium">No business account team to display.</p>
-                    )}
-                </AdminEntityTabContent>
-            </AdminEntityTabPanel>
-        </div>
-    );
-}
+                            {activeTab === 'credit' && (
+                                <div className="space-y-6">
+                                    <AdminEntityStatsRow
+                                        stats={[
+                                            { label: 'Total Orders', value: user._count.orders, icon: Package, color: '#299E60' },
+                                            { label: 'Quick Order Lists', value: user._count.quickOrderLists, icon: ListOrdered, color: '#F59E0B' },
+                                        ]}
+                                    />
+                                    {user.creditWallets && user.creditWallets.length > 0 ? (
+                                        <div className="divide-y divide-[#D1D5DB] border border-[#D1D5DB] rounded-[14px] overflow-hidden bg-white">
+                                            {user.creditWallets.map((w) => (
+                                                <div key={w.id} className="p-6">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <p className="text-[14px] font-bold text-[#181725]">
+                                                            {w.vendorId ? (w.vendor?.businessName ?? 'Vendor credit line') : 'Horeca1 (platform)'}
+                                                        </p>
+                                                        <span className={cn('inline-block text-[11px] font-bold px-2.5 py-1 rounded-md', getWalletStatusStyles(w.status))}>
+                                                            {w.status}
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                                                        <div>
+                                                            <p className="text-[12px] font-bold text-[#7C7C7C] mb-1">Credit Limit</p>
+                                                            <p className="text-[14px] font-bold">{INR(w.creditLimit)}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[12px] font-bold text-[#7C7C7C] mb-1">Available</p>
+                                                            <p className="text-[14px] font-bold text-[#299E60]">{INR(w.availableCredit)}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[12px] font-bold text-[#7C7C7C] mb-1">Outstanding</p>
+                                                            <p className="text-[14px] font-bold">{INR(w.outstandingAmount)}</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[12px] font-bold text-[#7C7C7C] mb-1">Due Date</p>
+                                                            <p className="text-[14px] font-bold">{w.currentDueDate ? formatDateIndian(w.currentDueDate) : '--'}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-[14px] text-[#6B7280] font-medium">No credit wallets assigned.</p>
+                                    )}
+                                </div>
+                            )}
 
-function DetailRow({ label, value, copyText }: { label: string; value: string; copyText?: string }) {
-    const [copied, setCopied] = useState(false);
+                            {activeTab === 'team' && primaryBa?.id && (
+                                <AdminAccountTeamPanel businessAccountId={primaryBa.id} />
+                            )}
+                            {activeTab === 'team' && !primaryBa?.id && (
+                                <p className="text-[14px] text-[#6B7280] font-medium">No business account team to display.</p>
+                            )}
+                        </AdminEntityTabContent>
+                    </AdminEntityTabPanel>
+                </div>
 
-    const handleCopy = async () => {
-        if (!copyText) return;
-        try {
-            await navigator.clipboard.writeText(copyText);
-            setCopied(true);
-            toast.success(`${label} copied to clipboard`);
-            setTimeout(() => setCopied(false), 2000);
-        } catch (err) {
-            toast.error('Failed to copy to clipboard');
-        }
-    };
+                {/* Right Column: Sticky actions / Login credentials */}
+                <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-8 animate-in fade-in duration-300">
+                    <AdminLoginCredentialsPanel
+                        user={user}
+                        adminPassword={ownerPassword}
+                        permission="customers.edit"
+                        accent="#299E60"
+                        onPasswordUpdated={setOwnerPassword}
+                    />
 
-    return (
-        <div className="px-6 py-4 flex items-center justify-between text-[13px]">
-            <span className="font-[800] text-[#4B4B4B]">{label} :</span>
-            <div className="flex items-center gap-1.5 justify-end max-w-[60%]">
-                <span className="font-[800] text-[#181725] truncate">
-                    {value}
-                </span>
-                {copyText && (
-                    <button
-                        onClick={handleCopy}
-                        className="p-1 rounded hover:bg-gray-100 text-[#7C7C7C] hover:text-[#181725] transition-colors cursor-pointer shrink-0"
-                        title={`Copy ${label}`}
-                    >
-                        {copied ? (
-                            <span className="text-[10px] text-[#299E60] font-bold">Copied!</span>
-                        ) : (
-                            <Copy size={13} />
-                        )}
-                    </button>
-                )}
+                    <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm flex flex-col gap-4">
+                        <span className="text-[11px] font-extrabold text-[#9CA3AF] uppercase tracking-wider block">
+                            Account Actions
+                        </span>
+                        <button
+                            type="button"
+                            onClick={handleToggleActive}
+                            disabled={toggling}
+                            className={cn(
+                                'w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border',
+                                user.isActive
+                                    ? 'bg-white border-red-200 text-red-600 hover:bg-red-50'
+                                    : 'bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54]',
+                            )}
+                        >
+                            {toggling ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />}
+                            {user.isActive ? 'Deactivate User' : 'Activate User'}
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );
 }
 
-function CopyButton({ text, label }: { text: string; label: string }) {
-    const [copied, setCopied] = useState(false);
-    const handleCopy = async () => {
-        try {
-            await navigator.clipboard.writeText(text);
-            setCopied(true);
-            toast.success(`${label} copied to clipboard`);
-            setTimeout(() => setCopied(false), 2000);
-        } catch (err) {
-            toast.error('Failed to copy to clipboard');
-        }
-    };
+function EditField({ label, children }: { label: string; children: React.ReactNode }) {
     return (
-        <button
-            onClick={handleCopy}
-            className="p-1 rounded hover:bg-gray-100 text-[#7C7C7C] hover:text-[#181725] transition-colors inline-flex items-center justify-center cursor-pointer shrink-0"
-            title={`Copy ${label}`}
-        >
-            {copied ? (
-                <Check size={12} className="text-[#299E60]" />
-            ) : (
-                <Copy size={12} />
-            )}
-        </button>
+        <div className="flex flex-col gap-1.5 w-full">
+            <span className="text-[11px] font-bold text-[#6B7280] uppercase tracking-wider">{label}</span>
+            <div className="w-full">{children}</div>
+        </div>
     );
 }
 
-function EditRow({ label, children }: { label: string; children: React.ReactNode }) {
+function InfoCardField({ label, value, copyable }: { label: string; value: string | null | undefined; copyable?: boolean }) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = async () => {
+        if (!value) return;
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopied(true);
+            toast.success(`${label} copied`);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            toast.error('Failed to copy');
+        }
+    };
+
+    const displayValue = value && value.trim() !== '' ? value : '—';
+
     return (
-        <div className="px-6 py-3 flex items-center justify-between text-[13px] gap-3">
-            <span className="font-[800] text-[#4B4B4B] shrink-0">{label} :</span>
-            <div className="max-w-[60%] w-full">{children}</div>
+        <div className="flex flex-col gap-1 p-3.5 bg-[#F9FAFB] rounded-[10px] border border-[#F0F2F5] transition-all hover:bg-gray-50/60 relative group min-w-0">
+            <span className="text-[10px] font-extrabold text-[#9CA3AF] uppercase tracking-wider">{label}</span>
+            <div className="flex items-center gap-1.5 justify-between min-w-0">
+                <span className="text-[13px] font-extrabold text-[#181725] truncate">
+                    {displayValue}
+                </span>
+                {copyable && value && (
+                    <button
+                        onClick={handleCopy}
+                        className="p-1 rounded hover:bg-white hover:shadow-sm text-[#9CA3AF] hover:text-[#299E60] transition-all cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title={`Copy ${label}`}
+                    >
+                        {copied ? (
+                            <Check size={11} className="text-[#299E60]" />
+                        ) : (
+                            <Copy size={11} />
+                        )}
+                    </button>
+                )}
+            </div>
         </div>
     );
 }
