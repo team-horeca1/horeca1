@@ -8,6 +8,7 @@ import { withRole } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { prisma } from '@/lib/prisma';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
+import { requirePermission } from '@/lib/permissions/engine';
 import { parseServeSegment, readVendorDoc, mimeForExt } from '@/lib/vendorDocStorage';
 
 export const runtime = 'nodejs';
@@ -24,8 +25,10 @@ export const GET = withRole(['admin', 'vendor'], async (req: NextRequest, ctx) =
     });
     if (!doc) throw Errors.notFound('Document');
 
-    // Vendors may only read their own documents; admins may read any.
-    if (ctx.role !== 'admin') {
+    // Vendors may only read their own documents; admins need vendors.view.
+    if (ctx.role === 'admin') {
+      requirePermission(ctx, 'vendors.view');
+    } else {
       const { vendorId } = await resolveVendorContext(ctx, req);
       if (vendorId !== doc.vendorId) throw Errors.forbidden();
     }

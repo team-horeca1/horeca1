@@ -19,6 +19,7 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
 });
 
 export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
+  requirePermission(ctx, 'products.edit');
   const userId = await resolveUserId(ctx, req);
   const result = await brandService.triggerMapping(userId);
   return NextResponse.json({ success: true, data: result });

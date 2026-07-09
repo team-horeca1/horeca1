@@ -16,7 +16,6 @@ const adjustmentSchema = z.object({
   amount: z.number().positive(),
   type: z.enum(['credit', 'debit']),
   notes: z.string().max(500).optional(),
-  vendorId: z.string().uuid().optional(),
 });
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
@@ -148,8 +147,10 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     if (ctx.role !== 'admin') {
       throw Errors.forbidden('Admin only');
     }
+    // Finance mutation — scoped to impersonated/owned vendor only (no body.vendorId bypass).
+    requirePermission(ctx, 'payments.create');
     const body = adjustmentSchema.parse(await req.json());
-    const vendorId = body.vendorId ?? await resolveVendorId(ctx, req);
+    const vendorId = await resolveVendorId(ctx, req);
 
     const wallet = await prisma.vendorWallet.upsert({
       where: { vendorId },

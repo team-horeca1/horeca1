@@ -24,6 +24,7 @@ const createSchema = z.object({
 
 export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'brands.view');
     const { brandId } = await resolveBrandContext(ctx, req);
     const invites = await prisma.brandDistributorInvite.findMany({
       where: { brandId },

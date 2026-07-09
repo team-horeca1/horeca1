@@ -41,6 +41,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
 export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'customers.create');
     const vendorId = await resolveVendorId(ctx, req);
     const body = createSchema.parse(await req.json());
 

@@ -21,6 +21,7 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
 });
 
 export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
+  requirePermission(ctx, 'brands.create');
   const userId = await resolveUserId(ctx, req);
   const body = await req.json();
   const input = createBrandSchema.parse(body);
