@@ -27,6 +27,10 @@ import { cn } from '@/lib/utils';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
+import {
+    AdminRegistryPageHeader,
+    AdminRegistryFilterBar,
+} from '@/components/features/admin/entity';
 
 const cellInput = 'bg-transparent border border-transparent hover:border-[#D1D5DB] focus:border-[#299E60] focus:bg-white focus:ring-1 focus:ring-[#299E60]/20 px-1.5 py-1 rounded-[4px] outline-none w-full text-[12.5px] tabular-nums transition-colors';
 
@@ -593,63 +597,58 @@ export default function CategoriesPage() {
             {/* ============================================================= */}
             {/* Header */}
             {/* ============================================================= */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-[28px] font-[900] text-[#181725] tracking-tight">
-                        Category Management
-                    </h1>
-                    <p className="text-[#7C7C7C] font-medium mt-1">
-                        Organize and manage your product categories
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-3 flex-wrap">
-                    {/* Import */}
-                    <button
-                        onClick={openImportModal}
-                        className="h-[44px] px-5 flex items-center gap-2 bg-white border border-[#EEEEEE] rounded-[12px] text-[14px] font-bold text-[#181725] hover:border-[#299E60]/40 hover:shadow-sm transition-all"
-                    >
-                        <Upload size={16} />
-                        Import
-                    </button>
-
-                    {/* Export dropdown */}
-                    <div className="relative group">
-                        <button className="h-[44px] px-5 flex items-center gap-2 bg-white border border-[#EEEEEE] rounded-[12px] text-[14px] font-bold text-[#181725] hover:border-[#299E60]/40 hover:shadow-sm transition-all">
-                            <Download size={16} />
-                            Export
-                            <ChevronDown size={14} className="text-[#AEAEAE]" />
-                        </button>
-                        <div className="absolute right-0 top-full mt-2 bg-white border border-[#EEEEEE] rounded-[12px] shadow-lg py-2 w-[180px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
-                            <button
-                                onClick={() => handleExport('csv')}
-                                className="w-full px-4 py-2.5 text-left text-[14px] font-medium text-[#181725] hover:bg-[#F8F9FB] flex items-center gap-2.5 transition-colors"
-                            >
-                                <FileText size={16} className="text-[#299E60]" />
-                                Export CSV
-                            </button>
-                            <button
-                                onClick={() => handleExport('xlsx')}
-                                className="w-full px-4 py-2.5 text-left text-[14px] font-medium text-[#181725] hover:bg-[#F8F9FB] flex items-center gap-2.5 transition-colors"
-                            >
-                                <FileSpreadsheet size={16} className="text-[#299E60]" />
-                                Export Excel
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Add Category */}
-                    {canWriteProducts && (
+            <AdminRegistryPageHeader
+                title="Category Management"
+                subtitle="Organize and manage your product categories"
+                actions={
+                    <>
+                        {/* Import */}
                         <button
-                            onClick={openCreateModal}
-                            className="h-[44px] px-6 flex items-center gap-2 bg-[#299E60] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#238a54] shadow-sm shadow-[#299E60]/20 transition-all active:scale-[0.98]"
+                            onClick={openImportModal}
+                            className="h-[44px] px-5 flex items-center gap-2 bg-white border border-[#D1D5DB] rounded-[12px] text-[14px] font-bold text-[#181725] hover:border-[#299E60]/40 hover:shadow-sm transition-all"
                         >
-                            <Plus size={18} strokeWidth={2.5} />
-                            Add Category
+                            <Upload size={16} />
+                            Import
                         </button>
-                    )}
-                </div>
-            </div>
+
+                        {/* Export dropdown */}
+                        <div className="relative group">
+                            <button className="h-[44px] px-5 flex items-center gap-2 bg-white border border-[#D1D5DB] rounded-[12px] text-[14px] font-bold text-[#181725] hover:border-[#299E60]/40 hover:shadow-sm transition-all">
+                                <Download size={16} />
+                                Export
+                                <ChevronDown size={14} className="text-[#AEAEAE]" />
+                            </button>
+                            <div className="absolute right-0 top-full mt-2 bg-white border border-[#D1D5DB] rounded-[12px] shadow-lg py-2 w-[180px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+                                <button
+                                    onClick={() => handleExport('csv')}
+                                    className="w-full px-4 py-2.5 text-left text-[14px] font-medium text-[#181725] hover:bg-[#F8F9FB] flex items-center gap-2.5 transition-colors"
+                                >
+                                    <FileText size={16} className="text-[#299E60]" />
+                                    Export CSV
+                                </button>
+                                <button
+                                    onClick={() => handleExport('xlsx')}
+                                    className="w-full px-4 py-2.5 text-left text-[14px] font-medium text-[#181725] hover:bg-[#F8F9FB] flex items-center gap-2.5 transition-colors"
+                                >
+                                    <FileSpreadsheet size={16} className="text-[#299E60]" />
+                                    Export Excel
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Add Category */}
+                        {canWriteProducts && (
+                            <button
+                                onClick={openCreateModal}
+                                className="h-[44px] px-6 flex items-center gap-2 bg-[#299E60] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#238a54] shadow-sm shadow-[#299E60]/20 transition-all active:scale-[0.98] shrink-0"
+                            >
+                                <Plus size={18} strokeWidth={2.5} />
+                                Add Category
+                            </button>
+                        )}
+                    </>
+                }
+            />
 
             {/* ============================================================= */}
             {/* Stats */}
@@ -687,7 +686,7 @@ export default function CategoriesPage() {
                 ].map((stat, idx) => (
                     <div
                         key={idx}
-                        className="bg-white p-6 rounded-[14px] border border-[#EEEEEE] shadow-sm flex items-center gap-5"
+                        className="bg-white p-6 rounded-[14px] border border-[#D1D5DB] shadow-sm flex items-center gap-5"
                     >
                         <div
                             className="w-[56px] h-[56px] rounded-[14px] flex items-center justify-center shrink-0"
@@ -723,57 +722,46 @@ export default function CategoriesPage() {
                 </div>
             )}
 
+            <AdminRegistryFilterBar
+                searchValue={searchQuery}
+                onSearchChange={setSearchQuery}
+                searchPlaceholder="Search categories..."
+            />
+
             {/* ============================================================= */}
             {/* Category Table */}
             {/* ============================================================= */}
-            <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
-                {/* Search bar inside card */}
-                <div className="p-6 border-b border-[#EEEEEE] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <h2 className="text-[20px] font-[900] text-[#181725]">All Categories</h2>
-                    <div className="relative w-full md:w-[320px]">
-                        <Search
-                            className="absolute left-4 top-1/2 -translate-y-1/2 text-[#AEAEAE]"
-                            size={18}
-                        />
-                        <input
-                            type="text"
-                            placeholder="Search categories..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[12px] py-3 pl-11 pr-4 text-[14px] outline-none transition-all placeholder:text-[#AEAEAE] font-medium focus:border-[#299E60]/40 focus:bg-white focus:shadow-sm"
-                        />
-                    </div>
-                </div>
+            <div className="bg-white rounded-[14px] border border-[#D1D5DB] shadow-sm overflow-hidden">
 
                 {/* Table */}
                 <div className="overflow-x-auto min-h-[300px]">
                     <table className="w-full text-left border-collapse min-w-[1200px]">
                         <thead>
-                            <tr className="bg-[#F8F9FB] text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wider">
-                                <th className="px-8 py-4 sticky left-0 bg-[#F8F9FB] z-20 min-w-[280px]">
+                            <tr className="bg-[#F9FAFB] text-[11px] font-bold text-[#6B7280] uppercase tracking-wider border-b border-[#D1D5DB]">
+                                <th className="pl-8 pr-6 py-3.5 sticky left-0 bg-[#F9FAFB] z-20 min-w-[280px] border-r border-[#D1D5DB]">
                                     Category
                                 </th>
-                                <th className="px-6 py-4 min-w-[200px]">
+                                <th className="px-6 py-3.5 min-w-[200px] border-r border-[#D1D5DB]">
                                     Slug
                                 </th>
-                                <th className="px-6 py-4 min-w-[110px]">
+                                <th className="px-6 py-3.5 min-w-[110px] border-r border-[#D1D5DB]">
                                     Products
                                 </th>
-                                <th className="px-6 py-4 min-w-[110px] text-right">
+                                <th className="px-6 py-3.5 min-w-[110px] text-right border-r border-[#D1D5DB]">
                                     Sort Order
                                 </th>
-                                <th className="px-6 py-4 min-w-[130px]">
+                                <th className="px-6 py-3.5 min-w-[130px] border-r border-[#D1D5DB]">
                                     Status
                                 </th>
-                                <th className="px-6 py-4 min-w-[130px]">
+                                <th className="px-6 py-3.5 min-w-[130px] border-r border-[#D1D5DB]">
                                     Active
                                 </th>
-                                <th className="px-8 py-4 text-right sticky right-0 bg-[#F8F9FB] z-20 min-w-[100px]">
+                                <th className="pl-4 pr-8 py-3.5 text-right sticky right-0 bg-[#F9FAFB] z-20 min-w-[100px] border-l border-[#D1D5DB]">
                                     Actions
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#EEEEEE]">
+                        <tbody className="divide-y divide-[#D1D5DB]">
                             {filteredCategories.map((parent) => {
                                 const children = parent.children || [];
                                 const hasChildren = children.length > 0;
@@ -1321,14 +1309,14 @@ const CategoryRow = ({
     return (
         <tr
             className={cn(
-                'hover:bg-[#F8F9FB]/60 transition-colors group text-[13px]',
+                'hover:bg-[#F9FAFB]/60 transition-colors group text-[13px]',
                 isChild && 'bg-[#FAFBFC]'
             )}
         >
             {/* Name + Image (sticky left) */}
             <td className={cn(
-                "px-8 py-3 sticky left-0 z-10 border-r border-[#EEEEEE]/40 transition-colors",
-                isChild ? "bg-[#FAFBFC] group-hover:bg-[#F8F9FB]" : "bg-white group-hover:bg-[#F8F9FB]"
+                "pl-8 pr-6 py-3 sticky left-0 z-10 border-r border-[#D1D5DB] transition-colors align-middle",
+                isChild ? "bg-[#FAFBFC] group-hover:bg-[#F9FAFB]" : "bg-white group-hover:bg-[#F9FAFB]"
             )}>
                 <div className={cn('flex items-center gap-3', isChild && 'pl-8')}>
                     {/* Expand/collapse or indent indicator */}
@@ -1363,7 +1351,7 @@ const CategoryRow = ({
                         <img
                             src={cat.imageUrl}
                             alt={cat.name}
-                            className="w-9 h-9 rounded-[8px] object-cover border border-[#EEEEEE] shrink-0"
+                            className="w-9 h-9 rounded-[8px] object-cover border border-[#D1D5DB] shrink-0"
                         />
                     ) : (
                         <div className="w-9 h-9 rounded-[8px] bg-[#F1F4F9] flex items-center justify-center shrink-0">
@@ -1389,7 +1377,7 @@ const CategoryRow = ({
             </td>
 
             {/* Slug */}
-            <td className="px-6 py-3 border-r border-[#EEEEEE]/40">
+            <td className="px-6 py-3 border-r border-[#D1D5DB] align-middle">
                 <input
                     type="text"
                     value={cat.slug}
@@ -1400,7 +1388,7 @@ const CategoryRow = ({
             </td>
 
             {/* Products */}
-            <td className="px-6 py-3 border-r border-[#EEEEEE]/40">
+            <td className="px-6 py-3 border-r border-[#D1D5DB] align-middle">
                 <div className="flex items-center gap-1.5 px-1.5 font-semibold text-[#181725]">
                     <Package size={14} className="text-[#AEAEAE]" />
                     <span>{cat._count?.products ?? 0}</span>
@@ -1408,7 +1396,7 @@ const CategoryRow = ({
             </td>
 
             {/* Sort Order */}
-            <td className="px-6 py-3 border-r border-[#EEEEEE]/40 bg-[#FAFAFA]/10">
+            <td className="px-6 py-3 border-r border-[#D1D5DB] bg-[#FAFAFA]/10 align-middle">
                 <input
                     type="number"
                     value={cat.sortOrder}
@@ -1419,7 +1407,7 @@ const CategoryRow = ({
             </td>
 
             {/* Status */}
-            <td className="px-6 py-3 border-r border-[#EEEEEE]/40">
+            <td className="px-6 py-3 border-r border-[#D1D5DB] align-middle">
                 <select
                     value={cat.approvalStatus}
                     onChange={e => {
@@ -1440,7 +1428,7 @@ const CategoryRow = ({
             </td>
 
             {/* Active toggle */}
-            <td className="px-6 py-3 border-r border-[#EEEEEE]/40">
+            <td className="px-6 py-3 border-r border-[#D1D5DB] align-middle">
                 <button
                     type="button"
                     onClick={(e) => {
@@ -1474,7 +1462,7 @@ const CategoryRow = ({
             </td>
 
             {/* Actions (sticky right) */}
-            <td className="px-8 py-3 sticky right-0 bg-white group-hover:bg-[#F8F9FB] z-10 border-l border-[#EEEEEE]/40 text-right">
+            <td className="pl-4 pr-8 py-3 sticky right-0 bg-white group-hover:bg-[#F9FAFB] z-10 border-l border-[#D1D5DB] text-right align-middle">
                 <div className="flex items-center justify-end gap-2">
                     {savingRows.has(cat.id) ? (
                         <Loader2 size={16} className="animate-spin text-[#299E60] mx-auto mr-4" />

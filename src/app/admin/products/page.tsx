@@ -28,6 +28,8 @@ import {
     Settings as SettingsIcon,
     BarChart3,
     Wand2,
+    LayoutGrid,
+    List,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -51,6 +53,12 @@ import {
     focusFirstProductFormError,
     type ProductValidationField,
 } from '@/components/features/shared/productFormValidation';
+import {
+    AdminRegistryPageHeader,
+    AdminRegistryFilterBar,
+    registryFilterPillClass,
+} from '@/components/features/admin/entity';
+
 // Types
 // ---------------------------------------------------------------------------
 
@@ -268,7 +276,7 @@ const EMPTY_FORM: ProductFormData = {
 const inputCls = productFormInputCls;
 const selectCls = productFormSelectCls;
 const textareaCls = productFormTextareaCls;
-const cellInput = 'bg-transparent border border-transparent hover:border-[#D1D5DB] focus:border-[#299E60] focus:bg-white focus:ring-1 focus:ring-[#299E60]/20 px-1.5 py-1 rounded-[4px] outline-none w-full text-[12.5px] tabular-nums transition-colors';
+const cellInput = 'bg-transparent border border-transparent hover:border-[#D1D5DB] focus:border-[#299E60] focus:bg-white focus:ring-1 focus:ring-[#299E60]/20 px-1 py-0.5 rounded-[4px] outline-none w-full text-[11.5px] xl:text-[12.5px] tabular-nums transition-colors';
 
 function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
     const [input, setInput] = useState('');
@@ -856,6 +864,9 @@ export default function ProductsPage() {
 
     const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0, rejected: 0 });
 
+    // View Mode State
+    const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+
     const statCards = [
         { label: 'Total Products', value: stats.total, icon: Package, color: '#3B82F6', bgColor: '#EFF6FF' },
         { label: 'Approved', value: stats.approved, icon: CheckCircle, color: '#299E60', bgColor: '#EEF8F1' },
@@ -1309,7 +1320,11 @@ export default function ProductsPage() {
         if (formData.storageType) payload.storageType = formData.storageType;
         if (formData.shelfLifeDays) payload.shelfLifeDays = parseInt(formData.shelfLifeDays, 10);
         if (formData.countryOfOrigin.trim()) payload.countryOfOrigin = formData.countryOfOrigin.trim();
-        if (formData.substituteIds.length > 0) payload.substituteIds = formData.substituteIds;
+        if (formData.substituteIds.length > 0) {
+            payload.substituteIds = formData.substituteIds;
+        } else if (editingProduct) {
+            payload.substituteIds = [];
+        }
         payload.isFeatured = formData.isFeatured;
         return payload;
     };
@@ -1606,60 +1621,53 @@ export default function ProductsPage() {
     return (
         <div className="max-w-[1600px] mx-auto space-y-8 pb-10 animate-in fade-in duration-500">
             {/* ============================================================= */}
-            {/* Header Row                                                      */}
-            {/* ============================================================= */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-[28px] font-[900] text-[#181725] tracking-tight leading-none mb-1">
-                        Product Management
-                    </h1>
-                    <p className="text-[#7C7C7C] font-medium text-[13px]">
-                        Manage all products across every vendor
-                    </p>
-                </div>
+            <AdminRegistryPageHeader
+                title="Product Management"
+                subtitle="Manage all products across every vendor"
+                actions={
+                    <>
+                        {canWriteProducts && (
+                            <BulkProductToolbar
+                                vendors={vendors}
+                                gridVendorId={gridVendorId}
+                                onGridVendorChange={setGridVendorId}
+                                onImport={openImport}
+                                onSpreadsheet={() => void openBulkGrid()}
+                                onExportCsv={() => handleExport('csv')}
+                                onExportXlsx={() => handleExport('xlsx')}
+                                spreadsheetLoading={gridLoading}
+                                showVendorPicker
+                                activeTab={gridOpen ? 'spreadsheet' : importOpen ? 'import' : null}
+                            />
+                        )}
 
-                <div className="flex items-center gap-3 flex-wrap justify-end">
-                    {canWriteProducts && (
-                        <BulkProductToolbar
-                            vendors={vendors}
-                            gridVendorId={gridVendorId}
-                            onGridVendorChange={setGridVendorId}
-                            onImport={openImport}
-                            onSpreadsheet={() => void openBulkGrid()}
-                            onExportCsv={() => handleExport('csv')}
-                            onExportXlsx={() => handleExport('xlsx')}
-                            spreadsheetLoading={gridLoading}
-                            showVendorPicker
-                            activeTab={gridOpen ? 'spreadsheet' : importOpen ? 'import' : null}
-                        />
-                    )}
+                        {canWriteProducts && draftCount > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setFilterDrafts(true);
+                                    setFilterStatus('');
+                                }}
+                                className="h-[44px] px-4 bg-white border border-[#D1D5DB] rounded-[12px] text-[13px] font-bold text-[#4F6BED] hover:bg-[#F0F4FF] transition-all flex items-center gap-2"
+                            >
+                                <Clock size={16} />
+                                Drafts ({draftCount})
+                            </button>
+                        )}
 
-                    {canWriteProducts && draftCount > 0 && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setFilterDrafts(true);
-                                setFilterStatus('');
-                            }}
-                            className="h-[44px] px-4 bg-white border border-[#EEEEEE] rounded-[12px] text-[13px] font-bold text-[#4F6BED] hover:bg-[#F0F4FF] transition-all flex items-center gap-2"
-                        >
-                            <Clock size={16} />
-                            Drafts ({draftCount})
-                        </button>
-                    )}
-
-                    {/* Add Product Button */}
-                    {canWriteProducts && (
-                        <button
-                            onClick={openCreate}
-                            className="h-[44px] px-6 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] transition-all flex items-center gap-2 shadow-sm shadow-[#299E60]/20"
-                        >
-                            <Plus size={16} strokeWidth={3} />
-                            Add Product
-                        </button>
-                    )}
-                </div>
-            </div>
+                        {/* Add Product Button */}
+                        {canWriteProducts && (
+                            <button
+                                onClick={openCreate}
+                                className="h-[44px] px-6 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] transition-all flex items-center gap-2 shadow-sm shadow-[#299E60]/20 shrink-0"
+                            >
+                                <Plus size={16} strokeWidth={3} />
+                                Add Product
+                            </button>
+                        )}
+                    </>
+                }
+            />
 
             {/* ============================================================= */}
             {/* Stats Cards                                                     */}
@@ -1668,7 +1676,7 @@ export default function ProductsPage() {
                 {statCards.map((card, idx) => (
                     <div
                         key={idx}
-                        className="bg-white p-6 rounded-[14px] border border-[#EEEEEE] shadow-sm flex items-center gap-5"
+                        className="bg-white p-6 rounded-[14px] border border-[#D1D5DB] shadow-sm flex items-center gap-5"
                     >
                         <div
                             className="w-[56px] h-[56px] rounded-[14px] flex items-center justify-center shrink-0"
@@ -1686,64 +1694,98 @@ export default function ProductsPage() {
                 ))}
             </div>
 
-            {/* ============================================================= */}
-            {/* Filters Row                                                     */}
-            {/* ============================================================= */}
-            <div className="bg-white p-6 rounded-[14px] border border-[#EEEEEE] shadow-sm">
-                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                    {/* Search */}
-                    <div className="relative flex-1 min-w-[220px]">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#AEAEAE]" size={16} />
-                        <input
-                            type="text"
-                            placeholder="Search products..."
-                            value={searchInput}
-                            onChange={e => setSearchInput(e.target.value)}
-                            className="w-full h-[44px] bg-[#F8F9FB] border border-[#EEEEEE] rounded-[12px] pl-10 pr-4 text-[13px] outline-none transition-all placeholder:text-[#AEAEAE] font-medium focus:border-[#299E60]/40 focus:bg-white focus:shadow-sm"
-                        />
+            <AdminRegistryFilterBar
+                searchValue={searchInput}
+                onSearchChange={setSearchInput}
+                searchPlaceholder="Search products..."
+                leftSlot={
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/* Status Pills */}
+                        {(
+                            [
+                                { id: 'all', label: 'All Statuses' },
+                                { id: 'draft', label: 'Drafts' },
+                                { id: 'pending', label: 'Pending' },
+                                { id: 'approved', label: 'Approved' },
+                                { id: 'rejected', label: 'Rejected' },
+                            ] as const
+                        ).map((tab) => {
+                            const active = tab.id === 'all'
+                                ? (!filterDrafts && !filterStatus)
+                                : tab.id === 'draft'
+                                ? filterDrafts
+                                : filterStatus === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    type="button"
+                                    onClick={() => {
+                                        if (tab.id === 'all') {
+                                            setFilterDrafts(false);
+                                            setFilterStatus('');
+                                        } else if (tab.id === 'draft') {
+                                            setFilterDrafts(true);
+                                            setFilterStatus('');
+                                        } else {
+                                            setFilterDrafts(false);
+                                            setFilterStatus(tab.id);
+                                        }
+                                    }}
+                                    className={registryFilterPillClass(active)}
+                                >
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
+
+                        {/* Category Dropdown Filter */}
+                        <select
+                            value={filterCategory}
+                            onChange={e => setFilterCategory(e.target.value)}
+                            className="h-[34px] bg-[#F9FAFB] border border-[#D1D5DB] rounded-[8px] px-3.5 text-[12px] font-bold text-[#6B7280] outline-none focus:border-[#299E60]/50 transition-all min-w-[150px] cursor-pointer ml-1"
+                        >
+                            <option value="">All Categories</option>
+                            {categories.map(c => (
+                                <option key={c.id} value={c.id}>
+                                    {c.parentId ? `— ${c.name}` : c.name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
-
-                    {/* Approval Status */}
-                    <select
-                        value={filterDrafts ? '__drafts__' : filterStatus}
-                        onChange={e => {
-                            if (e.target.value === '__drafts__') {
-                                setFilterDrafts(true);
-                                setFilterStatus('');
-                            } else {
-                                setFilterDrafts(false);
-                                setFilterStatus(e.target.value);
-                            }
-                        }}
-                        className="h-[44px] bg-[#F8F9FB] border border-[#EEEEEE] rounded-[12px] px-4 text-[13px] font-medium text-[#181725] outline-none focus:border-[#299E60]/40 focus:bg-white transition-all min-w-[160px] cursor-pointer"
-                    >
-                        <option value="">All Statuses</option>
-                        <option value="__drafts__">Drafts</option>
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                    </select>
-
-                    {/* Category */}
-                    <select
-                        value={filterCategory}
-                        onChange={e => setFilterCategory(e.target.value)}
-                        className="h-[44px] bg-[#F8F9FB] border border-[#EEEEEE] rounded-[12px] px-4 text-[13px] font-medium text-[#181725] outline-none focus:border-[#299E60]/40 focus:bg-white transition-all min-w-[180px] cursor-pointer"
-                    >
-                        <option value="">All Categories</option>
-                        {categories.map(c => (
-                            <option key={c.id} value={c.id}>
-                                {c.parentId ? `— ${c.name}` : c.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            </div>
+                }
+                trailingSlot={
+                    <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase mr-1 hidden md:inline">View:</span>
+                        <div className="flex items-center bg-[#F3F4F6] border border-[#D1D5DB] rounded-[10px] p-1">
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={cn(
+                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
+                                    viewMode === 'grid' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
+                                )}
+                            >
+                                <LayoutGrid size={15} />
+                                <span className="hidden sm:inline">Cards</span>
+                            </button>
+                            <button
+                                onClick={() => setViewMode('table')}
+                                className={cn(
+                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
+                                    viewMode === 'table' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
+                                )}
+                            >
+                                <List size={15} />
+                                <span className="hidden sm:inline">Table</span>
+                            </button>
+                        </div>
+                    </div>
+                }
+            />
 
             {/* ============================================================= */}
             {/* Products Table                                                  */}
             {/* ============================================================= */}
-            <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
+            <div className="bg-white rounded-[14px] border border-[#D1D5DB] shadow-sm overflow-hidden">
                 {loading ? (
                     <div className="flex items-center justify-center py-24">
                         <Loader2 className="animate-spin text-[#299E60]" size={32} />
@@ -1761,13 +1803,138 @@ export default function ProductsPage() {
                     </div>
                 ) : (
                     <>
-                        <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse min-w-[1440px]">
-                            <thead>
+                        {viewMode === 'grid' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6 bg-[#FDFDFD]">
+                                {products.map((product) => {
+                                    const grossPrice = product.basePrice * (1 + (product.taxPercent || 0) / 100);
+                                    return (
+                                        <div
+                                            key={product.id}
+                                            className="bg-white rounded-[16px] border border-[#D1D5DB] shadow-sm overflow-hidden flex flex-col h-full hover:shadow-md hover:border-[#299E60]/30 hover:-translate-y-0.5 transition-all w-full relative text-[12.5px]"
+                                        >
+                                            {/* Checkbox at top left */}
+                                            <div className="absolute top-4 left-4 z-10" onClick={(e) => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.has(product.id)}
+                                                    onChange={() => toggleSelect(product.id)}
+                                                    className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
+                                                />
+                                            </div>
+
+                                            {/* Top Visual Image Section */}
+                                            <div className="p-5 flex-1 flex flex-col">
+                                                <div className="bg-[#F9FAFB] rounded-[12px] h-[140px] relative flex items-center justify-center p-4 border border-[#F3F4F6] mb-4">
+                                                    {product.listingStatus === 'draft' ? (
+                                                        <span className="absolute top-2.5 right-2.5 text-[10px] font-extrabold px-2 py-0.5 rounded-[4px] uppercase tracking-wider bg-[#F0F4FF] text-[#4F6BED]">
+                                                            Draft
+                                                        </span>
+                                                    ) : (
+                                                        <span className={cn(
+                                                            "absolute top-2.5 right-2.5 text-[10px] font-extrabold px-2 py-0.5 rounded-[4px] uppercase tracking-wider shadow-sm",
+                                                            product.approvalStatus === 'approved' ? 'text-[#299E60] bg-[#EEF8F1]' :
+                                                            product.approvalStatus === 'rejected' ? 'text-[#E74C3C] bg-[#FFF0F0]' :
+                                                            'text-[#F59E0B] bg-[#FFF7E6]'
+                                                        )}>
+                                                            {product.approvalStatus}
+                                                        </span>
+                                                    )}
+
+                                                    {product.imageUrl ? (
+                                                        <img
+                                                            src={product.imageUrl}
+                                                            alt={product.name}
+                                                            className="w-[100px] h-[100px] object-cover rounded-lg"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-[80px] h-[80px] rounded-full bg-[#299E60]/10 flex items-center justify-center border border-[#299E60]/20">
+                                                            <ImageIcon size={30} className="text-[#299E60]" />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Info Block */}
+                                                <div className="mb-3">
+                                                    <h3 className="text-[15px] font-extrabold text-[#111827] line-clamp-1">{product.name}</h3>
+                                                    <p className="text-[11px] text-[#AEAEAE] font-semibold mt-0.5">SKU: {product.sku}</p>
+                                                    <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                                                        <span className="bg-gray-100 text-[#4B5563] text-[10px] font-bold px-2 py-0.5 rounded-[4px]">
+                                                            {product.brand || 'No Brand'}
+                                                        </span>
+                                                        <span className="bg-green-50 text-[#299E60] text-[10px] font-bold px-2 py-0.5 rounded-[4px]">
+                                                            {product.category?.name || 'Uncategorized'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Prices */}
+                                                <div className="space-y-1.5 mt-auto pt-2 border-t border-[#F3F4F6]">
+                                                    <div className="flex items-center justify-between text-[12px] font-semibold text-[#4B5563]">
+                                                        <span>Base Price:</span>
+                                                        <span className="text-[#181725]">₹{product.basePrice.toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-[12px] font-semibold text-[#4B5563]">
+                                                        <span>GST Rate:</span>
+                                                        <span>{product.taxPercent ?? 0}%</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-[13px] font-bold border-t border-dashed border-[#F3F4F6] pt-1.5 text-[#299E60]">
+                                                        <span>Gross Price:</span>
+                                                        <span>₹{grossPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Inventory */}
+                                                <div className="flex items-center justify-between border-t border-[#F3F4F6] pt-3 mt-4 -mx-5 px-5 bg-[#F9FAFB] rounded-b-[10px] h-[52px]">
+                                                    <span className="text-[11px] font-bold text-[#9CA3AF] uppercase">Stock:</span>
+                                                    {(product.vendorCount ?? 0) > 0 ? (
+                                                        <span className="text-[13px] font-extrabold text-[#181725]">
+                                                            {product.totalStock ?? 0} <span className="text-[11px] text-[#AEAEAE] font-semibold">({product.vendorCount} vendor{product.vendorCount !== 1 ? 's' : ''})</span>
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] font-bold text-[#3B82F6] bg-[#EFF6FF] px-2 py-0.5 rounded-[4px] uppercase tracking-wider">Catalog</span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Action Buttons */}
+                                            <div className="p-4 border-t border-[#D1D5DB] bg-white flex flex-col gap-2 rounded-b-[16px]">
+                                                <div className="flex items-center gap-2">
+                                                    {canWriteProducts && (
+                                                        <button
+                                                            onClick={() => openEdit(product)}
+                                                            className="flex-1 h-[36px] bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB] rounded-[10px] text-[12px] font-bold transition-all flex items-center justify-center border border-[#E5E7EB] gap-1.5"
+                                                        >
+                                                            <Pencil size={12} /> Edit
+                                                        </button>
+                                                    )}
+                                                    {canWriteProducts && (
+                                                        <button
+                                                            onClick={() => toggleActive(product)}
+                                                            disabled={actionLoading === product.id}
+                                                            className={cn(
+                                                                "flex-1 h-[36px] rounded-[10px] text-[12px] font-bold transition-all border",
+                                                                product.isActive
+                                                                    ? "bg-[#FFF0F0] border-transparent text-[#E74C3C] hover:bg-red-100"
+                                                                    : "bg-[#EEF8F1] border-transparent text-[#299E60] hover:bg-green-100"
+                                                            )}
+                                                        >
+                                                            {product.isActive ? 'Deactivate' : 'Activate'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse min-w-[1200px] xl:min-w-[1280px]">
+                                <thead>
                                 {/* Product (left) + Actions (right) stay pinned while the
                                     middle columns scroll horizontally — power-admin view. */}
-                                <tr className="bg-[#F8F9FB] text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wider">
-                                    <th className="px-5 py-3 sticky left-0 bg-[#F8F9FB] z-20 min-w-[320px]">
+                                <tr className="bg-[#F8F9FB] text-[10px] xl:text-[11px] font-bold text-[#6B7280] uppercase tracking-wider border-b border-[#D1D5DB]">
+                                    <th className="px-3.5 py-2.5 sticky left-0 bg-[#F8F9FB] z-20 min-w-[260px] xl:min-w-[280px] border-r border-[#D1D5DB]">
                                         <div className="flex items-center gap-2.5">
                                             <input
                                                 type="checkbox"
@@ -1779,44 +1946,44 @@ export default function ProductsPage() {
                                             Product
                                         </div>
                                     </th>
-                                    <th className="px-5 py-3 min-w-[150px]">
+                                    <th className="px-3.5 py-2.5 min-w-[110px] xl:min-w-[130px] border-r border-[#D1D5DB]">
                                         Brand
                                     </th>
-                                    <th className="px-5 py-3 min-w-[180px]">
+                                    <th className="px-3.5 py-2.5 min-w-[140px] xl:min-w-[160px] border-r border-[#D1D5DB]">
                                         Category
                                     </th>
-                                    <th className="px-5 py-3 min-w-[110px]">
+                                    <th className="px-3.5 py-2.5 min-w-[90px] xl:min-w-[100px] border-r border-[#D1D5DB]">
                                         Vendors
                                     </th>
-                                    <th className="px-5 py-3 min-w-[100px] text-right">
+                                    <th className="px-3.5 py-2.5 min-w-[80px] xl:min-w-[90px] text-right border-r border-[#D1D5DB]">
                                         Base ₹
                                     </th>
-                                    <th className="px-5 py-3 min-w-[85px] text-right">
+                                    <th className="px-3.5 py-2.5 min-w-[70px] xl:min-w-[75px] text-right border-r border-[#D1D5DB]">
                                         GST %
                                     </th>
-                                    <th className="px-5 py-3 min-w-[105px] text-right text-[#299E60]">
+                                    <th className="px-3.5 py-2.5 min-w-[85px] xl:min-w-[95px] text-right text-[#299E60] border-r border-[#D1D5DB]">
                                         Gross ₹
                                     </th>
-                                    <th className="px-5 py-3 min-w-[140px]">
+                                    <th className="px-3.5 py-2.5 min-w-[110px] xl:min-w-[125px] border-r border-[#D1D5DB]">
                                         Unit
                                     </th>
-                                    <th className="px-5 py-3 min-w-[120px]">
+                                    <th className="px-3.5 py-2.5 min-w-[100px] xl:min-w-[110px] border-r border-[#D1D5DB]">
                                         Status
                                     </th>
-                                    <th className="px-5 py-3 min-w-[150px]">
+                                    <th className="px-3.5 py-2.5 min-w-[110px] xl:min-w-[130px] border-r border-[#D1D5DB]">
                                         Inventory
                                     </th>
-                                    <th className="px-5 py-3 text-right sticky right-0 bg-[#F8F9FB] z-20 min-w-[120px]">
+                                    <th className="px-3.5 py-2.5 text-right sticky right-0 bg-[#F8F9FB] z-20 min-w-[100px] xl:min-w-[110px] border-l border-[#D1D5DB]">
                                         Actions
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-[#EEEEEE]">
+                            <tbody className="divide-y divide-[#D1D5DB]">
                                 {products.map(product => {
                                     return (
-                                        <tr key={product.id} className="hover:bg-[#F8F9FB]/60 transition-colors group text-[12.5px]">
+                                        <tr key={product.id} className="hover:bg-[#F8F9FB]/60 transition-colors group text-[11.5px] xl:text-[12.5px]">
                                             {/* Product — thumbnail + name + SKU, pinned left */}
-                                            <td className="px-5 py-3 sticky left-0 bg-white group-hover:bg-[#F8F9FB] z-10 border-r border-[#EEEEEE]/40">
+                                            <td className="px-3.5 py-2 sticky left-0 bg-white group-hover:bg-[#F8F9FB] z-10 border-r border-[#D1D5DB] align-middle">
                                                 <div className="flex items-center gap-3">
                                                     <input
                                                         type="checkbox"
@@ -1828,10 +1995,10 @@ export default function ProductsPage() {
                                                         <img
                                                             src={product.imageUrl}
                                                             alt={product.name}
-                                                            className="w-[42px] h-[42px] rounded-[10px] object-cover border border-[#EEEEEE] shrink-0"
+                                                            className="w-[36px] h-[36px] rounded-[8px] object-cover border border-[#D1D5DB] shrink-0"
                                                         />
                                                     ) : (
-                                                        <div className="w-[42px] h-[42px] rounded-[10px] bg-[#F8F9FB] border border-[#EEEEEE] flex items-center justify-center text-[#AEAEAE] shrink-0">
+                                                        <div className="w-[36px] h-[36px] rounded-[8px] bg-[#F8F9FB] border border-[#D1D5DB] flex items-center justify-center text-[#AEAEAE] shrink-0">
                                                             <ImageIcon size={18} />
                                                         </div>
                                                     )}
@@ -1856,7 +2023,7 @@ export default function ProductsPage() {
                                             </td>
 
                                             {/* Brand */}
-                                            <td className="px-5 py-3 border-r border-[#EEEEEE]/40">
+                                            <td className="px-3.5 py-2 border-r border-[#D1D5DB] align-middle">
                                                 <select
                                                     value={product.brand || ''}
                                                     onChange={e => {
@@ -1874,7 +2041,7 @@ export default function ProductsPage() {
                                             </td>
 
                                             {/* Category */}
-                                            <td className="px-5 py-3 border-r border-[#EEEEEE]/40">
+                                            <td className="px-3.5 py-2 border-r border-[#D1D5DB] align-middle">
                                                 <select
                                                     value={product.category?.id ?? ''}
                                                     onChange={e => {
@@ -1895,7 +2062,7 @@ export default function ProductsPage() {
                                             </td>
 
                                             {/* Vendors */}
-                                            <td className="px-5 py-3 border-r border-[#EEEEEE]/40">
+                                            <td className="px-3.5 py-2 border-r border-[#D1D5DB] align-middle">
                                                 {(product.vendorCount ?? 0) > 0 ? (
                                                     <span className="font-semibold text-[#181725]" title={product.vendors?.join(', ')}>
                                                         {product.vendorCount} vendor{product.vendorCount !== 1 ? 's' : ''}
@@ -1908,7 +2075,7 @@ export default function ProductsPage() {
                                             </td>
 
                                             {/* Base price (taxable rate) */}
-                                            <td className="px-5 py-3 text-right border-r border-[#EEEEEE]/40 bg-[#FAFAFA]/20">
+                                            <td className="px-3.5 py-2 text-right border-r border-[#D1D5DB] bg-[#FAFAFA]/20 align-middle">
                                                 <div className="flex items-center justify-end gap-0.5 max-w-[90px] ml-auto">
                                                     <span className="font-bold text-[#181725]">₹</span>
                                                     <input
@@ -1924,7 +2091,7 @@ export default function ProductsPage() {
                                             </td>
 
                                             {/* GST % */}
-                                            <td className="px-5 py-3 text-right border-r border-[#EEEEEE]/40 bg-[#FAFAFA]/20">
+                                            <td className="px-3.5 py-2 text-right border-r border-[#D1D5DB] bg-[#FAFAFA]/20 align-middle">
                                                 <select
                                                     value={String(product.taxPercent ?? 0)}
                                                     onChange={e => {
@@ -1941,14 +2108,14 @@ export default function ProductsPage() {
                                             </td>
 
                                             {/* Gross Price */}
-                                            <td className="px-5 py-3 text-right border-r border-[#EEEEEE]/40 bg-[#299E60]/[0.02]">
+                                            <td className="px-3.5 py-2 text-right border-r border-[#D1D5DB] bg-[#299E60]/[0.02] align-middle font-semibold">
                                                 <span className="font-extrabold text-[#299E60] tabular-nums">
                                                     ₹{(product.basePrice * (1 + (product.taxPercent || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </td>
 
                                             {/* Unit */}
-                                            <td className="px-5 py-3 border-r border-[#EEEEEE]/40">
+                                            <td className="px-3.5 py-2 border-r border-[#D1D5DB] align-middle">
                                                 <select
                                                     value={product.unit || ''}
                                                     onChange={e => {
@@ -1966,7 +2133,7 @@ export default function ProductsPage() {
                                             </td>
 
                                             {/* Status */}
-                                            <td className="px-5 py-3 border-r border-[#EEEEEE]/40">
+                                            <td className="px-3.5 py-2 border-r border-[#D1D5DB] align-middle">
                                                 {product.listingStatus === 'draft' ? (
                                                     <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-[6px] uppercase tracking-wider bg-[#F0F4FF] text-[#4F6BED]">
                                                         Draft
@@ -1994,7 +2161,7 @@ export default function ProductsPage() {
                                             </td>
 
                                             {/* Inventory — aggregated across vendors */}
-                                            <td className="px-5 py-3 whitespace-nowrap border-r border-[#EEEEEE]/40">
+                                            <td className="px-3.5 py-2 whitespace-nowrap border-r border-[#D1D5DB] align-middle">
                                                 {(product.vendorCount ?? 0) > 0 ? (
                                                     <div
                                                         className="cursor-default"
@@ -2018,7 +2185,7 @@ export default function ProductsPage() {
                                             </td>
 
                                             {/* Actions — pinned right */}
-                                            <td className="px-5 py-3 sticky right-0 bg-white group-hover:bg-[#F8F9FB] z-10 border-l border-[#EEEEEE]/40">
+                                            <td className="px-3.5 py-2 sticky right-0 bg-white group-hover:bg-[#F8F9FB] z-10 border-l border-[#D1D5DB] align-middle">
                                                 <div className="flex items-center justify-end gap-1.5">
                                                     {savingRows[product.id] && Object.keys(savingRows[product.id]).length > 0 ? (
                                                         <div className="w-[36px] h-[36px] flex items-center justify-center text-[#299E60]">
@@ -2082,10 +2249,11 @@ export default function ProductsPage() {
                                 })}
                             </tbody>
                         </table>
-                    </div>
+                            </div>
+                        )}
 
                     {/* Footer / Pagination */}
-                    <div className="p-6 bg-[#FDFDFD] border-t border-[#EEEEEE] flex items-center justify-between flex-wrap gap-4">
+                    <div className="p-6 bg-[#FDFDFD] border-t border-[#D1D5DB] flex items-center justify-between flex-wrap gap-4">
                         <div className="flex items-center gap-4 flex-wrap">
                             <p className="text-[13px] text-[#7C7C7C] font-semibold">
                                 Showing{' '}
@@ -2105,7 +2273,7 @@ export default function ProductsPage() {
                                         setPageSize(val);
                                         setCurrentPage(1);
                                     }}
-                                    className="h-[28px] px-1.5 bg-white border border-[#EEEEEE] rounded-[6px] text-[12px] font-bold text-[#181725] outline-none cursor-pointer focus:border-[#299E60]/40"
+                                    className="h-[28px] px-1.5 bg-white border border-[#D1D5DB] rounded-[6px] text-[12px] font-bold text-[#181725] outline-none cursor-pointer focus:border-[#299E60]/40"
                                 >
                                     <option value={20}>20</option>
                                     <option value={50}>50</option>
@@ -2121,7 +2289,7 @@ export default function ProductsPage() {
                                 <button
                                     onClick={() => fetchProducts(Math.max(1, currentPage - 1))}
                                     disabled={currentPage === 1 || loading}
-                                    className="w-[34px] h-[34px] flex items-center justify-center rounded-[8px] border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                    className="w-[34px] h-[34px] flex items-center justify-center rounded-[8px] border border-[#D1D5DB] text-[#7C7C7C] hover:bg-[#F5F5F5] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                 >
                                     <ChevronLeft size={16} />
                                 </button>
@@ -2139,7 +2307,7 @@ export default function ProductsPage() {
                                                 'w-[34px] h-[34px] flex items-center justify-center rounded-[8px] text-[13px] font-bold transition-colors',
                                                 item === currentPage
                                                     ? 'bg-[#299E60] text-white'
-                                                    : 'border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5]'
+                                                    : 'border border-[#D1D5DB] text-[#7C7C7C] hover:bg-[#F5F5F5]'
                                             )}
                                         >
                                             {item}
@@ -2151,7 +2319,7 @@ export default function ProductsPage() {
                                 <button
                                     onClick={() => fetchProducts(Math.min(totalPages, currentPage + 1))}
                                     disabled={currentPage === totalPages || loading}
-                                    className="w-[34px] h-[34px] flex items-center justify-center rounded-[8px] border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                    className="w-[34px] h-[34px] flex items-center justify-center rounded-[8px] border border-[#D1D5DB] text-[#7C7C7C] hover:bg-[#F5F5F5] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                 >
                                     <ChevronRight size={16} />
                                 </button>
@@ -2331,7 +2499,7 @@ export default function ProductsPage() {
                                     </div>
 
                                     <div id="ff-substituteIds">
-                                        <FieldLabel required>Substitute Mapping</FieldLabel>
+                                        <FieldLabel>Substitute Mapping</FieldLabel>
                                         <SubstituteProductPicker
                                             selectedIds={formData.substituteIds}
                                             currentProductId={editingProduct?.id}
