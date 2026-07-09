@@ -1,13 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
     Users,
     Package,
-    Search,
-    MoreVertical,
     Loader2,
     UserCheck,
     UserX,
@@ -154,7 +151,6 @@ export default function CustomersPage() {
 
     const totalCustomers = users.filter(u => u.role === 'customer').length;
     const activeCustomers = users.filter(u => u.role === 'customer' && u.isActive).length;
-    const totalVendors = users.filter(u => u.role === 'vendor').length;
     const inactiveUsers = users.filter(u => !u.isActive).length;
 
     const registryStats = [
@@ -352,13 +348,16 @@ export default function CustomersPage() {
                 searching={loading && !initialLoad}
                 leftSlot={
                     <button
+                        type="button"
                         onClick={() => setShowFilters(!showFilters)}
                         className={cn(
-                            'h-[42px] px-3 border rounded-[10px] text-[12px] font-bold flex items-center gap-1.5 transition-colors shadow-sm',
-                            showFilters ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]' : 'border-[#E5E7EB] bg-[#F9FAFB] text-[#6B7280] hover:text-[#111827]',
+                            'h-[34px] px-3 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-all border',
+                            showFilters
+                                ? 'bg-[#299E60] text-white border-[#299E60]'
+                                : 'bg-[#F3F4F6] text-[#6B7280] border-transparent hover:text-[#111827]',
                         )}
                     >
-                        <SlidersHorizontal size={16} /> Filters
+                        <SlidersHorizontal size={14} /> Filters
                     </button>
                 }
             />

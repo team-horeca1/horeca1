@@ -46,6 +46,7 @@ function slugify(name: string) {
 
 export const GET = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'brands.view');
     const id = req.nextUrl.pathname.split('/').at(-1)!;
     const brand = await prisma.brand.findUnique({
       where: { id },

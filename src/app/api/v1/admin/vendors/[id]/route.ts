@@ -30,6 +30,7 @@ function extractId(req: NextRequest): string {
 // GET — full vendor details with products, service areas, delivery slots
 export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'vendors.view');
     const id = extractId(req);
 
     const vendor = await prisma.vendor.findUnique({

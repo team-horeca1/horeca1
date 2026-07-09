@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Search, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface AdminRegistryFilterBarProps {
   searchValue: string;
@@ -10,6 +11,14 @@ interface AdminRegistryFilterBarProps {
   leftSlot?: React.ReactNode;
   trailingSlot?: React.ReactNode;
   searching?: boolean;
+}
+
+/** Shared pill classes for status / filter chips in the left slot. */
+export function registryFilterPillClass(active: boolean): string {
+  return cn(
+    'h-[34px] px-3 rounded-[8px] text-[12px] font-bold transition-all whitespace-nowrap',
+    active ? 'bg-[#299E60] text-white' : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#111827]',
+  );
 }
 
 export function AdminRegistryFilterBar({
@@ -21,11 +30,14 @@ export function AdminRegistryFilterBar({
   searching,
 }: AdminRegistryFilterBarProps) {
   return (
-    <div className="bg-white p-4 rounded-[16px] border border-[#EEEEEE] shadow-sm flex flex-col lg:flex-row items-center justify-between gap-4">
-      {leftSlot && (
-        <div className="flex items-center gap-1 flex-wrap w-full lg:w-auto">{leftSlot}</div>
-      )}
-      <div className="flex items-center gap-3 w-full lg:w-auto lg:ml-auto">
+    <div className="bg-white p-4 rounded-[16px] border border-[#EEEEEE] shadow-sm flex flex-col lg:flex-row lg:items-center gap-3">
+      {/* Left: filters / pills — always present as flex spacer so search stays right-aligned */}
+      <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0 w-full lg:w-auto">
+        {leftSlot}
+      </div>
+
+      {/* Right: search + trailing tools */}
+      <div className="flex items-center gap-3 w-full lg:w-auto shrink-0">
         <div className="relative group flex-1 sm:flex-none sm:w-[320px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={16} />
           <input

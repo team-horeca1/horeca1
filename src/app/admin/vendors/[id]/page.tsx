@@ -57,6 +57,7 @@ import {
     AdminEntityTabPanel,
     AdminEntityTabContent,
     AdminEntityHeroCard,
+    AdminRegistryLoadingState,
 } from '@/components/features/admin/entity';
 
 interface VendorProduct {
@@ -614,12 +615,7 @@ export default function VendorDetailsPage() {
     };
 
     if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center h-[60vh] gap-3">
-                <Loader2 size={36} className="animate-spin text-[#299E60]" />
-                <p className="text-[14px] font-bold text-[#7C7C7C]">Loading vendor details...</p>
-            </div>
-        );
+        return <AdminRegistryLoadingState message="Loading vendor details..." />;
     }
 
     if (error || !vendor) {
@@ -665,7 +661,7 @@ export default function VendorDetailsPage() {
             <AdminEntityDetailHeader
                 onBack={() => router.back()}
                 breadcrumbs={[
-                    { label: 'Sellers Registry', href: '/admin/vendors' },
+                    { label: 'Vendors Registry', href: '/admin/vendors' },
                     { label: vendor.businessName },
                 ]}
                 actions={

@@ -21,8 +21,9 @@ const patchSchema = z.object({
   note: z.string().max(500).optional(),
 });
 
-export const GET = adminOnly(async (req: NextRequest, _ctx: AuthContext) => {
+export const GET = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'brands.view');
     const brandId = req.nextUrl.pathname.split('/').slice(-2)[0]!;
     const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { id: true } });
     if (!brand) throw Errors.notFound('Brand not found');

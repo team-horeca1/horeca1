@@ -31,8 +31,9 @@ function extractId(req: NextRequest): string {
 }
 
 // GET — full order with items, payments, vendor, customer info
-export const GET = adminOnly(async (req: NextRequest, _ctx) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'orders.view');
     const id = extractId(req);
 
     const order = await prisma.order.findUnique({

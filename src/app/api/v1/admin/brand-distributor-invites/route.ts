@@ -16,8 +16,9 @@ const patchSchema = z.object({
   vendorId: z.string().uuid().optional(),
 });
 
-export const GET = adminOnly(async (req: NextRequest, _ctx: AuthContext) => {
+export const GET = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'brands.view');
     const status = req.nextUrl.searchParams.get('status') || undefined;
     const invites = await prisma.brandDistributorInvite.findMany({
       where: status ? { status: status as 'pending' | 'contacted' | 'onboarded' | 'declined' } : {},

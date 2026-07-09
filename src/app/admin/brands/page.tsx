@@ -5,14 +5,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
-    Search,
     Loader2,
     Plus,
     Store,
     Clock,
     CheckCircle,
     Boxes,
-    MoreVertical,
     Trash2,
     X,
     MessageSquare,
@@ -20,7 +18,6 @@ import {
     ExternalLink,
     ShieldCheck,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import BrandFormModal from '@/components/features/admin/BrandFormModal';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -31,6 +28,7 @@ import {
     AdminRegistryPageHeader,
     AdminRegistryStatsGrid,
     AdminRegistryFilterBar,
+    registryFilterPillClass,
     AdminRegistryLoadingState,
     AdminRegistryEmptyState,
     AdminRegistryTableShell,
@@ -58,14 +56,16 @@ function getInitials(name: string) {
     return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 
-function formatDate(d: string) {
-    return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-const STATUS_VARIANT: Record<string, 'verified' | 'pending' | 'inactive'> = {
+const STATUS_VARIANT: Record<string, 'verified' | 'pending' | 'rejected'> = {
     approved: 'verified',
     pending: 'pending',
-    rejected: 'inactive',
+    rejected: 'rejected',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+    approved: 'Approved',
+    pending: 'Pending',
+    rejected: 'Rejected',
 };
 
 export default function AdminBrandsPage() {
@@ -243,16 +243,21 @@ export default function AdminBrandsPage() {
                 searchPlaceholder="Search by brand, owner, email..."
                 leftSlot={
                     <>
-                        {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
+                        {(
+                            [
+                                { id: 'all' as const, label: 'All' },
+                                { id: 'pending' as const, label: 'Pending' },
+                                { id: 'approved' as const, label: 'Approved' },
+                                { id: 'rejected' as const, label: 'Rejected' },
+                            ] as const
+                        ).map((f) => (
                             <button
-                                key={f}
-                                onClick={() => setBrandFilter(f)}
-                                className={cn(
-                                    'px-3 py-1.5 rounded-[8px] text-[12px] font-bold transition-all capitalize',
-                                    brandFilter === f ? 'bg-[#299E60] text-white' : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#111827]',
-                                )}
+                                key={f.id}
+                                type="button"
+                                onClick={() => setBrandFilter(f.id)}
+                                className={registryFilterPillClass(brandFilter === f.id)}
                             >
-                                {f}
+                                {f.label}
                             </button>
                         ))}
                     </>
@@ -308,7 +313,11 @@ export default function AdminBrandsPage() {
                                                             /{brand.slug} <ExternalLink size={10} />
                                                         </Link>
                                                         <span className="w-1.5 h-1.5 rounded-full bg-[#E5E7EB]" />
-                                                        <AdminStatusBadge variant={statusVariant} label={brand.approvalStatus} className="normal-case" />
+                                                        <AdminStatusBadge
+                                                            variant={statusVariant}
+                                                            label={STATUS_LABEL[brand.approvalStatus] ?? brand.approvalStatus}
+                                                            className="normal-case"
+                                                        />
                                                     </div>
                                                 </div>
                                             </div>

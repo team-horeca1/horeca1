@@ -18,8 +18,9 @@ import {
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import { validateMasterSku } from '@/lib/sku';
 
-export const GET = adminOnly(async (req: NextRequest) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'products.view');
     const id = extractId(req);
     const master = await prisma.masterProduct.findUnique({
       where: { id },

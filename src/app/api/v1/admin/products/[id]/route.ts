@@ -66,8 +66,9 @@ const updateProductSchema = z.object({
 });
 
 // GET — full product detail with all relations
-export const GET = adminOnly(async (req: NextRequest, _ctx) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'products.view');
     const id = extractId(req);
 
     const product = await prisma.product.findUnique({

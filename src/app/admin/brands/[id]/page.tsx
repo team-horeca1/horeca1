@@ -406,7 +406,6 @@ export default function AdminBrandEditPage() {
                     <AdminEntityContactGrid
                         accent="#7C3AED"
                         accentBg="#EDE9FE"
-                        className="mt-4"
                         items={[
                             ...(owner
                                 ? [
@@ -432,7 +431,7 @@ export default function AdminBrandEditPage() {
                         )}
                         {canApprove && (
                             <div className="flex flex-col gap-2.5">
-                                <span className="text-[11px] font-bold text-[#9CA3AF] uppercase">Verification Actions</span>
+                                <span className="text-[11px] font-bold text-[#9CA3AF] uppercase text-center lg:text-left">Verification Actions</span>
                                 {brand.approvalStatus !== 'approved' && (
                                     <button
                                         onClick={() => void handleApprove()}

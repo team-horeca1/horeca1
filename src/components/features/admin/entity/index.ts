@@ -11,7 +11,7 @@ export { AdminLoginCredentialsPanel } from './AdminLoginCredentialsPanel';
 export { AdminRegistryPageHeader } from './AdminRegistryPageHeader';
 export { AdminRegistryStatsGrid } from './AdminRegistryStatsGrid';
 export type { AdminRegistryStat } from './AdminRegistryStatsGrid';
-export { AdminRegistryFilterBar } from './AdminRegistryFilterBar';
+export { AdminRegistryFilterBar, registryFilterPillClass } from './AdminRegistryFilterBar';
 export { AdminRegistryLoadingState } from './AdminRegistryLoadingState';
 export { AdminRegistryEmptyState } from './AdminRegistryEmptyState';
 export {

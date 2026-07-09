@@ -2,7 +2,6 @@
 // POST /api/v1/admin/brands — Admin creates a brand directly (auto-approved)
 
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
 import { BrandService } from '@/modules/brand/brand.service';
 import { adminOnly } from '@/middleware/rbac';
 import { requirePermission } from '@/lib/permissions/engine';
@@ -16,7 +15,7 @@ import {
   mapToBrandFields,
 } from '@/lib/brandProfileMapper';
 import type { AuthContext } from '@/middleware/auth';
-import { encryptAdminPassword } from '@/lib/adminPasswordCipher';
+import { passwordFieldsWithReveal } from '@/lib/adminPasswordCipher';
 
 const brandService = new BrandService();
 
@@ -53,8 +52,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
       const password = String(body.password ?? `Hc1-${Math.random().toString(36).slice(2, 10)}!`);
       if (password.length < 6) throw Errors.badRequest('Password must be at least 6 characters');
 
-      const hashedPassword = await bcrypt.hash(password, 12);
-      const adminPasswordCipher = encryptAdminPassword(password);
+      const pwd = await passwordFieldsWithReveal(password, 12);
       const hcidDisplay = await uniqueHcid();
 
       const result = await prisma.$transaction(async (tx) => {
@@ -62,8 +60,8 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
           data: {
             fullName: name,
             email,
-            password: hashedPassword,
-            adminPasswordCipher,
+            password: pwd.password,
+            adminPasswordCipher: pwd.adminPasswordCipher,
             role: 'brand',
             isActive: true,
             hcidDisplay,
@@ -140,8 +138,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
       throw Errors.fieldError('legalName', 'A brand with this name already exists', 409);
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-    const adminPasswordCipher = encryptAdminPassword(password);
+    const pwd = await passwordFieldsWithReveal(password, 12);
     const hcidDisplay = await uniqueHcid();
     const baData = mapToBusinessAccount(input) as Record<string, unknown>;
 
@@ -150,8 +147,8 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
         data: {
           fullName,
           email,
-          password: hashedPassword,
-          adminPasswordCipher,
+          password: pwd.password,
+          adminPasswordCipher: pwd.adminPasswordCipher,
           role: 'brand',
           isActive: true,
           hcidDisplay,

@@ -1,19 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
-    Search,
     Star,
     Mail,
     Phone,
     Loader2,
-    CheckCircle,
-    XCircle,
     LayoutGrid,
     List,
     LayoutDashboard,
@@ -22,10 +18,8 @@ import {
     Boxes,
     ShoppingBag,
     ShieldCheck,
-    AlertCircle,
     Building2,
     ArrowUpRight,
-    MoreVertical,
     Trash2,
     UserCheck,
     UserX,
@@ -41,6 +35,7 @@ import {
   AdminRegistryPageHeader,
   AdminRegistryStatsGrid,
   AdminRegistryFilterBar,
+  registryFilterPillClass,
   AdminRegistryLoadingState,
   AdminRegistryEmptyState,
   AdminRegistryTableShell,
@@ -96,6 +91,7 @@ export default function VendorsPage() {
     const confirm = useConfirm();
     const { start: startVendorView, loading: impersonateLoading } = useAdminImpersonate('vendor');
     const [searchQuery, setSearchQuery] = useState('');
+    const [vendorFilter, setVendorFilter] = useState<'all' | 'pending' | 'verified'>('all');
     const [vendors, setVendors] = useState<AdminVendor[]>([]);
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
@@ -188,12 +184,16 @@ export default function VendorsPage() {
     // Filter search query safely (handles null user fields)
     const filteredVendors = React.useMemo(() => {
         const query = searchQuery.toLowerCase();
-        return vendors.filter(vendor =>
-            (vendor.businessName || '').toLowerCase().includes(query) ||
-            (vendor.user?.email || '').toLowerCase().includes(query) ||
-            (vendor.user?.fullName || '').toLowerCase().includes(query)
-        );
-    }, [vendors, searchQuery]);
+        return vendors.filter((vendor) => {
+            if (vendorFilter === 'pending' && vendor.isVerified) return false;
+            if (vendorFilter === 'verified' && !vendor.isVerified) return false;
+            return (
+                (vendor.businessName || '').toLowerCase().includes(query) ||
+                (vendor.user?.email || '').toLowerCase().includes(query) ||
+                (vendor.user?.fullName || '').toLowerCase().includes(query)
+            );
+        });
+    }, [vendors, searchQuery, vendorFilter]);
 
     // Calculate metrics for stats cards using useMemo to optimize re-renders
     const { totalVendors, pendingVerification, totalProducts, totalOrders } = React.useMemo(() => {
@@ -239,6 +239,26 @@ export default function VendorsPage() {
                 searchValue={searchQuery}
                 onSearchChange={setSearchQuery}
                 searchPlaceholder="Search by vendor, owner, email..."
+                leftSlot={
+                    <>
+                        {(
+                            [
+                                { id: 'all' as const, label: 'All' },
+                                { id: 'pending' as const, label: 'Pending' },
+                                { id: 'verified' as const, label: 'Verified' },
+                            ] as const
+                        ).map((f) => (
+                            <button
+                                key={f.id}
+                                type="button"
+                                onClick={() => setVendorFilter(f.id)}
+                                className={registryFilterPillClass(vendorFilter === f.id)}
+                            >
+                                {f.label}
+                            </button>
+                        ))}
+                    </>
+                }
                 trailingSlot={
                     <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
                         <span className="text-[12px] font-bold text-[#9CA3AF] uppercase mr-1 hidden md:inline">View:</span>
@@ -271,10 +291,10 @@ export default function VendorsPage() {
             {filteredVendors.length === 0 ? (
                 <AdminRegistryEmptyState
                     icon={Building2}
-                    title={searchQuery ? 'No matched results' : 'No vendors registered yet'}
+                    title={searchQuery || vendorFilter !== 'all' ? 'No matched results' : 'No vendors registered yet'}
                     subtitle={
-                        searchQuery
-                            ? `We couldn't find any vendor matching "${searchQuery}"`
+                        searchQuery || vendorFilter !== 'all'
+                            ? 'Try adjusting your search or filter.'
                             : 'Click the "Add Vendor" button to register your first seller partner.'
                     }
                 />
@@ -392,7 +412,7 @@ export default function VendorsPage() {
                 ))}
             </div>
             ) : (
-            <AdminRegistryTableShell>
+            <AdminRegistryTableShell minWidth="1100px">
                 <AdminRegistryTableHead>
                     <th className="px-6 py-2.5 font-bold text-center w-[60px]">#</th>
                     <th className="px-6 py-2.5 font-bold min-w-[280px]">Vendor Partner</th>

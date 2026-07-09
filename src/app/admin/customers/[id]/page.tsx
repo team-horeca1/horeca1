@@ -40,6 +40,7 @@ import {
     AdminEntityTabBar,
     AdminEntityTabPanel,
     AdminEntityTabContent,
+    AdminRegistryLoadingState,
 } from '@/components/features/admin/entity';
 
 interface VendorProfile {
@@ -277,11 +278,7 @@ export default function CustomerDetailsPage() {
     }
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <Loader2 className="w-8 h-8 animate-spin text-[#299E60]" />
-            </div>
-        );
+        return <AdminRegistryLoadingState message="Loading customer details..." />;
     }
 
     if (error || !user) {
@@ -322,7 +319,7 @@ export default function CustomerDetailsPage() {
             <AdminEntityDetailHeader
                 onBack={() => router.back()}
                 breadcrumbs={[
-                    { label: 'Customers', href: '/admin/customers' },
+                    { label: 'Customers Registry', href: '/admin/customers' },
                     { label: user.fullName },
                 ]}
                 actions={
@@ -402,14 +399,12 @@ export default function CustomerDetailsPage() {
                     <AdminEntityContactGrid
                         accent="#299E60"
                         accentBg="#EEF8F1"
-                        className="mt-4"
                         items={[
                             { icon: Mail, label: 'Email', value: user.email || '—' },
                             { icon: Phone, label: 'Phone', value: user.phone || '—' },
                         ]}
                     />
                 }
-                sidebarTitle="Account Actions"
                 sidebar={
                     <>
                         <AdminLoginCredentialsPanel
@@ -419,20 +414,25 @@ export default function CustomerDetailsPage() {
                             accent="#299E60"
                             onPasswordUpdated={setOwnerPassword}
                         />
-                        <button
-                            type="button"
-                            onClick={handleToggleActive}
-                            disabled={toggling}
-                            className={cn(
-                                'w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border',
-                                user.isActive
-                                    ? 'bg-white border-red-200 text-red-600 hover:bg-red-50'
-                                    : 'bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54]',
-                            )}
-                        >
-                            {toggling ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />}
-                            {user.isActive ? 'Deactivate User' : 'Activate User'}
-                        </button>
+                        <div className="flex flex-col gap-2.5">
+                            <span className="text-[11px] font-bold text-[#9CA3AF] uppercase text-center lg:text-left">
+                                Account Actions
+                            </span>
+                            <button
+                                type="button"
+                                onClick={handleToggleActive}
+                                disabled={toggling}
+                                className={cn(
+                                    'w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border',
+                                    user.isActive
+                                        ? 'bg-white border-red-200 text-red-600 hover:bg-red-50'
+                                        : 'bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54]',
+                                )}
+                            >
+                                {toggling ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />}
+                                {user.isActive ? 'Deactivate User' : 'Activate User'}
+                            </button>
+                        </div>
                     </>
                 }
             />

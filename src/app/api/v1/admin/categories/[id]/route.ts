@@ -29,8 +29,9 @@ const updateCategorySchema = z.object({
 });
 
 // GET — category detail with children and product count
-export const GET = adminOnly(async (req: NextRequest, _ctx) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'products.view');
     const id = extractId(req);
 
     const category = await prisma.category.findUnique({
