@@ -17,10 +17,16 @@ import {
     ClipboardList,
     ExternalLink,
     ShieldCheck,
+    LayoutGrid,
+    List,
+    Mail,
+    Phone,
+    Building2,
 } from 'lucide-react';
 import BrandFormModal from '@/components/features/admin/BrandFormModal';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
     AdminStatusBadge,
@@ -85,6 +91,9 @@ export default function AdminBrandsPage() {
     const [activeMenu, setActiveMenu] = useState<{ id: string; top: number; right: number } | null>(null);
     const [rejectTarget, setRejectTarget] = useState<{ id: string; name: string } | null>(null);
     const [rejectNote, setRejectNote] = useState('');
+
+    // View Mode switcher
+    const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -262,6 +271,33 @@ export default function AdminBrandsPage() {
                         ))}
                     </>
                 }
+                trailingSlot={
+                    <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase mr-1 hidden md:inline">View:</span>
+                        <div className="flex items-center bg-[#F3F4F6] border border-[#D1D5DB] rounded-[10px] p-1">
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={cn(
+                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
+                                    viewMode === 'grid' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
+                                )}
+                            >
+                                <LayoutGrid size={15} />
+                                <span className="hidden sm:inline">Cards</span>
+                            </button>
+                            <button
+                                onClick={() => setViewMode('table')}
+                                className={cn(
+                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
+                                    viewMode === 'table' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
+                                )}
+                            >
+                                <List size={15} />
+                                <span className="hidden sm:inline">Table</span>
+                            </button>
+                        </div>
+                    </div>
+                }
             />
 
             {filteredBrands.length === 0 ? (
@@ -274,16 +310,150 @@ export default function AdminBrandsPage() {
                             : 'Click "Add Brand" to register your first brand partner.'
                     }
                 />
+            ) : viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredBrands.map((brand) => {
+                        const isDummyEmail = brand.user?.email?.includes('brand.internal.horeca1') || !brand.user;
+                        const statusVariant = STATUS_VARIANT[brand.approvalStatus] ?? 'pending';
+                        return (
+                            <div
+                                key={brand.id}
+                                className="bg-white rounded-[16px] border border-[#D1D5DB] shadow-sm overflow-hidden flex flex-col h-full hover:shadow-md hover:border-[#299E60]/30 hover:-translate-y-0.5 transition-all w-full relative"
+                            >
+                                {/* Upper Section — click to view details */}
+                                <div
+                                    onClick={() => openDetails(brand.id)}
+                                    className="p-5 flex-1 flex flex-col cursor-pointer"
+                                >
+                                    {/* Visual Avatar Container */}
+                                    <div className="bg-[#F9FAFB] rounded-[12px] h-[120px] relative flex items-center justify-center p-4 border border-[#F3F4F6] mb-4">
+                                        <AdminStatusBadge
+                                            variant={statusVariant}
+                                            label={STATUS_LABEL[brand.approvalStatus] ?? brand.approvalStatus}
+                                            className="absolute top-2.5 right-2.5 shadow-sm normal-case text-[10px]"
+                                        />
+
+                                        {brand.logoUrl ? (
+                                            <Image
+                                                src={brand.logoUrl}
+                                                alt={brand.name}
+                                                width={80}
+                                                height={80}
+                                                sizes="80px"
+                                                className="w-[80px] h-[80px] object-contain rounded-lg"
+                                            />
+                                        ) : (
+                                            <div className="w-[70px] h-[70px] rounded-full bg-[#7C3AED]/10 flex items-center justify-center border border-[#7C3AED]/20">
+                                                <span className="text-[26px] font-black text-[#7C3AED]">
+                                                    {getInitials(brand.name)}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Name & Slug */}
+                                    <div className="mb-3">
+                                        <h3 className="text-[16px] font-extrabold text-[#111827] line-clamp-1 group-hover:text-[#299E60]">{brand.name}</h3>
+                                        <Link
+                                            href={`/brand/${brand.slug}`}
+                                            target="_blank"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="text-[11px] text-[#299E60] hover:underline flex items-center gap-0.5 mt-1"
+                                        >
+                                            /{brand.slug} <ExternalLink size={10} />
+                                        </Link>
+                                    </div>
+
+                                    {/* Details Fields */}
+                                    <div className="space-y-2 mt-auto pt-2 border-t border-[#F3F4F6]">
+                                        <div className="flex items-center justify-between text-[12px] font-semibold">
+                                            <span className="text-[#9CA3AF]">Owner:</span>
+                                            {isDummyEmail ? (
+                                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200/50 px-1.5 py-0.5 rounded-[4px]">Admin Managed</span>
+                                            ) : (
+                                                <span className="text-[#374151] truncate max-w-[120px]">{brand.user?.fullName ?? '—'}</span>
+                                            )}
+                                        </div>
+                                        {!isDummyEmail && brand.user?.email && (
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <Mail size={13} className="text-[#9CA3AF] shrink-0" />
+                                                <span className="text-[12px] font-semibold text-[#4B5563] truncate">{brand.user.email}</span>
+                                            </div>
+                                        )}
+                                        {brand.user?.phone && (
+                                            <div className="flex items-center gap-2">
+                                                <Phone size={13} className="text-[#9CA3AF] shrink-0" />
+                                                <span className="text-[12px] font-semibold text-[#4B5563]">{brand.user.phone}</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Stats Grid */}
+                                    <div className="flex items-center justify-around border-t border-[#F3F4F6] pt-3 mt-4 -mx-5 px-5 bg-[#F9FAFB] rounded-b-[10px] h-[52px]">
+                                        <div className="text-center py-1 flex-1">
+                                            <p className="text-[13px] font-black text-[#111827] leading-none">{brand._count.masterProducts}</p>
+                                            <p className="text-[9px] font-bold text-[#9CA3AF] mt-1 uppercase">Products</p>
+                                        </div>
+                                        <div className="w-[1px] h-5 bg-[#E5E7EB]" />
+                                        <div className="text-center py-1 flex-1">
+                                            <p className="text-[13px] font-black text-[#111827] leading-none">{brand._count.productMappings}</p>
+                                            <p className="text-[9px] font-bold text-[#9CA3AF] mt-1 uppercase">Mappings</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="p-4 border-t border-[#D1D5DB] bg-white flex flex-col gap-2 rounded-b-[16px]">
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                        <AdminImpersonateButton
+                                            target="brand"
+                                            entityId={brand.id}
+                                            label="Impersonate"
+                                            variant="primary"
+                                            className="w-full h-[38px] text-[12px] font-bold"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Link
+                                            href={`/admin/brands/${brand.id}`}
+                                            className={cn(
+                                                "h-[36px] bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB] rounded-[10px] text-[12px] font-bold transition-all flex items-center justify-center border border-[#E5E7EB]",
+                                                brand.approvalStatus !== 'approved' && canEditBrands ? "flex-1" : "w-full"
+                                            )}
+                                        >
+                                            Details
+                                        </Link>
+                                        {brand.approvalStatus !== 'approved' && canEditBrands && (
+                                            <button
+                                                type="button"
+                                                disabled={actionLoading === brand.id}
+                                                onClick={(e) => { e.stopPropagation(); void handleApproveBrand(brand, e); }}
+                                                className="flex-1 h-[36px] bg-[#299E60] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 disabled:opacity-60"
+                                            >
+                                                {actionLoading === brand.id ? (
+                                                    <Loader2 size={12} className="animate-spin" />
+                                                ) : (
+                                                    <ShieldCheck size={12} />
+                                                )}
+                                                Approve
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             ) : (
                 <AdminRegistryTableShell minWidth="1100px">
                     <AdminRegistryTableHead>
-                        <th className="px-6 py-2.5 font-bold text-center w-[60px]">#</th>
-                        <th className="px-6 py-2.5 font-bold min-w-[280px]">Brand Partner</th>
-                        <th className="px-6 py-2.5 font-bold min-w-[150px]">Owner</th>
-                        <th className="px-6 py-2.5 font-bold min-w-[220px]">Contact Information</th>
-                        <th className="px-6 py-2.5 font-bold text-center w-[100px]">Products</th>
-                        <th className="px-6 py-2.5 font-bold text-center w-[100px]">Mappings</th>
-                        <th className="px-6 py-2.5 font-bold text-right pr-4">Actions</th>
+                        <th className="px-6 py-3.5 font-bold text-center w-[60px] border-r border-[#D1D5DB]">#</th>
+                        <th className="px-6 py-3.5 font-bold min-w-[280px] border-r border-[#D1D5DB]">Brand Partner</th>
+                        <th className="px-6 py-3.5 font-bold min-w-[150px] border-r border-[#D1D5DB]">Owner</th>
+                        <th className="px-6 py-3.5 font-bold min-w-[220px] border-r border-[#D1D5DB]">Contact Information</th>
+                        <th className="px-6 py-3.5 font-bold text-center w-[100px] border-r border-[#D1D5DB]">Products</th>
+                        <th className="px-6 py-3.5 font-bold text-center w-[100px] border-r border-[#D1D5DB]">Mappings</th>
+                        <th className="px-6 py-3.5 font-bold text-left min-w-[360px]">Actions</th>
                     </AdminRegistryTableHead>
                     <AdminRegistryTableBody>
                             {filteredBrands.map((brand, i) => {
@@ -295,8 +465,8 @@ export default function AdminBrandsPage() {
                                         onClick={() => openDetails(brand.id)}
                                         className="group hover:bg-[#F9FAFB]/60 transition-colors cursor-pointer"
                                     >
-                                        <td className="px-6 py-2.5 text-center font-bold text-[#9CA3AF] text-[12px]">{i + 1}</td>
-                                        <td className="px-6 py-2.5">
+                                        <td className="px-6 py-3 text-center font-bold text-[#9CA3AF] text-[12px] align-middle border-r border-[#D1D5DB]">{i + 1}</td>
+                                        <td className="px-6 py-3 align-middle border-r border-[#D1D5DB]">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-[42px] h-[42px] rounded-[10px] bg-[#F3F4F6] overflow-hidden shrink-0 border border-[#E5E7EB] flex items-center justify-center">
                                                     {brand.logoUrl ? (
@@ -322,14 +492,14 @@ export default function AdminBrandsPage() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-2.5 text-[13px] font-bold text-[#374151]">
+                                        <td className="px-6 py-3 text-[13px] font-bold text-[#374151] align-middle border-r border-[#D1D5DB]">
                                             {isDummyEmail ? (
                                                 <span className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200/50 px-2 py-0.5 rounded-[6px]">Admin Managed</span>
                                             ) : (
                                                 brand.user?.fullName ?? '—'
                                             )}
                                         </td>
-                                        <td className="px-6 py-2.5">
+                                        <td className="px-6 py-3 align-middle border-r border-[#D1D5DB]">
                                             <div className="flex flex-col gap-0.5">
                                                 {!isDummyEmail && brand.user?.email && (
                                                     <span className="text-[13px] font-medium text-[#4B5563] truncate block max-w-[200px]">{brand.user.email}</span>
@@ -342,9 +512,9 @@ export default function AdminBrandsPage() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-2.5 text-center font-bold text-[#111827] text-[14px]">{brand._count.masterProducts}</td>
-                                        <td className="px-6 py-2.5 text-center font-bold text-[#111827] text-[14px]">{brand._count.productMappings}</td>
-                                        <td className="px-6 py-2.5 text-right">
+                                        <td className="px-6 py-3 text-center font-bold text-[#111827] text-[14px] align-middle border-r border-[#D1D5DB]">{brand._count.masterProducts}</td>
+                                        <td className="px-6 py-3 text-center font-bold text-[#111827] text-[14px] align-middle border-r border-[#D1D5DB]">{brand._count.productMappings}</td>
+                                        <td className="px-6 py-3 text-left align-middle">
                                             <AdminRegistryRowActions
                                                 detailsHref={`/admin/brands/${brand.id}`}
                                                 onDetailsClick={(e) => e.stopPropagation()}
@@ -353,7 +523,7 @@ export default function AdminBrandsPage() {
                                                         <AdminImpersonateButton
                                                             target="brand"
                                                             entityId={brand.id}
-                                                            label="View as Brand"
+                                                            label="Impersonate"
                                                             variant="primary"
                                                             className="h-[34px] px-3 text-[12px] whitespace-nowrap"
                                                         />

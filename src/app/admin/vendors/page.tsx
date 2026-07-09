@@ -386,7 +386,7 @@ export default function VendorsPage() {
                                 className="w-full h-[38px] bg-[#299E60] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#238a54] active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-[#299E60]/10 disabled:opacity-60"
                             >
                                 <LayoutDashboard size={13} />
-                                View as Vendor
+                                Impersonate
                             </button>
                             <div className="flex items-center gap-2">
                                 <Link
@@ -414,13 +414,13 @@ export default function VendorsPage() {
             ) : (
             <AdminRegistryTableShell minWidth="1100px">
                 <AdminRegistryTableHead>
-                    <th className="px-6 py-2.5 font-bold text-center w-[60px]">#</th>
-                    <th className="px-6 py-2.5 font-bold min-w-[280px]">Vendor Partner</th>
-                    <th className="px-6 py-2.5 font-bold min-w-[150px]">Owner</th>
-                    <th className="px-6 py-2.5 font-bold min-w-[220px]">Contact Information</th>
-                    <th className="px-6 py-2.5 font-bold text-center w-[100px]">Products</th>
-                    <th className="px-6 py-2.5 font-bold text-center w-[100px]">Orders</th>
-                    <th className="px-6 py-2.5 font-bold text-right pr-4">Actions</th>
+                    <th className="px-6 py-3.5 font-bold text-center w-[60px] border-r border-[#D1D5DB]">#</th>
+                    <th className="px-6 py-3.5 font-bold min-w-[280px] border-r border-[#D1D5DB]">Vendor Partner</th>
+                    <th className="px-6 py-3.5 font-bold min-w-[150px] border-r border-[#D1D5DB]">Owner</th>
+                    <th className="px-6 py-3.5 font-bold min-w-[220px] border-r border-[#D1D5DB]">Contact Information</th>
+                    <th className="px-6 py-3.5 font-bold text-center w-[100px] border-r border-[#D1D5DB]">Products</th>
+                    <th className="px-6 py-3.5 font-bold text-center w-[100px] border-r border-[#D1D5DB]">Orders</th>
+                    <th className="px-6 py-3.5 font-bold text-left min-w-[360px]">Actions</th>
                 </AdminRegistryTableHead>
                 <AdminRegistryTableBody>
                         {filteredVendors.map((vendor, i) => (
@@ -430,12 +430,12 @@ export default function VendorsPage() {
                                 className="group hover:bg-[#F9FAFB]/60 transition-colors cursor-pointer"
                             >
                                 {/* Index */}
-                                <td className="px-6 py-2.5 text-center font-bold text-[#9CA3AF] text-[12px]">
+                                <td className="px-6 py-3 text-center font-bold text-[#9CA3AF] text-[12px] align-middle border-r border-[#D1D5DB]">
                                     {i + 1}
                                 </td>
 
                                 {/* Vendor Partner */}
-                                <td className="px-6 py-2.5">
+                                <td className="px-6 py-3 align-middle border-r border-[#D1D5DB]">
                                     <div className="flex items-center gap-3">
                                         {/* Avatar Box */}
                                         <div className="w-[42px] h-[42px] rounded-[10px] bg-[#F3F4F6] overflow-hidden shrink-0 border border-[#E5E7EB] flex items-center justify-center">
@@ -477,12 +477,12 @@ export default function VendorsPage() {
                                 </td>
 
                                 {/* Owner */}
-                                <td className="px-6 py-2.5 text-[13px] font-bold text-[#374151]">
+                                <td className="px-6 py-3 text-[13px] font-bold text-[#374151] align-middle border-r border-[#D1D5DB]">
                                     {vendor.user.fullName}
                                 </td>
 
                                 {/* Contact Information */}
-                                <td className="px-6 py-2.5">
+                                <td className="px-6 py-3 align-middle border-r border-[#D1D5DB]">
                                     <div className="flex flex-col gap-0.5">
                                         <span className="text-[13px] font-medium text-[#4B5563] truncate block max-w-[200px]">{vendor.user.email}</span>
                                         {vendor.user.phone && (
@@ -492,16 +492,16 @@ export default function VendorsPage() {
                                 </td>
 
                                 {/* Products Count */}
-                                <td className="px-6 py-2.5 text-center font-bold text-[#111827] text-[14px]">
+                                <td className="px-6 py-3 text-center font-bold text-[#111827] text-[14px] align-middle border-r border-[#D1D5DB]">
                                     {vendor._count.products}
                                 </td>
 
                                 {/* Orders Count */}
-                                <td className="px-6 py-2.5 text-center font-bold text-[#111827] text-[14px]">
+                                <td className="px-6 py-3 text-center font-bold text-[#111827] text-[14px] align-middle border-r border-[#D1D5DB]">
                                     {vendor._count.orders}
                                 </td>
 
-                                <td className="px-6 py-2.5 text-right">
+                                <td className="px-6 py-3 text-left align-middle">
                                     <AdminRegistryRowActions
                                         detailsHref={`/admin/vendors/${vendor.id}`}
                                         onDetailsClick={(e) => e.stopPropagation()}
@@ -513,7 +513,7 @@ export default function VendorsPage() {
                                                 className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] active:scale-97 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-[#299E60]/5 whitespace-nowrap disabled:opacity-60"
                                             >
                                                 <LayoutDashboard size={12} />
-                                                <span>View as Vendor</span>
+                                                <span>Impersonate</span>
                                                 <ArrowUpRight size={12} className="opacity-70" />
                                             </button>
                                         }

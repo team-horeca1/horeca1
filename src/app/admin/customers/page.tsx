@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
     Users,
     Package,
@@ -15,6 +16,11 @@ import {
     Upload,
     UserCircle,
     ArrowUpRight,
+    LayoutGrid,
+    List,
+    Mail,
+    Phone,
+    Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -28,6 +34,7 @@ import {
     AdminRegistryPageHeader,
     AdminRegistryStatsGrid,
     AdminRegistryFilterBar,
+    registryFilterPillClass,
     AdminRegistryLoadingState,
     AdminRegistryEmptyState,
     AdminRegistryTableShell,
@@ -62,6 +69,9 @@ export default function CustomersPage() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const confirm = useConfirm();
+
+    // View Mode switcher
+    const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
 
     // Filters state
     const [showFilters, setShowFilters] = useState(false);
@@ -347,36 +357,70 @@ export default function CustomersPage() {
                 searchPlaceholder="Search name, email, phone, business..."
                 searching={loading && !initialLoad}
                 leftSlot={
-                    <button
-                        type="button"
-                        onClick={() => setShowFilters(!showFilters)}
-                        className={cn(
-                            'h-[34px] px-3 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-all border',
-                            showFilters
-                                ? 'bg-[#299E60] text-white border-[#299E60]'
-                                : 'bg-[#F3F4F6] text-[#6B7280] border-transparent hover:text-[#111827]',
-                        )}
-                    >
-                        <SlidersHorizontal size={14} /> Filters
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {(
+                            [
+                                { id: 'all' as const, label: 'All Roles' },
+                                { id: 'customer' as const, label: 'Customers' },
+                                { id: 'vendor' as const, label: 'Vendors' },
+                                { id: 'admin' as const, label: 'Admins' },
+                            ] as const
+                        ).map((f) => (
+                            <button
+                                key={f.id}
+                                type="button"
+                                onClick={() => setFilterRole(f.id)}
+                                className={registryFilterPillClass(filterRole === f.id)}
+                            >
+                                {f.label}
+                            </button>
+                        ))}
+
+                        <button
+                            type="button"
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={cn(
+                                'h-[34px] px-3 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-all border ml-1',
+                                showFilters
+                                    ? 'bg-[#299E60] text-white border-[#299E60]'
+                                    : 'bg-[#F9FAFB] text-[#6B7280] border-[#D1D5DB] hover:text-[#111827] hover:bg-[#F3F4F6]',
+                            )}
+                        >
+                            <SlidersHorizontal size={14} /> More Filters
+                        </button>
+                    </div>
+                }
+                trailingSlot={
+                    <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
+                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase mr-1 hidden md:inline">View:</span>
+                        <div className="flex items-center bg-[#F3F4F6] border border-[#D1D5DB] rounded-[10px] p-1">
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={cn(
+                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
+                                    viewMode === 'grid' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
+                                )}
+                            >
+                                <LayoutGrid size={15} />
+                                <span className="hidden sm:inline">Cards</span>
+                            </button>
+                            <button
+                                onClick={() => setViewMode('table')}
+                                className={cn(
+                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
+                                    viewMode === 'table' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
+                                )}
+                            >
+                                <List size={15} />
+                                <span className="hidden sm:inline">Table</span>
+                            </button>
+                        </div>
+                    </div>
                 }
             />
 
             {showFilters && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 p-4 bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm animate-in slide-in-from-top-4 duration-200">
-                    <div>
-                        <label className="block text-[11px] font-bold text-[#9CA3AF] uppercase mb-1">Role</label>
-                        <select
-                            value={filterRole}
-                            onChange={(e) => setFilterRole(e.target.value)}
-                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
-                        >
-                            <option value="all">All Roles</option>
-                            <option value="customer">Customer</option>
-                            <option value="vendor">Vendor</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4 bg-white rounded-[16px] border border-[#D1D5DB] shadow-sm animate-in slide-in-from-top-4 duration-200">
                     <div>
                         <label className="block text-[11px] font-bold text-[#9CA3AF] uppercase mb-1">Pincode</label>
                         <input
@@ -384,7 +428,7 @@ export default function CustomersPage() {
                             placeholder="e.g. 560001"
                             value={filterPincode}
                             onChange={(e) => setFilterPincode(e.target.value)}
-                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
                         />
                     </div>
                     <div>
@@ -392,7 +436,7 @@ export default function CustomersPage() {
                         <select
                             value={filterSalespersonId}
                             onChange={(e) => setFilterSalespersonId(e.target.value)}
-                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
                         >
                             <option value="">All salespersons</option>
                             {salespersons.map((sp) => (
@@ -407,7 +451,7 @@ export default function CustomersPage() {
                         <select
                             value={filterCreditStatus}
                             onChange={(e) => setFilterCreditStatus(e.target.value)}
-                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
                         >
                             <option value="">All Statuses</option>
                             <option value="active">Active</option>
@@ -422,7 +466,7 @@ export default function CustomersPage() {
                             placeholder="e.g. Bangalore"
                             value={filterArea}
                             onChange={(e) => setFilterArea(e.target.value)}
-                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
                         />
                     </div>
                     <div>
@@ -432,7 +476,7 @@ export default function CustomersPage() {
                             placeholder="e.g. VIP"
                             value={filterTag}
                             onChange={(e) => setFilterTag(e.target.value)}
-                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
                         />
                     </div>
                 </div>
@@ -441,17 +485,120 @@ export default function CustomersPage() {
             {filteredUsers.length === 0 ? (
                 <AdminRegistryEmptyState
                     icon={Users}
-                    title={searchQuery ? 'No matched results' : 'No customers registered yet'}
-                    subtitle={
-                        searchQuery
-                            ? `We couldn't find any user matching "${searchQuery}"`
-                            : 'Click "Add Customer" to register your first buyer account.'
-                    }
+                    title={searchQuery || filterRole !== 'all' ? 'No matched results' : 'No customers registered yet'}
+                    subtitle="Try adjusting your filters or add a new customer."
                 />
+            ) : viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredUsers.map((user) => (
+                        <div
+                            key={user.id}
+                            className="bg-white rounded-[16px] border border-[#D1D5DB] shadow-sm overflow-hidden flex flex-col h-full hover:shadow-md hover:border-[#299E60]/30 hover:-translate-y-0.5 transition-all w-full relative"
+                        >
+                            {/* Checkbox at top left */}
+                            <div className="absolute top-4 left-4 z-10" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                    type="checkbox"
+                                    checked={selectedIds.has(user.id)}
+                                    onChange={(e) => handleSelectRow(user.id, e.target.checked)}
+                                    className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
+                                />
+                            </div>
+
+                            {/* Upper Section — click to view details */}
+                            <div
+                                onClick={() => openDetails(user.id)}
+                                className="p-5 flex-1 flex flex-col cursor-pointer"
+                            >
+                                {/* Visual Avatar Container */}
+                                <div className="bg-[#F9FAFB] rounded-[12px] h-[100px] relative flex items-center justify-center p-4 border border-[#F3F4F6] mb-4">
+                                    <AdminStatusBadge
+                                        variant={user.isActive ? 'active' : 'inactive'}
+                                        className="absolute top-2.5 right-2.5 shadow-sm normal-case text-[10px]"
+                                    />
+
+                                    <div className="w-[60px] h-[60px] rounded-full bg-[#299E60]/10 flex items-center justify-center border border-[#299E60]/20">
+                                        <span className="text-[22px] font-black text-[#299E60]">
+                                            {(user.fullName || 'U').charAt(0).toUpperCase()}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Name & Role */}
+                                <div className="mb-3">
+                                    <h3 className="text-[16px] font-extrabold text-[#111827] line-clamp-1 group-hover:text-[#299E60]">{user.fullName}</h3>
+                                    <span className={cn(
+                                        'inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold capitalize mt-1.5',
+                                        user.role === 'admin' ? 'bg-purple-50 text-purple-600' :
+                                        user.role === 'vendor' ? 'bg-blue-50 text-blue-600' :
+                                        'bg-[#EEF8F1] text-[#299E60]',
+                                    )}>
+                                        {user.role}
+                                    </span>
+                                </div>
+
+                                {/* Details Fields */}
+                                <div className="space-y-2 mt-auto pt-2 border-t border-[#F3F4F6]">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <Mail size={13} className="text-[#9CA3AF] shrink-0" />
+                                        <span className="text-[12px] font-semibold text-[#4B5563] truncate">{user.email}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Phone size={13} className="text-[#9CA3AF] shrink-0" />
+                                        <span className="text-[12px] font-semibold text-[#4B5563]">{user.phone || '—'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Building2 size={13} className="text-[#9CA3AF] shrink-0" />
+                                        <span className="text-[12px] font-semibold text-[#4B5563] truncate">{user.businessName || '—'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="p-4 border-t border-[#D1D5DB] bg-white flex flex-col gap-2 rounded-b-[16px]">
+                                {canEditCustomers && user.role === 'customer' && (
+                                    <button
+                                        type="button"
+                                        disabled={impersonateLoading}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            void startCustomerView(user.id);
+                                        }}
+                                        className="w-full h-[38px] bg-[#299E60] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#238a54] active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-[#299E60]/10 disabled:opacity-60"
+                                    >
+                                        <UserCircle size={13} />
+                                        Impersonate
+                                    </button>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <Link
+                                        href={`/admin/customers/${user.id}`}
+                                        className="flex-1 h-[36px] bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB] rounded-[10px] text-[12px] font-bold transition-all flex items-center justify-center border border-[#E5E7EB]"
+                                    >
+                                        Details
+                                    </Link>
+                                    {canEditCustomers && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); toggleUserActive(user.id, user.isActive); }}
+                                            className={cn(
+                                                "h-[36px] px-3 rounded-[10px] text-[12px] font-bold transition-all border",
+                                                user.isActive
+                                                    ? "bg-[#FFF0F0] border-transparent text-[#E74C3C] hover:bg-red-100"
+                                                    : "bg-[#EEF8F1] border-transparent text-[#299E60] hover:bg-green-100"
+                                            )}
+                                        >
+                                            {user.isActive ? 'Deactivate' : 'Activate'}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             ) : (
                 <AdminRegistryTableShell minWidth="1100px">
                     <AdminRegistryTableHead>
-                        <th className="px-6 py-2.5 font-bold text-center w-[52px]">
+                        <th className="px-6 py-3.5 font-bold text-center w-[52px] border-r border-[#D1D5DB]">
                             <input
                                 type="checkbox"
                                 checked={filteredUsers.length > 0 && selectedIds.size === filteredUsers.length}
@@ -460,13 +607,13 @@ export default function CustomersPage() {
                                 className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
                             />
                         </th>
-                        <th className="px-6 py-2.5 font-bold min-w-[240px]">Customer</th>
-                        <th className="px-6 py-2.5 font-bold min-w-[180px]">Email</th>
-                        <th className="px-6 py-2.5 font-bold min-w-[120px]">Phone</th>
-                        <th className="px-6 py-2.5 font-bold min-w-[100px]">Business</th>
-                        <th className="px-6 py-2.5 font-bold text-center w-[100px]">Status</th>
-                        <th className="px-6 py-2.5 font-bold text-center w-[100px]">Joined</th>
-                        <th className="px-6 py-2.5 font-bold text-right pr-4">Actions</th>
+                        <th className="px-6 py-3.5 font-bold min-w-[240px] border-r border-[#D1D5DB]">Customer</th>
+                        <th className="px-6 py-3.5 font-bold min-w-[180px] border-r border-[#D1D5DB]">Email</th>
+                        <th className="px-6 py-3.5 font-bold min-w-[120px] border-r border-[#D1D5DB]">Phone</th>
+                        <th className="px-6 py-3.5 font-bold min-w-[100px] border-r border-[#D1D5DB]">Business</th>
+                        <th className="px-6 py-3.5 font-bold text-center w-[100px] border-r border-[#D1D5DB]">Status</th>
+                        <th className="px-6 py-3.5 font-bold text-center w-[100px] border-r border-[#D1D5DB]">Joined</th>
+                        <th className="px-6 py-3.5 font-bold text-left min-w-[240px]">Actions</th>
                     </AdminRegistryTableHead>
                     <AdminRegistryTableBody>
                         {filteredUsers.map((user) => (
@@ -475,7 +622,7 @@ export default function CustomersPage() {
                                 onClick={() => openDetails(user.id)}
                                 className="group hover:bg-[#F9FAFB]/60 transition-colors cursor-pointer"
                             >
-                                <td className="px-6 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                <td className="px-6 py-3 text-center align-middle border-r border-[#D1D5DB]" onClick={(e) => e.stopPropagation()}>
                                     <input
                                         type="checkbox"
                                         checked={selectedIds.has(user.id)}
@@ -483,7 +630,7 @@ export default function CustomersPage() {
                                         className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
                                     />
                                 </td>
-                                <td className="px-6 py-2.5">
+                                <td className="px-6 py-3 align-middle border-r border-[#D1D5DB]">
                                     <div className="flex items-center gap-3">
                                         <div className="w-[42px] h-[42px] rounded-[10px] bg-[#F3F4F6] overflow-hidden shrink-0 border border-[#E5E7EB] flex items-center justify-center">
                                             <span className="text-[15px] font-black text-[#299E60]">
@@ -507,16 +654,16 @@ export default function CustomersPage() {
                                         </div>
                                     </div>
                                 </td>
-                                <td className="px-6 py-2.5 text-[13px] font-medium text-[#4B5563] truncate max-w-[200px]">{user.email}</td>
-                                <td className="px-6 py-2.5 text-[11px] text-[#9CA3AF] font-semibold font-mono">{user.phone || '—'}</td>
-                                <td className="px-6 py-2.5 text-[13px] font-medium text-[#4B5563] truncate max-w-[160px]">{user.businessName || '—'}</td>
-                                <td className="px-6 py-2.5 text-center">
+                                <td className="px-6 py-3 text-[13px] font-medium text-[#4B5563] truncate max-w-[200px] align-middle border-r border-[#D1D5DB]">{user.email}</td>
+                                <td className="px-6 py-3 text-[11px] text-[#9CA3AF] font-semibold font-mono align-middle border-r border-[#D1D5DB]">{user.phone || '—'}</td>
+                                <td className="px-6 py-3 text-[13px] font-medium text-[#4B5563] truncate max-w-[160px] align-middle border-r border-[#D1D5DB]">{user.businessName || '—'}</td>
+                                <td className="px-6 py-3 text-center align-middle border-r border-[#D1D5DB]">
                                     <AdminStatusBadge variant={user.isActive ? 'active' : 'inactive'} />
                                 </td>
-                                <td className="px-6 py-2.5 text-center text-[12px] font-bold text-[#6B7280]">
+                                <td className="px-6 py-3 text-center text-[12px] font-bold text-[#6B7280] align-middle border-r border-[#D1D5DB]">
                                     {new Date(user.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                                 </td>
-                                <td className="px-6 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                                <td className="px-6 py-3 text-left align-middle" onClick={(e) => e.stopPropagation()}>
                                     <AdminRegistryRowActions
                                         detailsHref={`/admin/customers/${user.id}`}
                                         onDetailsClick={(e) => e.stopPropagation()}
@@ -532,7 +679,7 @@ export default function CustomersPage() {
                                                     className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60"
                                                 >
                                                     <UserCircle size={12} />
-                                                    View as Customer
+                                                    Impersonate
                                                     <ArrowUpRight size={12} className="opacity-70" />
                                                 </button>
                                             ) : undefined
@@ -560,7 +707,7 @@ export default function CustomersPage() {
             )}
 
             {selectedIds.size > 0 && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white border border-[#EEEEEE] shadow-lg rounded-[16px] px-6 py-4 flex flex-wrap items-center gap-4 z-[9999] max-w-[92%] animate-in slide-in-from-bottom-8 duration-200">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white border border-[#D1D5DB] shadow-lg rounded-[16px] px-6 py-4 flex flex-wrap items-center gap-4 z-[9999] max-w-[92%] animate-in slide-in-from-bottom-8 duration-200">
                     <div className="flex items-center gap-2 border-r pr-4 border-[#F3F4F6] shrink-0">
                         <span className="bg-[#EEF8F1] text-[#299E60] font-black text-[12px] px-2.5 py-1 rounded-full">
                             {selectedIds.size} Selected
