@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { clearAllImpersonationCookies } from '@/lib/adminImpersonationCookies';
 
 const Body = z.object({ outletId: z.string().uuid() });
 
@@ -29,10 +30,12 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     });
     if (!outlet) throw Errors.badRequest('Outlet does not belong to the active account');
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       data: { outletId: outlet.id, requiresAddressUpdate: outlet.requiresAddressUpdate },
     });
+    clearAllImpersonationCookies(res);
+    return res;
   } catch (err) {
     return errorResponse(err);
   }

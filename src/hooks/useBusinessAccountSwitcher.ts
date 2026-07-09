@@ -9,6 +9,12 @@ import { clearForcePickerCookie, clearDismissFlag } from '@/lib/postLoginPicker'
 import { redirectIfPortalMismatch } from '@/lib/portalRouting';
 import { ACCOUNTS_REFRESH_EVENT } from '@/lib/addressUsability';
 import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
+import {
+  broadcastAuthEvent,
+  tryAcquireBootstrapLock,
+  releaseBootstrapLock,
+} from '@/lib/authTabSync';
+import { clearUserClientStores } from '@/lib/userScopedStorage';
 
 /**
  * V2.2 — Multi-account + multi-outlet switcher hook.
@@ -40,6 +46,13 @@ export interface OutletSummary {
   requiresAddressUpdate: boolean;
 }
 
+export class AccountSwitchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AccountSwitchError';
+  }
+}
+
 export function useBusinessAccountSwitcher() {
   const { data: session, update } = useSession();
   const pathname = usePathname();
@@ -51,6 +64,7 @@ export function useBusinessAccountSwitcher() {
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState(false);
   const legacyProvisionAttempted = useRef(false);
+  const bootstrapAttempted = useRef(false);
 
   const userId = session?.user?.id ?? null;
   const u = (session?.user ?? {}) as Record<string, unknown>;
@@ -59,6 +73,9 @@ export function useBusinessAccountSwitcher() {
   const activeOutletId = (u.activeOutletId as string | undefined) ?? null;
   const totalAccountCount = (u.totalAccountCount as number | undefined) ?? 0;
   const availableAccountsTruncated = (u.availableAccountsTruncated as boolean | undefined) ?? false;
+  const accessibleOutletIds = Array.isArray(u.accessibleOutletIds)
+    ? (u.accessibleOutletIds as string[])
+    : [];
 
   const fetchAccounts = useCallback(async () => {
     try {
@@ -88,14 +105,32 @@ export function useBusinessAccountSwitcher() {
       if (businessAccountId === activeBusinessAccountId && !outletId) return;
       setSwitching(true);
       try {
+        // BA switch must not leave a stale admin impersonation cookie pointing
+        // at another vendor/brand/customer.
+        try {
+          await clearAllAdminImpersonation();
+        } catch { /* ignore */ }
+
         const res = await fetch('/api/v1/auth/switch-business-account', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ businessAccountId, outletId }),
         });
-        if (!res.ok) { setSwitching(false); return; }
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          const msg =
+            (typeof json?.error === 'object' && json?.error?.message)
+            || (typeof json?.error === 'string' ? json.error : null)
+            || `Failed to switch account (HTTP ${res.status})`;
+          throw new AccountSwitchError(msg);
+        }
         clearWishlist();
         await update({ activeBusinessAccountId: businessAccountId, activeOutletId: outletId ?? undefined });
+        broadcastAuthEvent('account-switched', {
+          userId,
+          activeBusinessAccountId: businessAccountId,
+          activeOutletId: outletId ?? null,
+        });
 
         const target = accounts.find((a) => a.id === businessAccountId);
         if (target && pathname) {
@@ -104,9 +139,10 @@ export function useBusinessAccountSwitcher() {
         }
       } finally {
         setSwitching(false);
+        releaseBootstrapLock();
       }
     },
-    [switching, activeBusinessAccountId, accounts, pathname, clearCart, clearWishlist, update, router],
+    [switching, activeBusinessAccountId, accounts, pathname, clearWishlist, update, router, userId],
   );
 
   const switchOutlet = useCallback(
@@ -114,36 +150,67 @@ export function useBusinessAccountSwitcher() {
       if (switching || outletId === activeOutletId) return;
       setSwitching(true);
       try {
+        try {
+          await clearAllAdminImpersonation();
+        } catch { /* ignore */ }
+
         const res = await fetch('/api/v1/auth/switch-outlet', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ outletId }),
         });
-        if (!res.ok) { setSwitching(false); return; }
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          const msg =
+            (typeof json?.error === 'object' && json?.error?.message)
+            || (typeof json?.error === 'string' ? json.error : null)
+            || `Failed to switch outlet (HTTP ${res.status})`;
+          throw new AccountSwitchError(msg);
+        }
         await update({ activeOutletId: outletId });
+        broadcastAuthEvent('account-switched', {
+          userId,
+          activeBusinessAccountId,
+          activeOutletId: outletId,
+        });
       } finally {
         setSwitching(false);
+        releaseBootstrapLock();
       }
     },
-    [switching, activeOutletId, clearCart, update],
+    [switching, activeOutletId, update, userId, activeBusinessAccountId],
   );
 
   // Bootstrap session when JWT is missing account/outlet but memberships exist.
+  // Cross-tab lock prevents multiple tabs from racing switchAccount(primary).
   useEffect(() => {
     if (!userId || loading || switching || accounts.length === 0) return;
+    if (bootstrapAttempted.current) return;
 
     const primary = accounts.find((a) => a.isPrimary) ?? accounts[0];
     const defaultOutletId =
       primary.primaryOutletId ?? primary.outlets[0]?.id ?? null;
 
     if (!activeBusinessAccountId) {
-      void switchAccount(primary.id, defaultOutletId ?? undefined);
+      if (!tryAcquireBootstrapLock()) return;
+      bootstrapAttempted.current = true;
+      void switchAccount(primary.id, defaultOutletId ?? undefined).catch(() => {
+        bootstrapAttempted.current = false;
+        releaseBootstrapLock();
+      });
       return;
     }
     if (!activeOutletId && currentAccount) {
       const outletId =
         currentAccount.primaryOutletId ?? currentAccount.outlets[0]?.id ?? null;
-      if (outletId) void switchOutlet(outletId);
+      if (outletId) {
+        if (!tryAcquireBootstrapLock()) return;
+        bootstrapAttempted.current = true;
+        void switchOutlet(outletId).catch(() => {
+          bootstrapAttempted.current = false;
+          releaseBootstrapLock();
+        });
+      }
     }
   }, [
     userId,
@@ -170,19 +237,17 @@ export function useBusinessAccountSwitcher() {
   }, [userId, loading, activeBusinessAccountId, accounts.length, update, fetchAccounts]);
 
   const handleSignOut = useCallback(async () => {
+    clearCart();
     clearWishlist();
     clearForcePickerCookie();
     clearDismissFlag();
+    clearUserClientStores(userId);
     try {
       await clearAllAdminImpersonation();
     } catch { /* ignore */ }
-    try {
-      localStorage.removeItem('horeca_order_lists_all');
-      localStorage.removeItem('horeca_orders');
-      localStorage.removeItem('horeca_recently_viewed');
-    } catch { /* ignore */ }
+    broadcastAuthEvent('signed-out', { userId });
     await signOut({ callbackUrl: '/' });
-  }, [clearCart, clearWishlist]);
+  }, [clearCart, clearWishlist, userId]);
 
   return {
     loading,
@@ -193,6 +258,7 @@ export function useBusinessAccountSwitcher() {
     currentOutlet,
     activeBusinessAccountId,
     activeOutletId,
+    accessibleOutletIds,
     totalAccountCount,
     availableAccountsTruncated,
     switchAccount,

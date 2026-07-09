@@ -1,7 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { useSession } from 'next-auth/react';
 import type { VendorProduct } from '@/types';
+import { wishlistStorageKey, migrateLegacyKey } from '@/lib/userScopedStorage';
 
 interface WishlistContextType {
     wishlist: VendorProduct[];
@@ -14,23 +16,40 @@ interface WishlistContextType {
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
 
-export function WishlistProvider({ children }: { children: React.ReactNode }) {
-    const [wishlist, setWishlist] = useState<VendorProduct[]>(() => {
-        try {
-            const saved = typeof window !== 'undefined' ? localStorage.getItem('wishlist') : null;
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) return parsed;
-            }
-        } catch (e) {
-            console.error('Failed to parse wishlist', e);
+function readWishlist(userId?: string | null): VendorProduct[] {
+    try {
+        migrateLegacyKey('wishlist', wishlistStorageKey(null));
+        const saved = typeof window !== 'undefined' ? localStorage.getItem(wishlistStorageKey(userId)) : null;
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) return parsed;
         }
-        return [];
-    });
+    } catch (e) {
+        console.error('Failed to parse wishlist', e);
+    }
+    return [];
+}
+
+export function WishlistProvider({ children }: { children: React.ReactNode }) {
+    const { data: session, status } = useSession();
+    const userId = status === 'authenticated' ? (session?.user?.id ?? null) : null;
+    const [wishlist, setWishlist] = useState<VendorProduct[]>([]);
+    const [ready, setReady] = useState(false);
 
     useEffect(() => {
-        localStorage.setItem('wishlist', JSON.stringify(wishlist));
-    }, [wishlist]);
+        if (status === 'loading') return;
+        Promise.resolve().then(() => {
+            setWishlist(readWishlist(userId));
+            setReady(true);
+        });
+    }, [status, userId]);
+
+    useEffect(() => {
+        if (!ready) return;
+        try {
+            localStorage.setItem(wishlistStorageKey(userId), JSON.stringify(wishlist));
+        } catch { /* ignore */ }
+    }, [wishlist, ready, userId]);
 
     const addToWishlist = useCallback((product: VendorProduct) => {
         setWishlist(prev => {
@@ -43,7 +62,6 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
         setWishlist(prev => prev.filter(p => p.id !== productId));
     }, []);
 
-    // Use a Set for O(1) lookup instead of .some() on every call
     const wishlistIds = useMemo(() => new Set(wishlist.map(p => p.id)), [wishlist]);
 
     const isInWishlist = useCallback((productId: string) => {

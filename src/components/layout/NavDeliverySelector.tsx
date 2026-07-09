@@ -13,12 +13,23 @@ interface Props {
 
 export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }: Props) {
   const { status } = useSession();
-  const { currentAccount, currentOutlet, accounts, switchAccount, switchOutlet, switching } =
-    useBusinessAccountSwitcher();
+  const {
+    currentAccount,
+    currentOutlet,
+    accounts,
+    switchAccount,
+    switchOutlet,
+    switching,
+    accessibleOutletIds,
+  } = useBusinessAccountSwitcher();
   const [accOpen, setAccOpen] = useState(false);
   const [outletOpen, setOutletOpen] = useState(false);
   const [pickingId, setPickingId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+
+  const visibleOutlets = (currentAccount?.outlets ?? []).filter(
+    (o) => accessibleOutletIds.length === 0 || accessibleOutletIds.includes(o.id),
+  );
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -133,7 +144,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
           {outletOpen && (
             <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-xl z-[10500] w-[200px] p-1.5">
               <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">Select Outlet</p>
-              {currentAccount.outlets.map((o) => (
+              {visibleOutlets.map((o) => (
                 <button key={o.id} onClick={() => handleSwitchOutlet(o.id)}
                   disabled={switching || pickingId !== null}
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 text-left disabled:opacity-60"
@@ -228,7 +239,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
         {outletOpen && (
           <div className="absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-xl shadow-2xl z-[10500] w-[240px] p-2">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">Select Outlet</p>
-            {currentAccount.outlets.map((o) => (
+            {visibleOutlets.map((o) => (
               <button key={o.id} onClick={() => handleSwitchOutlet(o.id)}
                 disabled={switching || pickingId !== null}
                 className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-gray-50 text-left disabled:opacity-60 transition-colors"

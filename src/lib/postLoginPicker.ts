@@ -6,6 +6,8 @@
  * fresh login with 2+ business accounts must pick before redirect.
  */
 
+import { broadcastAuthEvent } from '@/lib/authTabSync';
+
 export const FORCE_PICKER_COOKIE = 'horeca_force_account_picker';
 export const PENDING_REDIRECT_KEY = 'horeca_pending_post_login_redirect';
 export const DISMISS_KEY = 'horeca_post_login_selector_dismissed';
@@ -83,6 +85,7 @@ export function prepareFreshLoginNavigation(redirectTo: string | null): void {
   clearDismissFlag();
   setPendingRedirect(redirectTo);
   setForcePickerCookie();
+  broadcastAuthEvent('session-changed');
   // Go straight to the destination (e.g. /checkout) instead of bouncing through
   // the homepage — the account picker is global and overlays whatever page we
   // land on. The pending redirect is still stashed so completePostLoginPicker
@@ -122,4 +125,5 @@ export function completePostLoginPicker(contextChanged = true): void {
 export function markFreshLoginPendingPicker(): void {
   clearDismissFlag();
   setForcePickerCookie();
+  broadcastAuthEvent('session-changed');
 }

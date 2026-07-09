@@ -1,3 +1,5 @@
+import { broadcastAuthEvent } from '@/lib/authTabSync';
+
 /** Clear all admin impersonation cookies (vendor, brand, customer). */
 export async function clearAllAdminImpersonation(): Promise<void> {
   await Promise.allSettled([
@@ -5,6 +7,12 @@ export async function clearAllAdminImpersonation(): Promise<void> {
     fetch('/api/v1/admin/impersonate/brand', { method: 'DELETE' }),
     fetch('/api/v1/admin/impersonate/customer', { method: 'DELETE' }),
   ]);
+  broadcastAuthEvent('impersonation-changed');
+}
+
+/** Start/stop helpers call this after setting impersonation cookies. */
+export function notifyImpersonationChanged(): void {
+  broadcastAuthEvent('impersonation-changed');
 }
 
 /** True when admin is viewing the marketplace as a customer. */

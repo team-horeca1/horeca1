@@ -19,6 +19,7 @@ import {
   readForcePickerCookie,
   completePostLoginPicker,
 } from '@/lib/postLoginPicker';
+import { broadcastAuthEvent } from '@/lib/authTabSync';
 import { ShieldCheck, Store, Sparkles, User, MapPin, Loader2, X, ChevronLeft, Check } from 'lucide-react';
 
 type Kind = 'customer' | 'vendor' | 'brand';
@@ -111,6 +112,14 @@ export function PostLoginAccountSelector() {
     setOutletStep(null);
     setPickingId(null);
     void update({ accountPickerCompleted: true }).catch(() => {});
+    if (contextChanged) {
+      broadcastAuthEvent('account-switched', {
+        userId: session?.user?.id,
+        activeBusinessAccountId: (session?.user as { activeBusinessAccountId?: string } | undefined)?.activeBusinessAccountId,
+      });
+    } else {
+      broadcastAuthEvent('session-changed', { userId: session?.user?.id });
+    }
     completePostLoginPicker(contextChanged);
   };
 
@@ -121,10 +130,14 @@ export function PostLoginAccountSelector() {
     }
     let contextChanged = false;
     if (a.id !== currentAccount?.id) {
-      // A failed switch must not strand the user — the redirect below still has
-      // to fire. The choice is persisted server-side by the POST inside
-      // switchAccount regardless of the client session refresh resolving.
-      try { await switchAccount(a.id); contextChanged = true; } catch { /* ignore */ }
+      // Fail loud — do not finish picker with stale context if switch failed.
+      try {
+        await switchAccount(a.id);
+        contextChanged = true;
+      } catch {
+        setPickingId(null);
+        return;
+      }
     }
     if (filterOutlets(a).length > 1) {
       accountChangedRef.current = contextChanged;
@@ -187,7 +200,12 @@ export function PostLoginAccountSelector() {
                       setPickingId(o.id);
                       const outletChanged = o.id !== activeOutletId;
                       if (outletChanged) {
-                        try { await switchOutlet(o.id); } catch { /* ignore — redirect must still fire */ }
+                        try {
+                          await switchOutlet(o.id);
+                        } catch {
+                          setPickingId(null);
+                          return;
+                        }
                       }
                       finishPicker(outletChanged || accountChangedRef.current);
                     }}

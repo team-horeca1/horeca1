@@ -5,6 +5,11 @@ import { useSession } from 'next-auth/react';
 import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 import { toast } from 'sonner';
 import { notifyAccountsRefresh } from '@/lib/addressUsability';
+import {
+    addressSelectedKey,
+    addressSavedKey,
+    migrateLegacyKey,
+} from '@/lib/userScopedStorage';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -44,18 +49,12 @@ interface AddressContextType {
 
 const AddressContext = createContext<AddressContextType | undefined>(undefined);
 
-// ─── Storage Keys (localStorage fallback for unauthenticated) ────────────────
-
-const STORAGE_KEYS = {
-    SELECTED: 'horeca1_selected_address',
-    SAVED: 'horeca1_saved_addresses',
-};
-
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function AddressProvider({ children }: { children: React.ReactNode }) {
     const { isLoaded, google } = useGoogleMaps();
-    const { status } = useSession();
+    const { data: session, status } = useSession();
+    const userId = status === 'authenticated' ? (session?.user?.id ?? null) : null;
     const [selectedAddress, setSelectedAddressState] = useState<Address | null>(null);
     const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
     const [isDetectingLocation, setIsDetectingLocation] = useState(false);
@@ -93,10 +92,18 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
     // ─── Load addresses on mount / session change ────────────────────────
 
     useEffect(() => {
-        // Always load selected address from localStorage (quick, no network)
+        if (status === 'loading') return;
+        migrateLegacyKey('horeca1_selected_address', addressSelectedKey(null));
+        migrateLegacyKey('horeca1_saved_addresses', addressSavedKey(null));
+
+        // Always load selected address from user-scoped localStorage (quick, no network)
         try {
-            const savedSelected = localStorage.getItem(STORAGE_KEYS.SELECTED);
-            if (savedSelected) Promise.resolve().then(() => setSelectedAddressState(JSON.parse(savedSelected)));
+            const savedSelected = localStorage.getItem(addressSelectedKey(userId));
+            if (savedSelected) {
+                Promise.resolve().then(() => setSelectedAddressState(JSON.parse(savedSelected)));
+            } else {
+                Promise.resolve().then(() => setSelectedAddressState(null));
+            }
         } catch { /* ignore */ }
 
         if (status === 'authenticated') {
@@ -110,7 +117,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                 if (defaultAddr) {
                     setSelectedAddressState(prev => {
                         if (!prev) {
-                            try { localStorage.setItem(STORAGE_KEYS.SELECTED, JSON.stringify(defaultAddr)); } catch { /* ignore */ }
+                            try { localStorage.setItem(addressSelectedKey(userId), JSON.stringify(defaultAddr)); } catch { /* ignore */ }
                             return defaultAddr;
                         }
                         return prev;
@@ -118,13 +125,14 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                 }
             });
         } else if (status === 'unauthenticated') {
-            // Fallback: load from localStorage
+            // Fallback: load from guest-scoped localStorage
             try {
-                const savedList = localStorage.getItem(STORAGE_KEYS.SAVED);
+                const savedList = localStorage.getItem(addressSavedKey(null));
                 if (savedList) Promise.resolve().then(() => setSavedAddresses(JSON.parse(savedList)));
+                else Promise.resolve().then(() => setSavedAddresses([]));
             } catch { /* ignore */ }
         }
-    }, [status, fetchAddressesFromDB]);
+    }, [status, userId, fetchAddressesFromDB]);
 
     // ─── Sync the selected delivery address into a cookie ────────────────
     // The server reads `h1_addr` (a SavedAddress id) to drive location-based
@@ -154,12 +162,12 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
         setSelectedAddressState(address);
         try {
             if (address) {
-                localStorage.setItem(STORAGE_KEYS.SELECTED, JSON.stringify(address));
+                localStorage.setItem(addressSelectedKey(userId), JSON.stringify(address));
             } else {
-                localStorage.removeItem(STORAGE_KEYS.SELECTED);
+                localStorage.removeItem(addressSelectedKey(userId));
             }
         } catch { /* ignore */ }
-    }, []);
+    }, [userId]);
 
     // ─── addAddress ──────────────────────────────────────────────────────
 
@@ -222,7 +230,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             const newAddr: Address = { ...address, id: `addr_${Date.now()}` };
             setSavedAddresses(prev => {
                 const updated = [...prev, newAddr];
-                try { localStorage.setItem(STORAGE_KEYS.SAVED, JSON.stringify(updated)); } catch { /* ignore */ }
+                try { localStorage.setItem(addressSavedKey(null), JSON.stringify(updated)); } catch { /* ignore */ }
                 return updated;
             });
             return newAddr;
@@ -243,20 +251,20 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
         setSavedAddresses(prev => {
             const updated = prev.filter(a => a.id !== id);
             if (status !== 'authenticated') {
-                try { localStorage.setItem(STORAGE_KEYS.SAVED, JSON.stringify(updated)); } catch { /* ignore */ }
+                try { localStorage.setItem(addressSavedKey(null), JSON.stringify(updated)); } catch { /* ignore */ }
             }
             return updated;
         });
         // If the removed address was selected, clear it
         setSelectedAddressState(prev => {
             if (prev?.id === id) {
-                try { localStorage.removeItem(STORAGE_KEYS.SELECTED); } catch { /* ignore */ }
+                try { localStorage.removeItem(addressSelectedKey(userId)); } catch { /* ignore */ }
                 return null;
             }
             return prev;
         });
         notifyAccountsRefresh();
-    }, [status]);
+    }, [status, userId]);
 
     // ─── updateAddress ───────────────────────────────────────────────────
 
@@ -276,7 +284,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
         setSavedAddresses(prev => {
             const updated = prev.map(a => a.id === id ? { ...a, ...updates } : a);
             if (status !== 'authenticated') {
-                try { localStorage.setItem(STORAGE_KEYS.SAVED, JSON.stringify(updated)); } catch { /* ignore */ }
+                try { localStorage.setItem(addressSavedKey(null), JSON.stringify(updated)); } catch { /* ignore */ }
             }
             return updated;
         });

@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { clearAllImpersonationCookies } from '@/lib/adminImpersonationCookies';
 
 const Body = z.object({
   businessAccountId: z.string().uuid(),
@@ -41,10 +42,14 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       if (!outlet) throw Errors.badRequest('Outlet does not belong to this account');
     }
 
-    return NextResponse.json({
+    // Account switch must not leave admin impersonation cookies pointing at
+    // another tenant (defense-in-depth alongside client clear).
+    const res = NextResponse.json({
       success: true,
       data: { businessAccountId, outletId: outletId ?? null },
     });
+    clearAllImpersonationCookies(res);
+    return res;
   } catch (err) {
     return errorResponse(err);
   }

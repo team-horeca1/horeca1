@@ -20,6 +20,14 @@ declare module 'next-auth' {
       activeVendorId?: string | null;
       activeBrandId?: string | null;
       forceAccountPicker?: boolean;
+      availableAccounts?: Array<{
+        id: string;
+        displayName: string | null;
+        isVendor: boolean;
+        isBrand: boolean;
+      }>;
+      availableAccountsTruncated?: boolean;
+      totalAccountCount?: number;
     };
   }
 }
@@ -42,5 +50,16 @@ declare module 'next-auth/jwt' {
     activeBrandId?: string | null;
     activeVendorTeamRole?: TeamRole | 'owner' | null;
     activeBrandTeamRole?: TeamRole | 'owner' | null;
+    forceAccountPicker?: boolean;
+    availableAccounts?: Array<{
+      id: string;
+      displayName: string | null;
+      isVendor: boolean;
+      isBrand: boolean;
+    }>;
+    availableAccountsTruncated?: boolean;
+    totalAccountCount?: number;
+    /** ms timestamp of User.updatedAt when permissions were last synced into this JWT */
+    userSyncedAt?: number;
   }
 }

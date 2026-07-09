@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
+import { clearAllAdminImpersonation, notifyImpersonationChanged } from '@/lib/clearImpersonation';
 
 export type ImpersonateTarget = 'vendor' | 'brand' | 'customer';
 
@@ -56,6 +56,7 @@ export function useAdminImpersonate(target: ImpersonateTarget) {
           toast.error(msg);
           return false;
         }
+        notifyImpersonationChanged();
         router.push(redirectTo ?? routes.redirect);
         router.refresh();
         return true;
