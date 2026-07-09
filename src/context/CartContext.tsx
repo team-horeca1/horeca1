@@ -209,22 +209,34 @@ function parseApiCart(apiData: { vendorGroups: unknown[]; total: number }): {
                 isPromoFree: Boolean(raw.isPromoFree),
                 bxgyFreeQty: Number(raw.bxgyFreeQty) || 0,
                 bxgyPromotionName: (raw.bxgyPromotionName as string) || undefined,
+                schemeFreeQty: Number(raw.schemeFreeQty) || 0,
             });
         }
     }
     return { items, groupMeta };
 }
 
-function loadLocalCart(userId?: string | null): CartItemWithId[] {
+function loadLocalCart(
+    userId?: string | null,
+    businessAccountId?: string | null,
+    outletId?: string | null,
+): CartItemWithId[] {
     try {
         migrateLegacyKey('horeca_cart', cartStorageKey(null));
-        const s = localStorage.getItem(cartStorageKey(userId));
+        const s = localStorage.getItem(cartStorageKey(userId, businessAccountId, outletId));
         return s ? JSON.parse(s) : [];
     } catch { return []; }
 }
 
-function saveLocalCart(cart: CartItemWithId[], userId?: string | null) {
-    try { localStorage.setItem(cartStorageKey(userId), JSON.stringify(cart)); } catch { /* ignore */ }
+function saveLocalCart(
+    cart: CartItemWithId[],
+    userId?: string | null,
+    businessAccountId?: string | null,
+    outletId?: string | null,
+) {
+    try {
+        localStorage.setItem(cartStorageKey(userId, businessAccountId, outletId), JSON.stringify(cart));
+    } catch { /* ignore */ }
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
@@ -293,7 +305,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                         setCart([]);
                         return;
                     }
-                    setCart(loadLocalCart(userId));
+                    setCart(loadLocalCart(userId, activeBAId, activeOutletId));
                 })
                 .finally(() => setIsInitialized(true));
         } else {
@@ -306,7 +318,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Persist to localStorage for both guest and logged-in users so guest session preserves it on logout
     useEffect(() => {
         if (!isInitialized) return;
-        saveLocalCart(cart, isLoggedIn ? userId : null);
+        saveLocalCart(cart, isLoggedIn ? userId : null, activeBAId, activeOutletId);
     }, [cart, isInitialized, isLoggedIn, userId]);
 
     const addToCart = useCallback((product: VendorProduct, quantity: number = 1) => {

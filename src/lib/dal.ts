@@ -197,7 +197,14 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
     category: (p.categoryName as string) || (p.category as Record<string, unknown>)?.name as string || '',
     packSize: packSizeDisplay,
     unit: rawUnit || 'unit',
-    stock: inventory ? Number((inventory as Record<string, unknown>).qtyAvailable) || 0 : 0,
+    stock: inventory
+      ? Math.max(
+          0,
+          (Number((inventory as Record<string, unknown>).qtySellable) ||
+            (Number((inventory as Record<string, unknown>).qtyAvailable) || 0) -
+              (Number((inventory as Record<string, unknown>).qtyReserved) || 0)),
+        )
+      : 0,
     isActive: (p.isActive as boolean) ?? true,
     createdAt: new Date(p.createdAt as string),
     updatedAt: new Date(p.updatedAt as string),

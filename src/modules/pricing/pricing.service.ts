@@ -623,3 +623,22 @@ function applyPricingType(
 function round2(d: Prisma.Decimal): Prisma.Decimal {
   return d.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 }
+
+/** Free units granted by a scheme price-list item ("buy X get Y free"). */
+export function computeSchemeFreeQty(
+  quantity: number,
+  schemeMinQty?: number | null,
+  schemeFreeQty?: number | null,
+): number {
+  if (!schemeMinQty || !schemeFreeQty || quantity < schemeMinQty) return 0;
+  return Math.floor(quantity / schemeMinQty) * schemeFreeQty;
+}
+
+/** Qty charged after scheme free goods (never negative). */
+export function computeSchemeBilledQty(
+  quantity: number,
+  schemeMinQty?: number | null,
+  schemeFreeQty?: number | null,
+): number {
+  return Math.max(0, quantity - computeSchemeFreeQty(quantity, schemeMinQty, schemeFreeQty));
+}

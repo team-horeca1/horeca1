@@ -18,7 +18,11 @@
 import { prisma } from '@/lib/prisma';
 import type { Prisma, Coupon, CashbackEntry } from '@prisma/client';
 import { Errors } from '@/middleware/errorHandler';
-import { resolveUnitPrice, type CustomerContext } from '@/modules/pricing/pricing.service';
+import {
+  resolveUnitPrice,
+  computeSchemeBilledQty,
+  type CustomerContext,
+} from '@/modules/pricing/pricing.service';
 import { getDeliveryGeo } from '@/lib/deliveryLocation';
 
 type Db = Prisma.TransactionClient;
@@ -1019,7 +1023,12 @@ export const promotionService = {
       );
       const taxPercent = Number(product.taxPercent) || 0;
       const grossUnit = r2(Number(resolved.unitPrice) * (1 + taxPercent / 100));
-      const lineTotal = r2(grossUnit * item.quantity);
+      const billedQty = computeSchemeBilledQty(
+        item.quantity,
+        resolved.schemeMinQty,
+        resolved.schemeFreeQty,
+      );
+      const lineTotal = r2(grossUnit * billedQty);
       taxableTotal += taxPercent > 0 ? lineTotal / (1 + taxPercent / 100) : lineTotal;
 
       let draft = draftsByVendor.get(item.vendorId);

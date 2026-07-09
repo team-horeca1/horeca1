@@ -19,11 +19,21 @@ const STOPWORDS = new Set(['the', 'and', 'for', 'with', 'pcs', 'kgs', 'ltr', 'pa
 
 // All tiers exit through here so logged-in buyers see THEIR price on
 // alternate-vendor suggestions too.
+function hasSellableStock(p: {
+  inventories?: Array<{ qtyAvailable: number; qtyReserved?: number }> | null;
+}): boolean {
+  const rows = p.inventories ?? [];
+  return rows.some((r) => r.qtyAvailable - (r.qtyReserved ?? 0) > 0);
+}
+
 async function respond<T extends { id: string; basePrice: unknown }>(
   alternates: T[],
   matchType: string,
 ) {
-  const enriched = alternates.map((a) =>
+  const inStock = alternates.filter((a) =>
+    hasSellableStock(a as T & { inventories?: Array<{ qtyAvailable: number; qtyReserved?: number }> }),
+  );
+  const enriched = inStock.map((a) =>
     withLegacyInventory(a as T & { inventories?: Array<{ qtyAvailable: number; qtyReserved?: number }> }),
   );
   return NextResponse.json({
@@ -34,7 +44,7 @@ async function respond<T extends { id: string; basePrice: unknown }>(
 
 const productInclude = {
   vendor: { select: { id: true, businessName: true, logoUrl: true, minOrderValue: true } },
-  inventories: { select: { qtyAvailable: true } },
+  inventories: { select: { qtyAvailable: true, qtyReserved: true } },
   category: { select: { id: true, name: true } },
 } as const;
 

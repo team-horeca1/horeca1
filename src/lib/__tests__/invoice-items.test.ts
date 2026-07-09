@@ -12,7 +12,8 @@ function lineWithDivergentEdit(overrides: Partial<InvoiceLineInput> = {}): Invoi
     categoryName: 'Rice & Grains', // snapshot category
     quantity: 3,
     fulfilledQty: 2,
-    unitPrice: 100,
+    // Order lines store GROSS (inc-GST). 100 taxable @ 5% → 105 gross.
+    unitPrice: 105,
     product: {
       // Live product was edited AFTER the order:
       hsn: '9999',
@@ -62,12 +63,13 @@ describe('buildInvoiceLineItems — transaction immutability', () => {
     const lines = buildInvoiceLineItems({ isPartial: true, items });
     expect(lines).toHaveLength(1);
     expect(lines[0].quantity).toBe(2);
-    expect(lines[0].preTax).toBe(200); // 100 × 2
+    expect(lines[0].preTax).toBe(200); // taxable 100 × 2 (backed out from gross 105)
   });
 
   it('bills ordered quantity on non-partial orders', () => {
     const [line] = buildInvoiceLineItems({ isPartial: false, items: [lineWithDivergentEdit()] });
     expect(line.quantity).toBe(3);
+    expect(line.unitPrice).toBeCloseTo(100, 5); // taxable after back-out
     expect(line.total).toBeCloseTo(315, 5); // 300 taxable + 5% tax
   });
 });

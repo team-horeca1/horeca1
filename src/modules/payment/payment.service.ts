@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getRazorpay } from '@/lib/razorpay';
 import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
+import { orderService } from '@/modules/order/order.service';
 import crypto from 'crypto';
 
 function timingSafeEqHex(expectedHex: string, providedHex: string): boolean {
@@ -64,6 +65,43 @@ export class PaymentService {
       throw Errors.notFound('Order');
     }
 
+    for (const o of orders) {
+      if (o.status === 'cancelled') {
+        throw Errors.badRequest(`Order ${o.orderNumber} is cancelled`);
+      }
+      if (o.paymentStatus === 'paid') {
+        throw Errors.badRequest(`Order ${o.orderNumber} is already paid`);
+      }
+      if (o.paymentMethod !== 'online') {
+        throw Errors.badRequest(`Order ${o.orderNumber} is not an online payment order`);
+      }
+    }
+
+    // Reuse an open Razorpay order if all selected POs already share one.
+    const existing = await prisma.payment.findMany({
+      where: {
+        orderId: { in: orderIds },
+        userId,
+        status: 'created',
+        razorpayOrderId: { not: null },
+      },
+      select: { razorpayOrderId: true, orderId: true },
+    });
+    if (
+      existing.length === orderIds.length
+      && existing.every((p) => p.razorpayOrderId === existing[0].razorpayOrderId)
+      && existing[0].razorpayOrderId
+    ) {
+      const rzId = existing[0].razorpayOrderId;
+      const totalAmount = orders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
+      return {
+        razorpay_order_id: rzId,
+        amount: Math.round(totalAmount * 100),
+        currency: 'INR',
+        key_id: process.env.RAZORPAY_KEY_ID,
+      };
+    }
+
     const totalAmount = orders.reduce((sum, o) => sum + Number(o.totalAmount), 0);
     const receipt = orders.length === 1
       ? orders[0].orderNumber
@@ -95,7 +133,12 @@ export class PaymentService {
     };
   }
 
-  async verify(razorpayOrderId: string, razorpayPaymentId: string, razorpaySignature: string) {
+  async verify(
+    razorpayOrderId: string,
+    razorpayPaymentId: string,
+    razorpaySignature: string,
+    userId: string,
+  ) {
     // Verify signature
     const body = `${razorpayOrderId}|${razorpayPaymentId}`;
     const expectedSignature = crypto
@@ -113,25 +156,43 @@ export class PaymentService {
       where: { razorpayOrderId },
     });
     if (payments.length === 0) throw Errors.notFound('Payment');
+    if (!payments.every((p) => p.userId === userId)) {
+      throw Errors.forbidden('Payment does not belong to this account');
+    }
+
+    // Idempotency: already captured by a prior verify or webhook
+    if (payments.every((p) => p.status === 'captured')) {
+      return { success: true, payment_status: 'captured', orders_paid: payments.length, alreadyCaptured: true };
+    }
 
     await prisma.$transaction([
       prisma.payment.updateMany({
-        where: { razorpayOrderId },
+        where: { razorpayOrderId, status: { not: 'captured' } },
         data: { razorpayPaymentId, razorpaySignature, status: 'captured' },
       }),
       prisma.order.updateMany({
-        where: { id: { in: payments.map(p => p.orderId) } },
+        where: { id: { in: payments.map((p) => p.orderId) }, status: { not: 'cancelled' } },
         data: { paymentStatus: 'paid' },
+      }),
+      prisma.order.updateMany({
+        where: { id: { in: payments.map((p) => p.orderId) }, status: 'pending' },
+        data: { status: 'confirmed' },
       }),
     ]);
 
     for (const payment of payments) {
+      if (payment.status === 'captured') continue;
       emitEvent('PaymentReceived', {
         orderId: payment.orderId,
         paymentId: payment.id,
         userId: payment.userId,
         vendorId: payment.vendorId,
         amount: Number(payment.amount),
+      });
+      emitEvent('OrderConfirmed', {
+        orderId: payment.orderId,
+        userId: payment.userId,
+        vendorId: payment.vendorId,
       });
     }
 
@@ -260,37 +321,17 @@ export class PaymentService {
       return { processed: true, event };
     }
 
-    // 4. Handle payment.failed
+    // 4. Handle payment.failed — mark payment failed AND cancel unpaid pending
+    // orders so reserved stock is released (same path as customer abandon).
     if (event === 'payment.failed') {
       const entity = payload.payment?.entity;
       if (!entity) return { processed: false, event };
 
-      const payments = await prisma.payment.findMany({
-        where: { razorpayOrderId: entity.order_id },
-      });
-
-      if (payments.length === 0) return { processed: false, event };
-
-      // Idempotency: skip if already in a terminal state
-      if (payments.every(p => p.status === 'captured' || p.status === 'failed')) {
-        return { processed: true, event };
-      }
-
-      await prisma.payment.updateMany({
-        where: { razorpayOrderId: entity.order_id, status: { notIn: ['captured', 'failed'] } },
-        data: { status: 'failed' },
-      });
-
-      for (const payment of payments) {
-        emitEvent('PaymentFailed', {
-          orderId: payment.orderId,
-          userId: payment.userId,
-          vendorId: payment.vendorId,
-          reason: 'Payment failed via Razorpay webhook',
-        });
-      }
-
-      return { processed: true, event };
+      const result = await this.failUnpaidCheckout(
+        entity.order_id,
+        'Payment failed via Razorpay webhook',
+      );
+      return { processed: result.processed, event };
     }
 
     // 5. Handle refund.processed
@@ -328,5 +369,85 @@ export class PaymentService {
 
     // Unhandled event type — ack with 200 so Razorpay stops retrying
     return { processed: false, event };
+  }
+
+  /**
+   * Customer dismissed Razorpay (or verify failed client-side). Ownership-checked.
+   * Cancels unpaid pending online orders and releases reserved stock.
+   */
+  async abandon(razorpayOrderId: string, userId: string) {
+    const payments = await prisma.payment.findMany({ where: { razorpayOrderId } });
+    if (payments.length === 0) throw Errors.notFound('Payment');
+    if (!payments.every((p) => p.userId === userId)) {
+      throw Errors.forbidden('Payment does not belong to this account');
+    }
+    if (payments.every((p) => p.status === 'captured')) {
+      throw Errors.badRequest('Payment already captured — cannot abandon');
+    }
+    return this.failUnpaidCheckout(razorpayOrderId, 'Payment cancelled by customer');
+  }
+
+  /**
+   * Mark linked payments failed and cancel unpaid pending online orders.
+   * Idempotent. Used by abandon API, payment.failed webhook, and reconciliation.
+   */
+  async failUnpaidCheckout(razorpayOrderId: string, reason: string) {
+    const payments = await prisma.payment.findMany({ where: { razorpayOrderId } });
+    if (payments.length === 0) return { processed: false, cancelled: 0 };
+
+    // Already fully settled — nothing to roll back
+    if (payments.every((p) => p.status === 'captured')) {
+      return { processed: true, cancelled: 0, alreadyCaptured: true as const };
+    }
+
+    const alreadyFailed = payments.every((p) => p.status === 'failed' || p.status === 'captured');
+
+    if (!alreadyFailed) {
+      await prisma.payment.updateMany({
+        where: { razorpayOrderId, status: { notIn: ['captured', 'failed'] } },
+        data: { status: 'failed' },
+      });
+    }
+
+    let cancelled = 0;
+    for (const payment of payments) {
+      if (payment.status === 'captured') continue;
+      const order = await prisma.order.findUnique({
+        where: { id: payment.orderId },
+        select: {
+          id: true,
+          vendorId: true,
+          status: true,
+          paymentStatus: true,
+          paymentMethod: true,
+        },
+      });
+      if (!order) continue;
+      if (order.paymentStatus === 'paid') continue;
+      if (order.paymentMethod !== 'online') continue;
+      if (order.status !== 'pending') continue;
+
+      await orderService.updateStatus(
+        order.id,
+        order.vendorId,
+        'cancelled',
+        reason,
+      );
+      cancelled++;
+    }
+
+    if (!alreadyFailed) {
+      for (const payment of payments) {
+        if (payment.status === 'captured') continue;
+        emitEvent('PaymentFailed', {
+          orderId: payment.orderId,
+          userId: payment.userId,
+          vendorId: payment.vendorId,
+          reason,
+        });
+      }
+    }
+
+    return { processed: true, cancelled, alreadyFailed };
   }
 }

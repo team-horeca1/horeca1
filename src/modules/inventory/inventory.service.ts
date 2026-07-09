@@ -149,10 +149,29 @@ export class InventoryService {
   ) {
     const db = tx || prisma;
     for (const item of items) {
-      await db.inventory.update({
-        where: invKey(item.productId, outletId),
-        data: { qtyReserved: { increment: item.quantity } },
-      });
+      // Atomic guard: only reserve when net available covers the qty.
+      // Prevents oversell under concurrent checkouts (check-then-increment race).
+      const updated = await db.$executeRaw`
+        UPDATE inventory
+        SET qty_reserved = qty_reserved + ${item.quantity},
+            updated_at = NOW()
+        WHERE product_id = ${item.productId}::uuid
+          AND outlet_id = ${outletId}::uuid
+          AND qty_available - qty_reserved >= ${item.quantity}
+      `;
+      if (Number(updated) === 0) {
+        const inv = await db.inventory.findUnique({
+          where: invKey(item.productId, outletId),
+          select: {
+            qtyAvailable: true,
+            qtyReserved: true,
+            product: { select: { name: true } },
+          },
+        });
+        const available = inv ? Math.max(0, inv.qtyAvailable - inv.qtyReserved) : 0;
+        const name = (inv as { product?: { name?: string } } | null)?.product?.name ?? 'Item';
+        throw Errors.outOfStock(name, available);
+      }
     }
   }
 
@@ -163,10 +182,14 @@ export class InventoryService {
   ) {
     const db = tx || prisma;
     for (const item of items) {
-      await db.inventory.update({
-        where: invKey(item.productId, outletId),
-        data: { qtyReserved: { decrement: item.quantity } },
-      });
+      // Never drive qtyReserved below zero (double-cancel / over-release).
+      await db.$executeRaw`
+        UPDATE inventory
+        SET qty_reserved = GREATEST(0, qty_reserved - ${item.quantity}),
+            updated_at = NOW()
+        WHERE product_id = ${item.productId}::uuid
+          AND outlet_id = ${outletId}::uuid
+      `;
     }
   }
 

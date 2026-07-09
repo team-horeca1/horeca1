@@ -355,10 +355,17 @@ async function postHandler(req: NextRequest) {
         select: { id: true, slug: true },
       });
 
-      const uniquePincodes = Array.from(new Set(input.serviceablePincodes));
+      const uniquePincodes = Array.from(
+        new Set(input.serviceablePincodes.map((p) => p.trim()).filter(Boolean)),
+      );
       if (uniquePincodes.length > 0) {
         await tx.serviceArea.createMany({
-          data: uniquePincodes.map((pincode) => ({ vendorId: vendor.id, pincode })),
+          data: uniquePincodes.map((pincode) => ({
+            vendorId: vendor.id,
+            outletId: null,
+            pincode,
+            isActive: true,
+          })),
           skipDuplicates: true,
         });
       }

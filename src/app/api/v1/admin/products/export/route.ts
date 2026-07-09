@@ -45,7 +45,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         vendor: { select: { businessName: true, vendorCode: true } },
         category: { select: { name: true, parentId: true, parent: { select: { name: true } } } },
         inventories: { select: { qtyAvailable: true } },
-        priceSlabs: { orderBy: { sortOrder: 'asc' }, take: 2 },
+        priceSlabs: { orderBy: { sortOrder: 'asc' }, take: 3 },
         categoryLinks: {
           include: { category: { select: { name: true, parentId: true } } },
         },

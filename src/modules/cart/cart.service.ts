@@ -1,6 +1,11 @@
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
-import { resolveUnitPrice, type CustomerContext } from '@/modules/pricing/pricing.service';
+import {
+  resolveUnitPrice,
+  computeSchemeFreeQty,
+  type CustomerContext,
+  type ResolutionResult,
+} from '@/modules/pricing/pricing.service';
 import { getDeliveryGeo } from '@/lib/deliveryLocation';
 import {
   evaluateBxgyForCart,
@@ -119,22 +124,30 @@ export class CartService {
   }
 
   private computeLineCharge(
-    item: { productId: string; vendorId: string; quantity: number; unitPrice: unknown },
+    item: {
+      productId: string;
+      vendorId: string;
+      quantity: number;
+      unitPrice: unknown;
+      schemeFreeQty?: number;
+    },
     bxgyResults: BxgyCartResult[],
   ): number {
     if (Number(item.unitPrice) <= 0) return 0;
+    // Same-product BXGY: customer pays for all units in the line; free units are
+    // informational. Scheme free-goods: charge billed qty only (matches order.create).
     const sameProductBxgy = bxgyResults.find(
       (b) => b.sameProduct && b.buyProductId === item.productId,
     );
-    const billedQty = sameProductBxgy
+    const schemeFree = item.schemeFreeQty ?? 0;
+    const chargeQty = sameProductBxgy
       ? item.quantity
-      : item.quantity;
-    const freeUnits = sameProductBxgy
-      ? computeBxgyFreeUnits(item.quantity, sameProductBxgy.minQty, sameProductBxgy.getQty)
-      : 0;
-    const chargeQty = sameProductBxgy ? item.quantity : billedQty;
-    void freeUnits;
-    return Number(item.unitPrice) * chargeQty;
+      : Math.max(0, item.quantity - schemeFree);
+    const taxPercent = Number(
+      (item as { product?: { taxPercent?: unknown } }).product?.taxPercent,
+    ) || 0;
+    const taxable = Number(item.unitPrice) * chargeQty;
+    return Math.round(taxable * (1 + taxPercent / 100) * 100) / 100;
   }
 
   private buildPromoSummary(
@@ -146,13 +159,11 @@ export class CartService {
       isPromoFree?: boolean;
       bxgyFreeQty?: number;
       bxgyPromotionName?: string;
+      schemeFreeQty?: number;
       product: { id: string; name: string; basePrice: unknown; taxPercent: unknown };
     }>,
     bxgyResults: BxgyCartResult[],
   ): VendorPromoSummary | null {
-    if (bxgyResults.length === 0) return null;
-
-    const primary = bxgyResults[0];
     const paidLines: VendorPromoSummary['paidLines'] = [];
     const freeLines: VendorPromoSummary['freeLines'] = [];
 
@@ -169,7 +180,7 @@ export class CartService {
         });
         continue;
       }
-      const freeQty = item.bxgyFreeQty ?? 0;
+      const freeQty = (item.bxgyFreeQty ?? 0) || (item.schemeFreeQty ?? 0);
       if (freeQty > 0) {
         paidLines.push({
           productId: item.productId,
@@ -177,7 +188,10 @@ export class CartService {
           paidQty: item.quantity,
           freeQty,
         });
-        if (bxgyResults.some((b) => b.sameProduct && b.buyProductId === item.productId)) {
+        if (
+          (item.schemeFreeQty ?? 0) > 0
+          || bxgyResults.some((b) => b.sameProduct && b.buyProductId === item.productId)
+        ) {
           freeLines.push({
             productId: item.productId,
             name: item.product.name,
@@ -209,16 +223,30 @@ export class CartService {
 
     if (paidLines.length === 0 && freeLines.length === 0) return null;
 
+    const hasBxgy = bxgyResults.length > 0;
+    const schemeLine = items.find((i) => (i.schemeFreeQty ?? 0) > 0);
+    const promotionName = hasBxgy
+      ? bxgyResults[0].promotionName
+      : schemeLine
+        ? `Buy more, get ${schemeLine.schemeFreeQty} free`
+        : 'Scheme offer';
+
     return {
       vendorId,
-      promotionName: primary.promotionName,
-      type: 'bxgy',
+      promotionName,
+      type: hasBxgy ? 'bxgy' : 'scheme',
       paidLines,
       freeLines,
     };
   }
 
-  private enrichItemsWithBxgy<T extends { productId: string; vendorId: string; quantity: number; unitPrice: unknown }>(
+  private enrichItemsWithBxgy<T extends {
+    productId: string;
+    vendorId: string;
+    quantity: number;
+    unitPrice: unknown;
+    schemeFreeQty?: number;
+  }>(
     items: T[],
     bxgyResults: BxgyCartResult[],
   ) {
@@ -236,6 +264,7 @@ export class CartService {
         isPromoFree,
         bxgyFreeQty,
         bxgyPromotionName: bxgyPromo?.promotionName ?? sameBxgy?.promotionName,
+        schemeFreeQty: item.schemeFreeQty ?? 0,
       };
     });
   }
@@ -273,6 +302,7 @@ export class CartService {
     });
     const ctxCache = new Map<string, CustomerContext>();
     const refreshes: Array<{ id: string; unitPrice: number }> = [];
+    const schemeByItemId = new Map<string, number>();
     for (const item of cart.items) {
       if (Number(item.unitPrice) === 0) continue;
       let customer = ctxCache.get(item.vendorId);
@@ -281,7 +311,7 @@ export class CartService {
         ctxCache.set(item.vendorId, customer);
       }
       try {
-        const resolved = await resolveUnitPrice({
+        const resolved: ResolutionResult = await resolveUnitPrice({
           productId: item.productId,
           vendorId: item.vendorId,
           quantity: item.quantity,
@@ -292,6 +322,10 @@ export class CartService {
           refreshes.push({ id: item.id, unitPrice: next });
           item.unitPrice = resolved.unitPrice as unknown as typeof item.unitPrice;
         }
+        schemeByItemId.set(
+          item.id,
+          computeSchemeFreeQty(item.quantity, resolved.schemeMinQty, resolved.schemeFreeQty),
+        );
       } catch {
         // Resolver throws if a product was deleted; leave the existing
         // unitPrice as-is so the row still renders. The pre-checkout
@@ -338,9 +372,13 @@ export class CartService {
         subtotal: 0,
         bxgyResults,
       };
-      const enriched = this.enrichItemsWithBxgy([item], bxgyResults)[0];
+      const withScheme = {
+        ...item,
+        schemeFreeQty: schemeByItemId.get(item.id) ?? 0,
+      };
+      const enriched = this.enrichItemsWithBxgy([withScheme], bxgyResults)[0];
       group.items.push({ ...enriched, product: item.product });
-      group.subtotal += this.computeLineCharge(item, bxgyResults);
+      group.subtotal += this.computeLineCharge(withScheme, bxgyResults);
       vendorMap.set(item.vendorId, group);
     }
 

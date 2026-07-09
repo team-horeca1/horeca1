@@ -52,30 +52,37 @@ export interface InvoiceOrderInput {
  * Build invoice line items from an order. Reads snapshot fields first, falling back
  * to the live product only when a snapshot value is absent (legacy rows). Partial
  * orders bill `fulfilledQty`; lines with zero billable qty are dropped.
+ *
+ * OrderItem.unitPrice is stored GROSS (inc-GST) at checkout. Invoice math needs
+ * taxable base, so we back out: taxableUnit = gross / (1 + tax%/100).
  */
 export function buildInvoiceLineItems(order: InvoiceOrderInput): InvoiceItem[] {
   return order.items
     .map((item) => {
-      const unitPrice = Number(item.unitPrice);
+      const grossUnitPrice = Number(item.unitPrice);
       const qty = order.isPartial ? item.fulfilledQty : item.quantity;
       const taxPct = Number(item.taxPercent ?? item.product.taxPercent ?? 0);
-      const preTax = unitPrice * qty;
+      const taxableUnit =
+        taxPct > 0
+          ? Math.round((grossUnitPrice / (1 + taxPct / 100)) * 100) / 100
+          : grossUnitPrice;
+      const preTax = Math.round(taxableUnit * qty * 100) / 100;
       const discount = 0;
       const taxableAmount = preTax - discount;
-      const taxAmount = taxableAmount * (taxPct / 100);
+      const taxAmount = Math.round(taxableAmount * (taxPct / 100) * 100) / 100;
       return {
         productName: item.productName,
         hsn: item.hsn ?? item.product.hsn,
         category: item.categoryName ?? item.product.category?.name ?? 'Other',
         quantity: qty,
         unit: item.packSize ?? item.product.unit ?? item.product.packSize ?? 'Pcs',
-        unitPrice,
+        unitPrice: taxableUnit,
         taxPercent: taxPct,
         preTax,
         discount,
         taxableAmount,
         taxAmount,
-        total: taxableAmount + taxAmount,
+        total: Math.round((taxableAmount + taxAmount) * 100) / 100,
       };
     })
     .filter((line) => line.quantity > 0);

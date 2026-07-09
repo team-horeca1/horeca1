@@ -829,13 +829,24 @@ function CheckoutPageContent() {
                     ? `Order ${createdOrders[0].orderNumber}`
                     : `${createdOrders.length} orders · ${createdOrders[0].orderNumber} +${createdOrders.length - 1}`;
 
-                const payment = await openRazorpayPopup({
-                    key: key_id,
-                    amount,
-                    currency,
-                    order_id: razorpay_order_id,
-                    description,
-                });
+                let payment: RazorpaySuccessPayload;
+                try {
+                    payment = await openRazorpayPopup({
+                        key: key_id,
+                        amount,
+                        currency,
+                        order_id: razorpay_order_id,
+                        description,
+                    });
+                } catch (popupErr) {
+                    // Dismiss / cancel — roll back pending orders + reserved stock.
+                    await fetch('/api/v1/payments/abandon', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ razorpay_order_id }),
+                    }).catch(() => { /* best-effort; reconciliation is the safety net */ });
+                    throw popupErr;
+                }
 
                 // Single verify call covers all linked Payment rows on the backend.
                 const verifyRes = await fetch('/api/v1/payments/verify', {
@@ -848,7 +859,14 @@ function CheckoutPageContent() {
                     }),
                 });
                 const verifyData = await verifyRes.json();
-                if (!verifyRes.ok) throw new Error(verifyData.error?.message || 'Payment verification failed');
+                if (!verifyRes.ok) {
+                    await fetch('/api/v1/payments/abandon', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ razorpay_order_id }),
+                    }).catch(() => { /* best-effort */ });
+                    throw new Error(verifyData.error?.message || 'Payment verification failed');
+                }
             }
 
             // 3. Show confirmation
@@ -1037,9 +1055,11 @@ function CheckoutPageContent() {
                                                 const paid = group.items.filter((i) => !i.isPromoFree).reduce((a, i) => a + i.quantity, 0);
                                                 const free = group.promoSummary
                                                     ? group.promoSummary.freeLines.reduce((s, l) => s + l.quantity, 0)
-                                                      + group.promoSummary.paidLines.reduce((s, l) => s + l.freeQty, 0)
                                                     : group.items.filter((i) => i.isPromoFree).reduce((a, i) => a + i.quantity, 0)
-                                                      + group.items.reduce((a, i) => a + (i.bxgyFreeQty ?? 0), 0);
+                                                      + group.items.reduce(
+                                                          (a, i) => a + ((i.bxgyFreeQty ?? 0) || (i.schemeFreeQty ?? 0)),
+                                                          0,
+                                                        );
                                                 if (free > 0) {
                                                     return `${paid} paid + ${free} free · ${group.promoSummary?.promotionName ?? 'Offer applied'}`;
                                                 }
@@ -1104,9 +1124,9 @@ function CheckoutPageContent() {
                                                         <span className="ml-1 line-through">₹{item.product.originalPrice}</span>
                                                     )}
                                                 </p>
-                                                <PaidLineWithBonus freeQty={item.bxgyFreeQty ?? 0} />
+                                                <PaidLineWithBonus freeQty={(item.bxgyFreeQty ?? 0) || (item.schemeFreeQty ?? 0)} />
                                             </div>
-                                            <span className="text-[12px] font-bold text-[#181725]">₹{(item.product.price * item.quantity).toLocaleString('en-IN')}</span>
+                                            <span className="text-[12px] font-bold text-[#181725]">₹{(item.product.price * Math.max(0, item.quantity - (item.schemeFreeQty ?? 0))).toLocaleString('en-IN')}</span>
                                         </div>
                                         );
                                     })}

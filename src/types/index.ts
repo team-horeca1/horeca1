@@ -128,13 +128,15 @@ export interface CartItem {
     isPromoFree?: boolean;
     bxgyFreeQty?: number;
     bxgyPromotionName?: string;
+    /** Free units from a scheme price-list item (buy X get Y free). */
+    schemeFreeQty?: number;
 }
 
-/** BXGY benefits summary for one vendor group (cart API). */
+/** Promo / scheme benefits summary for one vendor group (cart API). */
 export interface VendorPromoSummary {
     vendorId: string;
     promotionName: string;
-    type: 'bxgy';
+    type: 'bxgy' | 'scheme';
     paidLines: Array<{ productId: string; name: string; paidQty: number; freeQty: number }>;
     freeLines: Array<{ productId: string; name: string; quantity: number; unitValueSaved: number }>;
 }

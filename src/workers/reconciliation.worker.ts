@@ -6,6 +6,9 @@
 import { prisma } from '@/lib/prisma';
 import { getRazorpay } from '@/lib/razorpay';
 import { emitEvent } from '@/events/emitter';
+import { PaymentService } from '@/modules/payment/payment.service';
+
+const paymentService = new PaymentService();
 
 export async function reconcilePayments() {
   console.log('[Reconciliation] Starting payment reconciliation...');
@@ -85,25 +88,15 @@ export async function reconcilePayments() {
         }
         successCount++;
       } else {
-        // No capture and the checkout window has clearly lapsed → mark failed.
+        // No capture and the checkout window has clearly lapsed → fail payment
+        // and cancel unpaid pending orders (releases reserved stock).
         const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
         if (payment.createdAt < twoHoursAgo) {
-          console.log(`[Reconciliation] ${razorpayOrderId} unpaid after 2 hours. Marking FAILED.`);
-
-          await prisma.payment.updateMany({
-            where: { razorpayOrderId, status: 'created' },
-            data: { status: 'failed' },
-          });
-
-          const siblingPayments = await prisma.payment.findMany({ where: { razorpayOrderId } });
-          for (const sibling of siblingPayments) {
-            emitEvent('PaymentFailed', {
-              orderId: sibling.orderId,
-              userId: sibling.userId,
-              vendorId: sibling.vendorId,
-              reason: 'Payment timeout / missed checkout',
-            });
-          }
+          console.log(`[Reconciliation] ${razorpayOrderId} unpaid after 2 hours. Failing + cancelling.`);
+          await paymentService.failUnpaidCheckout(
+            razorpayOrderId,
+            'Payment timeout / missed checkout',
+          );
           failCount++;
         } else {
           console.log(`[Reconciliation] ${razorpayOrderId} still within the 2-hour window. Skipping.`);

@@ -142,6 +142,7 @@ export default function CartPage() {
         tierLabel: string | null;
         isPromoFree?: boolean;
         bxgyFreeQty?: number;
+        schemeFreeQty?: number;
         customerPriceApplied?: boolean;
         originalPrice?: number;
     };
@@ -167,6 +168,7 @@ export default function CartPage() {
                     tierLabel: activeTier ? `Bulk ${activeTier.minQty}+ @ ₹${activeTier.price}/pc` : null,
                     isPromoFree: item.isPromoFree,
                     bxgyFreeQty: item.bxgyFreeQty,
+                    schemeFreeQty: item.schemeFreeQty,
                     customerPriceApplied: item.product.customerPriceApplied,
                     originalPrice: item.product.originalPrice,
                 };
@@ -175,7 +177,11 @@ export default function CartPage() {
     }, [groups]);
 
     const getShipmentTotal = (items: ShipmentItem[]) =>
-        items.reduce((sum, item) => (item.isPromoFree ? sum : sum + item.price * item.pcs), 0);
+        items.reduce((sum, item) => {
+            if (item.isPromoFree) return sum;
+            const billed = Math.max(0, item.pcs - (item.schemeFreeQty ?? 0));
+            return sum + item.price * billed;
+        }, 0);
     const getShipmentItemCount = (items: ShipmentItem[]) => items.reduce((sum, item) => sum + item.pcs, 0);
 
     // Per-vendor (PO) selection — user picks which POs to pay for now.
@@ -368,8 +374,14 @@ export default function CartPage() {
                 })),
             }));
 
+            // Map UI payment ids → API enums (validator accepts online/credit, not razorpay/disco).
+            const apiPaymentMethod =
+                paymentMethod === 'razorpay' ? 'online'
+                : paymentMethod === 'disco' ? 'credit'
+                : paymentMethod;
+
             // 1. Create orders in DB
-            const result = await dal.orders.create(vendorOrders, paymentMethod) as {
+            const result = await dal.orders.create(vendorOrders, apiPaymentMethod) as {
                 orders: Array<{ id: string; orderNumber: string }>;
             };
             const createdOrders = result.orders || [];
@@ -895,7 +907,7 @@ export default function CartPage() {
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <PaidLineWithBonus freeQty={item.bxgyFreeQty ?? 0} />
+                                                        <PaidLineWithBonus freeQty={(item.bxgyFreeQty ?? 0) || (item.schemeFreeQty ?? 0)} />
                                                     </div>
 
                                                     {/* Quantity Controls */}

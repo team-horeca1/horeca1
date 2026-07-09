@@ -47,9 +47,18 @@ export function friendlyErrorMessage(error: unknown, fallback = 'Something went 
       return `${field} already exists`;
     }
     if (code === 'P2003') {
+      // P2003 is ANY foreign-key failure — create/update with a missing parent
+      // OR delete blocked by dependents. The old "Cannot delete…" copy was wrong
+      // for signup/create paths and confused applicants on vendor onboarding.
       const field = (error as { meta?: { field_name?: string } }).meta?.field_name;
+      const msg = error instanceof Error ? error.message : '';
       console.error('[API Error] P2003 foreign key constraint', field ?? error);
-      return 'Cannot delete — related records still exist. Contact support if this persists.';
+      const looksLikeDelete =
+        /\bdelete\b/i.test(msg) || /\bon delete\b/i.test(msg) || /\brestrict\b/i.test(msg);
+      if (looksLikeDelete) {
+        return 'Cannot delete — related records still exist. Contact support if this persists.';
+      }
+      return 'Could not save — a related record is missing or invalid. Please try again, or contact support if this persists.';
     }
     if (code === 'P2028') {
       console.error('[API Error] P2028 transaction timeout', error);

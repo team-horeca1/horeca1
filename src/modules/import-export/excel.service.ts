@@ -133,11 +133,19 @@ function cleanRow(raw: Record<string, any>): Record<string, unknown> {
     'Bulk Qty 1 - Net Rate / Pc',
     'Bulk Rates 2 - Qty',
     'Bulk Rates 2 - Gross Rate / Unit',
+    'Bulk Qty 2 - Quantity',
+    'Bulk Qty 2 - Net Rate / Pc',
+    'Bulk Rates 3 - Qty',
+    'Bulk Rates 3 - Gross Rate / Unit',
+    'Bulk Qty 3 - Quantity',
+    'Bulk Qty 3 - Net Rate / Pc',
     '6pm to 9am Promo Rate - Single Unit',
     '6pm to 9am Bulk Rates 1 - Qty',
     '6pm to 9am Bulk Rates 1 - Unit',
     '6pm to 9am Bulk Rates 2 - Qty',
     '6pm to 9am Bulk Rates 2 - Gross Rate / Unit',
+    '6pm to 9am Bulk Rates 3 - Qty',
+    '6pm to 9am Bulk Rates 3 - Gross Rate / Unit',
     'Available Stock',
     'Stock On Hand',
     'MOQ',
@@ -227,11 +235,19 @@ const productImportRowSchema = z
     'Bulk Qty 1 - Net Rate / Pc': z.coerce.number().positive().optional(),
     'Bulk Rates 2 - Qty': z.coerce.number().int().min(1).optional(),
     'Bulk Rates 2 - Gross Rate / Unit': z.coerce.number().positive().optional(),
+    'Bulk Qty 2 - Quantity': z.coerce.number().int().min(1).optional(),
+    'Bulk Qty 2 - Net Rate / Pc': z.coerce.number().positive().optional(),
+    'Bulk Rates 3 - Qty': z.coerce.number().int().min(1).optional(),
+    'Bulk Rates 3 - Gross Rate / Unit': z.coerce.number().positive().optional(),
+    'Bulk Qty 3 - Quantity': z.coerce.number().int().min(1).optional(),
+    'Bulk Qty 3 - Net Rate / Pc': z.coerce.number().positive().optional(),
     '6pm to 9am Promo Rate - Single Unit': z.coerce.number().positive().optional(),
     '6pm to 9am Bulk Rates 1 - Qty': z.coerce.number().int().min(1).optional(),
     '6pm to 9am Bulk Rates 1 - Unit': z.coerce.number().positive().optional(),
     '6pm to 9am Bulk Rates 2 - Qty': z.coerce.number().int().min(1).optional(),
     '6pm to 9am Bulk Rates 2 - Gross Rate / Unit': z.coerce.number().positive().optional(),
+    '6pm to 9am Bulk Rates 3 - Qty': z.coerce.number().int().min(1).optional(),
+    '6pm to 9am Bulk Rates 3 - Gross Rate / Unit': z.coerce.number().positive().optional(),
     'Available Stock': z.coerce.number().optional(),
     'Stock On Hand': z.coerce.number().optional(),
     'Image URL': z.coerce.string().optional(),
@@ -327,6 +343,10 @@ const HEADER_MAP: Record<string, string> = (() => {
     'unit name': 'Unit Name',
     'bulk qty 1 - quantity': 'Bulk Qty 1 - Quantity',
     'bulk qty 1 - net rate / pc': 'Bulk Qty 1 - Net Rate / Pc',
+    'bulk qty 2 - quantity': 'Bulk Qty 2 - Quantity',
+    'bulk qty 2 - net rate / pc': 'Bulk Qty 2 - Net Rate / Pc',
+    'bulk qty 3 - quantity': 'Bulk Qty 3 - Quantity',
+    'bulk qty 3 - net rate / pc': 'Bulk Qty 3 - Net Rate / Pc',
     'additional sub-category': 'Additional Sub-Category',
     'additional sub category': 'Additional Sub-Category',
     'sub-category': 'Sub-Category',
@@ -479,14 +499,21 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
       bulkSlabs.push(slab1);
     }
 
-    const s2Qty = r['Bulk Rates 2 - Qty'];
+    const s2Qty = r['Bulk Rates 2 - Qty'] ?? r['Bulk Qty 2 - Quantity'];
     const s2Gross = r['Bulk Rates 2 - Gross Rate / Unit'];
-    if (s2Qty && s2Gross) {
-      const slab2: ParsedProductRow['bulkSlabs'][0] = {
-        minQty: s2Qty,
-        grossRate: s2Gross,
-        taxableRate: toTaxable(s2Gross, taxPercent),
-      };
+    const s2Net = r['Bulk Qty 2 - Net Rate / Pc'];
+    if (s2Qty && (s2Gross || s2Net)) {
+      const slab2: ParsedProductRow['bulkSlabs'][0] = s2Gross
+        ? {
+            minQty: s2Qty,
+            grossRate: s2Gross,
+            taxableRate: toTaxable(s2Gross, taxPercent),
+          }
+        : {
+            minQty: s2Qty,
+            taxableRate: s2Net!,
+            grossRate: toGross(s2Net!, taxPercent),
+          };
       const ps2Qty = r['6pm to 9am Bulk Rates 2 - Qty'];
       const ps2Gross = r['6pm to 9am Bulk Rates 2 - Gross Rate / Unit'];
       if (ps2Qty && ps2Gross && ps2Qty === s2Qty) {
@@ -494,6 +521,34 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
         slab2.promoTaxableRate = toTaxable(ps2Gross, taxPercent);
       }
       bulkSlabs.push(slab2);
+    }
+
+    const s3Qty = r['Bulk Rates 3 - Qty'] ?? r['Bulk Qty 3 - Quantity'];
+    const s3Gross = r['Bulk Rates 3 - Gross Rate / Unit'];
+    const s3Net = r['Bulk Qty 3 - Net Rate / Pc'];
+    if (s3Qty && (s3Gross || s3Net)) {
+      const slab3: ParsedProductRow['bulkSlabs'][0] = s3Gross
+        ? {
+            minQty: s3Qty,
+            grossRate: s3Gross,
+            taxableRate: toTaxable(s3Gross, taxPercent),
+          }
+        : {
+            minQty: s3Qty,
+            taxableRate: s3Net!,
+            grossRate: toGross(s3Net!, taxPercent),
+          };
+      const ps3Qty = r['6pm to 9am Bulk Rates 3 - Qty'];
+      const ps3Gross = r['6pm to 9am Bulk Rates 3 - Gross Rate / Unit'];
+      if (ps3Qty && ps3Gross && ps3Qty === s3Qty) {
+        slab3.promoGrossRate = ps3Gross;
+        slab3.promoTaxableRate = toTaxable(ps3Gross, taxPercent);
+      }
+      bulkSlabs.push(slab3);
+    }
+
+    if (bulkSlabs.length > 3) {
+      bulkSlabs.length = 3;
     }
 
     const parsedRow: ParsedProductRow = {
@@ -685,6 +740,7 @@ function mapProductToImportColumns(p: ProductExportRow): Record<string, string |
   const tax = p.taxPercent || 0;
   const slab1 = p.priceSlabs?.[0];
   const slab2 = p.priceSlabs?.[1];
+  const slab3 = p.priceSlabs?.[2];
   const meta = (p.metadata && typeof p.metadata === 'object' ? p.metadata : {}) as Record<string, unknown>;
   const acc = (meta.accounting || {}) as Record<string, unknown>;
   const inv = (meta.inventory || {}) as Record<string, unknown>;
@@ -711,8 +767,14 @@ function mapProductToImportColumns(p: ProductExportRow): Record<string, string |
     'Bulk Qty 1 - Net Rate / Pc': slab1 ? Number(slab1.price) : '',
     'Bulk Rates 1 - Qty': slab1?.minQty ?? '',
     'Bulk Rates 1 - Gross Rate / Unit': slab1 ? toGross(Number(slab1.price), tax) : '',
+    'Bulk Qty 2 - Quantity': slab2?.minQty ?? '',
+    'Bulk Qty 2 - Net Rate / Pc': slab2 ? Number(slab2.price) : '',
     'Bulk Rates 2 - Qty': slab2?.minQty ?? '',
     'Bulk Rates 2 - Gross Rate / Unit': slab2 ? toGross(Number(slab2.price), tax) : '',
+    'Bulk Qty 3 - Quantity': slab3?.minQty ?? '',
+    'Bulk Qty 3 - Net Rate / Pc': slab3 ? Number(slab3.price) : '',
+    'Bulk Rates 3 - Qty': slab3?.minQty ?? '',
+    'Bulk Rates 3 - Gross Rate / Unit': slab3 ? toGross(Number(slab3.price), tax) : '',
     '6pm to 9am Promo Rate - Single Unit': p.promoPrice ? toGross(Number(p.promoPrice), tax) : '',
     'Stock On Hand': p.stock ?? 0,
     'Available Stock': p.stock ?? 0,

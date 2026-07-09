@@ -313,13 +313,17 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
           data: { role: 'vendor' },
         });
 
-        // Serviceable pincodes — one ServiceArea row per pincode. Dedupe so
-        // the user can paste a sloppy list without violating the
-        // (vendorId,pincode) unique index.
+        // Serviceable pincodes — vendor-wide (outletId null) until multi-warehouse
+        // coverage is configured. Dedupe; skipDuplicates covers race retries.
         if (vd && vd.serviceablePincodes.length > 0) {
-          const unique = Array.from(new Set(vd.serviceablePincodes));
+          const unique = Array.from(new Set(vd.serviceablePincodes.map((p) => p.trim()).filter(Boolean)));
           await tx.serviceArea.createMany({
-            data: unique.map((pincode) => ({ vendorId: vendor.id, pincode })),
+            data: unique.map((pincode) => ({
+              vendorId: vendor.id,
+              outletId: null,
+              pincode,
+              isActive: true,
+            })),
             skipDuplicates: true,
           });
         }

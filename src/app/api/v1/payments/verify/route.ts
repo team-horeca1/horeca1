@@ -20,12 +20,17 @@ const verifySchema = z.object({
 
 const paymentService = new PaymentService();
 
-export const POST = withAuth(async (req: NextRequest, _ctx) => {
+export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
     const body = await req.json();
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = verifySchema.parse(body);
 
-    const result = await paymentService.verify(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    const result = await paymentService.verify(
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      ctx.userId,
+    );
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
     return errorResponse(error);

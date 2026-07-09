@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
@@ -14,7 +13,7 @@ import {
   legacyScalarsFromSelections,
 } from '@/lib/constants/vendorProfile';
 import type { Prisma } from '@prisma/client';
-import { encryptAdminPassword } from '@/lib/adminPasswordCipher';
+import { passwordFieldsWithReveal } from '@/lib/adminPasswordCipher';
 
 function slugify(name: string, userId: string): string {
   const base = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
@@ -81,8 +80,7 @@ export async function createDirectVendor(
   if (!ownerTemplate) throw Errors.badRequest('Owner role template missing. Run data backfill first.');
   if (!vendorAdminTemplate) throw Errors.badRequest('Vendor Admin role template missing. Run data backfill first.');
 
-  const hashedPassword = await bcrypt.hash(input.password, 12);
-  const adminPasswordCipher = encryptAdminPassword(input.password);
+  const pwd = await passwordFieldsWithReveal(input.password, 12);
   const hcidDisplay = await uniqueHcid();
   const vd = input.vendorDetails;
   const typeSelections = normalizeVendorTypeSelections(vd.vendorTypeSelections);
@@ -96,8 +94,8 @@ export async function createDirectVendor(
       data: {
         fullName: input.fullName,
         email: normalizedEmail,
-        password: hashedPassword,
-        adminPasswordCipher,
+        password: pwd.password,
+        adminPasswordCipher: pwd.adminPasswordCipher,
         role: 'vendor',
         phone: phoneDigits,
         isActive: true,
@@ -233,10 +231,17 @@ export async function createDirectVendor(
       },
     });
 
-    const uniquePincodes = Array.from(new Set(vd.serviceablePincodes));
+    const uniquePincodes = Array.from(
+      new Set(vd.serviceablePincodes.map((p) => p.trim()).filter(Boolean)),
+    );
     if (uniquePincodes.length > 0) {
       await tx.serviceArea.createMany({
-        data: uniquePincodes.map((pincode) => ({ vendorId: vendor.id, pincode })),
+        data: uniquePincodes.map((pincode) => ({
+          vendorId: vendor.id,
+          outletId: null,
+          pincode,
+          isActive: true,
+        })),
         skipDuplicates: true,
       });
     }
