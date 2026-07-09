@@ -33,6 +33,9 @@ import {
     Copy,
     Check,
     Trash2,
+    Power,
+    SlidersHorizontal,
+    Calendar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -669,7 +672,7 @@ export default function VendorDetailsPage() {
                         <AdminImpersonateButton
                             target="vendor"
                             entityId={vendor.id}
-                            label="View as Vendor"
+                            label="Impersonate"
                         />
                         <button
                             type="button"
@@ -794,712 +797,501 @@ export default function VendorDetailsPage() {
                         ]}
                     />
                 }
-                sidebar={
-                    <>
-                        {vendor.user && (
-                            <AdminLoginCredentialsPanel
-                                user={vendor.user}
-                                adminPassword={ownerPassword}
-                                permission="vendors.edit"
-                                accent="#299E60"
-                                onPasswordUpdated={setOwnerPassword}
-                            />
-                        )}
-                        <div className="flex flex-col gap-2.5">
-                            <span className="text-[11px] font-bold text-[#9CA3AF] uppercase text-center lg:text-left">Verification Actions</span>
-                            <button
-                                onClick={handleToggleVerification}
-                                disabled={togglingVerification}
-                                className={cn(
-                                    'w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border',
-                                    vendor.isVerified
-                                        ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
-                                        : 'bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54]'
-                                )}
-                            >
-                                {togglingVerification ? (
-                                    <Loader2 size={13} className="animate-spin" />
-                                ) : vendor.isVerified ? (
-                                    <ShieldX size={13} />
-                                ) : (
-                                    <ShieldCheck size={13} />
-                                )}
-                                {togglingVerification
-                                    ? 'Updating State...'
-                                    : vendor.isVerified
-                                      ? 'Revoke Verification'
-                                      : 'Approve & Verify'}
-                            </button>
-                            {!vendor.isVerified && (
-                                <button
-                                    onClick={() => {
-                                        const reason = window.prompt('Reason for rejection (will be sent to vendor):');
-                                        if (!reason || !reason.trim()) return;
-                                        fetch(`/api/v1/admin/vendors/${vendor.id}`, {
-                                            method: 'PATCH',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ isActive: false, rejectionReason: reason.trim() }),
-                                        }).then(r => { if (r.ok) window.location.reload(); });
-                                    }}
-                                    className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 bg-[#EF4444] border border-[#EF4444] text-white hover:bg-[#DC2626]"
-                                >
-                                    <XCircle size={13} />
-                                    Reject Partner
-                                </button>
-                            )}
-                        </div>
-                    </>
-                }
             />
 
             <AdminEntityStatsRow stats={stats} />
 
-            <AdminVendorPlatformFee
-                vendorId={vendor.id}
-                platformFeePct={vendor.platformFeePct != null ? Number(vendor.platformFeePct) : null}
-                globalDefaultPct={globalDefaultFeePct}
-                onSaved={fetchVendor}
-            />
-
-            <AdminEntityTabPanel>
-                <AdminEntityTabBar
-                    activeTab={activeTab}
-                    onTabChange={(id) => setActiveTab(id as typeof activeTab)}
-                    tabs={[
-                        { id: 'overview', label: 'Company Overview', icon: Building2 },
-                        { id: 'kyc_bank', label: 'KYC & Settlement Bank', icon: Landmark },
-                        {
-                            id: 'documents',
-                            label: 'Verification Records',
-                            icon: FileCheck2,
-                            badge: documents.length > 0 ? (
-                                <span className="ml-1 bg-gray-200 text-gray-700 text-[10px] px-1.5 py-0.5 rounded-full font-black">
-                                    {documents.length}
-                                </span>
-                            ) : undefined,
-                        },
-                        {
-                            id: 'products',
-                            label: 'Catalog Products',
-                            icon: Package,
-                            badge: vendor.products.length > 0 ? (
-                                <span className="ml-1 bg-[#EEF8F1] text-[#299E60] text-[10px] px-1.5 py-0.5 rounded-full font-black border border-[#299E60]/10">
-                                    {vendor.products.length}
-                                </span>
-                            ) : undefined,
-                        },
-                        { id: 'delivery', label: 'Slots & Coverage', icon: Truck },
-                    ]}
-                />
-                <AdminEntityTabContent>
-                    {/* TAB 1: COMPANY OVERVIEW */}
-                    {activeTab === 'overview' && (
-                        <div className="space-y-8">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {/* Left Side: Profile Information */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                {/* Left/Middle Column: Tab panels */}
+                <div className="lg:col-span-8 space-y-6">
+                    <AdminEntityTabPanel>
+                        <AdminEntityTabBar
+                            activeTab={activeTab}
+                            onTabChange={(id) => setActiveTab(id as typeof activeTab)}
+                            tabs={[
+                                { id: 'overview', label: 'Company Overview', icon: Building2 },
+                                { id: 'kyc_bank', label: 'KYC & Settlement Bank', icon: Landmark },
+                                {
+                                    id: 'documents',
+                                    label: 'Verification Records',
+                                    icon: FileCheck2,
+                                    badge: documents.length > 0 ? (
+                                        <span className="ml-1 bg-gray-200 text-gray-700 text-[10px] px-1.5 py-0.5 rounded-full font-black">
+                                            {documents.length}
+                                        </span>
+                                    ) : undefined,
+                                },
+                                {
+                                    id: 'products',
+                                    label: 'Catalog Products',
+                                    icon: Package,
+                                    badge: vendor.products.length > 0 ? (
+                                        <span className="ml-1 bg-[#EEF8F1] text-[#299E60] text-[10px] px-1.5 py-0.5 rounded-full font-black border border-[#299E60]/10">
+                                            {vendor.products.length}
+                                        </span>
+                                    ) : undefined,
+                                },
+                                { id: 'delivery', label: 'Slots & Coverage', icon: Truck },
+                            ]}
+                        />
+                        <AdminEntityTabContent>
+                            {/* TAB 1: COMPANY OVERVIEW */}
+                            {activeTab === 'overview' && (
                                 <div className="space-y-6">
-                                    <div className="border-b border-[#F3F4F6] pb-2">
-                                        <h3 className="text-[15px] font-black text-[#111827]">Business Profile</h3>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        {/* Vendor ID */}
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1.5">Vendor ID</label>
-                                            <div className="flex items-center justify-between bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6] gap-2">
-                                                <span className="text-[13px] font-bold font-mono text-[#374151] block truncate">{truncateId(vendor.id)}</span>
-                                                <CopyButton text={vendor.id} label="Vendor ID" />
-                                            </div>
-                                        </div>
-
-                                        {/* Vendor Code (SKU prefix) */}
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1.5">
-                                                Vendor Code
-                                            </label>
-                                            {isEditing ? (
-                                                <div className="space-y-1.5">
+                                    {isEditing ? (
+                                        <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                            <h3 className="font-extrabold text-[15px] text-[#181725] mb-4">Edit Company Overview</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <EditField label="Vendor Code">
                                                     <input
                                                         type="text"
                                                         value={vendorCode}
                                                         onChange={(e) => setVendorCode(e.target.value.toUpperCase())}
                                                         placeholder="e.g. MAN"
                                                         maxLength={20}
-                                                        className="w-full h-[38px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60] focus:ring-1 focus:ring-[#299E60]/20 font-mono font-bold uppercase tracking-wide"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono font-bold uppercase tracking-wide bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
-                                                    <p className="text-[11px] text-[#6B7280] leading-relaxed">
-                                                        Short code used as the SKU prefix for this vendor&apos;s products.
-                                                        {vendorCode.trim() ? (
-                                                            <> Example: {formatVendorSku(vendorCode.trim(), 'POS123')}</>
-                                                        ) : (
-                                                            <> Leave blank to use slug-derived code ({resolveVendorCode(vendor)}).</>
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            ) : (
-                                                <div className="bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">
-                                                    <span className="text-[13px] font-bold font-mono text-[#374151] block">
-                                                        {vendor.vendorCode || resolveVendorCode(vendor)}
-                                                    </span>
-                                                    {!vendor.vendorCode && (
-                                                        <p className="text-[11px] text-[#9CA3AF] mt-1">
-                                                            Derived from slug — assign a code before the vendor publishes products.
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Business Name */}
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1.5">Commercial Business Name</label>
-                                            {isEditing ? (
-                                                <input
-                                                    type="text"
-                                                    value={businessName}
-                                                    onChange={(e) => setBusinessName(e.target.value)}
-                                                    className="w-full h-[38px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60] focus:ring-1 focus:ring-[#299E60]/20 font-medium"
-                                                />
-                                            ) : (
-                                                <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">{vendor.businessName}</span>
-                                            )}
-                                        </div>
-
-                                        {/* Description */}
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1.5">Business Description</label>
-                                            {isEditing ? (
-                                                <textarea
-                                                    value={description}
-                                                    onChange={(e) => setDescription(e.target.value)}
-                                                    rows={3}
-                                                    className="w-full border border-[#D1D5DB] rounded-[8px] p-3 text-[13px] outline-none focus:border-[#299E60] focus:ring-1 focus:ring-[#299E60]/20 font-medium resize-none"
-                                                />
-                                            ) : (
-                                                <span className="text-[13px] font-medium text-[#4B5563] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6] whitespace-pre-line leading-relaxed min-h-[70px]">
-                                                    {vendor.description || 'No description provided.'}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        {/* Office Address */}
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1.5">Registered Office Address</label>
-                                            {isEditing ? (
-                                                <div className="space-y-2 bg-[#FAFAFA] border border-[#EEEEEE] p-3 rounded-[8px]">
+                                                </EditField>
+                                                <EditField label="Commercial Business Name">
                                                     <input
                                                         type="text"
-                                                        placeholder="Street Address Line"
-                                                        value={address}
-                                                        onChange={(e) => setAddress(e.target.value)}
-                                                        className="w-full h-[36px] border border-[#D1D5DB] rounded-[6px] px-3 text-[13px] outline-none focus:border-[#299E60] bg-white"
+                                                        value={businessName}
+                                                        onChange={(e) => setBusinessName(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
-                                                    <div className="grid grid-cols-3 gap-2">
-                                                        <input
-                                                            type="text"
-                                                            placeholder="City"
-                                                            value={city}
-                                                            onChange={(e) => setCity(e.target.value)}
-                                                            className="w-full h-[36px] border border-[#D1D5DB] rounded-[6px] px-2 text-[13px] outline-none focus:border-[#299E60] bg-white"
+                                                </EditField>
+                                                <div className="md:col-span-2">
+                                                    <EditField label="Business Description">
+                                                        <textarea
+                                                            value={description}
+                                                            onChange={(e) => setDescription(e.target.value)}
+                                                            rows={3}
+                                                            className="w-full border border-[#D1D5DB] rounded-[8px] p-3 text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all resize-none"
                                                         />
-                                                        <input
-                                                            type="text"
-                                                            placeholder="State"
-                                                            value={stateVal}
-                                                            onChange={(e) => setStateVal(e.target.value)}
-                                                            className="w-full h-[36px] border border-[#D1D5DB] rounded-[6px] px-2 text-[13px] outline-none focus:border-[#299E60] bg-white"
-                                                        />
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Pincode"
-                                                            value={pincode}
-                                                            onChange={(e) => setPincode(e.target.value)}
-                                                            className="w-full h-[36px] border border-[#D1D5DB] rounded-[6px] px-2 text-[13px] outline-none focus:border-[#299E60] bg-white"
-                                                        />
-                                                    </div>
+                                                    </EditField>
                                                 </div>
-                                            ) : (
-                                                <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">{fullAddress || 'Not provided'}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                                                <div className="md:col-span-2">
+                                                    <EditField label="Registered Office Address (Street)">
+                                                        <input
+                                                            type="text"
+                                                            value={address}
+                                                            onChange={(e) => setAddress(e.target.value)}
+                                                            className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        />
+                                                    </EditField>
+                                                </div>
+                                                <EditField label="Office City">
+                                                    <input
+                                                        type="text"
+                                                        value={city}
+                                                        onChange={(e) => setCity(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Office State">
+                                                    <input
+                                                        type="text"
+                                                        value={stateVal}
+                                                        onChange={(e) => setStateVal(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Office Pincode">
+                                                    <input
+                                                        type="text"
+                                                        value={pincode}
+                                                        onChange={(e) => setPincode(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                            </div>
 
-                                {/* Right Side: Commercial settings */}
-                                <div className="space-y-6">
-                                    <div className="border-b border-[#F3F4F6] pb-2">
-                                        <h3 className="text-[15px] font-black text-[#111827]">Order & Commercial Settings</h3>
-                                    </div>
-
-                                    <div className="space-y-4 bg-[#F9FAFB] p-5 rounded-[12px] border border-[#E5E7EB]/50">
-                                        {/* Min Order Value */}
-                                        <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-3.5">
-                                            <span className="text-[12px] font-bold text-[#4B5563] uppercase">Minimum Order Value</span>
-                                            {isEditing ? (
-                                                <div className="relative">
-                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] text-[12px] font-bold">₹</span>
+                                            <h3 className="font-extrabold text-[15px] text-[#181725] mt-6 mb-4">Edit Commercial Settings</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <EditField label="Minimum Order Value (₹)">
                                                     <input
                                                         type="number"
                                                         value={minOrderValue}
                                                         onChange={(e) => setMinOrderValue(e.target.value)}
-                                                        className="w-[120px] h-[34px] border border-[#D1D5DB] rounded-[8px] pl-6 pr-2.5 text-[13px] outline-none focus:border-[#299E60] font-bold text-right"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-bold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
-                                                </div>
-                                            ) : (
-                                                <span className="text-[13px] font-extrabold text-[#111827]">{formatPrice(vendor.minOrderValue)}</span>
-                                            )}
-                                        </div>
-
-                                        {/* Delivery Fee */}
-                                        <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-3.5">
-                                            <span className="text-[12px] font-bold text-[#4B5563] uppercase">Delivery Surcharge Fee</span>
-                                            {isEditing ? (
-                                                <div className="relative">
-                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] text-[12px] font-bold">₹</span>
+                                                </EditField>
+                                                <EditField label="Delivery Surcharge Fee (₹)">
                                                     <input
                                                         type="number"
                                                         value={deliveryFee}
                                                         onChange={(e) => setDeliveryFee(e.target.value)}
-                                                        className="w-[120px] h-[34px] border border-[#D1D5DB] rounded-[8px] pl-6 pr-2.5 text-[13px] outline-none focus:border-[#299E60] font-bold text-right"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-bold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
-                                                </div>
-                                            ) : (
-                                                <span className="text-[13px] font-extrabold text-[#111827]">
-                                                    {vendor.deliveryFee === 0 ? 'Free' : formatPrice(vendor.deliveryFee)}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        {/* Free Delivery Threshold */}
-                                        <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-3.5">
-                                            <span className="text-[12px] font-bold text-[#4B5563] uppercase">Free Delivery Above</span>
-                                            {isEditing ? (
-                                                <div className="relative">
-                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] text-[12px] font-bold">₹</span>
+                                                </EditField>
+                                                <EditField label="Free Delivery Above (₹)">
                                                     <input
                                                         type="number"
-                                                        placeholder="optional"
                                                         value={freeDeliveryAbove}
                                                         onChange={(e) => setFreeDeliveryAbove(e.target.value)}
-                                                        className="w-[120px] h-[34px] border border-[#D1D5DB] rounded-[8px] pl-6 pr-2.5 text-[13px] outline-none focus:border-[#299E60] font-bold text-right"
+                                                        placeholder="optional"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-bold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
+                                                </EditField>
+                                            </div>
+
+                                            <h3 className="font-extrabold text-[15px] text-[#181725] mt-6 mb-4">Edit Primary User Details</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <EditField label="Primary User Full Name">
+                                                    <input
+                                                        type="text"
+                                                        value={fullName}
+                                                        onChange={(e) => setFullName(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Primary Account Email">
+                                                    <input
+                                                        type="email"
+                                                        value={email}
+                                                        onChange={(e) => setEmail(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Primary Mobile Phone">
+                                                    <input
+                                                        type="text"
+                                                        value={phone}
+                                                        onChange={(e) => setPhone(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Primary User GSTIN">
+                                                    <input
+                                                        type="text"
+                                                        value={userGstNumber}
+                                                        onChange={(e) => setUserGstNumber(e.target.value.toUpperCase())}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-6 animate-in fade-in duration-300">
+                                            {/* Business Profile Details */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                                    <Building2 size={16} className="text-[#299E60]" />
+                                                    Commercial Business Profile
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <InfoCardField label="Vendor ID" value={vendor.id} copyable />
+                                                    <InfoCardField label="Vendor Code" value={vendor.vendorCode || resolveVendorCode(vendor)} />
+                                                    <InfoCardField label="Commercial Business Name" value={vendor.businessName} />
+                                                    <div className="sm:col-span-2">
+                                                        <InfoCardField label="Business Description" value={vendor.description || 'No description provided.'} />
+                                                    </div>
+                                                    <InfoCardField label="Rating Status" value={`${Number(vendor.rating).toFixed(1)} / 5.0 Rating`} />
                                                 </div>
-                                            ) : (
-                                                <span className="text-[13px] font-extrabold text-[#111827]">
-                                                    {vendor.freeDeliveryAbove ? formatPrice(vendor.freeDeliveryAbove) : 'N/A'}
-                                                </span>
-                                            )}
+                                            </div>
+
+                                            {/* Registered Office Address */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                                    <MapPin size={16} className="text-[#299E60]" />
+                                                    Registered Office Address
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <div className="sm:col-span-2">
+                                                        <InfoCardField label="Office Street Address" value={vendor.addressLine} />
+                                                    </div>
+                                                    <InfoCardField label="Office City" value={vendor.city} />
+                                                    <InfoCardField label="Office State" value={vendor.state} />
+                                                    <InfoCardField label="Office Pincode" value={vendor.addressPincode} />
+                                                </div>
+                                            </div>
+
+                                            {/* Order Settings & Metrics */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                                    <SlidersHorizontal size={16} className="text-[#299E60]" />
+                                                    Commercial Order Settings
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <InfoCardField label="Minimum Order Value" value={formatPrice(vendor.minOrderValue)} />
+                                                    <InfoCardField label="Delivery Surcharge Fee" value={vendor.deliveryFee === 0 ? 'Free' : formatPrice(vendor.deliveryFee)} />
+                                                    <InfoCardField label="Free Delivery Above" value={vendor.freeDeliveryAbove ? formatPrice(vendor.freeDeliveryAbove) : 'N/A'} />
+                                                    <InfoCardField label="Partner Registration Date" value={new Date(vendor.user.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })} />
+                                                </div>
+                                            </div>
+
+                                            {/* Onboarding account details */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                                    <User size={16} className="text-[#299E60]" />
+                                                    Onboarding Primary User Account
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                                    <InfoCardField label="Owner User ID" value={vendor.user.id} copyable />
+                                                    <InfoCardField label="Full Legal Name" value={vendor.user.fullName} />
+                                                    <InfoCardField label="Account Email Address" value={vendor.user.email} copyable />
+                                                    <InfoCardField label="Mobile Phone Number" value={vendor.user.phone || 'Not provided'} copyable />
+                                                    <InfoCardField label="User GSTIN (Registered)" value={vendor.user.gstNumber || 'Not provided'} copyable />
+                                                </div>
+                                            </div>
                                         </div>
-
-                                        {/* Onboarding Time */}
-                                        <div className="flex items-center justify-between pt-1">
-                                            <span className="text-[12px] font-bold text-[#4B5563] uppercase">Partner Registration</span>
-                                            <span className="text-[13px] font-extrabold text-[#374151]">
-                                                {new Date(vendor.user.createdAt).toLocaleDateString('en-IN', {
-                                                    day: '2-digit',
-                                                    month: 'long',
-                                                    year: 'numeric',
-                                                })}
-                                            </span>
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
-                            </div>
+                            )}
 
-                            {/* Owner Profile Panel */}
-                            <div className="border-t border-[#F3F4F6] pt-6">
-                                <h3 className="text-[15px] font-black text-[#111827] mb-4">Onboarding Account User</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Owner User ID</label>
-                                        <div className="flex items-center justify-between bg-[#F9FAFB] h-[36px] px-3 rounded-[8px] border border-[#F3F4F6] gap-2">
-                                            <span className="text-[13px] font-bold font-mono text-[#374151] block truncate">{truncateId(vendor.user.id)}</span>
-                                            <CopyButton text={vendor.user.id} label="Owner User ID" />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Full Legal Name</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={fullName}
-                                                onChange={(e) => setFullName(e.target.value)}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60]"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">{vendor.user.fullName}</span>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Account Email Address</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="email"
-                                                value={email}
-                                                onChange={(e) => setEmail(e.target.value)}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60]"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6] truncate">{vendor.user.email}</span>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Mobile Phone Number</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={phone}
-                                                onChange={(e) => setPhone(e.target.value)}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60]"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">{vendor.user.phone || 'Not provided'}</span>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">User GSTIN (Registered)</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={userGstNumber}
-                                                onChange={(e) => setUserGstNumber(e.target.value.toUpperCase())}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60] font-mono uppercase"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6] font-mono uppercase">{vendor.user.gstNumber || 'Not provided'}</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* TAB 2: KYC & BANK DETAILS */}
-                    {activeTab === 'kyc_bank' && (
-                        <div className="space-y-8">
-                            {/* Corporate Registry */}
-                            <div>
-                                <div className="border-b border-[#F3F4F6] pb-2 mb-4">
-                                    <h3 className="text-[15px] font-black text-[#111827]">Compliance Identifiers</h3>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Trade/Entity Name</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={tradeName}
-                                                onChange={(e) => setTradeName(e.target.value)}
-                                                className="w-full h-[38px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60]"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">{vendor.tradeName || 'Not provided'}</span>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Vendor Entity Type</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={vendorType}
-                                                onChange={(e) => setVendorType(e.target.value)}
-                                                className="w-full h-[38px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60]"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">
-                                              {formatVendorTypeSelections(normalizeVendorTypeSelections(vendor.vendorTypeSelections))
-                                                || vendor.vendorType
-                                                || 'Not provided'}
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Corporate GSTIN</label>
-                                        <div className="flex items-center gap-2">
-                                            {renderDocReviewIcon('gst')}
-                                            <div className="flex-1 min-w-0">
-                                                {isEditing ? (
+                            {/* TAB 2: KYC & BANK DETAILS */}
+                            {activeTab === 'kyc_bank' && (
+                                <div className="space-y-6">
+                                    {isEditing ? (
+                                        <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                            <h3 className="font-extrabold text-[15px] text-[#181725] mb-4">Edit KYC compliance details</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <EditField label="Trade/Entity Name">
+                                                    <input
+                                                        type="text"
+                                                        value={tradeName}
+                                                        onChange={(e) => setTradeName(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Vendor Entity Type">
+                                                    <input
+                                                        type="text"
+                                                        value={vendorType}
+                                                        onChange={(e) => setVendorType(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Corporate GSTIN">
                                                     <input
                                                         type="text"
                                                         value={gstNumber}
                                                         onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
-                                                        className="w-full h-[38px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60] font-mono"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
-                                                ) : (
-                                                    <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6] font-mono uppercase">{vendor.gstNumber || 'Not provided'}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Corporate PAN</label>
-                                        <div className="flex items-center gap-2">
-                                            {renderDocReviewIcon('pan')}
-                                            <div className="flex-1 min-w-0">
-                                                {isEditing ? (
+                                                </EditField>
+                                                <EditField label="Corporate PAN">
                                                     <input
                                                         type="text"
                                                         value={panNumber}
                                                         onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
-                                                        className="w-full h-[38px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60] font-mono"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
-                                                ) : (
-                                                    <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6] font-mono uppercase">{vendor.panNumber || 'Not provided'}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">FSSAI License No.</label>
-                                        <div className="flex items-center gap-2">
-                                            {renderDocReviewIcon('fssai')}
-                                            <div className="flex-1 min-w-0">
-                                                {isEditing ? (
+                                                </EditField>
+                                                <EditField label="FSSAI License">
                                                     <input
                                                         type="text"
                                                         value={fssaiNumber}
-                                                        onChange={(e) => setFssaiNumber(e.target.value)}
-                                                        className="w-full h-[38px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60]"
+                                                        onChange={(e) => setFssaiNumber(e.target.value.toUpperCase())}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
-                                                ) : (
-                                                    <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">{vendor.fssaiNumber || 'Not provided'}</span>
-                                                )}
+                                                </EditField>
+                                                <EditField label="MSME Udyam Number">
+                                                    <input
+                                                        type="text"
+                                                        value={udyamNumber}
+                                                        onChange={(e) => setUdyamNumber(e.target.value.toUpperCase())}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Corporate CIN">
+                                                    <input
+                                                        type="text"
+                                                        value={cinNumber}
+                                                        onChange={(e) => setCinNumber(e.target.value.toUpperCase())}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Delivery Capability">
+                                                    <input
+                                                        type="text"
+                                                        value={deliveryCapability}
+                                                        onChange={(e) => setDeliveryCapability(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
                                             </div>
-                                        </div>
-                                    </div>
 
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">MSME Udyam Registration No.</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={udyamNumber}
-                                                onChange={(e) => setUdyamNumber(e.target.value)}
-                                                className="w-full h-[38px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60]"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">{vendor.udyamNumber || 'Not provided'}</span>
-                                        )}
-                                    </div>
+                                            <h3 className="font-extrabold text-[15px] text-[#181725] mt-6 mb-4">Edit Settlement Bank Details</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <EditField label="Bank Name">
+                                                    <input
+                                                        type="text"
+                                                        value={bankName}
+                                                        onChange={(e) => setBankName(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Account Holder Name">
+                                                    <input
+                                                        type="text"
+                                                        value={bankAccountName}
+                                                        onChange={(e) => setBankAccountName(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Account Number">
+                                                    <input
+                                                        type="text"
+                                                        value={bankAccountNumber}
+                                                        onChange={(e) => setBankAccountNumber(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Account Type">
+                                                    <select
+                                                        value={bankAccountType}
+                                                        onChange={(e) => setBankAccountType(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-medium bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    >
+                                                        <option value="">Select account type...</option>
+                                                        <option value="current">Current Account</option>
+                                                        <option value="savings">Savings Account</option>
+                                                    </select>
+                                                </EditField>
+                                                <EditField label="IFSC Code">
+                                                    <input
+                                                        type="text"
+                                                        value={bankIfsc}
+                                                        onChange={(e) => setBankIfsc(e.target.value.toUpperCase())}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                            </div>
 
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">CIN (Corporate Identity Number)</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={cinNumber}
-                                                onChange={(e) => setCinNumber(e.target.value.toUpperCase())}
-                                                className="w-full h-[38px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60] font-mono"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6] font-mono uppercase">{vendor.cinNumber || 'Not provided'}</span>
-                                        )}
-                                    </div>
+                                            <h3 className="font-extrabold text-[15px] text-[#181725] mt-6 mb-4">Edit Authorized Person</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <EditField label="Authorized Person Name">
+                                                    <input
+                                                        type="text"
+                                                        value={authorizedPersonName}
+                                                        onChange={(e) => setAuthorizedPersonName(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Authorized Person Phone">
+                                                    <input
+                                                        type="text"
+                                                        value={authorizedPersonPhone}
+                                                        onChange={(e) => setAuthorizedPersonPhone(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Authorized Person Email">
+                                                    <input
+                                                        type="email"
+                                                        value={authorizedPersonEmail}
+                                                        onChange={(e) => setAuthorizedPersonEmail(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                            </div>
 
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Delivery Capacity (Vehicles)</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={deliveryCapability}
-                                                onChange={(e) => setDeliveryCapability(e.target.value)}
-                                                className="w-full h-[38px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60]"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">{vendor.deliveryCapability || 'Not provided'}</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Authorized Signatory Contacts */}
-                            <div className="border-t border-[#F3F4F6] pt-6">
-                                <div className="pb-2 mb-4">
-                                    <h3 className="text-[15px] font-black text-[#111827]">Authorized Signatory / Contacts</h3>
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Authorized Person Name</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={authorizedPersonName}
-                                                onChange={(e) => setAuthorizedPersonName(e.target.value)}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60]"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6]">{vendor.authorizedPersonName || 'Not provided'}</span>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Authorized Person Phone</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={authorizedPersonPhone}
-                                                onChange={(e) => setAuthorizedPersonPhone(e.target.value)}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60]"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6] font-mono">{vendor.authorizedPersonPhone || 'Not provided'}</span>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Authorized Person Email</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="email"
-                                                value={authorizedPersonEmail}
-                                                onChange={(e) => setAuthorizedPersonEmail(e.target.value)}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60]"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-2.5 rounded-lg border border-[#F3F4F6] truncate">{vendor.authorizedPersonEmail || 'Not provided'}</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Logistics / Pickup Address */}
-                            <div className="border-t border-[#F3F4F6] pt-6">
-                                <div className="pb-2 mb-4">
-                                    <h3 className="text-[15px] font-black text-[#111827]">Logistics / Pickup Address</h3>
-                                </div>
-
-                                <div className="max-w-[600px]">
-                                    {isEditing ? (
-                                        <div className="space-y-2 bg-[#FAFAFA] border border-[#EEEEEE] p-3 rounded-[8px]">
-                                            <input
-                                                type="text"
-                                                placeholder="Street Address Line"
-                                                value={pickupAddressLine}
-                                                onChange={(e) => setPickupAddressLine(e.target.value)}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[6px] px-3 text-[13px] outline-none focus:border-[#299E60] bg-white"
-                                            />
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <input
-                                                    type="text"
-                                                    placeholder="City"
-                                                    value={pickupCity}
-                                                    onChange={(e) => setPickupCity(e.target.value)}
-                                                    className="w-full h-[36px] border border-[#D1D5DB] rounded-[6px] px-2 text-[13px] outline-none focus:border-[#299E60] bg-white"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    placeholder="State"
-                                                    value={pickupState}
-                                                    onChange={(e) => setPickupState(e.target.value)}
-                                                    className="w-full h-[36px] border border-[#D1D5DB] rounded-[6px] px-2 text-[13px] outline-none focus:border-[#299E60] bg-white"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Pincode"
-                                                    value={pickupPincode}
-                                                    onChange={(e) => setPickupPincode(e.target.value)}
-                                                    className="w-full h-[36px] border border-[#D1D5DB] rounded-[6px] px-2 text-[13px] outline-none focus:border-[#299E60] bg-white"
-                                                />
+                                            <h3 className="font-extrabold text-[15px] text-[#181725] mt-6 mb-4">Edit Pickup warehouse address</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="md:col-span-2">
+                                                    <EditField label="Pickup warehouse address (Street)">
+                                                        <input
+                                                            type="text"
+                                                            value={pickupAddressLine}
+                                                            onChange={(e) => setPickupAddressLine(e.target.value)}
+                                                            className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        />
+                                                    </EditField>
+                                                </div>
+                                                <EditField label="Pickup city">
+                                                    <input
+                                                        type="text"
+                                                        value={pickupCity}
+                                                        onChange={(e) => setPickupCity(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Pickup state">
+                                                    <input
+                                                        type="text"
+                                                        value={pickupState}
+                                                        onChange={(e) => setPickupState(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
+                                                <EditField label="Pickup Pincode">
+                                                    <input
+                                                        type="text"
+                                                        value={pickupPincode}
+                                                        onChange={(e) => setPickupPincode(e.target.value)}
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                    />
+                                                </EditField>
                                             </div>
                                         </div>
                                     ) : (
-                                        <span className="text-[13px] font-bold text-[#374151] block bg-[#F9FAFB] p-3 rounded-lg border border-[#F3F4F6] leading-relaxed">
-                                            {[vendor.pickupAddressLine, vendor.pickupCity, vendor.pickupState, vendor.pickupPincode].filter(Boolean).join(', ') || 'Not configured'}
-                                        </span>
+                                        <div className="space-y-6 animate-in fade-in duration-300">
+                                            {/* Compliance Identifiers */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                                    <ShieldCheck size={16} className="text-[#299E60]" />
+                                                    Compliance Identifiers & Licenses
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <InfoCardField label="Trade/Entity Name" value={vendor.tradeName || 'Not provided'} />
+                                                    <InfoCardField label="Vendor Entity Type" value={formatVendorTypeSelections(normalizeVendorTypeSelections(vendor.vendorTypeSelections)) || vendor.vendorType || 'Not provided'} />
+                                                    <InfoCardField label="Corporate GSTIN" value={vendor.gstNumber || 'Not provided'} copyable docReviewIcon={renderDocReviewIcon('gst')} />
+                                                    <InfoCardField label="Corporate PAN" value={vendor.panNumber || 'Not provided'} copyable docReviewIcon={renderDocReviewIcon('pan')} />
+                                                    <InfoCardField label="FSSAI License" value={vendor.fssaiNumber || 'Not provided'} copyable docReviewIcon={renderDocReviewIcon('fssai')} />
+                                                    <InfoCardField label="MSME Udyam Number" value={vendor.udyamNumber || 'Not provided'} copyable />
+                                                    <InfoCardField label="Corporate CIN" value={vendor.cinNumber || 'Not provided'} copyable />
+                                                    <InfoCardField label="Delivery Capability" value={vendor.deliveryCapability || 'Not provided'} />
+                                                </div>
+                                            </div>
+
+                                            {/* Settlement Bank Details */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                                    <Landmark size={16} className="text-[#299E60]" />
+                                                    Settlement Bank Account
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <InfoCardField label="Bank Name" value={vendor.bankName || 'Not provided'} docReviewIcon={renderDocReviewIcon('bank_proof')} />
+                                                    <InfoCardField label="Account Holder Name" value={vendor.bankAccountName || 'Not provided'} />
+                                                    <InfoCardField label="Account Number" value={vendor.bankAccountNumber || 'Not provided'} copyable />
+                                                    <InfoCardField label="Account Type" value={vendor.bankAccountType || 'Not provided'} />
+                                                    <InfoCardField label="IFSC Code" value={vendor.bankIfsc || 'Not provided'} copyable />
+                                                </div>
+                                            </div>
+
+                                            {/* Authorized Person */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                                    <User size={16} className="text-[#299E60]" />
+                                                    Primary Authorized Representative
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <InfoCardField label="Authorized Contact Name" value={vendor.authorizedPersonName || 'Not provided'} />
+                                                    <InfoCardField label="Authorized Phone Number" value={vendor.authorizedPersonPhone || 'Not provided'} copyable />
+                                                    <InfoCardField label="Authorized Email Address" value={vendor.authorizedPersonEmail || 'Not provided'} copyable />
+                                                </div>
+                                            </div>
+
+                                            {/* Pickup Address */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
+                                                    <MapPin size={16} className="text-[#299E60]" />
+                                                    Business Warehouse Pickup Address
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                    <div className="sm:col-span-2">
+                                                        <InfoCardField label="Pickup Street Address" value={vendor.pickupAddressLine || 'Not provided'} />
+                                                    </div>
+                                                    <InfoCardField label="Pickup City" value={vendor.pickupCity || 'Not provided'} />
+                                                    <InfoCardField label="Pickup State" value={vendor.pickupState || 'Not provided'} />
+                                                    <InfoCardField label="Pickup Pincode" value={vendor.pickupPincode || 'Not provided'} />
+                                                </div>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
-                            </div>
-
-                            {/* Settlement Bank details */}
-                            <div className="border-t border-[#F3F4F6] pt-6 bg-[#FAFAFA] -mx-6 md:-mx-8 px-6 md:px-8 py-6 rounded-b-[16px]">
-                                <div className="pb-2 mb-4 flex items-center justify-between gap-3">
-                                    <h3 className="text-[15px] font-black text-[#111827]">Settlement Bank Details</h3>
-                                    {renderDocReviewIcon('bank_proof')}
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Beneficiary Account Name</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={bankAccountName}
-                                                onChange={(e) => setBankAccountName(e.target.value)}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60] bg-white"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-white p-2.5 rounded-lg border border-[#E5E7EB]">{vendor.bankAccountName || 'Not configured'}</span>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Account Number</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={bankAccountNumber}
-                                                onChange={(e) => setBankAccountNumber(e.target.value)}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60] bg-white"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-white p-2.5 rounded-lg border border-[#E5E7EB] font-mono">{vendor.bankAccountNumber || 'Not configured'}</span>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">IFSC Code (Indian Financial System)</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={bankIfsc}
-                                                onChange={(e) => setBankIfsc(e.target.value.toUpperCase())}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60] bg-white font-mono uppercase"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-white p-2.5 rounded-lg border border-[#E5E7EB] font-mono uppercase">{vendor.bankIfsc || 'Not configured'}</span>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Bank Name</label>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={bankName}
-                                                onChange={(e) => setBankName(e.target.value)}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60] bg-white"
-                                            />
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-white p-2.5 rounded-lg border border-[#E5E7EB]">{vendor.bankName || 'Not configured'}</span>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider mb-1">Account Category/Type</label>
-                                        {isEditing ? (
-                                            <select
-                                                value={bankAccountType}
-                                                onChange={(e) => setBankAccountType(e.target.value)}
-                                                className="w-full h-[36px] border border-[#D1D5DB] rounded-[8px] px-3 text-[13px] outline-none focus:border-[#299E60] bg-white font-medium"
-                                            >
-                                                <option value="">Select account type...</option>
-                                                <option value="current">Current Account</option>
-                                                <option value="savings">Savings Account</option>
-                                            </select>
-                                        ) : (
-                                            <span className="text-[13px] font-bold text-[#374151] block bg-white p-2.5 rounded-lg border border-[#E5E7EB] uppercase">{vendor.bankAccountType || 'Not configured'}</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                            )}
 
                     {/* TAB 3: VERIFICATION COMPLIANCE DOCUMENTS */}
                     {activeTab === 'documents' && (
@@ -1980,6 +1772,110 @@ export default function VendorDetailsPage() {
                     </div>
                 )}
             </AdminEntityTabPanel>
+                </div>
+
+                {/* Right Sidebar Column */}
+                <div className="lg:col-span-4 space-y-6">
+                    {/* Login Credentials */}
+                    {vendor.user && (
+                        <AdminLoginCredentialsPanel
+                            user={vendor.user}
+                            adminPassword={ownerPassword}
+                            permission="vendors.edit"
+                            accent="#299E60"
+                            onPasswordUpdated={setOwnerPassword}
+                        />
+                    )}
+
+                    {/* Platform Fee */}
+                    <AdminVendorPlatformFee
+                        vendorId={vendor.id}
+                        platformFeePct={vendor.platformFeePct != null ? Number(vendor.platformFeePct) : null}
+                        globalDefaultPct={globalDefaultFeePct}
+                        onSaved={fetchVendor}
+                    />
+
+                    {/* Verification Actions */}
+                    <div className="bg-white rounded-[16px] border border-[#D1D5DB] p-5 shadow-sm space-y-4">
+                        <h4 className="text-[12px] font-black text-[#9CA3AF] uppercase tracking-wider">Verification & Status Actions</h4>
+                        <button
+                            onClick={handleToggleVerification}
+                            disabled={togglingVerification}
+                            className={cn(
+                                'w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border',
+                                vendor.isVerified
+                                    ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
+                                    : 'bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54]'
+                            )}
+                        >
+                            {togglingVerification ? (
+                                <Loader2 size={13} className="animate-spin" />
+                            ) : vendor.isVerified ? (
+                                <ShieldX size={13} />
+                            ) : (
+                                <ShieldCheck size={13} />
+                            )}
+                            {togglingVerification
+                                ? 'Updating State...'
+                                : vendor.isVerified
+                                  ? 'Revoke Verification'
+                                  : 'Approve & Verify'}
+                        </button>
+                        {!vendor.isVerified && (
+                            <button
+                                onClick={() => {
+                                    const reason = window.prompt('Reason for rejection (will be sent to vendor):');
+                                    if (!reason || !reason.trim()) return;
+                                    fetch(`/api/v1/admin/vendors/${vendor.id}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ isActive: false, rejectionReason: reason.trim() }),
+                                    }).then(r => { if (r.ok) window.location.reload(); });
+                                }}
+                                className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 bg-[#EF4444] border border-[#EF4444] text-white hover:bg-[#DC2626]"
+                            >
+                                <XCircle size={13} />
+                                Reject Partner
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Quick Info Summary */}
+                    <div className="bg-white rounded-[16px] border border-[#D1D5DB] p-5 shadow-sm space-y-3">
+                        <h4 className="text-[12px] font-black text-[#9CA3AF] uppercase tracking-wider">Quick Summary</h4>
+                        <div className="space-y-2.5">
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-[#6B7280] font-medium">Products</span>
+                                <span className="font-extrabold text-[#111827]">{vendor.products.length}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-[#6B7280] font-medium">Rating</span>
+                                <span className="font-extrabold text-[#111827]">{Number(vendor.rating).toFixed(1)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-[#6B7280] font-medium">Status</span>
+                                <AdminStatusBadge
+                                    variant={vendor.isActive ? 'active' : 'inactive'}
+                                    label={vendor.isActive ? 'Active' : 'Inactive'}
+                                />
+                            </div>
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-[#6B7280] font-medium">Verified</span>
+                                <AdminStatusBadge
+                                    variant={vendor.isVerified ? 'verified' : 'inactive'}
+                                    label={vendor.isVerified ? 'Yes' : 'No'}
+                                />
+                            </div>
+                            <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-[#6B7280] font-medium">Registered</span>
+                                <span className="font-bold text-[#374151]">
+                                    {new Date(vendor.user.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <AdminUserTeamPanel
                 teamEndpoint={`/api/v1/admin/vendors/${vendorId}/team`}
@@ -2124,5 +2020,69 @@ function CopyButton({ text, label }: { text: string; label: string }) {
                 <Copy size={12} />
             )}
         </button>
+    );
+}
+
+function EditField({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div className="flex flex-col gap-1.5 w-full">
+            <span className="text-[11px] font-bold text-[#6B7280] uppercase tracking-wider">{label}</span>
+            <div className="w-full">{children}</div>
+        </div>
+    );
+}
+
+function InfoCardField({
+    label,
+    value,
+    copyable,
+    docReviewIcon,
+}: {
+    label: string;
+    value: string | null | undefined;
+    copyable?: boolean;
+    docReviewIcon?: React.ReactNode;
+}) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = async () => {
+        if (!value) return;
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopied(true);
+            toast.success(`${label} copied`);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            toast.error('Failed to copy');
+        }
+    };
+
+    const displayValue = value && value.trim() !== '' ? value : '—';
+
+    return (
+        <div className="flex flex-col gap-1 p-3.5 bg-[#F9FAFB] rounded-[10px] border border-[#F0F2F5] transition-all hover:bg-gray-50/60 relative group min-w-0">
+            <span className="text-[10px] font-extrabold text-[#9CA3AF] uppercase tracking-wider">{label}</span>
+            <div className="flex items-center gap-1.5 justify-between min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[13px] font-extrabold text-[#181725] truncate">
+                        {displayValue}
+                    </span>
+                    {docReviewIcon}
+                </div>
+                {copyable && value && (
+                    <button
+                        onClick={handleCopy}
+                        className="p-1 rounded hover:bg-white hover:shadow-sm text-[#9CA3AF] hover:text-[#299E60] transition-all cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title={`Copy ${label}`}
+                    >
+                        {copied ? (
+                            <Check size={11} className="text-[#299E60]" />
+                        ) : (
+                            <Copy size={11} />
+                        )}
+                    </button>
+                )}
+            </div>
+        </div>
     );
 }
