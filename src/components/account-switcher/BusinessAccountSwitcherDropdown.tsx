@@ -115,15 +115,14 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
     loading, switching,
     accounts, currentAccount, currentOutlet,
     hcidDisplay, totalAccountCount, availableAccountsTruncated,
+    accessibleOutletIds,
+    vendorImpersonating,
     switchAccount, switchOutlet, signOut,
   } = useBusinessAccountSwitcher();
 
   // Per-outlet scoped users can only see their assigned outlets.
+  // During vendor Admin View the hook clears this list so vendor warehouses are not filtered out.
   const { data: session } = useSession();
-  const sessionUser = (session?.user ?? {}) as Record<string, unknown>;
-  const accessibleOutletIds = Array.isArray(sessionUser.accessibleOutletIds)
-    ? (sessionUser.accessibleOutletIds as string[])
-    : [];
 
   function filterOutlets(outlets: AccountSummary['outlets']) {
     if (accessibleOutletIds.length === 0) return outlets;
@@ -409,7 +408,7 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
           )}
 
           {/* ── Other accounts ── */}
-          {otherAccounts.length > 0 && !showOutletPicker && (
+          {otherAccounts.length > 0 && !showOutletPicker && !vendorImpersonating && (
             <div className="py-2">
               <div className="px-4 py-1.5">
                 <p className="text-[10px] font-semibold text-[#AEAEAE] uppercase tracking-wider">
@@ -506,20 +505,22 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
                   </div>
                 </Link>
               )}
-              <button
-                onClick={() => { setIsOpen(false); setShowCreateAccount(true); }}
-                className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-[#F8F8F8] transition-colors text-left"
-              >
-                <div className="w-[36px] h-[36px] rounded-full bg-[#EEF8F1] flex items-center justify-center text-[#299E60]">
-                  <Plus size={16} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[13px] font-semibold text-[#299E60] block">{copy.createBusinessLabel}</span>
-                  {copy.createBusinessHint && (
-                    <span className="text-[10px] text-[#AEAEAE]">{copy.createBusinessHint}</span>
-                  )}
-                </div>
-              </button>
+              {!vendorImpersonating && (
+                <button
+                  onClick={() => { setIsOpen(false); setShowCreateAccount(true); }}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-[#F8F8F8] transition-colors text-left"
+                >
+                  <div className="w-[36px] h-[36px] rounded-full bg-[#EEF8F1] flex items-center justify-center text-[#299E60]">
+                    <Plus size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[13px] font-semibold text-[#299E60] block">{copy.createBusinessLabel}</span>
+                    {copy.createBusinessHint && (
+                      <span className="text-[10px] text-[#AEAEAE]">{copy.createBusinessHint}</span>
+                    )}
+                  </div>
+                </button>
+              )}
               <button
                 onClick={() => { setIsOpen(false); signOut(); }}
                 className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-red-50 transition-colors text-left"

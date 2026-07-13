@@ -7,6 +7,7 @@ import type { AuthContext } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
+import { VENDOR_ID_COOKIE, VENDOR_OUTLET_COOKIE } from '@/lib/adminImpersonationCookies';
 
 export interface VendorOutletContext {
   vendorId: string;
@@ -59,11 +60,19 @@ export async function resolveVendorOutletContext(
   const queryOutletId = req?.nextUrl.searchParams.get('outletId') ?? undefined;
   const allOutlets = options?.allowAllOutlets && queryOutletId === 'all';
 
+  // Admin vendor Admin View: JWT activeOutletId belongs to the admin's BA.
+  // Prefer the impersonation outlet cookie instead.
+  const vendorImpersonating = !!req?.cookies.get(VENDOR_ID_COOKIE)?.value;
+  const impersonationOutletId = vendorImpersonating
+    ? req?.cookies.get(VENDOR_OUTLET_COOKIE)?.value
+    : undefined;
+
   let outletId: string | null = null;
   if (!allOutlets) {
     const candidate =
       queryOutletId ??
-      ctx.activeOutletId ??
+      impersonationOutletId ??
+      (vendorImpersonating ? undefined : ctx.activeOutletId) ??
       (await getVendorPrimaryOutletId(vendor.businessAccountId));
 
     if (candidate) {
@@ -79,7 +88,7 @@ export async function resolveVendorOutletContext(
     throw Errors.badRequest('No active outlet. Select a warehouse to continue.');
   }
 
-  if (outletId) {
+  if (outletId && !vendorImpersonating) {
     assertOutletAccess(ctx, outletId);
   }
 
@@ -90,7 +99,7 @@ export async function resolveVendorOutletContext(
     vendorId,
     businessAccountId: vendor.businessAccountId,
     outletId: primaryId,
-    accessibleOutletIds: ctx.accessibleOutletIds,
+    accessibleOutletIds: vendorImpersonating ? [] : ctx.accessibleOutletIds,
     multiWarehouseEnabled: vendor.multiWarehouseEnabled,
     teamRole,
   };

@@ -41,6 +41,11 @@ export function isAdminCustomerImpersonationActive(): boolean {
   return hasCookie(CUSTOMER_NAME_COOKIE);
 }
 
+/** True when admin is viewing the vendor portal as a vendor (Admin View). */
+export function isAdminVendorImpersonationActive(): boolean {
+  return hasCookie(VENDOR_NAME_COOKIE);
+}
+
 /** True when any admin impersonation cookie is set (vendor, brand, or customer). */
 export function isAnyAdminImpersonationActive(): boolean {
   return (
