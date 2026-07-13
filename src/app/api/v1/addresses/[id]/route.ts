@@ -6,8 +6,12 @@ import { z } from 'zod';
 import { withRole } from '@/middleware/rbac';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
-import { assertAccountMember, assertAccountPermission } from '@/lib/accountAccess';
+import { assertCanMutateAccount } from '@/lib/accountAccess';
 import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
+import {
+  effectiveCustomerBusinessAccountId,
+  effectiveCustomerUserId,
+} from '@/lib/resolveCustomerImpersonation';
 
 const updateSchema = z.object({
   label: z.string().min(1).max(50).optional(),
@@ -19,6 +23,9 @@ const updateSchema = z.object({
   pincode: z.string().max(10).nullable().optional(),
   city: z.string().max(100).nullable().optional(),
   state: z.string().max(100).nullable().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  placeId: z.string().max(500).nullable().optional(),
   isDefault: z.boolean().optional(),
 });
 
@@ -34,20 +41,22 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
     const id = extractId(req);
     const body = await req.json();
     const input = updateSchema.parse(body);
+    const userId = effectiveCustomerUserId(ctx);
+    const businessAccountId = effectiveCustomerBusinessAccountId(ctx);
 
     const existing = await prisma.savedAddress.findFirst({
-      where: { id, userId: ctx.userId },
+      where: { id, userId },
     });
     if (existing) {
       const updated = await prisma.$transaction(async (tx) => {
         if (input.isDefault) {
           await tx.savedAddress.updateMany({
-            where: { userId: ctx.userId, isDefault: true, id: { not: id } },
+            where: { userId, isDefault: true, id: { not: id } },
             data: { isDefault: false },
           });
-          if (ctx.activeBusinessAccountId && existing.outletId) {
+          if (businessAccountId && existing.outletId) {
             await tx.businessAccount.update({
-              where: { id: ctx.activeBusinessAccountId },
+              where: { id: businessAccountId },
               data: { primaryOutletId: existing.outletId },
             });
           }
@@ -63,13 +72,16 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
           if (input.pincode !== undefined) outletPatch.pincode = input.pincode;
           if (input.city !== undefined) outletPatch.city = input.city;
           if (input.state !== undefined) outletPatch.state = input.state;
+          if (input.latitude !== undefined) outletPatch.latitude = input.latitude;
+          if (input.longitude !== undefined) outletPatch.longitude = input.longitude;
+          if (input.placeId !== undefined) outletPatch.placeId = input.placeId;
           if (input.pincode !== undefined && input.pincode && /^\d{6}$/.test(input.pincode)) {
             outletPatch.requiresAddressUpdate = false;
           } else if (
             hasUsableDeliveryLocation({
-              pincode: input.pincode ?? undefined,
-              latitude: existing.latitude,
-              longitude: existing.longitude,
+              pincode: input.pincode ?? existing.pincode ?? undefined,
+              latitude: input.latitude ?? existing.latitude,
+              longitude: input.longitude ?? existing.longitude,
             })
           ) {
             outletPatch.requiresAddressUpdate = false;
@@ -91,6 +103,9 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
             ...(input.pincode !== undefined && { pincode: input.pincode }),
             ...(input.city !== undefined && { city: input.city }),
             ...(input.state !== undefined && { state: input.state }),
+            ...(input.latitude !== undefined && { latitude: input.latitude }),
+            ...(input.longitude !== undefined && { longitude: input.longitude }),
+            ...(input.placeId !== undefined && { placeId: input.placeId }),
             ...(input.isDefault !== undefined && { isDefault: input.isDefault }),
           },
         });
@@ -99,12 +114,11 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
     }
 
     // Client may hold an Outlet id (legacy GET mapped outlets directly).
-    if (!ctx.activeBusinessAccountId) throw Errors.notFound('Address');
-    await assertAccountMember(ctx.userId, ctx.activeBusinessAccountId);
-    await assertAccountPermission(ctx.userId, ctx.activeBusinessAccountId, 'outlets.edit', ctx.activeOutletId);
+    if (!businessAccountId) throw Errors.notFound('Address');
+    await assertCanMutateAccount(ctx, businessAccountId, 'outlets.edit', ctx.activeOutletId);
 
     const outlet = await prisma.outlet.findFirst({
-      where: { id, businessAccountId: ctx.activeBusinessAccountId, isActive: true },
+      where: { id, businessAccountId, isActive: true },
     });
     if (!outlet) throw Errors.notFound('Address');
 
@@ -117,26 +131,36 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
       ...(input.pincode !== undefined && { pincode: input.pincode }),
       ...(input.city !== undefined && { city: input.city }),
       ...(input.state !== undefined && { state: input.state }),
+      ...(input.latitude !== undefined && { latitude: input.latitude }),
+      ...(input.longitude !== undefined && { longitude: input.longitude }),
+      ...(input.placeId !== undefined && { placeId: input.placeId }),
     };
-    if (input.pincode && /^\d{6}$/.test(input.pincode)) {
+    if (
+      (input.pincode && /^\d{6}$/.test(input.pincode))
+      || hasUsableDeliveryLocation({
+        pincode: input.pincode ?? outlet.pincode ?? undefined,
+        latitude: input.latitude ?? outlet.latitude,
+        longitude: input.longitude ?? outlet.longitude,
+      })
+    ) {
       outletPatch.requiresAddressUpdate = false;
     }
 
     const updated = await prisma.$transaction(async (tx) => {
       if (input.isDefault) {
         await tx.businessAccount.update({
-          where: { id: ctx.activeBusinessAccountId! },
+          where: { id: businessAccountId },
           data: { primaryOutletId: outlet.id },
         });
         await tx.savedAddress.updateMany({
-          where: { userId: ctx.userId, isDefault: true },
+          where: { userId, isDefault: true },
           data: { isDefault: false },
         });
       }
 
       const u = await tx.outlet.update({ where: { id: outlet.id }, data: outletPatch });
 
-      const linked = await tx.savedAddress.findFirst({ where: { outletId: outlet.id, userId: ctx.userId } });
+      const linked = await tx.savedAddress.findFirst({ where: { outletId: outlet.id, userId } });
       if (linked) {
         await tx.savedAddress.update({
           where: { id: linked.id },
@@ -152,13 +176,16 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
             ...(input.pincode !== undefined && { pincode: input.pincode }),
             ...(input.city !== undefined && { city: input.city }),
             ...(input.state !== undefined && { state: input.state }),
+            ...(input.latitude !== undefined && { latitude: input.latitude }),
+            ...(input.longitude !== undefined && { longitude: input.longitude }),
+            ...(input.placeId !== undefined && { placeId: input.placeId }),
             ...(input.isDefault !== undefined && { isDefault: input.isDefault }),
           },
         });
       } else if (input.fullAddress) {
         await tx.savedAddress.create({
           data: {
-            userId: ctx.userId,
+            userId,
             outletId: outlet.id,
             label: input.label ?? 'Business',
             businessName: outletName,
@@ -169,9 +196,9 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
             pincode: input.pincode,
             city: input.city,
             state: input.state,
-            latitude: outlet.latitude ?? 0,
-            longitude: outlet.longitude ?? 0,
-            placeId: outlet.placeId,
+            latitude: input.latitude ?? outlet.latitude ?? 0,
+            longitude: input.longitude ?? outlet.longitude ?? 0,
+            placeId: input.placeId ?? outlet.placeId,
             isDefault: input.isDefault ?? false,
           },
         });
@@ -189,8 +216,11 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
 export const DELETE = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
   try {
     const id = extractId(req);
+    const userId = effectiveCustomerUserId(ctx);
+    const businessAccountId = effectiveCustomerBusinessAccountId(ctx);
+
     const existing = await prisma.savedAddress.findFirst({
-      where: { id, userId: ctx.userId },
+      where: { id, userId },
       select: { id: true, outletId: true },
     });
 
@@ -199,7 +229,7 @@ export const DELETE = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => 
         if (existing.outletId) {
           const activeCount = await tx.outlet.count({
             where: {
-              businessAccountId: ctx.activeBusinessAccountId ?? undefined,
+              businessAccountId: businessAccountId ?? undefined,
               isActive: true,
             },
           });
@@ -216,18 +246,17 @@ export const DELETE = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => 
       return NextResponse.json({ success: true });
     }
 
-    if (!ctx.activeBusinessAccountId) throw Errors.notFound('Address');
-    await assertAccountMember(ctx.userId, ctx.activeBusinessAccountId);
-    await assertAccountPermission(ctx.userId, ctx.activeBusinessAccountId, 'outlets.delete', ctx.activeOutletId);
+    if (!businessAccountId) throw Errors.notFound('Address');
+    await assertCanMutateAccount(ctx, businessAccountId, 'outlets.delete', ctx.activeOutletId);
 
     const outlet = await prisma.outlet.findFirst({
-      where: { id, businessAccountId: ctx.activeBusinessAccountId, isActive: true },
+      where: { id, businessAccountId, isActive: true },
       select: { id: true },
     });
     if (!outlet) throw Errors.notFound('Address');
 
     const activeCount = await prisma.outlet.count({
-      where: { businessAccountId: ctx.activeBusinessAccountId, isActive: true },
+      where: { businessAccountId, isActive: true },
     });
     if (activeCount <= 1) {
       throw Errors.badRequest('Cannot remove your only delivery outlet — edit it instead');
@@ -235,7 +264,7 @@ export const DELETE = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => 
 
     await prisma.$transaction(async (tx) => {
       await tx.outlet.update({ where: { id: outlet.id }, data: { isActive: false } });
-      await tx.savedAddress.deleteMany({ where: { outletId: outlet.id, userId: ctx.userId } });
+      await tx.savedAddress.deleteMany({ where: { outletId: outlet.id, userId } });
     });
 
     return NextResponse.json({ success: true });

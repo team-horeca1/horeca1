@@ -75,14 +75,16 @@ export const POST = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
   try {
     const body = await req.json();
     const input = createSchema.parse(body);
+    const userId = effectiveCustomerUserId(ctx);
+    const businessAccountId = effectiveCustomerBusinessAccountId(ctx);
 
     const address = await prisma.$transaction(async (tx) => {
       let outletId: string | undefined;
 
-      if (ctx.activeBusinessAccountId) {
+      if (businessAccountId) {
         // First real address adopts the empty placeholder primary outlet instead
         // of spawning a duplicate that leaves the primary stuck "Address needed".
-        const { outlet } = await adoptOrCreateOutlet(tx, ctx.activeBusinessAccountId, {
+        const { outlet } = await adoptOrCreateOutlet(tx, businessAccountId, {
           name: input.businessName || input.label || 'Branch Outlet',
           addressLine: input.fullAddress,
           flatInfo: input.flatInfo,
@@ -98,7 +100,7 @@ export const POST = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
 
         if (input.isDefault) {
           await tx.businessAccount.update({
-            where: { id: ctx.activeBusinessAccountId },
+            where: { id: businessAccountId },
             data: { primaryOutletId: outlet.id },
           });
         }
@@ -107,7 +109,7 @@ export const POST = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
       // Unset any existing default if this one is flagged as default
       if (input.isDefault) {
         await tx.savedAddress.updateMany({
-          where: { userId: ctx.userId, isDefault: true },
+          where: { userId, isDefault: true },
           data: { isDefault: false },
         });
       }
@@ -117,19 +119,19 @@ export const POST = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
       const userPatch: Record<string, string> = {};
       if (input.pincode || input.businessName) {
         const current = await tx.user.findUnique({
-          where: { id: ctx.userId },
+          where: { id: userId },
           select: { pincode: true, businessName: true },
         });
         if (input.pincode && !current?.pincode) userPatch.pincode = input.pincode;
         if (input.businessName && !current?.businessName) userPatch.businessName = input.businessName;
         if (Object.keys(userPatch).length > 0) {
-          await tx.user.update({ where: { id: ctx.userId }, data: userPatch });
+          await tx.user.update({ where: { id: userId }, data: userPatch });
         }
       }
 
       return tx.savedAddress.create({
         data: {
-          userId: ctx.userId,
+          userId,
           outletId: outletId,
           label: input.label,
           businessName: input.businessName,

@@ -17,13 +17,16 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
-import { assertAccountMember, assertAccountPermission } from '@/lib/accountAccess';
+import { assertAccountMember, assertCanMutateAccount } from '@/lib/accountAccess';
 import { markSessionStale } from '@/lib/sessionStale';
+import { isImpersonatingBusinessAccount } from '@/lib/resolveCustomerImpersonation';
 
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
   try {
     const id = extractId(_req);
-    await assertAccountMember(ctx.userId, id);
+    if (!isImpersonatingBusinessAccount(ctx, id)) {
+      await assertAccountMember(ctx.userId, id);
+    }
     const account = await prisma.businessAccount.findUnique({
       where: { id },
       select: {
@@ -53,7 +56,7 @@ const PatchBody = z.object({
 export const PATCH = withAuth(async (req: NextRequest, ctx) => {
   try {
     const id = extractId(req);
-    await assertAccountPermission(ctx.userId, id, 'settings.edit', ctx.activeOutletId);
+    await assertCanMutateAccount(ctx, id, 'settings.edit', ctx.activeOutletId);
     const body = PatchBody.parse(await req.json());
 
     // If changing primaryOutletId, verify it belongs to this account.
@@ -78,6 +81,12 @@ const DeleteBody = z.object({
 
 export const DELETE = withAuth(async (req: NextRequest, ctx) => {
   try {
+    if (ctx.impersonatedCustomer) {
+      return NextResponse.json(
+        { success: false, error: { message: 'Cannot delete account while in admin view mode' } },
+        { status: 403 },
+      );
+    }
     const id = extractId(req);
     const { confirm } = DeleteBody.parse(await req.json().catch(() => ({})));
 

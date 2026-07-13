@@ -16,21 +16,28 @@ const authService = new AuthService();
 export const GET = withAuth(async (_req, ctx) => {
   const userId = effectiveCustomerUserId(ctx);
   const profile = await authService.getProfile(userId);
-  return NextResponse.json({ success: true, data: profile });
+  const impersonating = ctx.impersonatedCustomer
+    ? {
+        type: 'customer' as const,
+        userId: ctx.impersonatedCustomer.userId,
+        businessAccountId: ctx.impersonatedCustomer.businessAccountId,
+        name: ctx.impersonatedCustomer.name,
+      }
+    : null;
+  return NextResponse.json({
+    success: true,
+    data: profile,
+    ...(impersonating ? { impersonating } : {}),
+  });
 });
 
-// PATCH — update profile fields (never while impersonating)
+// PATCH — update profile fields (impersonation writes the customer's profile)
 export const PATCH = withAuth(async (req: NextRequest, ctx) => {
   try {
-    if (ctx.impersonatedCustomer) {
-      return NextResponse.json(
-        { success: false, error: { message: 'Cannot edit profile while in admin view mode' } },
-        { status: 403 },
-      );
-    }
     const body = await req.json();
     const data = updateProfileSchema.parse(body);
-    const profile = await authService.updateProfile(ctx.userId, data);
+    const userId = effectiveCustomerUserId(ctx);
+    const profile = await authService.updateProfile(userId, data);
     return NextResponse.json({ success: true, data: profile });
   } catch (error) {
     return errorResponse(error);

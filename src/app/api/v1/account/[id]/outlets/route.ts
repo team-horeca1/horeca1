@@ -8,15 +8,21 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
-import { assertAccountMember, assertAccountPermission } from '@/lib/accountAccess';
+import { assertAccountMember, assertAccountPermission, assertCanMutateAccount } from '@/lib/accountAccess';
 import { adoptOrCreateOutlet } from '@/lib/outletWrites';
 import { ensureInventoryRowsForOutlet } from '@/lib/inventoryOutlet';
+import {
+  effectiveCustomerUserId,
+  isImpersonatingBusinessAccount,
+} from '@/lib/resolveCustomerImpersonation';
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
     const id = extractAccountId(req);
-    await assertAccountMember(ctx.userId, id);
-    await assertAccountPermission(ctx.userId, id, 'outlets.view', ctx.activeOutletId);
+    if (!isImpersonatingBusinessAccount(ctx, id)) {
+      await assertAccountMember(ctx.userId, id);
+      await assertAccountPermission(ctx.userId, id, 'outlets.view', ctx.activeOutletId);
+    }
     const outlets = await prisma.outlet.findMany({
       where: { businessAccountId: id },
       orderBy: { createdAt: 'asc' },
@@ -42,8 +48,9 @@ const CreateBody = z.object({
 export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
     const id = extractAccountId(req);
-    await assertAccountPermission(ctx.userId, id, 'outlets.create', ctx.activeOutletId);
+    await assertCanMutateAccount(ctx, id, 'outlets.create', ctx.activeOutletId);
     const body = CreateBody.parse(await req.json());
+    const ownerUserId = effectiveCustomerUserId(ctx);
 
     const result = await prisma.$transaction(async (tx) => {
       // First real address adopts the empty placeholder primary outlet instead of
@@ -85,7 +92,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
         await tx.savedAddress.update({ where: { id: existingSaved.id }, data: savedData });
       } else {
         await tx.savedAddress.create({
-          data: { userId: ctx.userId, outletId: outlet.id, isDefault: false, ...savedData },
+          data: { userId: ownerUserId, outletId: outlet.id, isDefault: false, ...savedData },
         });
       }
 
