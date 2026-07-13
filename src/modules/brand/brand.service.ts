@@ -7,9 +7,30 @@ import { Errors } from '@/middleware/errorHandler';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
 import { runMappingForProduct, runMappingForBrand, embedBrandMasterProduct } from './brand-mapper';
 import { validateMasterSku } from '@/lib/sku';
-import { assertLeafCategory } from '@/modules/catalog/catalog.service';
+import { assertLeafCategory, syncMasterProductCategories } from '@/modules/catalog/catalog.service';
+import { pushMasterCategoriesToVendorListings } from '@/modules/catalog/master-sync.service';
 function slugify(str: string): string {
   return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+/**
+ * Write brand product categories onto the linked MasterProduct and repair-push
+ * linked vendor listings so placeholders (e.g. Category-01) get corrected.
+ */
+async function syncBrandCategoriesToLinkedMaster(
+  masterProductId: string,
+  categoryIds: string[],
+  changedBy: string,
+): Promise<void> {
+  if (!masterProductId || categoryIds.length === 0) return;
+
+  await assertLeafCategory(categoryIds);
+  await prisma.masterProduct.update({
+    where: { id: masterProductId },
+    data: { categoryId: categoryIds[0] },
+  });
+  await syncMasterProductCategories(masterProductId, categoryIds);
+  await pushMasterCategoriesToVendorListings(masterProductId, changedBy, categoryIds);
 }
 
 function approvedActiveBrandWhere() {
@@ -704,6 +725,14 @@ export class BrandService {
       } catch (err) {
         console.error('Failed to auto-create mappings for masterProductId:', err);
       }
+
+      if (categoryIds.length > 0) {
+        try {
+          await syncBrandCategoriesToLinkedMaster(input.masterProductId, categoryIds, userId);
+        } catch (err) {
+          console.error('Failed to sync brand categories to master product:', err);
+        }
+      }
     }
 
     // Embed first so the AI signal is available, then auto-map. Non-blocking.
@@ -784,6 +813,24 @@ export class BrandService {
       where: { id: productId },
       data,
     });
+
+    const categoriesTouched = input.categoryIds !== undefined || input.categoryId !== undefined;
+    const masterJustLinked = input.masterProductId !== undefined && !!updated.masterProductId;
+    if (
+      updated.masterProductId
+      && updated.categoryIds.length > 0
+      && (categoriesTouched || masterJustLinked)
+    ) {
+      try {
+        await syncBrandCategoriesToLinkedMaster(
+          updated.masterProductId,
+          updated.categoryIds,
+          userId,
+        );
+      } catch (err) {
+        console.error('Failed to sync brand categories to master product:', err);
+      }
+    }
 
     // Re-embed + re-map when name (or other text-affecting fields) changed.
     if (input.name || input.packSize !== undefined || input.unit !== undefined

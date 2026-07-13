@@ -109,17 +109,20 @@ export async function revertMasterProductRevision(
   await syncMasterFieldsToVendorListings(revision.masterProductId, adminUserId, {
     name: String(snap.name ?? ''),
     brand: snap.brand != null ? String(snap.brand) : null,
-    categoryId: categoryIds[0],
-    categoryIds,
     taxPercent: Number(snap.taxPercent ?? 0),
     imageUrl: snap.imageUrl != null ? String(snap.imageUrl) : null,
     images: Array.isArray(snap.images) ? (snap.images as string[]) : [],
   });
+
+  if (categoryIds.length > 0) {
+    await pushMasterCategoriesToVendorListings(revision.masterProductId, adminUserId, categoryIds);
+  }
 }
 
 /**
  * Auto-sync locked fields from master catalog to all linked vendor listings.
- * Vendor-owned fields (price, inventory, description, POS SKU) are never touched.
+ * Vendor-owned fields (price, inventory, description, POS SKU, categories) are never touched.
+ * Categories are seeded on adopt; brand-driven repair uses pushMasterCategoriesToVendorListings.
  */
 export async function syncMasterFieldsToVendorListings(
   masterProductId: string,
@@ -136,7 +139,6 @@ export async function syncMasterFieldsToVendorListings(
       vendorId: true,
       name: true,
       brand: true,
-      categoryId: true,
       taxPercent: true,
       imageUrl: true,
       images: true,
@@ -166,16 +168,6 @@ export async function syncMasterFieldsToVendorListings(
       });
     }
 
-    const categoryIds = fields.categoryIds ?? (fields.categoryId ? [fields.categoryId] : undefined);
-    if (categoryIds && categoryIds.length > 0 && categoryIds[0] !== listing.categoryId) {
-      updateData.category = { connect: { id: categoryIds[0] } };
-      auditChanges.push({
-        field: 'categoryId',
-        oldValue: listing.categoryId,
-        newValue: categoryIds[0],
-      });
-    }
-
     // Images: sync only when vendor has no custom upload
     if (fields.imageUrl !== undefined && !listing.imageUrl) {
       updateData.imageUrl = fields.imageUrl;
@@ -186,13 +178,9 @@ export async function syncMasterFieldsToVendorListings(
       auditChanges.push({ field: 'images', oldValue: listing.images, newValue: fields.images });
     }
 
-    if (Object.keys(updateData).length === 0 && !categoryIds?.length) continue;
+    if (Object.keys(updateData).length === 0) continue;
 
     await prisma.product.update({ where: { id: listing.id }, data: updateData });
-
-    if (categoryIds?.length) {
-      await syncProductCategories(listing.id, categoryIds);
-    }
 
     if (auditChanges.length > 0) {
       await logProductFieldChanges(listing.id, changedBy, 'master_sync', auditChanges);
@@ -209,4 +197,64 @@ export async function syncMasterFieldsToVendorListings(
   }
 
   return listings.length;
+}
+
+/**
+ * Explicit category push to linked vendor listings (brand repair / revision revert).
+ * Not used by routine admin master edits — categories stay vendor-owned after adopt.
+ */
+export async function pushMasterCategoriesToVendorListings(
+  masterProductId: string,
+  changedBy: string,
+  categoryIds: string[],
+): Promise<number> {
+  if (categoryIds.length === 0) return 0;
+
+  const listings = await prisma.product.findMany({
+    where: {
+      masterProductId,
+      slug: { not: { startsWith: '_deleted_' } },
+    },
+    select: {
+      id: true,
+      vendorId: true,
+      name: true,
+      categoryId: true,
+    },
+  });
+
+  if (listings.length === 0) return 0;
+
+  const primaryId = categoryIds[0];
+  let updatedCount = 0;
+
+  for (const listing of listings) {
+    const categoryChanged = primaryId !== listing.categoryId;
+    if (!categoryChanged) {
+      // Still refresh join rows in case primary matched but extras differ
+      await syncProductCategories(listing.id, categoryIds);
+      continue;
+    }
+
+    await prisma.product.update({
+      where: { id: listing.id },
+      data: { category: { connect: { id: primaryId } } },
+    });
+    await syncProductCategories(listing.id, categoryIds);
+    await logProductFieldChanges(listing.id, changedBy, 'master_sync', [
+      { field: 'categoryId', oldValue: listing.categoryId, newValue: primaryId },
+    ]);
+
+    if (listing.vendorId) {
+      emitEvent('MasterProductSyncedToVendor', {
+        masterProductId,
+        productId: listing.id,
+        vendorId: listing.vendorId,
+        productName: listing.name,
+      });
+    }
+    updatedCount += 1;
+  }
+
+  return updatedCount;
 }

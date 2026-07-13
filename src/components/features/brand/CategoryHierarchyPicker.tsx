@@ -495,6 +495,7 @@ export function CategoryHierarchyPicker({
                         <input
                             type="text"
                             value={displayParentValue}
+                            title={displayParentValue || undefined}
                             onChange={(e) => {
                                 setParentQuery(e.target.value);
                                 setParentOpen(true);
@@ -515,7 +516,7 @@ export function CategoryHierarchyPicker({
                             }}
                             placeholder={loading ? 'Loading...' : 'Search parent category…'}
                             disabled={loading || parentLocked}
-                            className="w-full h-[40px] bg-transparent pl-2 pr-8 text-[13px] outline-none border-none disabled:cursor-not-allowed"
+                            className="w-full min-w-0 h-[40px] bg-transparent pl-2 pr-8 text-[13px] outline-none border-none disabled:cursor-not-allowed truncate"
                         />
                         {parentId && !parentLocked && (
                             <button
@@ -623,6 +624,7 @@ export function CategoryHierarchyPicker({
                         <input
                             type="text"
                             value={displaySubValue}
+                            title={displaySubValue || undefined}
                             onChange={(e) => {
                                 setSubQuery(e.target.value);
                                 setSubOpen(true);
@@ -643,7 +645,7 @@ export function CategoryHierarchyPicker({
                             }}
                             placeholder={!parentId ? 'Select parent first' : 'Search sub-category…'}
                             disabled={loading || subLocked}
-                            className="w-full h-[40px] bg-transparent pl-2 pr-8 text-[13px] outline-none border-none disabled:cursor-not-allowed"
+                            className="w-full min-w-0 h-[40px] bg-transparent pl-2 pr-8 text-[13px] outline-none border-none disabled:cursor-not-allowed truncate"
                         />
                         {primarySubId && !subLocked && (
                             <button

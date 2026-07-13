@@ -179,8 +179,6 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       await syncMasterFieldsToVendorListings(id, ctx.userId, {
         name: updated.name,
         brand: updated.brand,
-        categoryId: updated.categoryId,
-        categoryIds: resolvedCategoryIds,
         taxPercent: updated.taxPercent,
         imageUrl: updated.imageUrl,
         images: updated.images,

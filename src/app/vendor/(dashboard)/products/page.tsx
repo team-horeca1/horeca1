@@ -480,7 +480,6 @@ export default function VendorProductsPage() {
         images?: string[];
     }>>([]);
     const [categoryPickerKey, setCategoryPickerKey] = useState(0);
-    const [masterCategoryLeafMissing, setMasterCategoryLeafMissing] = useState(false);
     const [brandSuggesting, setBrandSuggesting] = useState(false);
     const suggestionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -695,7 +694,6 @@ export default function VendorProductsPage() {
 
     const clearCatalogSelection = () => {
         setMasterProductId(null);
-        setMasterCategoryLeafMissing(false);
         setBasedOnProductId(null);
         setCatalogSearch('');
         setNoCatalogMatch(false);
@@ -892,7 +890,6 @@ export default function VendorProductsPage() {
     }) => {
         skipDraftAutosaveRef.current = true;
         setMasterProductId(m.id);
-        setMasterCategoryLeafMissing(!!m.categoryLeafMissing);
         setBasedOnProductId(null);
         setCatalogSearch(`${m.sku} — ${m.name}`);
         setNoCatalogMatch(false);
@@ -953,7 +950,6 @@ export default function VendorProductsPage() {
     const fillFromSuggestion = (s: ProductSuggestion) => {
         setBasedOnProductId(s.id);
         setMasterProductId(null);
-        setMasterCategoryLeafMissing(false);
         setCatalogSearch(s.sku ? `${s.sku} — ${s.name}` : s.name);
         setNoCatalogMatch(false);
         setShowSuggestions(false);
@@ -1343,7 +1339,6 @@ export default function VendorProductsPage() {
         setFieldErrors({});
         setBasedOnProductId(null);
         setMasterProductId(null);
-        setMasterCategoryLeafMissing(false);
         setCatalogSearch('');
         setNoCatalogMatch(false);
         setSuggestions([]);
@@ -1372,7 +1367,6 @@ export default function VendorProductsPage() {
         setFieldErrors({});
         setShowCloseConfirm(false);
         setMasterProductId(null);
-        setMasterCategoryLeafMissing(false);
         setCatalogSearch('');
         setIsPanelOpen(true);
         setLoadingProduct(true);
@@ -1396,7 +1390,6 @@ export default function VendorProductsPage() {
             setMasterProductId(
                 typeof p.masterProductId === 'string' ? p.masterProductId : null
             );
-            setMasterCategoryLeafMissing(!!p.categoryLeafMissing);
             setBasedOnProductId(null);
             const linkIds: string[] = Array.isArray(p.categoryLinks)
                 ? (p.categoryLinks as Array<{ categoryId: string }>).map(l => l.categoryId)
@@ -2596,21 +2589,14 @@ export default function VendorProductsPage() {
                                         onCategoryIdsChange={(ids) => updateField('categoryIds', ids)}
                                         categoryEndpoint="/api/v1/vendor/categories/suggest"
                                         categoryPickerKey={String(categoryPickerKey)}
-                                        categoryDisabled={!!masterProductId && !masterCategoryLeafMissing}
-                                        lockParent={!!masterProductId}
+                                        categoryDisabled={false}
+                                        lockParent={false}
                                         categoryHelper={
-                                            <>
-                                                {masterProductId && !masterCategoryLeafMissing && (
-                                                    <p className="text-[11px] text-[#7C7C7C] font-medium mt-1">
-                                                        Categories are set from the master catalog (read-only).
-                                                    </p>
-                                                )}
-                                                {masterProductId && masterCategoryLeafMissing && (
-                                                    <p className="text-[11px] text-[#7C7C7C] font-medium mt-1">
-                                                        Parent category is from the master catalog. Pick the sub-category below.
-                                                    </p>
-                                                )}
-                                            </>
+                                            masterProductId ? (
+                                                <p className="text-[11px] text-[#7C7C7C] font-medium mt-1">
+                                                    Seeded from the master catalog — you can change categories for this listing.
+                                                </p>
+                                            ) : undefined
                                         }
                                         imageUrl={form.imageUrl}
                                         onImageUrlChange={(url) => updateField('imageUrl', url)}
