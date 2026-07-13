@@ -36,3 +36,11 @@ export function effectiveCustomerUserId(ctx: AuthContext): string {
 export function effectiveCustomerBusinessAccountId(ctx: AuthContext): string | null {
   return ctx.impersonatedCustomer?.businessAccountId ?? ctx.activeBusinessAccountId;
 }
+
+/** Admin is viewing-as-customer for this exact business account. */
+export function isImpersonatingBusinessAccount(
+  ctx: AuthContext,
+  businessAccountId: string,
+): boolean {
+  return ctx.impersonatedCustomer?.businessAccountId === businessAccountId;
+}

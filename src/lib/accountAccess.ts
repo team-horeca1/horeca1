@@ -6,6 +6,7 @@
  *   for the target account (uses their UserRole rows, not the JWT-cached set, so it works
  *   on a non-active account too).
  * - resolveAccountPermissions: mirrors activeContext owner bypass (isPrimary + owner-class roles).
+ * - assertCanMutateAccount: membership + permission, OR admin impersonating that exact BA.
  */
 
 import { prisma } from '@/lib/prisma';
@@ -13,6 +14,8 @@ import { Errors } from '@/middleware/errorHandler';
 import { flatten, mergePermissions } from '@/lib/permissions/engine';
 import { ALL_PERMISSION_KEYS, type PermissionKey, type PermissionsJson } from '@/lib/permissions/registry';
 import { isOwnerRoleName } from '@/lib/permissions/portalFeatures';
+import type { AuthContext } from '@/middleware/auth';
+import { isImpersonatingBusinessAccount } from '@/lib/resolveCustomerImpersonation';
 
 export async function assertAccountMember(userId: string, businessAccountId: string): Promise<void> {
   const m = await prisma.businessAccountMember.findUnique({
@@ -62,4 +65,19 @@ export async function assertAccountPermission(
 ): Promise<void> {
   const merged = await resolveAccountPermissions(userId, businessAccountId, outletId);
   if (!merged.has(requiredKey)) throw Errors.forbidden(`Requires ${requiredKey}`);
+}
+
+/**
+ * Allow mutation when the caller is a member with the permission, OR when an
+ * admin is impersonating this exact business account (acts as owner).
+ */
+export async function assertCanMutateAccount(
+  ctx: AuthContext,
+  businessAccountId: string,
+  requiredKey: PermissionKey,
+  outletId: string | null = null,
+): Promise<void> {
+  if (isImpersonatingBusinessAccount(ctx, businessAccountId)) return;
+  await assertAccountMember(ctx.userId, businessAccountId);
+  await assertAccountPermission(ctx.userId, businessAccountId, requiredKey, outletId);
 }
