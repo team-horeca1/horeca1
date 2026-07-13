@@ -520,7 +520,6 @@ export default function VendorProductsPage() {
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
     const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const skipDraftAutosaveRef = useRef(false);
-    const creatingDraftRef = useRef(false);
     const draftSlugRef = useRef<string | null>(null);
     const [draftSavedOnce, setDraftSavedOnce] = useState(false);
 
@@ -545,9 +544,16 @@ export default function VendorProductsPage() {
     const canAutosaveDraft = useCallback(() => {
         if (!isPanelOpen || loadingProduct || saving || draftSaving) return false;
         if (editingProduct?.listingStatus === 'submitted') return false;
-        if (editingProduct?.listingStatus === 'draft') return true;
+        // Never autosave placeholder drafts — require a real product name.
         return form.name.trim().length > 0;
     }, [isPanelOpen, loadingProduct, saving, draftSaving, editingProduct?.listingStatus, form.name]);
+
+    const isFormEffectivelyEmpty = useCallback(() => {
+        return (
+            serializeFormSnapshot(form, { masterProductId, basedOnProductId }) ===
+            serializeFormSnapshot(EMPTY_FORM, { masterProductId: null, basedOnProductId: null })
+        );
+    }, [form, masterProductId, basedOnProductId]);
 
     /* ---- Data fetching ---- */
 
@@ -1151,6 +1157,7 @@ export default function VendorProductsPage() {
     }, [form, editingProduct, masterProductId, basedOnProductId]);
 
     const saveDraftRef = useRef<(force?: boolean) => Promise<boolean>>(async () => false);
+    const discardEmptyDraftRef = useRef<() => Promise<boolean>>(async () => false);
 
     const adoptDraftProduct = useCallback((p: {
         id: string;
@@ -1204,6 +1211,11 @@ export default function VendorProductsPage() {
 
     const saveDraft = useCallback(async (force = false): Promise<boolean> => {
         if (skipDraftAutosaveRef.current && !force) return false;
+        if (!form.name.trim()) {
+            // Clearing the name must not POST/PATCH "Untitled product".
+            if (force) setDraftSaveError('Enter a product name to save a draft');
+            return false;
+        }
         if (!force) {
             if (!canAutosaveDraft() || !isFormDirty()) return false;
         }
@@ -1282,11 +1294,40 @@ export default function VendorProductsPage() {
         } finally {
             setDraftSaving(false);
         }
-    }, [canAutosaveDraft, isFormDirty, buildProductBody, editingProduct, products, adoptDraftProduct, syncSavedSnapshot]);
+    }, [canAutosaveDraft, isFormDirty, buildProductBody, editingProduct, products, adoptDraftProduct, syncSavedSnapshot, form.name]);
+
+    const discardEmptyDraft = useCallback(async (): Promise<boolean> => {
+        if (skipDraftAutosaveRef.current) return false;
+        if (!editingProduct || editingProduct.listingStatus !== 'draft') return false;
+        if (!isFormEffectivelyEmpty()) return false;
+
+        const id = editingProduct.id;
+        try {
+            const res = await fetch(`/api/v1/vendor/products/${id}`, { method: 'DELETE' });
+            const json = await res.json();
+            if (!json.success) return false;
+
+            setProducts(prev => prev.filter(p => p.id !== id));
+            setEditingProduct(null);
+            draftSlugRef.current = null;
+            setDraftSavedOnce(false);
+            setDraftSaveError(null);
+            syncSavedSnapshot(
+                serializeFormSnapshot(EMPTY_FORM, { masterProductId: null, basedOnProductId: null }),
+            );
+            return true;
+        } catch {
+            return false;
+        }
+    }, [editingProduct, isFormEffectivelyEmpty, syncSavedSnapshot]);
 
     useEffect(() => {
         saveDraftRef.current = saveDraft;
     }, [saveDraft]);
+
+    useEffect(() => {
+        discardEmptyDraftRef.current = discardEmptyDraft;
+    }, [discardEmptyDraft]);
 
     /* ---- Panel open / close ---- */
 
@@ -1313,17 +1354,10 @@ export default function VendorProductsPage() {
         setAuditLogs([]);
         setCategoryPickerKey((k) => k + 1);
         setIsPanelOpen(true);
-        void (async () => {
-            if (creatingDraftRef.current) return;
-            creatingDraftRef.current = true;
-            skipDraftAutosaveRef.current = true;
-            try {
-                await saveDraftRef.current(true);
-            } finally {
-                creatingDraftRef.current = false;
-                skipDraftAutosaveRef.current = false;
-            }
-        })();
+        // Re-enable autosave after reset settles; do not create a DB row until the user edits or saves.
+        Promise.resolve().then(() => {
+            skipDraftAutosaveRef.current = false;
+        });
     };
 
     const openEditPanel = async (product: VendorProduct) => {
@@ -1592,6 +1626,16 @@ export default function VendorProductsPage() {
 
     const requestClosePanel = () => {
         void (async () => {
+            // Cleared form → remove the autosaved draft instead of prompting to discard.
+            if (editingProduct?.listingStatus === 'draft' && isFormEffectivelyEmpty()) {
+                if (draftSaveTimeoutRef.current) {
+                    clearTimeout(draftSaveTimeoutRef.current);
+                    draftSaveTimeoutRef.current = null;
+                }
+                await discardEmptyDraftRef.current();
+                closePanelImmediate();
+                return;
+            }
             await flushDraftAutosave();
             if (isFormDirty()) {
                 setShowCloseConfirm(true);
@@ -1601,12 +1645,25 @@ export default function VendorProductsPage() {
         })();
     };
 
-    // Debounced draft autosave while the panel is open (new products + draft listings only).
+    // Debounced draft autosave / empty-draft cleanup while the panel is open.
     useEffect(() => {
-        if (!canAutosaveDraft() || skipDraftAutosaveRef.current) return;
-        if (!isFormDirty()) return;
+        if (!isPanelOpen || loadingProduct || saving || draftSaving || skipDraftAutosaveRef.current) return;
+        if (editingProduct?.listingStatus === 'submitted') return;
 
         if (draftSaveTimeoutRef.current) clearTimeout(draftSaveTimeoutRef.current);
+
+        // Name/fields cleared back to empty → delete the autosaved draft.
+        if (editingProduct?.listingStatus === 'draft' && isFormEffectivelyEmpty()) {
+            draftSaveTimeoutRef.current = setTimeout(() => {
+                void discardEmptyDraftRef.current();
+            }, DRAFT_AUTOSAVE_MS);
+            return () => {
+                if (draftSaveTimeoutRef.current) clearTimeout(draftSaveTimeoutRef.current);
+            };
+        }
+
+        if (!canAutosaveDraft() || !isFormDirty()) return;
+
         draftSaveTimeoutRef.current = setTimeout(() => {
             void saveDraftRef.current();
         }, DRAFT_AUTOSAVE_MS);
@@ -1614,7 +1671,20 @@ export default function VendorProductsPage() {
         return () => {
             if (draftSaveTimeoutRef.current) clearTimeout(draftSaveTimeoutRef.current);
         };
-    }, [form, masterProductId, basedOnProductId, canAutosaveDraft, isFormDirty, lastSavedSnapshot]);
+    }, [
+        form,
+        masterProductId,
+        basedOnProductId,
+        canAutosaveDraft,
+        isFormDirty,
+        isFormEffectivelyEmpty,
+        isPanelOpen,
+        loadingProduct,
+        saving,
+        draftSaving,
+        editingProduct?.listingStatus,
+        lastSavedSnapshot,
+    ]);
 
     /* ---- Form field helpers ---- */
 

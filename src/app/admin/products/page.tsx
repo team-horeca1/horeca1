@@ -433,7 +433,6 @@ export default function ProductsPage() {
     const [draftSaving, setDraftSaving] = useState(false);
     const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
     const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const creatingDraftRef = useRef(false);
     const performDraftSaveRef = useRef<(opts?: { silent?: boolean }) => Promise<boolean>>(async () => false);
     const savedFormSnapshotRef = useRef<string>('');
     const prevLoadingProductRef = useRef(false);
@@ -1000,15 +999,7 @@ export default function ProductsPage() {
         setShowCloseConfirm(false);
         savedFormSnapshotRef.current = JSON.stringify(EMPTY_FORM);
         setPanelOpen(true);
-        void (async () => {
-            if (creatingDraftRef.current) return;
-            creatingDraftRef.current = true;
-            try {
-                await performDraftSaveRef.current({ silent: true });
-            } finally {
-                creatingDraftRef.current = false;
-            }
-        })();
+        // Do not create a DB row until the user edits or explicitly saves a draft.
     };
 
     // Auto-open edit panel
@@ -1341,13 +1332,48 @@ export default function ProductsPage() {
         if (!panelOpen || loadingProduct || saving || draftSaving) return false;
         if (editingProduct?.isMasterRow) return false;
         if (editingProduct?.listingStatus === 'submitted') return false;
-        if (editingProduct?.listingStatus === 'draft') return true;
+        // Never autosave placeholder drafts — require a real product name.
         return formData.name.trim().length > 0;
     }, [panelOpen, loadingProduct, saving, draftSaving, editingProduct, formData.name]);
+
+    const isFormEffectivelyEmpty = useCallback(() => {
+        return JSON.stringify(formData) === JSON.stringify(EMPTY_FORM);
+    }, [formData]);
+
+    const discardEmptyDraftRef = useRef<() => Promise<boolean>>(async () => false);
+
+    const discardEmptyDraft = useCallback(async (): Promise<boolean> => {
+        if (!editingProduct || editingProduct.isMasterRow || editingProduct.listingStatus !== 'draft') {
+            return false;
+        }
+        if (!isFormEffectivelyEmpty()) return false;
+
+        const id = editingProduct.id;
+        try {
+            const res = await fetch(`/api/v1/admin/products/${id}`, { method: 'DELETE' });
+            const json = await res.json();
+            if (!json.success && !res.ok) return false;
+
+            setProducts(prev => prev.filter(p => p.id !== id));
+            setEditingProduct(null);
+            setDraftSaveError(null);
+            savedFormSnapshotRef.current = JSON.stringify(EMPTY_FORM);
+            void fetchDraftCount();
+            return true;
+        } catch {
+            return false;
+        }
+    }, [editingProduct, isFormEffectivelyEmpty, fetchDraftCount]);
+
+    discardEmptyDraftRef.current = discardEmptyDraft;
 
     const performDraftSave = useCallback(async (opts?: { silent?: boolean }): Promise<boolean> => {
         if (editingProduct?.isMasterRow) {
             if (!opts?.silent) toast.error('Master catalog rows cannot be saved as drafts.');
+            return false;
+        }
+        if (!formData.name.trim()) {
+            if (!opts?.silent) toast.error('Enter a product name to save a draft');
             return false;
         }
 
@@ -1408,6 +1434,15 @@ export default function ProductsPage() {
 
     const requestClosePanel = () => {
         void (async () => {
+            if (editingProduct?.listingStatus === 'draft' && isFormEffectivelyEmpty()) {
+                if (draftSaveTimeoutRef.current) {
+                    clearTimeout(draftSaveTimeoutRef.current);
+                    draftSaveTimeoutRef.current = null;
+                }
+                await discardEmptyDraftRef.current();
+                closePanelImmediate();
+                return;
+            }
             await flushDraftAutosave();
             if (isFormDirty()) {
                 setShowCloseConfirm(true);
@@ -1509,15 +1544,28 @@ export default function ProductsPage() {
     }, [loadingProduct, panelOpen, syncFormSnapshot]);
 
     useEffect(() => {
-        if (!canAutosaveDraft() || !isFormDirty()) return;
+        if (!panelOpen || loadingProduct || saving || draftSaving) return;
+        if (editingProduct?.isMasterRow || editingProduct?.listingStatus === 'submitted') return;
+
         if (draftSaveTimeoutRef.current) clearTimeout(draftSaveTimeoutRef.current);
+
+        if (editingProduct?.listingStatus === 'draft' && isFormEffectivelyEmpty()) {
+            draftSaveTimeoutRef.current = setTimeout(() => {
+                void discardEmptyDraftRef.current();
+            }, 2000);
+            return () => {
+                if (draftSaveTimeoutRef.current) clearTimeout(draftSaveTimeoutRef.current);
+            };
+        }
+
+        if (!canAutosaveDraft() || !isFormDirty()) return;
         draftSaveTimeoutRef.current = setTimeout(() => {
             void saveDraftRef.current();
         }, 2000);
         return () => {
             if (draftSaveTimeoutRef.current) clearTimeout(draftSaveTimeoutRef.current);
         };
-    }, [formData, canAutosaveDraft, isFormDirty]);
+    }, [formData, canAutosaveDraft, isFormDirty, isFormEffectivelyEmpty, panelOpen, loadingProduct, saving, draftSaving, editingProduct?.listingStatus, editingProduct?.isMasterRow]);
 
     // -----------------------------------------------------------------------
     // Import
