@@ -274,6 +274,7 @@ export class CartService {
       where: { userId: ctx.userId, businessAccountId: ctx.businessAccountId, outletId: ctx.outletId },
       include: {
         items: {
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           include: {
             product: {
               select: {
@@ -343,6 +344,7 @@ export class CartService {
     // Re-load after BXGY sync may have added/removed free lines
     const freshItems = await prisma.cartItem.findMany({
       where: { cartId: cart.id },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       include: {
         product: {
           select: {
