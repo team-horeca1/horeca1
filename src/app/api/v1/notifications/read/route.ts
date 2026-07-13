@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { NotificationService } from '@/modules/notification/notification.service';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const notificationService = new NotificationService();
 
@@ -21,7 +22,8 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       );
     }
 
-    await notificationService.markRead(notificationId, ctx.userId);
+    const ownerUserId = effectiveCustomerUserId(ctx);
+    await notificationService.markRead(notificationId, ownerUserId);
     return NextResponse.json({ success: true, message: 'Marked as read' });
   } catch (error) {
     return errorResponse(error);

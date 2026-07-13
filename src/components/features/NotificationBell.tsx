@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Bell, Loader2, CheckCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { IMPERSONATION_CHANGED_EVENT } from '@/lib/clearImpersonation';
 
 interface AppNotification {
   id: string;
@@ -74,10 +75,13 @@ export function NotificationBell({ accentColor = '#299E60' }: { accentColor?: st
   useEffect(() => {
     void fetchNotifications();
     const onFocus = () => void fetchNotifications();
+    const onImpersonation = () => void fetchNotifications();
     window.addEventListener('focus', onFocus);
+    window.addEventListener(IMPERSONATION_CHANGED_EVENT, onImpersonation);
     const interval = window.setInterval(() => void fetchNotifications(), 60_000);
     return () => {
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener(IMPERSONATION_CHANGED_EVENT, onImpersonation);
       window.clearInterval(interval);
     };
   }, [fetchNotifications]);

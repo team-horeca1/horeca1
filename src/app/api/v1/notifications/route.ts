@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { NotificationService } from '@/modules/notification/notification.service';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 import type { NotificationChannel } from '@prisma/client';
 
 const notificationService = new NotificationService();
@@ -29,7 +30,9 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
       limit: params.has('limit') ? Number(params.get('limit')) : undefined,
     };
 
-    const result = await notificationService.list(ctx.userId, options);
+    // While viewing as a customer, show that customer's inbox — not the admin JWT user's.
+    const ownerUserId = effectiveCustomerUserId(ctx);
+    const result = await notificationService.list(ownerUserId, options);
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
     return errorResponse(error);
