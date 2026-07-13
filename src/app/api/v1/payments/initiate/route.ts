@@ -12,6 +12,7 @@ import { withAuth } from '@/middleware/auth';
 import { requireStorefrontAccess } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { checkRateLimit } from '@/lib/rateLimit';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 // Accept either a single orderId (legacy callers) or an orderIds array (multi-PO combined checkout).
 const initiateSchema = z.union([
@@ -38,8 +39,8 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const body = await req.json();
     const parsed = initiateSchema.parse(body);
     const orderIds = 'orderIds' in parsed ? parsed.orderIds : [parsed.orderId];
-
-    const result = await paymentService.initiate(orderIds, ctx.userId);
+    const payerUserId = effectiveCustomerUserId(ctx);
+    const result = await paymentService.initiate(orderIds, payerUserId);
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
     return errorResponse(error);

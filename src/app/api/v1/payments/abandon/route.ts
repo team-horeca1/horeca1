@@ -7,6 +7,7 @@ import { PaymentService } from '@/modules/payment/payment.service';
 import { withAuth } from '@/middleware/auth';
 import { requireStorefrontAccess } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const abandonSchema = z.object({
   razorpay_order_id: z.string().min(1),
@@ -18,7 +19,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
     requireStorefrontAccess(ctx, 'storefront.pay');
     const body = abandonSchema.parse(await req.json());
-    const result = await paymentService.abandon(body.razorpay_order_id, ctx.userId);
+    const result = await paymentService.abandon(body.razorpay_order_id, effectiveCustomerUserId(ctx));
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
     return errorResponse(error);

@@ -32,8 +32,10 @@ export default function OrderSuccessPage() {
             fetch(`/api/v1/orders/${id}`).then(r => r.json())
         ))
             .then(results => {
-                const summaries: OrderSummary[] = results.map(r => {
-                    const d = r.data || r;
+                const summaries: OrderSummary[] = results
+                    .filter((r) => r?.success && r.data)
+                    .map(r => {
+                    const d = r.data;
                     return {
                         id: d.id,
                         orderNumber: d.orderNumber,

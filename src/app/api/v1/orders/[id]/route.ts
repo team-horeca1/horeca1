@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { OrderService } from '@/modules/order/order.service';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const orderService = new OrderService();
 
@@ -19,8 +20,8 @@ export const GET = withAuth(async (
     const segments = url.pathname.split('/');
     // URL: /api/v1/orders/{id} → the ID is second-to-last segment
     const orderId = segments[segments.length - 1];
-
-    const order = await orderService.getById(orderId, ctx.userId);
+    const ownerUserId = effectiveCustomerUserId(ctx);
+    const order = await orderService.getById(orderId, ownerUserId);
     return NextResponse.json({ success: true, data: order });
   } catch (error) {
     return errorResponse(error);
@@ -36,7 +37,7 @@ export const DELETE = withAuth(async (
     const segments = url.pathname.split('/');
     const orderId = segments[segments.length - 1];
 
-    const result = await orderService.delete(orderId, ctx.userId);
+    const result = await orderService.delete(orderId, effectiveCustomerUserId(ctx));
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
     return errorResponse(error);

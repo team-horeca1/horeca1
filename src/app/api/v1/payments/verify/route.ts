@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { PaymentService } from '@/modules/payment/payment.service';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const verifySchema = z.object({
   razorpay_order_id: z.string().min(1, 'razorpay_order_id is required'),
@@ -29,7 +30,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      ctx.userId,
+      effectiveCustomerUserId(ctx),
     );
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
