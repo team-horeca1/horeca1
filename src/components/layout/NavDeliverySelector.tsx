@@ -21,6 +21,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
     switchOutlet,
     switching,
     accessibleOutletIds,
+    customerImpersonating,
   } = useBusinessAccountSwitcher();
   const [accOpen, setAccOpen] = useState(false);
   const [outletOpen, setOutletOpen] = useState(false);
@@ -78,7 +79,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
   const accName = currentAccount.displayName ?? currentAccount.legalName;
   const outletName = currentOutlet.name;
   const needsAddress = currentOutlet.requiresAddressUpdate;
-  const showAccountSwitcher = accounts.length > 1;
+  const showAccountSwitcher = accounts.length > 1 && !customerImpersonating;
 
   const handleSwitchAccount = async (id: string) => {
     setPickingId(id);
@@ -132,7 +133,14 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
         {/* Outlet button — mobile */}
         <div className="relative">
           <button
-            onClick={() => { setOutletOpen(!outletOpen); setAccOpen(false); }}
+            onClick={() => {
+              if (customerImpersonating) {
+                onFallbackClick();
+                return;
+              }
+              setOutletOpen(!outletOpen);
+              setAccOpen(false);
+            }}
             className="flex items-center gap-1 px-2.5 py-1.5 border border-gray-100 rounded-full bg-[#F7F7F7] shadow-sm hover:bg-gray-100 transition-colors"
           >
             {needsAddress
@@ -141,7 +149,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
             <span className="text-[11px] font-bold text-gray-700 truncate max-w-[70px]">{currentOutlet.pincode ?? outletName}</span>
             <ChevronDown size={11} className="text-gray-400 shrink-0" />
           </button>
-          {outletOpen && (
+          {outletOpen && !customerImpersonating && (
             <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-xl z-[10500] w-[200px] p-1.5">
               <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">Select Outlet</p>
               {visibleOutlets.map((o) => (
@@ -222,7 +230,14 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
       {/* Outlet Switcher — desktop */}
       <div className="relative">
         <button
-          onClick={() => { setOutletOpen(!outletOpen); setAccOpen(false); }}
+          onClick={() => {
+            if (customerImpersonating) {
+              onFallbackClick();
+              return;
+            }
+            setOutletOpen(!outletOpen);
+            setAccOpen(false);
+          }}
           className="flex items-center gap-2 px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 hover:bg-gray-100 hover:border-gray-300 transition-all cursor-pointer"
         >
           {needsAddress
@@ -236,7 +251,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
           </div>
           <ChevronDown size={12} className="text-gray-400 shrink-0" />
         </button>
-        {outletOpen && (
+        {outletOpen && !customerImpersonating && (
           <div className="absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-xl shadow-2xl z-[10500] w-[240px] p-2">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">Select Outlet</p>
             {visibleOutlets.map((o) => (

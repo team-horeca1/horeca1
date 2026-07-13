@@ -27,9 +27,10 @@ import {
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
+import { clearAllAdminImpersonation, isAdminCustomerImpersonationActive } from '@/lib/clearImpersonation';
 import { ACCOUNTS_REFRESH_EVENT } from '@/lib/addressUsability';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { EditProfileOverlay } from './EditProfileOverlay';
@@ -92,6 +93,10 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
 
     const { data: session, update: updateSession } = useSession();
     const { has, hasAny } = usePermissions();
+    const {
+        activeBusinessAccountId: switcherAccountId,
+        customerImpersonating,
+    } = useBusinessAccountSwitcher();
 
     useEffect(() => {
         const openParam = searchParams?.get('open');
@@ -191,8 +196,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
 
     // One-shot role drift fix — separate from profile fetch so session.update()
     // doesn't re-trigger four API calls and hammer /api/auth/session (429).
+    // Skip while viewing as a customer: JWT stays admin by design while
+    // GET /auth/me returns the impersonated customer's role.
     useEffect(() => {
         if (!sessionUserId || !sessionRole) return;
+        if (isAdminCustomerImpersonationActive()) return;
 
         let cancelled = false;
         fetch('/api/v1/auth/me', { credentials: 'include' })
@@ -214,6 +222,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                     .finally(() => {
                         window.setTimeout(() => {
                             if (cancelled || hardReloadDoneRef.current) return;
+                            if (isAdminCustomerImpersonationActive()) return;
                             const reloadGuardKey = `horeca_role_reload_${sessionUserId}`;
                             try {
                                 if (sessionStorage.getItem(reloadGuardKey)) return;
@@ -223,6 +232,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 .then(r => r.ok ? r.json() : null)
                                 .then((latest) => {
                                     if (cancelled || hardReloadDoneRef.current) return;
+                                    if (isAdminCustomerImpersonationActive()) return;
                                     const freshDbRole = latest?.success ? latest.data?.role : null;
                                     if (freshDbRole && freshDbRole !== sessionRole) {
                                         hardReloadDoneRef.current = true;
@@ -266,7 +276,12 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         { id: 'orders', label: 'Your Orders', sub: 'Track & history', icon: ShoppingBag, onClick: () => router.push('/orders') },
     ];
 
-    const activeAccountIdForLinks = (session?.user as { activeBusinessAccountId?: string } | undefined)?.activeBusinessAccountId;
+    // Prefer switcher BA (impersonation-aware). Never fall back to the admin JWT
+    // BA while viewing as a customer — that was loading admin outlets.
+    const jwtAccountId = (session?.user as { activeBusinessAccountId?: string } | undefined)?.activeBusinessAccountId;
+    const activeAccountIdForLinks = customerImpersonating
+      ? (switcherAccountId ?? undefined)
+      : (switcherAccountId ?? jwtAccountId);
 
     const yourInfoItems = [
         { id: 'edit-profile', label: 'Edit Profile', desc: 'Update your personal details', icon: Pencil, onClick: () => setIsEditProfileOpen(true) },
@@ -310,7 +325,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const canSeeOverview = has('settings.view');
     const businessAccountItems = activeAccountIdForLinks ? [
         ...(canSeeOutlets ? [{ id: 'outlets', label: 'Outlets & Delivery', desc: 'Branches and where orders are delivered', icon: MapPin, onClick: () => setIsOutletsOpen(true) }] : []),
-        ...(canSeeTeam ? [{ id: 'team-members', label: 'Team Members', desc: 'Invite users, manage roles & access', icon: Users, onClick: () => router.push('/profile/team') }] : []),
+        ...(!customerImpersonating && canSeeTeam ? [{ id: 'team-members', label: 'Team Members', desc: 'Invite users, manage roles & access', icon: Users, onClick: () => router.push('/profile/team') }] : []),
         ...(canSeeOverview ? [{ id: 'account-overview', label: 'Account Overview', desc: 'GST, business type, members', icon: Building2, onClick: () => setIsOverviewOpen(true) }] : []),
     ] : [];
 

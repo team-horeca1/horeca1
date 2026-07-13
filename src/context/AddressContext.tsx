@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 import { toast } from 'sonner';
@@ -10,6 +10,11 @@ import {
     addressSavedKey,
     migrateLegacyKey,
 } from '@/lib/userScopedStorage';
+import {
+    isAdminCustomerImpersonationActive,
+    IMPERSONATION_CHANGED_EVENT,
+} from '@/lib/clearImpersonation';
+import { subscribeAuthTabEvents } from '@/lib/authTabSync';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -49,6 +54,10 @@ interface AddressContextType {
 
 const AddressContext = createContext<AddressContextType | undefined>(undefined);
 
+function pickDefaultAddress(addresses: Address[]): Address | null {
+    return addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
+}
+
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function AddressProvider({ children }: { children: React.ReactNode }) {
@@ -59,6 +68,8 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
     const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
     const [isDetectingLocation, setIsDetectingLocation] = useState(false);
     const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
+    const [customerImpersonating, setCustomerImpersonating] = useState(false);
+    const impersonatingRef = useRef(false);
 
     // ─── DB Sync Helpers ─────────────────────────────────────────────────
 
@@ -89,34 +100,68 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    // ─── Load addresses on mount / session change ────────────────────────
+    useEffect(() => {
+        const sync = () => {
+            const active = isAdminCustomerImpersonationActive();
+            impersonatingRef.current = active;
+            setCustomerImpersonating(active);
+        };
+        sync();
+        const onSameTab = () => sync();
+        window.addEventListener(IMPERSONATION_CHANGED_EVENT, onSameTab);
+        const unsub = subscribeAuthTabEvents((event) => {
+            if (event.type === 'impersonation-changed' || event.type === 'session-changed') {
+                sync();
+            }
+        });
+        return () => {
+            window.removeEventListener(IMPERSONATION_CHANGED_EVENT, onSameTab);
+            unsub();
+        };
+    }, []);
+
+    // ─── Load addresses on mount / session / impersonation change ────────
 
     useEffect(() => {
         if (status === 'loading') return;
         migrateLegacyKey('horeca1_selected_address', addressSelectedKey(null));
         migrateLegacyKey('horeca1_saved_addresses', addressSavedKey(null));
 
-        // Always load selected address from user-scoped localStorage (quick, no network)
-        try {
-            const savedSelected = localStorage.getItem(addressSelectedKey(userId));
-            if (savedSelected) {
-                Promise.resolve().then(() => setSelectedAddressState(JSON.parse(savedSelected)));
-            } else {
-                Promise.resolve().then(() => setSelectedAddressState(null));
-            }
-        } catch { /* ignore */ }
+        const impersonating = customerImpersonating || isAdminCustomerImpersonationActive();
+
+        // While viewing as a customer, never hydrate the admin's localStorage
+        // selection — it mixes with the customer address list from the API.
+        if (!impersonating) {
+            try {
+                const savedSelected = localStorage.getItem(addressSelectedKey(userId));
+                if (savedSelected) {
+                    Promise.resolve().then(() => setSelectedAddressState(JSON.parse(savedSelected)));
+                } else {
+                    Promise.resolve().then(() => setSelectedAddressState(null));
+                }
+            } catch { /* ignore */ }
+        } else {
+            Promise.resolve().then(() => setSelectedAddressState(null));
+        }
 
         if (status === 'authenticated') {
-            // Load saved addresses from DB
             Promise.resolve().then(() => setIsLoadingAddresses(true));
             fetchAddressesFromDB().then((addresses) => {
                 setSavedAddresses(addresses);
                 setIsLoadingAddresses(false);
-                // If we have a default address and no selected one, use it
-                const defaultAddr = addresses.find(a => a.isDefault);
+                const defaultAddr = pickDefaultAddress(addresses);
+                if (impersonating) {
+                    // Always align selection to the customer list (default/primary).
+                    if (defaultAddr) {
+                        setSelectedAddressState(defaultAddr);
+                    }
+                    return;
+                }
                 if (defaultAddr) {
                     setSelectedAddressState(prev => {
-                        if (!prev) {
+                        // Drop orphan selections that aren't in the fetched list.
+                        const prevStillValid = prev && addresses.some((a) => a.id === prev.id);
+                        if (!prev || !prevStillValid) {
                             try { localStorage.setItem(addressSelectedKey(userId), JSON.stringify(defaultAddr)); } catch { /* ignore */ }
                             return defaultAddr;
                         }
@@ -125,14 +170,13 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                 }
             });
         } else if (status === 'unauthenticated') {
-            // Fallback: load from guest-scoped localStorage
             try {
                 const savedList = localStorage.getItem(addressSavedKey(null));
                 if (savedList) Promise.resolve().then(() => setSavedAddresses(JSON.parse(savedList)));
                 else Promise.resolve().then(() => setSavedAddresses([]));
             } catch { /* ignore */ }
         }
-    }, [status, userId, fetchAddressesFromDB]);
+    }, [status, userId, fetchAddressesFromDB, customerImpersonating]);
 
     // ─── Sync the selected delivery address into a cookie ────────────────
     // The server reads `h1_addr` (a SavedAddress id) to drive location-based
@@ -154,12 +198,21 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
         if (status !== 'authenticated') return;
         const addresses = await fetchAddressesFromDB();
         setSavedAddresses(addresses);
+        if (impersonatingRef.current) {
+            const defaultAddr = pickDefaultAddress(addresses);
+            setSelectedAddressState((prev) => {
+                if (prev && addresses.some((a) => a.id === prev.id)) return prev;
+                return defaultAddr;
+            });
+        }
     }, [status, fetchAddressesFromDB]);
 
     // ─── setSelectedAddress ──────────────────────────────────────────────
 
     const setSelectedAddress = useCallback((address: Address | null) => {
         setSelectedAddressState(address);
+        // Don't overwrite the admin's localStorage selection while impersonating.
+        if (impersonatingRef.current) return;
         try {
             if (address) {
                 localStorage.setItem(addressSelectedKey(userId), JSON.stringify(address));
@@ -194,7 +247,11 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                     }),
                 });
                 if (!res.ok) {
-                    toast.error('Failed to save address');
+                    const json = await res.json().catch(() => ({}));
+                    toast.error(
+                        (json as { error?: { message?: string } }).error?.message
+                        ?? 'Failed to save address',
+                    );
                     return null;
                 }
                 const json = await res.json();
@@ -258,7 +315,9 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
         // If the removed address was selected, clear it
         setSelectedAddressState(prev => {
             if (prev?.id === id) {
-                try { localStorage.removeItem(addressSelectedKey(userId)); } catch { /* ignore */ }
+                if (!impersonatingRef.current) {
+                    try { localStorage.removeItem(addressSelectedKey(userId)); } catch { /* ignore */ }
+                }
                 return null;
             }
             return prev;

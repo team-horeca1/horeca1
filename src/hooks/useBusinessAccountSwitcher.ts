@@ -8,13 +8,15 @@ import { useWishlist } from '@/context/WishlistContext';
 import { clearForcePickerCookie, clearDismissFlag } from '@/lib/postLoginPicker';
 import { redirectIfPortalMismatch } from '@/lib/portalRouting';
 import { ACCOUNTS_REFRESH_EVENT } from '@/lib/addressUsability';
-import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
+import { clearAllAdminImpersonation, isAdminCustomerImpersonationActive, IMPERSONATION_CHANGED_EVENT } from '@/lib/clearImpersonation';
 import {
   broadcastAuthEvent,
+  subscribeAuthTabEvents,
   tryAcquireBootstrapLock,
   releaseBootstrapLock,
 } from '@/lib/authTabSync';
 import { clearUserClientStores } from '@/lib/userScopedStorage';
+import { toast } from 'sonner';
 
 /**
  * V2.2 — Multi-account + multi-outlet switcher hook.
@@ -63,6 +65,7 @@ export function useBusinessAccountSwitcher() {
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState(false);
+  const [customerImpersonating, setCustomerImpersonating] = useState(false);
   const legacyProvisionAttempted = useRef(false);
   const bootstrapAttempted = useRef(false);
 
@@ -77,6 +80,28 @@ export function useBusinessAccountSwitcher() {
     ? (u.accessibleOutletIds as string[])
     : [];
 
+  // Cookie-based detection (name cookie is readable; id cookies are httpOnly).
+  useEffect(() => {
+    const sync = () => setCustomerImpersonating(isAdminCustomerImpersonationActive());
+    sync();
+    const onSameTab = () => sync();
+    window.addEventListener(IMPERSONATION_CHANGED_EVENT, onSameTab);
+    const unsub = subscribeAuthTabEvents((event) => {
+      if (event.type === 'impersonation-changed' || event.type === 'session-changed') {
+        sync();
+      }
+    });
+    return () => {
+      window.removeEventListener(IMPERSONATION_CHANGED_EVENT, onSameTab);
+      unsub();
+    };
+  }, []);
+
+  // Re-check on navigation (start/exit redirect) and userId change.
+  useEffect(() => {
+    setCustomerImpersonating(isAdminCustomerImpersonationActive());
+  }, [userId, pathname]);
+
   const fetchAccounts = useCallback(async () => {
     try {
       const res = await fetch('/api/v1/account');
@@ -88,7 +113,7 @@ export function useBusinessAccountSwitcher() {
 
   useEffect(() => {
     if (userId) fetchAccounts();
-  }, [userId, fetchAccounts]);
+  }, [userId, fetchAccounts, customerImpersonating]);
 
   useEffect(() => {
     const onRefresh = () => { void fetchAccounts(); };
@@ -96,12 +121,26 @@ export function useBusinessAccountSwitcher() {
     return () => window.removeEventListener(ACCOUNTS_REFRESH_EVENT, onRefresh);
   }, [fetchAccounts]);
 
-  const currentAccount = accounts.find((a) => a.id === activeBusinessAccountId) ?? null;
-  const currentOutlet = currentAccount?.outlets.find((o) => o.id === activeOutletId) ?? null;
+  // During customer impersonation, JWT still has the admin's BA/outlet ids while
+  // /api/v1/account returns only the impersonated BA — match by API list instead.
+  const currentAccount = customerImpersonating
+    ? (accounts[0] ?? null)
+    : (accounts.find((a) => a.id === activeBusinessAccountId) ?? null);
+  const currentOutlet = customerImpersonating
+    ? (
+      currentAccount?.outlets.find((o) => o.id === currentAccount.primaryOutletId)
+      ?? currentAccount?.outlets[0]
+      ?? null
+    )
+    : (currentAccount?.outlets.find((o) => o.id === activeOutletId) ?? null);
 
   const switchAccount = useCallback(
     async (businessAccountId: string, outletId?: string) => {
       if (switching) return;
+      if (isAdminCustomerImpersonationActive()) {
+        toast.info('Exit Admin View before switching accounts');
+        return;
+      }
       if (businessAccountId === activeBusinessAccountId && !outletId) return;
       setSwitching(true);
       try {
@@ -148,6 +187,10 @@ export function useBusinessAccountSwitcher() {
   const switchOutlet = useCallback(
     async (outletId: string) => {
       if (switching || outletId === activeOutletId) return;
+      if (isAdminCustomerImpersonationActive()) {
+        toast.info('Exit Admin View before switching outlets');
+        return;
+      }
       setSwitching(true);
       try {
         try {
@@ -183,7 +226,10 @@ export function useBusinessAccountSwitcher() {
 
   // Bootstrap session when JWT is missing account/outlet but memberships exist.
   // Cross-tab lock prevents multiple tabs from racing switchAccount(primary).
+  // Skip entirely while viewing as a customer — bootstrap would clear
+  // impersonation cookies and rewrite the admin JWT.
   useEffect(() => {
+    if (customerImpersonating) return;
     if (!userId || loading || switching || accounts.length === 0) return;
     if (bootstrapAttempted.current) return;
 
@@ -213,6 +259,7 @@ export function useBusinessAccountSwitcher() {
       }
     }
   }, [
+    customerImpersonating,
     userId,
     loading,
     switching,
@@ -226,6 +273,7 @@ export function useBusinessAccountSwitcher() {
 
   // Legacy sessions: refresh JWT so server can provision BusinessAccount if missing.
   useEffect(() => {
+    if (customerImpersonating) return;
     if (!userId || loading || legacyProvisionAttempted.current) return;
     if (!activeBusinessAccountId && accounts.length === 0) {
       legacyProvisionAttempted.current = true;
@@ -234,7 +282,7 @@ export function useBusinessAccountSwitcher() {
         await fetchAccounts();
       })();
     }
-  }, [userId, loading, activeBusinessAccountId, accounts.length, update, fetchAccounts]);
+  }, [customerImpersonating, userId, loading, activeBusinessAccountId, accounts.length, update, fetchAccounts]);
 
   const handleSignOut = useCallback(async () => {
     clearCart();
@@ -256,11 +304,12 @@ export function useBusinessAccountSwitcher() {
     accounts,
     currentAccount,
     currentOutlet,
-    activeBusinessAccountId,
-    activeOutletId,
-    accessibleOutletIds,
+    activeBusinessAccountId: customerImpersonating ? (currentAccount?.id ?? null) : activeBusinessAccountId,
+    activeOutletId: customerImpersonating ? (currentOutlet?.id ?? null) : activeOutletId,
+    accessibleOutletIds: customerImpersonating ? [] : accessibleOutletIds,
     totalAccountCount,
     availableAccountsTruncated,
+    customerImpersonating,
     switchAccount,
     switchOutlet,
     refresh: fetchAccounts,

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import {
-    ArrowLeft, Search, MapPin, Home, Briefcase, Loader2,
+    ArrowLeft, Search, MapPin, Loader2,
     Navigation, X, Trash2, Store, Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -22,13 +22,6 @@ interface LocationSelectionOverlayProps {
     onClose: () => void;
 }
 
-const LABEL_ICONS: Record<string, React.FC<{ size?: number; className?: string }>> = {
-    Business: Store,
-    Home: Home,
-    Work: Briefcase,
-    Other: MapPin,
-};
-
 export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionOverlayProps) {
     const { isLoaded, loadError } = useGoogleMaps();
     const confirm = useConfirm();
@@ -44,7 +37,13 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
     } = useAddress();
 
     const { status } = useSession();
-    const { currentAccount, accounts, switchAccount, switchOutlet, refresh: refreshAccounts } = useBusinessAccountSwitcher();
+    const {
+        currentAccount,
+        accounts,
+        switchAccount,
+        switchOutlet,
+        refresh: refreshAccounts,
+    } = useBusinessAccountSwitcher();
 
     const [searchQuery, setSearchQuery] = useState('');
     const [isAddNewOpen, setIsAddNewOpen] = useState(false);
@@ -251,8 +250,14 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                             </h3>
                             <div className="space-y-3 mb-6">
                                 {savedAddresses.map((addr) => {
-                                    const Icon = LABEL_ICONS[addr.label] || MapPin;
                                     const isSelected = selectedAddress?.id === addr.id;
+                                    const title = addr.businessName
+                                        || addr.shortAddress
+                                        || addr.fullAddress.split(',').slice(0, 2).join(',')
+                                        || 'Delivery address';
+                                    const subtitle = addr.businessName
+                                        ? (addr.shortAddress || addr.fullAddress)
+                                        : addr.fullAddress;
 
                                     return (
                                         <div
@@ -269,26 +274,19 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                                                 'w-10 h-10 shrink-0 rounded-xl flex items-center justify-center',
                                                 isSelected ? 'bg-[#e9f9e9]' : 'bg-gray-50'
                                             )}>
-                                                <Icon size={20} className={isSelected ? 'text-[#33a852]' : 'text-gray-400'} />
+                                                <MapPin size={20} className={isSelected ? 'text-[#33a852]' : 'text-gray-400'} />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                {/* Business name shown prominently if present */}
-                                                {addr.businessName && (
-                                                    <p className="text-[14px] font-bold text-gray-800 truncate leading-tight">
-                                                        {addr.businessName}
+                                                <p className="text-[14px] font-bold text-gray-800 truncate leading-tight">
+                                                    {title}
+                                                </p>
+                                                {addr.flatInfo && (
+                                                    <p className="text-[11px] text-gray-400 truncate mt-0.5">
+                                                        {addr.flatInfo}
                                                     </p>
                                                 )}
-                                                <p className={cn(
-                                                    'font-semibold truncate',
-                                                    addr.businessName
-                                                        ? 'text-[11px] text-gray-400 mt-0.5'
-                                                        : 'text-[14px] text-gray-800'
-                                                )}>
-                                                    {addr.label}
-                                                    {addr.flatInfo ? ` · ${addr.flatInfo}` : ''}
-                                                </p>
                                                 <p className="text-[11px] text-gray-400 truncate mt-0.5">
-                                                    {addr.shortAddress || addr.fullAddress}
+                                                    {subtitle}
                                                     {addr.pincode ? ` — ${addr.pincode}` : ''}
                                                 </p>
                                             </div>
@@ -308,7 +306,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                                                         e.stopPropagation();
                                                         const ok = await confirm({
                                                             title: 'Remove address?',
-                                                            message: `This will permanently remove "${addr.label || addr.shortAddress}" from your delivery addresses.`,
+                                                            message: `This will permanently remove "${title}" from your delivery addresses.`,
                                                             confirmText: 'Remove',
                                                             tone: 'danger',
                                                         });

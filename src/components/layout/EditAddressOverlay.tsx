@@ -1,19 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, MapPin, Store, Home, Briefcase, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { X, MapPin, Loader2 } from 'lucide-react';
 import { useAddress, Address } from '@/context/AddressContext';
+import { AddressAutocomplete, type AddressPickPayload } from '@/components/ui/AddressAutocomplete';
 import { toast } from 'sonner';
-
-type LabelType = 'Business' | 'Home' | 'Work' | 'Other';
-
-const LABEL_OPTIONS: { label: LabelType; icon: React.ElementType }[] = [
-    { label: 'Business', icon: Store },
-    { label: 'Home', icon: Home },
-    { label: 'Work', icon: Briefcase },
-    { label: 'Other', icon: MapPin },
-];
 
 interface EditAddressOverlayProps {
     address: Address | null;
@@ -22,33 +13,73 @@ interface EditAddressOverlayProps {
 
 export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps) {
     const { updateAddress } = useAddress();
-    const [label, setLabel] = useState<LabelType>('Business');
     const [businessName, setBusinessName] = useState('');
     const [fullAddress, setFullAddress] = useState('');
+    const [shortAddress, setShortAddress] = useState('');
     const [flatInfo, setFlatInfo] = useState('');
     const [landmark, setLandmark] = useState('');
+    const [pincode, setPincode] = useState('');
+    const [city, setCity] = useState('');
+    const [state, setState] = useState('');
+    const [latitude, setLatitude] = useState<number | null>(null);
+    const [longitude, setLongitude] = useState<number | null>(null);
+    const [placeId, setPlaceId] = useState<string | undefined>(undefined);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (!address) return;
-        setLabel((address.label as LabelType) || 'Business');
         setBusinessName(address.businessName || '');
         setFullAddress(address.fullAddress || '');
+        setShortAddress(address.shortAddress || '');
         setFlatInfo(address.flatInfo || '');
         setLandmark(address.landmark || '');
+        setPincode(address.pincode || '');
+        setCity(address.city || '');
+        setState(address.state || '');
+        setLatitude(Number.isFinite(address.latitude) ? address.latitude : null);
+        setLongitude(Number.isFinite(address.longitude) ? address.longitude : null);
+        setPlaceId(address.placeId);
     }, [address]);
 
     if (!address) return null;
 
+    const handlePick = (place: AddressPickPayload) => {
+        setFullAddress(place.fullAddress);
+        setShortAddress(place.shortAddress);
+        setPincode(place.pincode);
+        setCity(place.city);
+        setState(place.state);
+        setLatitude(place.latitude);
+        setLongitude(place.longitude);
+        setPlaceId(place.placeId);
+        if (!businessName.trim() && place.businessName) {
+            setBusinessName(place.businessName);
+        }
+    };
+
+    const canSave = fullAddress.trim().length > 0
+        && !fullAddress.includes('Address pending');
+
     const handleSave = async () => {
+        if (!canSave) {
+            toast.error('Search and pick a real delivery address');
+            return;
+        }
         setIsSaving(true);
         try {
             await updateAddress(address.id, {
-                label,
-                businessName: businessName || undefined,
-                fullAddress: fullAddress || address.fullAddress,
-                flatInfo: flatInfo || undefined,
-                landmark: landmark || undefined,
+                businessName: businessName.trim() || undefined,
+                fullAddress: fullAddress.trim(),
+                shortAddress: shortAddress.trim() || fullAddress.trim().split(',').slice(0, 2).join(', '),
+                flatInfo: flatInfo.trim() || undefined,
+                landmark: landmark.trim() || undefined,
+                pincode: pincode.trim() || undefined,
+                city: city.trim() || undefined,
+                state: state.trim() || undefined,
+                ...(latitude !== null && longitude !== null
+                    ? { latitude, longitude }
+                    : {}),
+                ...(placeId ? { placeId } : {}),
             });
             toast.success('Address updated');
             onClose();
@@ -58,6 +89,8 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
             setIsSaving(false);
         }
     };
+
+    const isPlaceholder = fullAddress.includes('Address pending') || !fullAddress.trim();
 
     return (
         <>
@@ -78,26 +111,14 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
                     </div>
 
                     <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
-                        <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Label</label>
-                            <div className="grid grid-cols-4 gap-2">
-                                {LABEL_OPTIONS.map(({ label: l, icon: Icon }) => (
-                                    <button
-                                        key={l}
-                                        onClick={() => setLabel(l)}
-                                        className={cn(
-                                            'flex flex-col items-center gap-1 py-2.5 rounded-xl border-2 text-[11px] font-bold transition-all',
-                                            label === l
-                                                ? 'border-[#33a852] bg-green-50/50 text-[#33a852]'
-                                                : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                                        )}
-                                    >
-                                        <Icon size={15} />
-                                        {l}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                        <AddressAutocomplete
+                            label="Search address"
+                            placeholder="Search area, street, or business name…"
+                            businessMode
+                            hint="Pick a place from search — this sets the map pin, pincode, city and state."
+                            initialValue={isPlaceholder ? '' : fullAddress}
+                            onPick={handlePick}
+                        />
 
                         <div>
                             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
@@ -112,17 +133,27 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Address</label>
-                            <textarea
-                                value={fullAddress}
-                                onChange={(e) => setFullAddress(e.target.value)}
-                                rows={2}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-[#33a852] transition-colors resize-none"
-                            />
-                            {address.pincode && (
-                                <p className="text-[11px] text-gray-400 mt-1.5">Pincode: {address.pincode} · To change the map pin, remove this address and add a new one.</p>
-                            )}
+                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
+                                <MapPin size={16} className="text-[#33a852]" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[13px] font-bold text-gray-800 leading-tight">
+                                    {isPlaceholder
+                                        ? 'No location set yet'
+                                        : (shortAddress || fullAddress.split(',').slice(0, 2).join(','))}
+                                </p>
+                                <p className="text-[12px] text-gray-500 mt-0.5 line-clamp-2">
+                                    {isPlaceholder
+                                        ? 'Use search above to pick a delivery location'
+                                        : fullAddress}
+                                </p>
+                                {pincode && !isPlaceholder && (
+                                    <span className="inline-block mt-1.5 text-[11px] font-semibold text-[#33a852] bg-green-50 px-2 py-0.5 rounded-full">
+                                        {pincode}{city ? ` · ${city}` : ''}
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
                         <div>
@@ -159,7 +190,7 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
                         </button>
                         <button
                             onClick={handleSave}
-                            disabled={isSaving}
+                            disabled={isSaving || !canSave}
                             className="flex-1 h-[44px] bg-[#33a852] hover:bg-[#2d9548] disabled:opacity-70 text-white rounded-xl text-[13px] font-bold transition-colors flex items-center justify-center gap-2"
                         >
                             {isSaving && <Loader2 size={15} className="animate-spin" />}

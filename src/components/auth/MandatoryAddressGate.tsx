@@ -29,6 +29,7 @@ import {
   writeAddressGateSkipped,
   notifyAccountsRefresh,
 } from '@/lib/addressUsability';
+import { isAdminCustomerImpersonationActive } from '@/lib/clearImpersonation';
 
 // Auth screens + non-customer portals never get the gate.
 const EXCLUDED_PREFIXES = ['/login', '/register', '/admin', '/vendor', '/brand'];
@@ -71,7 +72,8 @@ export function MandatoryAddressGate() {
       isCustomerContext &&
       !onExcludedRoute &&
       !readForcePickerCookie() &&
-      !skipped;
+      !skipped &&
+      !isAdminCustomerImpersonationActive();
 
     if (!eligible) {
       Promise.resolve().then(() => setOpen(false));
