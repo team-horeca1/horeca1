@@ -16,6 +16,7 @@ import { StockTransferModal } from '@/components/features/vendor/StockTransferMo
 interface InventoryItem {
     id: string;
     productId: string;
+    outletId: string;
     qtyAvailable: number;
     qtyReserved: number;
     qtyInTransit: number;
@@ -32,6 +33,7 @@ interface InventoryItem {
         isActive: boolean;
         basePrice: number;
     };
+    outlet?: { id: string; name: string } | null;
 }
 
 type FilterTab = 'all' | 'low_stock' | 'out_of_stock';
@@ -296,7 +298,17 @@ function BulkUploadModal({
 
 // ─── Inline row component ─────────────────────────────────────────────────────
 
-function InventoryRow({ item, onSaved, outletId }: { item: InventoryItem; onSaved: (updated: Partial<InventoryItem> & { id: string }) => void; outletId?: string | null }) {
+function InventoryRow({
+    item,
+    onSaved,
+    outletId,
+    showWarehouse,
+}: {
+    item: InventoryItem;
+    onSaved: (updated: Partial<InventoryItem> & { id: string }) => void;
+    outletId?: string | null;
+    showWarehouse?: boolean;
+}) {
     const [qty, setQty] = useState(item.qtyAvailable);
     const [transit, setTransit] = useState(item.qtyInTransit);
     const [damaged, setDamaged] = useState(item.qtyDamaged);
@@ -409,6 +421,14 @@ function InventoryRow({ item, onSaved, outletId }: { item: InventoryItem; onSave
                 </div>
             </td>
 
+            {showWarehouse && (
+                <td className="px-5 py-3.5">
+                    <span className="text-[13px] font-semibold text-[#181725]">
+                        {item.outlet?.name ?? '—'}
+                    </span>
+                </td>
+            )}
+
             {/* Available — inline +/- */}
             <td className="px-5 py-3.5">
                 <div className="flex items-center gap-1 justify-center">
@@ -512,7 +532,17 @@ function InventoryRow({ item, onSaved, outletId }: { item: InventoryItem; onSave
     );
 }
 
-function InventoryMobileCard({ item, onSaved, outletId }: { item: InventoryItem; onSaved: (updated: Partial<InventoryItem> & { id: string }) => void; outletId?: string | null }) {
+function InventoryMobileCard({
+    item,
+    onSaved,
+    outletId,
+    showWarehouse,
+}: {
+    item: InventoryItem;
+    onSaved: (updated: Partial<InventoryItem> & { id: string }) => void;
+    outletId?: string | null;
+    showWarehouse?: boolean;
+}) {
     const [qty, setQty] = useState(item.qtyAvailable);
     const [saving, setSaving] = useState(false);
 
@@ -552,6 +582,9 @@ function InventoryMobileCard({ item, onSaved, outletId }: { item: InventoryItem;
                 <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-bold text-[#181725] leading-tight">{item.product.name}</p>
                     <p className="text-[11px] text-[#AEAEAE]">{item.product.sku ? `SKU ${item.product.sku}` : ''}</p>
+                    {showWarehouse && item.outlet?.name && (
+                        <p className="text-[11px] font-semibold text-[#1E40AF] mt-0.5">{item.outlet.name}</p>
+                    )}
                 </div>
                 <span className={cn('text-[12px] font-bold', net <= 0 ? 'text-[#E74C3C]' : 'text-[#181725]')}>Net {net}</span>
             </div>
@@ -726,11 +759,13 @@ export default function VendorInventoryPage() {
                             {outOfStockItems.slice(0, 12).map(i => (
                                 <span key={i.id} className="text-[11px] font-bold bg-red-100 text-[#E74C3C] px-2.5 py-1 rounded-[6px]">
                                     {i.product.name}
+                                    {viewAll && i.outlet?.name ? ` · ${i.outlet.name}` : ''}
                                 </span>
                             ))}
                             {lowStockItems.slice(0, 12).map(i => (
                                 <span key={i.id} className="text-[11px] font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-[6px]">
                                     {i.product.name}
+                                    {viewAll && i.outlet?.name ? ` · ${i.outlet.name}` : ''}
                                 </span>
                             ))}
                             {(outOfStockItems.length + lowStockItems.length) > 24 && (
@@ -803,7 +838,13 @@ export default function VendorInventoryPage() {
                     <>
                         <div className="md:hidden p-3 space-y-3">
                             {filtered.map((item) => (
-                                <InventoryMobileCard key={item.id} item={item} onSaved={handleRowSaved} outletId={multiWarehouseEnabled ? activeOutletId : null} />
+                                <InventoryMobileCard
+                                    key={item.id}
+                                    item={item}
+                                    onSaved={handleRowSaved}
+                                    outletId={multiWarehouseEnabled ? (item.outletId ?? item.outlet?.id ?? activeOutletId) : null}
+                                    showWarehouse={viewAll && multiWarehouseEnabled}
+                                />
                             ))}
                         </div>
                         <div className="hidden md:block overflow-x-auto">
@@ -811,6 +852,9 @@ export default function VendorInventoryPage() {
                             <thead>
                                 <tr className="bg-[#FAFAFA] border-b border-[#EEEEEE]">
                                     <th className="px-5 py-3 text-left text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">Product</th>
+                                    {viewAll && multiWarehouseEnabled && (
+                                        <th className="px-5 py-3 text-left text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">Warehouse</th>
+                                    )}
                                     <th className="px-5 py-3 text-center text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">Available</th>
                                     <th className="px-5 py-3 text-center text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">Reserved</th>
                                     <th className="px-5 py-3 text-center text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">In Transit</th>
@@ -823,7 +867,13 @@ export default function VendorInventoryPage() {
                             </thead>
                             <tbody className="divide-y divide-[#F5F5F5]">
                                 {filtered.map(item => (
-                                    <InventoryRow key={item.id} item={item} onSaved={handleRowSaved} outletId={multiWarehouseEnabled ? activeOutletId : null} />
+                                    <InventoryRow
+                                        key={item.id}
+                                        item={item}
+                                        onSaved={handleRowSaved}
+                                        outletId={multiWarehouseEnabled ? (item.outletId ?? item.outlet?.id ?? activeOutletId) : null}
+                                        showWarehouse={viewAll && multiWarehouseEnabled}
+                                    />
                                 ))}
                             </tbody>
                         </table>
@@ -833,7 +883,10 @@ export default function VendorInventoryPage() {
                 {!loading && filtered.length > 0 && (
                     <div className="px-5 py-3 border-t border-[#F5F5F5]">
                         <p className="text-[12px] text-[#AEAEAE]">
-                            Showing {filtered.length} of {items.length} product{items.length !== 1 ? 's' : ''}
+                            Showing {filtered.length} of {items.length}{' '}
+                            {viewAll && multiWarehouseEnabled
+                                ? `row${items.length !== 1 ? 's' : ''}`
+                                : `product${items.length !== 1 ? 's' : ''}`}
                         </p>
                     </div>
                 )}

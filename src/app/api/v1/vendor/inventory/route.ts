@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
-import { errorResponse } from '@/middleware/errorHandler';
+import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { InventoryService } from '@/modules/inventory/inventory.service';
 import { resolveVendorOutletContext, buildInventoryOutletWhere } from '@/lib/resolveVendorOutletContext';
 import { ensureInventoryRowsForOutlet } from '@/lib/inventoryOutlet';
@@ -15,6 +15,7 @@ import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
 const updateInventorySchema = z.object({
   productId: z.string().uuid(),
+  outletId: z.string().uuid().optional(),
   qtyAvailable: z.number().int().min(0).optional(),
   qtyInTransit: z.number().int().min(0).optional(),
   qtyDamaged: z.number().int().min(0).optional(),
@@ -75,14 +76,40 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     requirePermission(ctx, 'inventory.edit');
 
     const body = await req.json();
-    const { productId, qtyAvailable, qtyInTransit, qtyDamaged, qtyReturned, lowStockThreshold } =
-      updateInventorySchema.parse(body);
+    const {
+      productId,
+      outletId: bodyOutletId,
+      qtyAvailable,
+      qtyInTransit,
+      qtyDamaged,
+      qtyReturned,
+      lowStockThreshold,
+    } = updateInventorySchema.parse(body);
+
+    let targetOutletId = voc.outletId;
+    if (bodyOutletId) {
+      const belongsToVendor = await prisma.outlet.findFirst({
+        where: {
+          id: bodyOutletId,
+          businessAccountId: voc.businessAccountId,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+      if (!belongsToVendor) {
+        throw Errors.badRequest('Outlet not found for this vendor');
+      }
+      if (ctx.accessibleOutletIds.length > 0 && !ctx.accessibleOutletIds.includes(bodyOutletId)) {
+        throw Errors.forbidden('You do not have access to that outlet');
+      }
+      targetOutletId = bodyOutletId;
+    }
 
     const inventoryService = new InventoryService();
     const updated = await inventoryService.updateStock(
       productId,
       voc.vendorId,
-      voc.outletId,
+      targetOutletId,
       {
         ...(qtyAvailable !== undefined && { qtyAvailable }),
         ...(qtyInTransit !== undefined && { qtyInTransit }),
