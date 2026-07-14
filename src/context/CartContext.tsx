@@ -5,6 +5,11 @@ import { useSession } from 'next-auth/react';
 import type { VendorProduct, CartItem, VendorCartGroup, BulkPriceTier, VendorPromoSummary } from '@/types';
 import { dal } from '@/lib/dal';
 import { cartStorageKey, migrateLegacyKey } from '@/lib/userScopedStorage';
+import {
+    isAdminCustomerImpersonationActive,
+    IMPERSONATION_CHANGED_EVENT,
+} from '@/lib/clearImpersonation';
+import { subscribeAuthTabEvents } from '@/lib/authTabSync';
 
 // CartItem extended with API item ID (needed for PATCH/DELETE on server cart)
 interface CartItemWithId extends CartItem {
@@ -249,11 +254,30 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const [cart, setCart] = useState<CartItemWithId[]>([]);
     const [apiGroupMeta, setApiGroupMeta] = useState<Record<string, ApiGroupMeta>>({});
     const [isInitialized, setIsInitialized] = useState(false);
+    const [customerImpersonating, setCustomerImpersonating] = useState(false);
 
     const applyApiCart = useCallback((apiData: { vendorGroups: unknown[]; total: number }) => {
         const { items, groupMeta } = parseApiCart(apiData);
         setCart(items);
         setApiGroupMeta(groupMeta);
+    }, []);
+
+    // Admin View: JWT stays admin while cookies switch the API to the customer.
+    // Reload cart when impersonation starts/stops (same pattern as AddressContext).
+    useEffect(() => {
+        const sync = () => setCustomerImpersonating(isAdminCustomerImpersonationActive());
+        sync();
+        const onSameTab = () => sync();
+        window.addEventListener(IMPERSONATION_CHANGED_EVENT, onSameTab);
+        const unsub = subscribeAuthTabEvents((event) => {
+            if (event.type === 'impersonation-changed' || event.type === 'session-changed') {
+                sync();
+            }
+        });
+        return () => {
+            window.removeEventListener(IMPERSONATION_CHANGED_EVENT, onSameTab);
+            unsub();
+        };
     }, []);
 
     // On mount or context switch: load cart (API if logged in, localStorage if guest).
@@ -271,7 +295,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setIsInitialized(false);
         setCart([]); // Clear immediately on account/outlet/session change so UI doesn't flicker old data
         if (isLoggedIn) {
-            const guestItems = loadLocalCart(null);
+            // Never merge guest/admin local lines into an impersonated customer cart.
+            const guestItems = customerImpersonating ? [] : loadLocalCart(null);
             const mergePayload = guestItems
                 .map(it => ({
                     productId: it.productId,
@@ -301,7 +326,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                         isLoggedIn &&
                         (msg.toLowerCase().includes('delivery address') ||
                             msg.toLowerCase().includes('no active outlet'));
-                    if (noDelivery) {
+                    if (noDelivery || customerImpersonating) {
+                        // Impersonation must not fall back to the admin's local cart.
                         setCart([]);
                         return;
                     }
@@ -313,13 +339,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             setIsInitialized(true);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sessionStatus, userId, activeBAId, activeOutletId]);
+    }, [sessionStatus, userId, activeBAId, activeOutletId, customerImpersonating]);
 
-    // Persist to localStorage for both guest and logged-in users so guest session preserves it on logout
+    // Persist to localStorage for both guest and logged-in users so guest session preserves it on logout.
+    // Skip while Admin View is on — otherwise the customer's cart overwrites the admin mirror key.
     useEffect(() => {
-        if (!isInitialized) return;
+        if (!isInitialized || customerImpersonating) return;
         saveLocalCart(cart, isLoggedIn ? userId : null, activeBAId, activeOutletId);
-    }, [cart, isInitialized, isLoggedIn, userId]);
+    }, [cart, isInitialized, isLoggedIn, userId, activeBAId, activeOutletId, customerImpersonating]);
 
     const addToCart = useCallback((product: VendorProduct, quantity: number = 1) => {
         // Cap to fulfillment-aware stock when known (stock > 0). stock === 0 means OOS.
