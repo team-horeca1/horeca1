@@ -7,22 +7,22 @@ const FEATURES = [
     {
         icon: Truck,
         title: 'Free Shipping',
-        description: 'Free shipping all over the US'
+        description: 'Doorstep delivery on eligible bulk orders'
     },
     {
         icon: ThumbsUp,
         title: '100% Satisfaction',
-        description: 'Free shipping all over the US'
+        description: 'Quality checked produce from verified vendors'
     },
     {
         icon: ShieldCheck,
         title: 'Secure Payments',
-        description: 'Free shipping all over the US'
+        description: 'Razorpay checkout with invoice-ready GST bills'
     },
     {
         icon: Headphones,
         title: '24/7 Support',
-        description: 'Free shipping all over the US'
+        description: 'Help when you need it for orders and account'
     }
 ];
 

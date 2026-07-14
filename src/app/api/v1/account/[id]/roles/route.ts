@@ -9,15 +9,14 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
-import { assertAccountMember, assertAccountPermission } from '@/lib/accountAccess';
+import { assertCanMutateAccount } from '@/lib/accountAccess';
 import { sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import { filterRolesForDisplay } from '@/lib/teamRoleWrites';
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
     const id = extractAccountId(req);
-    await assertAccountMember(ctx.userId, id);
-    await assertAccountPermission(ctx.userId, id, 'users.view', ctx.activeOutletId);
+    await assertCanMutateAccount(ctx, id, 'users.view', ctx.activeOutletId);
     const includeTemplates = new URL(req.url).searchParams.get('templates') === 'true';
     const roles = await prisma.accountRole.findMany({
       where: includeTemplates
@@ -45,7 +44,7 @@ const CreateBody = z.object({
 export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
     const id = extractAccountId(req);
-    await assertAccountPermission(ctx.userId, id, 'users.create', ctx.activeOutletId);
+    await assertCanMutateAccount(ctx, id, 'users.create', ctx.activeOutletId);
     const body = CreateBody.parse(await req.json());
     const cleanedPerms = sanitizePermissionsForScope(body.permissions, body.scope);
     const created = await prisma.accountRole.create({

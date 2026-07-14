@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
-import { assertAccountPermission } from '@/lib/accountAccess';
+import { assertCanMutateAccount } from '@/lib/accountAccess';
 import { sanitizePermissionsForScope } from '@/lib/permissions/engine';
 import { markSessionStale } from '@/lib/sessionStale';
 
@@ -21,7 +21,7 @@ const PatchBody = z.object({
 export const PATCH = withAuth(async (req: NextRequest, ctx) => {
   try {
     const { id, roleId } = extractIds(req);
-    await assertAccountPermission(ctx.userId, id, 'users.edit', ctx.activeOutletId);
+    await assertCanMutateAccount(ctx, id, 'users.edit', ctx.activeOutletId);
     const role = await prisma.accountRole.findFirst({ where: { id: roleId, businessAccountId: id }, select: { id: true, isTemplate: true, scope: true } });
     if (!role) throw Errors.notFound('Role');
     if (role.isTemplate) throw Errors.badRequest('System templates cannot be edited; duplicate and customize instead');
@@ -47,7 +47,7 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
 export const DELETE = withAuth(async (req: NextRequest, ctx) => {
   try {
     const { id, roleId } = extractIds(req);
-    await assertAccountPermission(ctx.userId, id, 'users.delete', ctx.activeOutletId);
+    await assertCanMutateAccount(ctx, id, 'users.delete', ctx.activeOutletId);
     const role = await prisma.accountRole.findFirst({ where: { id: roleId, businessAccountId: id }, select: { id: true, isTemplate: true, _count: { select: { userRoles: true } } } });
     if (!role) throw Errors.notFound('Role');
     if (role.isTemplate) throw Errors.badRequest('System templates cannot be deleted');

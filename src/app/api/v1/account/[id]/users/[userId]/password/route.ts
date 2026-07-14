@@ -1,7 +1,7 @@
 // PATCH /api/v1/account/[id]/users/[userId]/password — reset a customer team member's password
 //
-// Requires the caller to hold `users.edit` on the target account (assertAccountPermission
-// will also check membership). The target user must be a member of the account.
+// Requires users.edit on the account, or admin impersonating that BA (assertCanMutateAccount).
+// The target user must be a member of the account.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -9,7 +9,7 @@ import bcrypt from 'bcryptjs';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
-import { assertAccountPermission } from '@/lib/accountAccess';
+import { assertCanMutateAccount } from '@/lib/accountAccess';
 
 const schema = z.object({
   password: z.string().min(6).max(72),
@@ -24,7 +24,7 @@ function extractIds(req: NextRequest) {
 export const PATCH = withAuth(async (req: NextRequest, ctx) => {
   try {
     const { id, userId } = extractIds(req);
-    await assertAccountPermission(ctx.userId, id, 'users.edit', ctx.activeOutletId);
+    await assertCanMutateAccount(ctx, id, 'users.edit', ctx.activeOutletId);
 
     // Caller must outrank — actually here we use a simpler check: the target must
     // be a member of this account (otherwise any account admin could reset any

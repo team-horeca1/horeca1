@@ -10,7 +10,7 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
-import { assertAccountPermission } from '@/lib/accountAccess';
+import { assertCanMutateAccount } from '@/lib/accountAccess';
 import { markSessionStale } from '@/lib/sessionStale';
 import { finalizeTeamMemberRemoval } from '@/lib/userHardDelete';
 
@@ -24,7 +24,7 @@ const PatchBody = z.object({
 export const PATCH = withAuth(async (req: NextRequest, ctx) => {
   try {
     const { id, userId } = extractIds(req);
-    await assertAccountPermission(ctx.userId, id, 'users.edit', ctx.activeOutletId);
+    await assertCanMutateAccount(ctx, id, 'users.edit', ctx.activeOutletId);
     const body = PatchBody.parse(await req.json());
 
     // Validate every role + outlet ref belongs to the account
@@ -62,7 +62,7 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
 export const DELETE = withAuth(async (req: NextRequest, ctx) => {
   try {
     const { id, userId } = extractIds(req);
-    await assertAccountPermission(ctx.userId, id, 'users.delete', ctx.activeOutletId);
+    await assertCanMutateAccount(ctx, id, 'users.delete', ctx.activeOutletId);
 
     // Don't remove the last Owner — would orphan the account.
     const ownerTemplate = await prisma.accountRole.findFirst({

@@ -10,7 +10,7 @@ import bcrypt from 'bcryptjs';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
-import { assertAccountMember, assertAccountPermission } from '@/lib/accountAccess';
+import { assertCanMutateAccount } from '@/lib/accountAccess';
 import { uniqueHcid } from '@/lib/hcid';
 import { phoneLookupVariants, normalizePhone } from '@/lib/phone';
 import { sendEmailInBackground } from '@/lib/providers/email';
@@ -24,8 +24,7 @@ import { runInBackground } from '@/lib/asyncBackground';
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
     const id = extractAccountId(req);
-    await assertAccountMember(ctx.userId, id);
-    await assertAccountPermission(ctx.userId, id, 'users.view', ctx.activeOutletId);
+    await assertCanMutateAccount(ctx, id, 'users.view', ctx.activeOutletId);
     // (V2.2 HCID model). In that case a single User on the account may hold both
     // 'account' (customer-side) UserRoles AND 'vendor' UserRoles. The customer
     // team page must surface ONLY the account-scope roles — otherwise vendor-
@@ -69,7 +68,7 @@ const InviteBody = z.object({
 export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
     const id = extractAccountId(req);
-    await assertAccountPermission(ctx.userId, id, 'users.create', ctx.activeOutletId);
+    await assertCanMutateAccount(ctx, id, 'users.create', ctx.activeOutletId);
     const body = InviteBody.parse(await req.json());
 
     // Resolve the role for this membership.
