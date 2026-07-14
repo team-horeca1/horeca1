@@ -32,7 +32,10 @@ import {
 import { ExistingPhoneModal } from '@/components/auth/ExistingPhoneModal';
 import { accountLabelFromCheck } from '@/lib/auth/phoneCheckLabels';
 import type { PhoneCheckResult } from '@/lib/auth/checkPhoneLookup';
-import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
+import {
+  isRegisterEmailOtpEnabled,
+  resolveRegisterVerifyChannel,
+} from '@/lib/config/registerEmailOtp';
 import { getEffectiveVendorTypeSelections } from '@/lib/validators/vendor-profile';
 
 const EMAIL_REGISTER_ALLOWED = isRegisterEmailOtpEnabled();
@@ -382,16 +385,22 @@ export default function VendorRegisterPage() {
 
   const handleSendOtp = async () => {
     setError('');
-    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
-    if (useEmail) {
-      if (!EMAIL_RE.test(registerEmail.trim())) {
-        setError('Enter a valid email address');
-        return;
-      }
-    } else if (!PHONE_RE.test(phone)) {
-      setError('Enter a valid 10-digit mobile number');
+    const email = registerEmail.trim().toLowerCase();
+    const channel = resolveRegisterVerifyChannel({
+      email,
+      phone,
+      preferred: verifyChannel,
+    });
+    if (!channel) {
+      setError(
+        EMAIL_REGISTER_ALLOWED
+          ? 'Enter a mobile number or email address'
+          : 'Enter a valid 10-digit mobile number',
+      );
       return;
     }
+    if (channel !== verifyChannel) setVerifyChannel(channel);
+    const useEmail = channel === 'email';
     setOtpLoading(true);
     try {
       if (!isAuthMode) {
@@ -399,11 +408,11 @@ export default function VendorRegisterPage() {
           const checkRes = await fetch('/api/v1/auth/check-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: registerEmail.trim().toLowerCase(), intent: 'vendor' }),
+            body: JSON.stringify({ email, intent: 'vendor' }),
           });
           const checkData = await checkRes.json();
           if (checkData.success && checkData.data?.exists) {
-            openExistingPhoneModal(registerEmail.trim().toLowerCase(), checkData.data as PhoneCheckResult, 'email');
+            openExistingPhoneModal(email, checkData.data as PhoneCheckResult, 'email');
             return;
           }
         } else {
@@ -425,14 +434,14 @@ export default function VendorRegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           useEmail
-            ? { email: registerEmail.trim().toLowerCase(), mode: 'register', intent: 'vendor' }
+            ? { email, mode: 'register', intent: 'vendor' }
             : { phone, mode: 'register', intent: 'vendor' },
         ),
       });
       const data = await res.json();
       if (!data.success) {
         if (data.code === 'EMAIL_EXISTS' && data.data) {
-          openExistingPhoneModal(registerEmail.trim().toLowerCase(), data.data as PhoneCheckResult, 'email');
+          openExistingPhoneModal(email, data.data as PhoneCheckResult, 'email');
           return;
         }
         setError(data.error || 'Failed to send OTP');
@@ -449,14 +458,20 @@ export default function VendorRegisterPage() {
     if (code.length !== 4) return;
     setError('');
     setOtpLoading(true);
-    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
+    const email = registerEmail.trim().toLowerCase();
+    const channel = resolveRegisterVerifyChannel({
+      email,
+      phone,
+      preferred: verifyChannel,
+    });
+    const useEmail = channel === 'email';
     try {
       const res = await fetch('/api/v1/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           useEmail
-            ? { email: registerEmail.trim().toLowerCase(), code }
+            ? { email, code }
             : { phone, code },
         ),
       });
@@ -468,10 +483,9 @@ export default function VendorRegisterPage() {
         return;
       }
       if (useEmail) {
-        const verified = registerEmail.trim().toLowerCase();
         setEmailVerified(true);
-        setEmail(verified);
-        setAuthorizedPersonEmail(verified);
+        setEmail(email);
+        setAuthorizedPersonEmail(email);
       } else {
         setPhoneVerified(true);
       }
@@ -1103,9 +1117,11 @@ export default function VendorRegisterPage() {
                   onClick={handleSendOtp}
                   disabled={
                     otpLoading
-                    || (verifyChannel === 'email'
-                      ? !EMAIL_RE.test(registerEmail.trim())
-                      : !PHONE_RE.test(phone))
+                    || !resolveRegisterVerifyChannel({
+                      email: registerEmail,
+                      phone,
+                      preferred: verifyChannel,
+                    })
                   }
                   className={cn(FORM.primaryBtn, 'mt-4 py-3 px-6')}>
                   {otpLoading && <Loader2 size={16} className="animate-spin" />} Send OTP
@@ -1114,7 +1130,11 @@ export default function VendorRegisterPage() {
                 <div className="mt-6">
                   <Field
                     label={
-                      verifyChannel === 'email'
+                      resolveRegisterVerifyChannel({
+                        email: registerEmail,
+                        phone,
+                        preferred: verifyChannel,
+                      }) === 'email'
                         ? `Enter the 4-digit OTP sent to ${registerEmail.trim().toLowerCase()}`
                         : `Enter the 4-digit OTP sent to +91 ${phone}`
                     }

@@ -25,7 +25,10 @@ import { ExistingPhoneModal } from '@/components/auth/ExistingPhoneModal';
 import { accountLabelFromCheck } from '@/lib/auth/phoneCheckLabels';
 import type { PhoneCheckResult } from '@/lib/auth/checkPhoneLookup';
 import { toast } from 'sonner';
-import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
+import {
+  isRegisterEmailOtpEnabled,
+  resolveRegisterVerifyChannel,
+} from '@/lib/config/registerEmailOtp';
 
 const EMAIL_REGISTER_ALLOWED = isRegisterEmailOtpEnabled();
 
@@ -34,8 +37,6 @@ const STEP_TITLES = [
   { id: 2, label: 'Brand Profile', icon: Building2 },
 ];
 
-const PHONE_RE = /^\d{10}$/;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESEND_COOLDOWN = 60;
 
 const BRAND_FIELD_ORDER = [
@@ -146,19 +147,23 @@ export default function BrandRegisterPage() {
   };
 
   const sendOtp = async () => {
-    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
-    if (useEmail) {
-      if (!EMAIL_RE.test(registerEmail.trim())) {
-        setError('Enter a valid email address');
-        return;
-      }
-    } else {
-      const digits = phone.replace(/\D/g, '').slice(-10);
-      if (!PHONE_RE.test(digits)) {
-        setError('Enter a valid 10-digit mobile number');
-        return;
-      }
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    const email = registerEmail.trim().toLowerCase();
+    const channel = resolveRegisterVerifyChannel({
+      email,
+      phone: digits,
+      preferred: verifyChannel,
+    });
+    if (!channel) {
+      setError(
+        EMAIL_REGISTER_ALLOWED
+          ? 'Enter a mobile number or email address'
+          : 'Enter a valid 10-digit mobile number',
+      );
+      return;
     }
+    if (channel !== verifyChannel) setVerifyChannel(channel);
+    const useEmail = channel === 'email';
     setOtpLoading(true);
     setError('');
     try {
@@ -167,15 +172,14 @@ export default function BrandRegisterPage() {
           const checkRes = await fetch('/api/v1/auth/check-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: registerEmail.trim().toLowerCase(), intent: 'brand' }),
+            body: JSON.stringify({ email, intent: 'brand' }),
           });
           const checkData = await checkRes.json();
           if (checkData.success && checkData.data?.exists) {
-            openExistingPhoneModal(registerEmail.trim().toLowerCase(), checkData.data as PhoneCheckResult, 'email');
+            openExistingPhoneModal(email, checkData.data as PhoneCheckResult, 'email');
             return;
           }
         } else {
-          const digits = phone.replace(/\D/g, '').slice(-10);
           const checkRes = await fetch('/api/v1/auth/check-phone', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -194,8 +198,8 @@ export default function BrandRegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           useEmail
-            ? { email: registerEmail.trim().toLowerCase(), mode: 'register', intent: 'brand' }
-            : { phone: phone.replace(/\D/g, '').slice(-10), mode: 'register', intent: 'brand' },
+            ? { email, mode: 'register', intent: 'brand' }
+            : { phone: digits, mode: 'register', intent: 'brand' },
         ),
       });
       const data = await res.json();
@@ -214,8 +218,14 @@ export default function BrandRegisterPage() {
   };
 
   const verifyOtp = async (code: string) => {
-    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
     const digits = phone.replace(/\D/g, '').slice(-10);
+    const email = registerEmail.trim().toLowerCase();
+    const channel = resolveRegisterVerifyChannel({
+      email,
+      phone: digits,
+      preferred: verifyChannel,
+    });
+    const useEmail = channel === 'email';
     setOtpLoading(true);
     setError('');
     try {
@@ -224,7 +234,7 @@ export default function BrandRegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           useEmail
-            ? { email: registerEmail.trim().toLowerCase(), code }
+            ? { email, code }
             : { phone: digits, code },
         ),
       });
@@ -237,8 +247,7 @@ export default function BrandRegisterPage() {
       }
       if (useEmail) {
         setEmailVerified(true);
-        const verified = registerEmail.trim().toLowerCase();
-        setProfile(prev => ({ ...prev, email: verified }));
+        setProfile(prev => ({ ...prev, email }));
       } else {
         setPhoneVerified(true);
         setProfile(prev => ({ ...prev, phone: digits, mobilePhone: digits }));

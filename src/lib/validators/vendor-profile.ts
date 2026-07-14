@@ -208,7 +208,7 @@ export function contactChannelErrors(
       errors.authorizedPersonPhone = 'Enter a mobile number or email address';
       errors.email = 'Enter a mobile number or email address';
     } else {
-      if (authPhone && authPhone.length !== 10) {
+      if (!hasEmail && authPhone && authPhone.length !== 10) {
         errors.authorizedPersonPhone = 'Enter a valid 10-digit mobile number';
       }
       if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';

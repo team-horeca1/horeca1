@@ -24,10 +24,12 @@ import {
   derivedFullName,
   derivedLegalName,
 } from '@/lib/validators/customer-profile';
-import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
+import {
+  isRegisterEmailOtpEnabled,
+  resolveRegisterVerifyChannel,
+} from '@/lib/config/registerEmailOtp';
 
 const RESEND_COOLDOWN = 60;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_REGISTER_ALLOWED = isRegisterEmailOtpEnabled();
 
 type Step = 'form' | 'otp' | 'success';
@@ -126,16 +128,17 @@ export default function RegisterPageInner() {
 
     const phone = (profile.phone ?? profile.mobilePhone ?? '').replace(/\D/g, '').slice(-10);
     const email = (profile.email ?? '').trim().toLowerCase();
-    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
-
-    if (useEmail && !EMAIL_RE.test(email)) {
-      setApiError('Enter a valid email address');
+    const channel = resolveRegisterVerifyChannel({
+      email,
+      phone,
+      preferred: verifyChannel,
+    });
+    if (!channel) {
+      setApiError('Enter a mobile number or email address');
       return;
     }
-    if (!useEmail && phone.length !== 10) {
-      setApiError('Enter a valid 10-digit mobile number');
-      return;
-    }
+    if (channel !== verifyChannel) setVerifyChannel(channel);
+    const useEmail = channel === 'email';
 
     setIsLoading(true);
     try {
@@ -201,7 +204,12 @@ export default function RegisterPageInner() {
     setApiError('');
     const phone = (profile.phone ?? profile.mobilePhone ?? '').replace(/\D/g, '').slice(-10);
     const email = (profile.email ?? '').trim().toLowerCase();
-    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
+    const channel = resolveRegisterVerifyChannel({
+      email,
+      phone,
+      preferred: verifyChannel,
+    });
+    const useEmail = channel === 'email';
     const fullName = derivedFullName(profile);
     const businessName = derivedLegalName(profile);
 
@@ -306,7 +314,11 @@ export default function RegisterPageInner() {
   if (step === 'otp') {
     const phone = (profile.phone ?? profile.mobilePhone ?? '').replace(/\D/g, '').slice(-10);
     const email = (profile.email ?? '').trim().toLowerCase();
-    const useEmail = EMAIL_REGISTER_ALLOWED && verifyChannel === 'email';
+    const useEmail = resolveRegisterVerifyChannel({
+      email,
+      phone,
+      preferred: verifyChannel,
+    }) === 'email';
     return (
       <CenteredCard>
         <div className="p-6 sm:p-8">

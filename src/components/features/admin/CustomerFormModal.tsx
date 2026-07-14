@@ -105,14 +105,19 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
       });
       return;
     }
-    if (mode === 'create' && (!primaryPhone || primaryPhone.length !== 10)) {
-      const errs = { phone: 'Enter a valid 10-digit mobile or work phone' };
-      setTab('overview');
-      applyValidationErrors(errs, 'Enter a valid 10-digit mobile or work phone', {
-        fieldOrder: CUSTOMER_FIELD_ORDER,
-        dataField: true,
-      });
-      return;
+    if (mode === 'create') {
+      const email = (profile.email ?? '').trim();
+      const hasEmail = !!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const hasPhone = !!primaryPhone && primaryPhone.length === 10;
+      if (!hasPhone && !hasEmail) {
+        const errs = { phone: 'Enter a mobile number or email address', email: 'Enter a mobile number or email address' };
+        setTab('overview');
+        applyValidationErrors(errs, 'Enter a mobile number or email address', {
+          fieldOrder: CUSTOMER_FIELD_ORDER,
+          dataField: true,
+        });
+        return;
+      }
     }
 
     setSubmitting(true);

@@ -271,17 +271,26 @@ export const POST = withRateLimit(adminOnly(async (req: NextRequest, ctx) => {
     const role: Role = body.role === 'vendor' ? 'vendor' : 'customer';
 
     if (!fullName) throw Errors.badRequest('Full name is required');
-    if (!/^\d{10}$/.test(phone)) throw Errors.badRequest('Enter a valid 10-digit phone number');
+    const hasPhone = /^\d{10}$/.test(phone);
+    if (!hasPhone && !email) {
+      throw Errors.badRequest('Enter a mobile number or email address');
+    }
+    if (phone && !hasPhone) throw Errors.badRequest('Enter a valid 10-digit phone number');
     if (rawEmail && !email) throw Errors.badRequest('Enter a valid email address');
+    if (!hasPhone && email && (!password || password.length < 6)) {
+      throw Errors.badRequest('Password is required when creating with email only');
+    }
     if (password && password.length < 6) throw Errors.badRequest('Password must be at least 6 characters');
 
     // Uniqueness checks — match all legacy phone representations.
-    const phoneTaken = await prisma.user.findFirst({ where: { phone: { in: phoneLookupVariants(phone) } }, select: { id: true } });
-    if (phoneTaken) {
-      throw Errors.fieldError(
-        'phone',
-        'This mobile number is already registered. Search for the existing customer instead.',
-      );
+    if (hasPhone) {
+      const phoneTaken = await prisma.user.findFirst({ where: { phone: { in: phoneLookupVariants(phone) } }, select: { id: true } });
+      if (phoneTaken) {
+        throw Errors.fieldError(
+          'phone',
+          'This mobile number is already registered. Search for the existing customer instead.',
+        );
+      }
     }
 
     if (email) {
@@ -300,7 +309,7 @@ export const POST = withRateLimit(adminOnly(async (req: NextRequest, ctx) => {
     const user = await prisma.user.create({
       data: {
         fullName,
-        phone,
+        phone: hasPhone ? phone : null,
         email,
         businessName,
         gstNumber,

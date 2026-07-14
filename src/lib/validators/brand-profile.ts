@@ -164,7 +164,9 @@ export function validateBrandProfile(
         errors.phone = 'Enter a mobile number or email address';
         errors.email = 'Enter a mobile number or email address';
       } else {
-        if (phone && phone.length !== 10) errors.phone = 'Enter a valid 10-digit mobile number';
+        if (!hasEmail && phone && phone.length !== 10) {
+          errors.phone = 'Enter a valid 10-digit mobile number';
+        }
         if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
         if (!hasPhone && hasEmail && (!password || password.length < 6)) {
           errors.password = 'Password is required when registering with email only';
