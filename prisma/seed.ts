@@ -266,26 +266,77 @@ async function main() {
       where: { email: v.email }, update: {},
       create: { email: v.email, password: vendorPw, fullName: v.owner, phone: v.phone, role: 'vendor', pincode: SERVICE_PINCODES[0], businessName: v.name, emailVerified: new Date(), hcidDisplay: await uniqueHcid() },
     });
-    let vendor = await prisma.vendor.findFirst({ where: { userId: user.id }, select: { id: true } });
+    let vendor = await prisma.vendor.findFirst({
+      where: { userId: user.id },
+      select: { id: true, businessAccountId: true },
+    });
+    let outletId: string | null = null;
     if (!vendor) {
       const ba = await prisma.businessAccount.create({ data: { legalName: v.name, displayName: v.name, isVendor: true, isCustomer: false, status: 'active' } });
       await prisma.businessAccountMember.create({ data: { userId: user.id, businessAccountId: ba.id, isPrimary: true } });
+      const outlet = await prisma.outlet.create({
+        data: {
+          businessAccountId: ba.id,
+          name: `${v.name} Primary`,
+          addressLine: `${v.city}, Maharashtra`,
+          city: v.city,
+          state: 'Maharashtra',
+          pincode: SERVICE_PINCODES[0],
+          isActive: true,
+        },
+      });
+      await prisma.businessAccount.update({ where: { id: ba.id }, data: { primaryOutletId: outlet.id } });
+      outletId = outlet.id;
       vendor = await prisma.vendor.create({
-        data: { userId: user.id, businessAccountId: ba.id, businessName: v.name, slug: v.slug, description: `${v.name} — bulk supplies for HoReCa businesses across Mumbai & Navi Mumbai.`, logoUrl: VENDOR_LOGOS[vi % VENDOR_LOGOS.length], rating: v.rating, minOrderValue: v.mov, creditEnabled: v.credit, isVerified: true, isActive: true, pickupCity: v.city, pickupState: 'Maharashtra' },
-        select: { id: true },
+        data: { userId: user.id, businessAccountId: ba.id, businessName: v.name, slug: v.slug, description: `${v.name} — bulk supplies for HoReCa businesses across Mumbai & Navi Mumbai.`, logoUrl: VENDOR_LOGOS[vi % VENDOR_LOGOS.length], rating: v.rating, minOrderValue: v.mov, creditEnabled: v.credit, isVerified: true, isActive: true, pickupCity: v.city, pickupState: 'Maharashtra', multiWarehouseEnabled: true },
+        select: { id: true, businessAccountId: true },
       });
     } else {
       await prisma.vendor.update({ where: { id: vendor.id }, data: { logoUrl: VENDOR_LOGOS[vi % VENDOR_LOGOS.length], isActive: true } });
+      const existingOutlet = await prisma.outlet.findFirst({
+        where: { businessAccountId: vendor.businessAccountId },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      outletId = existingOutlet?.id ?? null;
+      if (!outletId) {
+        const outlet = await prisma.outlet.create({
+          data: {
+            businessAccountId: vendor.businessAccountId,
+            name: `${v.name} Primary`,
+            addressLine: `${v.city}, Maharashtra`,
+            city: v.city,
+            state: 'Maharashtra',
+            pincode: SERVICE_PINCODES[0],
+            isActive: true,
+          },
+        });
+        await prisma.businessAccount.update({ where: { id: vendor.businessAccountId }, data: { primaryOutletId: outlet.id } });
+        outletId = outlet.id;
+      }
     }
     vendorIds.push(vendor.id);
+    if (!outletId) throw new Error(`No outlet for vendor ${v.name}`);
 
-    // Service areas (broad) + delivery slots
+    // Service areas + delivery slots (scoped to primary outlet)
     for (const pin of SERVICE_PINCODES) {
-      await prisma.serviceArea.upsert({ where: { vendorId_pincode: { vendorId: vendor.id, pincode: pin } }, update: {}, create: { vendorId: vendor.id, pincode: pin } });
+      await prisma.serviceArea.upsert({
+        where: { vendorId_outletId_pincode: { vendorId: vendor.id, outletId, pincode: pin } },
+        update: { isActive: true },
+        create: { vendorId: vendor.id, outletId, pincode: pin },
+      });
     }
     for (let day = 1; day <= 6; day++) {
-      await prisma.deliverySlot.upsert({ where: { vendorId_dayOfWeek_slotStart: { vendorId: vendor.id, dayOfWeek: day, slotStart: '06:00' } }, update: {}, create: { vendorId: vendor.id, dayOfWeek: day, slotStart: '06:00', slotEnd: '10:00', cutoffTime: '22:00' } });
-      await prisma.deliverySlot.upsert({ where: { vendorId_dayOfWeek_slotStart: { vendorId: vendor.id, dayOfWeek: day, slotStart: '14:00' } }, update: {}, create: { vendorId: vendor.id, dayOfWeek: day, slotStart: '14:00', slotEnd: '18:00', cutoffTime: '10:00' } });
+      await prisma.deliverySlot.upsert({
+        where: { vendorId_outletId_dayOfWeek_slotStart: { vendorId: vendor.id, outletId, dayOfWeek: day, slotStart: '06:00' } },
+        update: { isActive: true },
+        create: { vendorId: vendor.id, outletId, dayOfWeek: day, slotStart: '06:00', slotEnd: '10:00', cutoffTime: '22:00' },
+      });
+      await prisma.deliverySlot.upsert({
+        where: { vendorId_outletId_dayOfWeek_slotStart: { vendorId: vendor.id, outletId, dayOfWeek: day, slotStart: '14:00' } },
+        update: { isActive: true },
+        create: { vendorId: vendor.id, outletId, dayOfWeek: day, slotStart: '14:00', slotEnd: '18:00', cutoffTime: '10:00' },
+      });
     }
 
     // Products → each maps to a sub-category + a Horeca1 master SKU + valid local image
@@ -304,7 +355,11 @@ async function main() {
       await prisma.priceSlab.upsert({ where: { productId_minQty: { productId: product.id, minQty: 1 } }, update: {}, create: { productId: product.id, vendorId: vendor.id, minQty: 1, maxQty: 9, price, sortOrder: 0 } });
       await prisma.priceSlab.upsert({ where: { productId_minQty: { productId: product.id, minQty: 10 } }, update: {}, create: { productId: product.id, vendorId: vendor.id, minQty: 10, maxQty: 49, price: Math.round(price * 0.95), sortOrder: 1 } });
       await prisma.priceSlab.upsert({ where: { productId_minQty: { productId: product.id, minQty: 50 } }, update: {}, create: { productId: product.id, vendorId: vendor.id, minQty: 50, maxQty: null, price: Math.round(price * 0.9), sortOrder: 2 } });
-      await prisma.inventory.upsert({ where: { productId: product.id }, update: {}, create: { productId: product.id, vendorId: vendor.id, qtyAvailable: stock, lowStockThreshold: Math.max(10, Math.round(stock * 0.1)) } });
+      await prisma.inventory.upsert({
+        where: { productId_outletId: { productId: product.id, outletId } },
+        update: { qtyAvailable: stock },
+        create: { productId: product.id, vendorId: vendor.id, outletId, qtyAvailable: stock, lowStockThreshold: Math.max(10, Math.round(stock * 0.1)) },
+      });
       totalProducts++;
     }
     console.log(`  Vendor: ${v.name} (${v.items.length} products)`);
