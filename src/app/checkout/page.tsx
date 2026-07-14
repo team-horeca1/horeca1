@@ -492,15 +492,29 @@ function CheckoutPageContent() {
         () => activeGroups.filter(g => !excludedVendorIds.has(g.vendorId) && g.meetsMinOrder),
         [activeGroups, excludedVendorIds]
     );
+    /** Included vendors regardless of MOV — for cart totals when payment is still locked. */
+    const includedGroups = useMemo(
+        () => activeGroups.filter(g => !excludedVendorIds.has(g.vendorId)),
+        [activeGroups, excludedVendorIds]
+    );
     const selectedTotal = useMemo(
         () => selectedGroups.reduce((sum, g) => sum + g.subtotal, 0),
         [selectedGroups]
+    );
+    const includedTotal = useMemo(
+        () => includedGroups.reduce((sum, g) => sum + g.subtotal, 0),
+        [includedGroups]
     );
     const selectedItemCount = useMemo(
         () => selectedGroups.reduce((sum, g) => sum + g.items.reduce((a: number, i: CartItem) => a + i.quantity, 0), 0),
         [selectedGroups]
     );
+    const includedItemCount = useMemo(
+        () => includedGroups.reduce((sum, g) => sum + g.items.reduce((a: number, i: CartItem) => a + i.quantity, 0), 0),
+        [includedGroups]
+    );
     const selectedVendorCount = selectedGroups.length;
+    const paymentLockedByMov = selectedGroups.length === 0 && includedGroups.some(g => !g.meetsMinOrder);
 
     const availablePaymentOptions = useMemo(() => {
         const vendorIds = selectedGroups.map((g) => g.vendorId);
@@ -707,10 +721,15 @@ function CheckoutPageContent() {
     // server: subtotal → vendor promo → coupon → wallet. Use the server-priced
     // subtotal (from the preview) once loaded so the line, discounts and total
     // all match what the order charges; fall back to the client cart total.
-    const summarySubtotal = previewSubtotal != null ? previewSubtotal : selectedTotal;
-    const promoDiscountEst = Math.min(autoPromoDiscount, summarySubtotal);
-    const afterPromo = Math.max(0, summarySubtotal - promoDiscountEst);
-    const couponDiscountEst = appliedCoupon ? Math.min(appliedCoupon.estimatedDiscount, afterPromo) : 0;
+    // When MOV blocks every vendor, still show cart line totals (not ₹0 / 0 items).
+    const summarySubtotal = selectedGroups.length > 0
+        ? (previewSubtotal != null ? previewSubtotal : selectedTotal)
+        : includedTotal;
+    const promoDiscountEst = selectedGroups.length > 0 ? Math.min(autoPromoDiscount, summarySubtotal) : 0;
+    const afterPromo = selectedGroups.length > 0 ? Math.max(0, summarySubtotal - promoDiscountEst) : 0;
+    const couponDiscountEst = selectedGroups.length > 0 && appliedCoupon
+        ? Math.min(appliedCoupon.estimatedDiscount, afterPromo)
+        : 0;
     const payableAfterCoupon = Math.max(0, afterPromo - couponDiscountEst);
     // Online payments keep a ₹1 floor (Razorpay can't charge ₹0) — mirrors the server rule.
     const walletUseEst = useRewardsWallet
@@ -723,9 +742,16 @@ function CheckoutPageContent() {
         [selectedGroups],
     );
     const freeItemCount = useMemo(
-        () => bxgyFreeItems.reduce((sum, item) => sum + item.quantity, 0),
-        [bxgyFreeItems],
+        () => (selectedGroups.length > 0 ? bxgyFreeItems.reduce((sum, item) => sum + item.quantity, 0) : 0),
+        [bxgyFreeItems, selectedGroups.length],
     );
+    const checkoutCaption = paymentLockedByMov
+        ? `Cart ₹${includedTotal.toLocaleString('en-IN')} · ${includedItemCount} item${includedItemCount !== 1 ? 's' : ''} — meet vendor minimums to pay`
+        : promoTotalCaption({
+            paidItemCount: paidItemCount || includedItemCount,
+            freeItemCount,
+            totalPay: estimatedPayable || afterPromo,
+        });
     const freeItemsValue = useMemo(
         () => bxgyFreeItems.reduce((sum, item) => {
             const cartItem = selectedGroups.flatMap((g) => g.items).find((c) => c.productId === item.productId);
@@ -1190,8 +1216,8 @@ function CheckoutPageContent() {
                                 </div>
                             </div>
                             <p className="text-[11px] text-gray-400 mt-2">
-                                {promoTotalCaption({ paidItemCount, freeItemCount, totalPay: afterPromo })}
-                                {(promoDiscountEst > 0 || bxgyFreeItems.length > 0) ? ' · promotions applied' : ''}
+                                {checkoutCaption}
+                                {!paymentLockedByMov && (promoDiscountEst > 0 || bxgyFreeItems.length > 0) ? ' · promotions applied' : ''}
                             </p>
                         </div>
 
@@ -1585,8 +1611,8 @@ function CheckoutPageContent() {
                                         <span className="text-[22px] font-black text-[#53B175]">₹{estimatedPayable.toLocaleString('en-IN')}</span>
                                     </div>
                                     <p className="text-[10px] text-gray-400 leading-normal">
-                                        {promoTotalCaption({ paidItemCount, freeItemCount, totalPay: estimatedPayable })}
-                                        {(promoDiscountEst > 0 || couponDiscountEst > 0 || walletUseEst > 0) ? ' Discounts shown are estimates — exact amounts are confirmed at order placement.' : ''}
+                                        {checkoutCaption}
+                                        {!paymentLockedByMov && (promoDiscountEst > 0 || couponDiscountEst > 0 || walletUseEst > 0) ? ' Discounts shown are estimates — exact amounts are confirmed at order placement.' : ''}
                                     </p>
                                 </div>
                             </div>
