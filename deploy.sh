@@ -87,7 +87,7 @@ if ! migrate; then
 fi
 
 echo "==> Restart app + worker + nginx"
-"${COMPOSE[@]}" up -d app worker
+"${COMPOSE[@]}" up -d --force-recreate app worker
 "${COMPOSE[@]}" restart nginx
 
 echo "==> Health check"
