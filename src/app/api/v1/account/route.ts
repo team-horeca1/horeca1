@@ -320,7 +320,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
           await tx.serviceArea.createMany({
             data: unique.map((pincode) => ({
               vendorId: vendor.id,
-              outletId: null,
+              outletId: outlet.id,
               pincode,
               isActive: true,
             })),

@@ -362,7 +362,7 @@ async function postHandler(req: NextRequest) {
         await tx.serviceArea.createMany({
           data: uniquePincodes.map((pincode) => ({
             vendorId: vendor.id,
-            outletId: null,
+            outletId: outlet.id,
             pincode,
             isActive: true,
           })),

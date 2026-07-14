@@ -48,17 +48,29 @@ export function friendlyErrorMessage(error: unknown, fallback = 'Something went 
     }
     if (code === 'P2003') {
       // P2003 is ANY foreign-key failure — create/update with a missing parent
-      // OR delete blocked by dependents. The old "Cannot delete…" copy was wrong
-      // for signup/create paths and confused applicants on vendor onboarding.
+      // OR delete blocked by dependents. Do NOT treat "Restrict" in the engine
+      // dump as a delete — that misled vendor onboarding applicants with
+      // "Cannot delete…" on Submit Application.
       const field = (error as { meta?: { field_name?: string } }).meta?.field_name;
-      const msg = error instanceof Error ? error.message : '';
-      console.error('[API Error] P2003 foreign key constraint', field ?? error);
+      const rawMessage = (error as { message?: unknown }).message;
+      const msg =
+        typeof rawMessage === 'string'
+          ? rawMessage
+          : error instanceof Error
+            ? error.message
+            : '';
+      console.error('[API Error] P2003 foreign key constraint', { field, msg: msg.slice(0, 400) });
       const looksLikeDelete =
-        /\bdelete\b/i.test(msg) || /\bon delete\b/i.test(msg) || /\brestrict\b/i.test(msg);
+        /\b(delete|deleted|deleting)\b/i.test(msg)
+        && !/\b(create|insert|update)\b/i.test(msg);
       if (looksLikeDelete) {
-        return 'Cannot delete — related records still exist. Contact support if this persists.';
+        return field
+          ? `Cannot delete — related records still exist (${field}). Contact support if this persists.`
+          : 'Cannot delete — related records still exist. Contact support if this persists.';
       }
-      return 'Could not save — a related record is missing or invalid. Please try again, or contact support if this persists.';
+      return field
+        ? `Could not save — related data is missing or invalid (${field}). Please try again, or contact support if this persists.`
+        : 'Could not save — related data is missing or invalid. Please try again, or contact support if this persists.';
     }
     if (code === 'P2028') {
       console.error('[API Error] P2028 transaction timeout', error);
