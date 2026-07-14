@@ -67,7 +67,9 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       path: '/',
       maxAge: COOKIE_MAX_AGE,
     });
-    res.cookies.set(CUSTOMER_NAME_COOKIE, encodeURIComponent(displayName), {
+    // Store raw display name (same as vendor/brand name cookies). Encoding here
+    // double-encodes when browsers/%-decode document.cookie readers once.
+    res.cookies.set(CUSTOMER_NAME_COOKIE, displayName, {
       httpOnly: false,
       secure: IS_PROD,
       sameSite: 'lax',

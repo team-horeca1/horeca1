@@ -19,12 +19,24 @@ export function readCustomerImpersonationFromRequest(
 ): CustomerImpersonation | null {
   const userId = req.cookies.get(CUSTOMER_USER_COOKIE)?.value;
   const businessAccountId = req.cookies.get(CUSTOMER_BA_COOKIE)?.value;
-  const name = req.cookies.get(CUSTOMER_NAME_COOKIE)?.value;
+  const rawName = req.cookies.get(CUSTOMER_NAME_COOKIE)?.value;
   if (!userId || !businessAccountId) return null;
+  let name = rawName || 'Customer';
+  if (rawName) {
+    for (let i = 0; i < 2; i++) {
+      try {
+        const next = decodeURIComponent(name);
+        if (next === name) break;
+        name = next;
+      } catch {
+        break;
+      }
+    }
+  }
   return {
     userId,
     businessAccountId,
-    name: name ? decodeURIComponent(name) : 'Customer',
+    name,
   };
 }
 
