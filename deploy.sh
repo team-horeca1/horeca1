@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
 COMPOSE=(docker compose -f docker/docker-compose.prod.yml)
-DEPLOY_IMAGE="${DEPLOY_IMAGE:-ghcr.io/aneeverse/horeca1}"
+DEPLOY_IMAGE="${DEPLOY_IMAGE:-ghcr.io/team-horeca1/horeca1}"
 DEPLOY_SHA="${DEPLOY_SHA:-latest}"
 APP_TAG="${DEPLOY_IMAGE}:${DEPLOY_SHA}"
 WORKER_TAG="${DEPLOY_IMAGE}-worker:${DEPLOY_SHA}"
