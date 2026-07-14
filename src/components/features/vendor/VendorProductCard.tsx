@@ -93,12 +93,28 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         e.stopPropagation();
 
         const minQty = product.minOrderQuantity || 1;
+        const maxStock = typeof product.stock === 'number' && product.stock > 0 ? product.stock : undefined;
 
         if (currentQty > 0) {
-            updateQuantity(product.id, currentQty + qty);
+            const next = currentQty + qty;
+            if (maxStock != null && next > maxStock) {
+                if (currentQty >= maxStock) {
+                    toast.error(`Only ${maxStock} units available`);
+                    return;
+                }
+                updateQuantity(product.id, maxStock);
+                toast.success(`${product.name} — quantity set to ${maxStock} ${product.packSize || ''}`, { duration: 2000 });
+                return;
+            }
+            updateQuantity(product.id, next);
         } else {
             // First add: respect minimum order quantity
-            const firstAddQty = Math.max(qty, minQty);
+            let firstAddQty = Math.max(qty, minQty);
+            if (maxStock != null) firstAddQty = Math.min(firstAddQty, maxStock);
+            if (firstAddQty <= 0) {
+                toast.error('Out of stock');
+                return;
+            }
             addToCart(product, firstAddQty);
             qty = firstAddQty;
         }
@@ -122,9 +138,15 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         e.stopPropagation();
 
         const minQty = product.minOrderQuantity || 1;
+        const maxStock = typeof product.stock === 'number' && product.stock > 0 ? product.stock : undefined;
 
         if (currentQty === 0) {
-            const target = Math.max(tierMinQty, minQty);
+            let target = Math.max(tierMinQty, minQty);
+            if (maxStock != null) target = Math.min(target, maxStock);
+            if (target <= 0) {
+                toast.error('Out of stock');
+                return;
+            }
             addToCart(product, target);
             toast.success(`${product.name} — quantity set to ${target} ${product.packSize || ''}`, { duration: 2000 });
             return;
@@ -134,11 +156,18 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         const tiers = (product.bulkPrices ?? []).slice(0, 3);
         const activeMin = tiers.reduce((max, t) => (currentQty >= t.minQty && t.minQty > max ? t.minQty : max), -1);
 
-        const target = tierMinQty === activeMin
+        let target = tierMinQty === activeMin
             ? currentQty + tierMinQty      // re-tapping the current tier adds another batch
             : Math.max(tierMinQty, minQty); // a different tier — jump straight to it (up or down)
 
-        if (target === currentQty) return;
+        if (maxStock != null) target = Math.min(target, maxStock);
+
+        if (target === currentQty) {
+            if (maxStock != null && currentQty >= maxStock) {
+                toast.error(`Only ${maxStock} units available`);
+            }
+            return;
+        }
         updateQuantity(product.id, target);
         toast.success(`${product.name} — quantity set to ${target} ${product.packSize || ''}`, { duration: 2000 });
     };
@@ -164,7 +193,12 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         e.stopPropagation();
         const raw = e.target.value.replace(/[^0-9]/g, '');
         if (raw === '') return;
-        const parsed = parseInt(raw, 10);
+        let parsed = parseInt(raw, 10);
+        const maxStock = typeof product.stock === 'number' && product.stock > 0 ? product.stock : undefined;
+        if (maxStock != null && parsed > maxStock) {
+            parsed = maxStock;
+            toast.error(`Only ${maxStock} units available`);
+        }
         if (parsed === 0) {
             removeFromCart(product.id);
         } else {

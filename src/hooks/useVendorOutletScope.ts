@@ -21,7 +21,7 @@ export function useVendorOutletScope() {
     switchOutlet,
   } = useBusinessAccountSwitcher();
 
-  const [multiWarehouseEnabled, setMultiWarehouseEnabled] = useState(false);
+  const [multiWarehouseEnabled, setMultiWarehouseEnabled] = useState(true);
   const [scopeVersion, setScopeVersion] = useState(0);
 
   const bump = useCallback(() => setScopeVersion((v) => v + 1), []);
@@ -29,7 +29,7 @@ export function useVendorOutletScope() {
   useEffect(() => {
     fetch('/api/v1/vendor/settings')
       .then((r) => r.json())
-      .then((j) => { if (j.success) setMultiWarehouseEnabled(!!j.data.multiWarehouseEnabled); })
+      .then((j) => { if (j.success) setMultiWarehouseEnabled(true); })
       .catch(() => {});
   }, []);
 

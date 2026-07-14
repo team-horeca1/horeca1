@@ -1,5 +1,10 @@
 import { getApprovedDistributorKeys, filterAuthorizedMappings } from '@/lib/brandAuthorizedDistributor';
 import { aggregateInventories } from '@/lib/inventoryHelpers';
+import {
+  loadFulfillmentStockContext,
+  sellableForContext,
+  type InvRow,
+} from '@/modules/fulfillment/fulfillmentStock';
 import { Prisma, type ApprovalStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
@@ -712,9 +717,19 @@ export async function applyMasterLinkToVendorProduct(
 export class CatalogService {
   async getVendorProducts(
     vendorIdOrSlug: string,
-    options: { categoryId?: string; search?: string; cursor?: string; limit?: number; includeInactive?: boolean }
+    options: {
+      categoryId?: string;
+      search?: string;
+      cursor?: string;
+      limit?: number;
+      includeInactive?: boolean;
+      /** Customer delivery pincode — scopes stock to fulfillment outlets */
+      pincode?: string;
+      /** Vendor dashboard: keep network aggregate instead of fulfillment-aware */
+      aggregateStock?: boolean;
+    }
   ) {
-    const { categoryId, search, cursor, limit = 20, includeInactive } = options;
+    const { categoryId, search, cursor, limit = 20, includeInactive, pincode, aggregateStock } = options;
 
     // Accept either UUID or slug (matches VendorService.getById behaviour).
     // Postgres throws P2007 ("invalid input syntax for type uuid") if a non-UUID
@@ -741,83 +756,132 @@ export class CatalogService {
     if (categoryId) where.categoryId = categoryId;
     if (search) where.name = { contains: search, mode: 'insensitive' };
 
-    const products = await prisma.product.findMany({
-      where,
-      take: limit + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      orderBy: { name: 'asc' },
-      include: {
-        priceSlabs: { orderBy: { sortOrder: 'asc' } },
-        inventories: { select: { qtyAvailable: true, qtyReserved: true } },
-        // parent + parentId let the Vendor Store sidebar render the Hyperpure-style
-        // hierarchical "Categories >> Sub-Categories" navigation per UI/UX Notes.
-        category: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            imageUrl: true,
-            parentId: true,
-            parent: { select: { id: true, name: true, slug: true, imageUrl: true } },
-          },
-        },
-        // ALL sub-categories this product is tagged in (primary + additional). The vendor's
-        // "Additional Sub-Category" choices are display-only, so the storefront shows the
-        // product under every one of these, not just the primary categoryId.
-        categoryLinks: {
-          select: {
-            isPrimary: true,
-            category: {
-              select: {
-                id: true,
-                name: true,
-                imageUrl: true,
-                parentId: true,
-                parent: { select: { id: true, name: true } },
-              },
-            },
-          },
-        },
-        vendor: { select: { id: true, businessName: true, logoUrl: true, vendorCode: true } },
-        brandMappings: {
-          where: { status: { in: ['verified', 'auto_mapped'] } },
-          select: {
-            brandId: true,
-            brandMasterProduct: {
-              select: {
-                name: true,
-                brand: { select: { name: true, slug: true } },
-              },
-            },
-          },
-          orderBy: { confidenceScore: 'desc' },
-          take: 1,
+    const useFulfillmentStock = !aggregateStock;
+    const stockCtx = useFulfillmentStock
+      ? await loadFulfillmentStockContext(vendorId)
+      : null;
+    /** Hard-hide zero-sellable SKUs when customer delivery pin is known */
+    const hardHideZero = Boolean(useFulfillmentStock && pincode && stockCtx);
+
+    const include = {
+      priceSlabs: { orderBy: { sortOrder: 'asc' as const } },
+      inventories: {
+        select: {
+          outletId: true,
+          qtyAvailable: true,
+          qtyReserved: true,
         },
       },
-    });
-
-    const hasMore = products.length > limit;
-    if (hasMore) products.pop();
+      category: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          imageUrl: true,
+          parentId: true,
+          parent: { select: { id: true, name: true, slug: true, imageUrl: true } },
+        },
+      },
+      categoryLinks: {
+        select: {
+          isPrimary: true,
+          category: {
+            select: {
+              id: true,
+              name: true,
+              imageUrl: true,
+              parentId: true,
+              parent: { select: { id: true, name: true } },
+            },
+          },
+        },
+      },
+      vendor: { select: { id: true, businessName: true, logoUrl: true, vendorCode: true } },
+      brandMappings: {
+        where: { status: { in: ['verified' as const, 'auto_mapped' as const] } },
+        select: {
+          brandId: true,
+          brandMasterProduct: {
+            select: {
+              name: true,
+              brand: { select: { name: true, slug: true } },
+            },
+          },
+        },
+        orderBy: { confidenceScore: 'desc' as const },
+        take: 1,
+      },
+    };
 
     const approvedKeys = await getApprovedDistributorKeys({ vendorId });
 
-    return {
-      products: products.map((p) => ({
+    const mapOne = (p: {
+      id: string;
+      inventories: InvRow[];
+      brandMappings: unknown;
+      category?: { name?: string; slug?: string } | null;
+      [key: string]: unknown;
+    }) => {
+      const rows = p.inventories as InvRow[];
+      let qtyAvailable: number;
+      if (stockCtx) {
+        qtyAvailable = sellableForContext(stockCtx, rows, pincode);
+      } else {
+        const inv = aggregateInventories(rows);
+        qtyAvailable = inv ? inv.qtySellable : 0;
+      }
+      return {
         ...p,
-        brandMappings: filterAuthorizedMappings(p.brandMappings, vendorId, approvedKeys),
+        inventories: [{ qtyAvailable, qtyReserved: 0 }],
+        brandMappings: filterAuthorizedMappings(
+          p.brandMappings as Parameters<typeof filterAuthorizedMappings>[0],
+          vendorId,
+          approvedKeys,
+        ),
         categoryName: p.category?.name || '',
         categorySlug: p.category?.slug || '',
-        in_stock: (() => {
-          const inv = aggregateInventories(p.inventories);
-          return inv ? inv.qtyAvailable - inv.qtyReserved > 0 : false;
-        })(),
-        qty_available: (() => {
-          const inv = aggregateInventories(p.inventories);
-          return inv ? inv.qtyAvailable - inv.qtyReserved : 0;
-        })(),
-      })),
+        in_stock: qtyAvailable > 0,
+        qty_available: qtyAvailable,
+      };
+    };
+
+    // Fill a page, skipping zero-sellable rows when hard-hide is on.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const collected: any[] = [];
+    let pageCursor = cursor;
+    let dbExhausted = false;
+    while (collected.length < limit + 1 && !dbExhausted) {
+      const remaining = limit + 1 - collected.length;
+      const take = hardHideZero ? Math.min(Math.max(remaining * 4, remaining + 1), 200) : remaining;
+      const batch = await prisma.product.findMany({
+        where,
+        take,
+        ...(pageCursor ? { cursor: { id: pageCursor }, skip: 1 } : {}),
+        orderBy: { name: 'asc' },
+        include,
+      });
+      if (batch.length === 0) {
+        dbExhausted = true;
+        break;
+      }
+      if (batch.length < take) dbExhausted = true;
+      pageCursor = batch[batch.length - 1]!.id;
+
+      for (const p of batch) {
+        const mapped = mapOne(p as Parameters<typeof mapOne>[0]);
+        if (hardHideZero && mapped.qty_available <= 0) continue;
+        collected.push(mapped);
+        if (collected.length >= limit + 1) break;
+      }
+    }
+
+    const hasMore = collected.length > limit;
+    if (hasMore) collected.pop();
+
+    return {
+      products: collected,
       pagination: {
-        next_cursor: hasMore ? products[products.length - 1]?.id : null,
+        next_cursor: hasMore ? (collected[collected.length - 1]?.id as string | undefined) ?? null : null,
         has_more: hasMore,
       },
     };

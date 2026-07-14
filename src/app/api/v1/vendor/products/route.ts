@@ -96,6 +96,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       cursor,
       limit,
       includeInactive: true,
+      aggregateStock: true,
     });
 
     return NextResponse.json({ success: true, data: result });
@@ -163,26 +164,8 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     });
     if (!vendor) throw Errors.notFound('Vendor');
 
-    // Initialize inventory at primary outlet (or all outlets when multi-warehouse)
-    if (vendor.multiWarehouseEnabled) {
-      await ensureInventoryForAllOutlets(product.id, vendorId, vendor.businessAccountId);
-    } else {
-      const primaryOutlet = await prisma.outlet.findFirst({
-        where: { businessAccountId: vendor.businessAccountId, isActive: true },
-        orderBy: { createdAt: 'asc' },
-        select: { id: true },
-      });
-      if (!primaryOutlet) throw Errors.badRequest('Vendor has no outlet for inventory');
-      await prisma.inventory.create({
-        data: {
-          productId: product.id,
-          vendorId,
-          outletId: primaryOutlet.id,
-          qtyAvailable: 0,
-          lowStockThreshold: 10,
-        },
-      });
-    }
+    // Platform policy: always initialize inventory on all active outlets
+    await ensureInventoryForAllOutlets(product.id, vendorId, vendor.businessAccountId);
 
     // Only notify admins if product needs approval (not auto-approved or draft)
     if (!isDraft && product.approvalStatus === 'pending') {

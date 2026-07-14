@@ -13,6 +13,12 @@ import {
   type BxgyCartResult,
 } from '@/modules/promotion/promotion.service';
 import type { VendorPromoSummary } from '@/types';
+import {
+  getFulfillmentAwareSellable,
+  loadFulfillmentStockContext,
+  sellableForContext,
+  type InvRow,
+} from '@/modules/fulfillment/fulfillmentStock';
 
 /**
  * V2.2: cart is keyed by (userId, businessAccountId, outletId). Every method
@@ -282,7 +288,7 @@ export class CartService {
                 taxPercent: true, minOrderQty: true, packSize: true,
                 unit: true, creditEligible: true,
                 priceSlabs: { orderBy: { minQty: 'asc' as const }, select: { minQty: true, maxQty: true, price: true } },
-                inventories: { select: { qtyAvailable: true } },
+                inventories: { select: { outletId: true, qtyAvailable: true, qtyReserved: true } },
               },
             },
             vendor: { select: { id: true, businessName: true, slug: true, minOrderValue: true, logoUrl: true } },
@@ -352,12 +358,32 @@ export class CartService {
             taxPercent: true, minOrderQty: true, packSize: true,
             unit: true, creditEligible: true,
             priceSlabs: { orderBy: { minQty: 'asc' as const }, select: { minQty: true, maxQty: true, price: true } },
-            inventories: { select: { qtyAvailable: true } },
+            inventories: { select: { outletId: true, qtyAvailable: true, qtyReserved: true } },
           },
         },
         vendor: { select: { id: true, businessName: true, slug: true, minOrderValue: true, logoUrl: true } },
       },
     });
+
+    const delivery = await getDeliveryGeo(ctx.userId);
+    const deliveryPincode = delivery?.pincode ?? outletInfo?.pincode ?? null;
+    const vendorIds = [...new Set(freshItems.map((i) => i.vendorId))];
+    const stockCtxByVendor = new Map<string, Awaited<ReturnType<typeof loadFulfillmentStockContext>>>();
+    await Promise.all(
+      vendorIds.map(async (vid) => {
+        stockCtxByVendor.set(vid, await loadFulfillmentStockContext(vid));
+      }),
+    );
+    for (const item of freshItems) {
+      const ctxStock = stockCtxByVendor.get(item.vendorId);
+      const rows = (item.product.inventories ?? []) as InvRow[];
+      const qty = ctxStock
+        ? sellableForContext(ctxStock, rows, deliveryPincode)
+        : rows.reduce((s, r) => s + Math.max(0, r.qtyAvailable - (r.qtyReserved ?? 0)), 0);
+      (item.product as { inventories: Array<{ qtyAvailable: number }> }).inventories = [
+        { qtyAvailable: qty },
+      ];
+    }
 
     const vendorMap = new Map<string, {
       vendor: (typeof freshItems)[0]['vendor'];
@@ -424,6 +450,15 @@ export class CartService {
     if (quantity < product.minOrderQty) throw Errors.badRequest(`Minimum order quantity for this product is ${product.minOrderQty}`);
 
     const customer = await this.buildCustomerContext(ctx, vendorId);
+    const { qty: sellable, productName } = await getFulfillmentAwareSellable({
+      vendorId,
+      productId,
+      deliveryPincode: customer.outletPincode,
+    });
+    if (quantity > sellable) {
+      throw Errors.outOfStock(productName, sellable);
+    }
+
     const { unitPrice: resolved } = await resolveUnitPrice({ productId, vendorId, quantity, customer });
     const unitPrice = Number(resolved);
 
@@ -457,6 +492,15 @@ export class CartService {
     if (quantity < product.minOrderQty) throw Errors.badRequest(`Minimum order quantity for this product is ${product.minOrderQty}`);
 
     const customer = await this.buildCustomerContext(ctx, item.vendorId);
+    const { qty: sellable, productName } = await getFulfillmentAwareSellable({
+      vendorId: item.vendorId,
+      productId: item.productId,
+      deliveryPincode: customer.outletPincode,
+    });
+    if (quantity > sellable) {
+      throw Errors.outOfStock(productName, sellable);
+    }
+
     const { unitPrice: resolved } = await resolveUnitPrice({
       productId: item.productId,
       vendorId: item.vendorId,

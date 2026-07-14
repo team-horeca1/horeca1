@@ -322,6 +322,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }, [cart, isInitialized, isLoggedIn, userId]);
 
     const addToCart = useCallback((product: VendorProduct, quantity: number = 1) => {
+        // Cap to fulfillment-aware stock when known (stock > 0). stock === 0 means OOS.
+        const maxStock = typeof product.stock === 'number' && product.stock > 0 ? product.stock : undefined;
+        if (typeof product.stock === 'number' && product.stock <= 0) {
+            return;
+        }
+        if (maxStock != null && quantity > maxStock) {
+            quantity = maxStock;
+        }
+
         // product.price = base gross price (below any bulk tier)
         // Compute the correct tier price for the quantity being added
         const basePriceGross = product.price;
@@ -337,12 +346,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                     const apiData = await dal.cart.get();
                     applyApiCart(apiData as { vendorGroups: unknown[]; total: number });
                 })
-                .catch(() => {
-                    // Optimistic update on API failure — use locally-computed effective price
+                .catch((err: unknown) => {
+                    const msg = err instanceof Error ? err.message : '';
+                    if (msg.includes('units available') || msg.includes('OUT_OF_STOCK')) {
+                        // Server rejected oversell — refresh cart, do not optimistic-add
+                        dal.cart.get()
+                          .then(apiData => applyApiCart(apiData as { vendorGroups: unknown[]; total: number }))
+                          .catch(() => {});
+                        return;
+                    }
+                    // Optimistic update on other API failures — use locally-computed effective price
                     setCart(prev => {
                         const existing = prev.find(i => i.productId === product.id);
                         if (existing) {
-                            const newQty = existing.quantity + quantity;
+                            let newQty = existing.quantity + quantity;
+                            if (maxStock != null) newQty = Math.min(newQty, maxStock);
                             const newGross = getEffectiveGrossPrice(existing.basePriceGross, existing.product.bulkPrices || [], newQty);
                             const newTaxable = tax > 0 ? newGross / (1 + tax / 100) : newGross;
                             return prev.map(i => i.productId === product.id
@@ -356,7 +374,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             setCart(prev => {
                 const existing = prev.find(i => i.productId === product.id);
                 if (existing) {
-                    const newQty = existing.quantity + quantity;
+                    let newQty = existing.quantity + quantity;
+                    if (maxStock != null) newQty = Math.min(newQty, maxStock);
                     const newGross = getEffectiveGrossPrice(existing.basePriceGross, existing.product.bulkPrices || [], newQty);
                     const newTaxable = tax > 0 ? newGross / (1 + tax / 100) : newGross;
                     return prev.map(i => i.productId === product.id
@@ -366,7 +385,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 return [...prev, { productId: product.id, product: productWithEffectivePrice, quantity, basePriceGross }];
             });
         }
-    }, [isLoggedIn]);
+    }, [isLoggedIn, applyApiCart]);
 
     // Side effects (API calls) must run OUTSIDE setCart's updater function —
     // React 19 strict mode invokes the updater twice, which would fire the
@@ -394,6 +413,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         // Enforce minOrderQuantity — silently block; UI must show the toast
         const minQty = item.product?.minOrderQuantity || 1;
         if (quantity < minQty) return;
+
+        // Cap to known stock
+        const maxStock = typeof item.product?.stock === 'number' && item.product.stock > 0
+          ? item.product.stock
+          : undefined;
+        if (maxStock != null && quantity > maxStock) {
+          quantity = maxStock;
+        }
 
         // Sync with server cart (server also recalculates slab price).
         // For customer-priced items the server is the only price authority

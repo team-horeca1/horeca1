@@ -5,6 +5,7 @@ export const vendorProductsSchema = z.object({
   search: z.string().optional(),
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(20),
+  pincode: z.string().regex(/^\d{6}$/).optional(),
 });
 
 export const searchProductsSchema = z.object({

@@ -51,10 +51,9 @@ function VendorSettingsContent() {
   const [savingSlot, setSavingSlot] = useState(false);
   const [paymentModes, setPaymentModes] = useState<string[]>(['cod', 'prepaid']);
   const [vendorType, setVendorType] = useState<'distributor' | 'wholesaler' | 'dark_store'>('distributor');
-  const [multiWarehouseEnabled, setMultiWarehouseEnabled] = useState(false);
+  const [multiWarehouseEnabled, setMultiWarehouseEnabled] = useState(true);
   const [configOutlets, setConfigOutlets] = useState<Array<{ id: string; name: string }>>([]);
   const [configOutletId, setConfigOutletId] = useState<string | null>(searchParams.get('outletId'));
-  const [showMultiWarehouseConfirm, setShowMultiWarehouseConfirm] = useState(false);
   const [bankAccountName, setBankAccountName] = useState('');
   const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [bankShowNumber, setBankShowNumber] = useState(false);
@@ -105,7 +104,7 @@ function VendorSettingsContent() {
         if (data.vendorType === 'distributor' || data.vendorType === 'wholesaler' || data.vendorType === 'dark_store') {
           setVendorType(data.vendorType);
         }
-        setMultiWarehouseEnabled(!!data.multiWarehouseEnabled);
+        setMultiWarehouseEnabled(true);
         setBankAccountName(data.bankAccountName || '');
         setBankAccountNumber(data.bankAccountNumber || '');
         setBankIfsc(data.bankIfsc || '');
@@ -411,9 +410,9 @@ function VendorSettingsContent() {
             logoUrl={logoUrl} setLogoUrl={setLogoUrl}
             bannerUrl={bannerUrl} setBannerUrl={setBannerUrl}
             vendorType={vendorType} setVendorType={setVendorType}
-            multiWarehouseEnabled={multiWarehouseEnabled}
-            setMultiWarehouseEnabled={setMultiWarehouseEnabled}
-            onRequestMultiWarehouseEnable={() => setShowMultiWarehouseConfirm(true)}
+            multiWarehouseEnabled={true}
+            setMultiWarehouseEnabled={() => {}}
+            onRequestMultiWarehouseEnable={() => {}}
             minOrderValue={minOrderValue} setMinOrderValue={setMinOrderValue}
             creditEnabled={creditEnabled} setCreditEnabled={setCreditEnabled}
             addressLine={addressLine} setAddressLine={setAddressLine}
@@ -479,21 +478,6 @@ function VendorSettingsContent() {
           />
         )}
       </VendorSettingsShell>
-
-      {showMultiWarehouseConfirm && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-[14px] max-w-md w-full p-6 border border-[#EEEEEE] shadow-xl">
-            <h3 className="text-[16px] font-bold text-[#181725]">Enable multi-warehouse?</h3>
-            <p className="text-[13px] text-[#7C7C7C] mt-2 leading-relaxed">
-              Stock rows will be created for each outlet (new outlets start at zero). You can split inventory and transfer stock between warehouses after saving.
-            </p>
-            <div className="flex gap-2 justify-end mt-6">
-              <button type="button" onClick={() => setShowMultiWarehouseConfirm(false)} className="h-[40px] px-4 rounded-[10px] border border-[#EEEEEE] text-[13px] font-bold">Cancel</button>
-              <button type="button" onClick={() => { setMultiWarehouseEnabled(true); setShowMultiWarehouseConfirm(false); }} className="h-[40px] px-4 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold">Enable &amp; continue</button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

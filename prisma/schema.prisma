@@ -271,7 +271,7 @@ model Vendor {
   tradeName             String?  @map("trade_name") @db.VarChar(255)
   vendorType            String?  @map("vendor_type") @db.VarChar(50)
   setupProgress         Json?    @map("setup_progress")
-  multiWarehouseEnabled Boolean  @default(false) @map("multi_warehouse_enabled")
+  multiWarehouseEnabled Boolean  @default(true) @map("multi_warehouse_enabled")
   autoDisableOos        Boolean  @default(false) @map("auto_disable_oos")
   panNumber             String?  @map("pan_number") @db.VarChar(20)
   authorizedPersonName  String?  @map("authorized_person_name") @db.VarChar(255)

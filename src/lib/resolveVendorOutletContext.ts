@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { VENDOR_ID_COOKIE, VENDOR_OUTLET_COOKIE } from '@/lib/adminImpersonationCookies';
+import { isMultiWarehouseEnabled } from '@/lib/config/multiWarehouse';
 
 export interface VendorOutletContext {
   vendorId: string;
@@ -100,7 +101,7 @@ export async function resolveVendorOutletContext(
     businessAccountId: vendor.businessAccountId,
     outletId: primaryId,
     accessibleOutletIds: vendorImpersonating ? [] : ctx.accessibleOutletIds,
-    multiWarehouseEnabled: vendor.multiWarehouseEnabled,
+    multiWarehouseEnabled: isMultiWarehouseEnabled(vendor.multiWarehouseEnabled),
     teamRole,
   };
 }

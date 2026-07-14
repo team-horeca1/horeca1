@@ -15,9 +15,10 @@ export interface StoreProfileTabProps {
   setBannerUrl: (v: string) => void;
   vendorType: 'distributor' | 'wholesaler' | 'dark_store';
   setVendorType: (v: 'distributor' | 'wholesaler' | 'dark_store') => void;
-  multiWarehouseEnabled: boolean;
-  setMultiWarehouseEnabled: (v: boolean) => void;
-  onRequestMultiWarehouseEnable: () => void;
+  /** @deprecated Always on — kept for call-site compatibility */
+  multiWarehouseEnabled?: boolean;
+  setMultiWarehouseEnabled?: (v: boolean) => void;
+  onRequestMultiWarehouseEnable?: () => void;
   minOrderValue: string;
   setMinOrderValue: (v: string) => void;
   creditEnabled: boolean;
@@ -41,8 +42,7 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
   const {
     businessName, setBusinessName, description, setDescription,
     logoUrl, setLogoUrl, bannerUrl, setBannerUrl,
-    vendorType, setVendorType, multiWarehouseEnabled, setMultiWarehouseEnabled,
-    onRequestMultiWarehouseEnable, minOrderValue, setMinOrderValue,
+    vendorType, setVendorType, minOrderValue, setMinOrderValue,
     creditEnabled, setCreditEnabled,
     addressLine, setAddressLine, city, setCity, stateName, setStateName,
     addressPincode, setAddressPincode, gstNumber, setGstNumber,
@@ -109,18 +109,14 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
               />
               <span className="text-[14px] font-bold text-[#181725]">Enable credit for customers</span>
             </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={multiWarehouseEnabled}
-                onChange={(e) => {
-                  if (e.target.checked && !multiWarehouseEnabled) onRequestMultiWarehouseEnable();
-                  else setMultiWarehouseEnabled(e.target.checked);
-                }}
-                className="w-5 h-5 accent-[#299E60]"
-              />
-              <span className="text-[14px] font-bold text-[#181725]">Multi-warehouse inventory</span>
-            </label>
+            <div className="rounded-xl border border-[#E2F3E9] bg-[#F5FBF7] px-4 py-3">
+              <p className="text-[14px] font-bold text-[#181725]">Multi-warehouse inventory — always on</p>
+              <p className="text-[12px] text-[#7C7C7C] mt-1 leading-relaxed">
+                Each outlet is a godown with its own stock. Customers see one storefront.
+                At checkout we ship from the warehouse that serves their pincode and has stock
+                (same model as Zoho / Hyperpure-style hubs — not separate shops).
+              </p>
+            </div>
           </div>
         </div>
 

@@ -321,12 +321,13 @@ export const dal = {
     },
 
     /** Get vendor products with price slabs + inventory */
-    async getProducts(vendorId: string, options?: { categoryId?: string; search?: string; cursor?: string; limit?: number }) {
+    async getProducts(vendorId: string, options?: { categoryId?: string; search?: string; cursor?: string; limit?: number; pincode?: string }) {
       const params = new URLSearchParams();
       if (options?.categoryId) params.set('categoryId', options.categoryId);
       if (options?.search) params.set('search', options.search);
       if (options?.cursor) params.set('cursor', options.cursor);
       if (options?.limit) params.set('limit', String(options.limit));
+      if (options?.pincode) params.set('pincode', options.pincode);
       const qs = params.toString() ? `?${params}` : '';
 
       const data = await apiFetch<{ products: Record<string, unknown>[]; pagination: unknown }>(`/api/v1/vendors/${vendorId}/products${qs}`);

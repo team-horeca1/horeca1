@@ -13,6 +13,7 @@ import { resolveVendorId, resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { GST_RE } from '@/lib/validators/vendor-kyc';
 import { seedInventoryRowsForMultiWarehouse } from '@/lib/inventoryOutlet';
+import { isMultiWarehouseEnabled } from '@/lib/config/multiWarehouse';
 
 const optionalUrlSchema = z.string()
   .optional()
@@ -92,7 +93,20 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
     if (!profile) throw Errors.notFound('Vendor');
 
-    return NextResponse.json({ success: true, data: profile });
+    // Platform policy: multi-warehouse is always on — backfill DB + inventory rows if needed.
+    if (!profile.multiWarehouseEnabled) {
+      await prisma.vendor.update({
+        where: { id: vendorId },
+        data: { multiWarehouseEnabled: true },
+      });
+      await seedInventoryRowsForMultiWarehouse(vendorId, profile.businessAccountId);
+      profile.multiWarehouseEnabled = true;
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { ...profile, multiWarehouseEnabled: isMultiWarehouseEnabled(true) },
+    });
   } catch (error) {
     return errorResponse(error);
   }
@@ -107,11 +121,12 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     const body = await req.json();
     const allowedFields = updateSettingsSchema.parse(body);
 
-    const { paymentModes, notificationPrefs, multiWarehouseEnabled, ...scalarFields } = allowedFields;
+    const { paymentModes, notificationPrefs, multiWarehouseEnabled: _mwIgnored, ...scalarFields } = allowedFields;
 
-    const existing = multiWarehouseEnabled !== undefined
-      ? await prisma.vendor.findUnique({ where: { id: vendorId }, select: { multiWarehouseEnabled: true, businessAccountId: true } })
-      : null;
+    const existing = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { multiWarehouseEnabled: true, businessAccountId: true },
+    });
 
     const updated = await prisma.vendor.update({
       where: { id: vendorId },
@@ -119,15 +134,19 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         ...scalarFields,
         ...(paymentModes !== undefined && { paymentModes }),
         ...(notificationPrefs !== undefined && { notificationPrefs: notificationPrefs as Record<string, string[]> }),
-        ...(multiWarehouseEnabled !== undefined && { multiWarehouseEnabled }),
+        // Always keep multi-warehouse on — ignore client attempts to disable.
+        multiWarehouseEnabled: true,
       },
     });
 
-    if (multiWarehouseEnabled === true && existing && !existing.multiWarehouseEnabled) {
+    if (existing && !existing.multiWarehouseEnabled) {
       await seedInventoryRowsForMultiWarehouse(vendorId, existing.businessAccountId);
     }
 
-    return NextResponse.json({ success: true, data: updated });
+    return NextResponse.json({
+      success: true,
+      data: { ...updated, multiWarehouseEnabled: true },
+    });
   } catch (error) {
     return errorResponse(error);
   }

@@ -11,6 +11,7 @@ import { dal } from '@/lib/dal';
 import { cn } from '@/lib/utils';
 import { buildCategoryTree, filterProductsByCatalogTab } from '@/lib/categoryTree';
 import { useCart } from '@/context/CartContext';
+import { useAddress } from '@/context/AddressContext';
 import type { Vendor, VendorProduct } from '@/types';
 import { Package, Star, CheckCircle, Clock, ChevronRight, LayoutGrid, CreditCard } from 'lucide-react';
 import Image from 'next/image';
@@ -32,6 +33,7 @@ export default function VendorStorePage() {
     const vendorId = params.id as string;
     const { status: sessionStatus } = useSession();
     const { addToCart } = useCart();
+    const { selectedAddress } = useAddress();
     const [vendor, setVendor] = useState<Vendor | null>(null);
     const [products, setProducts] = useState<VendorProduct[]>([]);
     const [loading, setLoading] = useState(true);
@@ -70,13 +72,20 @@ export default function VendorStorePage() {
         window.scrollTo({ top: 0, behavior: 'instant' });
     }, [vendorId]);
 
-    // Fetch vendor + products from real API
+    // Fetch vendor + products from real API (stock scoped to delivery pin)
     useEffect(() => {
         if (!vendorId) return;
         Promise.resolve().then(() => setLoading(true));
+        const pincode =
+            selectedAddress?.pincode
+            || (typeof window !== 'undefined' ? localStorage.getItem('user_pincode') : null)
+            || undefined;
         Promise.all([
             dal.vendors.getById(vendorId),
-            dal.vendors.getProducts(vendorId, { limit: 200 }),
+            dal.vendors.getProducts(vendorId, {
+                limit: 200,
+                pincode: pincode && /^\d{6}$/.test(pincode) ? pincode : undefined,
+            }),
             fetch(`/api/v1/vendors/${vendorId}/store-promotions`).then((r) => r.json()).catch(() => ({ success: false })),
         ]).then(([v, p, promosRes]) => {
             setVendor(v);
@@ -85,7 +94,7 @@ export default function VendorStorePage() {
                 setStorePromos(promosRes.data as Array<{ id: string; name: string; badgeLabel: string; type: 'pct_discount' | 'flat_discount' }>);
             }
         }).catch(console.error).finally(() => setLoading(false));
-    }, [vendorId]);
+    }, [vendorId, selectedAddress?.pincode]);
 
     useEffect(() => {
         if (sessionStatus !== 'authenticated' || !vendorId) return;
@@ -144,6 +153,11 @@ export default function VendorStorePage() {
         } catch { setPrevOrders([]); }
     }, [vendorId, sessionStatus]);
 
+    // Refetch previously-ordered when delivery pin changes (stock visibility depends on pin).
+    useEffect(() => {
+        setPrevOrderedProducts([]);
+    }, [selectedAddress?.pincode, vendorId]);
+
     useEffect(() => {
         if (activeTab === 'orders') Promise.resolve().then(() => loadPrevOrders());
         if (activeTab === 'prev-ordered' && !prevOrderedLoading && prevOrderedProducts.length === 0) {
@@ -152,12 +166,48 @@ export default function VendorStorePage() {
                 try {
                     const res = await fetch(`/api/v1/vendors/${vendorId}/previously-ordered`);
                     const json = await res.json();
-                    setPrevOrderedProducts((json.data || json.items || []).map((p: { id: string; name: string; basePrice?: number | string; price?: number | string; imageUrl?: string; categoryName?: string; packSize?: string; lastOrderedQty?: number; lastOrderedDate?: string }) => ({ ...p, id: p.id, name: p.name, price: Number(p.basePrice || p.price) || 0, images: p.imageUrl ? [p.imageUrl] : [], category: p.categoryName || '', packSize: p.packSize || '1 unit', unit: 'unit', stock: 99, isActive: true, createdAt: new Date(), updatedAt: new Date(), vendorId: vendorId, vendorName: vendor?.name || '', vendorLogo: vendor?.logo || '', bulkPrices: [], creditBadge: false, minOrderQuantity: 1, frequentlyOrdered: true, isDeal: false, description: '', lastOrderedQty: p.lastOrderedQty, lastOrderedDate: p.lastOrderedDate } as VendorProduct)));
+                    const pin =
+                        selectedAddress?.pincode
+                        || (typeof window !== 'undefined' ? localStorage.getItem('user_pincode') : null);
+                    setPrevOrderedProducts((json.data || json.items || []).map((p: { id: string; name: string; basePrice?: number | string; price?: number | string; imageUrl?: string; categoryName?: string; packSize?: string; lastOrderedQty?: number; lastOrderedDate?: string; stock?: number; qty_available?: number }) => {
+                        const fromCatalog = products.find((c) => c.id === p.id);
+                        const stock = fromCatalog?.stock
+                            ?? (typeof p.qty_available === 'number' ? p.qty_available : undefined)
+                            ?? (typeof p.stock === 'number' ? p.stock : 0);
+                        return {
+                            ...p,
+                            id: p.id,
+                            name: p.name,
+                            price: Number(p.basePrice || p.price) || 0,
+                            images: p.imageUrl ? [p.imageUrl] : [],
+                            category: p.categoryName || '',
+                            packSize: p.packSize || '1 unit',
+                            unit: 'unit',
+                            stock,
+                            isActive: true,
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                            vendorId: vendorId,
+                            vendorName: vendor?.name || '',
+                            vendorLogo: vendor?.logo || '',
+                            bulkPrices: [],
+                            creditBadge: false,
+                            minOrderQuantity: 1,
+                            frequentlyOrdered: true,
+                            isDeal: false,
+                            description: '',
+                            lastOrderedQty: p.lastOrderedQty,
+                            lastOrderedDate: p.lastOrderedDate,
+                        } as VendorProduct;
+                    }).filter((p: VendorProduct) => {
+                        if (pin && /^\d{6}$/.test(pin)) return (p.stock ?? 0) > 0;
+                        return true;
+                    }));
                 } catch { setPrevOrderedProducts([]); }
                 finally { setPrevOrderedLoading(false); }
             });
         }
-    }, [activeTab, loadPrevOrders]);
+    }, [activeTab, loadPrevOrders, products, selectedAddress?.pincode, vendorId, vendor?.name, vendor?.logo, prevOrderedLoading, prevOrderedProducts.length]);
 
     // Load reviews when ratings tab is activated
     useEffect(() => {
@@ -233,6 +283,15 @@ export default function VendorStorePage() {
             );
         }
 
+        // Defense: when a delivery pin is known, never show zero-stock cards
+        // (server also hard-hides; this covers stale client state / prev-ordered tab).
+        const pin =
+            selectedAddress?.pincode
+            || (typeof window !== 'undefined' ? localStorage.getItem('user_pincode') : null);
+        if (pin && /^\d{6}$/.test(pin)) {
+            result = result.filter(p => (p.stock ?? 0) > 0);
+        }
+
         // Surface in-stock items first so buyers never hit a wall of sold-out cards.
         // Stable sort preserves the server's original ordering within each bucket.
         return [...result].sort((a, b) => {
@@ -240,7 +299,7 @@ export default function VendorStorePage() {
             const bOut = (b.stock ?? 0) <= 0 ? 1 : 0;
             return aOut - bOut;
         });
-    }, [products, activeTab, searchQuery]);
+    }, [products, activeTab, searchQuery, prevOrderedProducts, selectedAddress?.pincode]);
 
     if (loading) {
         return (

@@ -1,6 +1,11 @@
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { getApprovedDistributorKeys, filterAuthorizedMappings } from '@/lib/brandAuthorizedDistributor';
+import {
+  loadFulfillmentStockContext,
+  sellableForContext,
+  type InvRow,
+} from '@/modules/fulfillment/fulfillmentStock';
 
 // Shape returned by Prisma.$queryRaw for trgm fuzzy match
 interface TrgmRow {
@@ -12,7 +17,7 @@ const PRODUCT_INCLUDE = {
     select: { id: true, businessName: true, slug: true, logoUrl: true, rating: true, minOrderValue: true },
   },
   priceSlabs: { orderBy: { sortOrder: 'asc' as const } },
-  inventories: { select: { qtyAvailable: true } },
+  inventories: { select: { outletId: true, qtyAvailable: true, qtyReserved: true } },
   category: { select: { id: true, name: true, slug: true, imageUrl: true } },
   brandMappings: {
     where: { status: { in: ['verified' as const, 'auto_mapped' as const] } },
@@ -106,10 +111,6 @@ export class SearchService {
       products = exactProducts;
     }
 
-    // Honour the original limit + cursor pagination contract
-    const hasMore = products.length > limit;
-    if (hasMore) products.pop();
-
     const vendorIds = [...new Set(products.map((p) => p.vendorId).filter((id): id is string => id != null))];
     const brandIds = new Set<string>();
     for (const p of products) {
@@ -126,6 +127,39 @@ export class SearchService {
       const filtered = filterAuthorizedMappings(p.brandMappings, vendorId, approvedKeys);
       return filtered.length === p.brandMappings.length ? p : { ...p, brandMappings: filtered };
     });
+
+    // Align search stock with checkout fulfillment rules (per vendor).
+    const stockCtxByVendor = new Map<string, Awaited<ReturnType<typeof loadFulfillmentStockContext>>>();
+    await Promise.all(
+      vendorIds.map(async (vid) => {
+        stockCtxByVendor.set(vid, await loadFulfillmentStockContext(vid));
+      }),
+    );
+    products = products.map((p) => {
+      const vendorId = p.vendorId ?? p.vendor?.id;
+      if (!vendorId) return p;
+      const ctx = stockCtxByVendor.get(vendorId);
+      const rows = (p.inventories ?? []) as InvRow[];
+      const qty = ctx
+        ? sellableForContext(ctx, rows, pincode)
+        : rows.reduce((s, r) => s + Math.max(0, r.qtyAvailable - (r.qtyReserved ?? 0)), 0);
+      return {
+        ...p,
+        inventories: [{ outletId: '', qtyAvailable: qty, qtyReserved: 0 }],
+      };
+    });
+
+    // Hard-hide SKUs with no sellable stock for the customer's delivery pin.
+    if (pincode) {
+      products = products.filter((p) => {
+        const qty = (p.inventories?.[0] as { qtyAvailable?: number } | undefined)?.qtyAvailable ?? 0;
+        return qty > 0;
+      });
+    }
+
+    // Honour limit after stock rewrite / hard-hide
+    const hasMore = products.length > limit;
+    if (hasMore) products = products.slice(0, limit);
 
     // Extract unique vendors and categories for the 3-block response
     const vendorMap = new Map<string, ProductWithIncludes['vendor']>();
