@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -21,6 +21,7 @@ import {
   type PortalRole,
   type TeamPanelScope,
 } from '@/components/features/team/teamPanelConfig';
+import { isAdminCustomerImpersonationActive } from '@/lib/clearImpersonation';
 import { toast } from 'sonner';
 
 interface AccountMemberApiRow {
@@ -64,6 +65,7 @@ export function TeamPanel({
 }: TeamPanelProps) {
   const preset = TEAM_PANEL_PRESETS[scope];
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, status: sessionStatus } = useSession();
   const perms = usePermissions();
   const confirm = useConfirm();
@@ -75,7 +77,38 @@ export function TeamPanel({
   } | undefined;
   const currentUserId = sessionUser?.id;
   const isAdminImpersonating = sessionUser?.role === 'admin' && scope !== 'admin';
-  const accountId = scope === 'account' ? sessionUser?.activeBusinessAccountId : undefined;
+  // URL accountId wins (Admin View deep-link). Under customer Admin View the JWT
+  // still holds the admin's BA — resolve the impersonated BA from /api/v1/account.
+  const urlAccountId = scope === 'account' ? (searchParams.get('accountId') ?? undefined) : undefined;
+  const [accountId, setAccountId] = useState<string | undefined>(
+    scope === 'account' ? (urlAccountId || sessionUser?.activeBusinessAccountId) : undefined,
+  );
+
+  useEffect(() => {
+    if (scope !== 'account') {
+      setAccountId(undefined);
+      return;
+    }
+    if (urlAccountId) {
+      setAccountId(urlAccountId);
+      return;
+    }
+    if (isAdminCustomerImpersonationActive()) {
+      let cancelled = false;
+      fetch('/api/v1/account')
+        .then((r) => r.json())
+        .then((json: { success?: boolean; data?: Array<{ id: string }> }) => {
+          if (cancelled) return;
+          const id = json.success ? json.data?.[0]?.id : undefined;
+          setAccountId(id || sessionUser?.activeBusinessAccountId);
+        })
+        .catch(() => {
+          if (!cancelled) setAccountId(sessionUser?.activeBusinessAccountId);
+        });
+      return () => { cancelled = true; };
+    }
+    setAccountId(sessionUser?.activeBusinessAccountId);
+  }, [scope, urlAccountId, sessionUser?.activeBusinessAccountId]);
 
   const canInvite = perms.has('users.create');
   const canEdit = perms.has('users.edit');

@@ -12,6 +12,7 @@ import { AuthProvider } from "@/components/providers/AuthProvider";
 import { Toaster } from 'sonner';
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 import { VendorApplicationBanner } from '@/components/features/homepage/VendorApplicationBanner';
+import { AdminCustomerImpersonationBanner } from '@/components/features/admin/AdminCustomerImpersonationBanner';
 import { ScrollRestoration } from '@/components/layout/ScrollRestoration';
 import { PostLoginAccountSelector } from '@/components/auth/PostLoginAccountSelector';
 import { MandatoryAddressGate } from '@/components/auth/MandatoryAddressGate';
@@ -52,6 +53,9 @@ export default function RootLayout({
                     <Suspense fallback={null}><CallbackUrlRedirect /></Suspense>
                     <Toaster position="top-center" richColors />
                     <Navbar />
+                    <div className="px-[clamp(1rem,3vw,2rem)] pt-2">
+                      <AdminCustomerImpersonationBanner />
+                    </div>
                     <OutletCompletionBanner />
                     <VendorApplicationBanner />
                     <main className="w-full min-h-screen pb-20 md:pb-0">

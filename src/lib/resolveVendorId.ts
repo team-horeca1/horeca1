@@ -78,6 +78,25 @@ export async function resolveVendorContext(ctx: AuthContext, req: NextRequest): 
   return { vendorId: membership.vendorId, teamRole: membership.role };
 }
 
+/**
+ * User id whose in-app notifications to show in the vendor portal.
+ * Under Admin View, JWT userId is the admin — use the impersonated vendor owner.
+ */
+export async function resolveVendorNotificationUserId(
+  ctx: AuthContext,
+  req: NextRequest,
+): Promise<string> {
+  const impersonateId = req.cookies.get('admin_impersonate_vendor_id')?.value;
+  if (ctx.role === 'admin' && impersonateId) {
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: impersonateId },
+      select: { userId: true },
+    });
+    if (vendor?.userId) return vendor.userId;
+  }
+  return ctx.userId;
+}
+
 // Backward-compatible wrapper — all existing routes that only need the ID still work
 export async function resolveVendorId(ctx: AuthContext, req: NextRequest): Promise<string> {
   return (await resolveVendorContext(ctx, req)).vendorId;

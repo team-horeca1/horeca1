@@ -11,11 +11,12 @@ import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import type { AuthContext } from '@/middleware/auth';
 import { ADMIN_ONLY_NOTIFICATION_TITLES } from '@/lib/vendorNotifications';
+import { resolveVendorNotificationUserId } from '@/lib/resolveVendorId';
 
-export const GET = vendorOnly(async (_req: NextRequest, ctx: AuthContext) => {
+export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
     requirePermission(ctx, 'settings.view');
-    const userId = ctx.userId;
+    const userId = await resolveVendorNotificationUserId(ctx, req);
 
     const notifications = await prisma.notification.findMany({
       where: {
@@ -35,10 +36,10 @@ export const GET = vendorOnly(async (_req: NextRequest, ctx: AuthContext) => {
   }
 });
 
-export const PATCH = vendorOnly(async (_req: NextRequest, ctx: AuthContext) => {
+export const PATCH = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
     requirePermission(ctx, 'settings.view');
-    const userId = ctx.userId;
+    const userId = await resolveVendorNotificationUserId(ctx, req);
 
     await prisma.notification.updateMany({
       where: { userId, channel: 'in_app', readAt: null },
