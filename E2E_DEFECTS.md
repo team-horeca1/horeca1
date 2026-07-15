@@ -44,7 +44,7 @@
 | P2-09 | Admin→Vendor | P2 | Settings MOV | Editable under Admin View | Decide lock cue | open (non-blocking) |
 | P2-10 | Brand | P2 | `/brand/register` | No OTP channel toggle | Different flow | open (non-blocking) |
 | P2-11 | Vendor | P2 | Mobile inventory | Action bar dense at 390px | `flex-wrap` on toolbar (`f8077f3`) | retest after deploy |
-| P2-12 | Auth | **P1** | Logout | UI→`/` but `/auth/me` still 200 after `f8077f3` | AuthTabSync raced `signOut({redirect:false})` after broadcast before CSRF clear | `clientLogout` CSRF POST + `markSigningOut` before broadcast | pending retest |
+| P2-12 | Auth | **P1** | Logout | UI→`/` but `/auth/me` still 200; CSRF/signout **429** under auth RL | AuthTabSync race + **auth route 30/min RL blocked signout** | `clientLogout` + exempt `/csrf`/`/signout` from RL; session bucket 180/min | pending retest on next SHA |
 | D5 | Ops | P2 | CI Deploy SSH | Missing secret | Restored on team-horeca1 | **PASS** |
 
 ---
