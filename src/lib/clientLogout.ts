@@ -39,6 +39,9 @@ export async function clientLogout(callbackUrl = '/'): Promise<void> {
       const signoutRes = await fetch('/api/auth/signout', {
         method: 'POST',
         credentials: 'include',
+        // Critical: Auth.js clears the cookie on a 302. Default fetch follows
+        // the redirect and drops Set-Cookie — session stays logged in (P2-12).
+        redirect: 'manual',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           csrfToken: csrfJson.csrfToken ?? '',
@@ -46,7 +49,10 @@ export async function clientLogout(callbackUrl = '/'): Promise<void> {
           json: 'true',
         }),
       });
-      cleared = signoutRes.ok;
+      // opaqueredirect (0) or 2xx/3xx all count as cookie cleared
+      cleared =
+        signoutRes.type === 'opaqueredirect' ||
+        (signoutRes.status >= 200 && signoutRes.status < 400);
     }
   } catch {
     /* fall through */
