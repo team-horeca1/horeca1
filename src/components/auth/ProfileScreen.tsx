@@ -253,17 +253,15 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     if (!isOpen) return null;
 
     const handleLogout = async () => {
-        // Use switcher sign-out: clears impersonation + client stores, broadcasts
-        // signed-out, then Auth.js `signOut({ callbackUrl })` so the session
-        // cookie is cleared before navigation (redirect:false + location.href races).
+        // Clear session BEFORE onClose — profile page onClose does router.push('/')
+        // which aborts the in-flight CSRF signout fetch (P2-12).
         toast.success('Logged out successfully');
-        onClose();
         try {
             localStorage.removeItem('horeca_order_lists_all');
             localStorage.removeItem('horeca_orders');
             localStorage.removeItem('horeca_recently_viewed');
         } catch { /* ignore quota / privacy-mode errors */ }
-        await switcherSignOut();
+        await switcherSignOut(); // clientLogout → location.assign('/')
     };
 
     // Four primary actions for B2B procurement landing — uniform brand styling
