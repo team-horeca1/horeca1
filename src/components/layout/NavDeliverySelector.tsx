@@ -150,8 +150,8 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
             <ChevronDown size={11} className="text-gray-400 shrink-0" />
           </button>
           {outletOpen && !customerImpersonating && (
-            <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-xl z-[10500] w-[200px] p-1.5">
-              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">Select Outlet</p>
+            <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-xl z-[10500] w-[200px] p-1.5 max-h-[min(60vh,320px)] overflow-y-auto">
+              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1 sticky top-0 bg-white">Select Outlet</p>
               {visibleOutlets.map((o) => (
                 <button key={o.id} onClick={() => handleSwitchOutlet(o.id)}
                   disabled={switching || pickingId !== null}
@@ -165,7 +165,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
                   {o.id === currentOutlet.id && <Check size={12} className="text-[#53B175] shrink-0" />}
                 </button>
               ))}
-              <div className="border-t border-gray-100 mt-1 pt-1.5 px-0.5">
+              <div className="border-t border-gray-100 mt-1 pt-1.5 px-0.5 sticky bottom-0 bg-white">
                 <button
                   onClick={() => {
                     setOutletOpen(false);
@@ -252,8 +252,8 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
           <ChevronDown size={12} className="text-gray-400 shrink-0" />
         </button>
         {outletOpen && !customerImpersonating && (
-          <div className="absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-xl shadow-2xl z-[10500] w-[240px] p-2">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">Select Outlet</p>
+          <div className="absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-xl shadow-2xl z-[10500] w-[240px] p-2 max-h-[min(60vh,360px)] overflow-y-auto">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1 sticky top-0 bg-white">Select Outlet</p>
             {visibleOutlets.map((o) => (
               <button key={o.id} onClick={() => handleSwitchOutlet(o.id)}
                 disabled={switching || pickingId !== null}
@@ -272,7 +272,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
                 {o.id === currentOutlet.id && <Check size={14} className="text-[#53B175] shrink-0" />}
               </button>
             ))}
-            <div className="border-t border-gray-100 mt-1.5 pt-1.5 px-1">
+            <div className="border-t border-gray-100 mt-1.5 pt-1.5 px-1 sticky bottom-0 bg-white">
               <button
                 onClick={() => {
                   setOutletOpen(false);

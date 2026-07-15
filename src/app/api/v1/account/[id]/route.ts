@@ -34,6 +34,8 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
         businessType: true, isCustomer: true, isVendor: true, isBrand: true, status: true,
         primaryOutletId: true, createdAt: true, updatedAt: true,
         outlets: {
+          where: { isActive: true },
+          orderBy: { createdAt: 'asc' },
           select: { id: true, name: true, code: true, addressLine: true, city: true, state: true, pincode: true, isActive: true, requiresAddressUpdate: true },
         },
         _count: { select: { members: true, roles: true } },
