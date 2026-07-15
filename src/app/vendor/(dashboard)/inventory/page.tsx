@@ -668,7 +668,7 @@ export default function VendorInventoryPage() {
                     <h1 className="text-[24px] font-bold text-[#181725]">Inventory</h1>
                     <p className="text-[12px] text-[#AEAEAE]">Manage stock levels — changes save automatically</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEAEAE]" size={14} />
                         <input
@@ -676,7 +676,7 @@ export default function VendorInventoryPage() {
                             placeholder="Search products..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="h-[38px] w-[200px] bg-white border border-[#EEEEEE] rounded-[10px] pl-9 pr-3 text-[12px] outline-none placeholder:text-[#AEAEAE] focus:border-[#299E60]/40 shadow-sm"
+                            className="h-[38px] w-[min(200px,100%)] max-w-full bg-white border border-[#EEEEEE] rounded-[10px] pl-9 pr-3 text-[12px] outline-none placeholder:text-[#AEAEAE] focus:border-[#299E60]/40 shadow-sm"
                         />
                     </div>
                     {multiWarehouseEnabled && !viewAll && activeOutletId && (

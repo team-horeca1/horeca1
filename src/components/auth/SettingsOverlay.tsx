@@ -166,8 +166,7 @@ export function SettingsOverlay({
             toast.success('Your account has been permanently deleted');
             closeDeleteModal();
             onClose();
-            await signOut({ redirect: false });
-            router.push('/');
+            await signOut({ callbackUrl: '/' });
         } catch (err) {
             setFullDeleteError(err instanceof Error ? err.message : 'Failed to delete account');
         } finally {

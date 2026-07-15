@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { clearAllAdminImpersonation, isAdminCustomerImpersonationActive } from '@/lib/clearImpersonation';
 import { ACCOUNTS_REFRESH_EVENT } from '@/lib/addressUsability';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -96,6 +96,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const {
         activeBusinessAccountId: switcherAccountId,
         customerImpersonating,
+        signOut: switcherSignOut,
     } = useBusinessAccountSwitcher();
 
     useEffect(() => {
@@ -252,19 +253,17 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     if (!isOpen) return null;
 
     const handleLogout = async () => {
-        try {
-            await clearAllAdminImpersonation();
-        } catch { /* ignore */ }
-        await signOut({ redirect: false });
-        // Clear user-scoped caches so the next user on this browser doesn't inherit them
+        // Use switcher sign-out: clears impersonation + client stores, broadcasts
+        // signed-out, then Auth.js `signOut({ callbackUrl })` so the session
+        // cookie is cleared before navigation (redirect:false + location.href races).
+        toast.success('Logged out successfully');
+        onClose();
         try {
             localStorage.removeItem('horeca_order_lists_all');
             localStorage.removeItem('horeca_orders');
             localStorage.removeItem('horeca_recently_viewed');
         } catch { /* ignore quota / privacy-mode errors */ }
-        toast.success('Logged out successfully');
-        onClose();
-        window.location.href = '/';
+        await switcherSignOut();
     };
 
     // Four primary actions for B2B procurement landing — uniform brand styling
