@@ -1,81 +1,99 @@
 # E2E Defect Ledger
 
-## Production run — 2026-07-15
+## Production run — 2026-07-15 (launch gap pass)
 
 **Target:** `https://freshville.store`  
-**Health:** `/api/health` healthy (db ok); `/api/v1/health` db+redis ok  
-**origin/master tip:** `9ae1df2` (`fix(seed): align service areas and inventory with outlet-scoped uniques`)  
-**Droplet `/opt/horeca1` git:** `bbf7732`  
-**Running image:** `ghcr.io/team-horeca1/horeca1:latest` digest `sha256:aed618a98362…` (built ~2026-07-15 09:17 UTC) — note tip SHA vs droplet git may diverge; verify after each deploy.
+**Live image:** `ghcr.io/team-horeca1/horeca1:latest` = **`a437b1f`** (manual `deploy.sh` after CI Deploy SSH failed)  
+**Health:** `/api/health` + `/api/v1/health` OK  
 
 ### Fixture map
 
 | Actor | Identity | Notes |
 |-------|----------|-------|
-| Admin | HoReCa Admin / Platform Admin | `admin@horeca1.com` |
-| Customer | Mandar Shetty — `saketsuman@rediffmail.com` — Rasoi Bar & Restaurant | Admin Impersonate |
-| Vendor | Patel Enterprise — Chirag Patel — `saket@horeca1.com` | 3 outlets (Brothers / Enterprise / Kirana); Admin Impersonate |
-| Brand | Sarwar — Sohail Ansari — `saket@red.org.in` | Admin Impersonate |
-| Disposable | `E2E Viewer` on Mandar BA; `E2E Support Agent` admin invite left labeled | |
+| Admin | `admin@horeca1.com` | Session used + Impersonate |
+| Customer | Mandar Shetty — Rasoi Bar & Restaurant — `saketsuman@rediffmail.com` | 3 outlets |
+| Vendor | Patel Enterprise — Chirag Patel — `saket@horeca1.com` | 3 outlets |
+| Brand | Sarwar — `saket@red.org.in` | Admin View |
+| Disposable | E2E Viewer (Mandar BA); Support Agent (deleted during DELETE retest) | |
+
+---
+
+### D5 — CI Deploy failure (root cause)
+
+| | |
+|--|--|
+| Symptom | Actions `#240` / `#241` — Build & push **OK**, Deploy **fails** on `SSH deploy` |
+| Evidence | Droplet `auth.log`: **no** GitHub Actions SSH attempt on 2026-07-15 for those runs (failure before TCP auth). Last good CI key accept: **2026-07-14** fingerprint `SHA256:YBz7Eu690sUgliPAdIhtki+E+NAcb+yyhph2ZZPXy5A` |
+| Cause | `secrets.DO_SSH_PRIVATE_KEY` missing/empty/wrong on the repo that runs Actions (`AneeVerse/horeca1` and/or `team-horeca1/horeca1`) |
+| Key on droplet | Private key still at `/root/.ssh/github_actions_deploy` (matches `YBz7Eu…` / `github-actions-horeca1`) |
+| Fix (human, once) | GitHub → repo Settings → Secrets → Actions → set **`DO_SSH_PRIVATE_KEY`** to full contents of `/root/.ssh/github_actions_deploy` (include `BEGIN/END OPENSSH PRIVATE KEY`). Do this on **both** remotes if both run CI. Then re-run failed Deploy job. |
+| Workaround | `ssh root@64.227.187.210 "cd /opt/horeca1 && DEPLOY_SHA=<sha> bash deploy.sh"` (already used for `a437b1f`) |
+
+---
 
 ### Production defect ledger
 
 | ID | Actor | Sev | Surface | Observation | Root cause | Fix | Retest |
 |----|-------|-----|---------|-------------|------------|-----|--------|
-| P1-01 | Admin→Customer | P1 | `/profile/team` TeamPanel | Under Mandar Admin View, team showed admin BA (HoReCa Admin) not Mandar + E2E Viewer | JWT `activeBusinessAccountId` ignored URL/`accountId` + impersonation BA | Prefer URL accountId, else `/api/v1/account` under impersonation | pending deploy |
-| P1-02 | Admin→Vendor | P1 | `/api/v1/vendor/notifications` | Under Patel Admin View, feed returned admin `userId` notifications | Route used `ctx.userId` (admin JWT) | `resolveVendorNotificationUserId` → vendor owner | pending deploy |
-| P2-01 | Admin→Customer | P2 | Storefront layout | Admin View banner only on `/profile` | Banner only on profile page | Mount in root layout | pending deploy |
-| P2-02 | Ops | P2 | Next image cache | `EACCES mkdir /app/.next/cache` in logs | `.next` owned by root in image | Pre-create `/app/.next/cache` owned by nextjs in Dockerfile | pending deploy |
-| P2-03 | Customer | P2 | `/lists` | 404 when probing wrong URL | Correct route `/order-lists` | none | **closed** |
-| P2-04 | Admin | P2 | Bad JSON POST | Malformed body → 500 INTERNAL_ERROR | JSON parse not mapped to 400 | `errorResponse` treats SyntaxError as 400 VALIDATION_ERROR | pending deploy |
-| P2-05 | Admin | P2 | DELETE `/api/v1/admin/team/:id` | Cleanup with membership id → 404 “not found not found” | DELETE only accepted userId; `Errors.notFound` double-appended | Accept membership id OR userId; fix notFound message | pending deploy |
-| D5 | Ops | P2 | GH Actions Deploy | Needs `DO_SSH_PRIVATE_KEY` | Secret missing | SSH on-box rebuild fallback | open |
-
-### Pass matrix (production)
-
-| Pack | Result |
-|------|--------|
-| Preflight | PASS — health ok; fixtures Mandar / Patel (3 outlets) / Sarwar |
-| Customer | PASS* — auth session via Admin View; browse/search/vendor+pin; cart ≥3 + oversell 400; checkout MOV caption correct; Razorpay Test Mode opened then abandoned; orders list/detail; invoice PDF 200; profile/outlets; team blocked by P1-01 until deploy |
-| Vendor | PASS — Admin View banner; warehouse switch; dashboard; inventory PATCH with outletId; order pending→confirmed; products Add Product cancel no Untitled; warehouse/returns/claims/settings/team/notifications pages 200 |
-| Brand | PASS — Sarwar portal home/products/analytics/team/settings/distributors pages 200; `/brand/register` form opens |
-| Admin | PASS — all portal pages 200; Support Agent invite 201; Impersonate customer+vendor+brand banners readable |
-| Cross-cutting | PASS* — customer cart/checkout under Admin View (orders owned by Mandar); customer notif APIs already scoped; vendor notif P1-02 fixed pending deploy; bad POST message present; mobile viewport ~774px spot-check OK |
-
-\*After deploy: retest P1-01 team list + P1-02 vendor notifications + P2-01 banner on home.
-
-### Out of scope (documented)
-
-- Live Razorpay success charge
-- WhatsApp channel
-- Exhaustive report chart pixels
-- Historical `outletId: null` service-area backfill
+| P1-01 | Admin→Customer | P1 | `/profile/team` | Wrong BA under Admin View | JWT BA | Prefer URL/`/api/v1/account` | **PASS** live |
+| P1-02 | Admin→Vendor | P1 | vendor notifications | Admin userId | `ctx.userId` | `resolveVendorNotificationUserId` | **PASS** live |
+| P2-01 | Admin→Customer | P2 | storefront banner | Banner only on profile | layout | root layout mount | **PASS** live |
+| P2-02 | Ops | P2 | image cache | EACCES `.next/cache` | perms | Dockerfile | **PASS** |
+| P2-03 | Customer | P2 | `/lists` | 404 | wrong URL | use `/order-lists` | closed |
+| P2-04 | Admin | P2 | bad JSON | 500 | SyntaxError | 400 VALIDATION_ERROR | **PASS** |
+| P2-05 | Admin | P2 | team DELETE | membership id 404 | id vs userId | accept both | **PASS** |
+| P2-06 | Storefront | P2 | Footer | “Shoping Cart”, “Grocery Shop…supliers”, ©2025 | placeholder copy | Footer.tsx (local, not deployed) | pending ship |
+| P2-07 | Storefront | P2 | Homepage catalog | Demo junk: `Catogery-01`, `cat-02`, `Vender01`, brand `gggg` | seed/demo data live | hide/clean via admin | open |
+| P2-08 | Admin→Customer | P2 | Profile / Outlets | Brief empty “Hi there” / “Active Branches (0)” then fills | slow client fetch, no skeleton | loading state (optional) | observed |
+| P2-09 | Admin→Vendor | P2 | Vendor settings | MOV editable under Admin View with no lock cue | intentional or missing MW lock | decide + affordance | open |
+| P2-10 | Brand | P2 | `/brand/register` | No OTP channel toggle (unlike customer register) | different flow for logged-in add-brand | align or document | open |
+| P2-11 | Vendor | P2 | Mobile inventory | Transfer/Export/Bulk bar may crowd at 390px | dense action bar | wrap/stack | open |
+| D5 | Ops | P2 | CI Deploy | SSH step fails | secret | restore `DO_SSH_PRIVATE_KEY` | open |
 
 ---
 
-## Prior local Docker run
+### Honest gap matrix (launch UI/UX)
 
-Verified against **local Docker** (`localhost:3000` + compose postgres/redis) with seeded fixtures. Production left online (health 200); no further prod stop/rebuilds.
+| Area | Status | Notes |
+|------|--------|-------|
+| **Preflight health + image** | PASS | `a437b1f` live via manual deploy |
+| **Auth: OTP login UI** | PASS | `/login` Send OTP + password path present |
+| **Auth: password login + logout E2E** | PARTIAL | UI present; full logout/login cycle not re-run this pass (admin session held) |
+| **Register customer OTP channels** | PASS | Verify via Mobile / Email; email↔mobile optional copy; Send OTP |
+| **Browse home/search** | PASS | Search garlic → Patel SKU; homepage loads |
+| **Pin / OOS** | PARTIAL | Search returned in-stock; dedicated OOS-hidden pin walk not re-done |
+| **Cart ≥3 / oversell / checkout MOV / Razorpay abandon** | PASS | Prior pack + retest |
+| **Orders + invoice PDF** | PASS | Prior pack |
+| **Lists / wishlist / wallet / rewards** | PASS | Pages 200 + open |
+| **Profile + outlets** | PASS* | Mandar details + 3 outlets after load (*empty flash P2-08) |
+| **Account team Viewer** | PASS | After P1-01 fix |
+| **Vendor warehouse / inventory outletId / pages** | PASS | Prior pack |
+| **Vendor pending→confirmed→processing** | PASS | Unpaid PO-2026-701824-01 → processing via UI |
+| **Vendor team invite Sales Rep** | PASS | `e2e-sales-202607151046@example.com` left labeled |
+| **Vendor settings MOV under Admin View** | PARTIAL | MOV editable (no lock affordance); MW “always on” |
+| **Brand portal + Marketing invite** | PASS | Sarwar; `e2e-mkt-202607151050@example.com` Marketing Exec |
+| **Brand `/brand/register` OTP channels** | PARTIAL | Logged-in add-brand form; no Mobile/Email OTP toggle |
+| **Customer register OTP channels** | PASS | Verify via Mobile / Email |
+| **Admin portal + Support Agent + Impersonate** | PASS | Prior + DELETE retest |
+| **Admin finance filter / approve disposable** | PARTIAL / not done | |
+| **Vendor onboarding submit → 201** | NOT DONE | register opened/abandoned only |
+| **Mobile viewport home/cart** | PASS | 390×844 no horizontal overflow |
+| **Mobile vendor inventory** | PARTIAL | Action bar may crowd at true 390px |
+| **Cross: Admin View cart ownership + notif scope** | PASS | |
+| **Bad JSON error surface** | PASS | |
 
-| ID | Actor | Sev | Surface | Observation | Root cause | Fix | Retest |
-|----|-------|-----|---------|-------------|------------|-----|--------|
-| D1 | Admin→Customer | P1 | BA team users/roles APIs | 403 under customer Admin View | Missing impersonation bypass | `assertCanMutateAccount` | **PASS** local (users 200, invite Viewer 201) |
-| D2 | Storefront | P2 | FeatureBar | US shipping copy | Placeholder | India-relevant blurbs | **PASS** local + earlier prod image |
-| D3 | Checkout | P1 | Summary caption | “You pay ₹0 for 0 items” below MOV | Selected groups empty while cart has lines | `paymentLockedByMov` caption + included totals | **PASS** local (`Cart ₹90 · 1 item — meet vendor minimums to pay`) |
-| D4 | Admin→Customer | P1 | Cart UI vs API | Cart empty in UI while API had items | CartContext ignored impersonation changes | Reload on impersonation event; skip admin LS persist | **PASS** local (badge/checkout after signal) |
-| D5 | Ops | P2 | GitHub Actions Deploy | Deploy job fails | Missing `DO_SSH_PRIVATE_KEY` | Add secret / SSH `deploy.sh` after GHCR build | open |
-| D6 | Local | P2 | `prisma/seed.ts` | Seed broke on multi-outlet uniques | Stale `vendorId_pincode` / inventory keys | Seed outlets + `vendorId_outletId_*` | **PASS** seed completes |
+---
 
-## Pass matrix (local Docker)
+### Open launch blockers / must-do before “go”
 
-| Pack | Result |
-|------|--------|
-| Preflight fixtures | PASS (admin/vendor/customer/brand seed) |
-| Customer (via Admin View) | PASS — team list/invite, cart add, checkout MOV copy |
-| Vendor / Brand / Admin pages | Prior prod smoke PASS; local smoke seed users OK |
-| Cross-cutting | PASS — mobile home layout, MOV unlock messaging; payment abandon deferred (no live Razorpay on local) |
-| Prod uptime | PASS — left running during local work |
+1. **Restore `DO_SSH_PRIVATE_KEY`** so CI Deploy works (D5) — otherwise every push needs manual SSH.
+2. **Ship footer copy fix** (P2-06) + ideally scrub demo catalog names (P2-07).
+3. Optional: vendor onboarding submit smoke (disposable) if launch includes new vendors Day 1.
+4. Clean or keep labeled disposables: `e2e-sales-…`, `e2e-mkt-…` (and note PO-2026-701824-01 now processing).
 
-## Deploy note
+### Out of scope
 
-Pushed to GitHub: account + checkout + cart fixes. **Do not** stop prod for on-box rebuilds. Prefer CI image build + `deploy.sh` swap (needs `DO_SSH_PRIVATE_KEY`), or brief `--force-recreate` only after image exists.
+- Live Razorpay success charge  
+- WhatsApp  
+- Exhaustive report charts  
+- Historical `outletId: null` service-area backfill  

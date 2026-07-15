@@ -35,7 +35,7 @@ const FOOTER_LINKS = {
     account: [
         'My Account',
         'Order History',
-        'Shoping Cart',
+        'Shopping Cart',
         'Compare',
         'Help Ticket',
         'Wishlist'
@@ -76,7 +76,7 @@ export function Footer() {
                             <img src="/Horeca1.png" alt="Horeca1" className="h-8 md:h-10 w-auto object-contain" />
                         </Link>
                         <p className="text-[14px] text-[#7C7C7C] leading-[1.6] max-w-[320px]">
-                            We&apos;re Grocery Shop, an innovative team of food supliers.
+                            HoReCa Hub — bulk food and supplies for restaurants, hotels, and caterers.
                         </p>
                         <ul className="space-y-5 pt-2">
                             <li className="flex items-start gap-4">
@@ -175,7 +175,7 @@ export function Footer() {
                 {/* Bottom Bar */}
                 <div className="py-6 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-6">
                     <p className="text-[14px] text-[#7C7C7C] text-center md:text-left">
-                        Horeca1 eCommerce © 2025. All Rights Reserved
+                        Horeca1 eCommerce © 2026. All Rights Reserved
                     </p>
                     <div className="flex items-center gap-4">
                         {SOCIAL_LINKS.map((social, idx) => (
