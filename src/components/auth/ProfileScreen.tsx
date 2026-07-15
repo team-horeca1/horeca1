@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { clearAllAdminImpersonation, isAdminCustomerImpersonationActive } from '@/lib/clearImpersonation';
+import { clientLogout } from '@/lib/clientLogout';
 import { ACCOUNTS_REFRESH_EVENT } from '@/lib/addressUsability';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
@@ -253,15 +254,15 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     if (!isOpen) return null;
 
     const handleLogout = async () => {
-        // Clear session BEFORE onClose — profile page onClose does router.push('/')
-        // which aborts the in-flight CSRF signout fetch (P2-12).
         toast.success('Logged out successfully');
         try {
             localStorage.removeItem('horeca_order_lists_all');
             localStorage.removeItem('horeca_orders');
             localStorage.removeItem('horeca_recently_viewed');
-        } catch { /* ignore quota / privacy-mode errors */ }
-        await switcherSignOut(); // clientLogout → location.assign('/')
+        } catch { /* ignore */ }
+        // Cookie clear first — do not await impersonation DELETEs (can delay/hang).
+        void clearAllAdminImpersonation();
+        await clientLogout('/');
     };
 
     // Four primary actions for B2B procurement landing — uniform brand styling

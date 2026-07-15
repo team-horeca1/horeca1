@@ -1,9 +1,7 @@
 /**
  * Hard client logout (P2-12).
- *
- * 1) Best-effort Auth.js CSRF signout (redirect:manual so Set-Cookie is kept).
- * 2) Always hit /api/v1/auth/logout to Max-Age=0 every authjs/next-auth cookie.
- * 3) Hard navigate only after cookie clear.
+ * Clears Auth.js cookies via /api/v1/auth/logout FIRST (authoritative),
+ * then best-effort Auth.js signout, then hard navigate.
  */
 const SIGNING_OUT_FLAG = 'horeca_signing_out';
 
@@ -31,6 +29,16 @@ export function consumeSigningOutFlag(): boolean {
 export async function clientLogout(callbackUrl = '/'): Promise<void> {
   markSigningOut();
 
+  // Authoritative cookie wipe — must run even if Auth.js signout hangs/429s.
+  try {
+    await fetch('/api/v1/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    });
+  } catch {
+    /* continue */
+  }
+
   try {
     const csrfRes = await fetch('/api/auth/csrf', { credentials: 'include' });
     if (csrfRes.ok) {
@@ -48,16 +56,7 @@ export async function clientLogout(callbackUrl = '/'): Promise<void> {
       });
     }
   } catch {
-    /* continue to explicit cookie clear */
-  }
-
-  try {
-    await fetch('/api/v1/auth/logout', {
-      method: 'POST',
-      credentials: 'include',
-    });
-  } catch {
-    /* still navigate */
+    /* cookies already cleared above */
   }
 
   if (typeof window !== 'undefined') {

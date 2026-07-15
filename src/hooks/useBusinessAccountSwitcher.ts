@@ -21,6 +21,7 @@ import {
   releaseBootstrapLock,
 } from '@/lib/authTabSync';
 import { clearUserClientStores } from '@/lib/userScopedStorage';
+import { clientLogout, markSigningOut } from '@/lib/clientLogout';
 import { toast } from 'sonner';
 
 /**
@@ -442,14 +443,9 @@ export function useBusinessAccountSwitcher() {
     clearForcePickerCookie();
     clearDismissFlag();
     clearUserClientStores(userId);
-    // Clear session cookies first — impersonation DELETEs after would race
-    // navigation and left JWT alive when form/fetch signout was flaky (P2-12).
-    const { clientLogout, markSigningOut } = await import('@/lib/clientLogout');
     markSigningOut();
     broadcastAuthEvent('signed-out', { userId });
-    try {
-      await clearAllAdminImpersonation();
-    } catch { /* ignore */ }
+    void clearAllAdminImpersonation();
     await clientLogout('/');
   }, [clearCart, clearWishlist, userId]);
 
