@@ -52,3 +52,24 @@ next-env.d.ts
 .claude/worktrees/
 
 .git-commit-msg.tmp
+
+# Audit disposable credentials (never commit)
+AUDIT_SECRETS.local.md
+audit-cookies*.txt
+audit-*-cookies.txt
+audit-retest-*.txt
+audit-verify-*.txt
+audit-session-token.txt
+.playwright-mcp/
+test-results/
+/playwright-report/
+tmp-*.json
+*_probe.json
+oversell*.json
+login-resp.txt
+login.html
+register.html
+me1.json
+bad-login-body.txt
+rice.json
+tomato-search.json

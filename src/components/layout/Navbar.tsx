@@ -10,7 +10,6 @@ import {
     X,
     Home as HomeIcon,
     Store,
-    Tag,
     ClipboardList,
     LayoutDashboard,
     Gift,
@@ -49,7 +48,6 @@ const DEFAULT_STYLE = { image: '/images/category/vegitable.png', bgColor: '#f7f8
 const DESKTOP_NAV = [
     { name: 'Home', href: '/', Icon: HomeIcon },
     { name: 'Vendors', href: '/vendors', Icon: Store },
-    { name: 'Offers', href: '/under-construction', Icon: Tag },
     { name: 'Lists', href: '/order-lists', Icon: ClipboardList },
 ];
 

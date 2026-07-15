@@ -75,7 +75,8 @@ export default function VendorLayout({
     const [adminVendorName, setAdminVendorName] = useState<string | null>(null);
     const [isApplicationPending, setIsApplicationPending] = useState(false);
     const [checkingApplication, setCheckingApplication] = useState(true);
-    const [hasBrandMappings, setHasBrandMappings] = useState(false);
+    // null = brands fetch in flight — do not hide Brand Mappings (avoids false redirect to dashboard/setup)
+    const [hasBrandMappings, setHasBrandMappings] = useState<boolean | null>(null);
 
     const userRole = (session?.user as { role?: string } | undefined)?.role;
     const activeAccountType = (session?.user as {
@@ -113,7 +114,8 @@ export default function VendorLayout({
     const visibleGroups = VENDOR_NAV_GROUPS.map((g) => ({
       ...g,
       links: filterNavLinks(g.links, can, 'vendor', (link) =>
-        link.href === '/vendor/brand-mappings' && !hasBrandMappings,
+        // Hide only after we know there are no authorized brands (null = still loading)
+        link.href === '/vendor/brand-mappings' && hasBrandMappings === false,
       ),
     })).filter((g) => g.links.length > 0);
 
@@ -123,11 +125,13 @@ export default function VendorLayout({
         if (!isAdmin && !isActiveVendor) return;
         if (visibleGroups.length === 0) return;
         if (!firstAllowedRoute) return;
+        // Wait until brand-mapping access is known so we don't bounce /brand-mappings → dashboard → setup
+        if (hasBrandMappings === null && pathname.startsWith('/vendor/brand-mappings')) return;
         const allHrefs = visibleGroups.flatMap((g) => g.links.map((l) => l.href));
         if (!allHrefs.some((h) => pathname === h || pathname.startsWith(`${h}/`))) {
             router.replace(firstAllowedRoute);
         }
-    }, [status, isApplicationPending, isAdmin, isActiveVendor, visibleGroups, firstAllowedRoute, pathname, router]);
+    }, [status, isApplicationPending, isAdmin, isActiveVendor, visibleGroups, firstAllowedRoute, pathname, router, hasBrandMappings]);
 
     // Only treat the impersonation cookie as authoritative when the current
     // session is actually an admin. A vendor logging in fresh would otherwise
@@ -189,14 +193,16 @@ export default function VendorLayout({
         };
     }, [status, isAdmin, isActiveVendor]);
 
-    // Redirect to setup wizard until go_live is marked complete
+    // Redirect to setup wizard until complete — verified vendors are never forced (AUD-005)
     React.useEffect(() => {
         if (status !== 'authenticated' || isAdmin || !isActiveVendor) return;
         if (pathname === '/vendor/setup') return;
         fetch('/api/v1/vendor/setup')
             .then((r) => r.json())
             .then((j) => {
-                if (j.success && !j.data.wizardComplete && pathname === '/vendor/dashboard') {
+                if (!j.success) return;
+                if (j.data?.isVerified === true || j.data?.wizardComplete === true) return;
+                if (pathname === '/vendor/dashboard') {
                     router.replace('/vendor/setup');
                 }
             })

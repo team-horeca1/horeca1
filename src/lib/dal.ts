@@ -19,10 +19,17 @@ function getBaseUrl() {
   return process.env.AUTH_URL || 'http://localhost:3000'; // server-side: absolute URL
 }
 
+const API_FETCH_TIMEOUT_MS = 15_000;
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${getBaseUrl()}${path}`;
+  const timeoutSignal = AbortSignal.timeout(API_FETCH_TIMEOUT_MS);
+  const signal = options?.signal
+    ? AbortSignal.any([options.signal, timeoutSignal])
+    : timeoutSignal;
   const res = await fetch(url, {
     ...options,
+    signal,
     headers: {
       'Content-Type': 'application/json',
       ...options?.headers,

@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Loader2, MapPin, Plus, AlertCircle, X, Trash2, Pencil } from 'lucide-react';
 import { AddressAutocomplete } from '@/components/ui/AddressAutocomplete';
 import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { notifyAccountsRefresh } from '@/lib/addressUsability';
 import { FormErrorBanner } from '@/components/ui/form';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { toast } from 'sonner';
 
 interface Outlet {
@@ -69,6 +70,7 @@ interface OutletsOverlayProps {
 }
 
 export function OutletsOverlay({ isOpen, onClose, accountId }: OutletsOverlayProps) {
+  const confirm = useConfirm();
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<OutletDraft | null>(null); // null = closed, has .id = editing, no .id = creating
@@ -95,14 +97,21 @@ export function OutletsOverlay({ isOpen, onClose, accountId }: OutletsOverlayPro
     if (isOpen) load();
   }, [isOpen, accountId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleDelete = async (outletId: string) => {
-    if (!confirm('Deactivate this outlet?')) return;
-    const res = await fetch(`/api/v1/account/${accountId}/outlets/${outletId}`, { method: 'DELETE' });
+  const handleDelete = async (outlet: Outlet) => {
+    const ok = await confirm({
+      title: 'Remove outlet?',
+      message: `This will remove "${outlet.name}" from your delivery branches. You can add the same address again later if needed.`,
+      confirmText: 'Remove',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    const res = await fetch(`/api/v1/account/${accountId}/outlets/${outlet.id}`, { method: 'DELETE' });
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
       toast.error((json as { error?: { message?: string } }).error?.message ?? 'Could not remove outlet');
       return;
     }
+    setOutlets((prev) => prev.filter((o) => o.id !== outlet.id));
     toast.success('Outlet removed');
     afterMutation();
   };
@@ -152,7 +161,6 @@ export function OutletsOverlay({ isOpen, onClose, accountId }: OutletsOverlayPro
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-[14px] font-[700] text-[#181725]">{o.name}</p>
                       {o.code && <span className="text-[11px] text-[#AEAEAE] font-mono">{o.code}</span>}
-                      {!o.isActive && <span className="text-[10px] uppercase font-bold text-[#AEAEAE]">inactive</span>}
                       {o.requiresAddressUpdate && (
                         <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">
                           <AlertCircle size={10} />
@@ -174,9 +182,9 @@ export function OutletsOverlay({ isOpen, onClose, accountId }: OutletsOverlayPro
                       <Pencil size={14} />
                     </button>
                     <button
-                      onClick={() => handleDelete(o.id)}
+                      onClick={() => handleDelete(o)}
                       className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
-                      title="Deactivate"
+                      title="Remove outlet"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -216,6 +224,7 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
   const [longitude, setLongitude] = useState<number | null>(draft.longitude);
   const [placeId, setPlaceId] = useState<string | null>(draft.placeId);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   // Auto-fill city & state when a valid 6-digit pincode is typed manually
@@ -248,56 +257,62 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
   };
 
   const submit = async () => {
-    setSubmitting(true); setError(null);
-    const url = isEdit
-      ? `/api/v1/account/${accountId}/outlets/${draft.id}`
-      : `/api/v1/account/${accountId}/outlets`;
-    const method = isEdit ? 'PATCH' : 'POST';
-    const body = {
-      name: name.trim(),
-      addressLine: addressLine.trim(),
-      flatInfo: flatInfo.trim() || null,
-      landmark: landmark.trim() || null,
-      city: city.trim() || null,
-      state: state.trim() || null,
-      pincode: pincode.trim() || null,
-      // Only include coords when present — API schema uses .optional(), not .nullable()
-      ...(latitude !== null && longitude !== null && { latitude, longitude }),
-      ...(placeId !== null && { placeId }),
-    };
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const json = await res.json();
-    setSubmitting(false);
-    if (!json.success) {
-      const msg = json.error?.message ?? 'Could not save outlet';
-      setError(msg);
-      toast.error(msg);
-      return;
-    }
-
-    if (hasCoords && pincodeValid) {
-      setSelectedAddress({
-        id: `outlet_${json.data.id}`,
-        label: name.trim() || 'Outlet',
-        businessName: name.trim(),
-        fullAddress: addressLine.trim(),
-        shortAddress: [city, state].filter(Boolean).join(', ') || addressLine.trim().split(',').slice(0, 2).join(','),
-        latitude: latitude!,
-        longitude: longitude!,
-        flatInfo: flatInfo.trim() || undefined,
-        landmark: landmark.trim() || undefined,
-        pincode: pincode.trim(),
-        city: city.trim() || undefined,
-        state: state.trim() || undefined,
-        placeId: placeId ?? undefined,
-        isDefault: false,
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const url = isEdit
+        ? `/api/v1/account/${accountId}/outlets/${draft.id}`
+        : `/api/v1/account/${accountId}/outlets`;
+      const method = isEdit ? 'PATCH' : 'POST';
+      const body = {
+        name: name.trim(),
+        addressLine: addressLine.trim(),
+        flatInfo: flatInfo.trim() || null,
+        landmark: landmark.trim() || null,
+        city: city.trim() || null,
+        state: state.trim() || null,
+        pincode: pincode.trim() || null,
+        ...(latitude !== null && longitude !== null && { latitude, longitude }),
+        ...(placeId !== null && { placeId }),
+      };
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       });
+      const json = await res.json();
+      if (!json.success) {
+        const msg = json.error?.message ?? 'Could not save outlet';
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+
+      if (hasCoords && pincodeValid) {
+        setSelectedAddress({
+          id: `outlet_${json.data.id}`,
+          label: name.trim() || 'Outlet',
+          businessName: name.trim(),
+          fullAddress: addressLine.trim(),
+          shortAddress: [city, state].filter(Boolean).join(', ') || addressLine.trim().split(',').slice(0, 2).join(','),
+          latitude: latitude!,
+          longitude: longitude!,
+          flatInfo: flatInfo.trim() || undefined,
+          landmark: landmark.trim() || undefined,
+          pincode: pincode.trim(),
+          city: city.trim() || undefined,
+          state: state.trim() || undefined,
+          placeId: placeId ?? undefined,
+          isDefault: false,
+        });
+      }
+      onSaved();
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
-    onSaved();
   };
 
   return (

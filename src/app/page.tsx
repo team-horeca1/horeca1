@@ -15,7 +15,7 @@ import { FrequentlyOrderedVendors, TopRatedVendors } from "@/components/features
 
 export default function Home() {
   return (
-    <div className="flex flex-col w-full">
+    <div className="flex flex-col w-full min-w-0 overflow-x-hidden">
       {/* Hero / Banner */}
       <Hero />
 

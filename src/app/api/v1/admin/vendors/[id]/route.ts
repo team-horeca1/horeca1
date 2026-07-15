@@ -255,9 +255,21 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       throw Errors.notFound('Vendor');
     }
 
-    // When approving: also activate the vendor
+    // When approving: also activate the vendor and mark setup wizard complete (AUD-005)
     if (allowedFields.isVerified === true) {
       allowedFields.isActive = true;
+      const prior = await prisma.vendor.findUnique({
+        where: { id },
+        select: { setupProgress: true },
+      });
+      const progress = {
+        ...((prior?.setupProgress ?? {}) as Record<string, boolean>),
+        profile: true,
+        delivery: true,
+        products: true,
+        go_live: true,
+      };
+      (allowedFields as Record<string, unknown>).setupProgress = progress;
     }
 
     const updated = await prisma.$transaction(async (tx) => {

@@ -65,6 +65,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
       { name: 'Products', icon: Package, href: '/admin/products', feature: 'products', requiredPerm: 'products.view' },
       { name: 'Categories', icon: Tag, href: '/admin/categories', feature: 'products', requiredPerm: 'products.view' },
       { name: 'Brands', icon: Sparkles, href: '/admin/brands', feature: 'brands', requiredPerm: 'brands.view' },
+      { name: 'Distributor invites', icon: Users, href: '/admin/brand-distributor-invites', feature: 'brands', requiredPerm: 'brands.view' },
     ],
   },
   {

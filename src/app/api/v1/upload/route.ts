@@ -10,7 +10,7 @@ import { withRateLimit } from '@/middleware/withRateLimit';
 import { errorResponse } from '@/middleware/errorHandler';
 import { toFile } from '@imagekit/nodejs';
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
 export const POST = withRateLimit(withRole(['admin', 'vendor', 'customer', 'brand'], async (req: NextRequest) => {

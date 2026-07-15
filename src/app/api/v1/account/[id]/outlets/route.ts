@@ -8,8 +8,8 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
-import { assertAccountMember, assertAccountPermission, assertCanMutateAccount } from '@/lib/accountAccess';
-import { adoptOrCreateOutlet } from '@/lib/outletWrites';
+import { assertAccountMember, assertCanMutateAccount } from '@/lib/accountAccess';
+import { adoptOrCreateOutlet, softDeactivateDuplicateActiveOutlets } from '@/lib/outletWrites';
 import { ensureInventoryRowsForOutlet } from '@/lib/inventoryOutlet';
 import {
   effectiveCustomerUserId,
@@ -19,12 +19,16 @@ import {
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
     const id = extractAccountId(req);
+    // GET: membership (or impersonation) is enough — seeded customers often have
+    // BA membership without Owner UserRole, so outlets.view would 403 (AUD-003).
+    // Mutations below still require outlets.create|edit|delete.
     if (!isImpersonatingBusinessAccount(ctx, id)) {
       await assertAccountMember(ctx.userId, id);
-      await assertAccountPermission(ctx.userId, id, 'outlets.view', ctx.activeOutletId);
     }
+    // Clean multi-click clones before listing (idempotent soft-deactivate).
+    await softDeactivateDuplicateActiveOutlets(id).catch(() => 0);
     const outlets = await prisma.outlet.findMany({
-      where: { businessAccountId: id },
+      where: { businessAccountId: id, isActive: true },
       orderBy: { createdAt: 'asc' },
     });
     return NextResponse.json({ success: true, data: outlets });

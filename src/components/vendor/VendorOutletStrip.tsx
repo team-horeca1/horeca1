@@ -36,9 +36,13 @@ export function VendorOutletStrip() {
     // strip so layout doesn't jump.
     if (loading) {
         return (
-            <div className="w-full bg-emerald-50/60 border-b border-emerald-100/80 px-[clamp(1rem,2.5vw,2rem)] py-[clamp(0.4rem,0.8vw,0.7rem)] flex items-center gap-3 text-[12px] text-emerald-700/70">
-                <Loader2 size={14} className="animate-spin" />
-                <span>Loading active outlet…</span>
+            <div
+                className="w-full bg-emerald-50/60 border-b border-emerald-100/80 px-[clamp(1rem,2.5vw,2rem)] py-[clamp(0.4rem,0.8vw,0.7rem)] flex items-center gap-3 text-[12px] text-emerald-700/70"
+                aria-busy="true"
+                aria-label="Loading active outlet"
+            >
+                <Loader2 size={14} className="animate-spin shrink-0" aria-hidden />
+                <span className="h-3 w-40 max-w-[50%] rounded bg-emerald-100/80 animate-pulse" />
             </div>
         );
     }

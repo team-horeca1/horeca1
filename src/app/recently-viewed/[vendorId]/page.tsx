@@ -26,7 +26,6 @@ export default function RecentlyViewedPage() {
     const [products, setProducts] = useState<ViewedProduct[]>([]);
     const [vendorName, setVendorName] = useState('');
     const [vendorLogo, setVendorLogo] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
     const [quantities, setQuantities] = useState<Record<string, number>>({});
     const [expandedVendors, setExpandedVendors] = useState<Record<string, boolean>>({});
 
@@ -35,24 +34,40 @@ export default function RecentlyViewedPage() {
     };
     const isExpanded = (vid: string) => expandedVendors[vid] !== false;
 
+    // No blocking spinner — empty state first paint; hydrate from localStorage (AUD-001)
     useEffect(() => {
         try {
             const saved = localStorage.getItem('horeca_recently_viewed');
-            if (saved) {
-                const entries = JSON.parse(saved);
-                const entry = entries.find((e: { vendorId: string; vendorName?: string; vendorLogo?: string; viewedProducts?: ViewedProduct[] }) => e.vendorId === vendorId);
-                if (entry) {
-                    setVendorName(entry.vendorName || 'Vendor');
-                    setVendorLogo(entry.vendorLogo || '');
-                    const viewedProducts = entry.viewedProducts || [];
-                    setProducts(viewedProducts);
-                    setQuantities(Object.fromEntries(viewedProducts.map((p: ViewedProduct) => [p.id, 1])));
-                }
+            if (!saved) {
+                setProducts([]);
+                setVendorName('');
+                setVendorLogo('');
+                setQuantities({});
+                return;
             }
+            const entries = JSON.parse(saved) as Array<{
+                vendorId: string;
+                vendorName?: string;
+                vendorLogo?: string;
+                viewedProducts?: ViewedProduct[];
+            }>;
+            const entry = entries.find((e) => e.vendorId === vendorId);
+            if (!entry) {
+                setProducts([]);
+                setVendorName('');
+                setVendorLogo('');
+                setQuantities({});
+                return;
+            }
+            const viewedProducts = entry.viewedProducts || [];
+            setVendorName(entry.vendorName || 'Vendor');
+            setVendorLogo(entry.vendorLogo || '');
+            setProducts(viewedProducts);
+            setQuantities(Object.fromEntries(viewedProducts.map((p) => [p.id, 1])));
         } catch (e) {
             console.error('Failed to load recently viewed:', e);
+            setProducts([]);
         }
-        setIsLoading(false);
     }, [vendorId]);
 
     const updateQty = (productId: string, delta: number) => {
@@ -122,14 +137,6 @@ export default function RecentlyViewedPage() {
             router.push('/cart');
         }
     };
-
-    if (isLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="w-10 h-10 border-4 border-[#299e60] border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
 
     if (products.length === 0) {
         return (

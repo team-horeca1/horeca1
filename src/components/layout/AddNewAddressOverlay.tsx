@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 interface AddNewAddressOverlayProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (address: Omit<Address, 'id'>) => void;
+    onSave: (address: Omit<Address, 'id'>) => void | Promise<void>;
     initialLat?: number;
     initialLng?: number;
     /** When false the overlay cannot be dismissed — used by mandatory first-address gate. */
@@ -243,6 +243,8 @@ export function AddNewAddressOverlay({
     const [isGeocodingPin, setIsGeocodingPin] = useState(false);
     const [isLocatingGps, setIsLocatingGps] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const savingRef = useRef(false);
 
     const { predictions, isSearching, getPlaceDetails, clearPredictions } =
         useGooglePlacesAutocomplete(searchQuery, { businessMode: true, countryCode: 'in' });
@@ -479,26 +481,33 @@ export function AddNewAddressOverlay({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, isLoaded, google, initialLat, initialLng]);
 
-    const handleSave = useCallback(() => {
-        if (!mapAddress) return;
-        onSave({
-            label: 'Business',
-            businessName: selectedPlace?.businessName,
-            fullAddress: mapAddress,
-            shortAddress: mapShortAddress || mapAddress.split(',').slice(0, 2).join(', '),
-            latitude: mapLatLng.lat,
-            longitude: mapLatLng.lng,
-            pincode: mapPincode,
-            city: mapCity,
-            state: mapState,
-            placeId: mapPlaceId || selectedPlace?.placeId,
-            flatInfo: flatInfo || undefined,
-            landmark: landmark || undefined,
-            isDefault: false,
-        });
+    const handleSave = useCallback(async () => {
+        if (!mapAddress || savingRef.current) return;
+        savingRef.current = true;
+        setSaving(true);
+        try {
+            await onSave({
+                label: 'Business',
+                businessName: selectedPlace?.businessName,
+                fullAddress: mapAddress,
+                shortAddress: mapShortAddress || mapAddress.split(',').slice(0, 2).join(', '),
+                latitude: mapLatLng.lat,
+                longitude: mapLatLng.lng,
+                pincode: mapPincode,
+                city: mapCity,
+                state: mapState,
+                placeId: mapPlaceId || selectedPlace?.placeId,
+                flatInfo: flatInfo || undefined,
+                landmark: landmark || undefined,
+                isDefault: false,
+            });
+        } finally {
+            savingRef.current = false;
+            setSaving(false);
+        }
     }, [mapAddress, mapShortAddress, mapLatLng, mapPincode, mapCity, mapState, mapPlaceId, selectedPlace, flatInfo, landmark, onSave]);
 
-    const canSave = !!mapAddress && !isGeocodingPin && !isLocatingGps;
+    const canSave = !!mapAddress && !isGeocodingPin && !isLocatingGps && !saving;
 
     const formProps: FormFieldsProps = {
         flatInfo,
@@ -568,15 +577,19 @@ export function AddNewAddressOverlay({
                         <div className="px-4 pb-4 pt-3 border-t border-gray-50 shrink-0">
                             <button
                                 type="button"
-                                onClick={handleSave}
+                                onClick={() => void handleSave()}
                                 disabled={!canSave}
                                 className="w-full bg-[#33a852] hover:bg-[#2d9548] disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]"
                             >
-                                {isGeocodingPin || isLocatingGps
+                                {saving || isGeocodingPin || isLocatingGps
                                     ? (
                                         <span className="flex items-center justify-center gap-2">
                                             <Loader2 size={16} className="animate-spin" />
-                                            {isLocatingGps ? 'Detecting location...' : 'Finding address...'}
+                                            {saving
+                                                ? 'Saving...'
+                                                : isLocatingGps
+                                                    ? 'Detecting location...'
+                                                    : 'Finding address...'}
                                         </span>
                                     )
                                     : 'Confirm This Location'}
@@ -676,15 +689,19 @@ export function AddNewAddressOverlay({
                             <FormFields {...formProps} />
                             <button
                                 type="button"
-                                onClick={handleSave}
+                                onClick={() => void handleSave()}
                                 disabled={!canSave}
                                 className="w-full mt-4 bg-[#33a852] hover:bg-[#2d9548] disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]"
                             >
-                                {isGeocodingPin || isLocatingGps
+                                {saving || isGeocodingPin || isLocatingGps
                                     ? (
                                         <span className="flex items-center justify-center gap-2">
                                             <Loader2 size={16} className="animate-spin" />
-                                            {isLocatingGps ? 'Detecting location...' : 'Finding address...'}
+                                            {saving
+                                                ? 'Saving...'
+                                                : isLocatingGps
+                                                    ? 'Detecting location...'
+                                                    : 'Finding address...'}
                                         </span>
                                     )
                                     : 'Confirm This Location'}

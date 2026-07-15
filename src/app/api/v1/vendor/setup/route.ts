@@ -27,14 +27,17 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     });
     const progress = (vendor?.setupProgress ?? {}) as Record<string, boolean>;
     const required = ['profile', 'delivery', 'products'];
-    const completedRequired = required.every((s) => progress[s]);
+    // Verified/live marketplace vendors are treated as wizard-complete even when
+    // seed/admin approve never wrote setupProgress.go_live (AUD-005/006).
+    const wizardComplete = progress.go_live === true || vendor?.isVerified === true;
+    const completedRequired = wizardComplete || required.every((s) => progress[s]);
     return NextResponse.json({
       success: true,
       data: {
         steps: SETUP_STEPS,
         progress,
         completedRequired,
-        wizardComplete: progress.go_live === true,
+        wizardComplete,
         isVerified: vendor?.isVerified,
       },
     });

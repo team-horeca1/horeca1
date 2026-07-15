@@ -25,7 +25,17 @@ const PHONE_RE = /^\d{10}$/;
 
 async function postHandler(req: NextRequest) {
   try {
-    const form = await req.formData();
+    const contentType = req.headers.get('content-type') || '';
+    if (!contentType.includes('multipart/form-data') && !contentType.includes('application/x-www-form-urlencoded')) {
+      throw Errors.badRequest('Content-Type must be multipart/form-data');
+    }
+
+    let form: FormData;
+    try {
+      form = await req.formData();
+    } catch {
+      throw Errors.badRequest('Content-Type must be multipart/form-data');
+    }
     const phone = String(form.get('phone') ?? '');
     const vendorId = String(form.get('vendorId') ?? '');
     const type = String(form.get('type') ?? '');

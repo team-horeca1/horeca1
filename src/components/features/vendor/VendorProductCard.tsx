@@ -32,7 +32,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
     availabilityLabel,
     forceInStockDisplay = false,
 }: VendorProductCardProps) {
-    const { addToCart, groups, updateQuantity, removeFromCart } = useCart();
+    const { addToCart, groups, updateQuantity, adjustQuantity, removeFromCart } = useCart();
     const { status: sessionStatus } = useSession();
 
     // ── Bulk pricing bottom-sheet state (opened from the mobile grid card's "Bulk ▾" chip) ──
@@ -106,7 +106,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 toast.success(`${product.name} — quantity set to ${maxStock} ${product.packSize || ''}`, { duration: 2000 });
                 return;
             }
-            updateQuantity(product.id, next);
+            adjustQuantity(product.id, qty);
         } else {
             // First add: respect minimum order quantity
             let firstAddQty = Math.max(qty, minQty);
@@ -179,7 +179,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         if (currentQty <= minQty) {
             removeFromCart(product.id);
         } else {
-            updateQuantity(product.id, currentQty - 1);
+            adjustQuantity(product.id, -1);
         }
     };
 

@@ -79,7 +79,7 @@ import type { VendorPromoSummary } from '@/types';
 
 export default function CartPage() {
     const [screen, setScreen] = useState<'cart' | 'payment' | 'success'>('cart');
-    const { cart, groups, removeFromCart, updateQuantity, totalItems, subtotal, totalGST, totalTaxable, clearCart } = useCart();
+    const { cart, groups, removeFromCart, updateQuantity, adjustQuantity, totalItems, subtotal, totalGST, totalTaxable, clearCart } = useCart();
     const router = useRouter();
     const searchParams = useSearchParams();
     const initialVendorParam = searchParams?.get('vendor') ?? null;
@@ -920,7 +920,7 @@ export default function CartPage() {
                                                                     return;
                                                                 }
                                                                 if (item.pcs <= 1) removeFromCart(item.id);
-                                                                else updateQuantity(item.id, item.pcs - 1);
+                                                                else adjustQuantity(item.id, -1);
                                                             }}
                                                             className="w-10 h-10 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
                                                         >
@@ -963,7 +963,7 @@ export default function CartPage() {
                                                             />
                                                         </div>
                                                         <button
-                                                            onClick={() => updateQuantity(item.id, item.pcs + 1)}
+                                                            onClick={() => adjustQuantity(item.id, 1)}
                                                             className="w-10 h-10 flex items-center justify-center text-primary hover:bg-green-50 transition-colors"
                                                         >
                                                             <Plus size={16} strokeWidth={2.5} />
@@ -1072,7 +1072,9 @@ export default function CartPage() {
                                                                     <p className={cn("text-[13px] font-bold truncate", sel ? "text-[#181725]" : "text-gray-400")}>
                                                                         {g.vendorName}
                                                                     </p>
-                                                                    <p className="text-[10px] text-gray-400 font-medium">{g.items.length} item{g.items.length !== 1 ? 's' : ''}</p>
+                                                                    <p className="text-[10px] text-gray-400 font-medium">
+                                                                        {g.items.reduce((s, i) => s + (i.quantity || 0), 0)} item{g.items.reduce((s, i) => s + (i.quantity || 0), 0) !== 1 ? 's' : ''}
+                                                                    </p>
                                                                 </div>
                                                             </div>
                                                             <span className={cn("text-[13px] font-black shrink-0", sel ? "text-[#181725]" : "text-gray-400 line-through")}>

@@ -9,11 +9,17 @@ import { generateInvoicePdf } from '@/lib/invoice';
 import { prisma } from '@/lib/prisma';
 import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
     const segments = req.nextUrl.pathname.split('/');
     // URL: /api/v1/orders/{id}/invoice → id is 3rd from end
     const orderId = segments[segments.length - 2];
+
+    if (!orderId || !UUID_RE.test(orderId)) {
+      throw Errors.badRequest('Invalid order id');
+    }
 
     // Verify the order belongs to this user (or impersonated customer)
     const order = await prisma.order.findFirst({

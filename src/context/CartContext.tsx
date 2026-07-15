@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import type { VendorProduct, CartItem, VendorCartGroup, BulkPriceTier, VendorPromoSummary } from '@/types';
 import { dal } from '@/lib/dal';
@@ -23,7 +23,10 @@ interface CartContextType {
     groups: VendorCartGroup[];
     addToCart: (product: VendorProduct, quantity?: number) => void;
     removeFromCart: (productId: string) => void;
+    /** Set absolute quantity (typed input, tier jumps). */
     updateQuantity: (productId: string, quantity: number) => void;
+    /** Nudge quantity by delta (+1 / -1). Prefer this for steppers — avoids stale-click races. */
+    adjustQuantity: (productId: string, delta: number) => void;
     clearCart: () => void;
     totalItems: number;
     subtotal: number;       // gross total (GST-inclusive)
@@ -249,12 +252,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const isLoggedIn = sessionStatus === 'authenticated';
     const sessionUser = (session?.user ?? {}) as Record<string, unknown>;
     const userId = (session?.user?.id as string | undefined) ?? null;
+    const userRole = (session?.user as { role?: string } | undefined)?.role;
     const activeBAId = sessionUser.activeBusinessAccountId as string | undefined;
     const activeOutletId = sessionUser.activeOutletId as string | undefined;
     const [cart, setCart] = useState<CartItemWithId[]>([]);
     const [apiGroupMeta, setApiGroupMeta] = useState<Record<string, ApiGroupMeta>>({});
     const [isInitialized, setIsInitialized] = useState(false);
     const [customerImpersonating, setCustomerImpersonating] = useState(false);
+
+    // Storefront cart APIs are customer-only (AUD-011) — skip for vendor/brand/admin unless impersonating
+    const shouldUseServerCart =
+        !isLoggedIn ||
+        customerImpersonating ||
+        userRole === 'customer';
 
     const applyApiCart = useCallback((apiData: { vendorGroups: unknown[]; total: number }) => {
         const { items, groupMeta } = parseApiCart(apiData);
@@ -294,6 +304,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         // it — so the guest cart (and the items the user came to buy) vanish.
         setIsInitialized(false);
         setCart([]); // Clear immediately on account/outlet/session change so UI doesn't flicker old data
+        if (isLoggedIn && !shouldUseServerCart) {
+            // Vendor/brand/admin portals must not poll /api/v1/cart
+            setApiGroupMeta({});
+            setIsInitialized(true);
+            return;
+        }
         if (isLoggedIn) {
             // Never merge guest/admin local lines into an impersonated customer cart.
             const guestItems = customerImpersonating ? [] : loadLocalCart(null);
@@ -339,7 +355,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             setIsInitialized(true);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sessionStatus, userId, activeBAId, activeOutletId, customerImpersonating]);
+    }, [sessionStatus, userId, activeBAId, activeOutletId, customerImpersonating, shouldUseServerCart]);
 
     // Persist to localStorage for both guest and logged-in users so guest session preserves it on logout.
     // Skip while Admin View is on — otherwise the customer's cart overwrites the admin mirror key.
@@ -366,7 +382,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const effectiveTaxableRate = tax > 0 ? effectiveGross / (1 + tax / 100) : effectiveGross;
         const productWithEffectivePrice: VendorProduct = { ...product, price: effectiveGross, taxableRate: effectiveTaxableRate };
 
-        if (isLoggedIn) {
+        if (isLoggedIn && shouldUseServerCart) {
             dal.cart.addItem(product.id, product.vendorId, quantity)
                 .then(async () => {
                     // Refresh cart from API to get cartItemId and server-computed prices
@@ -412,106 +428,168 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 return [...prev, { productId: product.id, product: productWithEffectivePrice, quantity, basePriceGross }];
             });
         }
-    }, [isLoggedIn, applyApiCart]);
+    }, [isLoggedIn, shouldUseServerCart, applyApiCart]);
 
     // Side effects (API calls) must run OUTSIDE setCart's updater function —
     // React 19 strict mode invokes the updater twice, which would fire the
     // DELETE/PATCH twice and the second call would 404/P2025.
+    const cartRef = useRef<CartItemWithId[]>([]);
+    useEffect(() => { cartRef.current = cart; }, [cart]);
+
+    // Coalesce rapid qty PATCH+GET so older responses can't snap the UI back.
+    const qtySyncGenRef = useRef<Map<string, number>>(new Map());
+    const qtySyncTimerRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+    const scheduleServerQtySync = useCallback((productId: string, cartItemId: string, quantity: number) => {
+        if (!isLoggedIn || !shouldUseServerCart) return;
+        const prevTimer = qtySyncTimerRef.current.get(productId);
+        if (prevTimer) clearTimeout(prevTimer);
+        const gen = (qtySyncGenRef.current.get(productId) ?? 0) + 1;
+        qtySyncGenRef.current.set(productId, gen);
+
+        const timer = setTimeout(() => {
+            qtySyncTimerRef.current.delete(productId);
+            void (async () => {
+                try {
+                    await dal.cart.updateItem(cartItemId, quantity);
+                    if (qtySyncGenRef.current.get(productId) !== gen) return;
+                    // Another item still debouncing — let the last flush refresh the cart.
+                    if (qtySyncTimerRef.current.size > 0) return;
+                    const apiData = await dal.cart.get();
+                    if (qtySyncGenRef.current.get(productId) !== gen) return;
+                    if (qtySyncTimerRef.current.size > 0) return;
+                    applyApiCart(apiData as { vendorGroups: unknown[]; total: number });
+                } catch {
+                    // Keep optimistic client cart; next successful sync will reconcile.
+                }
+            })();
+        }, 280);
+        qtySyncTimerRef.current.set(productId, timer);
+    }, [isLoggedIn, shouldUseServerCart, applyApiCart]);
+
+    useEffect(() => {
+        const timers = qtySyncTimerRef.current;
+        return () => {
+            timers.forEach((t) => clearTimeout(t));
+            timers.clear();
+        };
+    }, []);
+
     const removeFromCart = useCallback((productId: string) => {
-        const item = cart.find(i => i.productId === productId);
-        if (isLoggedIn && item?.cartItemId) {
+        const item = cartRef.current.find(i => i.productId === productId);
+        const syncTimer = qtySyncTimerRef.current.get(productId);
+        if (syncTimer) {
+            clearTimeout(syncTimer);
+            qtySyncTimerRef.current.delete(productId);
+        }
+        qtySyncGenRef.current.set(productId, (qtySyncGenRef.current.get(productId) ?? 0) + 1);
+
+        if (isLoggedIn && shouldUseServerCart && item?.cartItemId) {
             dal.cart.removeItem(item.cartItemId)
                 .then(() => dal.cart.get())
                 .then(apiData => applyApiCart(apiData as { vendorGroups: unknown[]; total: number }))
                 .catch(() => {});
         }
-        setCart(prev => prev.filter(i => i.productId !== productId));
-    }, [isLoggedIn, cart, applyApiCart]);
+        setCart(prev => {
+            const next = prev.filter(i => i.productId !== productId);
+            cartRef.current = next;
+            return next;
+        });
+        if (item?.product?.vendorId) {
+            const vendorId = item.product.vendorId;
+            setApiGroupMeta(prev => {
+                if (!(vendorId in prev)) return prev;
+                const next = { ...prev };
+                delete next[vendorId];
+                return next;
+            });
+        }
+    }, [isLoggedIn, shouldUseServerCart, applyApiCart]);
 
-    const updateQuantity = useCallback((productId: string, quantity: number) => {
+    const commitQuantity = useCallback((productId: string, quantity: number) => {
         if (quantity <= 0) {
             removeFromCart(productId);
             return;
         }
 
-        const item = cart.find(i => i.productId === productId);
+        const item = cartRef.current.find(i => i.productId === productId);
         if (!item || item.isPromoFree) return;
 
-        // Enforce minOrderQuantity — silently block; UI must show the toast
         const minQty = item.product?.minOrderQuantity || 1;
         if (quantity < minQty) return;
 
-        // Cap to known stock
+        let nextQty = quantity;
         const maxStock = typeof item.product?.stock === 'number' && item.product.stock > 0
-          ? item.product.stock
-          : undefined;
-        if (maxStock != null && quantity > maxStock) {
-          quantity = maxStock;
+            ? item.product.stock
+            : undefined;
+        if (maxStock != null && nextQty > maxStock) nextQty = maxStock;
+        if (nextQty === item.quantity) return;
+
+        const vendorId = item.product?.vendorId;
+        if (vendorId) {
+            setApiGroupMeta(meta => {
+                if (!(vendorId in meta)) return meta;
+                const nextMeta = { ...meta };
+                delete nextMeta[vendorId];
+                return nextMeta;
+            });
         }
 
-        // Sync with server cart (server also recalculates slab price).
-        // For customer-priced items the server is the only price authority
-        // (scheme prices change with quantity) — refresh after the PATCH so
-        // the UI always shows exactly what checkout will charge.
         if (isLoggedIn && item.cartItemId) {
-            const patch = dal.cart.updateItem(item.cartItemId, quantity);
-            patch
-                .then(() => dal.cart.get())
-                .then(apiData => applyApiCart(apiData as { vendorGroups: unknown[]; total: number }))
-                .catch(() => {});
+            scheduleServerQtySync(productId, item.cartItemId, nextQty);
         }
 
-        setCart(prev => prev.map(i => {
+        const keepServerUnitPrice = !!item.product?.customerPriceApplied;
+        const basePriceGross = item.basePriceGross || item.product?.price || 0;
+        const newGrossPrice = getEffectiveGrossPrice(basePriceGross, item.product?.bulkPrices || [], nextQty);
+        const tax = item.product?.taxPercent || 0;
+        const newTaxableRate = tax > 0 ? newGrossPrice / (1 + tax / 100) : newGrossPrice;
+
+        const next = cartRef.current.map(i => {
             if (i.productId !== productId) return i;
-            // ── LIVE TIER PRICE RECALCULATION ──────────────────────────────
-            // Use the immutable basePriceGross (set at first add) to find the
-            // correct tier price for the new quantity.
-            //
-            //   qty=9  → below tier1 (minQty:10) → basePriceGross (₹100)
-            //   qty=10 → tier1 matches            → tier1.price    (₹90)
-            //   qty=50 → tier2 also matches        → tier2.price    (₹80)
-            const basePriceGross = i.basePriceGross || i.product?.price || 0;
-            const newGrossPrice = getEffectiveGrossPrice(basePriceGross, i.product?.bulkPrices || [], quantity);
-            const tax = i.product?.taxPercent || 0;
-            const newTaxableRate = tax > 0 ? newGrossPrice / (1 + tax / 100) : newGrossPrice;
             return {
                 ...i,
-                quantity,
-                product: { ...i.product, price: newGrossPrice, taxableRate: newTaxableRate },
+                quantity: nextQty,
+                product: keepServerUnitPrice
+                    ? i.product
+                    : { ...i.product, price: newGrossPrice, taxableRate: newTaxableRate },
             };
-        }));
-    }, [isLoggedIn, cart, removeFromCart, applyApiCart]);
+        });
+        // Sync ref before setState so rapid +/- clicks see the latest qty immediately.
+        cartRef.current = next;
+        setCart(next);
+    }, [isLoggedIn, removeFromCart, scheduleServerQtySync]);
+
+    const updateQuantity = useCallback((productId: string, quantity: number) => {
+        commitQuantity(productId, quantity);
+    }, [commitQuantity]);
+
+    const adjustQuantity = useCallback((productId: string, delta: number) => {
+        if (!delta) return;
+        const item = cartRef.current.find(i => i.productId === productId);
+        if (!item || item.isPromoFree) return;
+        commitQuantity(productId, item.quantity + delta);
+    }, [commitQuantity]);
 
     const clearCart = useCallback(() => {
-        if (isLoggedIn) {
+        qtySyncTimerRef.current.forEach((t) => clearTimeout(t));
+        qtySyncTimerRef.current.clear();
+        if (isLoggedIn && shouldUseServerCart) {
             dal.cart.clear().catch(() => {});
         }
         setCart([]);
+        cartRef.current = [];
         setApiGroupMeta({});
-    }, [isLoggedIn]);
+    }, [isLoggedIn, shouldUseServerCart]);
 
     const groups = useMemo(() => buildGroups(cart, apiGroupMeta), [cart, apiGroupMeta]);
     const totalItems = useMemo(() => cart.reduce((sum, i) => sum + (i.quantity || 0), 0), [cart]);
 
-    const subtotal = useMemo(() => {
-        if (Object.keys(apiGroupMeta).length > 0) {
-            return Object.values(apiGroupMeta).reduce((s, m) => s + m.subtotal, 0);
-        }
-        return cart.reduce((sum, i) => {
-            if (i.isPromoFree) return sum;
-            return sum + ((i.product?.price || 0) * i.quantity);
-        }, 0);
-    }, [cart, apiGroupMeta]);
-
-    const totalTaxable = useMemo(() => cart.reduce((sum, i) => {
-        if (i.isPromoFree) return sum;
-        const tax = i.product?.taxPercent || 0;
-        const gross = (i.product?.price || 0) * i.quantity;
-        return sum + (tax > 0 ? gross / (1 + tax / 100) : gross);
-    }, 0), [cart]);
-
-    // totalGST = GST portion extracted from inclusive gross price
-    const totalGST = useMemo(() => subtotal - totalTaxable, [subtotal, totalTaxable]);
+    // Always derive money totals from groups so optimistic qty edits aren't stuck
+    // behind a stale apiGroupMeta.subtotal while line prices already moved.
+    const subtotal = useMemo(() => groups.reduce((s, g) => s + g.subtotal, 0), [groups]);
+    const totalTaxable = useMemo(() => groups.reduce((s, g) => s + g.subtotalTaxable, 0), [groups]);
+    const totalGST = useMemo(() => groups.reduce((s, g) => s + g.totalGST, 0), [groups]);
 
     const totalAmount = subtotal;
     const vendorCount = groups.length;
@@ -522,6 +600,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         addToCart,
         removeFromCart,
         updateQuantity,
+        adjustQuantity,
         clearCart,
         totalItems,
         subtotal,
@@ -529,7 +608,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         totalGST,
         totalAmount,
         vendorCount,
-    }), [cart, groups, addToCart, removeFromCart, updateQuantity, clearCart, totalItems, subtotal, totalTaxable, totalGST, totalAmount, vendorCount]);
+    }), [cart, groups, addToCart, removeFromCart, updateQuantity, adjustQuantity, clearCart, totalItems, subtotal, totalTaxable, totalGST, totalAmount, vendorCount]);
 
     return (
         <CartContext.Provider value={value}>

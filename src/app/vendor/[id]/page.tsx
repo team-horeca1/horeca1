@@ -37,6 +37,8 @@ export default function VendorStorePage() {
     const [vendor, setVendor] = useState<Vendor | null>(null);
     const [products, setProducts] = useState<VendorProduct[]>([]);
     const [loading, setLoading] = useState(true);
+    const [productsError, setProductsError] = useState<string | null>(null);
+    const [reloadToken, setReloadToken] = useState(0);
     // Pre-fill active tab from ?cat= param (deep-link from search overlay / category page).
     // ?cat=mayo-sauces → activeTab='cat:Mayo & Sauces' once products load (slug → name match below).
     const initialCatSlug = searchParams?.get('cat') || '';
@@ -72,29 +74,56 @@ export default function VendorStorePage() {
         window.scrollTo({ top: 0, behavior: 'instant' });
     }, [vendorId]);
 
-    // Fetch vendor + products from real API (stock scoped to delivery pin)
+    // Fetch vendor + products (AUD-002: allSettled so products failure doesn't hang / wipe vendor)
     useEffect(() => {
         if (!vendorId) return;
-        Promise.resolve().then(() => setLoading(true));
+        let cancelled = false;
+        Promise.resolve().then(() => {
+            if (!cancelled) {
+                setLoading(true);
+                setProductsError(null);
+            }
+        });
         const pincode =
             selectedAddress?.pincode
             || (typeof window !== 'undefined' ? localStorage.getItem('user_pincode') : null)
             || undefined;
-        Promise.all([
+        const pin = pincode && /^\d{6}$/.test(pincode) ? pincode : undefined;
+
+        Promise.allSettled([
             dal.vendors.getById(vendorId),
-            dal.vendors.getProducts(vendorId, {
-                limit: 200,
-                pincode: pincode && /^\d{6}$/.test(pincode) ? pincode : undefined,
-            }),
+            dal.vendors.getProducts(vendorId, { limit: 200, pincode: pin }),
             fetch(`/api/v1/vendors/${vendorId}/store-promotions`).then((r) => r.json()).catch(() => ({ success: false })),
-        ]).then(([v, p, promosRes]) => {
-            setVendor(v);
-            setProducts(p.products);
-            if (promosRes?.success && Array.isArray(promosRes.data)) {
-                setStorePromos(promosRes.data as Array<{ id: string; name: string; badgeLabel: string; type: 'pct_discount' | 'flat_discount' }>);
+        ]).then(([vRes, pRes, promoRes]) => {
+            if (cancelled) return;
+            if (vRes.status === 'fulfilled') {
+                setVendor(vRes.value);
+            } else {
+                console.error(vRes.reason);
+                setVendor(null);
             }
-        }).catch(console.error).finally(() => setLoading(false));
-    }, [vendorId, selectedAddress?.pincode]);
+            if (pRes.status === 'fulfilled') {
+                setProducts(pRes.value.products);
+                setProductsError(null);
+            } else {
+                console.error(pRes.reason);
+                setProducts([]);
+                setProductsError(
+                    pRes.reason instanceof Error ? pRes.reason.message : 'Failed to load products'
+                );
+            }
+            if (promoRes.status === 'fulfilled') {
+                const promosRes = promoRes.value as { success?: boolean; data?: unknown };
+                if (promosRes?.success && Array.isArray(promosRes.data)) {
+                    setStorePromos(promosRes.data as Array<{ id: string; name: string; badgeLabel: string; type: 'pct_discount' | 'flat_discount' }>);
+                }
+            }
+        }).finally(() => {
+            if (!cancelled) setLoading(false);
+        });
+
+        return () => { cancelled = true; };
+    }, [vendorId, selectedAddress?.pincode, reloadToken]);
 
     useEffect(() => {
         if (sessionStatus !== 'authenticated' || !vendorId) return;
@@ -332,6 +361,23 @@ export default function VendorStorePage() {
                 onTabChange={setActiveTab}
                 storePromos={storePromos}
             />
+
+            {productsError && (
+                <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] pt-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                        <p className="text-[13px] text-amber-900">
+                            Couldn’t load products{productsError ? `: ${productsError}` : ''}.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => setReloadToken((t) => t + 1)}
+                            className="rounded-lg bg-amber-900 px-3 py-1.5 text-[12px] font-semibold text-white"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {vendorCredit && vendorCredit.limit > 0 && (
                 <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] pt-3">

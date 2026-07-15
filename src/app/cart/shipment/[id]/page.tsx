@@ -11,7 +11,7 @@ const SavingsDemo = 131;
 export default function ShipmentDetailPage() {
     const router = useRouter();
     const { id } = useParams();
-    const { groups, removeFromCart, updateQuantity } = useCart();
+    const { groups, removeFromCart, adjustQuantity } = useCart();
 
     const shipment = React.useMemo(() => {
         if (id === 'cart-shipment') {
@@ -62,12 +62,12 @@ export default function ShipmentDetailPage() {
         };
     }, [id, groups]);
 
-    const handleQuantityChange = (itemId: string, vendorId: string, delta: number, currentPcs: number) => {
+    const handleQuantityChange = (itemId: string, _vendorId: string, delta: number, currentPcs: number) => {
         const newQty = currentPcs + delta;
         if (newQty <= 0) {
             removeFromCart(itemId);
         } else {
-            updateQuantity(itemId, newQty);
+            adjustQuantity(itemId, delta);
         }
     };
 

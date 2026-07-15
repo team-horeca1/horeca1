@@ -59,7 +59,7 @@ export default function ProductDetailPage() {
     const [pageLoading, setPageLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(true);
-    const { addToCart, groups, updateQuantity } = useCart();
+    const { addToCart, groups, adjustQuantity } = useCart();
 
     useEffect(() => {
         fetch(`/api/v1/products/${id}`)
@@ -178,7 +178,7 @@ export default function ProductDetailPage() {
         const currentQty = cartItem?.quantity || 0;
 
         if (currentQty > 0) {
-            updateQuantity(apiProduct.id, currentQty + qty);
+            adjustQuantity(apiProduct.id, qty);
         } else {
             addToCart(vendorProductForContext, qty);
         }

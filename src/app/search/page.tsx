@@ -54,27 +54,49 @@ function SearchPageContent() {
     }, [pincode]);
 
     useEffect(() => {
+        setQuery(initialQuery);
+    }, [initialQuery]);
+
+    useEffect(() => {
         if (!query.trim()) {
             Promise.resolve().then(() => setResults({ products: [], vendors: [], categories: [], brands: [] }));
             return;
         }
 
         let cancelled = false;
+        let retried = false;
 
-        dal.search.query(query).then((data) => {
-            if (!cancelled) {
+        const run = () => {
+            dal.search.query(query).then((data) => {
+                if (cancelled) return;
+                const empty =
+                    data.products.length === 0 &&
+                    data.vendors.length === 0 &&
+                    data.categories.length === 0 &&
+                    (data.brands?.length ?? 0) === 0;
+                // One retry when empty — covers race before pincode/index warm (AUD-007)
+                if (empty && !retried) {
+                    retried = true;
+                    window.setTimeout(run, 350);
+                    return;
+                }
                 setResults({
                     products: data.products,
                     vendors: data.vendors,
                     categories: data.categories,
                     brands: data.brands as SearchBrand[],
                 });
-            }
-        }).catch(() => {
-            if (!cancelled) {
+            }).catch(() => {
+                if (cancelled) return;
+                if (!retried) {
+                    retried = true;
+                    window.setTimeout(run, 350);
+                    return;
+                }
                 setResults({ products: [], vendors: [], categories: [], brands: [] });
-            }
-        });
+            });
+        };
+        run();
 
         return () => { cancelled = true; };
     }, [query]);
