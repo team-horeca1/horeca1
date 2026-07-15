@@ -38,6 +38,11 @@ export function AuthTabSync() {
       handling.current = true;
       try {
         if (reason === 'signed-out') {
+          const { consumeSigningOutFlag } = await import('@/lib/clientLogout');
+          if (consumeSigningOutFlag()) {
+            // This tab already ran CSRF signout + is navigating — do not race.
+            return;
+          }
           clearForcePickerCookie();
           clearDismissFlag();
           clearUserClientStores((session?.user as SessionUser | undefined)?.id);

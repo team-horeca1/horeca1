@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { clearForcePickerCookie, clearDismissFlag } from '@/lib/postLoginPicker';
@@ -445,8 +445,12 @@ export function useBusinessAccountSwitcher() {
     try {
       await clearAllAdminImpersonation();
     } catch { /* ignore */ }
+    // Mark before broadcast so AuthTabSync on this tab skips the racing
+    // signOut({ redirect: false }) + location.href path (P2-12).
+    const { clientLogout, markSigningOut } = await import('@/lib/clientLogout');
+    markSigningOut();
     broadcastAuthEvent('signed-out', { userId });
-    await signOut({ callbackUrl: '/' });
+    await clientLogout('/');
   }, [clearCart, clearWishlist, userId]);
 
   const refresh = useCallback(async () => {

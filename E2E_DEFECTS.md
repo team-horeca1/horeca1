@@ -3,7 +3,7 @@
 ## Production run — 2026-07-15 (launch gap pass — complete)
 
 **Target:** `https://freshville.store`  
-**Live image:** `7f15742` (CI Deploy **success** on `team-horeca1`)  
+**Live image:** (updating — hard logout fix shipping)  
 **Health:** `/api/health` + `/api/v1/health` OK  
 
 ### Fixture map
@@ -43,8 +43,8 @@
 | P2-08 | Admin→Customer | P2 | Profile flash empty | Brief “Hi there” | Optional skeleton | observed (fills) |
 | P2-09 | Admin→Vendor | P2 | Settings MOV | Editable under Admin View | Decide lock cue | open (non-blocking) |
 | P2-10 | Brand | P2 | `/brand/register` | No OTP channel toggle | Different flow | open (non-blocking) |
-| P2-11 | Vendor | P2 | Mobile inventory | Action bar dense at 390px | Wrap/stack | open (non-blocking) |
-| P2-12 | Auth | P2 | Logout | UI redirects home but `GET /api/v1/auth/me` still 200 admin | `signOut({ redirect: false })` may not clear session cookie before client nav | Fix signOut / cookie clear | open |
+| P2-11 | Vendor | P2 | Mobile inventory | Action bar dense at 390px | `flex-wrap` on toolbar (`f8077f3`) | retest after deploy |
+| P2-12 | Auth | **P1** | Logout | UI→`/` but `/auth/me` still 200 after `f8077f3` | AuthTabSync raced `signOut({redirect:false})` after broadcast before CSRF clear | `clientLogout` CSRF POST + `markSigningOut` before broadcast | pending retest |
 | D5 | Ops | P2 | CI Deploy SSH | Missing secret | Restored on team-horeca1 | **PASS** |
 
 ---
