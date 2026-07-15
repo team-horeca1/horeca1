@@ -1,10 +1,12 @@
 /**
- * Hard client logout — CSRF POST to Auth.js signout, then hard navigate.
- * Avoids next-auth `signOut({ redirect: false })` + immediate `location.href`
- * races that leave the JWT session cookie intact (P2-12).
+ * Hard client logout via CSRF form POST to Auth.js signout.
  *
- * Falls back to next-auth `signOut({ callbackUrl })` if CSRF/signout POST
- * fails (e.g. transient network). Signout/CSRF are not rate-limited server-side.
+ * Why a form (not fetch):
+ * - `fetch` + default redirect follows Auth.js 302 and can drop Set-Cookie.
+ * - `fetch` + `redirect: 'manual'` yields opaqueredirect; cookie clear is
+ *   unreliable across hard navigations in some WebView clients (P2-12).
+ * - A real HTML form POST lets the browser apply Set-Cookie on the response
+ *   and navigate to callbackUrl in one step.
  */
 const SIGNING_OUT_FLAG = 'horeca_signing_out';
 
@@ -31,44 +33,47 @@ export function consumeSigningOutFlag(): boolean {
 
 export async function clientLogout(callbackUrl = '/'): Promise<void> {
   markSigningOut();
-  let cleared = false;
+
+  let csrfToken = '';
   try {
     const csrfRes = await fetch('/api/auth/csrf', { credentials: 'include' });
     if (csrfRes.ok) {
       const csrfJson = (await csrfRes.json()) as { csrfToken?: string };
-      const signoutRes = await fetch('/api/auth/signout', {
-        method: 'POST',
-        credentials: 'include',
-        // Critical: Auth.js clears the cookie on a 302. Default fetch follows
-        // the redirect and drops Set-Cookie — session stays logged in (P2-12).
-        redirect: 'manual',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          csrfToken: csrfJson.csrfToken ?? '',
-          callbackUrl,
-          json: 'true',
-        }),
-      });
-      // opaqueredirect (0) or 2xx/3xx all count as cookie cleared
-      cleared =
-        signoutRes.type === 'opaqueredirect' ||
-        (signoutRes.status >= 200 && signoutRes.status < 400);
+      csrfToken = csrfJson.csrfToken ?? '';
     }
   } catch {
-    /* fall through */
+    /* fall through to next-auth helper */
   }
 
-  if (!cleared) {
-    try {
-      const { signOut } = await import('next-auth/react');
-      await signOut({ callbackUrl });
-      return; // signOut with callbackUrl navigates
-    } catch {
-      /* still force navigate below */
+  if (csrfToken && typeof document !== 'undefined') {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/api/auth/signout';
+    form.style.display = 'none';
+
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfToken';
+    csrfInput.value = csrfToken;
+    form.appendChild(csrfInput);
+
+    const cbInput = document.createElement('input');
+    cbInput.type = 'hidden';
+    cbInput.name = 'callbackUrl';
+    cbInput.value = callbackUrl;
+    form.appendChild(cbInput);
+
+    document.body.appendChild(form);
+    form.submit();
+    return;
+  }
+
+  try {
+    const { signOut } = await import('next-auth/react');
+    await signOut({ callbackUrl });
+  } catch {
+    if (typeof window !== 'undefined') {
+      window.location.assign(callbackUrl);
     }
-  }
-
-  if (typeof window !== 'undefined') {
-    window.location.assign(callbackUrl);
   }
 }
