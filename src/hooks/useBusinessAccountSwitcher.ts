@@ -442,14 +442,14 @@ export function useBusinessAccountSwitcher() {
     clearForcePickerCookie();
     clearDismissFlag();
     clearUserClientStores(userId);
-    try {
-      await clearAllAdminImpersonation();
-    } catch { /* ignore */ }
-    // Mark before broadcast so AuthTabSync on this tab skips the racing
-    // signOut({ redirect: false }) + location.href path (P2-12).
+    // Clear session cookies first — impersonation DELETEs after would race
+    // navigation and left JWT alive when form/fetch signout was flaky (P2-12).
     const { clientLogout, markSigningOut } = await import('@/lib/clientLogout');
     markSigningOut();
     broadcastAuthEvent('signed-out', { userId });
+    try {
+      await clearAllAdminImpersonation();
+    } catch { /* ignore */ }
     await clientLogout('/');
   }, [clearCart, clearWishlist, userId]);
 

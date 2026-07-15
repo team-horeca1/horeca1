@@ -1,12 +1,9 @@
 /**
- * Hard client logout via CSRF form POST to Auth.js signout.
+ * Hard client logout (P2-12).
  *
- * Why a form (not fetch):
- * - `fetch` + default redirect follows Auth.js 302 and can drop Set-Cookie.
- * - `fetch` + `redirect: 'manual'` yields opaqueredirect; cookie clear is
- *   unreliable across hard navigations in some WebView clients (P2-12).
- * - A real HTML form POST lets the browser apply Set-Cookie on the response
- *   and navigate to callbackUrl in one step.
+ * 1) Best-effort Auth.js CSRF signout (redirect:manual so Set-Cookie is kept).
+ * 2) Always hit /api/v1/auth/logout to Max-Age=0 every authjs/next-auth cookie.
+ * 3) Hard navigate only after cookie clear.
  */
 const SIGNING_OUT_FLAG = 'horeca_signing_out';
 
@@ -34,46 +31,36 @@ export function consumeSigningOutFlag(): boolean {
 export async function clientLogout(callbackUrl = '/'): Promise<void> {
   markSigningOut();
 
-  let csrfToken = '';
   try {
     const csrfRes = await fetch('/api/auth/csrf', { credentials: 'include' });
     if (csrfRes.ok) {
       const csrfJson = (await csrfRes.json()) as { csrfToken?: string };
-      csrfToken = csrfJson.csrfToken ?? '';
+      await fetch('/api/auth/signout', {
+        method: 'POST',
+        credentials: 'include',
+        redirect: 'manual',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          csrfToken: csrfJson.csrfToken ?? '',
+          callbackUrl,
+          json: 'true',
+        }),
+      });
     }
   } catch {
-    /* fall through to next-auth helper */
-  }
-
-  if (csrfToken && typeof document !== 'undefined') {
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/api/auth/signout';
-    form.style.display = 'none';
-
-    const csrfInput = document.createElement('input');
-    csrfInput.type = 'hidden';
-    csrfInput.name = 'csrfToken';
-    csrfInput.value = csrfToken;
-    form.appendChild(csrfInput);
-
-    const cbInput = document.createElement('input');
-    cbInput.type = 'hidden';
-    cbInput.name = 'callbackUrl';
-    cbInput.value = callbackUrl;
-    form.appendChild(cbInput);
-
-    document.body.appendChild(form);
-    form.submit();
-    return;
+    /* continue to explicit cookie clear */
   }
 
   try {
-    const { signOut } = await import('next-auth/react');
-    await signOut({ callbackUrl });
+    await fetch('/api/v1/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    });
   } catch {
-    if (typeof window !== 'undefined') {
-      window.location.assign(callbackUrl);
-    }
+    /* still navigate */
+  }
+
+  if (typeof window !== 'undefined') {
+    window.location.assign(callbackUrl);
   }
 }
