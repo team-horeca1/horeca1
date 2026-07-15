@@ -51,7 +51,9 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # Create the uploads mountpoint owned by the runtime user. When the named
 # volume (docker-compose) first mounts onto this path it inherits uid 1001
 # ownership, so the app can write vendor KYC files without permission errors.
-RUN mkdir -p /app/uploads && chown -R nextjs:nodejs /app/uploads
+# Also pre-create Image Optimization cache so nextjs can write without EACCES.
+RUN mkdir -p /app/uploads /app/.next/cache \
+  && chown -R nextjs:nodejs /app/uploads /app/.next
 
 USER nextjs
 

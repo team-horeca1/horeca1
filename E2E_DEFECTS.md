@@ -25,11 +25,11 @@
 | P1-01 | Admin→Customer | P1 | `/profile/team` TeamPanel | Under Mandar Admin View, team showed admin BA (HoReCa Admin) not Mandar + E2E Viewer | JWT `activeBusinessAccountId` ignored URL/`accountId` + impersonation BA | Prefer URL accountId, else `/api/v1/account` under impersonation | pending deploy |
 | P1-02 | Admin→Vendor | P1 | `/api/v1/vendor/notifications` | Under Patel Admin View, feed returned admin `userId` notifications | Route used `ctx.userId` (admin JWT) | `resolveVendorNotificationUserId` → vendor owner | pending deploy |
 | P2-01 | Admin→Customer | P2 | Storefront layout | Admin View banner only on `/profile` | Banner only on profile page | Mount in root layout | pending deploy |
-| P2-02 | Ops | P2 | Next image cache | `EACCES mkdir /app/.next/cache` in logs | Container cache perms | open | open |
+| P2-02 | Ops | P2 | Next image cache | `EACCES mkdir /app/.next/cache` in logs | `.next` owned by root in image | Pre-create `/app/.next/cache` owned by nextjs in Dockerfile | pending deploy |
 | P2-03 | Customer | P2 | `/lists` | 404 when probing wrong URL | Correct route `/order-lists` | none | **closed** |
-| P2-04 | Admin | P2 | Bad JSON POST | Malformed body → 500 INTERNAL_ERROR | JSON parse not mapped to 400 | open | open |
-| P2-05 | Admin | P2 | DELETE `/api/v1/admin/team/:id` | Cleanup after Support Agent invite → 404 “not found not found” | Delete path/id mismatch | open | open |
-| D5 | Ops | P2 | GH Actions Deploy | Needs `DO_SSH_PRIVATE_KEY` | Secret missing | SSH `deploy.sh` fallback | open |
+| P2-04 | Admin | P2 | Bad JSON POST | Malformed body → 500 INTERNAL_ERROR | JSON parse not mapped to 400 | `errorResponse` treats SyntaxError as 400 VALIDATION_ERROR | pending deploy |
+| P2-05 | Admin | P2 | DELETE `/api/v1/admin/team/:id` | Cleanup with membership id → 404 “not found not found” | DELETE only accepted userId; `Errors.notFound` double-appended | Accept membership id OR userId; fix notFound message | pending deploy |
+| D5 | Ops | P2 | GH Actions Deploy | Needs `DO_SSH_PRIVATE_KEY` | Secret missing | SSH on-box rebuild fallback | open |
 
 ### Pass matrix (production)
 

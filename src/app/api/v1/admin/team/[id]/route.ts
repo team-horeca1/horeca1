@@ -110,28 +110,42 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
 export const DELETE = adminOnly(async (req: NextRequest, ctx) => {
   try {
     requirePermission(ctx, 'users.delete');
-    const userId = extractId(req);
+    const rawId = extractId(req);
 
-    if (userId === ctx.userId) {
+    if (rawId === ctx.userId) {
       throw Errors.badRequest('You cannot remove yourself from the admin team');
+    }
+
+    // Accept either AdminTeamMember.id (invite response `data.id`) or userId
+    // (legacy front-end contract).
+    let userId = rawId;
+    let member = await prisma.adminTeamMember.findUnique({
+      where: { userId: rawId },
+      select: { id: true, userId: true, role: true, roleId: true },
+    });
+    if (!member) {
+      member = await prisma.adminTeamMember.findUnique({
+        where: { id: rawId },
+        select: { id: true, userId: true, role: true, roleId: true },
+      });
+      if (member) userId = member.userId;
     }
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, role: true },
     });
-    if (!user || user.role !== 'admin') throw Errors.notFound('Admin user not found');
-
-    const member = await prisma.adminTeamMember.findUnique({
-      where: { userId },
-      select: { id: true, role: true, roleId: true },
-    });
+    if (!user || user.role !== 'admin') throw Errors.notFound('Admin user');
 
     // The seeded super-admin owner has no AdminTeamMember row. Without this
     // guard, ANY admin with users.delete could demote them to 'customer' and
     // lock the platform out.
     if (!member) {
       throw Errors.forbidden('The platform owner cannot be removed from the admin team');
+    }
+
+    if (userId === ctx.userId) {
+      throw Errors.badRequest('You cannot remove yourself from the admin team');
     }
 
     // Rank check — caller must outrank target before removing them.

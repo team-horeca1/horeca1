@@ -146,6 +146,23 @@ export function errorResponse(error: unknown): NextResponse<ErrorResponse> {
     );
   }
 
+  // Malformed JSON body from req.json() — client error, not a 500.
+  if (
+    error instanceof SyntaxError
+    || (error instanceof Error && /JSON|Unexpected token|is not valid JSON/i.test(error.message))
+  ) {
+    return NextResponse.json(
+      {
+        success: false as const,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid JSON body',
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   // Unknown error
   console.error('[API Error]', error);
   return NextResponse.json(
@@ -168,8 +185,12 @@ export const Errors = {
   forbidden: (message = "You don't have permission for this action") =>
     new ApiError('FORBIDDEN', message, 403),
 
-  notFound: (resource: string) =>
-    new ApiError('NOT_FOUND', `${resource} not found`, 404),
+  notFound: (resource: string) => {
+    const message = /not found$/i.test(resource.trim())
+      ? resource.trim()
+      : `${resource} not found`;
+    return new ApiError('NOT_FOUND', message, 404);
+  },
 
   duplicate: (field: string) =>
     new ApiError('DUPLICATE', `${field} already exists`, 409),
