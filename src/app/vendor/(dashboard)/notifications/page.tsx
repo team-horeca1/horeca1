@@ -41,7 +41,6 @@ const NOTIF_EVENTS: { key: string; label: string }[] = [
 const CHANNELS: { key: string; label: string }[] = [
     { key: 'push',      label: 'App Push' },
     { key: 'sms',       label: 'SMS' },
-    { key: 'whatsapp',  label: 'WhatsApp' },
     { key: 'email',     label: 'Email' },
 ];
 

@@ -13,6 +13,7 @@ import { PoliciesTab } from '@/components/features/vendor/settings/PoliciesTab';
 import { DocumentsTab } from '@/components/features/vendor/settings/DocumentsTab';
 import type { DeliverySlot, ServiceArea, SettingsTabId, VendorDocument, VendorSettings } from '@/components/features/vendor/settings/types';
 import { normalizeTimeInput, SETTINGS_TABS } from '@/components/features/vendor/settings/types';
+import { isAdminVendorImpersonationActive } from '@/lib/clearImpersonation';
 
 function parseTab(raw: string | null): SettingsTabId {
   if (raw && SETTINGS_TABS.some((t) => t.id === raw)) return raw as SettingsTabId;
@@ -70,6 +71,11 @@ function VendorSettingsContent() {
   const [docFile, setDocFile] = useState<File | null>(null);
   const docFileRef = useRef<HTMLInputElement>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [adminViewReadOnly, setAdminViewReadOnly] = useState(false);
+
+  useEffect(() => {
+    Promise.resolve().then(() => setAdminViewReadOnly(isAdminVendorImpersonationActive()));
+  }, []);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -420,6 +426,7 @@ function VendorSettingsContent() {
             stateName={stateName} setStateName={setStateName}
             addressPincode={addressPincode} setAddressPincode={setAddressPincode}
             gstNumber={gstNumber} setGstNumber={setGstNumber}
+            readOnly={adminViewReadOnly}
             {...saveProps}
           />
         )}

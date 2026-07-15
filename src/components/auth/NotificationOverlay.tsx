@@ -20,7 +20,7 @@ export function NotificationOverlay({ isOpen, onClose }: NotificationOverlayProp
     const [settings, setSettings] = useState<NotificationSetting[]>([
         { id: 'order-updates', label: 'Order Updates', description: 'Get notified about order status changes', enabled: true },
         { id: 'promotions', label: 'Promotions & Offers', description: 'Receive deals and discount notifications', enabled: true },
-        { id: 'price-alerts', label: 'Price Alerts', description: 'Get notified when prices drop on wishlist items', enabled: false },
+        { id: 'price-alerts', label: 'Price Alerts', description: 'Get notified when prices drop on saved products', enabled: false },
         { id: 'delivery', label: 'Delivery Updates', description: 'Real-time delivery tracking notifications', enabled: true },
         { id: 'rewards', label: 'Reward Points', description: 'Points earned and redemption updates', enabled: true },
         { id: 'new-products', label: 'New Products', description: 'Get notified about new arrivals', enabled: false },

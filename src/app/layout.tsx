@@ -7,7 +7,6 @@ import { Inter } from "next/font/google";
 import { CartProvider } from "@/context/CartContext";
 import { GoogleMapsProvider } from "@/components/providers/GoogleMapsProvider";
 import { AddressProvider } from "@/context/AddressContext";
-import { WishlistProvider } from "@/context/WishlistContext";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { Toaster } from 'sonner';
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
@@ -46,27 +45,25 @@ export default function RootLayout({
         <AuthProvider>
           <GoogleMapsProvider>
             <AddressProvider>
-              <WishlistProvider>
-                <CartProvider>
-                  <ConfirmProvider>
-                    <Suspense fallback={null}><ScrollRestoration /></Suspense>
-                    <Suspense fallback={null}><CallbackUrlRedirect /></Suspense>
-                    <Toaster position="top-center" richColors />
-                    <Navbar />
-                    <div className="px-[clamp(1rem,3vw,2rem)] pt-2">
-                      <AdminCustomerImpersonationBanner />
-                    </div>
-                    <OutletCompletionBanner />
-                    <VendorApplicationBanner />
-                    <main className="w-full min-h-screen pb-20 md:pb-0">
-                      {children}
-                    </main>
-                    <Footer />
-                    <PostLoginAccountSelector />
-                    <MandatoryAddressGate />
-                  </ConfirmProvider>
-                </CartProvider>
-              </WishlistProvider>
+              <CartProvider>
+                <ConfirmProvider>
+                  <Suspense fallback={null}><ScrollRestoration /></Suspense>
+                  <Suspense fallback={null}><CallbackUrlRedirect /></Suspense>
+                  <Toaster position="top-center" richColors />
+                  <Navbar />
+                  <div className="px-[clamp(1rem,3vw,2rem)] pt-2">
+                    <AdminCustomerImpersonationBanner />
+                  </div>
+                  <OutletCompletionBanner />
+                  <VendorApplicationBanner />
+                  <main className="w-full min-h-screen pb-20 md:pb-0">
+                    {children}
+                  </main>
+                  <Footer />
+                  <PostLoginAccountSelector />
+                  <MandatoryAddressGate />
+                </ConfirmProvider>
+              </CartProvider>
             </AddressProvider>
           </GoogleMapsProvider>
         </AuthProvider>

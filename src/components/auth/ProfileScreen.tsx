@@ -137,13 +137,33 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         city: '',
         image: '',
     });
+    const [profileReady, setProfileReady] = useState(false);
 
     const sessionUserId = session?.user?.id;
     const sessionRole = (session?.user as { role?: string } | undefined)?.role;
+    const sessionName = session?.user?.name ?? '';
+    const sessionEmail = session?.user?.email ?? '';
+
+    // Seed from session immediately so we never flash "Hi there" / empty email
+    // while /auth/me is in flight.
+    useEffect(() => {
+        if (!sessionUserId) {
+            Promise.resolve().then(() => setProfileReady(false));
+            return;
+        }
+        Promise.resolve().then(() => {
+            setUserData(prev => ({
+                ...prev,
+                fullName: prev.fullName || sessionName || '',
+                email: prev.email || sessionEmail || '',
+            }));
+        });
+    }, [sessionUserId, sessionName, sessionEmail]);
 
     // Fetch full profile from DB (session only carries name/email/role)
     useEffect(() => {
         if (!sessionUserId) return;
+        let cancelled = false;
         Promise.all([
             fetch('/api/v1/auth/me', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
             fetch('/api/v1/addresses', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
@@ -151,6 +171,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
             fetch('/api/v1/wallet', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
         ])
             .then(([profileJson, addrJson, vendorJson, walletJson]) => {
+                if (cancelled) return;
                 if (vendorJson?.success) {
                     Promise.resolve().then(() => setHasVendorApplication(!!vendorJson.data.hasApplication));
                 }
@@ -182,19 +203,23 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                 const defaultAddr = addresses?.[0];
                 setUserData(prev => ({
                     ...prev,
-                    fullName: p?.fullName || prev.fullName || '',
+                    fullName: p?.fullName || prev.fullName || sessionName || '',
                     phone: p?.phone || '',
                     businessName: p?.businessName || '',
-                    email: p?.email || '',
+                    email: p?.email || prev.email || sessionEmail || '',
                     pincode: p?.pincode || defaultAddr?.pincode || '',
                     image: p?.image || '',
                     address: defaultAddr?.shortAddress || defaultAddr?.fullAddress || '',
                     address2: defaultAddr?.flatInfo || defaultAddr?.landmark || '',
                     city: defaultAddr?.city || '',
                 }));
+                setProfileReady(true);
             })
-            .catch(() => {});
-    }, [sessionUserId]);
+            .catch(() => {
+                if (!cancelled) setProfileReady(true);
+            });
+        return () => { cancelled = true; };
+    }, [sessionUserId, sessionName, sessionEmail]);
 
     // One-shot role drift fix — separate from profile fetch so session.update()
     // doesn't re-trigger four API calls and hammer /api/auth/session (429).
@@ -389,7 +414,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1.5">
-                                        <h3 className="text-[16px] font-[700] text-[#181725] truncate">{userData.fullName || 'Welcome'}</h3>
+                                        {!profileReady && !userData.fullName ? (
+                                            <div className="h-5 w-28 rounded bg-gray-100 animate-pulse" aria-hidden />
+                                        ) : (
+                                            <h3 className="text-[16px] font-[700] text-[#181725] truncate">{userData.fullName || 'Welcome'}</h3>
+                                        )}
                                         {isProfileComplete && <BadgeCheck size={15} className="text-[#53B175] shrink-0" />}
                                     </div>
                                     <p className="text-[12px] text-gray-400 font-medium truncate">{userData.email}</p>
@@ -591,7 +620,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                             </button>
                                         </div>
                                         <div className="flex items-center gap-1.5 max-w-full">
-                                            <h3 className="text-[15px] font-[700] text-[#181725] truncate">{userData.fullName || 'Welcome'}</h3>
+                                            {!profileReady && !userData.fullName ? (
+                                                <div className="h-5 w-28 rounded bg-gray-100 animate-pulse" aria-hidden />
+                                            ) : (
+                                                <h3 className="text-[15px] font-[700] text-[#181725] truncate">{userData.fullName || 'Welcome'}</h3>
+                                            )}
                                             {isProfileComplete && <BadgeCheck size={14} className="text-[#53B175] shrink-0" />}
                                         </div>
                                         <p className="text-[11.5px] text-gray-400 font-medium mt-0.5 truncate max-w-full">{userData.email}</p>
@@ -710,14 +743,23 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 <div className="bg-white border border-gray-100 rounded-2xl px-6 lg:px-8 py-5 lg:py-6 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)] flex items-center justify-between gap-4">
                                     <div className="min-w-0">
                                         <p className="text-[10.5px] font-[800] text-[#53B175] uppercase tracking-[0.18em] mb-1">Welcome back</p>
-                                        <h2 className="text-[22px] lg:text-[26px] font-black text-[#181725] leading-tight truncate">
-                                            {userData.fullName ? `Hi, ${userData.fullName.split(' ')[0]}` : 'Hi there'}
-                                        </h2>
-                                        <p className="text-[13px] text-gray-500 mt-1.5 truncate">
-                                            {userData.businessName
-                                                ? `Manage ${userData.businessName}'s procurement from one place.`
-                                                : 'Manage your procurement from one place.'}
-                                        </p>
+                                        {!profileReady && !userData.fullName ? (
+                                            <div className="space-y-2" aria-hidden>
+                                                <div className="h-7 w-40 max-w-full rounded-lg bg-gray-100 animate-pulse" />
+                                                <div className="h-4 w-64 max-w-full rounded bg-gray-50 animate-pulse" />
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <h2 className="text-[22px] lg:text-[26px] font-black text-[#181725] leading-tight truncate">
+                                                    {userData.fullName ? `Hi, ${userData.fullName.split(' ')[0]}` : 'Hi there'}
+                                                </h2>
+                                                <p className="text-[13px] text-gray-500 mt-1.5 truncate">
+                                                    {userData.businessName
+                                                        ? `Manage ${userData.businessName}'s procurement from one place.`
+                                                        : 'Manage your procurement from one place.'}
+                                                </p>
+                                            </>
+                                        )}
                                     </div>
                                     {!isProfileComplete && (
                                         <button

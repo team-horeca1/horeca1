@@ -7,7 +7,6 @@ import { ChevronLeft, Plus, Minus, ShoppingCart, ClipboardList, Home, ChevronRig
 import { dal } from '@/lib/dal';
 import type { Vendor, VendorProduct, OrderList } from '@/types';
 import { useCart } from '@/context/CartContext';
-import { useWishlist } from '@/context/WishlistContext';
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
 import { toast } from 'sonner';
 
@@ -16,7 +15,6 @@ export default function OrderListDetailPage() {
     const params = useParams();
     const listId = params.id as string;
     const { addToCart, totalItems } = useCart();
-    const { wishlist } = useWishlist();
     const [orderList, setOrderList] = useState<OrderList | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [vendorsList, setVendorsList] = useState<Vendor[]>([]);

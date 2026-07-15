@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
     ArrowLeft,
-    Heart,
     ChevronDown,
     ChevronUp,
     Plus,
@@ -23,7 +22,6 @@ import { cn } from '@/lib/utils';
 import { PromotionBanners } from '@/components/features/PromotionBanners';
 import { DeliveryPoster } from '@/components/features/DeliveryPoster';
 import { useCart } from '@/context/CartContext';
-import { useWishlist } from '@/context/WishlistContext';
 import { toast } from 'sonner';
 import { dal } from '@/lib/dal';
 import type { Vendor as DalVendor, VendorProduct } from '@/types';
@@ -57,16 +55,11 @@ export default function ProductDetailPage() {
     const router = useRouter();
     const id = params.id as string;
 
-    useEffect(() => {
-        router.replace('/');
-    }, [router]);
-
     const [apiProduct, setApiProduct] = useState<ApiProduct | null>(null);
     const [pageLoading, setPageLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
     const [isDetailsExpanded, setIsDetailsExpanded] = useState(true);
     const { addToCart, groups, updateQuantity } = useCart();
-    const { isInWishlist, toggleWishlist } = useWishlist();
 
     useEffect(() => {
         fetch(`/api/v1/products/${id}`)
@@ -139,8 +132,6 @@ export default function ProductDetailPage() {
         minOrderQuantity: bulkPrices[0]?.minQty || 1,
         customerPriceApplied: hasCustomerPrice || undefined,
     }), [apiProduct, id, productName, productDescription, productCategory, productPrice, productImage, productUnit, stockQty, bulkPrices, hasCustomerPrice]);
-
-    const isLiked = isInWishlist(vendorProductForContext.id);
 
     // Track recently viewed vendor for "Continue Ordering" section
     const [dalVendors, setDalVendors] = useState<DalVendor[]>([]);
@@ -294,9 +285,6 @@ export default function ProductDetailPage() {
                                 )}
                             </div>
                             <div className="flex items-center gap-2 pt-1.5">
-                                <button onClick={() => toggleWishlist(vendorProductForContext)} className="text-[#181725] active:scale-90 transition-transform">
-                                    <Heart size={21} className={cn("transition-colors", isLiked ? "text-red-500 fill-red-500" : "text-[#181725]")} />
-                                </button>
                                 <button onClick={handleShare} className="text-[#181725] active:scale-90 transition-transform">
                                     <Share2 size={21} />
                                 </button>
@@ -405,9 +393,6 @@ export default function ProductDetailPage() {
                                     {product.name}
                                 </h1>
                                 <div className="flex items-center gap-4 pt-4 shrink-0">
-                                    <button onClick={() => toggleWishlist(vendorProductForContext)} className="w-14 h-14 rounded-full bg-white border border-gray-100 flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm active:scale-90">
-                                        <Heart size={26} className={cn("transition-colors", isLiked ? "text-red-500 fill-red-500" : "text-[#181725]")} />
-                                    </button>
                                     <button onClick={handleShare} className="w-14 h-14 rounded-full bg-white border border-gray-100 flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm active:scale-90 transition-transform">
                                         <Share2 size={26} className="text-[#181725]" />
                                     </button>

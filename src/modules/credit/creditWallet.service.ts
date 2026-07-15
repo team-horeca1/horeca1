@@ -627,7 +627,7 @@ export class CreditWalletService {
   // ── Reminders + daily runner ────────────────────────────────────────────────
 
   /** Send repayment reminders (2d/1d/0d before due, day 3 + day 10 overdue) over
-   *  in-app + SMS + WhatsApp. Meant to run once daily. */
+   *  in-app + SMS. Meant to run once daily. */
   async sendDueReminders(): Promise<{ sent: number }> {
     const wallets = await prisma.creditWallet.findMany({
       where: { outstandingAmount: { gt: 0 }, currentDueDate: { not: null }, status: { not: 'BLACKLISTED' } },
@@ -648,7 +648,7 @@ export class CreditWalletService {
       const amount = num(w.outstandingAmount);
       const body = `Your Horeca1 credit payment of ₹${amount} ${phrase}. Pay now from your wallet: /wallet`;
       const notifications = await getNotifications();
-      for (const channel of ['in_app', 'sms', 'whatsapp'] as const) {
+      for (const channel of ['in_app', 'sms'] as const) {
         await notifications.send({
           userId: w.userId,
           type: 'credit',

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Star, MapPin, Phone, Heart, Share2, ChevronLeft, Image as ImageIcon, Navigation, ClipboardList, CreditCard, Clock, Megaphone } from 'lucide-react';
+import { Star, MapPin, Phone, Share2, ChevronLeft, Image as ImageIcon, Navigation, ClipboardList, CreditCard, Clock, Megaphone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
@@ -260,10 +260,6 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                         <button className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gray-50 border border-gray-100 text-[13px] font-black text-gray-700 hover:bg-[#53B175]/5 hover:border-[#53B175]/40 hover:text-[#53B175] transition-all duration-200">
                             <Phone size={15} strokeWidth={2.5} />
                             Call Vendor
-                        </button>
-                        <button className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gray-50 border border-gray-100 text-[13px] font-black text-gray-700 hover:bg-[#53B175]/5 hover:border-[#53B175]/40 hover:text-[#53B175] transition-all duration-200">
-                            <Heart size={15} strokeWidth={2.5} />
-                            Favourite
                         </button>
                         <button onClick={handleShare} className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gray-50 border border-gray-100 text-[13px] font-black text-gray-700 hover:bg-[#53B175]/5 hover:border-[#53B175]/40 hover:text-[#53B175] transition-all duration-200">
                             <Share2 size={15} strokeWidth={2.5} />

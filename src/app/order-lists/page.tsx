@@ -8,7 +8,6 @@ import { dal } from '@/lib/dal';
 import type { Vendor, VendorProduct, OrderList } from '@/types';
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
 import { useCart } from '@/context/CartContext';
-import { useWishlist } from '@/context/WishlistContext';
 import { toast } from 'sonner';
 import { useSession } from 'next-auth/react';
 import { CreateListOverlay } from '@/components/features/order-lists/CreateListOverlay';
@@ -20,7 +19,6 @@ export default function OrderListsPage() {
     const { data: session, status: sessionStatus } = useSession();
     const isLoggedIn = sessionStatus === 'authenticated';
     const { totalItems, addToCart } = useCart();
-    const { wishlist } = useWishlist();
     const [allLists, setAllLists] = React.useState<OrderList[]>([]);
     const [isCreateOverlayOpen, setIsCreateOverlayOpen] = React.useState(false);
     const [editingList, setEditingList] = React.useState<OrderList | null>(null);

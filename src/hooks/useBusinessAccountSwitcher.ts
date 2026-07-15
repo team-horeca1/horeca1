@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useCart } from '@/context/CartContext';
-import { useWishlist } from '@/context/WishlistContext';
 import { clearForcePickerCookie, clearDismissFlag } from '@/lib/postLoginPicker';
 import { redirectIfPortalMismatch } from '@/lib/portalRouting';
 import { ACCOUNTS_REFRESH_EVENT } from '@/lib/addressUsability';
@@ -70,7 +69,6 @@ export function useBusinessAccountSwitcher() {
   const pathname = usePathname();
   const router = useRouter();
   const { clearCart } = useCart();
-  const { clearWishlist } = useWishlist();
 
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -265,7 +263,6 @@ export function useBusinessAccountSwitcher() {
             || `Failed to switch account (HTTP ${res.status})`;
           throw new AccountSwitchError(msg);
         }
-        clearWishlist();
         await update({ activeBusinessAccountId: businessAccountId, activeOutletId: outletId ?? undefined });
         broadcastAuthEvent('account-switched', {
           userId,
@@ -283,7 +280,7 @@ export function useBusinessAccountSwitcher() {
         releaseBootstrapLock();
       }
     },
-    [switching, activeBusinessAccountId, accounts, pathname, clearWishlist, update, router, userId],
+    [switching, activeBusinessAccountId, accounts, pathname, update, router, userId],
   );
 
   const switchOutlet = useCallback(
@@ -439,7 +436,6 @@ export function useBusinessAccountSwitcher() {
 
   const handleSignOut = useCallback(async () => {
     clearCart();
-    clearWishlist();
     clearForcePickerCookie();
     clearDismissFlag();
     clearUserClientStores(userId);
@@ -447,7 +443,7 @@ export function useBusinessAccountSwitcher() {
     broadcastAuthEvent('signed-out', { userId });
     void clearAllAdminImpersonation();
     await clientLogout('/');
-  }, [clearCart, clearWishlist, userId]);
+  }, [clearCart, userId]);
 
   const refresh = useCallback(async () => {
     if (vendorImpersonating) await fetchVendorImpersonationContext();

@@ -7,7 +7,6 @@ const CUSTOMER_PROTECTED_PREFIXES = [
   '/orders',
   '/order-lists',
   '/profile',
-  '/wishlist',
   '/account',
 ];
 

@@ -2665,6 +2665,7 @@ export default function ProductsPage() {
                                                     placeholder="0.00"
                                                     className={inputCls}
                                                 />
+                                                <p className="mt-1 text-[11px] text-[#7C7C7C]">Accounting metadata only — does not change settlement math.</p>
                                             </div>
                                         </div>
                                 </FormSection>

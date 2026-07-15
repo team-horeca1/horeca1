@@ -843,12 +843,25 @@ function SendPaymentReminderModal({
         }))
         : OVERDUE_CUSTOMERS_FALLBACK;
 
-    const handleSendReminder = (id: string, name: string) => {
+    const handleSendReminder = async (id: string, name: string) => {
         setSendingId(id);
-        setTimeout(() => {
+        try {
+            const res = await fetch('/api/v1/vendor/credit/remind', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: id }),
+            });
+            const json = await res.json();
+            if (json.success) {
+                toast.success(`Reminder sent to ${name} successfully!`);
+            } else {
+                toast.error(json.error?.message || 'Failed to send payment reminder');
+            }
+        } catch {
+            toast.error('Network error sending payment reminder');
+        } finally {
             setSendingId(null);
-            toast.success(`Payment reminder dispatch queued for ${name}!`);
-        }, 800);
+        }
     };
 
     return (
@@ -857,7 +870,7 @@ function SendPaymentReminderModal({
                 <div className="p-6 border-b border-gray-100 flex items-center justify-between">
                     <div>
                         <h3 className="text-[18px] font-bold text-gray-900">Send Payment Reminders</h3>
-                        <p className="text-[12px] text-gray-500">Notify credit customers with outstanding or overdue balances via SMS/WhatsApp.</p>
+                        <p className="text-[12px] text-gray-500">Notify credit customers with outstanding or overdue balances via SMS.</p>
                     </div>
                     <button onClick={onClose} className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
                         <X size={20} />

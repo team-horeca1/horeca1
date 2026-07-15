@@ -2,11 +2,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Search, X, Star, Heart, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, Search, X, Star, ShoppingCart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { dal } from '@/lib/dal';
 import type { Vendor, VendorProduct, VendorSummary, Category } from '@/types';
-import { useWishlist } from '@/context/WishlistContext';
 import { useCart } from '@/context/CartContext';
 
 interface MobileSearchOverlayProps {
@@ -20,7 +19,6 @@ interface MobileSearchOverlayProps {
 export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: MobileSearchOverlayProps) {
     const [searchQuery, setSearchQuery] = useState(initialQuery);
     const prevOpenRef = React.useRef(false);
-    const { wishlist } = useWishlist();
     const { totalItems } = useCart();
 
     const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -151,14 +149,6 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                        <Link href="/wishlist" onClick={onClose} className="relative p-1">
-                            <Heart size={20} className="text-[#181725]" />
-                            {wishlist.length > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 bg-[#FF4B4B] text-white text-[8px] w-3.5 h-3.5 flex items-center justify-center rounded-full font-extrabold border-[1.5px] border-white">
-                                    {wishlist.length}
-                                </span>
-                            )}
-                        </Link>
                         <Link href="/cart" onClick={onClose} className="relative p-1">
                             <ShoppingCart size={20} className="text-[#181725]" />
                             {totalItems > 0 && (

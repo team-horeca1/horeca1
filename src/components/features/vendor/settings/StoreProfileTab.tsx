@@ -2,6 +2,7 @@
 
 import { Store } from 'lucide-react';
 import { ImageUploadField } from '@/components/ui/ImageUploadField';
+import { cn } from '@/lib/utils';
 import { VendorSettingsSaveBar } from './VendorSettingsSaveBar';
 
 export interface StoreProfileTabProps {
@@ -36,6 +37,8 @@ export interface StoreProfileTabProps {
   saving: boolean;
   saved: boolean;
   onSave: () => void;
+  /** Admin View: settings are read-only so admins don't accidentally mutate vendor config */
+  readOnly?: boolean;
 }
 
 export function StoreProfileTab(props: StoreProfileTabProps) {
@@ -46,14 +49,24 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
     creditEnabled, setCreditEnabled,
     addressLine, setAddressLine, city, setCity, stateName, setStateName,
     addressPincode, setAddressPincode, gstNumber, setGstNumber,
-    saving, saved, onSave,
+    saving, saved, onSave, readOnly = false,
   } = props;
+
+  const fieldClass = cn(
+    'w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40',
+    readOnly && 'bg-gray-50 text-gray-600 cursor-not-allowed',
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 pb-1 border-b border-[#F5F5F5]">
         <Store size={18} className="text-[#299E60]" />
         <h2 className="text-[16px] font-bold text-[#181725]">Store profile</h2>
+        {readOnly && (
+          <span className="ml-auto text-[10px] font-extrabold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+            Admin View — read only
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] gap-6 xl:gap-8">
@@ -64,7 +77,8 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
               type="text"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
-              className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40"
+              disabled={readOnly}
+              className={fieldClass}
             />
           </div>
           <div>
@@ -73,7 +87,11 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
-              className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-[#299E60]/40 resize-none"
+              disabled={readOnly}
+              className={cn(
+                'w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-[#299E60]/40 resize-none',
+                readOnly && 'bg-gray-50 text-gray-600 cursor-not-allowed',
+              )}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -82,7 +100,8 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
               <select
                 value={vendorType}
                 onChange={(e) => setVendorType(e.target.value as typeof vendorType)}
-                className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40 bg-white"
+                disabled={readOnly}
+                className={cn(fieldClass, 'bg-white')}
               >
                 <option value="distributor">Distributor</option>
                 <option value="wholesaler">Wholesaler</option>
@@ -95,16 +114,21 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
                 type="number"
                 value={minOrderValue}
                 onChange={(e) => setMinOrderValue(e.target.value)}
-                className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40"
+                disabled={readOnly}
+                className={fieldClass}
               />
+              {readOnly && (
+                <p className="mt-1 text-[11px] text-amber-700 font-medium">Locked while in Admin View</p>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap gap-6">
-            <label className="flex items-center gap-3 cursor-pointer">
+            <label className={cn('flex items-center gap-3', readOnly ? 'cursor-not-allowed opacity-70' : 'cursor-pointer')}>
               <input
                 type="checkbox"
                 checked={creditEnabled}
                 onChange={(e) => setCreditEnabled(e.target.checked)}
+                disabled={readOnly}
                 className="w-5 h-5 accent-[#299E60]"
               />
               <span className="text-[14px] font-bold text-[#181725]">Enable credit for customers</span>
@@ -120,7 +144,7 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
+        <div className={cn('grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4', readOnly && 'pointer-events-none opacity-80')}>
           <ImageUploadField
             label="Store logo"
             aspectHint="Square — 200×200 recommended"
@@ -150,31 +174,35 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
               value={addressLine}
               onChange={(e) => setAddressLine(e.target.value)}
               rows={2}
-              className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-[#299E60]/40 resize-none"
+              disabled={readOnly}
+              className={cn(
+                'w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-[#299E60]/40 resize-none',
+                readOnly && 'bg-gray-50 text-gray-600 cursor-not-allowed',
+              )}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-[13px] font-bold text-[#181725] mb-1.5">City</label>
-              <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40" />
+              <input type="text" value={city} onChange={(e) => setCity(e.target.value)} disabled={readOnly} className={fieldClass} />
             </div>
             <div>
               <label className="block text-[13px] font-bold text-[#181725] mb-1.5">State</label>
-              <input type="text" value={stateName} onChange={(e) => setStateName(e.target.value)} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40" />
+              <input type="text" value={stateName} onChange={(e) => setStateName(e.target.value)} disabled={readOnly} className={fieldClass} />
             </div>
             <div>
               <label className="block text-[13px] font-bold text-[#181725] mb-1.5">Pincode</label>
-              <input type="text" inputMode="numeric" maxLength={6} value={addressPincode} onChange={(e) => setAddressPincode(e.target.value.replace(/[^\d]/g, ''))} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40" />
+              <input type="text" inputMode="numeric" maxLength={6} value={addressPincode} onChange={(e) => setAddressPincode(e.target.value.replace(/[^\d]/g, ''))} disabled={readOnly} className={fieldClass} />
             </div>
           </div>
           <div>
             <label className="block text-[13px] font-bold text-[#181725] mb-1.5">GSTIN</label>
-            <input type="text" value={gstNumber} onChange={(e) => setGstNumber(e.target.value.toUpperCase())} maxLength={15} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] font-mono outline-none focus:border-[#299E60]/40" />
+            <input type="text" value={gstNumber} onChange={(e) => setGstNumber(e.target.value.toUpperCase())} maxLength={15} disabled={readOnly} className={cn(fieldClass, 'font-mono')} />
           </div>
         </div>
       </div>
 
-      <VendorSettingsSaveBar saving={saving} saved={saved} onSave={onSave} />
+      {!readOnly && <VendorSettingsSaveBar saving={saving} saved={saved} onSave={onSave} />}
     </div>
   );
 }

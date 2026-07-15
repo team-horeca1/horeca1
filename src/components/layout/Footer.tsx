@@ -38,7 +38,6 @@ const FOOTER_LINKS = {
         'Shopping Cart',
         'Compare',
         'Help Ticket',
-        'Wishlist'
     ],
     groceries: [
         'Dairy & Eggs',
