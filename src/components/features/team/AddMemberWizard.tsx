@@ -53,7 +53,6 @@ export interface AddMemberWizardConfig {
   accent?: string;           // default '#299E60'
   outletsEndpoint?: string;  // overrides /api/v1/vendor/outlets
   teamEndpoint?: string;     // overrides /api/v1/vendor/team
-  modules?: ReadonlyArray<{ key: string; label: string }>; // overrides VENDOR_MODULES
   showStorefront?: boolean;  // vendor-only concept; default true for vendor, false otherwise
   skipOutletStep?: boolean;  // admin/brand — skip outlet picker (2-step wizard)
   businessAccountLabel?: string; // step-2 left card title — e.g. 'Customer Account'
@@ -69,37 +68,6 @@ interface AddMemberWizardProps {
 type PermissionsMap = Record<string, Record<string, boolean>>;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const VENDOR_MODULES: ReadonlyArray<{ key: string; label: string }> = [
-  { key: 'dashboard',    label: 'Dashboard' },
-  { key: 'products',     label: 'Products' },
-  { key: 'orders',       label: 'Orders' },
-  { key: 'repeatOrders', label: 'Repeat Orders' },
-  { key: 'inventory',    label: 'Inventory' },
-  { key: 'grn',          label: 'GRN' },
-  { key: 'dispatch',     label: 'Dispatch' },
-  { key: 'payments',     label: 'Payments' },
-  { key: 'creditLine',   label: 'Credit Line' },
-  { key: 'customers',    label: 'Customers' },
-  { key: 'users',        label: 'Team' },
-  { key: 'analytics',    label: 'Analytics' },
-  { key: 'promotions',   label: 'Promotions' },
-  { key: 'settings',     label: 'Settings' },
-];
-
-// Account-scope modules — narrower; no inventory/GRN/dispatch/customers/analytics/promotions
-const ACCOUNT_MODULES: ReadonlyArray<{ key: string; label: string }> = [
-  { key: 'dashboard',    label: 'Dashboard' },
-  { key: 'orders',       label: 'Orders' },
-  { key: 'repeatOrders', label: 'Repeat Orders' },
-  { key: 'payments',     label: 'Payments' },
-  { key: 'creditLine',   label: 'Credit Line' },
-  { key: 'users',        label: 'Team' },
-  { key: 'outlets',      label: 'Outlets' },
-  { key: 'settings',     label: 'Settings' },
-];
-
-const ACTIONS = ['view', 'create', 'edit', 'delete', 'approve'] as const;
 
 const ROLE_STYLES: Record<string, { color: string; bg: string; border: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
   'Vendor Admin':      { color: '#D97706', bg: '#FFF7E6', border: '#F59E0B', Icon: Crown },
@@ -142,7 +110,6 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
     ?? (scope === 'account' && config?.accountId ? `/api/v1/account/${config.accountId}/outlets` : '/api/v1/vendor/outlets');
   const teamEndpoint = config?.teamEndpoint
     ?? (scope === 'account' && config?.accountId ? `/api/v1/account/${config.accountId}/users` : '/api/v1/vendor/team');
-  const modules = config?.modules ?? (scope === 'account' ? ACCOUNT_MODULES : VENDOR_MODULES);
   // Storefront access toggle is a vendor-team concept (vendor staff acting
   // as a buyer on the storefront). It has no meaning for account members.
   const showStorefront = config?.showStorefront ?? (scope === 'vendor');

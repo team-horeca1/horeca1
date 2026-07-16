@@ -3,6 +3,20 @@
  * exist per actor scope, their human labels, valid actions, and routes.
  */
 
+import {
+  orderedScopeModuleKeys,
+  scopeModuleGroups,
+  scopeModuleLabels,
+  type MatrixModuleGroup,
+} from './matrixGroups';
+
+export type { MatrixModuleGroup };
+export {
+  orderedScopeModuleKeys as scopeModuleKeys,
+  scopeModuleGroups,
+  scopeModuleLabels,
+};
+
 export type RoleScope = 'account' | 'vendor' | 'brand' | 'admin' | 'delivery';
 
 export type Module =
@@ -84,10 +98,10 @@ const VENDOR_FEATURES: PortalFeatureMap = {
   orders:       { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/vendor/orders'] },
   repeatOrders: { label: 'Repeat Orders', actions: MODULE_ACTIONS.repeatOrders, routes: [] },
   inventory:    { label: 'Inventory', actions: MODULE_ACTIONS.inventory, routes: ['/vendor/inventory'] },
-  grn:          { label: 'GRN', actions: MODULE_ACTIONS.grn, routes: ['/vendor/warehouse'] },
+  grn:          { label: 'Warehouse', actions: MODULE_ACTIONS.grn, routes: ['/vendor/warehouse'] },
   dispatch:     { label: 'Dispatch', actions: MODULE_ACTIONS.dispatch, routes: ['/vendor/warehouse'] },
   deliveries:   { label: 'Deliveries', actions: MODULE_ACTIONS.deliveries, routes: ['/vendor/warehouse'] },
-  payments:     { label: 'Payments', actions: MODULE_ACTIONS.payments, routes: ['/vendor/wallet', '/vendor/ledger'] },
+  payments:     { label: 'Wallet & Ledger', actions: MODULE_ACTIONS.payments, routes: ['/vendor/wallet', '/vendor/ledger'] },
   creditLine:   { label: 'Credit & Collections', actions: MODULE_ACTIONS.creditLine, routes: ['/vendor/credit', '/vendor/collections'] },
   customers:    { label: 'Customers', actions: MODULE_ACTIONS.customers, routes: ['/vendor/customers'] },
   users:        { label: 'Team', actions: MODULE_ACTIONS.users, routes: ['/vendor/team'] },
@@ -144,11 +158,6 @@ export const PORTAL_FEATURES: Record<RoleScope, PortalFeatureMap> = {
   delivery: DELIVERY_FEATURES,
 };
 
-/** Module keys that exist for a given scope — derived from PORTAL_FEATURES. */
-export function scopeModuleKeys(scope: RoleScope): Module[] {
-  return Object.keys(PORTAL_FEATURES[scope]) as Module[];
-}
-
 /** Human label for a module within a scope. */
 export function moduleLabel(scope: RoleScope, module: string): string {
   const feat = PORTAL_FEATURES[scope][module as Module];
@@ -169,7 +178,7 @@ const ACTION_ORDER = ['view', 'create', 'edit', 'delete', 'approve', 'order', 'p
 
 export function scopeActionColumns(scope: RoleScope): string[] {
   const set = new Set<string>();
-  for (const mod of scopeModuleKeys(scope)) {
+  for (const mod of orderedScopeModuleKeys(scope)) {
     for (const a of scopeModuleActions(scope, mod)) set.add(a);
   }
   return ACTION_ORDER.filter((a) => set.has(a));
@@ -178,7 +187,7 @@ export function scopeActionColumns(scope: RoleScope): string[] {
 /** MODULE_ACTIONS-shaped record for the permissions registry API. */
 export function modulesForPortalScope(scope: RoleScope): Record<string, readonly string[]> {
   const out: Record<string, readonly string[]> = {};
-  for (const mod of scopeModuleKeys(scope)) {
+  for (const mod of orderedScopeModuleKeys(scope)) {
     const actions = scopeModuleActions(scope, mod);
     if (actions.length > 0) out[mod] = actions;
   }

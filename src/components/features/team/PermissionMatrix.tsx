@@ -5,11 +5,13 @@ import { Check } from 'lucide-react';
 import {
   moduleLabel,
   scopeActionColumns,
-  scopeModuleKeys,
   scopeModuleActions,
+  scopeModuleGroups,
+  scopeModuleLabels,
   type RoleScope,
 } from '@/lib/permissions/portalFeatures';
 import { countScopedPermissions } from '@/lib/permissions/engine';
+
 type PermissionsMap = Record<string, Record<string, boolean>>;
 
 interface PermissionMatrixProps {
@@ -28,6 +30,67 @@ export function countMatrixPermissions(
   return countScopedPermissions(permissions as Parameters<typeof countScopedPermissions>[0], scope);
 }
 
+export { scopeModuleLabels };
+
+function PermissionRow({
+  scope,
+  moduleKey,
+  columns,
+  permissions,
+  readOnly,
+  accent,
+  onToggle,
+}: {
+  scope: RoleScope;
+  moduleKey: string;
+  columns: string[];
+  permissions: PermissionsMap;
+  readOnly: boolean;
+  accent: string;
+  onToggle: (m: string, a: string) => void;
+}) {
+  const allowed = scopeModuleActions(scope, moduleKey as Parameters<typeof scopeModuleActions>[1]);
+
+  return (
+    <tr className="border-t border-gray-50 hover:bg-gray-50/50">
+      <td className="px-4 py-2.5 font-bold text-[#181725]">{moduleLabel(scope, moduleKey)}</td>
+      {columns.map((a) => {
+        const isAllowed = allowed.includes(a);
+        const on = !!permissions[moduleKey]?.[a];
+        return (
+          <td key={a} className="text-center px-2 py-2.5">
+            {isAllowed ? (
+              readOnly ? (
+                <span
+                  className="w-[24px] h-[24px] rounded-md border-2 flex items-center justify-center mx-auto"
+                  style={on
+                    ? { borderColor: accent, backgroundColor: accent, color: 'white' }
+                    : { borderColor: '#E5E7EB', backgroundColor: 'white' }}
+                >
+                  {on && <Check size={14} />}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onToggle(moduleKey, a)}
+                  className="w-[24px] h-[24px] rounded-md border-2 flex items-center justify-center transition-colors mx-auto"
+                  style={on
+                    ? { borderColor: accent, backgroundColor: accent, color: 'white' }
+                    : { borderColor: '#E5E7EB', backgroundColor: 'white' }}
+                >
+                  {on && <Check size={14} />}
+                </button>
+              )
+            ) : (
+              <span className="text-gray-200">—</span>
+            )}
+          </td>
+        );
+      })}
+    </tr>
+  );
+}
+
 export function PermissionMatrix({
   scope,
   permissions,
@@ -37,7 +100,7 @@ export function PermissionMatrix({
   className = '',
 }: PermissionMatrixProps) {
   const columns = scopeActionColumns(scope);
-  const modules = scopeModuleKeys(scope);
+  const groups = scopeModuleGroups(scope);
 
   const toggle = (m: string, a: string) => {
     if (readOnly || !onChange) return;
@@ -63,47 +126,30 @@ export function PermissionMatrix({
           </tr>
         </thead>
         <tbody>
-          {modules.map((m) => {
-            const allowed = scopeModuleActions(scope, m);
-            return (
-              <tr key={m} className="border-t border-gray-50 hover:bg-gray-50/50">
-                <td className="px-4 py-2.5 font-bold text-[#181725]">{moduleLabel(scope, m)}</td>
-                {columns.map((a) => {
-                  const isAllowed = allowed.includes(a);
-                  const on = !!permissions[m]?.[a];
-                  return (
-                    <td key={a} className="text-center px-2 py-2.5">
-                      {isAllowed ? (
-                        readOnly ? (
-                          <span
-                            className="w-[24px] h-[24px] rounded-md border-2 flex items-center justify-center mx-auto"
-                            style={on
-                              ? { borderColor: accent, backgroundColor: accent, color: 'white' }
-                              : { borderColor: '#E5E7EB', backgroundColor: 'white' }}
-                          >
-                            {on && <Check size={14} />}
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => toggle(m, a)}
-                            className="w-[24px] h-[24px] rounded-md border-2 flex items-center justify-center transition-colors mx-auto"
-                            style={on
-                              ? { borderColor: accent, backgroundColor: accent, color: 'white' }
-                              : { borderColor: '#E5E7EB', backgroundColor: 'white' }}
-                          >
-                            {on && <Check size={14} />}
-                          </button>
-                        )
-                      ) : (
-                        <span className="text-gray-200">—</span>
-                      )}
-                    </td>
-                  );
-                })}
+          {groups.map((group) => (
+            <React.Fragment key={group.label}>
+              <tr className="bg-[#F5F5F5] border-t border-gray-100">
+                <td
+                  colSpan={columns.length + 1}
+                  className="px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-[#7C7C7C]"
+                >
+                  {group.label}
+                </td>
               </tr>
-            );
-          })}
+              {group.modules.map((m) => (
+                <PermissionRow
+                  key={m}
+                  scope={scope}
+                  moduleKey={m}
+                  columns={columns}
+                  permissions={permissions}
+                  readOnly={readOnly}
+                  accent={accent}
+                  onToggle={toggle}
+                />
+              ))}
+            </React.Fragment>
+          ))}
         </tbody>
       </table>
     </div>
