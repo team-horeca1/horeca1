@@ -257,7 +257,15 @@ export function Navbar() {
 
                             {/* Logo */}
                             <Link href="/" className="shrink-0">
-                                <Image src="/Horeca1.png" alt="Horeca1" width={100} height={26} className="h-[26px] w-auto object-contain" priority />
+                                <Image
+                                    src="/Horeca1.png"
+                                    alt="Horeca1"
+                                    width={100}
+                                    height={26}
+                                    className="h-[26px] w-auto object-contain"
+                                    style={{ width: 'auto', height: 'auto' }}
+                                    priority
+                                />
                             </Link>
 
                             {/* Search Bar — flex-1, fills available space. Always visible. */}
@@ -277,8 +285,8 @@ export function Navbar() {
                             {/* Divider */}
                             <div className="h-9 w-px bg-gray-200 shrink-0" />
 
-                            {/* Iconized nav: Home | Vendors | Offers | Lists (+ Dashboard if logged in) */}
-                            <div className="flex items-center gap-1">
+                            {/* Iconized nav — scroll when Dashboard+Rewards crowd the row */}
+                            <div className="flex items-center gap-1 min-w-0 max-w-[min(42vw,420px)] overflow-x-auto scrollbar-none">
                                 {desktopNavItems.map(({ name, href, Icon }) => {
                                     const isActive = pathname === href;
                                     return (

@@ -5,21 +5,12 @@
  */
 import { prisma } from '@/lib/prisma';
 import { sanitizePermissionsForScope } from '@/lib/permissions/engine';
+import { sortPermissionJson } from '@/lib/permissions/sortPermissionJson';
 import type { RoleScope } from '@/lib/permissions/portalFeatures';
 import type { Prisma } from '@prisma/client';
 import { markSessionStaleForRole } from '@/lib/sessionStale';
 
-export function sortPermissionJson(v: unknown): unknown {
-  if (Array.isArray(v)) return v.map(sortPermissionJson);
-  if (v && typeof v === 'object') {
-    return Object.fromEntries(
-      Object.entries(v as Record<string, unknown>)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([k, val]) => [k, sortPermissionJson(val)]),
-    );
-  }
-  return v;
-}
+export { sortPermissionJson } from '@/lib/permissions/sortPermissionJson';
 
 function sanitizeRawPermissions(
   input: Record<string, Record<string, boolean>>,
@@ -57,6 +48,40 @@ export async function resolveTeamMemberRoleFromPermissions(args: {
 }): Promise<ResolvedTeamRole> {
   const { scope, permissions, businessAccountId, createdBy, existingRoleId } = args;
   const sanitized = sanitizeRawPermissions(permissions, scope);
+  const sanitizedStr = JSON.stringify(sortPermissionJson(sanitized));
+
+  // Prefer a template when the matrix matches (e.g. Super Admin / Vendor Admin).
+  // Invite UI historically POSTed only `permissions`, which spawned Custom-* rows
+  // and broke owner-role bypass (Team nav needs users.* / isAdminPermissionOwner).
+  const templates = await prisma.accountRole.findMany({
+    where:
+      scope === 'admin'
+        ? { scope: 'admin', isTemplate: true, businessAccountId: null }
+        : {
+            scope,
+            isTemplate: true,
+            OR: [
+              { businessAccountId: null },
+              ...(businessAccountId ? [{ businessAccountId }] : []),
+            ],
+          },
+    select: { id: true, name: true, scope: true, description: true, permissions: true },
+  });
+  const templateMatch = templates.find((r) => {
+    const tplSanitized = sanitizeRawPermissions(
+      (r.permissions ?? {}) as Record<string, Record<string, boolean>>,
+      scope,
+    );
+    return JSON.stringify(sortPermissionJson(tplSanitized)) === sanitizedStr;
+  });
+  if (templateMatch) {
+    return {
+      id: templateMatch.id,
+      name: templateMatch.name,
+      scope: templateMatch.scope,
+      description: templateMatch.description,
+    };
+  }
 
   if (existingRoleId) {
     const existing = await prisma.accountRole.findUnique({
@@ -86,7 +111,6 @@ export async function resolveTeamMemberRoleFromPermissions(args: {
     }
   }
 
-  const sanitizedStr = JSON.stringify(sortPermissionJson(sanitized));
   const candidates = await prisma.accountRole.findMany({
     where:
       scope === 'admin'

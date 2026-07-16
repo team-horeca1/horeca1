@@ -21,6 +21,7 @@ import { buildInviteEmail, buildInviteSms } from '@/lib/email-templates/invite';
 import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import { markSessionStale } from '@/lib/sessionStale';
 import { resolveTeamMemberRoleFromPermissions } from '@/lib/teamRoleWrites';
+import { upsertTeamAccountMembership } from '@/lib/teamMembership';
 import { sendSms } from '@/lib/providers/sms';
 import { runInBackground } from '@/lib/asyncBackground';
 import type { AuthContext } from '@/middleware/auth';
@@ -232,10 +233,10 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         include: teamMemberInclude,
       });
 
-      await tx.businessAccountMember.upsert({
-        where: { userId_businessAccountId: { userId, businessAccountId } },
-        update: {},
-        create: { userId, businessAccountId, isPrimary: false, invitedBy: ctx.userId, acceptedAt: new Date() },
+      await upsertTeamAccountMembership(tx, {
+        userId,
+        businessAccountId,
+        invitedBy: ctx.userId,
       });
 
       // Replace any prior vendor-scope roles for this user+account.

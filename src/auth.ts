@@ -9,6 +9,7 @@ import { FORCE_PICKER_COOKIE } from '@/lib/postLoginPicker';
 import { redis } from '@/lib/redis';
 import { clearSessionRevoked, isSessionRevoked } from '@/lib/sessionStale';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
+import { ensureAdminInheritsShoppingAccount } from '@/lib/adminShoppingInherit';
 import { uniqueHcid } from '@/lib/hcid';
 import { phoneLookupVariants } from '@/lib/phone';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
@@ -609,8 +610,20 @@ async function loadOrProvisionActiveContext(
   targetAccountId: string | null,
   targetOutletId: string | null,
 ): Promise<ActiveContext | null> {
+  // Admin team members inherit the inviter/platform owner's shopping BA so
+  // storefront "Deliver to" shows the owner's outlet, not an empty placeholder.
+  if (role === 'admin') {
+    try {
+      await ensureAdminInheritsShoppingAccount({ memberUserId: userId });
+    } catch (err) {
+      console.error('[auth] admin shopping inherit failed:', err);
+    }
+  }
+
   let active = await loadActiveContext(userId, targetAccountId, targetOutletId);
-  if (!active && (role === 'customer' || role === 'admin')) {
+  // Admin portal staff should not get an empty personal shopping BA on login.
+  // Storefront checkout can still provision later via resolveStorefrontContext.
+  if (!active && role === 'customer') {
     try {
       const legacyUser = await prisma.user.findUnique({
         where: { id: userId },

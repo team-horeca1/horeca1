@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { flatten, mergePermissions } from '@/lib/permissions/engine';
 import { ALL_PERMISSION_KEYS, type PermissionKey, type PermissionsJson } from '@/lib/permissions/registry';
 import { isOwnerRoleName } from '@/lib/permissions/portalFeatures';
+import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 import type { TeamRole } from '@prisma/client';
 
 const MAX_AVAILABLE_ACCOUNTS = 20;
@@ -91,11 +92,39 @@ export async function loadActiveContext(
 
     if (!user || user.accountMemberships.length === 0) return null;
 
-    // Pick the active account: explicit target wins, else primary, else first.
+    // Pick the active account: explicit target wins. Otherwise prefer the
+    // primary membership (team invites set the owner's BA as primary so
+    // members inherit that business's outlets/address). Fall back to any
+    // membership that already has a usable delivery outlet.
     const memberships = user.accountMemberships;
     let chosen = targetAccountId
       ? memberships.find((m) => m.businessAccount.id === targetAccountId)
-      : (memberships.find((m) => m.isPrimary) ?? memberships[0]);
+      : null;
+    if (!chosen && !targetAccountId) {
+      const accountIds = memberships.map((m) => m.businessAccount.id);
+      const outletRows = await prisma.outlet.findMany({
+        where: { businessAccountId: { in: accountIds }, isActive: true },
+        select: {
+          businessAccountId: true,
+          pincode: true,
+          latitude: true,
+          longitude: true,
+        },
+      });
+      const usableAccountIds = new Set<string>();
+      for (const o of outletRows) {
+        if (hasUsableDeliveryLocation(o)) usableAccountIds.add(o.businessAccountId);
+      }
+      const primary = memberships.find((m) => m.isPrimary);
+      if (primary && usableAccountIds.has(primary.businessAccount.id)) {
+        chosen = primary;
+      } else {
+        chosen =
+          memberships.find((m) => usableAccountIds.has(m.businessAccount.id))
+          ?? primary
+          ?? memberships[0];
+      }
+    }
     if (!chosen) chosen = memberships[0];
     const account = chosen.businessAccount;
 

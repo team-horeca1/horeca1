@@ -8,6 +8,7 @@ import {
 import type { RoleItem } from './AddMemberWizard';
 import { PermissionMatrix, countMatrixPermissions } from './PermissionMatrix';
 import type { RoleScope } from '@/lib/permissions/portalFeatures';
+import { sortPermissionJson } from '@/lib/permissions/sortPermissionJson';
 import { FormErrorBanner, useFormFeedback } from '@/components/ui/form';
 import { parseJsonResponse } from '@/lib/apiError';
 import { toast } from 'sonner';
@@ -161,7 +162,8 @@ export function EditMemberModal({
   const isDirty =
     !selectedRoleId
     || !selectedRole
-    || JSON.stringify(permissions) !== JSON.stringify(selectedRole.permissions);
+    || JSON.stringify(sortPermissionJson(permissions))
+      !== JSON.stringify(sortPermissionJson(selectedRole.permissions));
 
   const handleSelectRole = useCallback((role: RoleItem) => {
     setSelectedRoleId(role.id);
@@ -208,12 +210,12 @@ export function EditMemberModal({
         }
         body = isDirty || !selectedRoleId ? { permissions } : { roleId: selectedRoleId };
       } else {
-        if (Object.keys(permissions).length === 0) {
+        if (!selectedRoleId && Object.keys(permissions).length === 0) {
           applyValidationErrors({}, 'Select at least one permission');
           setSubmitting(false);
           return;
         }
-        body = { permissions };
+        body = isDirty || !selectedRoleId ? { permissions } : { roleId: selectedRoleId };
         if (!allOutlets) body.outletIds = Array.from(selectedOutletIds);
         else body.outletIds = [];
         if (showStorefront) {

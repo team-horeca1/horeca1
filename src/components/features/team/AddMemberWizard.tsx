@@ -316,10 +316,16 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
     clearErrors();
     setIdentifierError(null);
     try {
+      // Prefer roleId when a template chip is selected so owner roles
+      // (Super Admin / Vendor Admin / Brand Admin) stay templates — not Custom-*.
       const body: Record<string, unknown> = {
         identifier: identifier.trim(),
-        permissions,
       };
+      if (selectedRoleId) {
+        body.roleId = selectedRoleId;
+      } else {
+        body.permissions = permissions;
+      }
       if (fullName.trim()) body.fullName = fullName.trim();
       if (password) body.password = password;
       if (!allOutlets && selectedOutletIds.size > 0) body.outletIds = Array.from(selectedOutletIds);

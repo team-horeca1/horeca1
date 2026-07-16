@@ -18,6 +18,7 @@ import { buildInviteEmail, buildInviteSms } from '@/lib/email-templates/invite';
 import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import { markSessionStale } from '@/lib/sessionStale';
 import { resolveTeamMemberRoleFromPermissions } from '@/lib/teamRoleWrites';
+import { upsertTeamAccountMembership } from '@/lib/teamMembership';
 import { sendSms } from '@/lib/providers/sms';
 import { runInBackground } from '@/lib/asyncBackground';
 
@@ -194,16 +195,14 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const inviteeUser = invitee; // tight non-null reference for the tx closure
 
     const result = await prisma.$transaction(async (tx) => {
-      const membership = await tx.businessAccountMember.upsert({
+      // Team members inherit this business's outlets/address — make it primary.
+      await upsertTeamAccountMembership(tx, {
+        userId: inviteeUser.id,
+        businessAccountId: id,
+        invitedBy: ctx.userId,
+      });
+      const membership = await tx.businessAccountMember.findUniqueOrThrow({
         where: { userId_businessAccountId: { userId: inviteeUser.id, businessAccountId: id } },
-        update: {},
-        create: {
-          userId: inviteeUser.id,
-          businessAccountId: id,
-          isPrimary: false,
-          invitedBy: ctx.userId,
-          acceptedAt: new Date(),
-        },
       });
       // outletIds empty → one assignment with outletId=null (account-wide).
       // outletIds non-empty → one assignment per outlet so the caller can

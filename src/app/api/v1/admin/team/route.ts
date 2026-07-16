@@ -25,6 +25,7 @@ import { buildInviteEmail } from '@/lib/email-templates/invite';
 import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import { markSessionStale } from '@/lib/sessionStale';
 import { resolveTeamMemberRoleFromPermissions } from '@/lib/teamRoleWrites';
+import { ensureAdminInheritsShoppingAccount } from '@/lib/adminShoppingInherit';
 import { passwordFieldsWithReveal, setUserPasswordWithReveal } from '@/lib/adminPasswordCipher';
 import type { AuthContext } from '@/middleware/auth';
 import type { TeamRole } from '@prisma/client';
@@ -175,6 +176,16 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
       },
       include: teamMemberInclude,
     });
+
+    // Share inviter's shopping outlets/address with the new admin team member.
+    try {
+      await ensureAdminInheritsShoppingAccount({
+        memberUserId: user.id,
+        invitedByUserId: ctx.userId,
+      });
+    } catch (err) {
+      console.error('[admin/team] shopping inherit failed:', err);
+    }
 
     logAction(ctx, req, {
       action: AUDIT_ACTIONS.adminTeamInvite,
