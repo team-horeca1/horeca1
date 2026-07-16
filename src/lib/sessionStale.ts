@@ -10,7 +10,17 @@ export async function markSessionStale(userId: string): Promise<void> {
   try {
     await redis.set(`session:stale:${userId}`, '1', 'EX', STALE_TTL_SEC);
   } catch {
-    /* non-critical */
+    /* non-critical — DB updatedAt below still forces JWT reload */
+  }
+  // Durable fallback when Redis is down or the client never sees the Redis flag:
+  // auth jwt compares User.updatedAt > token.userSyncedAt and reloads permissions.
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { updatedAt: new Date() },
+    });
+  } catch {
+    /* user may already be deleted */
   }
 }
 

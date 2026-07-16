@@ -140,20 +140,32 @@ export function TeamMemberList({
                   ) : (
                     <>
                       {canEdit && onEdit && (
-                        <button onClick={() => onEdit(member)}
-                          className="p-2 rounded-[8px] hover:bg-amber-50 transition-colors" title="Change role">
+                        <button
+                          onClick={() => onEdit(member)}
+                          className="p-2 rounded-[8px] hover:bg-amber-50 transition-colors"
+                          title="Change role"
+                          aria-label={`Change role for ${member.user.fullName}`}
+                        >
                           <Pencil size={14} className="text-[#F59E0B]" />
                         </button>
                       )}
                       {canEdit && onResetPassword && (
-                        <button onClick={() => onResetPassword(member)}
-                          className="p-2 rounded-[8px] hover:bg-gray-100 transition-colors" title="Reset password">
+                        <button
+                          onClick={() => onResetPassword(member)}
+                          className="p-2 rounded-[8px] hover:bg-gray-100 transition-colors"
+                          title="Reset password"
+                          aria-label={`Reset password for ${member.user.fullName}`}
+                        >
                           <KeyRound size={14} className="text-[#AEAEAE]" />
                         </button>
                       )}
                       {canDelete && onRemove && (
-                        <button onClick={() => onRemove(member)}
-                          className="p-2 rounded-[8px] hover:bg-red-50 transition-colors" title="Remove member">
+                        <button
+                          onClick={() => onRemove(member)}
+                          className="p-2 rounded-[8px] hover:bg-red-50 transition-colors"
+                          title="Remove member"
+                          aria-label={`Remove ${member.user.fullName}`}
+                        >
                           <Trash2 size={14} style={{ color: accent }} />
                         </button>
                       )}
