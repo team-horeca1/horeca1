@@ -8,21 +8,19 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
-import { assertAccountMember, assertCanMutateAccount } from '@/lib/accountAccess';
+import { assertAccountMember, assertCanMutateAccount, isAdminActingAsBusinessAccount } from '@/lib/accountAccess';
 import { adoptOrCreateOutlet, softDeactivateDuplicateActiveOutlets } from '@/lib/outletWrites';
 import { ensureInventoryRowsForOutlet } from '@/lib/inventoryOutlet';
-import {
-  effectiveCustomerUserId,
-  isImpersonatingBusinessAccount,
-} from '@/lib/resolveCustomerImpersonation';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
     const id = extractAccountId(req);
-    // GET: membership (or impersonation) is enough — seeded customers often have
-    // BA membership without Owner UserRole, so outlets.view would 403 (AUD-003).
-    // Mutations below still require outlets.create|edit|delete.
-    if (!isImpersonatingBusinessAccount(ctx, id)) {
+    // GET: membership or admin Admin View (customer/vendor/brand) is enough —
+    // seeded customers often have BA membership without Owner UserRole, so
+    // outlets.view would 403 (AUD-003). Mutations still require outlets.create|edit|delete
+    // (or admin acting as this BA).
+    if (!(await isAdminActingAsBusinessAccount(ctx, id))) {
       await assertAccountMember(ctx.userId, id);
     }
     // Clean multi-click clones before listing (idempotent soft-deactivate).

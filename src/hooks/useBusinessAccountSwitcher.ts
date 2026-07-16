@@ -23,6 +23,14 @@ import { clearUserClientStores } from '@/lib/userScopedStorage';
 import { clientLogout, markSigningOut } from '@/lib/clientLogout';
 import { toast } from 'sonner';
 
+/** Same-tab sync: each useBusinessAccountSwitcher() has its own state — broadcast outlet switches. */
+const VENDOR_OUTLET_SYNC_EVENT = 'horeca-vendor-outlet-sync';
+
+function emitVendorOutletSync(outletId: string) {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(VENDOR_OUTLET_SYNC_EVENT, { detail: { outletId } }));
+}
+
 /**
  * V2.2 — Multi-account + multi-outlet switcher hook.
  *
@@ -111,6 +119,17 @@ export function useBusinessAccountSwitcher() {
       unsub();
     };
   }, [syncImpersonationFlags]);
+
+  // Keep every hook instance on the same warehouse after Switch warehouse (Admin View).
+  useEffect(() => {
+    const onOutletSync = (e: Event) => {
+      const outletId = (e as CustomEvent<{ outletId?: string }>).detail?.outletId;
+      if (!outletId) return;
+      setVendorImpersonationOutletId((prev) => (prev === outletId ? prev : outletId));
+    };
+    window.addEventListener(VENDOR_OUTLET_SYNC_EVENT, onOutletSync);
+    return () => window.removeEventListener(VENDOR_OUTLET_SYNC_EVENT, onOutletSync);
+  }, []);
 
   // Re-check on navigation (start/exit redirect) and userId change.
   useEffect(() => {
@@ -306,6 +325,7 @@ export function useBusinessAccountSwitcher() {
             throw new AccountSwitchError(msg);
           }
           setVendorImpersonationOutletId(outletId);
+          emitVendorOutletSync(outletId);
           broadcastAuthEvent('account-switched', {
             userId,
             activeBusinessAccountId: vendorImpersonationAccount?.id ?? null,

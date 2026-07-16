@@ -17,14 +17,13 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
-import { assertAccountMember, assertCanMutateAccount } from '@/lib/accountAccess';
+import { assertAccountMember, assertCanMutateAccount, isAdminActingAsBusinessAccount } from '@/lib/accountAccess';
 import { markSessionStale } from '@/lib/sessionStale';
-import { isImpersonatingBusinessAccount } from '@/lib/resolveCustomerImpersonation';
 
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
   try {
     const id = extractId(_req);
-    if (!isImpersonatingBusinessAccount(ctx, id)) {
+    if (!(await isAdminActingAsBusinessAccount(ctx, id))) {
       await assertAccountMember(ctx.userId, id);
     }
     const account = await prisma.businessAccount.findUnique({

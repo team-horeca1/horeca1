@@ -67,15 +67,26 @@ interface OutletsOverlayProps {
   isOpen: boolean;
   onClose: () => void;
   accountId: string;
+  /** When set, open the editor for this outlet after load. */
+  initialOutletId?: string | null;
+  /** Open directly on the create form (Add warehouse). */
+  startInCreate?: boolean;
 }
 
-export function OutletsOverlay({ isOpen, onClose, accountId }: OutletsOverlayProps) {
+export function OutletsOverlay({
+  isOpen,
+  onClose,
+  accountId,
+  initialOutletId = null,
+  startInCreate = false,
+}: OutletsOverlayProps) {
   const confirm = useConfirm();
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<OutletDraft | null>(null); // null = closed, has .id = editing, no .id = creating
   const { refresh: refreshAccounts } = useBusinessAccountSwitcher();
   const { refreshAddresses } = useAddress();
+  const openedInitialRef = useRef<string | null>(null);
 
   const afterMutation = () => {
     load();
@@ -88,14 +99,43 @@ export function OutletsOverlay({ isOpen, onClose, accountId }: OutletsOverlayPro
     if (!accountId) return;
     Promise.resolve().then(() => setLoading(true));
     fetch(`/api/v1/account/${accountId}/outlets`)
-      .then((r) => r.json())
-      .then((json) => { if (json.success) setOutlets(json.data); })
+      .then(async (r) => {
+        const json = await r.json();
+        if (!r.ok || !json.success) {
+          toast.error(json.error?.message ?? 'Could not load warehouses');
+          return;
+        }
+        const list = json.data as Outlet[];
+        setOutlets(list);
+        if (
+          initialOutletId &&
+          openedInitialRef.current !== initialOutletId
+        ) {
+          const match = list.find((o) => o.id === initialOutletId);
+          if (match) {
+            openedInitialRef.current = initialOutletId;
+            setEditing(outletToDraft(match));
+            return;
+          }
+        }
+        if (startInCreate && !initialOutletId && openedInitialRef.current !== '__create__') {
+          openedInitialRef.current = '__create__';
+          setEditing({ ...EMPTY_DRAFT });
+        }
+      })
+      .catch(() => toast.error('Could not load warehouses'))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    if (isOpen) load();
-  }, [isOpen, accountId]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (isOpen) {
+      openedInitialRef.current = null;
+      load();
+    } else {
+      setEditing(null);
+      openedInitialRef.current = null;
+    }
+  }, [isOpen, accountId, initialOutletId, startInCreate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDelete = async (outlet: Outlet) => {
     const ok = await confirm({

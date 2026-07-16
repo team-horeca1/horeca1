@@ -70,11 +70,14 @@ export async function resolveVendorOutletContext(
 
   let outletId: string | null = null;
   if (!allOutlets) {
+    // Prefer an explicit ?outletId= when present (transfer / scoped reads).
+    // Inventory UI must not send a stale query after Switch warehouse — that is
+    // handled client-side via pendingOutletId + same-tab outlet sync.
     const candidate =
-      queryOutletId ??
-      impersonationOutletId ??
-      (vendorImpersonating ? undefined : ctx.activeOutletId) ??
-      (await getVendorPrimaryOutletId(vendor.businessAccountId));
+      (queryOutletId && queryOutletId !== 'all' ? queryOutletId : undefined)
+      ?? impersonationOutletId
+      ?? (vendorImpersonating ? undefined : ctx.activeOutletId)
+      ?? (await getVendorPrimaryOutletId(vendor.businessAccountId));
 
     if (candidate) {
       const belongsToVendor = await prisma.outlet.findFirst({

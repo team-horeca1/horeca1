@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Building2, Loader2, MapPin, Plus, Settings } from 'lucide-react';
+import { Building2, Loader2, MapPin, Pencil, Plus, Settings } from 'lucide-react';
 import { OutletsOverlay } from '@/components/auth/OutletsOverlay';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 
@@ -31,9 +31,11 @@ export function VendorOutletsManager({ embedded = false }: Props) {
   const [outlets, setOutlets] = useState<VendorOutletSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [showOverlay, setShowOverlay] = useState(false);
+  const [editOutletId, setEditOutletId] = useState<string | null>(null);
 
   useEffect(() => {
     if (searchParams.get('action') === 'add') {
+      setEditOutletId(null);
       setShowOverlay(true);
     }
   }, [searchParams]);
@@ -66,13 +68,16 @@ export function VendorOutletsManager({ embedded = false }: Props) {
           <div>
             <h1 className="text-[28px] font-bold text-[#181725]">Outlets &amp; warehouses</h1>
             <p className="text-[13px] text-[#7C7C7C] mt-1 max-w-lg">
-              Branches where you stock inventory and fulfill orders. Switch the active warehouse from the bar above.
+              Set each warehouse address and delivery pincodes here. Inventory and the sidebar Warehouse page use the active warehouse from the bar above.
             </p>
           </div>
           {currentAccount && (
             <button
               type="button"
-              onClick={() => setShowOverlay(true)}
+              onClick={() => {
+                setEditOutletId(null);
+                setShowOverlay(true);
+              }}
               className="inline-flex items-center gap-2 h-[40px] px-4 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold"
             >
               <Plus size={16} />
@@ -123,17 +128,30 @@ export function VendorOutletsManager({ embedded = false }: Props) {
                     {[o.city, o.pincode].filter(Boolean).join(' · ')}
                   </p>
                   <p className="text-[11px] text-[#299E60] font-semibold mt-2">
-                    {o.serviceAreaCount ?? 0} service pincodes · {o.totalQty ?? 0} units in stock
+                    {o.serviceAreaCount ?? 0} delivery pin{(o.serviceAreaCount ?? 0) === 1 ? '' : 's'} · {o.totalQty ?? 0} units in stock
                   </p>
                 </div>
               </div>
-              <Link
-                href={`/vendor/settings?tab=delivery&outletId=${o.id}`}
-                className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#181725] border border-[#EEEEEE] rounded-lg px-3 py-2 hover:bg-gray-50"
-              >
-                <Settings size={14} />
-                Service areas
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditOutletId(o.id);
+                    setShowOverlay(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#181725] border border-[#EEEEEE] rounded-lg px-3 py-2 hover:bg-gray-50"
+                >
+                  <Pencil size={14} />
+                  Edit address
+                </button>
+                <Link
+                  href={`/vendor/settings?tab=delivery&outletId=${o.id}`}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#181725] border border-[#EEEEEE] rounded-lg px-3 py-2 hover:bg-gray-50"
+                >
+                  <Settings size={14} />
+                  Delivery pins
+                </Link>
+              </div>
             </li>
           ))}
         </ul>
@@ -144,9 +162,12 @@ export function VendorOutletsManager({ embedded = false }: Props) {
           isOpen={showOverlay}
           onClose={() => {
             setShowOverlay(false);
+            setEditOutletId(null);
             void load();
           }}
           accountId={currentAccount.id}
+          initialOutletId={editOutletId}
+          startInCreate={editOutletId == null}
         />
       )}
     </div>

@@ -69,6 +69,7 @@ export class FulfillmentRouterService {
       input.deliveryPincode,
       input.deliveryLat,
       input.deliveryLng,
+      true, // multi-warehouse path only reaches here
     );
 
     for (const c of candidates) {
@@ -123,19 +124,26 @@ export class FulfillmentRouterService {
     deliveryPincode: string | null,
     deliveryLat: number | null,
     deliveryLng: number | null,
+    multiWarehouse = false,
   ): Promise<FulfillmentCandidate[]> {
     const serviceAreas = await prisma.serviceArea.findMany({
       where: { vendorId, isActive: true },
       select: { outletId: true, pincode: true },
     });
+    const legacy = serviceAreas.filter((sa) => sa.outletId === null);
+    const multi = multiWarehouse && outlets.length > 1;
 
     const outletServesPincode = (outletId: string): boolean => {
+      // No delivery pin at checkout → allow ranking by distance only.
       if (!deliveryPincode) return true;
       const scoped = serviceAreas.filter((sa) => sa.outletId === outletId);
       if (scoped.length === 0) {
-        const legacy = serviceAreas.filter((sa) => sa.outletId === null);
-        if (legacy.length === 0) return true;
-        return legacy.some((sa) => sa.pincode === deliveryPincode);
+        if (legacy.length > 0) {
+          return legacy.some((sa) => sa.pincode === deliveryPincode);
+        }
+        // Multi-warehouse with no scoped pins = does not serve this pin.
+        if (multi) return false;
+        return true;
       }
       return scoped.some((sa) => sa.pincode === deliveryPincode);
     };
@@ -157,10 +165,7 @@ export class FulfillmentRouterService {
       withDistance.push({ outletId: o.id, name: o.name, distanceKm: dist });
     }
 
-    if (withDistance.length === 0) {
-      return outlets.map((o) => ({ outletId: o.id, name: o.name, distanceKm: Number.MAX_SAFE_INTEGER }));
-    }
-
+    // Do not fall back to all warehouses when none serve the pin.
     return withDistance.sort((a, b) => a.distanceKm - b.distanceKm);
   }
 }

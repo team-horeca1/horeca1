@@ -132,11 +132,11 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
   const visibleOutlets = filterOutlets(currentAccount?.outlets ?? []);
   const canSwitchOutlets = visibleOutlets.length > 1;
   const isVendorPortal = portal === 'vendor';
-  // Vendor portal: always open warehouse picker (switch + add). Storefront: only when 2+ locations.
-  const canOpenOutletPicker = isVendorPortal ? visibleOutlets.length > 0 : canSwitchOutlets;
+  // Vendor: warehouse switching lives in the green strip — no nested picker here (avoids collision).
+  // Customer/brand: inline picker when there are 2+ locations.
+  const canOpenOutletPicker = !isVendorPortal && canSwitchOutlets;
 
   const [isOpen, setIsOpen] = useState(false);
-  const [showOutletPicker, setShowOutletPicker] = useState(false);
   const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [switchingId, setSwitchingId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -145,7 +145,6 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
     function onMouseDown(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
-        setShowOutletPicker(false);
       }
     }
     if (isOpen) {
@@ -157,7 +156,6 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
   useEffect(() => {
     function onOpenRequest() {
       setIsOpen(true);
-      setShowOutletPicker(false);
     }
     window.addEventListener(ACCOUNT_SWITCHER_OPEN_EVENT, onOpenRequest);
     return () => window.removeEventListener(ACCOUNT_SWITCHER_OPEN_EVENT, onOpenRequest);
@@ -189,15 +187,15 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
   };
 
   const handleOutletClick = async (outletId: string) => {
-    setShowOutletPicker(false);
     setIsOpen(false);
     await switchOutlet(outletId);
   };
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className={`relative${isOpen ? ' z-[100]' : ''}`} ref={dropdownRef}>
       <button
-        onClick={() => { setIsOpen((v) => !v); setShowOutletPicker(false); }}
+        type="button"
+        onClick={() => { setIsOpen((v) => !v); }}
         disabled={switching}
         className="flex items-center gap-3 cursor-pointer group disabled:opacity-50"
       >
@@ -221,9 +219,12 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
                 <MapPin size={10} className="shrink-0" />
               )}
               <span className="truncate">
-                {isVendorPortal ? 'Warehouse' : portal === 'customer' ? 'Deliver to' : 'Location'}
-                {' · '}
-                {currentOutlet.pincode ?? currentOutlet.name}
+                {isVendorPortal
+                  ? currentOutlet.name
+                  : portal === 'customer'
+                    ? `Deliver to · ${currentOutlet.pincode ?? currentOutlet.name}`
+                    : `Location · ${currentOutlet.pincode ?? currentOutlet.name}`}
+                {isVendorPortal && currentOutlet.pincode ? ` · ${currentOutlet.pincode}` : ''}
               </span>
               {currentOutlet.requiresAddressUpdate && (
                 <AlertCircle size={10} className="text-amber-500 shrink-0" />
@@ -240,7 +241,7 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-[calc(100%+8px)] w-[340px] bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#F0F0F0] z-50 overflow-hidden">
+        <div className="absolute right-0 top-[calc(100%+8px)] w-[340px] bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#F0F0F0] z-[100] overflow-hidden">
           {/* ── Current account header ── */}
           <div className="p-4 border-b border-[#F0F0F0]">
             <div className="flex items-center gap-3">
@@ -266,149 +267,108 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
             </div>
           </div>
 
-          {/* ── Warehouse / delivery location ── */}
-          {!showOutletPicker && isVendorPortal && visibleOutlets.length === 0 && copy.addOutletHref && (
-            <Link
-              href={copy.addOutletHref}
-              onClick={() => setIsOpen(false)}
-              className="block px-4 py-3 border-b border-[#F0F0F0] hover:bg-emerald-50/50 transition-colors"
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-[32px] h-[32px] rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                  <Warehouse size={14} className="text-emerald-700" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-emerald-800">Set up your first warehouse</p>
-                  <p className="text-[11px] text-[#7C7C7C] mt-0.5">Add where you stock inventory and ship orders from</p>
-                </div>
-                <ChevronRight size={14} className="text-emerald-600 shrink-0 mt-1" />
-              </div>
-            </Link>
-          )}
-
-          {visibleOutlets.length > 0 && !showOutletPicker && (
-            canOpenOutletPicker ? (
-              <button
-                onClick={() => setShowOutletPicker(true)}
-                className="w-full px-4 py-3 border-b border-[#F0F0F0] hover:bg-[#F8F8F8] flex items-center gap-3 text-left transition-colors"
-              >
-                <div className="w-[32px] h-[32px] rounded-full bg-[#F5F5F5] flex items-center justify-center shrink-0">
-                  {isVendorPortal ? (
-                    <Warehouse size={14} className="text-emerald-700" />
-                  ) : (
-                    <MapPin size={14} className="text-[#666]" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-semibold text-[#AEAEAE] uppercase tracking-wider">
-                    {copy.outletSectionTitle}
-                  </p>
-                  <p className="text-[13px] font-semibold text-[#181725] truncate">
-                    {currentOutlet?.name ?? visibleOutlets[0]?.name ?? 'Not selected'}
-                  </p>
-                  {(currentOutlet?.pincode ?? visibleOutlets[0]?.pincode) && (
-                    <p className="text-[11px] text-[#7C7C7C]">
-                      {currentOutlet?.pincode ?? visibleOutlets[0]?.pincode}
-                    </p>
-                  )}
-                  {copy.outletHint && (
-                    <p className="text-[10px] text-[#AEAEAE] mt-0.5">{copy.outletHint}</p>
-                  )}
-                </div>
-                <ChevronRight size={14} className="text-[#AEAEAE] shrink-0" />
-              </button>
-            ) : (
-              <div className="w-full px-4 py-3 border-b border-[#F0F0F0] flex items-center gap-3">
-                <div className="w-[32px] h-[32px] rounded-full bg-[#F5F5F5] flex items-center justify-center shrink-0">
-                  <MapPin size={14} className="text-[#666]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-semibold text-[#AEAEAE] uppercase tracking-wider">
-                    {copy.outletSectionTitle}
-                  </p>
-                  <p className="text-[13px] font-semibold text-[#181725] truncate">
-                    {currentOutlet?.name ?? visibleOutlets[0]?.name ?? 'Not selected'}
-                  </p>
-                  {copy.outletHint && (
-                    <p className="text-[10px] text-[#AEAEAE] mt-0.5">{copy.outletHint}</p>
-                  )}
-                </div>
-              </div>
-            )
-          )}
-
-          {/* ── Quick add warehouse (vendor) ── */}
-          {!showOutletPicker && isVendorPortal && copy.addOutletHref && visibleOutlets.length > 0 && (
-            <Link
-              href={copy.addOutletHref}
-              onClick={() => setIsOpen(false)}
-              className="flex items-center gap-3 w-full px-4 py-2.5 border-b border-[#F0F0F0] hover:bg-emerald-50/60 transition-colors"
-            >
-              <div className="w-[32px] h-[32px] rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                <Plus size={14} className="text-emerald-700" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-emerald-800">{copy.addOutletLabel}</p>
-                <p className="text-[10px] text-[#7C7C7C]">Open another branch or warehouse</p>
-              </div>
-            </Link>
-          )}
-
-          {/* ── Outlet / warehouse picker ── */}
-          {showOutletPicker && canOpenOutletPicker && (
-            <div className="border-b border-[#F0F0F0]">
-              <div className="px-4 py-2 flex items-center justify-between">
-                <p className="text-[10px] font-semibold text-[#AEAEAE] uppercase tracking-wider">
-                  {copy.outletPickerTitle}
-                </p>
-                <button
-                  onClick={() => setShowOutletPicker(false)}
-                  className="text-[11px] text-[#666] hover:text-[#181725] font-medium"
-                >
-                  Back
-                </button>
-              </div>
-              <div className="max-h-[200px] overflow-y-auto">
-                {visibleOutlets.map((o) => (
-                  <button
-                    key={o.id}
-                    onClick={() => handleOutletClick(o.id)}
-                    disabled={switching}
-                    className="w-full px-4 py-2.5 hover:bg-[#F8F8F8] flex items-center gap-3 text-left transition-colors"
-                  >
-                    {isVendorPortal ? (
-                      <Warehouse size={14} className="text-emerald-700 shrink-0" />
-                    ) : (
-                      <MapPin size={14} className="text-[#666] shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-[#181725] truncate">{o.name}</p>
-                      {o.pincode && <p className="text-[11px] text-[#AEAEAE]">{o.pincode}</p>}
-                    </div>
-                    {o.requiresAddressUpdate && (
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700">
-                        Address needed
-                      </span>
-                    )}
-                    {o.id === currentOutlet?.id && <Check size={14} className="text-[#299E60] shrink-0" />}
-                  </button>
-                ))}
-              </div>
-              {isVendorPortal && copy.addOutletHref && (
+          {/* ── Vendor: current warehouse (read-only — switch via green strip) ── */}
+          {isVendorPortal && (
+            <div className="px-4 py-3 border-b border-[#F0F0F0]">
+              {visibleOutlets.length === 0 && copy.addOutletHref ? (
                 <Link
                   href={copy.addOutletHref}
-                  onClick={() => { setIsOpen(false); setShowOutletPicker(false); }}
-                  className="flex items-center gap-2 px-4 py-3 border-t border-[#F0F0F0] text-emerald-800 hover:bg-emerald-50/60 transition-colors"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-start gap-3 hover:opacity-90"
                 >
-                  <Plus size={14} className="shrink-0" />
-                  <span className="text-[13px] font-semibold">{copy.addOutletLabel}</span>
+                  <div className="w-[32px] h-[32px] rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                    <Warehouse size={14} className="text-emerald-700" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-emerald-800">Set up your first warehouse</p>
+                    <p className="text-[11px] text-[#7C7C7C] mt-0.5">Add where you stock inventory and ship orders from</p>
+                  </div>
+                  <ChevronRight size={14} className="text-emerald-600 shrink-0 mt-1" />
+                </Link>
+              ) : (
+                <div className="flex items-start gap-3">
+                  <div className="w-[32px] h-[32px] rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
+                    <Warehouse size={14} className="text-emerald-700" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-semibold text-[#AEAEAE] uppercase tracking-wider">
+                      Active warehouse
+                    </p>
+                    <p className="text-[13px] font-semibold text-[#181725] truncate">
+                      {currentOutlet?.name ?? 'Not selected'}
+                    </p>
+                    {currentOutlet?.pincode && (
+                      <p className="text-[11px] text-[#7C7C7C]">{currentOutlet.pincode}</p>
+                    )}
+                    <p className="text-[10px] text-[#AEAEAE] mt-1">
+                      Use <span className="font-semibold text-emerald-700">Switch warehouse</span> in the bar above to change
+                    </p>
+                  </div>
+                </div>
+              )}
+              {copy.addOutletHref && visibleOutlets.length > 0 && (
+                <Link
+                  href={copy.addOutletHref}
+                  onClick={() => setIsOpen(false)}
+                  className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-bold text-emerald-800 hover:text-emerald-900"
+                >
+                  <Plus size={13} />
+                  {copy.addOutletLabel}
                 </Link>
               )}
             </div>
           )}
 
+          {/* ── Customer/brand: delivery location (inline picker, no nested panel) ── */}
+          {!isVendorPortal && visibleOutlets.length > 0 && (
+            <div className="border-b border-[#F0F0F0]">
+              <div className="px-4 py-2">
+                <p className="text-[10px] font-semibold text-[#AEAEAE] uppercase tracking-wider">
+                  {copy.outletSectionTitle}
+                </p>
+                {copy.outletHint && (
+                  <p className="text-[10px] text-[#AEAEAE] mt-0.5">{copy.outletHint}</p>
+                )}
+              </div>
+              {canOpenOutletPicker ? (
+                <div className="max-h-[200px] overflow-y-auto pb-1">
+                  {visibleOutlets.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => handleOutletClick(o.id)}
+                      disabled={switching}
+                      className="w-full px-4 py-2.5 hover:bg-[#F8F8F8] flex items-center gap-3 text-left transition-colors disabled:opacity-50"
+                    >
+                      <MapPin size={14} className="text-[#666] shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-[#181725] truncate">{o.name}</p>
+                        {o.pincode && <p className="text-[11px] text-[#AEAEAE]">{o.pincode}</p>}
+                      </div>
+                      {o.id === currentOutlet?.id && <Check size={14} className="text-[#299E60] shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 pb-3 flex items-center gap-3">
+                  <MapPin size={14} className="text-[#666] shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-[#181725] truncate">
+                      {currentOutlet?.name ?? visibleOutlets[0]?.name ?? 'Not selected'}
+                    </p>
+                    {(currentOutlet?.pincode ?? visibleOutlets[0]?.pincode) && (
+                      <p className="text-[11px] text-[#7C7C7C]">
+                        {currentOutlet?.pincode ?? visibleOutlets[0]?.pincode}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Other accounts ── */}
-          {otherAccounts.length > 0 && !showOutletPicker && !vendorImpersonating && (
+          {otherAccounts.length > 0 && !vendorImpersonating && (
             <div className="py-2">
               <div className="px-4 py-1.5">
                 <p className="text-[10px] font-semibold text-[#AEAEAE] uppercase tracking-wider">
@@ -478,60 +438,52 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
           )}
 
           {/* ── Actions ── */}
-          {!showOutletPicker && (
-            <div className="border-t border-[#F0F0F0] py-2">
-              {currentAccount && (
-                <Link
-                  href={
-                    portal === 'vendor'
-                      ? '/vendor/account'
-                      : portal === 'brand'
-                        ? `/account/${currentAccount.id}?from=brand`
-                        : `/account/${currentAccount.id}`
-                  }
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-[#F8F8F8] transition-colors"
-                >
-                  <div className="w-[36px] h-[36px] rounded-full bg-[#F5F5F5] flex items-center justify-center">
-                    <ShieldCheck size={16} className="text-[#666]" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[13px] font-semibold text-[#181725] block">
-                      {isVendorPortal ? 'Business account' : 'Manage account'}
-                    </span>
-                    {isVendorPortal && (
-                      <span className="text-[10px] text-[#AEAEAE]">GST, team, outlets &amp; permissions</span>
-                    )}
-                  </div>
-                </Link>
-              )}
-              {!vendorImpersonating && (
-                <button
-                  onClick={() => { setIsOpen(false); setShowCreateAccount(true); }}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-[#F8F8F8] transition-colors text-left"
-                >
-                  <div className="w-[36px] h-[36px] rounded-full bg-[#EEF8F1] flex items-center justify-center text-[#299E60]">
-                    <Plus size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[13px] font-semibold text-[#299E60] block">{copy.createBusinessLabel}</span>
-                    {copy.createBusinessHint && (
-                      <span className="text-[10px] text-[#AEAEAE]">{copy.createBusinessHint}</span>
-                    )}
-                  </div>
-                </button>
-              )}
-              <button
-                onClick={() => { setIsOpen(false); signOut(); }}
-                className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-red-50 transition-colors text-left"
+          <div className="border-t border-[#F0F0F0] py-2">
+            {/* Vendor: no "Business account" row — Settings/Account live in the sidebar. */}
+            {currentAccount && !isVendorPortal && (
+              <Link
+                href={
+                  portal === 'brand'
+                    ? `/account/${currentAccount.id}?from=brand`
+                    : `/account/${currentAccount.id}`
+                }
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-[#F8F8F8] transition-colors"
               >
-                <div className="w-[36px] h-[36px] rounded-full bg-red-50 flex items-center justify-center">
-                  <LogOut size={16} className="text-red-500" />
+                <div className="w-[36px] h-[36px] rounded-full bg-[#F5F5F5] flex items-center justify-center">
+                  <ShieldCheck size={16} className="text-[#666]" />
                 </div>
-                <span className="text-[13px] font-semibold text-red-500">Sign out</span>
+                <span className="text-[13px] font-semibold text-[#181725]">Manage account</span>
+              </Link>
+            )}
+            {!vendorImpersonating && !isVendorPortal && (
+              <button
+                type="button"
+                onClick={() => { setIsOpen(false); setShowCreateAccount(true); }}
+                className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-[#F8F8F8] transition-colors text-left"
+              >
+                <div className="w-[36px] h-[36px] rounded-full bg-[#EEF8F1] flex items-center justify-center text-[#299E60]">
+                  <Plus size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[13px] font-semibold text-[#299E60] block">{copy.createBusinessLabel}</span>
+                  {copy.createBusinessHint && (
+                    <span className="text-[10px] text-[#AEAEAE]">{copy.createBusinessHint}</span>
+                  )}
+                </div>
               </button>
-            </div>
-          )}
+            )}
+            <button
+              type="button"
+              onClick={() => { setIsOpen(false); signOut(); }}
+              className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-red-50 transition-colors text-left"
+            >
+              <div className="w-[36px] h-[36px] rounded-full bg-red-50 flex items-center justify-center">
+                <LogOut size={16} className="text-red-500" />
+              </div>
+              <span className="text-[13px] font-semibold text-red-500">Sign out</span>
+            </button>
+          </div>
         </div>
       )}
       {showCreateAccount && (
@@ -620,7 +572,7 @@ function UserOnlyMenu({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] w-[300px] bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#F0F0F0] z-50 overflow-hidden">
+        <div className="absolute right-0 top-[calc(100%+8px)] w-[300px] bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#F0F0F0] z-[100] overflow-hidden">
           <div className="p-4 border-b border-[#F0F0F0]">
             <div className="flex items-center gap-3">
               <div

@@ -4,6 +4,9 @@ const VENDOR_PORTAL_SEGMENTS = new Set([
   'orders',
   'products',
   'inventory',
+  'warehouse',
+  'outlets',
+  'account',
   'settings',
   'notifications',
   'team',
@@ -13,17 +16,18 @@ const VENDOR_PORTAL_SEGMENTS = new Set([
   'credit',
   'collections',
   'returns',
+  'claims',
   'customers',
+  'customer-groups',
   'price-lists',
   'promotions',
   'brand-mappings',
   'sales-team',
   'register',
   'setup',
-  'customer-groups',
 ]);
 
-/** True for /vendor/dashboard, /vendor/notifications, etc. False for /vendor/{store-slug}. */
+/** True for /vendor/dashboard, /vendor/outlets, etc. False for /vendor/{store-slug}. */
 export function isVendorPortalPath(pathname: string | null | undefined): boolean {
   if (!pathname?.startsWith('/vendor/')) return false;
   const segment = pathname.split('/').filter(Boolean)[1];

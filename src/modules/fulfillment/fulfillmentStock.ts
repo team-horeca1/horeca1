@@ -83,8 +83,16 @@ export function outletServesPincode(
   if (!deliveryPincode) return false;
   const scoped = ctx.outletPincodes.get(outletId);
   if (!scoped || scoped.length === 0) {
-    if (ctx.legacyPincodes.length === 0) return true;
-    return ctx.legacyPincodes.includes(deliveryPincode);
+    // Legacy vendor-wide areas (outletId = null) still apply.
+    if (ctx.legacyPincodes.length > 0) {
+      return ctx.legacyPincodes.includes(deliveryPincode);
+    }
+    // Multi-warehouse: empty scoped coverage = serves nothing (must set delivery pins).
+    if (ctx.multiWarehouseEnabled && ctx.outletIds.length > 1) {
+      return false;
+    }
+    // Single warehouse / MW off: no areas configured → serve all (legacy).
+    return true;
   }
   return scoped.includes(deliveryPincode);
 }

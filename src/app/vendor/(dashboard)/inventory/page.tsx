@@ -298,6 +298,14 @@ function BulkUploadModal({
 
 // ─── Inline row component ─────────────────────────────────────────────────────
 
+type StockPatch = {
+    qtyAvailable?: number;
+    qtyInTransit?: number;
+    qtyDamaged?: number;
+    qtyReturned?: number;
+    lowStockThreshold?: number;
+};
+
 function InventoryRow({
     item,
     onSaved,
@@ -317,58 +325,130 @@ function InventoryRow({
     const [editingThreshold, setEditingThreshold] = useState(false);
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
+    const dirtyRef = useRef(false);
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pendingPayload = useRef<StockPatch | null>(null);
+    const saveGen = useRef(0);
+    const abortRef = useRef<AbortController | null>(null);
+    const latestRef = useRef({
+        productId: item.productId,
+        id: item.id,
+        qtyReserved: item.qtyReserved,
+        outletId,
+        qty,
+        threshold,
+        transit,
+        damaged,
+        returned,
+        onSaved,
+    });
+    latestRef.current = {
+        productId: item.productId,
+        id: item.id,
+        qtyReserved: item.qtyReserved,
+        outletId,
+        qty,
+        threshold,
+        transit,
+        damaged,
+        returned,
+        onSaved,
+    };
 
-    // Sync if parent refreshes
+    // Sync from parent only when this row has no pending edits
     useEffect(() => {
+        if (dirtyRef.current) return;
         setQty(item.qtyAvailable);
         setTransit(item.qtyInTransit);
         setDamaged(item.qtyDamaged);
         setReturned(item.qtyReturned);
         setThreshold(item.lowStockThreshold);
-        setDirty(false);
     }, [item.qtyAvailable, item.qtyInTransit, item.qtyDamaged, item.qtyReturned, item.lowStockThreshold]);
 
-    const persist = useCallback(async (payload: {
-        qtyAvailable?: number;
-        qtyInTransit?: number;
-        qtyDamaged?: number;
-        qtyReturned?: number;
-        lowStockThreshold?: number;
-    }) => {
+    const persist = useCallback(async (payload: StockPatch) => {
+        const gen = ++saveGen.current;
+        abortRef.current?.abort();
+        const ac = new AbortController();
+        abortRef.current = ac;
         setSaving(true);
+        const snap = latestRef.current;
         try {
+            const body: Record<string, unknown> = {
+                productId: snap.productId,
+                ...payload,
+            };
+            if (snap.outletId) body.outletId = snap.outletId;
             const res = await fetch('/api/v1/vendor/inventory', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productId: item.productId, ...(outletId ? { outletId } : {}), ...payload }),
+                body: JSON.stringify(body),
+                signal: ac.signal,
             });
             const json = await res.json();
+            if (gen !== saveGen.current) return;
             if (!json.success) throw new Error(json.error?.message || 'Save failed');
+            dirtyRef.current = false;
             setDirty(false);
-            const newQty = payload.qtyAvailable ?? qty;
-            const newThreshold = payload.lowStockThreshold ?? threshold;
-            onSaved({
-                id: item.id,
+            pendingPayload.current = null;
+            const newQty = payload.qtyAvailable ?? snap.qty;
+            const newThreshold = payload.lowStockThreshold ?? snap.threshold;
+            snap.onSaved({
+                id: snap.id,
                 qtyAvailable: newQty,
-                qtyInTransit: payload.qtyInTransit ?? transit,
-                qtyDamaged: payload.qtyDamaged ?? damaged,
-                qtyReturned: payload.qtyReturned ?? returned,
+                qtyInTransit: payload.qtyInTransit ?? snap.transit,
+                qtyDamaged: payload.qtyDamaged ?? snap.damaged,
+                qtyReturned: payload.qtyReturned ?? snap.returned,
                 lowStockThreshold: newThreshold,
-                isLowStock: newQty - item.qtyReserved <= newThreshold,
+                isLowStock: newQty - snap.qtyReserved <= newThreshold,
             });
         } catch (err) {
+            if (err instanceof DOMException && err.name === 'AbortError') return;
+            if (gen !== saveGen.current) return;
             toast.error(err instanceof Error ? err.message : 'Save failed');
         } finally {
-            setSaving(false);
+            if (gen === saveGen.current) setSaving(false);
         }
-    }, [item.productId, item.id, item.qtyReserved, qty, threshold, transit, damaged, returned, onSaved, outletId]);
+    }, []);
 
-    const scheduleAutoSave = (fields: Parameters<typeof persist>[0]) => {
+    const scheduleAutoSave = (fields: StockPatch) => {
         if (saveTimer.current) clearTimeout(saveTimer.current);
+        dirtyRef.current = true;
         setDirty(true);
-        saveTimer.current = setTimeout(() => persist(fields), 900);
+        pendingPayload.current = fields;
+        saveTimer.current = setTimeout(() => {
+            saveTimer.current = null;
+            const payload = pendingPayload.current;
+            if (payload) void persist(payload);
+        }, 900);
     };
+
+    // Flush or cancel pending save on unmount (warehouse switch / list reload)
+    useEffect(() => {
+        return () => {
+            if (saveTimer.current) {
+                clearTimeout(saveTimer.current);
+                saveTimer.current = null;
+            }
+            const pending = pendingPayload.current;
+            if (pending && dirtyRef.current) {
+                // Fire-and-forget flush so stock lands on the correct outlet
+                const snap = latestRef.current;
+                const body: Record<string, unknown> = {
+                    productId: snap.productId,
+                    ...pending,
+                };
+                if (snap.outletId) body.outletId = snap.outletId;
+                void fetch('/api/v1/vendor/inventory', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                    keepalive: true,
+                }).catch(() => {});
+            } else {
+                abortRef.current?.abort();
+            }
+        };
+    }, []);
 
     const nudgeQty = (delta: number) => {
         const newQty = Math.max(0, qty + delta);
@@ -545,27 +625,55 @@ function InventoryMobileCard({
 }) {
     const [qty, setQty] = useState(item.qtyAvailable);
     const [saving, setSaving] = useState(false);
+    const [dirty, setDirty] = useState(false);
+    const dirtyRef = useRef(false);
+    const saveGen = useRef(0);
+    const abortRef = useRef<AbortController | null>(null);
 
-    useEffect(() => { setQty(item.qtyAvailable); }, [item.qtyAvailable]);
+    useEffect(() => {
+        if (dirtyRef.current) return;
+        setQty(item.qtyAvailable);
+    }, [item.qtyAvailable]);
+
+    useEffect(() => {
+        return () => { abortRef.current?.abort(); };
+    }, []);
 
     const net = qty - item.qtyReserved;
 
     const saveQty = async (newQty: number) => {
         setQty(newQty);
+        dirtyRef.current = true;
+        setDirty(true);
+        const gen = ++saveGen.current;
+        abortRef.current?.abort();
+        const ac = new AbortController();
+        abortRef.current = ac;
         setSaving(true);
         try {
+            const body: Record<string, unknown> = {
+                productId: item.productId,
+                qtyAvailable: newQty,
+            };
+            if (outletId) body.outletId = outletId;
             const res = await fetch('/api/v1/vendor/inventory', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productId: item.productId, ...(outletId ? { outletId } : {}), qtyAvailable: newQty }),
+                body: JSON.stringify(body),
+                signal: ac.signal,
             });
             const json = await res.json();
+            if (gen !== saveGen.current) return;
             if (!json.success) throw new Error(json.error?.message || 'Save failed');
+            dirtyRef.current = false;
+            setDirty(false);
             onSaved({ id: item.id, qtyAvailable: newQty, isLowStock: newQty - item.qtyReserved <= item.lowStockThreshold });
         } catch (err) {
+            if (err instanceof DOMException && err.name === 'AbortError') return;
+            if (gen !== saveGen.current) return;
             toast.error(err instanceof Error ? err.message : 'Save failed');
         } finally {
-            setSaving(false);
+            if (gen === saveGen.current) setSaving(false);
         }
     };
 
@@ -600,6 +708,7 @@ function InventoryMobileCard({
                 <span className="text-[13px] font-bold w-8 text-center">{qty}</span>
                 <button type="button" onClick={() => saveQty(qty + 1)} className="w-7 h-7 rounded border border-[#EEEEEE]">+</button>
                 {saving && <Loader2 size={12} className="animate-spin text-[#299E60]" />}
+                {dirty && !saving && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
             </div>
         </div>
     );
@@ -608,7 +717,7 @@ function InventoryMobileCard({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function VendorInventoryPage() {
-    const { activeOutletId, currentOutlet, multiWarehouseEnabled, outletQuery, scopeVersion } = useVendorOutletScope();
+    const { activeOutletId, currentOutlet, multiWarehouseEnabled, outletQuery, scopeVersion, switching } = useVendorOutletScope();
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [viewAll, setViewAll] = useState(false);
@@ -616,8 +725,17 @@ export default function VendorInventoryPage() {
     const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
     const [showCsvModal, setShowCsvModal] = useState(false);
     const [alertCollapsed, setAlertCollapsed] = useState(false);
+    const fetchGen = useRef(0);
+
+    // Drop stale rows the moment the warehouse changes so we never edit the wrong stock.
+    useEffect(() => {
+        if (viewAll) return;
+        setItems([]);
+        setLoading(true);
+    }, [activeOutletId, viewAll]);
 
     const fetchInventory = useCallback(async (silent = false) => {
+        const gen = ++fetchGen.current;
         if (!silent) setLoading(true);
         try {
             const endpoint = viewAll && multiWarehouseEnabled
@@ -625,15 +743,27 @@ export default function VendorInventoryPage() {
                 : `/api/v1/vendor/inventory${outletQuery(viewAll)}`;
             const res = await fetch(endpoint);
             const json = await res.json();
-            if (json.success) setItems(json.data);
+            if (gen !== fetchGen.current) return;
+            if (json.success) {
+                const rows = json.data as InventoryItem[];
+                // Guard: if scoped to one warehouse, ignore rows from another outlet.
+                if (!viewAll && activeOutletId) {
+                    setItems(rows.filter((r) => !r.outletId || r.outletId === activeOutletId));
+                } else {
+                    setItems(rows);
+                }
+            }
         } catch (err) {
             console.error('Failed to load inventory:', err);
         } finally {
-            setLoading(false);
+            if (gen === fetchGen.current) setLoading(false);
         }
-    }, [multiWarehouseEnabled, outletQuery, viewAll, scopeVersion]);
+    }, [multiWarehouseEnabled, outletQuery, viewAll, scopeVersion, activeOutletId]);
 
-    useEffect(() => { fetchInventory(); }, [fetchInventory]);
+    useEffect(() => {
+        if (switching && !viewAll) return;
+        void fetchInventory();
+    }, [fetchInventory, switching, viewAll]);
 
     const [showTransfer, setShowTransfer] = useState(false);
 
@@ -666,7 +796,13 @@ export default function VendorInventoryPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-[24px] font-bold text-[#181725]">Inventory</h1>
-                    <p className="text-[12px] text-[#AEAEAE]">Manage stock levels — changes save automatically</p>
+                    <p className="text-[12px] text-[#AEAEAE]">
+                        {viewAll
+                            ? 'All warehouses · each row shows its own stock'
+                            : currentOutlet?.name
+                                ? `Editing stock for ${currentOutlet.name} only · use Switch warehouse above to change`
+                                : 'Stock is saved per warehouse · changes auto-save'}
+                    </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="relative">
@@ -712,12 +848,7 @@ export default function VendorInventoryPage() {
             </div>
 
             {multiWarehouseEnabled && (
-                <div className="flex flex-wrap items-center gap-3">
-                    <div className="bg-[#EFF6FF] border border-[#DBEAFE] rounded-[12px] px-4 py-3 text-[13px] text-[#1E40AF] font-semibold flex-1 min-w-[200px]">
-                        {viewAll
-                            ? 'Showing stock across all warehouses'
-                            : <>Stock for: <span className="font-bold">{currentOutlet?.name ?? 'warehouse'}</span></>}
-                    </div>
+                <div className="flex flex-wrap items-center justify-end gap-3">
                     <div className="flex rounded-[10px] border border-[#EEEEEE] overflow-hidden bg-white">
                         <button
                             type="button"
@@ -839,10 +970,10 @@ export default function VendorInventoryPage() {
                         <div className="md:hidden p-3 space-y-3">
                             {filtered.map((item) => (
                                 <InventoryMobileCard
-                                    key={item.id}
+                                    key={`${item.outletId ?? 'x'}-${item.productId}`}
                                     item={item}
                                     onSaved={handleRowSaved}
-                                    outletId={multiWarehouseEnabled ? (item.outletId ?? item.outlet?.id ?? activeOutletId) : null}
+                                    outletId={item.outletId ?? item.outlet?.id ?? activeOutletId}
                                     showWarehouse={viewAll && multiWarehouseEnabled}
                                 />
                             ))}
@@ -868,10 +999,10 @@ export default function VendorInventoryPage() {
                             <tbody className="divide-y divide-[#F5F5F5]">
                                 {filtered.map(item => (
                                     <InventoryRow
-                                        key={item.id}
+                                        key={`${item.outletId ?? 'x'}-${item.productId}`}
                                         item={item}
                                         onSaved={handleRowSaved}
-                                        outletId={multiWarehouseEnabled ? (item.outletId ?? item.outlet?.id ?? activeOutletId) : null}
+                                        outletId={item.outletId ?? item.outlet?.id ?? activeOutletId}
                                         showWarehouse={viewAll && multiWarehouseEnabled}
                                     />
                                 ))}
