@@ -228,7 +228,7 @@ export default function SuppliersPage() {
               </thead>
               <tbody className="divide-y divide-[#F3F4F6]">
                 {filtered.map((s) => {
-                  const open = expanded[s.userId] ?? true;
+                  const open = expanded[s.userId] ?? false;
                   return (
                     <React.Fragment key={s.userId}>
                       <tr className="hover:bg-[#FAFBFC]">
