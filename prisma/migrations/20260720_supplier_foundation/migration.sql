@@ -106,15 +106,28 @@ WHERE i."vendor_id" = v."id"
   AND v."default_outlet_id" IS NOT NULL
   AND i."outlet_id" <> v."default_outlet_id";
 
--- 7. Collapse service areas onto default outlet (dedupe pincodes first)
+-- 7. Collapse service areas / delivery slots onto default outlet (dedupe first).
+-- Prefer keeping the default-outlet row; otherwise keep the lowest id per natural key.
 DELETE FROM "service_areas" sa
-USING "vendors" v, "service_areas" keep
-WHERE sa."vendor_id" = v."id"
-  AND v."default_outlet_id" IS NOT NULL
-  AND sa."outlet_id" IS DISTINCT FROM v."default_outlet_id"
-  AND keep."vendor_id" = sa."vendor_id"
-  AND keep."pincode" = sa."pincode"
-  AND keep."outlet_id" IS NOT DISTINCT FROM v."default_outlet_id";
+WHERE sa."id" IN (
+  SELECT ranked."id" FROM (
+    SELECT
+      sa2."id",
+      ROW_NUMBER() OVER (
+        PARTITION BY sa2."vendor_id", sa2."pincode"
+        ORDER BY
+          CASE
+            WHEN sa2."outlet_id" IS NOT DISTINCT FROM v."default_outlet_id" THEN 0
+            ELSE 1
+          END,
+          sa2."id"
+      ) AS rn
+    FROM "service_areas" sa2
+    JOIN "vendors" v ON v."id" = sa2."vendor_id"
+    WHERE v."default_outlet_id" IS NOT NULL
+  ) ranked
+  WHERE ranked.rn > 1
+);
 
 UPDATE "service_areas" sa
 SET "outlet_id" = v."default_outlet_id"
@@ -122,6 +135,27 @@ FROM "vendors" v
 WHERE sa."vendor_id" = v."id"
   AND v."default_outlet_id" IS NOT NULL
   AND sa."outlet_id" IS DISTINCT FROM v."default_outlet_id";
+
+DELETE FROM "delivery_slots" ds
+WHERE ds."id" IN (
+  SELECT ranked."id" FROM (
+    SELECT
+      ds2."id",
+      ROW_NUMBER() OVER (
+        PARTITION BY ds2."vendor_id", ds2."day_of_week", ds2."slot_start"
+        ORDER BY
+          CASE
+            WHEN ds2."outlet_id" IS NOT DISTINCT FROM v."default_outlet_id" THEN 0
+            ELSE 1
+          END,
+          ds2."id"
+      ) AS rn
+    FROM "delivery_slots" ds2
+    JOIN "vendors" v ON v."id" = ds2."vendor_id"
+    WHERE v."default_outlet_id" IS NOT NULL
+  ) ranked
+  WHERE ranked.rn > 1
+);
 
 UPDATE "delivery_slots" ds
 SET "outlet_id" = v."default_outlet_id"

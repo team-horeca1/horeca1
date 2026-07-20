@@ -78,11 +78,17 @@ resolve_admin_cipher_drift
 echo "==> Apply migrations"
 if ! migrate; then
   echo "==> migrate deploy failed — retry after rolled-back resolve"
-  docker run --rm --network "$NET" \
-    -e DATABASE_URL="$DB_URL" \
-    "$WORKER_TAG" \
-    npx prisma migrate resolve --rolled-back 20260708120000_add_admin_password_cipher \
-    2>/dev/null || true
+  for mig in \
+    20260708120000_add_admin_password_cipher \
+    20260720_supplier_foundation \
+    20260721_fix_user_roles_unique_index
+  do
+    docker run --rm --network "$NET" \
+      -e DATABASE_URL="$DB_URL" \
+      "$WORKER_TAG" \
+      npx prisma migrate resolve --rolled-back "$mig" \
+      2>/dev/null || true
+  done
   migrate
 fi
 
