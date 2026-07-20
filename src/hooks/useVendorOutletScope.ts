@@ -47,12 +47,12 @@ export function useVendorOutletScope() {
   // Once React state catches up to the switched outlet, drop the pending override.
   useEffect(() => {
     if (pendingOutletId && activeOutletId === pendingOutletId) {
-      setPendingOutletId(null);
+      Promise.resolve().then(() => setPendingOutletId(null));
     }
   }, [activeOutletId, pendingOutletId]);
 
   useEffect(() => {
-    if (activeOutletId) bump();
+    if (activeOutletId) Promise.resolve().then(() => bump());
   }, [activeOutletId, bump]);
 
   const scopedOutletId = pendingOutletId ?? activeOutletId;

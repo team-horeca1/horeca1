@@ -1,3 +1,4 @@
+import os from 'node:os';
 import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
@@ -26,7 +27,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : Math.min(4, require('node:os').cpus().length),
+  workers: process.env.CI ? 1 : Math.min(4, os.cpus().length),
   reporter: 'list',
   timeout: 90_000,
   expect: { timeout: 20_000 },
