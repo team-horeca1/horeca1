@@ -14,7 +14,7 @@ const VENDOR_PORTAL_SEGMENTS = new Set([
   'dashboard', 'orders', 'products', 'inventory', 'warehouse', 'returns', 'claims',
   'brand-mappings', 'price-lists', 'promotions', 'customers', 'sales-team', 'credit',
   'wallet', 'ledger', 'reports', 'notifications', 'account', 'team', 'outlets', 'settings',
-  'collections', 'customer-groups', 'setup',
+  'collections', 'customer-groups', 'setup', 'businesses', 'overview', 'all-orders',
 ]);
 
 /** Public onboarding — must stay reachable without a session. */
@@ -43,10 +43,14 @@ export async function proxy(req: NextRequest) {
   const needsAuth = isAdminRoute || isBrandPortal || isVendorPortal || isCustomerProtected;
   if (!needsAuth) return NextResponse.next();
 
+  // Match cookie name to the request protocol — production builds on
+  // http://localhost (Playwright / local standalone) set `authjs.session-token`,
+  // not `__Secure-authjs.session-token`. Using NODE_ENV===production here made
+  // getToken miss the cookie and 307 every portal route to /login.
   const token = await getToken({
     req,
     secret: process.env.AUTH_SECRET,
-    secureCookie: process.env.NODE_ENV === 'production',
+    secureCookie: req.nextUrl.protocol === 'https:',
   }) as (TokenUser & { sub?: string }) | null;
 
   if (!token) {

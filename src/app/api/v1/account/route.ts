@@ -256,9 +256,14 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
             userId: ctx.userId,
             businessAccountId: account.id,
             businessName: body.legalName,
+            displayName: body.displayName || body.legalName,
             slug: slugify(body.displayName || body.legalName, ctx.userId),
             isActive: false,
             isVerified: false,
+            isPrimaryStore: true,
+            multiWarehouseEnabled: false,
+            defaultOutletId: outlet.id,
+            setupProgress: { business: true, online_store: true },
 
             // Tax / billing on the Vendor row (separate from outlet)
             gstNumber: body.gstin ?? null,
@@ -315,7 +320,13 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
           select: { id: true },
         });
         await tx.userRole.create({
-          data: { userId: ctx.userId, businessAccountId: account.id, outletId: null, roleId: vendorAdminTemplate.id },
+          data: {
+            userId: ctx.userId,
+            businessAccountId: account.id,
+            outletId: null,
+            vendorId: null,
+            roleId: vendorAdminTemplate.id,
+          },
         });
         // Legacy User.role field — only used by older routes that haven't been
         // migrated to BusinessAccountMember + UserRole yet. We ONLY promote

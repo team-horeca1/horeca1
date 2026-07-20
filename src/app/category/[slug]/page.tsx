@@ -10,7 +10,7 @@ import { dal } from '@/lib/dal';
 import type { Category } from '@/types';
 import { VENDOR_COVERS } from '@/components/features/homepage/VendorCardShared';
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
-import { useAddress } from '@/context/AddressContext';
+import { useDeliveryPincode } from '@/hooks/useDeliveryPincode';
 
 interface VendorSummary {
     id: string;
@@ -35,8 +35,7 @@ function CategoryVendorsContent() {
     const [sortBy, setSortBy] = useState<'relevance' | 'rating' | 'mov_low' | 'mov_high'>('relevance');
     const [servicingIds, setServicingIds] = useState<Set<string> | null>(null);
 
-    const { selectedAddress } = useAddress();
-    const pincode = selectedAddress?.pincode;
+    const pincode = useDeliveryPincode();
 
     useEffect(() => {
         if (!slug) return;

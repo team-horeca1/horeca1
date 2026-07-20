@@ -93,9 +93,9 @@ const ACCOUNT_FEATURES: PortalFeatureMap = {
 // ─── Vendor (selling-side) ──────────────────────────────────────────────────
 
 const VENDOR_FEATURES: PortalFeatureMap = {
-  dashboard:    { label: 'Dashboard', actions: MODULE_ACTIONS.dashboard, routes: ['/vendor/dashboard'] },
+  dashboard:    { label: 'Dashboard', actions: MODULE_ACTIONS.dashboard, routes: ['/vendor/dashboard', '/vendor/overview', '/vendor/businesses'] },
   products:     { label: 'Products', actions: MODULE_ACTIONS.products, routes: ['/vendor/products', '/vendor/price-lists'] },
-  orders:       { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/vendor/orders'] },
+  orders:       { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/vendor/orders', '/vendor/all-orders'] },
   repeatOrders: { label: 'Repeat Orders', actions: MODULE_ACTIONS.repeatOrders, routes: [] },
   inventory:    { label: 'Inventory', actions: MODULE_ACTIONS.inventory, routes: ['/vendor/inventory'] },
   grn:          { label: 'Warehouse', actions: MODULE_ACTIONS.grn, routes: ['/vendor/warehouse'] },
@@ -130,7 +130,7 @@ const ADMIN_FEATURES: PortalFeatureMap = {
   dashboard:  { label: 'Dashboard', actions: MODULE_ACTIONS.dashboard, routes: ['/admin/dashboard'] },
   orders:     { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/admin/orders', '/admin/returns', '/admin/claims'] },
   customers:  { label: 'Customers', actions: MODULE_ACTIONS.customers, routes: ['/admin/customers'] },
-  vendors:    { label: 'Vendors', actions: MODULE_ACTIONS.vendors, routes: ['/admin/vendors', '/admin/approvals'] },
+  vendors:    { label: 'Suppliers', actions: MODULE_ACTIONS.vendors, routes: ['/admin/vendors', '/admin/approvals'] },
   brands:     { label: 'Brands', actions: MODULE_ACTIONS.brands, routes: ['/admin/brands', '/admin/approvals'] },
   products:   { label: 'Products', actions: MODULE_ACTIONS.products, routes: ['/admin/products', '/admin/categories', '/admin/approvals'] },
   payments:   { label: 'Finance', actions: MODULE_ACTIONS.payments, routes: ['/admin/finance', '/admin/ledger', '/admin/credit'] },

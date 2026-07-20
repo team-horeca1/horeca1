@@ -101,13 +101,25 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       return { outlet, adopted };
     });
 
+    // Supplier Foundation: Online Store owns stock via its default outlet only.
+    // Do not seed inventory for extra BA outlets (warehouses retired).
     if (!result.adopted) {
-      const vendor = await prisma.vendor.findUnique({
-        where: { businessAccountId: id },
-        select: { id: true },
+      const store = await prisma.vendor.findFirst({
+        where: {
+          businessAccountId: id,
+          OR: [{ defaultOutletId: result.outlet.id }, { defaultOutletId: null }],
+        },
+        orderBy: [{ isPrimaryStore: 'desc' }, { createdAt: 'asc' }],
+        select: { id: true, defaultOutletId: true },
       });
-      if (vendor) {
-        await ensureInventoryRowsForOutlet(vendor.id, result.outlet.id);
+      if (store && (store.defaultOutletId === result.outlet.id || store.defaultOutletId === null)) {
+        if (!store.defaultOutletId) {
+          await prisma.vendor.update({
+            where: { id: store.id },
+            data: { defaultOutletId: result.outlet.id, multiWarehouseEnabled: false },
+          });
+        }
+        await ensureInventoryRowsForOutlet(store.id, result.outlet.id);
       }
     }
 

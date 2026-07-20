@@ -2,15 +2,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   ChevronDown, LogOut, Loader2, ShieldCheck, Store, User,
-  Sparkles, MapPin, Check, ChevronRight, AlertCircle, Plus, Warehouse,
+  Sparkles, MapPin, Check, ChevronRight, AlertCircle, Plus,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useBusinessAccountSwitcher, type AccountSummary } from '@/hooks/useBusinessAccountSwitcher';
 import { CreateBusinessAccountModal } from '@/components/auth/CreateBusinessAccountModal';
 import { ACCOUNT_SWITCHER_OPEN_EVENT } from '@/lib/accountSwitcherEvents';
+import { toast } from 'sonner';
 
 type AccountKind = 'customer' | 'vendor' | 'brand';
 type Portal = 'vendor' | 'brand' | 'customer' | 'admin';
@@ -36,11 +37,11 @@ const PORTAL_COPY: Record<Portal, {
 }> = {
   vendor: {
     workspaceLabel: 'Vendor workspace',
-    outletSectionTitle: 'Operating warehouse',
-    outletPickerTitle: 'Select warehouse',
-    outletHint: 'Inventory & orders use this location',
-    addOutletLabel: 'Add warehouse',
-    addOutletHref: '/vendor/outlets?action=add',
+    outletSectionTitle: 'Online store',
+    outletPickerTitle: 'Select online store',
+    outletHint: 'Inventory & orders use this storefront',
+    addOutletLabel: 'Manage businesses',
+    addOutletHref: '/vendor/businesses',
     switchAccountsTitle: 'Other businesses',
     switchAccountsHint: 'Switch between vendor, brand, or customer accounts',
     createBusinessLabel: 'Register another business',
@@ -108,6 +109,7 @@ function initialsOf(name: string): string {
 
 export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdminMode?: boolean }) {
   const pathname = usePathname();
+  const router = useRouter();
   const portal = detectPortal(pathname, isAdminMode);
   const copy = PORTAL_COPY[portal];
 
@@ -116,8 +118,9 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
     accounts, currentAccount, currentOutlet,
     hcidDisplay, totalAccountCount, availableAccountsTruncated,
     accessibleOutletIds,
+    availableStores, activeVendorId, isStoreScopedOnly,
     vendorImpersonating,
-    switchAccount, switchOutlet, signOut,
+    switchAccount, switchOutlet, switchOnlineStore, signOut,
   } = useBusinessAccountSwitcher();
 
   // Per-outlet scoped users can only see their assigned outlets.
@@ -132,7 +135,13 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
   const visibleOutlets = filterOutlets(currentAccount?.outlets ?? []);
   const canSwitchOutlets = visibleOutlets.length > 1;
   const isVendorPortal = portal === 'vendor';
-  // Vendor: warehouse switching lives in the green strip — no nested picker here (avoids collision).
+  const activeStores = availableStores.filter((s) => s.isActive);
+  const canSwitchOnlineStores = isVendorPortal && activeStores.length > 1;
+  const activeStore =
+    activeStores.find((s) => s.id === activeVendorId)
+    ?? activeStores.find((s) => s.isPrimaryStore)
+    ?? activeStores[0]
+    ?? null;
   // Customer/brand: inline picker when there are 2+ locations.
   const canOpenOutletPicker = !isVendorPortal && canSwitchOutlets;
 
@@ -191,6 +200,20 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
     await switchOutlet(outletId);
   };
 
+  const handleOnlineStoreClick = async (vendorId: string) => {
+    if (vendorId === activeVendorId) {
+      setIsOpen(false);
+      return;
+    }
+    setIsOpen(false);
+    try {
+      await switchOnlineStore(vendorId);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to switch online store');
+    }
+  };
+
   return (
     <div className={`relative${isOpen ? ' z-[100]' : ''}`} ref={dropdownRef}>
       <button
@@ -211,20 +234,18 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
         </div>
         <div className="flex flex-col items-start min-w-0">
           <span className="text-[14px] font-bold text-[#181725] truncate max-w-[180px]">{displayName}</span>
-          {currentOutlet ? (
+          {isVendorPortal && activeStore ? (
             <span className="text-[11px] text-[#666] flex items-center gap-1 truncate max-w-[180px]">
-              {isVendorPortal ? (
-                <Warehouse size={10} className="shrink-0 text-[#299E60]" />
-              ) : (
-                <MapPin size={10} className="shrink-0" />
-              )}
+              <Store size={10} className="shrink-0 text-[#299E60]" />
+              <span className="truncate">{activeStore.displayName}</span>
+            </span>
+          ) : currentOutlet ? (
+            <span className="text-[11px] text-[#666] flex items-center gap-1 truncate max-w-[180px]">
+              <MapPin size={10} className="shrink-0" />
               <span className="truncate">
-                {isVendorPortal
-                  ? currentOutlet.name
-                  : portal === 'customer'
-                    ? `Deliver to · ${currentOutlet.pincode ?? currentOutlet.name}`
-                    : `Location · ${currentOutlet.pincode ?? currentOutlet.name}`}
-                {isVendorPortal && currentOutlet.pincode ? ` · ${currentOutlet.pincode}` : ''}
+                {portal === 'customer'
+                  ? `Deliver to · ${currentOutlet.pincode ?? currentOutlet.name}`
+                  : `Location · ${currentOutlet.pincode ?? currentOutlet.name}`}
               </span>
               {currentOutlet.requiresAddressUpdate && (
                 <AlertCircle size={10} className="text-amber-500 shrink-0" />
@@ -267,54 +288,81 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
             </div>
           </div>
 
-          {/* ── Vendor: current warehouse (read-only — switch via green strip) ── */}
+          {/* ── Vendor: Online Store picker (when 2+ stores) ── */}
           {isVendorPortal && (
-            <div className="px-4 py-3 border-b border-[#F0F0F0]">
-              {visibleOutlets.length === 0 && copy.addOutletHref ? (
+            <div className="border-b border-[#F0F0F0]">
+              {activeStores.length === 0 && copy.addOutletHref ? (
                 <Link
                   href={copy.addOutletHref}
                   onClick={() => setIsOpen(false)}
-                  className="flex items-start gap-3 hover:opacity-90"
+                  className="flex items-start gap-3 px-4 py-3 hover:opacity-90"
                 >
                   <div className="w-[32px] h-[32px] rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                    <Warehouse size={14} className="text-emerald-700" />
+                    <Store size={14} className="text-emerald-700" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-emerald-800">Set up your first warehouse</p>
-                    <p className="text-[11px] text-[#7C7C7C] mt-0.5">Add where you stock inventory and ship orders from</p>
+                    <p className="text-[13px] font-semibold text-emerald-800">Set up your first online store</p>
+                    <p className="text-[11px] text-[#7C7C7C] mt-0.5">Create a business and storefront to start selling</p>
                   </div>
                   <ChevronRight size={14} className="text-emerald-600 shrink-0 mt-1" />
                 </Link>
+              ) : canSwitchOnlineStores ? (
+                <>
+                  <div className="px-4 py-2">
+                    <p className="text-[10px] font-semibold text-[#AEAEAE] uppercase tracking-wider">
+                      {copy.outletSectionTitle}
+                    </p>
+                    {copy.outletHint && (
+                      <p className="text-[10px] text-[#AEAEAE] mt-0.5">{copy.outletHint}</p>
+                    )}
+                  </div>
+                  <div className="max-h-[200px] overflow-y-auto pb-1">
+                    {activeStores.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => void handleOnlineStoreClick(s.id)}
+                        disabled={switching}
+                        className="w-full px-4 py-2.5 hover:bg-[#F8F8F8] flex items-center gap-3 text-left transition-colors disabled:opacity-50"
+                      >
+                        <Store size={14} className="text-[#299E60] shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-[#181725] truncate">{s.displayName}</p>
+                          {s.isPrimaryStore && (
+                            <p className="text-[11px] text-[#AEAEAE]">Primary store</p>
+                          )}
+                        </div>
+                        {s.id === activeVendorId && <Check size={14} className="text-[#299E60] shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                </>
               ) : (
-                <div className="flex items-start gap-3">
+                <div className="px-4 py-3 flex items-start gap-3">
                   <div className="w-[32px] h-[32px] rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
-                    <Warehouse size={14} className="text-emerald-700" />
+                    <Store size={14} className="text-emerald-700" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] font-semibold text-[#AEAEAE] uppercase tracking-wider">
-                      Active warehouse
+                      Active online store
                     </p>
                     <p className="text-[13px] font-semibold text-[#181725] truncate">
-                      {currentOutlet?.name ?? 'Not selected'}
-                    </p>
-                    {currentOutlet?.pincode && (
-                      <p className="text-[11px] text-[#7C7C7C]">{currentOutlet.pincode}</p>
-                    )}
-                    <p className="text-[10px] text-[#AEAEAE] mt-1">
-                      Use <span className="font-semibold text-emerald-700">Switch warehouse</span> in the bar above to change
+                      {activeStore?.displayName ?? 'Not selected'}
                     </p>
                   </div>
                 </div>
               )}
-              {copy.addOutletHref && visibleOutlets.length > 0 && (
-                <Link
-                  href={copy.addOutletHref}
-                  onClick={() => setIsOpen(false)}
-                  className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-bold text-emerald-800 hover:text-emerald-900"
-                >
-                  <Plus size={13} />
-                  {copy.addOutletLabel}
-                </Link>
+              {copy.addOutletHref && activeStores.length > 0 && !isStoreScopedOnly && (
+                <div className="px-4 pb-3">
+                  <Link
+                    href={copy.addOutletHref}
+                    onClick={() => setIsOpen(false)}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-bold text-emerald-800 hover:text-emerald-900"
+                  >
+                    <Plus size={13} />
+                    {copy.addOutletLabel}
+                  </Link>
+                </div>
               )}
             </div>
           )}

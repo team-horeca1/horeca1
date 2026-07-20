@@ -288,7 +288,7 @@ async function main() {
       await prisma.businessAccount.update({ where: { id: ba.id }, data: { primaryOutletId: outlet.id } });
       outletId = outlet.id;
       vendor = await prisma.vendor.create({
-        data: { userId: user.id, businessAccountId: ba.id, businessName: v.name, slug: v.slug, description: `${v.name} — bulk supplies for HoReCa businesses across Mumbai & Navi Mumbai.`, logoUrl: VENDOR_LOGOS[vi % VENDOR_LOGOS.length], rating: v.rating, minOrderValue: v.mov, creditEnabled: v.credit, isVerified: true, isActive: true, pickupCity: v.city, pickupState: 'Maharashtra', multiWarehouseEnabled: true, setupProgress: { profile: true, delivery: true, products: true, go_live: true } },
+        data: { userId: user.id, businessAccountId: ba.id, businessName: v.name, slug: v.slug, description: `${v.name} — bulk supplies for HoReCa businesses across Mumbai & Navi Mumbai.`, logoUrl: VENDOR_LOGOS[vi % VENDOR_LOGOS.length], rating: v.rating, minOrderValue: v.mov, creditEnabled: v.credit, isVerified: true, isActive: true, pickupCity: v.city, pickupState: 'Maharashtra', multiWarehouseEnabled: false, isPrimaryStore: true, displayName: v.name, setupProgress: { business: true, online_store: true, profile: true, delivery: true, products: true, go_live: true } },
         select: { id: true, businessAccountId: true },
       });
     } else {

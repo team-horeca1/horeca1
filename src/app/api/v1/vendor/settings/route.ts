@@ -12,7 +12,6 @@ import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId, resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { GST_RE } from '@/lib/validators/vendor-kyc';
-import { seedInventoryRowsForMultiWarehouse } from '@/lib/inventoryOutlet';
 import { isMultiWarehouseEnabled } from '@/lib/config/multiWarehouse';
 
 const optionalUrlSchema = z.string()
@@ -93,19 +92,18 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
     if (!profile) throw Errors.notFound('Vendor');
 
-    // Platform policy: multi-warehouse is always on — backfill DB + inventory rows if needed.
-    if (!profile.multiWarehouseEnabled) {
+    // Multi-warehouse retired — stock unit is Online Store (default outlet).
+    if (profile.multiWarehouseEnabled) {
       await prisma.vendor.update({
         where: { id: vendorId },
-        data: { multiWarehouseEnabled: true },
+        data: { multiWarehouseEnabled: false },
       });
-      await seedInventoryRowsForMultiWarehouse(vendorId, profile.businessAccountId);
-      profile.multiWarehouseEnabled = true;
+      profile.multiWarehouseEnabled = false;
     }
 
     return NextResponse.json({
       success: true,
-      data: { ...profile, multiWarehouseEnabled: isMultiWarehouseEnabled(true) },
+      data: { ...profile, multiWarehouseEnabled: isMultiWarehouseEnabled(false) },
     });
   } catch (error) {
     return errorResponse(error);
@@ -123,29 +121,20 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
 
     const { paymentModes, notificationPrefs, multiWarehouseEnabled: _mwIgnored, ...scalarFields } = allowedFields;
 
-    const existing = await prisma.vendor.findUnique({
-      where: { id: vendorId },
-      select: { multiWarehouseEnabled: true, businessAccountId: true },
-    });
-
     const updated = await prisma.vendor.update({
       where: { id: vendorId },
       data: {
         ...scalarFields,
         ...(paymentModes !== undefined && { paymentModes }),
         ...(notificationPrefs !== undefined && { notificationPrefs: notificationPrefs as Record<string, string[]> }),
-        // Always keep multi-warehouse on — ignore client attempts to disable.
-        multiWarehouseEnabled: true,
+        // Multi-warehouse retired — ignore client attempts to enable.
+        multiWarehouseEnabled: false,
       },
     });
 
-    if (existing && !existing.multiWarehouseEnabled) {
-      await seedInventoryRowsForMultiWarehouse(vendorId, existing.businessAccountId);
-    }
-
     return NextResponse.json({
       success: true,
-      data: { ...updated, multiWarehouseEnabled: true },
+      data: { ...updated, multiWarehouseEnabled: isMultiWarehouseEnabled(false) },
     });
   } catch (error) {
     return errorResponse(error);

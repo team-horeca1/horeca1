@@ -430,6 +430,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const u = (updatePayload ?? {}) as {
           activeBusinessAccountId?: string;
           activeOutletId?: string;
+          activeVendorId?: string;
           accountPickerCompleted?: boolean;
         };
 
@@ -439,6 +440,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const targetAccountId = u.activeBusinessAccountId ?? (token.activeBusinessAccountId as string | undefined) ?? null;
         const targetOutletId = u.activeOutletId ?? (token.activeOutletId as string | undefined) ?? null;
+        const targetVendorId = u.activeVendorId ?? (token.activeVendorId as string | undefined) ?? null;
 
         let freshRole: string | null = null;
         try {
@@ -453,6 +455,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             freshRole ?? (token.role as string) ?? 'customer',
             targetAccountId,
             targetOutletId,
+            targetVendorId,
           );
           applyActiveContext(token, active);
         } catch (err) {
@@ -510,6 +513,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (token.forceAccountPicker === true) u.forceAccountPicker = true;
         if (token.activeVendorId) u.activeVendorId = token.activeVendorId as string;
         if (token.activeBrandId) u.activeBrandId = token.activeBrandId as string;
+        if (Array.isArray(token.availableStores)) u.availableStores = token.availableStores;
+        if (typeof token.isStoreScopedOnly === 'boolean') u.isStoreScopedOnly = token.isStoreScopedOnly;
       }
       return session;
     },
@@ -609,6 +614,7 @@ async function loadOrProvisionActiveContext(
   role: string,
   targetAccountId: string | null,
   targetOutletId: string | null,
+  targetVendorId: string | null = null,
 ): Promise<ActiveContext | null> {
   // Admin team members inherit the inviter/platform owner's shopping BA so
   // storefront "Deliver to" shows the owner's outlet, not an empty placeholder.
@@ -620,7 +626,7 @@ async function loadOrProvisionActiveContext(
     }
   }
 
-  let active = await loadActiveContext(userId, targetAccountId, targetOutletId);
+  let active = await loadActiveContext(userId, targetAccountId, targetOutletId, targetVendorId);
   // Admin portal staff should not get an empty personal shopping BA on login.
   // Storefront checkout can still provision later via resolveStorefrontContext.
   if (!active && role === 'customer') {
@@ -638,7 +644,7 @@ async function loadOrProvisionActiveContext(
           pincode: legacyUser.pincode ?? undefined,
           gstin: legacyUser.gstNumber ?? undefined,
         });
-        active = await loadActiveContext(userId, targetAccountId, targetOutletId);
+        active = await loadActiveContext(userId, targetAccountId, targetOutletId, targetVendorId);
       }
     } catch (provisionErr) {
       console.error('[auth] legacy customer provision failed:', provisionErr);
@@ -662,6 +668,8 @@ function applyActiveContext(token: Record<string, unknown>, active: ActiveContex
     delete token.activeBrandId;
     delete token.activeVendorTeamRole;
     delete token.activeBrandTeamRole;
+    delete token.availableStores;
+    delete token.isStoreScopedOnly;
     return;
   }
   token.hcidDisplay = active.hcidDisplay;
@@ -678,6 +686,8 @@ function applyActiveContext(token: Record<string, unknown>, active: ActiveContex
   token.activeBrandId = active.activeBrandId;
   token.activeVendorTeamRole = active.activeVendorTeamRole;
   token.activeBrandTeamRole = active.activeBrandTeamRole;
+  token.availableStores = active.availableStores;
+  token.isStoreScopedOnly = active.isStoreScopedOnly;
 }
 
 function clearAdminTokenFields(token: Record<string, unknown>): void {

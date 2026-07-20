@@ -13,7 +13,10 @@ export function emitVendorOutletChanged(outletId?: string | null) {
   }
 }
 
-/** Vendor portal: active warehouse + multi-warehouse flag + refetch subscription. */
+/**
+ * Vendor portal outlet scope.
+ * Multi-warehouse is retired — stock unit is the Online Store (default outlet).
+ */
 export function useVendorOutletScope() {
   const {
     activeOutletId,
@@ -23,19 +26,13 @@ export function useVendorOutletScope() {
     switchOutlet,
   } = useBusinessAccountSwitcher();
 
-  const [multiWarehouseEnabled, setMultiWarehouseEnabled] = useState(true);
+  /** Always false — Online Store owns a single default outlet. */
+  const multiWarehouseEnabled = false;
   const [scopeVersion, setScopeVersion] = useState(0);
-  /** Last outlet id announced by Switch warehouse (beats stale React state for one tick). */
+  /** Last outlet id announced by switch (beats stale React state for one tick). */
   const [pendingOutletId, setPendingOutletId] = useState<string | null>(null);
 
   const bump = useCallback(() => setScopeVersion((v) => v + 1), []);
-
-  useEffect(() => {
-    fetch('/api/v1/vendor/settings')
-      .then((r) => r.json())
-      .then((j) => { if (j.success) setMultiWarehouseEnabled(true); })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     const onChange = (e: Event) => {
@@ -62,8 +59,8 @@ export function useVendorOutletScope() {
 
   const outletQuery = useCallback((all = false) => {
     const params = new URLSearchParams();
-    if (all) params.set('outletId', 'all');
-    else if (scopedOutletId) params.set('outletId', scopedOutletId);
+    // Multi-warehouse retired — never request outletId=all
+    if (!all && scopedOutletId) params.set('outletId', scopedOutletId);
     const qs = params.toString();
     return qs ? `?${qs}` : '';
   }, [scopedOutletId]);

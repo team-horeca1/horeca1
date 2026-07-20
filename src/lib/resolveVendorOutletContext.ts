@@ -1,5 +1,6 @@
 /**
- * Resolve vendor + active warehouse (outlet) for vendor portal API routes.
+ * Resolve vendor + default Online Store outlet for vendor portal API routes.
+ * Supplier Foundation: multi-warehouse retired — always use Vendor.defaultOutletId.
  */
 
 import { NextRequest } from 'next/server';
@@ -7,8 +8,6 @@ import type { AuthContext } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
-import { VENDOR_ID_COOKIE, VENDOR_OUTLET_COOKIE } from '@/lib/adminImpersonationCookies';
-import { isMultiWarehouseEnabled } from '@/lib/config/multiWarehouse';
 
 export interface VendorOutletContext {
   vendorId: string;
@@ -19,7 +18,18 @@ export interface VendorOutletContext {
   teamRole: Awaited<ReturnType<typeof resolveVendorContext>>['teamRole'];
 }
 
-async function getVendorPrimaryOutletId(businessAccountId: string): Promise<string | null> {
+async function getStoreDefaultOutletId(
+  vendorId: string,
+  businessAccountId: string,
+  defaultOutletId: string | null,
+): Promise<string | null> {
+  if (defaultOutletId) {
+    const ok = await prisma.outlet.findFirst({
+      where: { id: defaultOutletId, businessAccountId, isActive: true },
+      select: { id: true },
+    });
+    if (ok) return ok.id;
+  }
   const ba = await prisma.businessAccount.findUnique({
     where: { id: businessAccountId },
     select: { primaryOutletId: true },
@@ -30,81 +40,48 @@ async function getVendorPrimaryOutletId(businessAccountId: string): Promise<stri
     orderBy: { createdAt: 'asc' },
     select: { id: true },
   });
+  // Persist default if missing so future calls are stable
+  if (first) {
+    await prisma.vendor.update({
+      where: { id: vendorId },
+      data: { defaultOutletId: first.id, multiWarehouseEnabled: false },
+    }).catch(() => undefined);
+  }
   return first?.id ?? null;
 }
 
-function assertOutletAccess(ctx: AuthContext, outletId: string): void {
-  if (ctx.accessibleOutletIds.length > 0 && !ctx.accessibleOutletIds.includes(outletId)) {
-    throw Errors.forbidden('You do not have access to that outlet');
-  }
-}
-
 /**
- * Resolve the warehouse context for a vendor API request.
- *
- * @param req - optional; reads `?outletId=` when account-wide user overrides active outlet
- * @param options.allOutlets - when true, returns outletId as primary but signals aggregated mode via caller
+ * Resolve the stock/fulfillment outlet for an Online Store (always the default outlet).
  */
 export async function resolveVendorOutletContext(
   ctx: AuthContext,
   req?: NextRequest,
   options?: { allowAllOutlets?: boolean },
 ): Promise<VendorOutletContext> {
+  void options;
   const { vendorId, teamRole } = await resolveVendorContext(ctx, req!);
 
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { businessAccountId: true, multiWarehouseEnabled: true },
+    select: { businessAccountId: true, defaultOutletId: true },
   });
-  if (!vendor) throw Errors.notFound('Vendor');
+  if (!vendor) throw Errors.notFound('Online Store');
 
-  const queryOutletId = req?.nextUrl.searchParams.get('outletId') ?? undefined;
-  const allOutlets = options?.allowAllOutlets && queryOutletId === 'all';
-
-  // Admin vendor Admin View: JWT activeOutletId belongs to the admin's BA.
-  // Prefer the impersonation outlet cookie instead.
-  const vendorImpersonating = !!req?.cookies.get(VENDOR_ID_COOKIE)?.value;
-  const impersonationOutletId = vendorImpersonating
-    ? req?.cookies.get(VENDOR_OUTLET_COOKIE)?.value
-    : undefined;
-
-  let outletId: string | null = null;
-  if (!allOutlets) {
-    // Prefer an explicit ?outletId= when present (transfer / scoped reads).
-    // Inventory UI must not send a stale query after Switch warehouse — that is
-    // handled client-side via pendingOutletId + same-tab outlet sync.
-    const candidate =
-      (queryOutletId && queryOutletId !== 'all' ? queryOutletId : undefined)
-      ?? impersonationOutletId
-      ?? (vendorImpersonating ? undefined : ctx.activeOutletId)
-      ?? (await getVendorPrimaryOutletId(vendor.businessAccountId));
-
-    if (candidate) {
-      const belongsToVendor = await prisma.outlet.findFirst({
-        where: { id: candidate, businessAccountId: vendor.businessAccountId, isActive: true },
-        select: { id: true },
-      });
-      outletId = belongsToVendor?.id ?? (await getVendorPrimaryOutletId(vendor.businessAccountId));
-    }
+  const outletId = await getStoreDefaultOutletId(
+    vendorId,
+    vendor.businessAccountId,
+    vendor.defaultOutletId,
+  );
+  if (!outletId) {
+    throw Errors.badRequest('Online Store has no default outlet. Re-save store address or contact support.');
   }
-
-  if (!outletId && !allOutlets) {
-    throw Errors.badRequest('No active outlet. Select a warehouse to continue.');
-  }
-
-  if (outletId && !vendorImpersonating) {
-    assertOutletAccess(ctx, outletId);
-  }
-
-  const primaryId = outletId ?? (await getVendorPrimaryOutletId(vendor.businessAccountId));
-  if (!primaryId) throw Errors.badRequest('Vendor has no outlets configured');
 
   return {
     vendorId,
     businessAccountId: vendor.businessAccountId,
-    outletId: primaryId,
-    accessibleOutletIds: vendorImpersonating ? [] : ctx.accessibleOutletIds,
-    multiWarehouseEnabled: isMultiWarehouseEnabled(vendor.multiWarehouseEnabled),
+    outletId,
+    accessibleOutletIds: [],
+    multiWarehouseEnabled: false,
     teamRole,
   };
 }
@@ -113,29 +90,16 @@ export async function resolveVendorOutletContext(
 export function buildFulfillmentOutletWhere(
   voc: VendorOutletContext,
   allOutlets?: boolean,
-): { fulfillmentOutletId?: string | { in: string[] } } {
-  if (allOutlets) {
-    if (voc.accessibleOutletIds.length > 0) {
-      return { fulfillmentOutletId: { in: voc.accessibleOutletIds } };
-    }
-    return {};
-  }
+): { fulfillmentOutletId?: string } {
+  void allOutlets;
   return { fulfillmentOutletId: voc.outletId };
 }
 
-/** Prisma filter for inventory / warehouse ops scoped to outlet. */
+/** Prisma filter for inventory scoped to the Online Store default outlet. */
 export function buildInventoryOutletWhere(
   voc: VendorOutletContext,
   allOutlets?: boolean,
-): { outletId?: string | { in: string[] } } {
-  if (!voc.multiWarehouseEnabled) {
-    return { outletId: voc.outletId };
-  }
-  if (allOutlets) {
-    if (voc.accessibleOutletIds.length > 0) {
-      return { outletId: { in: voc.accessibleOutletIds } };
-    }
-    return {};
-  }
+): { outletId?: string } {
+  void allOutlets;
   return { outletId: voc.outletId };
 }

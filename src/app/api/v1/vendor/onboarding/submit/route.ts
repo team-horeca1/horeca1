@@ -299,13 +299,19 @@ async function postHandler(req: NextRequest) {
       });
 
       await tx.userRole.create({
-        data: { userId: user.id, businessAccountId: account.id, outletId: null, roleId: vendorAdminTemplate.id },
+        data: {
+          userId: user.id,
+          businessAccountId: account.id,
+          outletId: null,
+          vendorId: null,
+          roleId: vendorAdminTemplate.id,
+        },
       });
 
       const slug = slugify(input.tradeName, user.id);
       const slugTaken = await tx.vendor.findUnique({ where: { slug }, select: { id: true } });
       if (slugTaken) {
-        throw Errors.conflict('A vendor with this trade name already exists.');
+        throw Errors.conflict('A supplier Online Store with this trade name already exists.');
       }
 
       const vendor = await tx.vendor.create({
@@ -313,9 +319,18 @@ async function postHandler(req: NextRequest) {
           userId: user.id,
           businessAccountId: account.id,
           businessName: input.businessName,
+          displayName: input.tradeName || input.businessName,
           slug,
           isActive: false,
           isVerified: false,
+          isPrimaryStore: true,
+          multiWarehouseEnabled: false,
+          defaultOutletId: outlet.id,
+          setupProgress: {
+            business: true,
+            online_store: true,
+            delivery: (input.serviceablePincodes?.length ?? 0) > 0,
+          },
 
           gstNumber: input.gstNumber || null,
           addressLine: input.billingAddress.addressLine,

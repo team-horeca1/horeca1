@@ -88,11 +88,25 @@ export async function resolveBusinessAccountContext(
       isCustomer: true,
       isVendor: true,
       isBrand: true,
-      vendor: { select: { id: true } },
+      vendors: {
+        orderBy: [{ isPrimaryStore: 'desc' }, { createdAt: 'asc' }],
+        take: 1,
+        select: { id: true },
+      },
       brand: { select: { id: true } },
     },
   });
   if (!account) throw Errors.forbidden('Your session is out of date — please refresh the page.');
+
+  // Prefer JWT active Online Store when it belongs to this Business.
+  let legacyVendorId = account.vendors[0]?.id ?? null;
+  if (ctx.activeVendorId) {
+    const activeStore = await prisma.vendor.findFirst({
+      where: { id: ctx.activeVendorId, businessAccountId: activeBusinessAccountId },
+      select: { id: true },
+    });
+    if (activeStore) legacyVendorId = activeStore.id;
+  }
 
   return {
     businessAccountId: activeBusinessAccountId,
@@ -101,7 +115,7 @@ export async function resolveBusinessAccountContext(
     isVendor: account.isVendor,
     isBrand: account.isBrand,
     permissions: new Set(ctx.permissions ?? []),
-    legacyVendorId: account.vendor?.id ?? null,
+    legacyVendorId,
     legacyBrandId: account.brand?.id ?? null,
   };
 }

@@ -10,7 +10,7 @@ import type { VendorProduct, VendorSummary, Category } from '@/types';
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
 import { VendorProductCard } from '@/components/features/vendor/VendorProductCard';
 import { BrandStoreCard } from '@/components/features/brand/BrandStoreCard';
-import { useAddress } from '@/context/AddressContext';
+import { useDeliveryPincode } from '@/hooks/useDeliveryPincode';
 import { cn } from '@/lib/utils';
 
 interface SearchBrand {
@@ -34,8 +34,7 @@ function SearchPageContent() {
     const [sort, setSort] = useState<'relevance' | 'price_asc' | 'price_desc'>('relevance');
     const [servicingIds, setServicingIds] = useState<Set<string> | null>(null);
 
-    const { selectedAddress } = useAddress();
-    const pincode = selectedAddress?.pincode;
+    const pincode = useDeliveryPincode();
 
     useEffect(() => {
         if (!pincode || !/^\d{6}$/.test(pincode)) {

@@ -28,6 +28,13 @@ declare module 'next-auth' {
       }>;
       availableAccountsTruncated?: boolean;
       totalAccountCount?: number;
+      availableStores?: Array<{
+        id: string;
+        displayName: string;
+        isPrimaryStore: boolean;
+        isActive: boolean;
+      }>;
+      isStoreScopedOnly?: boolean;
     };
   }
 }
@@ -59,6 +66,13 @@ declare module 'next-auth/jwt' {
     }>;
     availableAccountsTruncated?: boolean;
     totalAccountCount?: number;
+    availableStores?: Array<{
+      id: string;
+      displayName: string;
+      isPrimaryStore: boolean;
+      isActive: boolean;
+    }>;
+    isStoreScopedOnly?: boolean;
     /** ms timestamp of User.updatedAt when permissions were last synced into this JWT */
     userSyncedAt?: number;
     /** Set when the account was deleted/deactivated/revoked — session callback drops user */

@@ -180,9 +180,15 @@ model LinkedAccount {
 model Vendor {
   id            String   @id @default(uuid()) @db.Uuid
   userId        String   @map("user_id") @db.Uuid
-  // V2.2: Vendor is a 1:1 extension of BusinessAccount. NOT NULL after Step C.
-  businessAccountId String @unique @map("business_account_id") @db.Uuid
+  // Supplier Foundation: Online Store under a Business (N stores per BusinessAccount).
+  businessAccountId String @map("business_account_id") @db.Uuid
   businessName  String   @map("business_name") @db.VarChar(255)
+  // Customer-facing / portal display name (falls back to businessName).
+  displayName   String?  @map("display_name") @db.VarChar(255)
+  // First Online Store created under the Business (migration backfill = true).
+  isPrimaryStore Boolean @default(false) @map("is_primary_store")
+  // Silent default warehouse outlet for this Online Store (inventory/fulfillment FKs).
+  defaultOutletId String? @unique @map("default_outlet_id") @db.Uuid
   slug          String   @unique @db.VarChar(255)
   // Short admin-assigned code used as the vendor SKU prefix (e.g. MAN-MANJRSYP123).
   vendorCode    String?  @unique @map("vendor_code") @db.VarChar(20)
@@ -207,6 +213,7 @@ model Vendor {
 
   user               User                 @relation(fields: [userId], references: [id])
   businessAccount    BusinessAccount      @relation(fields: [businessAccountId], references: [id])
+  defaultOutlet      Outlet?              @relation("VendorDefaultOutlet", fields: [defaultOutletId], references: [id], onDelete: SetNull)
   serviceAreas       ServiceArea[]
   products           Product[]
   priceSlabs         PriceSlab[]
@@ -245,6 +252,7 @@ model Vendor {
   dispatches          Dispatch[]
   goodsReceipts       GoodsReceipt[]
   stockTransfers      StockTransfer[]
+  storeScopedRoles    UserRole[]          @relation("UserRoleOnlineStore")
 
   // Ordering defaults applied to new products and checkout
   defaultMOQ          Int?      @map("default_moq")
@@ -271,7 +279,8 @@ model Vendor {
   tradeName             String?  @map("trade_name") @db.VarChar(255)
   vendorType            String?  @map("vendor_type") @db.VarChar(50)
   setupProgress         Json?    @map("setup_progress")
-  multiWarehouseEnabled Boolean  @default(true) @map("multi_warehouse_enabled")
+  // Supplier Foundation: Online Store is the stock unit — multi-warehouse retired.
+  multiWarehouseEnabled Boolean  @default(false) @map("multi_warehouse_enabled")
   autoDisableOos        Boolean  @default(false) @map("auto_disable_oos")
   panNumber             String?  @map("pan_number") @db.VarChar(20)
   authorizedPersonName  String?  @map("authorized_person_name") @db.VarChar(255)
@@ -299,6 +308,7 @@ model Vendor {
   @@index([slug])
   @@index([isActive])
   @@index([userId])
+  @@index([businessAccountId])
   @@map("vendors")
 }
 
@@ -1794,7 +1804,8 @@ model BusinessAccount {
   contactPersons  ContactPerson[]
   roles           AccountRole[]
   userRoles       UserRole[]
-  vendor          Vendor?
+  // Supplier Foundation: N Online Stores (Vendor rows) per Business.
+  vendors         Vendor[]
   brand           Brand?
   orders          Order[]
   carts           Cart[]
@@ -1866,6 +1877,7 @@ model Outlet {
   goodsReceipts        GoodsReceipt[]
   stockTransfersFrom   StockTransfer[]       @relation("StockTransferFrom")
   stockTransfersTo     StockTransfer[]       @relation("StockTransferTo")
+  defaultForVendor     Vendor?               @relation("VendorDefaultOutlet")
 
   @@index([businessAccountId])
   @@index([pincode])
@@ -1919,24 +1931,31 @@ model AccountRole {
   @@map("account_roles")
 }
 
-// User ↔ Role assignment, optionally narrowed to one Outlet (outletId = null => all outlets in account).
+// User ↔ Role assignment.
+// outletId = null => all warehouses in account (legacy; supplier multi-warehouse retired).
+// vendorId = null => Business-wide (all Online Stores under the BA).
+// vendorId set => store-only (cannot access Business-level screens).
 // Permissions from multiple UserRole rows are UNION-merged at request time.
 model UserRole {
   id                String   @id @default(uuid()) @db.Uuid
   userId            String   @map("user_id") @db.Uuid
   businessAccountId String   @map("business_account_id") @db.Uuid
   outletId          String?  @map("outlet_id") @db.Uuid
+  // Supplier Foundation: Online Store scope (null = all stores under Business).
+  vendorId          String?  @map("vendor_id") @db.Uuid
   roleId            String   @map("role_id") @db.Uuid
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   user            User            @relation("UserRoles", fields: [userId], references: [id], onDelete: Cascade)
   businessAccount BusinessAccount @relation(fields: [businessAccountId], references: [id], onDelete: Cascade)
   outlet          Outlet?         @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  vendor          Vendor?         @relation("UserRoleOnlineStore", fields: [vendorId], references: [id], onDelete: Cascade)
   role            AccountRole     @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
-  @@unique([userId, businessAccountId, outletId, roleId])
+  @@unique([userId, businessAccountId, outletId, vendorId, roleId])
   @@index([userId])
   @@index([businessAccountId])
+  @@index([vendorId])
   @@map("user_roles")
 }
 

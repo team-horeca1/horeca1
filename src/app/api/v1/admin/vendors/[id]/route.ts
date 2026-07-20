@@ -94,13 +94,38 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
     });
 
     if (!vendor) {
-      throw Errors.notFound('Vendor');
+      throw Errors.notFound('Online Store');
     }
+
+    const siblingStores = await prisma.vendor.findMany({
+      where: {
+        businessAccountId: vendor.businessAccountId,
+        id: { not: vendor.id },
+      },
+      orderBy: [{ isPrimaryStore: 'desc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        businessName: true,
+        displayName: true,
+        slug: true,
+        isActive: true,
+        isVerified: true,
+        isPrimaryStore: true,
+      },
+    });
 
     const adminPassword = await getAdminRevealedPasswordForRole(ctx, vendor.user.id, 'vendor');
     const data = {
       ...vendor,
       user: { ...vendor.user, adminPassword },
+      siblingStores: siblingStores.map((s) => ({
+        id: s.id,
+        name: (s.displayName ?? s.businessName).trim() || s.businessName,
+        slug: s.slug,
+        isActive: s.isActive,
+        isVerified: s.isVerified,
+        isPrimaryStore: s.isPrimaryStore,
+      })),
     };
 
     return NextResponse.json({ success: true, data });

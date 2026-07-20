@@ -34,6 +34,8 @@ const inviteSchema = z.object({
   roleId: z.string().uuid().optional(),
   permissions: z.record(z.string(), z.record(z.string(), z.boolean())).optional(),
   outletIds: z.array(z.string().uuid()).optional(),
+  /** Supplier Foundation: business = all Online Stores; store = current store only. */
+  scope: z.enum(['business', 'store']).optional().default('store'),
   storefrontAccess: z.object({
     view: z.boolean().optional(),
     order: z.boolean().optional(),
@@ -226,6 +228,8 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     const outletTargets: (string | null)[] =
       input.outletIds && input.outletIds.length > 0 ? input.outletIds : [null];
 
+    const inviteScope = input.scope ?? 'store';
+
     // ── Transactional write ────────────────────────────────────────────────────
     const member = await prisma.$transaction(async (tx) => {
       const m = await tx.vendorTeamMember.create({
@@ -233,22 +237,70 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         include: teamMemberInclude,
       });
 
+      // Business-level invite: cascade VendorTeamMember to every Online Store under BA
+      if (inviteScope === 'business') {
+        const siblingStores = await tx.vendor.findMany({
+          where: { businessAccountId, id: { not: vendorId } },
+          select: { id: true },
+        });
+        for (const s of siblingStores) {
+          const exists = await tx.vendorTeamMember.findUnique({
+            where: { vendorId_userId: { vendorId: s.id, userId } },
+            select: { id: true },
+          });
+          if (!exists) {
+            await tx.vendorTeamMember.create({
+              data: {
+                vendorId: s.id,
+                userId,
+                role: legacyEnum,
+                roleId: role.id,
+                invitedBy: ctx.userId,
+              },
+            });
+          }
+        }
+      }
+
       await upsertTeamAccountMembership(tx, {
         userId,
         businessAccountId,
         invitedBy: ctx.userId,
       });
 
-      // Replace any prior vendor-scope roles for this user+account.
+      // Replace prior vendor-scope roles for this user+account (keep storefront roles).
       await tx.userRole.deleteMany({
-        where: { userId, businessAccountId, outletId: null, role: { scope: 'vendor' } },
+        where: {
+          userId,
+          businessAccountId,
+          role: { scope: 'vendor', name: { not: { startsWith: 'Storefront' } } },
+        },
       });
 
-      // Create UserRole per outlet target (null = account-wide).
-      for (const outletId of outletTargets) {
+      if (inviteScope === 'business') {
+        // Business-wide: vendorId null → all Online Stores
         await tx.userRole.create({
-          data: { userId, businessAccountId, outletId: outletId ?? null, roleId: role.id },
+          data: {
+            userId,
+            businessAccountId,
+            outletId: null,
+            vendorId: null,
+            roleId: role.id,
+          },
         });
+      } else {
+        // Store-only: confined to this Online Store
+        await tx.userRole.create({
+          data: {
+            userId,
+            businessAccountId,
+            outletId: null,
+            vendorId,
+            roleId: role.id,
+          },
+        });
+        // Legacy outlet targets ignored for supplier multi-warehouse retirement
+        void outletTargets;
       }
 
       // Storefront access — find or create a per-account role with just storefront perms.

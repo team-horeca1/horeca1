@@ -10,10 +10,9 @@ import { errorResponse } from '@/middleware/errorHandler';
 
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
   try {
-    // A user may own multiple vendor profiles since the V2.2 HCID change.
-    // Surface the most recently created one for the homepage banner — that's
-    // the most likely candidate for "still pending review".
-    const vendor = await prisma.vendor.findFirst({
+    // A user may own multiple Online Stores. Prefer any verified store so creating
+    // an extra draft/unverified store does not lock the whole Supplier portal.
+    const vendors = await prisma.vendor.findMany({
       where: { userId: ctx.userId },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -25,20 +24,39 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
       },
     });
 
-    if (!vendor) {
+    if (vendors.length === 0) {
       return NextResponse.json({
         success: true,
         data: { hasApplication: false },
       });
     }
 
+    const verified =
+      (ctx.activeVendorId
+        ? vendors.find((v) => v.id === ctx.activeVendorId && v.isVerified)
+        : undefined)
+      ?? vendors.find((v) => v.isVerified);
+
+    if (verified) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          hasApplication: true,
+          status: 'approved',
+          businessName: verified.businessName,
+          appliedAt: verified.createdAt,
+        },
+      });
+    }
+
+    const newest = vendors[0];
     return NextResponse.json({
       success: true,
       data: {
         hasApplication: true,
-        status: vendor.isVerified ? 'approved' : 'pending',
-        businessName: vendor.businessName,
-        appliedAt: vendor.createdAt,
+        status: 'pending',
+        businessName: newest.businessName,
+        appliedAt: newest.createdAt,
       },
     });
   } catch (error) {

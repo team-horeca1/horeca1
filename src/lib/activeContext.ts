@@ -22,6 +22,13 @@ export interface AvailableAccountSummary {
   isBrand: boolean;
 }
 
+export interface AvailableStoreSummary {
+  id: string;
+  displayName: string;
+  isPrimaryStore: boolean;
+  isActive: boolean;
+}
+
 export interface ActiveContext {
   hcidDisplay: string | null;
   activeBusinessAccountId: string;
@@ -41,6 +48,10 @@ export interface ActiveContext {
   activeBrandId: string | null;
   activeVendorTeamRole: TeamRole | 'owner' | null;
   activeBrandTeamRole: TeamRole | 'owner' | null;
+  /** Online Stores under the active Business (supplier portal). */
+  availableStores: AvailableStoreSummary[];
+  /** True when all UserRoles for this BA are store-scoped (no business-wide null vendorId). */
+  isStoreScopedOnly: boolean;
 }
 
 /**
@@ -49,6 +60,7 @@ export interface ActiveContext {
  * @param userId            HCID (User.id).
  * @param targetAccountId   The BusinessAccount to switch to, or null to pick the primary.
  * @param targetOutletId    The Outlet to switch to within that account, or null to pick the account's primary outlet.
+ * @param targetVendorId    The Online Store (Vendor) to activate under the Business, or null to pick primary/default.
  *
  * Returns null if the user has no BusinessAccountMember rows yet (legacy users mid-migration).
  * In that case the JWT will not carry account/outlet/permissions and the caller treats it as legacy.
@@ -57,6 +69,7 @@ export async function loadActiveContext(
   userId: string,
   targetAccountId: string | null,
   targetOutletId: string | null,
+  targetVendorId: string | null = null,
 ): Promise<ActiveContext | null> {
   // Defensive top-level try/catch: this function is called from the auth.ts jwt
   // callback on every sign-in and every session.update(). If anything inside
@@ -128,7 +141,7 @@ export async function loadActiveContext(
     if (!chosen) chosen = memberships[0];
     const account = chosen.businessAccount;
 
-    const [allRoleRows, vendorTenant, brandTenant] = await Promise.all([
+    const [allRoleRows, storeRows, brandTenant] = await Promise.all([
       prisma.userRole.findMany({
         where: {
           userId,
@@ -137,22 +150,25 @@ export async function loadActiveContext(
         },
         select: {
           outletId: true,
+          vendorId: true,
           role: { select: { name: true, permissions: true } },
         },
       }),
       account.isVendor
-        ? prisma.vendor.findFirst({
-            where: { userId, businessAccountId: account.id },
-            select: { id: true },
-          }).then(async (own) => {
-            if (own) return { id: own.id, teamRole: 'owner' as const };
-            const m = await prisma.vendorTeamMember.findFirst({
-              where: { userId, vendor: { businessAccountId: account.id } },
-              select: { vendorId: true, role: true },
-            });
-            return m ? { id: m.vendorId, teamRole: m.role } : null;
+        ? prisma.vendor.findMany({
+            where: { businessAccountId: account.id },
+            orderBy: [{ isPrimaryStore: 'desc' }, { createdAt: 'asc' }],
+            select: {
+              id: true,
+              userId: true,
+              businessName: true,
+              displayName: true,
+              isPrimaryStore: true,
+              isActive: true,
+              defaultOutletId: true,
+            },
           })
-        : Promise.resolve(null),
+        : Promise.resolve([]),
       account.isBrand
         ? prisma.brand.findFirst({
             where: { userId, businessAccountId: account.id },
@@ -168,17 +184,76 @@ export async function loadActiveContext(
         : Promise.resolve(null),
     ]);
 
+    const hasBusinessWideRole = allRoleRows.some((r) => r.vendorId === null);
+    const storeScopedVendorIds = [...new Set(
+      allRoleRows.filter((r) => r.vendorId !== null).map((r) => r.vendorId!),
+    )];
+    const isStoreScopedOnly = account.isVendor && !hasBusinessWideRole && storeScopedVendorIds.length > 0;
+
+    // Filter Online Stores the user can access
+    let accessibleStores = storeRows;
+    if (isStoreScopedOnly) {
+      accessibleStores = storeRows.filter((s) => storeScopedVendorIds.includes(s.id));
+    }
+    // Also allow team membership stores
+    if (account.isVendor && accessibleStores.length === 0) {
+      const teamStores = await prisma.vendorTeamMember.findMany({
+        where: { userId, vendor: { businessAccountId: account.id } },
+        select: { vendorId: true, role: true },
+      });
+      const teamIds = new Set(teamStores.map((t) => t.vendorId));
+      accessibleStores = storeRows.filter((s) => teamIds.has(s.id) || s.userId === userId);
+    } else if (account.isVendor) {
+      // Owners see all stores they own on this BA
+      const ownsAny = storeRows.some((s) => s.userId === userId);
+      if (ownsAny && hasBusinessWideRole) {
+        accessibleStores = storeRows;
+      }
+    }
+
+    const availableStores: AvailableStoreSummary[] = accessibleStores.map((s) => ({
+      id: s.id,
+      displayName: (s.displayName?.trim() || s.businessName).trim(),
+      isPrimaryStore: s.isPrimaryStore,
+      isActive: s.isActive,
+    }));
+
+    // Resolve active Online Store
+    let vendorTenant: { id: string; teamRole: TeamRole | 'owner'; defaultOutletId: string | null } | null = null;
+    if (account.isVendor && accessibleStores.length > 0) {
+      const chosenStore =
+        (targetVendorId ? accessibleStores.find((s) => s.id === targetVendorId) : null)
+        ?? accessibleStores.find((s) => s.isPrimaryStore)
+        ?? accessibleStores[0];
+      const isOwner = chosenStore.userId === userId;
+      let teamRole: TeamRole | 'owner' = isOwner ? 'owner' : 'viewer';
+      if (!isOwner) {
+        const m = await prisma.vendorTeamMember.findFirst({
+          where: { userId, vendorId: chosenStore.id },
+          select: { role: true },
+        });
+        teamRole = m?.role ?? 'viewer';
+      }
+      vendorTenant = {
+        id: chosenStore.id,
+        teamRole,
+        defaultOutletId: chosenStore.defaultOutletId,
+      };
+    }
+
     const hasAccountWideRole = allRoleRows.some((r) => r.outletId === null);
     const outletScopedIds = [...new Set(
       allRoleRows.filter((r) => r.outletId !== null).map((r) => r.outletId!),
     )];
     const accessibleOutletIds = hasAccountWideRole ? [] : outletScopedIds;
 
-    // Pick the active outlet within the chosen account.
-    // For per-outlet users: auto-pick their accessible outlet, validate targets against it.
+    // Pick the active outlet: for supplier Online Stores prefer the store default outlet.
+    // Customer BAs keep primary / first outlet behavior.
     let activeOutletId: string | null = null;
 
-    if (targetOutletId) {
+    if (vendorTenant?.defaultOutletId) {
+      activeOutletId = vendorTenant.defaultOutletId;
+    } else if (targetOutletId) {
       const canUse = accessibleOutletIds.length === 0 || accessibleOutletIds.includes(targetOutletId);
       if (canUse) {
         const ok = await prisma.outlet.findFirst({
@@ -191,7 +266,6 @@ export async function loadActiveContext(
 
     if (!activeOutletId) {
       if (accessibleOutletIds.length > 0) {
-        // Per-outlet user: pick their first accessible outlet (ignore account primaryOutletId).
         const ok = await prisma.outlet.findFirst({
           where: { id: { in: accessibleOutletIds }, businessAccountId: account.id, isActive: true },
           orderBy: { createdAt: 'asc' },
@@ -199,7 +273,6 @@ export async function loadActiveContext(
         });
         activeOutletId = ok?.id ?? null;
       } else {
-        // Account-wide user: pick primary or first outlet.
         activeOutletId = account.primaryOutletId;
         if (!activeOutletId) {
           const first = await prisma.outlet.findFirst({
@@ -212,9 +285,13 @@ export async function loadActiveContext(
       }
     }
 
-    const userRoles = allRoleRows.filter(
-      (r) => r.outletId === null || (activeOutletId && r.outletId === activeOutletId),
-    );
+    const userRoles = allRoleRows.filter((r) => {
+      const outletOk = r.outletId === null || (activeOutletId && r.outletId === activeOutletId);
+      const storeOk =
+        r.vendorId === null
+        || (vendorTenant && r.vendorId === vendorTenant.id);
+      return outletOk && storeOk;
+    });
     // ALL_PERMISSION_KEYS at session time so it can never go stale when new
     // modules (e.g. storefront.*) are added to the registry — stale role JSON
     // snapshots are what locked owners out of their own checkout before.
@@ -281,9 +358,11 @@ export async function loadActiveContext(
       activeBrandId: brandTenant?.id ?? null,
       activeVendorTeamRole: vendorTenant?.teamRole ?? null,
       activeBrandTeamRole: brandTenant?.teamRole ?? null,
+      availableStores,
+      isStoreScopedOnly,
     };
   } catch (err) {
-    console.error('[loadActiveContext] failed for userId=%s targetAccountId=%s targetOutletId=%s:', userId, targetAccountId, targetOutletId, err);
+    console.error('[loadActiveContext] failed for userId=%s targetAccountId=%s targetOutletId=%s targetVendorId=%s:', userId, targetAccountId, targetOutletId, targetVendorId, err);
     return null;
   }
 }

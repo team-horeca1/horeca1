@@ -26,7 +26,6 @@ import {
   Building2,
   UserCircle,
   BadgeIndianRupee,
-  MapPin,
   ShieldAlert,
   ScrollText,
 } from 'lucide-react';
@@ -61,7 +60,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
     label: 'Marketplace',
     links: [
       { name: 'Customers', icon: Users, href: '/admin/customers', feature: 'customers', requiredPerm: 'customers.view' },
-      { name: 'Vendors', icon: Store, href: '/admin/vendors', feature: 'vendors', requiredPerm: 'vendors.view' },
+      { name: 'Suppliers', icon: Store, href: '/admin/vendors', feature: 'vendors', requiredPerm: 'vendors.view' },
       { name: 'Products', icon: Package, href: '/admin/products', feature: 'products', requiredPerm: 'products.view' },
       { name: 'Categories', icon: Tag, href: '/admin/categories', feature: 'products', requiredPerm: 'products.view' },
       { name: 'Brands', icon: Sparkles, href: '/admin/brands', feature: 'brands', requiredPerm: 'brands.view' },
@@ -93,6 +92,23 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
   },
 ];
 
+/** Supplier root (Panel 1) — no products/inventory here. */
+export const SUPPLIER_NAV_GROUPS: PortalNavGroup[] = [
+  {
+    label: 'Supplier',
+    links: [
+      { name: 'Dashboard', icon: LayoutDashboard, href: '/vendor/overview', feature: 'dashboard', requiredPerm: 'dashboard.view' },
+      { name: 'Orders', icon: ShoppingBag, href: '/vendor/all-orders', feature: 'orders', requiredPerm: 'orders.view' },
+      { name: 'Businesses', icon: Building2, href: '/vendor/businesses', feature: 'dashboard', requiredPerm: ['dashboard.view', 'settings.view'] },
+      { name: 'Team Members', icon: Users, href: '/vendor/team', feature: 'users', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
+      { name: 'Reports', icon: BarChart3, href: '/vendor/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
+      { name: 'Ledger', icon: BookOpen, href: '/vendor/ledger', feature: 'payments', requiredPerm: 'payments.view' },
+      { name: 'Settings', icon: Settings, href: '/vendor/account', feature: 'dashboard', requiredPerm: 'dashboard.view' },
+    ],
+  },
+];
+
+/** Online Store ops (Panel 3). */
 export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
   {
     label: 'Operations',
@@ -134,10 +150,8 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
     label: 'Account',
     links: [
       { name: 'Notifications', icon: Bell, href: '/vendor/notifications', feature: 'settings', requiredPerm: 'settings.view' },
-      { name: 'Business account', icon: Building2, href: '/vendor/account', feature: 'dashboard', requiredPerm: 'dashboard.view' },
-      { name: 'Team', icon: Users, href: '/vendor/team', feature: 'users', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
-      { name: 'Outlets', icon: MapPin, href: '/vendor/outlets', feature: 'outlets', requiredPerm: 'outlets.view' },
-      { name: 'Settings', icon: Settings, href: '/vendor/settings', feature: 'settings', requiredPerm: 'settings.view' },
+      { name: 'Back to Supplier', icon: Building2, href: '/vendor/overview', feature: 'dashboard', requiredPerm: 'dashboard.view' },
+      { name: 'Store Settings', icon: Settings, href: '/vendor/settings', feature: 'settings', requiredPerm: 'settings.view' },
     ],
   },
 ];
@@ -166,7 +180,10 @@ export function filterNavLinks(
 
 const PORTAL_FEATURE_EXISTS: Record<RoleScope, Set<string>> = {
   admin: new Set(ADMIN_NAV_GROUPS.flatMap((g) => g.links.map((l) => l.feature).filter(Boolean) as string[])),
-  vendor: new Set(VENDOR_NAV_GROUPS.flatMap((g) => g.links.map((l) => l.feature).filter(Boolean) as string[])),
+  vendor: new Set([
+    ...VENDOR_NAV_GROUPS.flatMap((g) => g.links.map((l) => l.feature).filter(Boolean) as string[]),
+    ...SUPPLIER_NAV_GROUPS.flatMap((g) => g.links.map((l) => l.feature).filter(Boolean) as string[]),
+  ]),
   brand: new Set(BRAND_NAV_LINKS.map((l) => l.feature).filter(Boolean) as string[]),
   account: new Set(),
   delivery: new Set(),

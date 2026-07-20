@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { cn, formatPackSize } from '@/lib/utils';
 import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
 import { buildCategoryTree, filterProductsByCatalogTab, slugifyCategory } from '@/lib/categoryTree';
-import { useAddress } from '@/context/AddressContext';
+import { useDeliveryPincode } from '@/hooks/useDeliveryPincode';
 import { useCart } from '@/context/CartContext';
 import type { VendorProduct } from '@/types';
 import { VendorProductCard } from '@/components/features/vendor/VendorProductCard';
@@ -214,8 +214,7 @@ function getProductAvailState(
 
 export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
     const router = useRouter();
-    const { selectedAddress } = useAddress();
-    const pincode = selectedAddress?.pincode;
+    const pincode = useDeliveryPincode();
     const { addToCart, groups } = useCart();
     const [activeTab, setActiveTab] = useState<ActiveTab>('items');
     const [selectedProduct, setSelectedProduct] = useState<BrandProduct | null>(null);

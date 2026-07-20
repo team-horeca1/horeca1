@@ -144,8 +144,8 @@ export const DELETE = withAuth(async (req: NextRequest, ctx) => {
     // rows before deleting the parent. Schema cascades members, outlets,
     // accountRoles, userRoles automatically, but Vendor / Brand and their
     // children do NOT cascade through BA — we wipe them by hand.
-    const [vendor, brand, members] = await Promise.all([
-      ba.isVendor ? prisma.vendor.findFirst({ where: { businessAccountId: id }, select: { id: true } }) : null,
+    const [vendors, brand, members] = await Promise.all([
+      ba.isVendor ? prisma.vendor.findMany({ where: { businessAccountId: id }, select: { id: true } }) : [],
       ba.isBrand ? prisma.brand.findFirst({ where: { businessAccountId: id }, select: { id: true } }) : null,
       prisma.businessAccountMember.findMany({
         where: { businessAccountId: id },
@@ -155,10 +155,11 @@ export const DELETE = withAuth(async (req: NextRequest, ctx) => {
     const memberUserIds = [...new Set(members.map((m) => m.userId))];
 
     await prisma.$transaction(async (tx) => {
-      if (vendor) {
+      for (const vendor of vendors) {
         const vendorId = vendor.id;
-        // Children of the vendor first. Order matters where one row points
-        // to another (e.g. priceSlab → product, inventory → product).
+        // Clear default outlet FK before outlet cascade on BA delete
+        await tx.vendor.update({ where: { id: vendorId }, data: { defaultOutletId: null } });
+        // Children of the Online Store first.
         await tx.priceSlab.deleteMany({ where: { vendorId } });
         await tx.inventory.deleteMany({ where: { vendorId } });
         await tx.collectionProduct.deleteMany({ where: { product: { vendorId } } });

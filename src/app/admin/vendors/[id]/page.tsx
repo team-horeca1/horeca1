@@ -121,11 +121,21 @@ function docIsPdf(d: { fileUrl: string; fileName: string }): boolean {
     return /\.pdf(\?|$)/i.test(d.fileUrl) || /\.pdf$/i.test(d.fileName);
 }
 
+interface SiblingStore {
+    id: string;
+    name: string;
+    slug: string;
+    isActive: boolean;
+    isVerified: boolean;
+    isPrimaryStore: boolean;
+}
+
 interface VendorData {
     id: string;
     businessName: string;
     slug: string;
     vendorCode: string | null;
+    siblingStores?: SiblingStore[];
     logoUrl: string | null;
     description: string | null;
     rating: number;
@@ -618,14 +628,14 @@ export default function VendorDetailsPage() {
     };
 
     if (loading) {
-        return <AdminRegistryLoadingState message="Loading vendor details..." />;
+        return <AdminRegistryLoadingState message="Loading supplier store details..." />;
     }
 
     if (error || !vendor) {
         return (
             <div className="flex flex-col items-center justify-center h-[60vh] gap-3">
                 <XCircle size={36} className="text-red-400" />
-                <p className="text-[16px] font-bold text-[#7C7C7C]">{error || 'Vendor not found'}</p>
+                <p className="text-[16px] font-bold text-[#7C7C7C]">{error || 'Online Store not found'}</p>
                 <button
                     onClick={() => router.back()}
                     className="mt-2 text-[14px] font-bold text-[#299E60] hover:underline"
@@ -664,16 +674,19 @@ export default function VendorDetailsPage() {
             <AdminEntityDetailHeader
                 onBack={() => router.back()}
                 breadcrumbs={[
-                    { label: 'Vendors Registry', href: '/admin/vendors' },
+                    { label: 'Suppliers', href: '/admin/vendors' },
                     { label: vendor.businessName },
                 ]}
                 actions={
                     <>
-                        <AdminImpersonateButton
-                            target="vendor"
-                            entityId={vendor.id}
-                            label="Impersonate"
-                        />
+                        {vendor.user?.id && (
+                            <AdminImpersonateButton
+                                target="vendor"
+                                entityId={vendor.user.id}
+                                label="Impersonate Supplier"
+                                redirectTo="/vendor/overview"
+                            />
+                        )}
                         <button
                             type="button"
                             onClick={() => setIsEditing(!isEditing)}
@@ -758,7 +771,7 @@ export default function VendorDetailsPage() {
                 title={vendor.businessName}
                 badges={
                     vendor.isVerified ? (
-                        <AdminStatusBadge variant="verified" label="Verified Vendor" className="normal-case" />
+                        <AdminStatusBadge variant="verified" label="Verified Supplier Store" className="normal-case" />
                     ) : undefined
                 }
                 subtitle={
@@ -800,6 +813,37 @@ export default function VendorDetailsPage() {
             />
 
             <AdminEntityStatsRow stats={stats} />
+
+            {(vendor.siblingStores?.length ?? 0) > 0 && (
+                <div className="bg-white border border-[#E5E7EB] rounded-[16px] p-5 shadow-sm">
+                    <h3 className="text-[14px] font-bold text-[#111827] mb-3">
+                        Sibling Online Stores (same Business)
+                    </h3>
+                    <div className="space-y-2">
+                        {vendor.siblingStores!.map((s) => (
+                            <div
+                                key={s.id}
+                                className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-[10px] bg-[#F9FAFB] border border-[#F3F4F6]"
+                            >
+                                <div className="min-w-0">
+                                    <Link
+                                        href={`/admin/vendors/${s.id}`}
+                                        className="text-[13px] font-semibold text-[#111827] hover:text-[#299E60] truncate block"
+                                    >
+                                        {s.name}
+                                    </Link>
+                                    <span className="text-[11px] text-[#9CA3AF]">/{s.slug}</span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    {!s.isActive && (
+                                        <span className="text-[10px] font-bold uppercase text-[#AEAEAE]">Disabled</span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 {/* Left/Middle Column: Tab panels */}

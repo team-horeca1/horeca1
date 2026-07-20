@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { clearAllAdminImpersonation, notifyImpersonationChanged } from '@/lib/clearImpersonation';
+import { setEnteredStore } from '@/lib/supplierPortalLevel';
 
 export type ImpersonateTarget = 'vendor' | 'brand' | 'customer';
 
@@ -11,7 +12,7 @@ const ROUTES: Record<ImpersonateTarget, { post: string; delete: string; redirect
   vendor: {
     post: '/api/v1/admin/impersonate',
     delete: '/api/v1/admin/impersonate',
-    redirect: '/vendor/dashboard',
+    redirect: '/vendor/overview',
   },
   brand: {
     post: '/api/v1/admin/impersonate/brand',
@@ -25,8 +26,9 @@ const ROUTES: Record<ImpersonateTarget, { post: string; delete: string; redirect
   },
 };
 
+/** Default body key; vendor UI uses supplierUserId (Supplier-level Impersonate). */
 const BODY_KEYS: Record<ImpersonateTarget, string> = {
-  vendor: 'vendorId',
+  vendor: 'supplierUserId',
   brand: 'brandId',
   customer: 'userId',
 };
@@ -38,14 +40,19 @@ export function useAdminImpersonate(target: ImpersonateTarget) {
   const bodyKey = BODY_KEYS[target];
 
   const start = useCallback(
-    async (entityId: string, redirectTo?: string) => {
+    async (
+      entityId: string,
+      redirectTo?: string,
+      opts?: { bodyKey?: string },
+    ) => {
       if (loading) return false;
       setLoading(true);
       try {
+        const key = opts?.bodyKey ?? bodyKey;
         const res = await fetch(routes.post, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ [bodyKey]: entityId }),
+          body: JSON.stringify({ [key]: entityId }),
         });
         const json = await res.json().catch(() => null);
         if (!res.ok || !json?.success) {
@@ -55,6 +62,9 @@ export function useAdminImpersonate(target: ImpersonateTarget) {
             || `Failed to start admin view (HTTP ${res.status})`;
           toast.error(msg);
           return false;
+        }
+        if (target === 'vendor') {
+          setEnteredStore(false);
         }
         notifyImpersonationChanged();
         router.push(redirectTo ?? routes.redirect);
@@ -67,7 +77,7 @@ export function useAdminImpersonate(target: ImpersonateTarget) {
         setLoading(false);
       }
     },
-    [loading, router, routes.post, routes.redirect, bodyKey],
+    [loading, router, routes.post, routes.redirect, bodyKey, target],
   );
 
   const exit = useCallback(

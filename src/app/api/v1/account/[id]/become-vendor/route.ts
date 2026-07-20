@@ -49,14 +49,14 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
 
     const body = Body.parse(await req.json());
 
-    // Vendor.businessAccountId is unique — prevent making this same
-    // BusinessAccount into two vendor profiles.
-    const existingForAccount = await prisma.vendor.findUnique({
+    // One Business may have multiple Online Stores — but become-vendor only
+    // creates the first store when none exist yet.
+    const existingForAccount = await prisma.vendor.findFirst({
       where: { businessAccountId: accountId },
       select: { id: true },
     });
     if (existingForAccount) {
-      throw Errors.conflict('This account is already a vendor.');
+      throw Errors.conflict('This Business already has an Online Store. Add another from Businesses → Online Stores.');
     }
 
     // Confirm slug is free (extremely unlikely collision, but cheap to check).
@@ -96,6 +96,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
           userId: ctx.userId,
           businessAccountId: accountId,
           businessName: body.businessName,
+          displayName: body.businessName,
           slug,
           description: body.description ?? null,
           gstNumber: body.gstNumber ?? null,
@@ -103,18 +104,40 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
           minOrderValue: body.minOrderValue ?? 0,
           isVerified: false,
           isActive: false,
+          isPrimaryStore: true,
+          multiWarehouseEnabled: false,
+          setupProgress: { business: true, online_store: true },
         },
         select: { id: true, businessName: true, slug: true, isVerified: true, isActive: true },
       });
 
+      const { ensureDefaultOutletForStore } = await import('@/modules/supplier/foundation.service');
+      await ensureDefaultOutletForStore(tx, {
+        businessAccountId: accountId,
+        vendorId: vendor.id,
+        name: body.businessName,
+      });
+
       // 3. Grant the caller the Vendor Admin role (additive — they keep their existing Owner role too).
       const existingRole = await tx.userRole.findFirst({
-        where: { userId: ctx.userId, businessAccountId: accountId, outletId: null, roleId: vendorAdminTemplate.id },
+        where: {
+          userId: ctx.userId,
+          businessAccountId: accountId,
+          outletId: null,
+          vendorId: null,
+          roleId: vendorAdminTemplate.id,
+        },
         select: { id: true },
       });
       if (!existingRole) {
         await tx.userRole.create({
-          data: { userId: ctx.userId, businessAccountId: accountId, outletId: null, roleId: vendorAdminTemplate.id },
+          data: {
+            userId: ctx.userId,
+            businessAccountId: accountId,
+            outletId: null,
+            vendorId: null,
+            roleId: vendorAdminTemplate.id,
+          },
         });
       }
 

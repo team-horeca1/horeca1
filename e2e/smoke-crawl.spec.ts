@@ -75,6 +75,7 @@ const ROUTES = [
   '/vendor/brand-mappings',
   '/vendor/sales-team',
   '/vendor/outlets',
+  '/vendor/businesses',
   '/vendor/account',
   '/vendor/notifications',
   '/vendor/setup',

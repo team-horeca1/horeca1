@@ -11,7 +11,7 @@ import { dal } from '@/lib/dal';
 import { cn } from '@/lib/utils';
 import { buildCategoryTree, filterProductsByCatalogTab } from '@/lib/categoryTree';
 import { useCart } from '@/context/CartContext';
-import { useAddress } from '@/context/AddressContext';
+import { useDeliveryPincode } from '@/hooks/useDeliveryPincode';
 import type { Vendor, VendorProduct } from '@/types';
 import { Package, Star, CheckCircle, Clock, ChevronRight, LayoutGrid, CreditCard } from 'lucide-react';
 import Image from 'next/image';
@@ -33,7 +33,7 @@ export default function VendorStorePage() {
     const vendorId = params.id as string;
     const { status: sessionStatus } = useSession();
     const { addToCart } = useCart();
-    const { selectedAddress } = useAddress();
+    const deliveryPincode = useDeliveryPincode();
     const [vendor, setVendor] = useState<Vendor | null>(null);
     const [products, setProducts] = useState<VendorProduct[]>([]);
     const [loading, setLoading] = useState(true);
@@ -84,11 +84,7 @@ export default function VendorStorePage() {
                 setProductsError(null);
             }
         });
-        const pincode =
-            selectedAddress?.pincode
-            || (typeof window !== 'undefined' ? localStorage.getItem('user_pincode') : null)
-            || undefined;
-        const pin = pincode && /^\d{6}$/.test(pincode) ? pincode : undefined;
+        const pin = deliveryPincode;
 
         Promise.allSettled([
             dal.vendors.getById(vendorId),
@@ -123,7 +119,7 @@ export default function VendorStorePage() {
         });
 
         return () => { cancelled = true; };
-    }, [vendorId, selectedAddress?.pincode, reloadToken]);
+    }, [vendorId, deliveryPincode, reloadToken]);
 
     useEffect(() => {
         if (sessionStatus !== 'authenticated' || !vendorId) return;
@@ -185,7 +181,7 @@ export default function VendorStorePage() {
     // Refetch previously-ordered when delivery pin changes (stock visibility depends on pin).
     useEffect(() => {
         setPrevOrderedProducts([]);
-    }, [selectedAddress?.pincode, vendorId]);
+    }, [deliveryPincode, vendorId]);
 
     useEffect(() => {
         if (activeTab === 'orders') Promise.resolve().then(() => loadPrevOrders());
@@ -195,9 +191,7 @@ export default function VendorStorePage() {
                 try {
                     const res = await fetch(`/api/v1/vendors/${vendorId}/previously-ordered`);
                     const json = await res.json();
-                    const pin =
-                        selectedAddress?.pincode
-                        || (typeof window !== 'undefined' ? localStorage.getItem('user_pincode') : null);
+                    const pin = deliveryPincode;
                     setPrevOrderedProducts((json.data || json.items || []).map((p: { id: string; name: string; basePrice?: number | string; price?: number | string; imageUrl?: string; categoryName?: string; packSize?: string; lastOrderedQty?: number; lastOrderedDate?: string; stock?: number; qty_available?: number }) => {
                         const fromCatalog = products.find((c) => c.id === p.id);
                         const stock = fromCatalog?.stock
@@ -229,14 +223,14 @@ export default function VendorStorePage() {
                             lastOrderedDate: p.lastOrderedDate,
                         } as VendorProduct;
                     }).filter((p: VendorProduct) => {
-                        if (pin && /^\d{6}$/.test(pin)) return (p.stock ?? 0) > 0;
+                        if (pin) return (p.stock ?? 0) > 0;
                         return true;
                     }));
                 } catch { setPrevOrderedProducts([]); }
                 finally { setPrevOrderedLoading(false); }
             });
         }
-    }, [activeTab, loadPrevOrders, products, selectedAddress?.pincode, vendorId, vendor?.name, vendor?.logo, prevOrderedLoading, prevOrderedProducts.length]);
+    }, [activeTab, loadPrevOrders, products, deliveryPincode, vendorId, vendor?.name, vendor?.logo, prevOrderedLoading, prevOrderedProducts.length]);
 
     // Load reviews when ratings tab is activated
     useEffect(() => {
@@ -302,22 +296,20 @@ export default function VendorStorePage() {
             result = filterProductsByCatalogTab(result, activeTab);
         }
 
-        // Filter by search
+        // Filter by search (include brand displayName; guard nullish fields)
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
             result = result.filter(p =>
-                p.name.toLowerCase().includes(q) ||
-                p.category.toLowerCase().includes(q) ||
-                p.description.toLowerCase().includes(q)
+                (p.name ?? '').toLowerCase().includes(q) ||
+                (p.displayName ?? '').toLowerCase().includes(q) ||
+                (p.category ?? '').toLowerCase().includes(q) ||
+                (p.description ?? '').toLowerCase().includes(q)
             );
         }
 
         // Defense: when a delivery pin is known, never show zero-stock cards
         // (server also hard-hides; this covers stale client state / prev-ordered tab).
-        const pin =
-            selectedAddress?.pincode
-            || (typeof window !== 'undefined' ? localStorage.getItem('user_pincode') : null);
-        if (pin && /^\d{6}$/.test(pin)) {
+        if (deliveryPincode) {
             result = result.filter(p => (p.stock ?? 0) > 0);
         }
 
@@ -328,7 +320,7 @@ export default function VendorStorePage() {
             const bOut = (b.stock ?? 0) <= 0 ? 1 : 0;
             return aOut - bOut;
         });
-    }, [products, activeTab, searchQuery, prevOrderedProducts, selectedAddress?.pincode]);
+    }, [products, activeTab, searchQuery, prevOrderedProducts, deliveryPincode]);
 
     if (loading) {
         return (

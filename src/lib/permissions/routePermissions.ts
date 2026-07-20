@@ -7,6 +7,7 @@ import type { RoleScope } from '@/lib/permissions/portalFeatures';
 import {
   ADMIN_NAV_GROUPS,
   VENDOR_NAV_GROUPS,
+  SUPPLIER_NAV_GROUPS,
   BRAND_NAV_LINKS,
   type PortalNavLink,
 } from '@/lib/permissions/portalNav';
@@ -62,6 +63,7 @@ function buildRules(scope: RoleScope): RouteRule[] {
       ].sort((a, b) => b.prefix.length - a.prefix.length);
     case 'vendor':
       return [
+        ...SUPPLIER_NAV_GROUPS.flatMap((g) => permFromLinks(g.links)),
         ...VENDOR_NAV_GROUPS.flatMap((g) => permFromLinks(g.links)),
         ...VENDOR_EXTRA,
       ].sort((a, b) => b.prefix.length - a.prefix.length);
@@ -107,18 +109,27 @@ export type CanFn = (need?: PermissionKey | PermissionKey[]) => boolean;
 export function getFirstAllowedRoute(
   scope: RoleScope,
   can: CanFn,
+  opts?: { vendorLevel?: 'supplier' | 'store' },
 ): string | null {
   const links: PortalNavLink[] =
     scope === 'admin'
       ? ADMIN_NAV_GROUPS.flatMap((g) => g.links)
       : scope === 'vendor'
-        ? VENDOR_NAV_GROUPS.flatMap((g) => g.links)
+        ? opts?.vendorLevel === 'store'
+          ? VENDOR_NAV_GROUPS.flatMap((g) => g.links)
+          : SUPPLIER_NAV_GROUPS.flatMap((g) => g.links)
         : scope === 'brand'
           ? BRAND_NAV_LINKS
           : [];
 
   for (const link of links) {
     if (can(link.requiredPerm)) return link.href;
+  }
+  // Fallback: store ops if supplier nav empty (e.g. store-scoped staff)
+  if (scope === 'vendor' && opts?.vendorLevel !== 'store') {
+    for (const link of VENDOR_NAV_GROUPS.flatMap((g) => g.links)) {
+      if (can(link.requiredPerm)) return link.href;
+    }
   }
   return null;
 }

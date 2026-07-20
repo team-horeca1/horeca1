@@ -1,15 +1,10 @@
 'use client';
 
 /**
- * Vendor portal layout — V2.2
- * ---------------------------
- * V2.2 introduces a visual "Operating from: <Outlet>" indicator strip
- * (VendorOutletStrip) directly under the top header so vendors always
- * see which dispatch outlet/warehouse they're operating as. The strip
- * also surfaces outlet switching.
- *
- * V2.3 — Outlet strip scopes dashboard, orders, inventory, and warehouse ops
- * to the active fulfillment warehouse via resolveVendorOutletContext.
+ * Vendor portal layout — Supplier Foundation
+ * -----------------------------------------
+ * Context bar shows active Business + Online Store from session.
+ * Multi-warehouse outlet strip retired — Online Stores replace warehouses.
  */
 
 import React, { useState } from 'react';
@@ -53,15 +48,22 @@ import { cn } from '@/lib/utils';
 import { defaultPortalPath } from '@/lib/portalRouting';
 import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
-import { VendorOutletStrip } from '@/components/vendor/VendorOutletStrip';
 import { VendorNotificationBell } from '@/components/features/vendor/VendorNotificationBell';
 import { VendorGlobalSearch } from '@/components/vendor/VendorGlobalSearch';
 import { usePermissions } from '@/hooks/usePermissions';
-import { VENDOR_NAV_GROUPS, filterNavLinks } from '@/lib/permissions/portalNav';
+import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
+import { VENDOR_NAV_GROUPS, SUPPLIER_NAV_GROUPS, filterNavLinks } from '@/lib/permissions/portalNav';
 import { getFirstAllowedRoute } from '@/lib/permissions/routePermissions';
 import { PortalPageGuard } from '@/components/auth/PortalPageGuard';
 import { PortalNoAccess } from '@/components/auth/PortalNoAccess';
 import { Suspense } from 'react';
+import {
+  isStoreOpsPath,
+  isSupplierLevelPath,
+  readEnteredStore,
+  setEnteredStore,
+  resolvePortalLevel,
+} from '@/lib/supplierPortalLevel';
 
 export default function VendorLayout({
     children,
@@ -77,15 +79,36 @@ export default function VendorLayout({
     const [checkingApplication, setCheckingApplication] = useState(true);
     // null = brands fetch in flight — do not hide Brand Mappings (avoids false redirect to dashboard/setup)
     const [hasBrandMappings, setHasBrandMappings] = useState<boolean | null>(null);
+    const [enteredStore, setEnteredStoreState] = useState(false);
 
-    const userRole = (session?.user as { role?: string } | undefined)?.role;
-    const activeAccountType = (session?.user as {
-        activeBusinessAccountType?: { isCustomer: boolean; isVendor: boolean; isBrand: boolean };
-    } | undefined)?.activeBusinessAccountType;
+    const sessionUser = session?.user;
+    const userRole = sessionUser?.role;
+    const activeAccountType = sessionUser?.activeBusinessAccountType;
     const isActiveVendor = activeAccountType?.isVendor === true;
     const isActiveBrand = activeAccountType?.isBrand === true;
     const isAdmin = userRole === 'admin';
     const canUseVendorPortal = isAdmin || isActiveVendor || userRole === 'vendor';
+    const {
+      currentAccount,
+      availableStores: switcherStores,
+      activeVendorId: switcherVendorId,
+      isStoreScopedOnly: switcherStoreScoped,
+    } = useBusinessAccountSwitcher();
+    const isStoreScopedOnly = switcherStoreScoped || sessionUser?.isStoreScopedOnly === true;
+    const availableStores = switcherStores.length > 0
+      ? switcherStores
+      : (sessionUser?.availableStores ?? []);
+    const activeVendorId = switcherVendorId ?? sessionUser?.activeVendorId ?? null;
+    const activeStoreName =
+        availableStores.find((s) => s.id === activeVendorId)?.displayName
+        ?? availableStores.find((s) => s.isPrimaryStore)?.displayName
+        ?? availableStores[0]?.displayName
+        ?? null;
+    const activeBusinessName =
+        currentAccount?.displayName
+        ?? currentAccount?.legalName
+        ?? sessionUser?.availableAccounts?.find((a) => a.id === sessionUser.activeBusinessAccountId)?.displayName
+        ?? null;
 
     const fetchBrandMappingAccess = React.useCallback(() => {
         if (status !== 'authenticated' || !canUseVendorPortal) return;
@@ -109,15 +132,60 @@ export default function VendorLayout({
         return () => window.removeEventListener('focus', onFocus);
     }, [status, canUseVendorPortal, fetchBrandMappingAccess]);
 
+    // Sync enter-store flag from sessionStorage (and clear when on supplier/business panels)
+    React.useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (isSupplierLevelPath(pathname)) {
+            setEnteredStore(false);
+            setEnteredStoreState(false);
+            return;
+        }
+        setEnteredStoreState(readEnteredStore());
+    }, [pathname]);
+
+    const portalLevel = resolvePortalLevel(pathname, {
+        isStoreScopedOnly,
+        enteredStore: isStoreScopedOnly ? true : enteredStore,
+    });
+    const showStoreNav = portalLevel === 'store' || isStoreScopedOnly;
+
     const { can } = usePermissions();
-    const firstAllowedRoute = getFirstAllowedRoute('vendor', can);
-    const visibleGroups = VENDOR_NAV_GROUPS.map((g) => ({
+    const firstAllowedRoute = getFirstAllowedRoute('vendor', can, {
+        vendorLevel: showStoreNav ? 'store' : 'supplier',
+    });
+    const navSource = showStoreNav ? VENDOR_NAV_GROUPS : SUPPLIER_NAV_GROUPS;
+    const visibleGroups = navSource.map((g) => ({
       ...g,
       links: filterNavLinks(g.links, can, 'vendor', (link) =>
         // Hide only after we know there are no authorized brands (null = still loading)
-        link.href === '/vendor/brand-mappings' && hasBrandMappings === false,
+        (link.href === '/vendor/brand-mappings' && hasBrandMappings === false)
+        // Store-scoped staff: no supplier hierarchy links
+        || (isStoreScopedOnly && (
+          link.href === '/vendor/businesses'
+          || link.href === '/vendor/overview'
+          || link.name === 'Back to Supplier'
+        )),
       ),
     })).filter((g) => g.links.length > 0);
+
+    // Hierarchy routing: store-scoped stay in ops; business-wide need Enter Store for ops
+    React.useEffect(() => {
+        if (status !== 'authenticated') return;
+        if (isApplicationPending) return;
+        if (!isAdmin && !isActiveVendor) return;
+        if (pathname === '/vendor/setup') return;
+
+        if (isStoreScopedOnly) {
+            if (pathname === '/vendor/overview' || pathname.startsWith('/vendor/businesses')) {
+                router.replace('/vendor/dashboard');
+            }
+            return;
+        }
+
+        if (isStoreOpsPath(pathname) && !readEnteredStore()) {
+            router.replace('/vendor/overview');
+        }
+    }, [status, isApplicationPending, isAdmin, isActiveVendor, isStoreScopedOnly, pathname, router]);
 
     React.useEffect(() => {
         if (status !== 'authenticated') return;
@@ -127,6 +195,9 @@ export default function VendorLayout({
         if (!firstAllowedRoute) return;
         // Wait until brand-mapping access is known so we don't bounce /brand-mappings → dashboard → setup
         if (hasBrandMappings === null && pathname.startsWith('/vendor/brand-mappings')) return;
+        // Allow business detail dynamic routes under supplier nav
+        if (pathname.startsWith('/vendor/businesses/')) return;
+        if (pathname === '/vendor/setup') return;
         const allHrefs = visibleGroups.flatMap((g) => g.links.map((l) => l.href));
         if (!allHrefs.some((h) => pathname === h || pathname.startsWith(`${h}/`))) {
             router.replace(firstAllowedRoute);
@@ -364,7 +435,15 @@ export default function VendorLayout({
                     "shrink-0 flex items-center gap-3 transition-all duration-300 ease-in-out",
                     isCollapsed ? "w-[60px]" : "w-[220px]"
                 )}>
-                    <Link href={firstAllowedRoute ?? '/vendor/dashboard'} className="flex items-center gap-3 overflow-hidden">
+                    <Link
+                        href={firstAllowedRoute ?? (showStoreNav ? '/vendor/dashboard' : '/vendor/overview')}
+                        className="flex items-center gap-3 overflow-hidden"
+                        onClick={() => {
+                            if (!showStoreNav || isStoreScopedOnly) return;
+                            setEnteredStore(false);
+                            setEnteredStoreState(false);
+                        }}
+                    >
                         <div className="w-[42px] h-[42px] shrink-0">
                             <img src="/images/admin/Ellipse 2.svg" alt="" className="w-full h-full object-contain" />
                         </div>
@@ -373,7 +452,9 @@ export default function VendorLayout({
                                 <h1 className="text-[22px] font-extrabold leading-tight">
                                     <span className="text-[#E74C3C]">Horeca</span><span className="text-[#299E60]">1</span>
                                 </h1>
-                                <p className="text-[10px] text-[#AEAEAE] font-semibold uppercase tracking-[0.15em] -mt-0.5">Vendor Panel</p>
+                                <p className="text-[10px] text-[#AEAEAE] font-semibold uppercase tracking-[0.15em] -mt-0.5">
+                                    {showStoreNav ? 'Store Ops' : 'Supplier Panel'}
+                                </p>
                             </div>
                         )}
                     </Link>
@@ -400,8 +481,81 @@ export default function VendorLayout({
                 </div>
             </header>
 
-            {/* V2.2 — Active outlet indicator strip (dispatch warehouse) */}
-            <VendorOutletStrip />
+            {/* Hierarchy breadcrumbs + context */}
+            <div className="w-full bg-emerald-50/70 border-b border-emerald-100 px-[clamp(1rem,2.5vw,2rem)] py-2.5 flex items-center gap-3 text-[13px]">
+                <Building2 size={14} className="text-[#299E60] shrink-0" />
+                <nav className="flex items-center gap-1.5 min-w-0 flex-wrap" aria-label="Portal level">
+                    {!isStoreScopedOnly && (
+                        <>
+                            <Link
+                                href="/vendor/overview"
+                                onClick={() => {
+                                    setEnteredStore(false);
+                                    setEnteredStoreState(false);
+                                }}
+                                className={cn(
+                                    'font-semibold truncate',
+                                    portalLevel === 'supplier' ? 'text-[#181725]' : 'text-[#299E60] hover:text-[#238a54]',
+                                )}
+                            >
+                                Supplier
+                            </Link>
+                            {(portalLevel === 'business' || portalLevel === 'store') && (
+                                <>
+                                    <span className="text-[#AEAEAE]">›</span>
+                                    <Link
+                                        href="/vendor/businesses"
+                                        onClick={() => {
+                                            setEnteredStore(false);
+                                            setEnteredStoreState(false);
+                                        }}
+                                        className={cn(
+                                            'font-semibold truncate max-w-[160px]',
+                                            portalLevel === 'business' ? 'text-[#181725]' : 'text-[#299E60] hover:text-[#238a54]',
+                                        )}
+                                        title={activeBusinessName ?? 'Business'}
+                                    >
+                                        {activeBusinessName ?? 'Business'}
+                                    </Link>
+                                </>
+                            )}
+                            {portalLevel === 'store' && activeStoreName && (
+                                <>
+                                    <span className="text-[#AEAEAE]">›</span>
+                                    <span className="text-[#181725] font-semibold truncate max-w-[160px]">
+                                        {activeStoreName}
+                                    </span>
+                                </>
+                            )}
+                        </>
+                    )}
+                    {isStoreScopedOnly && (
+                        <span className="font-semibold text-[#181725] truncate">
+                            {activeStoreName ?? activeBusinessName ?? 'Store'}
+                        </span>
+                    )}
+                </nav>
+                {showStoreNav && !isStoreScopedOnly && (
+                    <Link
+                        href="/vendor/overview"
+                        onClick={() => {
+                            setEnteredStore(false);
+                            setEnteredStoreState(false);
+                        }}
+                        className="ml-auto text-[12px] font-bold text-[#299E60] hover:text-[#238a54] shrink-0"
+                    >
+                        Back to Supplier
+                    </Link>
+                )}
+                {!showStoreNav && !isStoreScopedOnly && (
+                    <Link
+                        href="/vendor/businesses"
+                        className="ml-auto text-[12px] font-bold text-[#299E60] hover:text-[#238a54] shrink-0"
+                    >
+                        View businesses
+                    </Link>
+                )}
+            </div>
 
             {/* Body: Sidebar + Content */}
             <div className="flex flex-1">
@@ -451,12 +605,20 @@ export default function VendorLayout({
                                     )}
                                     <div className="space-y-1">
                                         {group.links.map((link) => {
-                                const isActive = pathname === link.href;
+                                const isActive = pathname === link.href
+                                  || (link.href !== '/vendor' && pathname.startsWith(`${link.href}/`));
+                                const isBackToSupplier = link.href === '/vendor/overview' && showStoreNav;
                                 return (
                                     <Link
                                         key={link.name}
                                         href={link.href}
                                         title={isCollapsed ? link.name : ""}
+                                        onClick={() => {
+                                            if (isBackToSupplier) {
+                                                setEnteredStore(false);
+                                                setEnteredStoreState(false);
+                                            }
+                                        }}
                                         className={cn(
                                             "flex items-center rounded-[10px] transition-all group text-[14px] overflow-hidden leading-none",
                                             isCollapsed ? "justify-center h-[48px] px-0" : "gap-3.5 px-5 py-3.5",

@@ -6,7 +6,7 @@ export type AccountPortalCaps = {
 
 /** Default landing page for an account's primary portal. */
 export function defaultPortalPath(account: AccountPortalCaps): string {
-  if (account.isVendor) return '/vendor/dashboard';
+  if (account.isVendor) return '/vendor/overview';
   if (account.isBrand) return '/brand/portal';
   return '/';
 }

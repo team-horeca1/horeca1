@@ -83,8 +83,17 @@ export function useBusinessAccountSwitcher() {
   const [switching, setSwitching] = useState(false);
   const [customerImpersonating, setCustomerImpersonating] = useState(false);
   const [vendorImpersonating, setVendorImpersonating] = useState(false);
+  const [vendorImpersonationAccounts, setVendorImpersonationAccounts] = useState<AccountSummary[]>([]);
   const [vendorImpersonationAccount, setVendorImpersonationAccount] = useState<AccountSummary | null>(null);
   const [vendorImpersonationOutletId, setVendorImpersonationOutletId] = useState<string | null>(null);
+  const [vendorImpersonationVendorId, setVendorImpersonationVendorId] = useState<string | null>(null);
+  const [vendorImpersonationStores, setVendorImpersonationStores] = useState<Array<{
+    id: string;
+    displayName: string;
+    isPrimaryStore: boolean;
+    isActive: boolean;
+    businessAccountId: string;
+  }>>([]);
   const legacyProvisionAttempted = useRef(false);
   const bootstrapAttempted = useRef(false);
 
@@ -93,6 +102,16 @@ export function useBusinessAccountSwitcher() {
   const hcidDisplay = (u.hcidDisplay as string | undefined) ?? null;
   const activeBusinessAccountId = (u.activeBusinessAccountId as string | undefined) ?? null;
   const activeOutletId = (u.activeOutletId as string | undefined) ?? null;
+  const activeVendorId = (u.activeVendorId as string | undefined) ?? null;
+  const availableStores = Array.isArray(u.availableStores)
+    ? (u.availableStores as Array<{
+        id: string;
+        displayName: string;
+        isPrimaryStore: boolean;
+        isActive: boolean;
+      }>)
+    : [];
+  const isStoreScopedOnly = u.isStoreScopedOnly === true;
   const totalAccountCount = (u.totalAccountCount as number | undefined) ?? 0;
   const availableAccountsTruncated = (u.availableAccountsTruncated as boolean | undefined) ?? false;
   const accessibleOutletIds = Array.isArray(u.accessibleOutletIds)
@@ -154,50 +173,98 @@ export function useBusinessAccountSwitcher() {
       const impJson = await impRes.json();
       const outletsJson = await outletsRes.json();
 
-      if (!impJson.success || !impJson.data || !outletsJson.success || !outletsJson.data) {
+      if (!impJson.success || !impJson.data) {
+        setVendorImpersonationAccounts([]);
         setVendorImpersonationAccount(null);
         setVendorImpersonationOutletId(null);
+        setVendorImpersonationVendorId(null);
+        setVendorImpersonationStores([]);
         return;
       }
 
-      const ba = outletsJson.data.businessAccount as {
-        id: string;
-        name: string;
-        primaryOutletId: string | null;
-      };
-      const outlets = (outletsJson.data.outlets as Array<{
-        id: string;
-        name: string;
-        pincode: string | null;
-        requiresAddressUpdate: boolean;
-      }>).map((o) => ({
+      const outlets = (outletsJson.success && outletsJson.data
+        ? (outletsJson.data.outlets as Array<{
+            id: string;
+            name: string;
+            pincode: string | null;
+            requiresAddressUpdate: boolean;
+          }>)
+        : []
+      ).map((o) => ({
         id: o.id,
         name: o.name,
         pincode: o.pincode,
         requiresAddressUpdate: o.requiresAddressUpdate,
       }));
 
-      setVendorImpersonationAccount({
-        id: ba.id,
-        legalName: impJson.data.legalName ?? ba.name,
-        displayName: impJson.data.displayName ?? ba.name,
+      type ImpBiz = {
+        id: string;
+        legalName: string;
+        displayName: string | null;
+        status: string;
+        isPrimary: boolean;
+        stores: Array<{
+          id: string;
+          displayName: string;
+          businessAccountId: string;
+          isActive: boolean;
+          isPrimaryStore: boolean;
+        }>;
+      };
+
+      const businesses = (impJson.data.businesses as ImpBiz[] | undefined) ?? [];
+      const currentBaId = impJson.data.businessAccountId as string;
+      const synthAccounts: AccountSummary[] = businesses.map((b) => ({
+        id: b.id,
+        legalName: b.legalName,
+        displayName: b.displayName,
         isCustomer: false,
         isVendor: true,
         isBrand: false,
-        status: 'active',
-        isPrimary: true,
-        primaryOutletId: ba.primaryOutletId,
-        outlets,
-      });
+        status: (b.status as AccountSummary['status']) || 'active',
+        isPrimary: b.isPrimary,
+        primaryOutletId: b.id === currentBaId
+          ? ((impJson.data.primaryOutletId as string | null) ?? outlets[0]?.id ?? null)
+          : null,
+        // Outlets only for the currently impersonated Business (warehouse retired)
+        outlets: b.id === currentBaId ? outlets : [],
+      }));
+
+      const stores = (
+        (impJson.data.stores as Array<{
+          id: string;
+          displayName: string;
+          businessAccountId: string;
+          isActive: boolean;
+          isPrimaryStore: boolean;
+        }> | undefined)
+        ?? businesses.flatMap((b) => b.stores)
+      ).map((s) => ({
+        id: s.id,
+        displayName: s.displayName,
+        isPrimaryStore: s.isPrimaryStore,
+        isActive: s.isActive,
+        businessAccountId: s.businessAccountId,
+      }));
+
+      const current = synthAccounts.find((a) => a.id === currentBaId) ?? synthAccounts[0] ?? null;
+
+      setVendorImpersonationAccounts(synthAccounts);
+      setVendorImpersonationAccount(current);
+      setVendorImpersonationVendorId((impJson.data.vendorId as string | null) ?? null);
+      setVendorImpersonationStores(stores);
       setVendorImpersonationOutletId(
         (impJson.data.outletId as string | null)
-          ?? ba.primaryOutletId
+          ?? (impJson.data.primaryOutletId as string | null)
           ?? outlets[0]?.id
           ?? null,
       );
     } catch {
+      setVendorImpersonationAccounts([]);
       setVendorImpersonationAccount(null);
       setVendorImpersonationOutletId(null);
+      setVendorImpersonationVendorId(null);
+      setVendorImpersonationStores([]);
     } finally {
       setLoading(false);
     }
@@ -208,8 +275,11 @@ export function useBusinessAccountSwitcher() {
     if (vendorImpersonating) {
       void fetchVendorImpersonationContext();
     } else {
+      setVendorImpersonationAccounts([]);
       setVendorImpersonationAccount(null);
       setVendorImpersonationOutletId(null);
+      setVendorImpersonationVendorId(null);
+      setVendorImpersonationStores([]);
       void fetchAccounts();
     }
   }, [userId, fetchAccounts, fetchVendorImpersonationContext, customerImpersonating, vendorImpersonating]);
@@ -256,15 +326,51 @@ export function useBusinessAccountSwitcher() {
   const switchAccount = useCallback(
     async (businessAccountId: string, outletId?: string) => {
       if (switching) return;
-      if (isAdminCustomerImpersonationActive() || isAdminVendorImpersonationActive()) {
+
+      // Admin View: switch to primary Online Store under the target Business
+      if (isAdminVendorImpersonationActive()) {
+        if (businessAccountId === vendorImpersonationAccount?.id && !outletId) return;
+        const store =
+          vendorImpersonationStores.find(
+            (s) => s.businessAccountId === businessAccountId && s.isPrimaryStore,
+          )
+          ?? vendorImpersonationStores.find((s) => s.businessAccountId === businessAccountId);
+        if (!store) {
+          toast.error('No Online Store under that Business');
+          return;
+        }
+        setSwitching(true);
+        try {
+          const res = await fetch('/api/v1/admin/impersonate', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vendorId: store.id }),
+          });
+          const json = await res.json().catch(() => null);
+          if (!res.ok || !json?.success) {
+            throw new AccountSwitchError(
+              (typeof json?.error === 'object' && json?.error?.message)
+              || (typeof json?.error === 'string' ? json.error : null)
+              || `Failed to switch Business (HTTP ${res.status})`,
+            );
+          }
+          await fetchVendorImpersonationContext();
+          broadcastAuthEvent('impersonation-changed', { userId });
+          router.refresh();
+        } finally {
+          setSwitching(false);
+          releaseBootstrapLock();
+        }
+        return;
+      }
+
+      if (isAdminCustomerImpersonationActive()) {
         toast.info('Exit Admin View before switching accounts');
         return;
       }
       if (businessAccountId === activeBusinessAccountId && !outletId) return;
       setSwitching(true);
       try {
-        // BA switch must not leave a stale admin impersonation cookie pointing
-        // at another vendor/brand/customer.
         try {
           await clearAllAdminImpersonation();
         } catch { /* ignore */ }
@@ -299,7 +405,109 @@ export function useBusinessAccountSwitcher() {
         releaseBootstrapLock();
       }
     },
-    [switching, activeBusinessAccountId, accounts, pathname, update, router, userId],
+    [
+      switching,
+      activeBusinessAccountId,
+      accounts,
+      pathname,
+      update,
+      router,
+      userId,
+      vendorImpersonationAccount?.id,
+      vendorImpersonationStores,
+      fetchVendorImpersonationContext,
+    ],
+  );
+
+  const switchOnlineStore = useCallback(
+    async (vendorId: string) => {
+      if (switching) return;
+      const currentId = vendorImpersonating ? vendorImpersonationVendorId : activeVendorId;
+      if (vendorId === currentId) return;
+
+      // Admin View: update impersonation cookie to sibling Online Store
+      if (isAdminVendorImpersonationActive()) {
+        setSwitching(true);
+        try {
+          const res = await fetch('/api/v1/admin/impersonate', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vendorId }),
+          });
+          const json = await res.json().catch(() => null);
+          if (!res.ok || !json?.success) {
+            throw new AccountSwitchError(
+              (typeof json?.error === 'object' && json?.error?.message)
+              || (typeof json?.error === 'string' ? json.error : null)
+              || `Failed to switch online store (HTTP ${res.status})`,
+            );
+          }
+          await fetchVendorImpersonationContext();
+          broadcastAuthEvent('impersonation-changed', { userId });
+          router.refresh();
+        } finally {
+          setSwitching(false);
+          releaseBootstrapLock();
+        }
+        return;
+      }
+
+      if (isAdminCustomerImpersonationActive()) {
+        toast.info('Exit Admin View before switching online stores');
+        return;
+      }
+      setSwitching(true);
+      try {
+        try {
+          await clearAllAdminImpersonation();
+        } catch { /* ignore */ }
+
+        const res = await fetch('/api/v1/auth/switch-online-store', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vendorId }),
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.success) {
+          const msg =
+            (typeof json?.error === 'object' && json?.error?.message)
+            || (typeof json?.error === 'string' ? json.error : null)
+            || `Failed to switch online store (HTTP ${res.status})`;
+          throw new AccountSwitchError(msg);
+        }
+        const data = json.data as {
+          vendorId: string;
+          outletId: string | null;
+          businessAccountId?: string;
+        };
+        await update({
+          activeVendorId: data.vendorId,
+          activeOutletId: data.outletId ?? undefined,
+          ...(data.businessAccountId
+            ? { activeBusinessAccountId: data.businessAccountId }
+            : {}),
+        });
+        broadcastAuthEvent('account-switched', {
+          userId,
+          activeBusinessAccountId: data.businessAccountId ?? activeBusinessAccountId,
+          activeOutletId: data.outletId ?? null,
+        });
+      } finally {
+        setSwitching(false);
+        releaseBootstrapLock();
+      }
+    },
+    [
+      switching,
+      activeVendorId,
+      vendorImpersonating,
+      vendorImpersonationVendorId,
+      update,
+      userId,
+      activeBusinessAccountId,
+      fetchVendorImpersonationContext,
+      router,
+    ],
   );
 
   const switchOutlet = useCallback(
@@ -470,12 +678,27 @@ export function useBusinessAccountSwitcher() {
     else await fetchAccounts();
   }, [vendorImpersonating, fetchVendorImpersonationContext, fetchAccounts]);
 
+  const effectiveAvailableStores = vendorImpersonating
+    ? vendorImpersonationStores.map((s) => ({
+        id: s.id,
+        displayName: s.displayName,
+        isPrimaryStore: s.isPrimaryStore,
+        isActive: s.isActive,
+      }))
+    : availableStores;
+
+  const effectiveActiveVendorId = vendorImpersonating
+    ? vendorImpersonationVendorId
+    : activeVendorId;
+
   return {
     loading,
     switching,
     hcidDisplay,
-    accounts: vendorImpersonating && vendorImpersonationAccount
-      ? [vendorImpersonationAccount]
+    accounts: vendorImpersonating
+      ? (vendorImpersonationAccounts.length > 0
+        ? vendorImpersonationAccounts
+        : (vendorImpersonationAccount ? [vendorImpersonationAccount] : []))
       : accounts,
     currentAccount,
     currentOutlet,
@@ -483,13 +706,19 @@ export function useBusinessAccountSwitcher() {
       ? (currentAccount?.id ?? null)
       : activeBusinessAccountId,
     activeOutletId: effectiveActiveOutletId,
+    activeVendorId: effectiveActiveVendorId,
+    availableStores: effectiveAvailableStores,
+    isStoreScopedOnly: vendorImpersonating ? false : isStoreScopedOnly,
     accessibleOutletIds: (vendorImpersonating || customerImpersonating) ? [] : accessibleOutletIds,
-    totalAccountCount,
+    totalAccountCount: vendorImpersonating
+      ? vendorImpersonationAccounts.length
+      : totalAccountCount,
     availableAccountsTruncated,
     customerImpersonating,
     vendorImpersonating,
     switchAccount,
     switchOutlet,
+    switchOnlineStore,
     refresh,
     signOut: handleSignOut,
   };

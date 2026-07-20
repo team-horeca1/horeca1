@@ -1,10 +1,9 @@
 /**
- * Multi-warehouse fulfillment is always enabled platform-wide.
- * Vendors cannot turn this off — stock is per godown/outlet; checkout
- * routes each order to one warehouse that can serve the delivery pincode.
+ * Supplier Foundation: Online Store is the stock location.
+ * Vendor multi-warehouse is retired — always treat as single default outlet per store.
  */
-export const MULTI_WAREHOUSE_ALWAYS_ON = true;
+export const MULTI_WAREHOUSE_ALWAYS_ON = false;
 
 export function isMultiWarehouseEnabled(_dbFlag?: boolean | null): boolean {
-  return MULTI_WAREHOUSE_ALWAYS_ON;
+  return false;
 }
