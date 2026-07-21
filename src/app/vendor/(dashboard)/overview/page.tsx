@@ -31,7 +31,7 @@ export default function SupplierDashboardPage() {
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/supplier/dashboard');
+      const res = await fetch('/api/v1/supplier/dashboard', { cache: 'no-store' });
       const json = await res.json();
       if (json.success) setData(json.data as DashboardData);
       else toast.error(json.error?.message ?? 'Failed to load dashboard');
@@ -45,6 +45,20 @@ export default function SupplierDashboardPage() {
   useEffect(() => {
     setEnteredStore(false);
     void fetchDashboard();
+  }, [fetchDashboard]);
+
+  // Refetch KPIs when returning to the tab/page so newly created businesses show up
+  useEffect(() => {
+    const onFocus = () => void fetchDashboard();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void fetchDashboard();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [fetchDashboard]);
 
   if (loading) {

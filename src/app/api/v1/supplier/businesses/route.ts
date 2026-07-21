@@ -17,7 +17,8 @@ const CreateBody = z.object({
   legalName: z.string().min(2).max(255),
   displayName: z.string().max(255).optional(),
   gstin: z.string().max(20).optional(),
-  storeName: z.string().min(2).max(255),
+  // Optional — the mandatory first Online Store defaults to the business legal name
+  storeName: z.string().min(2).max(255).optional(),
   storeDisplayName: z.string().max(255).optional(),
   addressLine: z.string().max(2000).optional(),
   city: z.string().max(100).optional(),
@@ -39,7 +40,10 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
     const actorId = await resolveSupplierActorUserId(ctx, req);
     const body = CreateBody.parse(await req.json());
-    const data = await createBusinessWithStore(actorId, body);
+    const data = await createBusinessWithStore(actorId, {
+      ...body,
+      storeName: body.storeName?.trim() || body.legalName.trim(),
+    });
     // Ensure User.role can access vendor portal (skip when Admin View)
     if (ctx.role === 'customer') {
       const { prisma } = await import('@/lib/prisma');

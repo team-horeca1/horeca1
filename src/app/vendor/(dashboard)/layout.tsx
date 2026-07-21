@@ -109,6 +109,9 @@ export default function VendorLayout({
         ?? currentAccount?.legalName
         ?? sessionUser?.availableAccounts?.find((a) => a.id === sessionUser.activeBusinessAccountId)?.displayName
         ?? null;
+    // Supplier's personal name (User.fullName) — shown as the root crumb instead of the account name
+    const supplierPersonName = sessionUser?.name?.trim() || null;
+    const onBusinessesList = pathname === '/vendor/businesses';
 
     const fetchBrandMappingAccess = React.useCallback(() => {
         if (status !== 'authenticated' || !canUseVendorPortal) return;
@@ -494,11 +497,12 @@ export default function VendorLayout({
                                     setEnteredStoreState(false);
                                 }}
                                 className={cn(
-                                    'font-semibold truncate',
+                                    'font-semibold truncate max-w-[180px]',
                                     portalLevel === 'supplier' ? 'text-[#181725]' : 'text-[#299E60] hover:text-[#238a54]',
                                 )}
+                                title={supplierPersonName ? `Supplier · ${supplierPersonName}` : 'Supplier'}
                             >
-                                Supplier
+                                {supplierPersonName ?? 'Supplier'}
                             </Link>
                             {(portalLevel === 'business' || portalLevel === 'store') && (
                                 <>
@@ -513,9 +517,9 @@ export default function VendorLayout({
                                             'font-semibold truncate max-w-[160px]',
                                             portalLevel === 'business' ? 'text-[#181725]' : 'text-[#299E60] hover:text-[#238a54]',
                                         )}
-                                        title={activeBusinessName ?? 'Business'}
+                                        title={onBusinessesList ? 'Businesses' : (activeBusinessName ?? 'Business')}
                                     >
-                                        {activeBusinessName ?? 'Business'}
+                                        {onBusinessesList ? 'Businesses' : (activeBusinessName ?? 'Business')}
                                     </Link>
                                 </>
                             )}

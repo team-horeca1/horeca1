@@ -5,17 +5,14 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   ArrowLeft,
-  Ban,
   LayoutGrid,
   List,
   Loader2,
   Pencil,
   Plus,
-  RefreshCw,
   LogIn,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { setEnteredStore } from '@/lib/supplierPortalLevel';
 import { cn } from '@/lib/utils';
@@ -48,7 +45,6 @@ interface BusinessRow {
 export default function BusinessDetailPage() {
   const params = useParams();
   const businessId = typeof params?.id === 'string' ? params.id : '';
-  const confirm = useConfirm();
   const { switchOnlineStore, activeVendorId } = useBusinessAccountSwitcher();
 
   const [business, setBusiness] = useState<BusinessRow | null>(null);
@@ -56,6 +52,10 @@ export default function BusinessDetailPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [addStoreOpen, setAddStoreOpen] = useState(false);
   const [newStoreName, setNewStoreName] = useState('');
+  const [newStoreAddressLine, setNewStoreAddressLine] = useState('');
+  const [newStoreCity, setNewStoreCity] = useState('');
+  const [newStoreState, setNewStoreState] = useState('');
+  const [newStorePincode, setNewStorePincode] = useState('');
   const [editStore, setEditStore] = useState<StoreRow | null>(null);
   const [editStoreName, setEditStoreName] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -108,7 +108,7 @@ export default function BusinessDetailPage() {
 
   const handleEnterStore = async (store: StoreRow) => {
     if (!store.isActive) {
-      toast.error('Re-enable this store before entering');
+      toast.error('This store is not active yet');
       return;
     }
     setEnteringId(store.id);
@@ -134,7 +134,13 @@ export default function BusinessDetailPage() {
       const res = await fetch(`/api/v1/supplier/businesses/${businessId}/stores`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeName: newStoreName.trim() }),
+        body: JSON.stringify({
+          storeName: newStoreName.trim(),
+          addressLine: newStoreAddressLine.trim() || undefined,
+          city: newStoreCity.trim() || undefined,
+          state: newStoreState.trim() || undefined,
+          pincode: newStorePincode.trim() || undefined,
+        }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
@@ -143,6 +149,10 @@ export default function BusinessDetailPage() {
       }
       toast.success('Online store created');
       setNewStoreName('');
+      setNewStoreAddressLine('');
+      setNewStoreCity('');
+      setNewStoreState('');
+      setNewStorePincode('');
       setAddStoreOpen(false);
       await fetchBusiness();
     } catch {
@@ -180,51 +190,6 @@ export default function BusinessDetailPage() {
     }
   };
 
-  const handleDisableStore = async (store: StoreRow) => {
-    const ok = await confirm({
-      title: 'Disable online store?',
-      message: `"${store.name}" will be hidden from customers. You can re-enable it later.`,
-      confirmText: 'Disable',
-      tone: 'danger',
-    });
-    if (!ok) return;
-    try {
-      const res = await fetch(`/api/v1/supplier/stores/${store.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: false }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        toast.error(json.error?.message ?? 'Failed to disable store');
-        return;
-      }
-      toast.success('Store disabled');
-      await fetchBusiness();
-    } catch {
-      toast.error('Failed to disable store');
-    }
-  };
-
-  const handleEnableStore = async (store: StoreRow) => {
-    try {
-      const res = await fetch(`/api/v1/supplier/stores/${store.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: true }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        toast.error(json.error?.message ?? 'Failed to re-enable store');
-        return;
-      }
-      toast.success('Store re-enabled');
-      await fetchBusiness();
-    } catch {
-      toast.error('Failed to re-enable store');
-    }
-  };
-
   const openEdit = (store: StoreRow) => {
     setEditStore(store);
     setEditStoreName(store.name);
@@ -254,25 +219,6 @@ export default function BusinessDetailPage() {
         <Pencil size={12} />
         Edit
       </button>
-      {store.isActive ? (
-        <button
-          type="button"
-          onClick={() => void handleDisableStore(store)}
-          className="inline-flex items-center gap-1 h-[30px] px-2 text-[12px] font-semibold text-[#7C7C7C] hover:text-[#E74C3C] hover:bg-red-50 rounded-[6px]"
-        >
-          <Ban size={12} />
-          Disable
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => void handleEnableStore(store)}
-          className="inline-flex items-center gap-1 h-[30px] px-2 text-[12px] font-semibold text-[#299E60] hover:bg-[#EEF8F1] rounded-[6px]"
-        >
-          <RefreshCw size={12} />
-          Re-enable
-        </button>
-      )}
     </div>
   );
 
@@ -382,6 +328,10 @@ export default function BusinessDetailPage() {
             onClick={() => {
               setAddStoreOpen(true);
               setNewStoreName('');
+              setNewStoreAddressLine('');
+              setNewStoreCity('');
+              setNewStoreState('');
+              setNewStorePincode('');
             }}
             className="inline-flex items-center gap-1.5 h-[36px] px-3.5 bg-[#299E60] hover:bg-[#238a54] text-white text-[13px] font-bold rounded-[8px] transition-colors"
           >
@@ -467,20 +417,73 @@ export default function BusinessDetailPage() {
 
       {addStoreOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-[16px] w-full max-w-[400px] shadow-xl border border-[#EEEEEE]">
+          <div className="bg-white rounded-[16px] w-full max-w-[440px] shadow-xl border border-[#EEEEEE]">
             <div className="px-5 py-4 border-b border-[#F0F0F0]">
               <h3 className="text-[16px] font-bold text-[#181725]">Add Online Store</h3>
+              <p className="text-[12px] text-[#7C7C7C] mt-0.5">
+                The store name is what customers see on the marketplace.
+              </p>
             </div>
             <form onSubmit={handleAddStore} className="px-5 py-4 space-y-3">
               <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">Store name</label>
+                <label className="block text-[11px] font-bold text-[#181725] mb-1">
+                  Store name <span className="text-[#E74C3C]">*</span>
+                </label>
                 <input
                   required
                   minLength={2}
                   value={newStoreName}
                   onChange={(e) => setNewStoreName(e.target.value)}
                   className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                  placeholder="e.g. Mumbai Store"
+                  placeholder="e.g. Acme Foods — Mumbai"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-[#181725] mb-1">
+                  Address line <span className="font-normal text-[#AEAEAE]">(optional)</span>
+                </label>
+                <input
+                  value={newStoreAddressLine}
+                  onChange={(e) => setNewStoreAddressLine(e.target.value)}
+                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
+                  placeholder="Shop / building, street, area"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#181725] mb-1">
+                    City <span className="font-normal text-[#AEAEAE]">(optional)</span>
+                  </label>
+                  <input
+                    value={newStoreCity}
+                    onChange={(e) => setNewStoreCity(e.target.value)}
+                    className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
+                    placeholder="e.g. Mumbai"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[#181725] mb-1">
+                    State <span className="font-normal text-[#AEAEAE]">(optional)</span>
+                  </label>
+                  <input
+                    value={newStoreState}
+                    onChange={(e) => setNewStoreState(e.target.value)}
+                    className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
+                    placeholder="e.g. Maharashtra"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-[#181725] mb-1">
+                  Pincode <span className="font-normal text-[#AEAEAE]">(optional)</span>
+                </label>
+                <input
+                  value={newStorePincode}
+                  onChange={(e) => setNewStorePincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  maxLength={6}
+                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
+                  placeholder="6-digit pincode"
                 />
               </div>
               <div className="flex gap-2 pt-1">

@@ -37,13 +37,14 @@ export default function VendorBusinessesPage() {
   const router = useRouter();
   const [businesses, setBusinesses] = useState<BusinessRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [showAddBusiness, setShowAddBusiness] = useState(false);
   const [editBusiness, setEditBusiness] = useState<BusinessRow | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const [legalName, setLegalName] = useState('');
-  const [storeName, setStoreName] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [gstin, setGstin] = useState('');
   const [editLegalName, setEditLegalName] = useState('');
   const [editDisplayName, setEditDisplayName] = useState('');
 
@@ -87,7 +88,8 @@ export default function VendorBusinessesPage() {
 
   const resetAddBusiness = () => {
     setLegalName('');
-    setStoreName('');
+    setDisplayName('');
+    setGstin('');
     setShowAddBusiness(false);
   };
 
@@ -99,7 +101,11 @@ export default function VendorBusinessesPage() {
       const res = await fetch('/api/v1/supplier/businesses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ legalName: legalName.trim(), storeName: storeName.trim() }),
+        body: JSON.stringify({
+          legalName: legalName.trim(),
+          displayName: displayName.trim() || undefined,
+          gstin: gstin.trim().toUpperCase() || undefined,
+        }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
@@ -163,13 +169,7 @@ export default function VendorBusinessesPage() {
     <div className="max-w-[1100px] mx-auto space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <Link
-            href="/vendor/overview"
-            className="text-[12px] font-semibold text-[#299E60] hover:text-[#238a54]"
-          >
-            Dashboard
-          </Link>
-          <h1 className="text-[20px] font-bold text-[#181725] leading-tight mt-0.5">Businesses</h1>
+          <h1 className="text-[20px] font-bold text-[#181725] leading-tight">Businesses</h1>
           <p className="text-[12px] text-[#7C7C7C] mt-0.5">
             Open a business to manage Online Stores.
           </p>
@@ -375,12 +375,14 @@ export default function VendorBusinessesPage() {
             <div className="px-5 py-4 border-b border-[#F0F0F0]">
               <h3 className="text-[16px] font-bold text-[#181725]">Add Business</h3>
               <p className="text-[12px] text-[#7C7C7C] mt-0.5">
-                Creates a business and its first online store.
+                Your first online store is created automatically with the business name.
               </p>
             </div>
             <form onSubmit={handleAddBusiness} className="px-5 py-4 space-y-3">
               <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">Legal name</label>
+                <label className="block text-[11px] font-bold text-[#181725] mb-1">
+                  Legal business name <span className="text-[#E74C3C]">*</span>
+                </label>
                 <input
                   required
                   minLength={2}
@@ -391,14 +393,26 @@ export default function VendorBusinessesPage() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">First online store name</label>
+                <label className="block text-[11px] font-bold text-[#181725] mb-1">
+                  Display / trade name <span className="font-normal text-[#AEAEAE]">(optional)</span>
+                </label>
                 <input
-                  required
-                  minLength={2}
-                  value={storeName}
-                  onChange={(e) => setStoreName(e.target.value)}
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
                   className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                  placeholder="e.g. Acme Foods — Mumbai"
+                  placeholder="Storefront name, e.g. Acme Foods"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-[#181725] mb-1">
+                  GSTIN <span className="font-normal text-[#AEAEAE]">(optional)</span>
+                </label>
+                <input
+                  value={gstin}
+                  onChange={(e) => setGstin(e.target.value.toUpperCase())}
+                  maxLength={15}
+                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] font-mono outline-none focus:border-[#299E60]"
+                  placeholder="15-character GSTIN"
                 />
               </div>
               <div className="flex gap-2 pt-1">
