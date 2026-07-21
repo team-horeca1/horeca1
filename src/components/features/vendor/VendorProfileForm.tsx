@@ -167,34 +167,42 @@ export function VendorProfileForm({
 
         {visibleSections.contact && (
           <>
-            <SectionHeader icon={User} spanClass={SPAN_FULL}>Authorized Contact</SectionHeader>
+            <SectionHeader icon={User} spanClass={SPAN_FULL}>Store Contact</SectionHeader>
             <FormField label="Contact Person" className={SPAN_FULL} dataField="firstName" error={errors.firstName}>
-              <div className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
+              <div className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
                 <FormSelect value={value.salutation ?? ''} onChange={v => set({ salutation: v })}>
                   {SALUTATIONS.map(s => <option key={s || 'empty'} value={s}>{s || 'Salutation'}</option>)}
                 </FormSelect>
-                <FormInput value={value.firstName ?? ''} onChange={v => set({ firstName: v })} placeholder="First Name"
+                <FormInput
+                  value={value.firstName ?? ''}
+                  onChange={v => {
+                    const last = value.lastName ?? '';
+                    const derived = [v, last].map(s => s.trim()).filter(Boolean).join(' ');
+                    set({
+                      firstName: v,
+                      ...(derived ? { authorizedPersonName: derived, fullName: derived } : {}),
+                    });
+                  }}
+                  placeholder="First Name"
                   hasError={!!errors.firstName}
-                  onBlur={() => blur('firstName', value.firstName ?? '')} />
-                <FormInput value={value.lastName ?? ''} onChange={v => set({ lastName: v })} placeholder="Last Name"
+                  onBlur={() => blur('firstName', value.firstName ?? '')}
+                />
+                <FormInput
+                  value={value.lastName ?? ''}
+                  onChange={v => {
+                    const first = value.firstName ?? '';
+                    const derived = [first, v].map(s => s.trim()).filter(Boolean).join(' ');
+                    set({
+                      lastName: v,
+                      ...(derived ? { authorizedPersonName: derived, fullName: derived } : {}),
+                    });
+                  }}
+                  placeholder="Last Name"
                   hasError={!!errors.lastName}
-                  onBlur={() => blur('lastName', value.lastName ?? '')} />
-                {isWide && (
-                  <FormInput value={value.designation ?? ''} onChange={v => set({ designation: v })}
-                    placeholder="Designation" />
-                )}
+                  onBlur={() => blur('lastName', value.lastName ?? '')}
+                />
               </div>
             </FormField>
-            <TextField label="Authorized Person Name" required
-              dataField="authorizedPersonName"
-              value={value.authorizedPersonName ?? ''}
-              error={errors.authorizedPersonName}
-              onChange={v => set({ authorizedPersonName: v, fullName: v })}
-              placeholder="Full name of authorized signatory" />
-            {!isWide && (
-              <TextField label="Designation" value={value.designation ?? ''}
-                onChange={v => set({ designation: v })} placeholder="e.g. Director" />
-            )}
             <TextField
               dataField="authorizedPersonPhone"
               label={relaxedContact ? 'Mobile (optional if email provided)' : 'Mobile'}

@@ -626,9 +626,12 @@ export default function VendorRegisterPage() {
       return null;
     }
     if (s === 3) {
-      const v = validateVendorProfile(getMergedVendorProfile(), 'selfRegister', 'contact');
+      const merged = getMergedVendorProfile();
+      const v = validateVendorProfile(merged, 'selfRegister', 'contact');
       const errors = { ...v.errors };
       if (isAuthMode) delete errors.password;
+      const storeName = (merged.tradeName ?? merged.displayName ?? tradeName).trim();
+      if (storeName.length < 2) errors.tradeName = 'Store name is required';
       if (Object.keys(errors).length > 0) {
         return { message: v.message ?? 'Please fix the highlighted fields before continuing', errors };
       }
@@ -650,7 +653,7 @@ export default function VendorRegisterPage() {
     return null;
   }, [
     phoneVerified, emailVerified, verifyChannel, vendorProfile, getMergedVendorProfile, isAuthMode, validateAllForStep,
-    pincodes.length, deliveryCapability,
+    pincodes.length, deliveryCapability, tradeName,
   ]);
 
   const validateStepsRange = useCallback((from: number, to: number):
@@ -1287,7 +1290,26 @@ export default function VendorRegisterPage() {
                 </p>
               </div>
               <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Store contact</h2>
-              <p className="text-[13px] text-gray-500 mb-6">Who we should reach for this store.</p>
+              <p className="text-[13px] text-gray-500 mb-6">Name this store and who we should reach for it.</p>
+              <div className="mb-5">
+                <Field label="Store name" required error={fieldErrors.tradeName} dataField="tradeName">
+                  <Input
+                    value={tradeName || vendorProfile.tradeName || vendorProfile.displayName || ''}
+                    onChange={v => {
+                      setTradeName(v);
+                      setVendorProfile(prev => ({ ...prev, tradeName: v, displayName: v }));
+                      if (fieldErrors.tradeName) setFE('tradeName', v.trim().length < 2 ? 'Store name is required' : '');
+                    }}
+                    onBlur={() => {
+                      const v = (tradeName || vendorProfile.tradeName || vendorProfile.displayName || '').trim();
+                      setFE('tradeName', v.length < 2 ? 'Store name is required' : '');
+                    }}
+                    hasError={!!fieldErrors.tradeName}
+                    placeholder="e.g. Acme Foods — Andheri"
+                  />
+                </Field>
+                <p className="text-[12px] text-gray-400 mt-1.5">Shown to customers on the marketplace as your store name.</p>
+              </div>
               <VendorProfileForm
                 value={{ ...vendorProfile, fullName, email, password }}
                 onChange={patch => {

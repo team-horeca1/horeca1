@@ -256,7 +256,6 @@ export function validateVendorProfile(
   step?: 'identity' | 'contact' | 'full',
 ): ValidationResult {
   const errors: Record<string, string> = {};
-  const authName = derivedAuthorizedPersonName(data);
   const gstin = trim(data.gstin || data.gstNumber).toUpperCase();
   const pan = trim(data.pan || data.panNumber).toUpperCase();
   const password = trim(data.password);
@@ -277,7 +276,11 @@ export function validateVendorProfile(
     if (context === 'selfRegister' || context === 'adminCreate') {
       const rawFirst = trim(data.firstName);
       if (!rawFirst || rawFirst.length < 2) errors.firstName = 'First name is required';
-      if (!authName || authName.length < 2) errors.authorizedPersonName = 'Authorized person name is required';
+      // Authorized person name is derived from first + last — no separate field
+      const derivedAuth = derivedAuthorizedPersonName(data);
+      if (!derivedAuth || derivedAuth.length < 2) {
+        errors.firstName = errors.firstName || 'Enter contact first and last name';
+      }
       Object.assign(errors, contactChannelErrors(data, context));
       if (context === 'selfRegister' && (step === 'contact' || step === 'full' || !step)) {
         if (!password) errors.password = 'Password is required';
@@ -313,12 +316,13 @@ export function validateFieldBlur(field: string, value: string): string {
       return v.length > 0 && v.length < 2 ? 'Legal business name is required' : v.length === 0 ? 'Legal business name is required' : '';
     case 'tradeName':
     case 'displayName':
-      // Optional at business create — storefront name lives on Online Store
-      return v.length > 0 && v.length < 2 ? 'Name must be at least 2 characters' : '';
+      // Soft blur: only flag if user typed something too short (hard require is step-level for Store name)
+      return v.length > 0 && v.length < 2 ? 'Store name must be at least 2 characters' : '';
     case 'firstName':
       return v.length > 0 && v.length < 2 ? 'First name is required' : v.length === 0 ? 'First name is required' : '';
     case 'authorizedPersonName':
-      return v.length > 0 && v.length < 2 ? 'Authorized person name is required' : v.length === 0 ? 'Authorized person name is required' : '';
+      // Derived from first + last — no standalone UI field
+      return '';
     case 'gstin':
     case 'gstNumber':
       return v && !GST_RE.test(v.toUpperCase()) ? 'Format: 22ABCDE1234F1Z5' : '';

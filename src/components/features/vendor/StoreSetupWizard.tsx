@@ -103,8 +103,8 @@ export function StoreSetupWizard({ submitting = false, onCancel, onSubmit }: Pro
     const errors: Record<string, string> = {};
     if (n === 1) {
       if (storeName.trim().length < 2) errors.storeName = 'Store name is required';
-      const contact = (profile.authorizedPersonName ?? '').trim();
-      if (contact.length < 2) errors.authorizedPersonName = 'Contact person is required';
+      const first = (profile.firstName ?? '').trim();
+      if (first.length < 2) errors.firstName = 'First name is required';
       const phone = (profile.phone ?? profile.authorizedPersonPhone ?? '').replace(/\D/g, '').slice(-10);
       const email = (profile.email ?? profile.authorizedPersonEmail ?? '').trim();
       if (phone.length !== 10 && !email) {
@@ -167,10 +167,15 @@ export function StoreSetupWizard({ submitting = false, onCancel, onSubmit }: Pro
     const pickupState = pickupSameAsBilling ? billingState : (profile.pickupState ?? '').trim();
     const pickupPin = pickupSameAsBilling ? billingPin : (profile.pickupPincode ?? '').trim();
 
+    const derivedContact = [profile.firstName, profile.lastName]
+      .map((s) => (s ?? '').trim())
+      .filter(Boolean)
+      .join(' ');
+
     await onSubmit({
       storeName: storeName.trim(),
       storeDisplayName: storeName.trim(),
-      authorizedPersonName: (profile.authorizedPersonName ?? '').trim() || undefined,
+      authorizedPersonName: derivedContact || (profile.authorizedPersonName ?? '').trim() || undefined,
       authorizedPersonPhone: (profile.phone ?? profile.authorizedPersonPhone ?? '').replace(/\D/g, '').slice(-10) || undefined,
       authorizedPersonEmail: (profile.email ?? profile.authorizedPersonEmail ?? '').trim() || undefined,
       gstNumber: (profile.gstin ?? profile.gstNumber ?? '').trim().toUpperCase() || undefined,
