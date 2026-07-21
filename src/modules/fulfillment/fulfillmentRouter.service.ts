@@ -29,7 +29,11 @@ export class FulfillmentRouterService {
   async resolveFulfillmentOutlet(input: FulfillmentRouteInput): Promise<string> {
     const vendor = await prisma.vendor.findUnique({
       where: { id: input.vendorId },
-      select: { businessAccountId: true, multiWarehouseEnabled: true },
+      select: {
+        businessAccountId: true,
+        multiWarehouseEnabled: true,
+        defaultOutletId: true,
+      },
     });
     if (!vendor) throw Errors.notFound('Vendor');
 
@@ -54,13 +58,12 @@ export class FulfillmentRouterService {
         select: { primaryOutletId: true },
       }))?.primaryOutletId ?? outlets[0]!.id;
 
+    // MW off: fulfill from this Online Store's default outlet (not BA primary —
+    // sibling stores share a BA and would otherwise reserve against the wrong row).
     if (!isMultiWarehouseEnabled(vendor.multiWarehouseEnabled) || outlets.length === 1) {
-      await this.assertStockAtOutlet(
-        primaryOutletId,
-        input.items,
-        outlets.map((o) => o.id),
-      );
-      return primaryOutletId;
+      const storeOutletId = vendor.defaultOutletId ?? primaryOutletId;
+      await this.assertStockAtOutlet(storeOutletId, input.items, [storeOutletId]);
+      return storeOutletId;
     }
 
     const candidates = await this.rankOutlets(
