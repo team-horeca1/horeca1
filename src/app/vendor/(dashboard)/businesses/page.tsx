@@ -318,7 +318,12 @@ export default function VendorBusinessesPage() {
           </button>
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden shadow-sm">
+          <div className="px-4 py-2.5 border-b border-[#F0F0F0]">
+            <h2 className="text-[13px] font-bold text-[#181725]">Businesses</h2>
+            <p className="text-[11px] text-[#7C7C7C]">Open a business to manage its Online Stores.</p>
+          </div>
+          <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
           {businesses.map((ba) => {
             const activeCount = ba.stores.filter((s) => s.isActive).length;
             return (
@@ -379,9 +384,14 @@ export default function VendorBusinessesPage() {
               </div>
             );
           })}
+          </div>
         </div>
       ) : (
         <div className="bg-white border border-[#E5E7EB] rounded-[12px] overflow-hidden shadow-sm">
+          <div className="px-4 py-2.5 border-b border-[#F0F0F0]">
+            <h2 className="text-[13px] font-bold text-[#181725]">Businesses</h2>
+            <p className="text-[11px] text-[#7C7C7C]">Open a business to manage its Online Stores.</p>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[13px]">
               <thead className="bg-[#F9FAFB] text-[#6B7280] uppercase text-[11px] tracking-wider">
