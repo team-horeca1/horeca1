@@ -362,11 +362,6 @@ export default function VendorLayout({
                     <Link
                         href={firstAllowedRoute ?? (showStoreNav ? '/vendor/dashboard' : '/vendor/overview')}
                         className="flex items-center gap-3 overflow-hidden"
-                        onClick={() => {
-                            if (!showStoreNav || isStoreScopedOnly) return;
-                            setEnteredStore(false);
-                            setEnteredStoreState(false);
-                        }}
                     >
                         <div className="w-[42px] h-[42px] shrink-0">
                             <img src="/images/admin/Ellipse 2.svg" alt="" className="w-full h-full object-contain" />
@@ -413,10 +408,6 @@ export default function VendorLayout({
                         <>
                             <Link
                                 href="/vendor/overview"
-                                onClick={() => {
-                                    setEnteredStore(false);
-                                    setEnteredStoreState(false);
-                                }}
                                 className={cn(
                                     'font-semibold shrink-0',
                                     portalLevel === 'supplier' && !supplierPersonName
@@ -431,10 +422,6 @@ export default function VendorLayout({
                                     <span className="text-[#AEAEAE]">›</span>
                                     <Link
                                         href="/vendor/businesses"
-                                        onClick={() => {
-                                            setEnteredStore(false);
-                                            setEnteredStoreState(false);
-                                        }}
                                         className={cn(
                                             'font-semibold truncate max-w-[180px]',
                                             onBusinessesList
@@ -454,10 +441,6 @@ export default function VendorLayout({
                                         href={currentAccount?.id
                                           ? `/vendor/businesses/${currentAccount.id}`
                                           : '/vendor/businesses'}
-                                        onClick={() => {
-                                            setEnteredStore(false);
-                                            setEnteredStoreState(false);
-                                        }}
                                         className={cn(
                                             'font-semibold truncate max-w-[160px]',
                                             portalLevel === 'business' ? 'text-[#181725]' : 'text-[#299E60] hover:text-[#238a54]',
@@ -487,10 +470,6 @@ export default function VendorLayout({
                 {showStoreNav && !isStoreScopedOnly && (
                     <Link
                         href="/vendor/overview"
-                        onClick={() => {
-                            setEnteredStore(false);
-                            setEnteredStoreState(false);
-                        }}
                         className="ml-auto text-[12px] font-bold text-[#299E60] hover:text-[#238a54] shrink-0"
                     >
                         Back to Supplier
@@ -576,18 +555,11 @@ export default function VendorLayout({
                                         {group.links.map((link) => {
                                 const isActive = pathname === link.href
                                   || (link.href !== '/vendor' && pathname.startsWith(`${link.href}/`));
-                                const isBackToSupplier = link.href === '/vendor/overview' && showStoreNav;
                                 return (
                                     <Link
                                         key={link.name}
                                         href={link.href}
                                         title={isCollapsed ? link.name : ""}
-                                        onClick={() => {
-                                            if (isBackToSupplier) {
-                                                setEnteredStore(false);
-                                                setEnteredStoreState(false);
-                                            }
-                                        }}
                                         className={cn(
                                             "flex items-center rounded-[10px] transition-all group text-[14px] overflow-hidden leading-none",
                                             isCollapsed ? "justify-center h-[48px] px-0" : "gap-3.5 px-5 py-3.5",
