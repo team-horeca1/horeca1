@@ -1,5 +1,15 @@
 import type { Page } from '@playwright/test';
 
+/** True when Playwright is aimed at the live freshville host. */
+export function isProductionE2ETarget(baseURL = process.env.PLAYWRIGHT_BASE_URL ?? ''): boolean {
+  try {
+    const u = new URL(baseURL);
+    return u.protocol === 'https:' && /freshville\.store|64\.227\.187\.210/i.test(u.host);
+  } catch {
+    return false;
+  }
+}
+
 /** Prefer the seed Daily Fresh business when the post-login picker / E2E biz noise appears. */
 export async function ensureDailyFreshVendorContext(page: Page) {
   // Account picker overlay (mandatory when multiple BAs exist)

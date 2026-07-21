@@ -39,7 +39,7 @@ export async function getVendorOutletIds(
   return rows.map((r) => r.id);
 }
 
-/** Ensure an inventory row exists for product at each active outlet (qty 0 if new). */
+/** Ensure an inventory row exists for product at each relevant outlet (qty 0 if new). */
 export async function ensureInventoryForAllOutlets(
   productId: string,
   vendorId: string,
@@ -47,7 +47,15 @@ export async function ensureInventoryForAllOutlets(
   opts?: { initialQty?: number; lowStockThreshold?: number },
   db: Db = prisma,
 ): Promise<void> {
-  const outletIds = await getVendorOutletIds(businessAccountId, db);
+  const vendor = await db.vendor.findUnique({
+    where: { id: vendorId },
+    select: { defaultOutletId: true, multiWarehouseEnabled: true },
+  });
+  // Multi-store: stock unit is the Online Store's default outlet unless MW is on.
+  let outletIds = await getVendorOutletIds(businessAccountId, db);
+  if (!vendor?.multiWarehouseEnabled && vendor?.defaultOutletId) {
+    outletIds = [vendor.defaultOutletId];
+  }
   for (const outletId of outletIds) {
     await db.inventory.upsert({
       where: { productId_outletId: { productId, outletId } },

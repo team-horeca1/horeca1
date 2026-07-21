@@ -28,11 +28,15 @@ export async function loadFulfillmentStockContext(
 ): Promise<FulfillmentStockContext | null> {
   const vendor = await prisma.vendor.findUnique({
     where: { id: vendorId },
-    select: { businessAccountId: true, multiWarehouseEnabled: true },
+    select: {
+      businessAccountId: true,
+      multiWarehouseEnabled: true,
+      defaultOutletId: true,
+    },
   });
   if (!vendor) return null;
 
-  const [ba, outlets, serviceAreas] = await Promise.all([
+  const [ba, baOutlets, serviceAreas] = await Promise.all([
     prisma.businessAccount.findUnique({
       where: { id: vendor.businessAccountId },
       select: { primaryOutletId: true },
@@ -48,9 +52,24 @@ export async function loadFulfillmentStockContext(
     }),
   ]);
 
-  if (outlets.length === 0) return null;
+  if (baOutlets.length === 0) return null;
 
-  const primaryOutletId = ba?.primaryOutletId ?? outlets[0]!.id;
+  const multiWarehouseEnabled = isMultiWarehouseEnabled(vendor.multiWarehouseEnabled);
+
+  // Online Store (Vendor) is the stock unit when multi-warehouse is off.
+  // Do not use every Business Account outlet — sibling stores would zero out sellable stock.
+  const storeOutletId = vendor.defaultOutletId
+    ?? ba?.primaryOutletId
+    ?? baOutlets[0]!.id;
+  const outletIds = multiWarehouseEnabled
+    ? baOutlets.map((o) => o.id)
+    : baOutlets.some((o) => o.id === storeOutletId)
+      ? [storeOutletId]
+      : [storeOutletId];
+
+  const primaryOutletId = multiWarehouseEnabled
+    ? (ba?.primaryOutletId ?? outletIds[0]!)
+    : storeOutletId;
   const outletPincodes = new Map<string, string[]>();
   const legacyPincodes: string[] = [];
   for (const sa of serviceAreas) {
@@ -65,9 +84,9 @@ export async function loadFulfillmentStockContext(
 
   return {
     vendorId,
-    multiWarehouseEnabled: isMultiWarehouseEnabled(vendor.multiWarehouseEnabled),
+    multiWarehouseEnabled,
     primaryOutletId,
-    outletIds: outlets.map((o) => o.id),
+    outletIds,
     outletPincodes,
     legacyPincodes,
   };

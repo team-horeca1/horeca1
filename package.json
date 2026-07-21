@@ -20,7 +20,9 @@
     "test:auth:revoke": "npx tsx scripts/auth-session-revoke.ts",
     "test:auth": "node scripts/run-auth-e2e.mjs",
     "test:e2e": "playwright test",
-    "test:e2e:foundation": "playwright test e2e/supplier-foundation-onboarding.spec.ts e2e/supplier-migration-compat.spec.ts e2e/supplier-team-cascade.spec.ts e2e/vendor-outlets-admin.spec.ts e2e/vendor-inventory-warehouse.spec.ts e2e/supplier-multistore-impersonation.spec.ts e2e/supplier-hierarchy-ui.spec.ts --workers=1"
+    "test:e2e:foundation": "playwright test e2e/supplier-foundation-onboarding.spec.ts e2e/supplier-migration-compat.spec.ts e2e/supplier-team-cascade.spec.ts e2e/vendor-outlets-admin.spec.ts e2e/vendor-inventory-warehouse.spec.ts e2e/supplier-multistore-impersonation.spec.ts e2e/supplier-hierarchy-ui.spec.ts --workers=1",
+    "test:e2e:prod": "playwright test e2e/prod-supplier-full-flow.spec.ts --workers=1",
+    "test:e2e:prod:lifecycle": "playwright test e2e/prod-vendor-lifecycle.spec.ts --workers=1"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

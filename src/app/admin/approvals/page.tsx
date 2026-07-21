@@ -205,6 +205,9 @@ export default function ApprovalsPage() {
 
     return (
         <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500">
+            <h1 className="text-[clamp(1.25rem,2vw+0.5rem,1.75rem)] font-bold text-[#181725]">
+                Approvals
+            </h1>
             {/* Centered section tabs */}
             <div className="flex justify-center">
                 <nav className="inline-flex items-center gap-0.5 border-b border-[#EEEEEE]">

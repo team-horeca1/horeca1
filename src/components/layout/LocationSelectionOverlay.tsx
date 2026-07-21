@@ -158,11 +158,11 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
 
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 bg-white sticky top-0 z-10 border-b border-gray-100 shrink-0">
-                    <button onClick={onClose} className="p-1 -ml-1 md:hidden">
+                    <button onClick={onClose} className="p-1 -ml-1 md:hidden" aria-label="Close delivery location">
                         <ArrowLeft size={24} className="text-gray-700" />
                     </button>
                     <h2 className="text-xl font-bold text-gray-800">Delivery Location</h2>
-                    <button onClick={onClose} className="p-1 -mr-1 hover:bg-gray-100 rounded-full transition-colors">
+                    <button onClick={onClose} className="p-1 -mr-1 hover:bg-gray-100 rounded-full transition-colors" aria-label="Close delivery location">
                         <X size={22} className="text-gray-600" />
                     </button>
                 </div>
