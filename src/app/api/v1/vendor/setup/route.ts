@@ -78,9 +78,11 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
 
     if (body.step === 'go_live' && body.completed) {
       const check = await assertGoLiveReady(vendorId, { enforceProduct: true });
-      if (!check.ready && !check.isLegacyLive) {
+      // Wizard completion does not require admin verification — that is Approve & Verify only.
+      const blocking = check.missing.filter((m) => m !== 'Horeca1 verification');
+      if (blocking.length > 0 && !check.isLegacyLive) {
         throw Errors.badRequest(
-          `Cannot go live yet. Missing: ${check.missing.join(', ')}`,
+          `Cannot complete setup yet. Missing: ${blocking.join(', ')}`,
         );
       }
       progress.go_live = true;
@@ -88,7 +90,8 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         where: { id: vendorId },
         data: {
           setupProgress: progress,
-          isActive: true,
+          // Only admin-verified stores may self-activate via setup
+          ...(vendor?.isVerified === true ? { isActive: true } : {}),
         },
         select: { id: true },
       });

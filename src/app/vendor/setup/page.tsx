@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   CheckCircle2, ChevronRight, ChevronLeft, Store, Truck, Package, Users, Rocket, Sparkles,
-  Warehouse, CreditCard, Wallet, Loader2,
+  Warehouse, CreditCard, Wallet, Loader2, Clock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -17,7 +17,7 @@ const API_STEPS: ApiStepKey[] = [
 ];
 
 const STEPS = [
-  { key: null as ApiStepKey | null, title: 'Welcome', subtitle: 'Your store is approved and ready to set up', icon: Sparkles, optional: false },
+  { key: null as ApiStepKey | null, title: 'Welcome', subtitle: 'Finish setup so your store is ready for review', icon: Sparkles, optional: false },
   { key: 'profile' as const, title: 'Store Profile', subtitle: 'Logo, banner and description', icon: Store, optional: false },
   { key: 'delivery' as const, title: 'Delivery Setup', subtitle: 'Service areas and delivery slots', icon: Truck, optional: false },
   { key: 'products' as const, title: 'Add Products', subtitle: 'Upload your catalog', icon: Package, optional: false },
@@ -25,7 +25,7 @@ const STEPS = [
   { key: 'credit' as const, title: 'Credit Rules', subtitle: 'Configure DiSCCO customer credit', icon: CreditCard, optional: true },
   { key: 'payment_modes' as const, title: 'Payment Modes', subtitle: 'COD, prepaid, credit, cheque', icon: Wallet, optional: true },
   { key: 'team' as const, title: 'Invite Team', subtitle: 'Add staff to help run your store', icon: Users, optional: true },
-  { key: 'go_live' as const, title: 'Go Live!', subtitle: "Open your store to buyers", icon: Rocket, optional: false },
+  { key: 'go_live' as const, title: 'Go Live!', subtitle: 'Open your store to buyers', icon: Rocket, optional: false },
 ];
 
 export default function SetupWizardPage() {
@@ -38,6 +38,7 @@ export default function SetupWizardPage() {
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [vendorName, setVendorName] = useState('');
+  const [isVerified, setIsVerified] = useState(false);
 
   const patchStep = useCallback(async (stepKey: ApiStepKey, completed: boolean, skipped?: boolean) => {
     const res = await fetch('/api/v1/vendor/setup', {
@@ -72,8 +73,11 @@ export default function SetupWizardPage() {
         if (setupJson.success) {
           const prog = (setupJson.data.progress ?? {}) as Record<string, boolean>;
           setProgress(prog);
+          setIsVerified(setupJson.data.isVerified === true);
           if (setupJson.data.wizardComplete) {
-            router.replace('/vendor/dashboard');
+            router.replace(
+              setupJson.data.isVerified === true ? '/vendor/dashboard' : '/vendor/overview',
+            );
             return;
           }
           const firstIncomplete = STEPS.findIndex((s, i) => {
@@ -106,12 +110,13 @@ export default function SetupWizardPage() {
   };
 
   const current = STEPS[step - 1];
+  const isGoLivePending = current.key === 'go_live' && !isVerified;
   const completedCount = API_STEPS.filter((k) => progress[k]).length;
   const progressPct = (completedCount / API_STEPS.length) * 100;
 
   const finish = async () => {
     await patchStep('go_live', true);
-    router.push('/vendor/dashboard');
+    router.push(isVerified ? '/vendor/dashboard' : '/vendor/overview');
   };
 
   const next = async () => {
@@ -139,7 +144,11 @@ export default function SetupWizardPage() {
     );
   }
 
-  const Icon = current.icon;
+  const Icon = isGoLivePending ? Clock : current.icon;
+  const headerTitle = isGoLivePending ? 'Waiting for approval' : current.title;
+  const headerSubtitle = isGoLivePending
+    ? 'Setup is done — marketplace access needs admin review'
+    : current.subtitle;
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] flex flex-col items-center justify-start py-10 px-4">
@@ -159,11 +168,14 @@ export default function SetupWizardPage() {
 
       <div className="w-full max-w-2xl bg-white rounded-[20px] border border-[#EEEEEE] shadow-sm p-8">
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-16 h-16 rounded-full bg-[#EEF8F1] flex items-center justify-center mb-4">
-            <Icon size={28} className="text-[#299E60]" />
+          <div className={cn(
+            'w-16 h-16 rounded-full flex items-center justify-center mb-4',
+            isGoLivePending ? 'bg-[#FFF7E6]' : 'bg-[#EEF8F1]',
+          )}>
+            <Icon size={28} className={isGoLivePending ? 'text-[#F59E0B]' : 'text-[#299E60]'} />
           </div>
-          <h1 className="text-[24px] font-extrabold text-[#181725]">{current.title}</h1>
-          <p className="text-[14px] text-[#7C7C7C] mt-1">{current.subtitle}</p>
+          <h1 className="text-[24px] font-extrabold text-[#181725]">{headerTitle}</h1>
+          <p className="text-[14px] text-[#7C7C7C] mt-1">{headerSubtitle}</p>
         </div>
 
         {step === 1 && (
@@ -171,6 +183,7 @@ export default function SetupWizardPage() {
             <p className="text-[16px] text-[#181725] mb-2">Welcome{vendorName ? `, ${vendorName}` : ''}!</p>
             <p className="text-[14px] text-[#7C7C7C] leading-relaxed">
               Let&apos;s set up your store in a few quick steps. Required steps are profile, delivery, and products — the rest can be skipped and done later.
+              Your store goes live for buyers only after a super-admin Approve &amp; Verify.
             </p>
           </div>
         )}
@@ -250,14 +263,34 @@ export default function SetupWizardPage() {
 
         {current.key === 'go_live' && (
           <div className="text-center">
-            <div className="w-20 h-20 rounded-full bg-[#EEF8F1] flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 size={40} className="text-[#299E60]" />
-            </div>
-            <p className="text-[16px] font-bold text-[#181725] mb-2">Your store is ready!</p>
-            <p className="text-[14px] text-[#7C7C7C] mb-6">Buyers in your service area can find and order from you.</p>
-            <button type="button" onClick={finish} className="inline-flex items-center gap-2 bg-[#299E60] text-white px-8 py-3 rounded-[12px] text-[15px] font-bold hover:bg-[#238a54] shadow-md">
-              Go to Dashboard <ChevronRight size={18} />
-            </button>
+            {isVerified ? (
+              <>
+                <div className="w-20 h-20 rounded-full bg-[#EEF8F1] flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 size={40} className="text-[#299E60]" />
+                </div>
+                <p className="text-[16px] font-bold text-[#181725] mb-2">Your store is ready!</p>
+                <p className="text-[14px] text-[#7C7C7C] mb-6">Buyers in your service area can find and order from you.</p>
+                <button type="button" onClick={() => void finish()} className="inline-flex items-center gap-2 bg-[#299E60] text-white px-8 py-3 rounded-[12px] text-[15px] font-bold hover:bg-[#238a54] shadow-md">
+                  Go to Dashboard <ChevronRight size={18} />
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-20 h-20 rounded-full bg-[#FFF7E6] flex items-center justify-center mx-auto mb-4">
+                  <Clock size={40} className="text-[#F59E0B]" />
+                </div>
+                <p className="text-[16px] font-bold text-[#181725] mb-2">Approval pending</p>
+                <p className="text-[14px] text-[#7C7C7C] mb-2">
+                  Setup is complete. Your store will appear on the marketplace only after a super-admin Approve &amp; Verify.
+                </p>
+                <p className="text-[13px] text-[#B45309] mb-6">
+                  You can manage businesses and team in the supplier panel while you wait.
+                </p>
+                <button type="button" onClick={() => void finish()} className="inline-flex items-center gap-2 bg-[#299E60] text-white px-8 py-3 rounded-[12px] text-[15px] font-bold hover:bg-[#238a54] shadow-md">
+                  Go to Supplier Panel <ChevronRight size={18} />
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -267,10 +300,10 @@ export default function SetupWizardPage() {
           </button>
           <div className="flex items-center gap-3">
             {current.optional && current.key !== 'go_live' && (
-              <button type="button" onClick={skip} className="text-[13px] text-[#AEAEAE] hover:text-[#7C7C7C]">Skip</button>
+              <button type="button" onClick={() => void skip()} className="text-[13px] text-[#AEAEAE] hover:text-[#7C7C7C]">Skip</button>
             )}
             {current.key !== 'go_live' && (
-              <button type="button" onClick={next} disabled={saving} className="flex items-center gap-2 bg-[#299E60] text-white px-6 py-2.5 rounded-[10px] text-[14px] font-bold hover:bg-[#238a54] disabled:opacity-50">
+              <button type="button" onClick={() => void next()} disabled={saving} className="flex items-center gap-2 bg-[#299E60] text-white px-6 py-2.5 rounded-[10px] text-[14px] font-bold hover:bg-[#238a54] disabled:opacity-50">
                 {saving ? 'Saving...' : 'Continue'} <ChevronRight size={16} />
               </button>
             )}
