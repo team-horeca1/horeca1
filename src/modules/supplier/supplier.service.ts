@@ -349,6 +349,7 @@ export async function updateOnlineStore(
       businessAccountId: true,
       defaultOutletId: true,
       isPrimaryStore: true,
+      isVerified: true,
     },
   });
   if (!vendor) throw Errors.notFound('Online Store');
@@ -361,6 +362,12 @@ export async function updateOnlineStore(
   });
   if (!membership && vendor.userId !== userId) {
     throw Errors.forbidden('You cannot edit this Online Store');
+  }
+
+  if (input.isActive === true && !vendor.isVerified) {
+    throw Errors.forbidden(
+      'This Online Store must be approved by a super-admin before it can go live.',
+    );
   }
 
   if (input.isActive === false) {

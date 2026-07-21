@@ -198,7 +198,7 @@ export default function VendorBusinessesPage() {
         <div className="min-w-0">
           <h1 className="text-[20px] font-bold text-[#181725] leading-tight">Businesses</h1>
           <p className="text-[12px] text-[#7C7C7C] mt-0.5">
-            Open a business to manage Online Stores.
+            Open a business to manage Online Stores. Stores need admin approval before going live.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -252,7 +252,7 @@ export default function VendorBusinessesPage() {
           <Building2 size={24} className="text-[#299E60] mx-auto mb-2" />
           <h2 className="text-[15px] font-bold text-[#181725] mb-1">No businesses yet</h2>
           <p className="text-[13px] text-[#7C7C7C] mb-4">
-            Create a business and your first online store to start selling.
+            Create a business for mapping (no approval). The first online store waits for super-admin approval before customers can see it.
           </p>
           <button
             type="button"
@@ -402,7 +402,8 @@ export default function VendorBusinessesPage() {
             <div className="px-5 py-4 border-b border-[#F0F0F0] sticky top-0 bg-white z-10">
               <h3 className="text-[16px] font-bold text-[#181725]">Add Business</h3>
               <p className="text-[12px] text-[#7C7C7C] mt-0.5">
-                Same fields as register Step 2 (Business Profile). Your first online store is created from the legal name.
+                Business is for mapping only — no admin approval needed. Your first online store
+                is created from the legal name and stays pending until a super-admin Approve &amp; Verify.
               </p>
             </div>
             <form onSubmit={handleAddBusiness} className="px-5 py-4 space-y-4">

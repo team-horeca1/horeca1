@@ -106,8 +106,8 @@ export default function BusinessDetailPage() {
   };
 
   const handleEnterStore = async (store: StoreRow) => {
-    if (!store.isActive) {
-      toast.error('This store is not active yet');
+    if (!store.isVerified || !store.isActive) {
+      toast.error('This store is pending admin approval');
       return;
     }
     setEnteringId(store.id);
@@ -186,10 +186,11 @@ export default function BusinessDetailPage() {
     <div className="inline-flex items-center gap-1 flex-wrap">
       <button
         type="button"
-        disabled={!store.isActive || enteringId === store.id}
+        disabled={!store.isVerified || !store.isActive || enteringId === store.id}
         onClick={() => void handleEnterStore(store)}
         className="inline-flex items-center gap-1 h-[30px] px-2.5 text-[12px] font-bold text-white bg-[#299E60] hover:bg-[#238a54] disabled:opacity-50 rounded-[6px]"
         data-testid="enter-store"
+        title={!store.isVerified ? 'Pending admin approval' : undefined}
       >
         {enteringId === store.id ? (
           <Loader2 size={12} className="animate-spin" />
@@ -218,7 +219,11 @@ export default function BusinessDetailPage() {
             Session
           </span>
         )}
-        {!store.isActive ? (
+        {!store.isVerified ? (
+          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#FFF7E6] text-[#F59E0B]">
+            Pending approval
+          </span>
+        ) : !store.isActive ? (
           <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#F5F5F5] text-[#AEAEAE]">
             Disabled
           </span>
@@ -338,7 +343,7 @@ export default function BusinessDetailPage() {
                 key={store.id}
                 className={cn(
                   'border border-[#EEEEEE] rounded-[10px] p-3.5 hover:border-[#299E60]/40 hover:shadow-sm transition-all',
-                  !store.isActive && 'opacity-70',
+                  !store.isVerified && 'opacity-70',
                 )}
                 data-testid="store-row"
               >
@@ -371,7 +376,7 @@ export default function BusinessDetailPage() {
                 {business.stores.map((store) => (
                   <tr
                     key={store.id}
-                    className={cn('hover:bg-[#FAFBFC]', !store.isActive && 'opacity-70')}
+                    className={cn('hover:bg-[#FAFBFC]', !store.isVerified && 'opacity-70')}
                     data-testid="store-row"
                   >
                     <td className="px-4 py-2.5 min-w-[160px]">

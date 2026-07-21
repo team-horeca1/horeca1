@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import {
     LayoutDashboard,
     ShoppingBag,
@@ -336,87 +336,8 @@ export default function VendorLayout({
         );
     }
 
-    // Block pending vendor application from accessing dashboard
-    if (isApplicationPending) {
-        return (
-            <div className="flex flex-col min-h-screen bg-[#F8F9FB]">
-                {/* Clean Header */}
-                <header className="h-[80px] bg-white border-b border-[#EEEEEE] flex items-center px-8 shrink-0 justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-[42px] h-[42px] shrink-0">
-                            <img src="/images/admin/Ellipse 2.svg" alt="" className="w-full h-full object-contain" />
-                        </div>
-                        <div>
-                            <h1 className="text-[22px] font-extrabold leading-tight">
-                                <span className="text-[#E74C3C]">Horeca</span><span className="text-[#299E60]">1</span>
-                            </h1>
-                            <p className="text-[10px] text-[#AEAEAE] font-semibold uppercase tracking-[0.15em] -mt-0.5">Vendor Panel</p>
-                        </div>
-                    </div>
-                    <div>
-                        <button
-                            onClick={() => signOut({ callbackUrl: '/' })}
-                            className="flex items-center gap-2 px-4 py-2 text-[14px] font-semibold text-[#7C7C7C] hover:text-[#E74C3C] border border-[#EEEEEE] hover:border-[#E74C3C]/20 rounded-[10px] bg-white hover:bg-[#FFF5F5] transition-all"
-                        >
-                            <LogOut size={16} />
-                            Sign Out
-                        </button>
-                    </div>
-                </header>
-
-                {/* Main Content Area */}
-                <div className="flex-1 flex items-center justify-center p-6">
-                    <div className="bg-white border border-[#EEEEEE] rounded-[24px] p-10 max-w-[500px] w-full text-center shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all">
-                        {/* Clock / Pending Illustration */}
-                        <div className="w-[80px] h-[80px] bg-[#FFF5E6] rounded-full flex items-center justify-center mx-auto mb-6 text-[#F39C12] animate-pulse">
-                            <Clock size={40} className="stroke-[2.5]" />
-                        </div>
-
-                        <h2 className="text-[24px] font-bold text-[#181725] mb-3">Application Under Review</h2>
-                        
-                        <p className="text-[14px] text-[#7C7C7C] leading-relaxed mb-8">
-                            Thank you for partnering with <span className="font-semibold text-[#181725]">Horeca1</span>. 
-                            Your vendor application for <span className="font-semibold text-[#299E60]">{(session?.user as Record<string, any>)?.businessName || 'your business'}</span> is currently being verified by our onboarding team.
-                        </p>
-
-                        <div className="bg-[#F8F9FB] rounded-[16px] p-5 mb-8 border border-[#EEEEEE] text-left">
-                            <h4 className="text-[12px] font-bold text-[#181725] uppercase tracking-wider mb-2">What happens next?</h4>
-                            <ul className="text-[13px] text-[#7C7C7C] space-y-2.5">
-                                <li className="flex items-start gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#F39C12] mt-1.5 shrink-0" />
-                                    <span>We are verifying your GSTIN, PAN, and address details.</span>
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#F39C12] mt-1.5 shrink-0" />
-                                    <span>Once approved, you will receive an email notification.</span>
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#F39C12] mt-1.5 shrink-0" />
-                                    <span>Upon approval, full dashboard access will be unlocked instantly.</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                            <button
-                                onClick={() => router.push('/')}
-                                className="px-6 py-3 bg-[#299E60] hover:bg-[#238a54] text-white font-bold text-[14px] rounded-[12px] transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#299E60]/10"
-                            >
-                                <Home size={18} />
-                                Go to Homepage
-                            </button>
-                            <button
-                                onClick={() => window.location.reload()}
-                                className="px-6 py-3 bg-white hover:bg-[#F8F9FB] text-[#181725] font-bold text-[14px] border border-[#EEEEEE] rounded-[12px] transition-all"
-                            >
-                                Refresh Status
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    // Pending stores no longer lock the whole supplier panel — Businesses/Team stay usable.
+    // isApplicationPending drives a non-blocking banner only (see main return).
 
     if (visibleGroups.length === 0) {
         return (
@@ -582,6 +503,26 @@ export default function VendorLayout({
                     </Link>
                 )}
             </div>
+
+            {isApplicationPending && (
+                <div className="w-full bg-[#FFF7E6] border-b border-[#F59E0B]/30 px-[clamp(1rem,2.5vw,2rem)] py-2.5 flex items-start gap-2.5">
+                    <Clock size={16} className="text-[#F59E0B] shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold text-[#92400E]">
+                            Online Store(s) pending admin approval
+                        </p>
+                        <p className="text-[12px] text-[#B45309] mt-0.5">
+                            You can manage businesses and team now. Stores appear on the marketplace only after a super-admin Approve &amp; Verify.
+                        </p>
+                    </div>
+                    <Link
+                        href="/vendor/businesses"
+                        className="text-[12px] font-bold text-[#92400E] hover:text-[#78350F] shrink-0 underline-offset-2 hover:underline"
+                    >
+                        View stores
+                    </Link>
+                </div>
+            )}
 
             {/* Body: Sidebar + Content */}
             <div className="flex flex-1">

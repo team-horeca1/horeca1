@@ -193,7 +193,7 @@ export function StoreSetupWizard({ submitting = false, onCancel, onSubmit }: Pro
       <div className="px-5 py-4 border-b border-[#F0F0F0] sticky top-0 bg-white z-10">
         <h3 className="text-[16px] font-bold text-[#181725]">Add Online Store</h3>
         <p className="text-[12px] text-[#7C7C7C] mt-0.5">
-          Same store setup as register (Steps 3–7): contact, GST, bank, addresses, service.
+          Same setup as register (Steps 3–7). This store stays off the marketplace until a super-admin Approve &amp; Verify.
         </p>
         <div className="mt-3 flex gap-1.5 flex-wrap">
           {STEPS.map((s) => (
