@@ -11,6 +11,7 @@ import { listStoresForBusiness } from '@/modules/supplier/foundation.service';
 import { createOnlineStore } from '@/modules/supplier/supplier.service';
 import { prisma } from '@/lib/prisma';
 import { resolveSupplierActorUserId } from '@/lib/resolveVendorId';
+import { DELIVERY_CAPABILITIES } from '@/lib/validators/vendor-kyc';
 
 const CreateBody = z.object({
   storeName: z.string().min(2).max(255),
@@ -19,6 +20,25 @@ const CreateBody = z.object({
   city: z.string().max(100).optional(),
   state: z.string().max(100).optional(),
   pincode: z.string().max(10).optional(),
+  authorizedPersonName: z.string().max(255).optional(),
+  authorizedPersonPhone: z.string().max(20).optional(),
+  authorizedPersonEmail: z.string().max(255).optional(),
+  gstNumber: z.string().max(20).optional(),
+  panNumber: z.string().max(20).optional(),
+  fssaiNumber: z.string().max(50).optional(),
+  udyamNumber: z.string().max(50).optional(),
+  cinNumber: z.string().max(50).optional(),
+  bankAccountName: z.string().max(100).optional(),
+  bankAccountNumber: z.string().max(30).optional(),
+  bankIfsc: z.string().max(20).optional(),
+  bankName: z.string().max(100).optional(),
+  bankAccountType: z.enum(['savings', 'current']).optional(),
+  pickupAddressLine: z.string().max(2000).optional(),
+  pickupCity: z.string().max(100).optional(),
+  pickupState: z.string().max(100).optional(),
+  pickupPincode: z.string().max(10).optional(),
+  deliveryCapability: z.enum(DELIVERY_CAPABILITIES).optional(),
+  serviceablePincodes: z.array(z.string().max(10)).max(200).optional(),
 });
 
 function businessIdFromUrl(url: string): string {

@@ -41,13 +41,13 @@ import { getEffectiveVendorTypeSelections } from '@/lib/validators/vendor-profil
 const EMAIL_REGISTER_ALLOWED = isRegisterEmailOtpEnabled();
 
 const STEP_TITLES = [
-  { id: 1, label: EMAIL_REGISTER_ALLOWED ? 'Verify Contact' : 'Verify Mobile', icon: Phone },
-  { id: 2, label: 'Business Profile', icon: Building2 },
-  { id: 3, label: 'Contact & Ops', icon: FileText },
-  { id: 4, label: 'GST & PAN', icon: FileText },
-  { id: 5, label: 'Bank Details', icon: Landmark },
-  { id: 6, label: 'Addresses', icon: MapPin },
-  { id: 7, label: 'Service & KYC', icon: ShieldCheck },
+  { id: 1, label: 'Supplier', icon: Phone },
+  { id: 2, label: 'Business', icon: Building2 },
+  { id: 3, label: 'Store Contact', icon: FileText },
+  { id: 4, label: 'Store GST', icon: FileText },
+  { id: 5, label: 'Store Bank', icon: Landmark },
+  { id: 6, label: 'Store Address', icon: MapPin },
+  { id: 7, label: 'Store Service', icon: ShieldCheck },
 ];
 
 // CSV-aligned vendor types are defined in VendorProfileForm / vendor-kyc VENDOR_TYPES.
@@ -1063,9 +1063,7 @@ export default function VendorRegisterPage() {
                   <ArrowLeft size={14} /> Choose a different signup type
                 </Link>
               )}
-              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">
-                {EMAIL_REGISTER_ALLOWED ? 'Verify your contact' : 'Verify your mobile number'}
-              </h2>
+              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Create your supplier account</h2>
               <p className="text-[13px] text-gray-500 mb-6">
                 {EMAIL_REGISTER_ALLOWED
                   ? 'Enter your supplier name, then we\'ll send a 4-digit OTP to your mobile or email.'
@@ -1220,8 +1218,10 @@ export default function VendorRegisterPage() {
 
           {step === 2 && (
             <section>
-              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">What kind of business are you?</h2>
-              <p className="text-[13px] text-gray-500 mb-6">Select your vendor type and operational profile.</p>
+              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Business details</h2>
+              <p className="text-[13px] text-gray-500 mb-6">
+                Set up your business under this supplier — type, categories, and operations.
+              </p>
               <VendorProfileForm
                 value={vendorProfile}
                 onChange={patch => setVendorProfile(prev => ({ ...prev, ...patch }))}
@@ -1238,8 +1238,14 @@ export default function VendorRegisterPage() {
 
           {step === 3 && (
             <section>
-              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Basic Details</h2>
-              <p className="text-[13px] text-gray-500 mb-6">Tell us about your business and the person we&apos;ll be in touch with.</p>
+              <div className="mb-5 rounded-xl border border-[#299E60]/25 bg-[#EEF8F1] px-4 py-3">
+                <p className="text-[13px] font-bold text-[#299E60]">Create your first Online Store</p>
+                <p className="text-[12px] text-[#238a54] mt-0.5">
+                  From here on, these details belong to your store under this business — contact, GST, bank, address, and service area.
+                </p>
+              </div>
+              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Store contact</h2>
+              <p className="text-[13px] text-gray-500 mb-6">Who we should reach for this store.</p>
               <VendorProfileForm
                 value={{ ...vendorProfile, fullName, email, password }}
                 onChange={patch => {
@@ -1267,8 +1273,8 @@ export default function VendorRegisterPage() {
 
           {step === 4 && (
             <section>
-              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">GST & PAN</h2>
-              <p className="text-[13px] text-gray-500 mb-6">Optional — add them now or leave blank and provide later.</p>
+              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Store GST &amp; PAN</h2>
+              <p className="text-[13px] text-gray-500 mb-6">Optional for this store — add now or leave blank and provide later.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field label="GSTIN (optional)" error={fieldErrors.gstNumber} dataField="gstNumber">
                   <Input value={gstNumber}
@@ -1313,8 +1319,8 @@ export default function VendorRegisterPage() {
 
           {step === 5 && (
             <section>
-              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Bank Details</h2>
-              <p className="text-[13px] text-gray-500 mb-6">For settlement of your orders. Your account will be verified via a ₹1 penny-drop.</p>
+              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Store bank details</h2>
+              <p className="text-[13px] text-gray-500 mb-6">For settlement of orders from this store. Account is verified via a ₹1 penny-drop.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field label="Account holder name" required className="md:col-span-2" error={fieldErrors.bankAccountName} dataField="bankAccountName">
                   <Input value={bankAccountName} onChange={v => { setBankAccountName(v); if (fieldErrors.bankAccountName) setFE('bankAccountName', V.minLen(v, 'Account holder name', 2)); }}
@@ -1358,7 +1364,7 @@ export default function VendorRegisterPage() {
 
           {step === 6 && (
             <section>
-              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Addresses</h2>
+              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Store addresses</h2>
               <p className="text-[13px] text-gray-500 mb-6">Billing address goes on invoices. Pickup address is where our delivery partner collects orders.</p>
 
               <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5">
@@ -1490,8 +1496,8 @@ export default function VendorRegisterPage() {
 
           {step === 7 && (
             <section>
-              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Service Area & KYC</h2>
-              <p className="text-[13px] text-gray-500 mb-6">Where can you deliver, and any additional certifications.</p>
+              <h2 className="text-[22px] font-[800] text-gray-800 mb-1">Store service area &amp; KYC</h2>
+              <p className="text-[13px] text-gray-500 mb-6">Where this store can deliver, and any additional certifications.</p>
 
               <Field label="Serviceable pincodes" required dataField="serviceablePincodes" error={fieldErrors.serviceablePincodes}>
                 <div className="flex gap-2">

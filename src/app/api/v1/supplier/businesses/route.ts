@@ -12,6 +12,7 @@ import {
   listSupplierBusinesses,
 } from '@/modules/supplier/supplier.service';
 import { resolveSupplierActorUserId } from '@/lib/resolveVendorId';
+import { normalizeVendorTypeSelections } from '@/lib/constants/vendorProfile';
 
 const CreateBody = z.object({
   legalName: z.string().min(2).max(255),
@@ -24,6 +25,19 @@ const CreateBody = z.object({
   city: z.string().max(100).optional(),
   state: z.string().max(100).optional(),
   pincode: z.string().max(10).optional(),
+  // Business Profile (wizard Step 2)
+  vendorTypeSelections: z.array(z.object({
+    type: z.string().min(1),
+    slug: z.string().optional(),
+    subTypes: z.array(z.string()).default([]),
+  })).optional(),
+  categoriesHandled: z.array(z.string()).optional(),
+  businessSize: z.string().max(50).optional(),
+  coverage: z.string().max(120).optional(),
+  warehouseCount: z.number().int().min(0).max(9999).optional(),
+  deliveryFleet: z.boolean().optional(),
+  monthlySupplyBand: z.string().max(50).optional(),
+  vendorType: z.string().max(50).optional(),
 });
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
@@ -40,9 +54,11 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
     const actorId = await resolveSupplierActorUserId(ctx, req);
     const body = CreateBody.parse(await req.json());
+    const typeSelections = normalizeVendorTypeSelections(body.vendorTypeSelections);
     const data = await createBusinessWithStore(actorId, {
       ...body,
       storeName: body.storeName?.trim() || body.legalName.trim(),
+      vendorTypeSelections: typeSelections.length > 0 ? typeSelections : undefined,
     });
     // Ensure User.role can access vendor portal (skip when Admin View)
     if (ctx.role === 'customer') {

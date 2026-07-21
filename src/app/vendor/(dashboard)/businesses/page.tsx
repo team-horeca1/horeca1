@@ -7,6 +7,16 @@ import { Building2, LayoutGrid, List, Loader2, Plus, Pencil } from 'lucide-react
 import { toast } from 'sonner';
 import { setEnteredStore } from '@/lib/supplierPortalLevel';
 import { cn } from '@/lib/utils';
+import {
+  VendorProfileForm,
+  type VendorProfileValues,
+} from '@/components/features/vendor/VendorProfileForm';
+import { EMPTY_VENDOR_PROFILE } from '@/components/features/vendor/vendorProfileDefaults';
+import {
+  getEffectiveVendorTypeSelections,
+  resolveVendorTypeSlug,
+  validateFieldBlur as validateVendorFieldBlur,
+} from '@/lib/validators/vendor-profile';
 
 const VIEW_STORAGE_KEY = 'horeca_vendor_businesses_view';
 
@@ -42,8 +52,8 @@ export default function VendorBusinessesPage() {
   const [editBusiness, setEditBusiness] = useState<BusinessRow | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const [legalName, setLegalName] = useState('');
-  const [gstin, setGstin] = useState('');
+  const [profile, setProfile] = useState<VendorProfileValues>({ ...EMPTY_VENDOR_PROFILE });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [editLegalName, setEditLegalName] = useState('');
   const [editDisplayName, setEditDisplayName] = useState('');
 
@@ -86,22 +96,42 @@ export default function VendorBusinessesPage() {
   };
 
   const resetAddBusiness = () => {
-    setLegalName('');
-    setGstin('');
+    setProfile({ ...EMPTY_VENDOR_PROFILE });
+    setFieldErrors({});
     setShowAddBusiness(false);
   };
 
   const handleAddBusiness = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
+
+    const legalName = (profile.legalName ?? profile.businessName ?? '').trim();
+    const errors: Record<string, string> = {};
+    if (legalName.length < 2) errors.legalName = 'Legal business name is required';
+    const typeSelections = getEffectiveVendorTypeSelections(profile);
+    if (typeSelections.length === 0) {
+      errors.vendorTypeSelections = 'Select at least one vendor type and sub-type';
+    }
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setSubmitting(true);
     try {
       const res = await fetch('/api/v1/supplier/businesses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          legalName: legalName.trim(),
-          gstin: gstin.trim().toUpperCase() || undefined,
+          legalName,
+          vendorTypeSelections: typeSelections,
+          categoriesHandled: profile.categoriesHandled ?? [],
+          businessSize: profile.businessSize || undefined,
+          coverage: profile.coverage || undefined,
+          warehouseCount: profile.warehouseCount != null && profile.warehouseCount !== ''
+            ? Number(profile.warehouseCount)
+            : undefined,
+          deliveryFleet: profile.deliveryFleet ?? undefined,
+          monthlySupplyBand: profile.monthlySupplyBand || undefined,
+          vendorType: resolveVendorTypeSlug(profile) ?? undefined,
         }),
       });
       const json = await res.json();
@@ -368,40 +398,26 @@ export default function VendorBusinessesPage() {
 
       {showAddBusiness && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-[16px] w-full max-w-[420px] shadow-xl border border-[#EEEEEE]">
-            <div className="px-5 py-4 border-b border-[#F0F0F0]">
+          <div className="bg-white rounded-[16px] w-full max-w-[720px] max-h-[90vh] overflow-y-auto shadow-xl border border-[#EEEEEE]">
+            <div className="px-5 py-4 border-b border-[#F0F0F0] sticky top-0 bg-white z-10">
               <h3 className="text-[16px] font-bold text-[#181725]">Add Business</h3>
               <p className="text-[12px] text-[#7C7C7C] mt-0.5">
-                Your first online store is created automatically with the business name.
+                Same fields as register Step 2 (Business Profile). Your first online store is created from the legal name.
               </p>
             </div>
-            <form onSubmit={handleAddBusiness} className="px-5 py-4 space-y-3">
-              <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">
-                  Legal business name <span className="text-[#E74C3C]">*</span>
-                </label>
-                <input
-                  required
-                  minLength={2}
-                  value={legalName}
-                  onChange={(e) => setLegalName(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                  placeholder="e.g. Acme Foods Pvt Ltd"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">
-                  GSTIN <span className="font-normal text-[#AEAEAE]">(optional)</span>
-                </label>
-                <input
-                  value={gstin}
-                  onChange={(e) => setGstin(e.target.value.toUpperCase())}
-                  maxLength={15}
-                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] font-mono outline-none focus:border-[#299E60]"
-                  placeholder="15-character GSTIN"
-                />
-              </div>
-              <div className="flex gap-2 pt-1">
+            <form onSubmit={handleAddBusiness} className="px-5 py-4 space-y-4">
+              <VendorProfileForm
+                value={profile}
+                onChange={(patch) => setProfile((prev) => ({ ...prev, ...patch }))}
+                errors={fieldErrors}
+                onFieldBlur={(field, value) => {
+                  const msg = validateVendorFieldBlur(field, value);
+                  setFieldErrors((prev) => ({ ...prev, [field]: msg }));
+                }}
+                visibleSections={{ identity: true, ops: true }}
+                layout="wide"
+              />
+              <div className="flex gap-2 pt-1 sticky bottom-0 bg-white pb-1">
                 <button
                   type="button"
                   onClick={resetAddBusiness}

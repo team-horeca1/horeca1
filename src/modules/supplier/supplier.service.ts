@@ -84,6 +84,14 @@ export async function createBusinessWithStore(
     city?: string;
     state?: string;
     pincode?: string;
+    vendorTypeSelections?: Array<{ type: string; slug?: string; subTypes: string[] }>;
+    categoriesHandled?: string[];
+    businessSize?: string;
+    coverage?: string;
+    warehouseCount?: number;
+    deliveryFleet?: boolean;
+    monthlySupplyBand?: string;
+    vendorType?: string;
   },
 ) {
   const storeName = input.storeName.trim();
@@ -100,6 +108,10 @@ export async function createBusinessWithStore(
     select: { id: true },
   });
 
+  const typeSelections = input.vendorTypeSelections?.length
+    ? (input.vendorTypeSelections as Prisma.InputJsonValue)
+    : undefined;
+
   return prisma.$transaction(async (tx) => {
     const ba = await tx.businessAccount.create({
       data: {
@@ -111,6 +123,8 @@ export async function createBusinessWithStore(
         isBrand: false,
         status: 'active',
         businessType: 'vendor',
+        vendorTypeSelections: typeSelections,
+        businessSize: input.businessSize?.trim() || null,
       },
     });
 
@@ -146,6 +160,14 @@ export async function createBusinessWithStore(
         state: input.state ?? null,
         addressPincode: input.pincode ?? null,
         setupProgress: { business: true, online_store: true },
+        vendorType: input.vendorType?.trim() || null,
+        vendorTypeSelections: typeSelections,
+        categoriesHandled: input.categoriesHandled ?? [],
+        businessSize: input.businessSize?.trim() || null,
+        coverage: input.coverage?.trim() || null,
+        warehouseCount: input.warehouseCount ?? null,
+        deliveryFleet: input.deliveryFleet ?? null,
+        monthlySupplyBand: input.monthlySupplyBand?.trim() || null,
       },
     });
 
@@ -173,6 +195,26 @@ export async function createOnlineStore(
     city?: string;
     state?: string;
     pincode?: string;
+    // Store KYC (register wizard steps 3–7)
+    authorizedPersonName?: string;
+    authorizedPersonPhone?: string;
+    authorizedPersonEmail?: string;
+    gstNumber?: string;
+    panNumber?: string;
+    fssaiNumber?: string;
+    udyamNumber?: string;
+    cinNumber?: string;
+    bankAccountName?: string;
+    bankAccountNumber?: string;
+    bankIfsc?: string;
+    bankName?: string;
+    bankAccountType?: string;
+    pickupAddressLine?: string;
+    pickupCity?: string;
+    pickupState?: string;
+    pickupPincode?: string;
+    deliveryCapability?: string;
+    serviceablePincodes?: string[];
   },
 ) {
   const membership = await prisma.businessAccountMember.findUnique({
@@ -215,6 +257,9 @@ export async function createOnlineStore(
   }
 
   const existingCount = await prisma.vendor.count({ where: { businessAccountId } });
+  const uniquePincodes = Array.from(
+    new Set((input.serviceablePincodes ?? []).map((p) => p.trim()).filter(Boolean)),
+  );
 
   return prisma.$transaction(async (tx) => {
     const vendor = await tx.vendor.create({
@@ -223,6 +268,7 @@ export async function createOnlineStore(
         businessAccountId,
         businessName: storeName,
         displayName: input.storeDisplayName?.trim() || storeName,
+        tradeName: input.storeDisplayName?.trim() || storeName,
         slug,
         isPrimaryStore: existingCount === 0,
         isActive: false,
@@ -232,19 +278,49 @@ export async function createOnlineStore(
         city: input.city ?? null,
         state: input.state ?? null,
         addressPincode: input.pincode ?? null,
+        pickupAddressLine: input.pickupAddressLine ?? null,
+        pickupCity: input.pickupCity ?? null,
+        pickupState: input.pickupState ?? null,
+        pickupPincode: input.pickupPincode ?? null,
+        authorizedPersonName: input.authorizedPersonName?.trim() || null,
+        authorizedPersonPhone: input.authorizedPersonPhone?.replace(/\D/g, '').slice(-10) || null,
+        authorizedPersonEmail: input.authorizedPersonEmail?.trim().toLowerCase() || null,
+        gstNumber: input.gstNumber?.trim().toUpperCase() || null,
+        panNumber: input.panNumber?.trim().toUpperCase() || null,
+        fssaiNumber: input.fssaiNumber?.trim() || null,
+        udyamNumber: input.udyamNumber?.trim() || null,
+        cinNumber: input.cinNumber?.trim() || null,
+        bankAccountName: input.bankAccountName?.trim() || null,
+        bankAccountNumber: input.bankAccountNumber?.trim() || null,
+        bankIfsc: input.bankIfsc?.trim().toUpperCase() || null,
+        bankName: input.bankName?.trim() || null,
+        bankAccountType: input.bankAccountType?.trim() || null,
+        deliveryCapability: input.deliveryCapability?.trim() || null,
         setupProgress: { business: true, online_store: true },
       },
     });
 
-    await ensureDefaultOutletForStore(tx, {
+    const outletId = await ensureDefaultOutletForStore(tx, {
       businessAccountId,
       vendorId: vendor.id,
       name: storeName,
-      addressLine: input.addressLine,
-      city: input.city,
-      state: input.state,
-      pincode: input.pincode,
+      addressLine: input.pickupAddressLine || input.addressLine,
+      city: input.pickupCity || input.city,
+      state: input.pickupState || input.state,
+      pincode: input.pickupPincode || input.pincode,
     });
+
+    if (uniquePincodes.length > 0) {
+      await tx.serviceArea.createMany({
+        data: uniquePincodes.map((pincode) => ({
+          vendorId: vendor.id,
+          outletId,
+          pincode,
+          isActive: true,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     await cascadeBusinessTeamToStore(businessAccountId, vendor.id, tx);
 

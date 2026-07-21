@@ -16,6 +16,10 @@ import { toast } from 'sonner';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { setEnteredStore } from '@/lib/supplierPortalLevel';
 import { cn } from '@/lib/utils';
+import {
+  StoreSetupWizard,
+  type StoreSetupPayload,
+} from '@/components/features/vendor/StoreSetupWizard';
 
 const VIEW_STORAGE_KEY = 'horeca_vendor_stores_view';
 
@@ -51,11 +55,6 @@ export default function BusinessDetailPage() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [addStoreOpen, setAddStoreOpen] = useState(false);
-  const [newStoreName, setNewStoreName] = useState('');
-  const [newStoreAddressLine, setNewStoreAddressLine] = useState('');
-  const [newStoreCity, setNewStoreCity] = useState('');
-  const [newStoreState, setNewStoreState] = useState('');
-  const [newStorePincode, setNewStorePincode] = useState('');
   const [editStore, setEditStore] = useState<StoreRow | null>(null);
   const [editStoreName, setEditStoreName] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -126,21 +125,14 @@ export default function BusinessDetailPage() {
     }
   };
 
-  const handleAddStore = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddStore = async (payload: StoreSetupPayload) => {
     if (!businessId || submitting) return;
     setSubmitting(true);
     try {
       const res = await fetch(`/api/v1/supplier/businesses/${businessId}/stores`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storeName: newStoreName.trim(),
-          addressLine: newStoreAddressLine.trim() || undefined,
-          city: newStoreCity.trim() || undefined,
-          state: newStoreState.trim() || undefined,
-          pincode: newStorePincode.trim() || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
@@ -148,11 +140,6 @@ export default function BusinessDetailPage() {
         return;
       }
       toast.success('Online store created');
-      setNewStoreName('');
-      setNewStoreAddressLine('');
-      setNewStoreCity('');
-      setNewStoreState('');
-      setNewStorePincode('');
       setAddStoreOpen(false);
       await fetchBusiness();
     } catch {
@@ -325,14 +312,7 @@ export default function BusinessDetailPage() {
           )}
           <button
             type="button"
-            onClick={() => {
-              setAddStoreOpen(true);
-              setNewStoreName('');
-              setNewStoreAddressLine('');
-              setNewStoreCity('');
-              setNewStoreState('');
-              setNewStorePincode('');
-            }}
+            onClick={() => setAddStoreOpen(true)}
             className="inline-flex items-center gap-1.5 h-[36px] px-3.5 bg-[#299E60] hover:bg-[#238a54] text-white text-[13px] font-bold rounded-[8px] transition-colors"
           >
             <Plus size={15} />
@@ -417,93 +397,11 @@ export default function BusinessDetailPage() {
 
       {addStoreOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-[16px] w-full max-w-[440px] shadow-xl border border-[#EEEEEE]">
-            <div className="px-5 py-4 border-b border-[#F0F0F0]">
-              <h3 className="text-[16px] font-bold text-[#181725]">Add Online Store</h3>
-              <p className="text-[12px] text-[#7C7C7C] mt-0.5">
-                The store name is what customers see on the marketplace.
-              </p>
-            </div>
-            <form onSubmit={handleAddStore} className="px-5 py-4 space-y-3">
-              <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">
-                  Store name <span className="text-[#E74C3C]">*</span>
-                </label>
-                <input
-                  required
-                  minLength={2}
-                  value={newStoreName}
-                  onChange={(e) => setNewStoreName(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                  placeholder="e.g. Acme Foods — Mumbai"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">
-                  Address line <span className="font-normal text-[#AEAEAE]">(optional)</span>
-                </label>
-                <input
-                  value={newStoreAddressLine}
-                  onChange={(e) => setNewStoreAddressLine(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                  placeholder="Shop / building, street, area"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#181725] mb-1">
-                    City <span className="font-normal text-[#AEAEAE]">(optional)</span>
-                  </label>
-                  <input
-                    value={newStoreCity}
-                    onChange={(e) => setNewStoreCity(e.target.value)}
-                    className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                    placeholder="e.g. Mumbai"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-[#181725] mb-1">
-                    State <span className="font-normal text-[#AEAEAE]">(optional)</span>
-                  </label>
-                  <input
-                    value={newStoreState}
-                    onChange={(e) => setNewStoreState(e.target.value)}
-                    className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                    placeholder="e.g. Maharashtra"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">
-                  Pincode <span className="font-normal text-[#AEAEAE]">(optional)</span>
-                </label>
-                <input
-                  value={newStorePincode}
-                  onChange={(e) => setNewStorePincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  inputMode="numeric"
-                  maxLength={6}
-                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                  placeholder="6-digit pincode"
-                />
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setAddStoreOpen(false)}
-                  className="flex-1 h-[36px] border border-[#EEEEEE] rounded-[8px] text-[13px] font-semibold text-[#7C7C7C]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 h-[36px] bg-[#299E60] text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50"
-                >
-                  {submitting ? 'Creating…' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
+          <StoreSetupWizard
+            submitting={submitting}
+            onCancel={() => setAddStoreOpen(false)}
+            onSubmit={handleAddStore}
+          />
         </div>
       )}
 
