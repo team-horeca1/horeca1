@@ -497,14 +497,36 @@ export default function VendorLayout({
                                     setEnteredStoreState(false);
                                 }}
                                 className={cn(
-                                    'font-semibold truncate max-w-[180px]',
-                                    portalLevel === 'supplier' ? 'text-[#181725]' : 'text-[#299E60] hover:text-[#238a54]',
+                                    'font-semibold shrink-0',
+                                    portalLevel === 'supplier' && !supplierPersonName
+                                      ? 'text-[#181725]'
+                                      : 'text-[#299E60] hover:text-[#238a54]',
                                 )}
-                                title={supplierPersonName ? `Supplier · ${supplierPersonName}` : 'Supplier'}
                             >
-                                {supplierPersonName ?? 'Supplier'}
+                                Supplier
                             </Link>
-                            {(portalLevel === 'business' || portalLevel === 'store') && (
+                            {supplierPersonName && (
+                                <>
+                                    <span className="text-[#AEAEAE]">›</span>
+                                    <Link
+                                        href="/vendor/overview"
+                                        onClick={() => {
+                                            setEnteredStore(false);
+                                            setEnteredStoreState(false);
+                                        }}
+                                        className={cn(
+                                            'font-semibold truncate max-w-[180px]',
+                                            (portalLevel === 'supplier' || onBusinessesList)
+                                              ? 'text-[#181725]'
+                                              : 'text-[#299E60] hover:text-[#238a54]',
+                                        )}
+                                        title={supplierPersonName}
+                                    >
+                                        {supplierPersonName}
+                                    </Link>
+                                </>
+                            )}
+                            {(portalLevel === 'business' || portalLevel === 'store') && !onBusinessesList && (
                                 <>
                                     <span className="text-[#AEAEAE]">›</span>
                                     <Link
@@ -517,16 +539,16 @@ export default function VendorLayout({
                                             'font-semibold truncate max-w-[160px]',
                                             portalLevel === 'business' ? 'text-[#181725]' : 'text-[#299E60] hover:text-[#238a54]',
                                         )}
-                                        title={onBusinessesList ? 'Businesses' : (activeBusinessName ?? 'Business')}
+                                        title={activeBusinessName ?? 'Business'}
                                     >
-                                        {onBusinessesList ? 'Businesses' : (activeBusinessName ?? 'Business')}
+                                        {activeBusinessName ?? 'Business'}
                                     </Link>
                                 </>
                             )}
                             {portalLevel === 'store' && activeStoreName && (
                                 <>
                                     <span className="text-[#AEAEAE]">›</span>
-                                    <span className="text-[#181725] font-semibold truncate max-w-[160px]">
+                                    <span className="text-[#181725] font-semibold truncate max-w-[160px]" title={activeStoreName}>
                                         {activeStoreName}
                                     </span>
                                 </>

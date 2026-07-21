@@ -36,16 +36,16 @@ const PORTAL_COPY: Record<Portal, {
   createBusinessHint: string;
 }> = {
   vendor: {
-    workspaceLabel: 'Vendor workspace',
+    workspaceLabel: 'Supplier workspace',
     outletSectionTitle: 'Online store',
     outletPickerTitle: 'Select online store',
     outletHint: 'Inventory & orders use this storefront',
     addOutletLabel: 'Manage businesses',
     addOutletHref: '/vendor/businesses',
     switchAccountsTitle: 'Other businesses',
-    switchAccountsHint: 'Switch between vendor, brand, or customer accounts',
+    switchAccountsHint: 'Switch between supplier, brand, or customer accounts',
     createBusinessLabel: 'Register another business',
-    createBusinessHint: 'Open a separate customer, vendor, or brand account',
+    createBusinessHint: 'Open a separate customer, supplier, or brand account',
   },
   brand: {
     workspaceLabel: 'Brand workspace',
@@ -55,9 +55,9 @@ const PORTAL_COPY: Record<Portal, {
     addOutletLabel: null,
     addOutletHref: null,
     switchAccountsTitle: 'Other businesses',
-    switchAccountsHint: 'Switch between vendor, brand, or customer accounts',
+    switchAccountsHint: 'Switch between supplier, brand, or customer accounts',
     createBusinessLabel: 'Register another business',
-    createBusinessHint: 'Open a separate customer, vendor, or brand account',
+    createBusinessHint: 'Open a separate customer, supplier, or brand account',
   },
   customer: {
     workspaceLabel: 'Shopping account',
@@ -87,7 +87,7 @@ const PORTAL_COPY: Record<Portal, {
 
 const KIND_STYLE: Record<AccountKind, { label: string; color: string; bg: string; icon: typeof Store }> = {
   customer: { label: 'Customer', color: '#2563EB', bg: '#DBEAFE', icon: User },
-  vendor:   { label: 'Vendor',   color: '#299E60', bg: '#DCFCE7', icon: Store },
+  vendor:   { label: 'Supplier', color: '#299E60', bg: '#DCFCE7', icon: Store },
   brand:    { label: 'Brand',    color: '#7C3AED', bg: '#EDE9FE', icon: Sparkles },
 };
 
@@ -135,6 +135,13 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
   const visibleOutlets = filterOutlets(currentAccount?.outlets ?? []);
   const canSwitchOutlets = visibleOutlets.length > 1;
   const isVendorPortal = portal === 'vendor';
+  // Supplier register Step 1 → User.fullName → session.user.name
+  const supplierPersonName = session?.user?.name?.trim() || null;
+  const accountDisplayName = currentAccount?.displayName ?? currentAccount?.legalName ?? 'Account';
+  // Vendor/supplier panel header shows the supplier person name, not the business
+  const displayName = isVendorPortal && supplierPersonName
+    ? supplierPersonName
+    : accountDisplayName;
   const activeStores = availableStores.filter((s) => s.isActive);
   const canSwitchOnlineStores = isVendorPortal && activeStores.length > 1;
   const activeStore =
@@ -180,7 +187,6 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
     return <UserOnlyMenu session={session} signOut={signOut} hcidDisplay={hcidDisplay} isAdminMode={isAdminMode} />;
   }
 
-  const displayName = currentAccount?.displayName ?? currentAccount?.legalName ?? 'Account';
   const kind = currentAccount ? classifyAccount(currentAccount) : 'customer';
   const conf = KIND_STYLE[kind];
   const Icon = conf.icon;
@@ -239,6 +245,8 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
               <Store size={10} className="shrink-0 text-[#299E60]" />
               <span className="truncate">{activeStore.displayName}</span>
             </span>
+          ) : isVendorPortal && accountDisplayName ? (
+            <span className="text-[11px] text-[#666] truncate max-w-[180px]">{accountDisplayName}</span>
           ) : currentOutlet ? (
             <span className="text-[11px] text-[#666] flex items-center gap-1 truncate max-w-[180px]">
               <MapPin size={10} className="shrink-0" />
@@ -274,7 +282,11 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[14px] font-bold text-[#181725] truncate">{displayName}</p>
-                <p className="text-[11px] text-[#7C7C7C]">{copy.workspaceLabel}</p>
+                <p className="text-[11px] text-[#7C7C7C]">
+                  {isVendorPortal && supplierPersonName && accountDisplayName !== displayName
+                    ? accountDisplayName
+                    : copy.workspaceLabel}
+                </p>
                 {hcidDisplay && (
                   <p className="text-[10px] text-[#AEAEAE] font-mono mt-0.5">{hcidDisplay}</p>
                 )}
@@ -556,7 +568,7 @@ interface RoleConf { color: string; bg: string; label: string }
 
 const ROLE_STYLE_FALLBACK: Record<string, RoleConf> = {
   admin:    { color: '#DC2626', bg: '#FEE2E2', label: 'Admin' },
-  vendor:   { color: '#299E60', bg: '#DCFCE7', label: 'Vendor' },
+  vendor:   { color: '#299E60', bg: '#DCFCE7', label: 'Supplier' },
   brand:    { color: '#7C3AED', bg: '#EDE9FE', label: 'Brand' },
   customer: { color: '#2563EB', bg: '#DBEAFE', label: 'Customer' },
   delivery: { color: '#EA580C', bg: '#FED7AA', label: 'Delivery' },

@@ -387,7 +387,7 @@ export default function VendorRegisterPage() {
     setError('');
     const supplierName = fullName.trim();
     if (supplierName.length < 2) {
-      setError('Enter your full name to continue');
+      setError('Enter supplier name to continue');
       return;
     }
     // Keep Step 3 authorized-person fields in sync when the supplier typed their name on Step 1
@@ -997,10 +997,10 @@ export default function VendorRegisterPage() {
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
           <div>
             <p className="text-[11px] md:text-[12px] font-bold uppercase tracking-[0.18em] text-white/70 mb-1">
-              {isAuthMode ? 'Add Vendor Business' : 'Vendor Application'}
+              {isAuthMode ? 'Add Supplier Business' : 'Supplier Application'}
             </p>
             <h1 className="text-[20px] md:text-[26px] font-[900] text-white leading-tight">
-              {isAuthMode ? 'Register a new vendor under your HCID' : 'Become a Horeca1 Vendor'}
+              {isAuthMode ? 'Register a new supplier under your HCID' : 'Become a Horeca1 Supplier'}
             </h1>
             <p className="text-[12px] md:text-[13px] text-white/80 mt-1">
               {isAuthMode
@@ -1068,21 +1068,21 @@ export default function VendorRegisterPage() {
               </h2>
               <p className="text-[13px] text-gray-500 mb-6">
                 {EMAIL_REGISTER_ALLOWED
-                  ? 'Tell us your name, then we\'ll send a 4-digit OTP to your mobile or email.'
-                  : 'Tell us your name, then we\'ll send a 4-digit OTP to confirm.'}
+                  ? 'Enter your supplier name, then we\'ll send a 4-digit OTP to your mobile or email.'
+                  : 'Enter your supplier name, then we\'ll send a 4-digit OTP to confirm.'}
               </p>
 
-              <Field label="Your name" required dataField="fullName">
+              <Field label="Supplier name" required dataField="fullName">
                 <input
                   type="text"
-                  autoComplete="name"
+                  autoComplete="organization"
                   value={fullName}
                   onChange={e => {
                     const next = e.target.value;
                     setFullName(next);
                     setError('');
                   }}
-                  placeholder="Full name (e.g. Rahul Sharma)"
+                  placeholder="e.g. Fresh Foods Supply"
                   className={inputClass(false)}
                   data-testid="supplier-register-name"
                 />
@@ -1574,7 +1574,7 @@ export default function VendorRegisterPage() {
           {step === 1 && !(phoneVerified || emailVerified) ? (
             <span className="text-[12px] text-gray-400">
               {fullName.trim().length < 2
-                ? 'Enter your name to continue'
+                ? 'Enter supplier name to continue'
                 : 'Verify your contact to continue'}
             </span>
           ) : (
