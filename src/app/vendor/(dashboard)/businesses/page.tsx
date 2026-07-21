@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Building2, LayoutGrid, List, Loader2, Plus, Pencil } from 'lucide-react';
+import { Building2, LayoutGrid, List, Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { setEnteredStore } from '@/lib/supplierPortalLevel';
 import { cn } from '@/lib/utils';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import {
   VendorProfileForm,
   type VendorProfileValues,
@@ -45,6 +46,7 @@ interface BusinessRow {
 
 export default function VendorBusinessesPage() {
   const router = useRouter();
+  const confirm = useConfirm();
   const [businesses, setBusinesses] = useState<BusinessRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -184,6 +186,32 @@ export default function VendorBusinessesPage() {
     setEditDisplayName(ba.displayName ?? '');
   };
 
+  const handleDeleteBusiness = async (ba: BusinessRow) => {
+    const ok = await confirm({
+      title: 'Delete Business?',
+      message: `Delete “${ba.displayName ?? ba.legalName}” and all its Online Stores? This cannot be undone. Businesses with order history cannot be deleted.`,
+      confirmText: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok || submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/v1/supplier/businesses/${ba.id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        toast.error(json.error?.message ?? 'Failed to delete business');
+        return;
+      }
+      toast.success('Business deleted');
+      setLoading(true);
+      await fetchBusinesses();
+    } catch {
+      toast.error('Failed to delete business');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-16">
@@ -316,6 +344,16 @@ export default function VendorBusinessesPage() {
                     <Pencil size={12} />
                     Edit
                   </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => void handleDeleteBusiness(ba)}
+                    className="inline-flex items-center gap-1 h-[30px] px-2 text-[12px] font-semibold text-[#E74C3C] hover:bg-[#FEE2E2] disabled:opacity-40 rounded-[6px]"
+                    data-testid="delete-business"
+                  >
+                    <Trash2 size={12} />
+                    Delete
+                  </button>
                 </div>
               </div>
             );
@@ -384,6 +422,16 @@ export default function VendorBusinessesPage() {
                           >
                             <Pencil size={12} />
                             Edit
+                          </button>
+                          <button
+                            type="button"
+                            disabled={submitting}
+                            onClick={() => void handleDeleteBusiness(ba)}
+                            className="inline-flex items-center gap-1 h-[30px] px-2 text-[12px] font-semibold text-[#E74C3C] hover:bg-[#FEE2E2] disabled:opacity-40 rounded-[6px]"
+                            data-testid="delete-business"
+                          >
+                            <Trash2 size={12} />
+                            Delete
                           </button>
                         </div>
                       </td>

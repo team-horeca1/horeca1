@@ -11,11 +11,13 @@ import {
   Pencil,
   Plus,
   LogIn,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { setEnteredStore } from '@/lib/supplierPortalLevel';
 import { cn } from '@/lib/utils';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import {
   StoreSetupWizard,
   type StoreSetupPayload,
@@ -50,6 +52,7 @@ export default function BusinessDetailPage() {
   const params = useParams();
   const businessId = typeof params?.id === 'string' ? params.id : '';
   const { switchOnlineStore, activeVendorId } = useBusinessAccountSwitcher();
+  const confirm = useConfirm();
 
   const [business, setBusiness] = useState<BusinessRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -182,33 +185,76 @@ export default function BusinessDetailPage() {
     setEditStoreName(store.name);
   };
 
-  const renderStoreActions = (store: StoreRow) => (
-    <div className="inline-flex items-center gap-1 flex-wrap">
-      <button
-        type="button"
-        disabled={!store.isVerified || !store.isActive || enteringId === store.id}
-        onClick={() => void handleEnterStore(store)}
-        className="inline-flex items-center gap-1 h-[30px] px-2.5 text-[12px] font-bold text-white bg-[#299E60] hover:bg-[#238a54] disabled:opacity-50 rounded-[6px]"
-        data-testid="enter-store"
-        title={!store.isVerified ? 'Pending admin approval' : undefined}
-      >
-        {enteringId === store.id ? (
-          <Loader2 size={12} className="animate-spin" />
-        ) : (
-          <LogIn size={12} />
-        )}
-        Enter
-      </button>
-      <button
-        type="button"
-        onClick={() => openEdit(store)}
-        className="inline-flex items-center gap-1 h-[30px] px-2 text-[12px] font-semibold text-[#7C7C7C] hover:text-[#181725] hover:bg-[#F3F4F6] rounded-[6px]"
-      >
-        <Pencil size={12} />
-        Edit
-      </button>
-    </div>
-  );
+  const handleDeleteStore = async (store: StoreRow) => {
+    if (!business || business.storeCount <= 1) {
+      toast.error('Cannot delete the last Online Store. Delete the Business instead, or add another store first.');
+      return;
+    }
+    const ok = await confirm({
+      title: 'Delete Online Store?',
+      message: `Delete “${store.name}”? This cannot be undone. Stores with orders cannot be deleted.`,
+      confirmText: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok || submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/v1/supplier/stores/${store.id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        toast.error(json.error?.message ?? 'Failed to delete online store');
+        return;
+      }
+      toast.success('Online store deleted');
+      await fetchBusiness();
+    } catch {
+      toast.error('Failed to delete online store');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const renderStoreActions = (store: StoreRow) => {
+    const isLastStore = (business?.storeCount ?? 0) <= 1;
+    return (
+      <div className="inline-flex items-center gap-1 flex-wrap">
+        <button
+          type="button"
+          disabled={!store.isVerified || !store.isActive || enteringId === store.id}
+          onClick={() => void handleEnterStore(store)}
+          className="inline-flex items-center gap-1 h-[30px] px-2.5 text-[12px] font-bold text-white bg-[#299E60] hover:bg-[#238a54] disabled:opacity-50 rounded-[6px]"
+          data-testid="enter-store"
+          title={!store.isVerified ? 'Pending admin approval' : undefined}
+        >
+          {enteringId === store.id ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <LogIn size={12} />
+          )}
+          Enter
+        </button>
+        <button
+          type="button"
+          onClick={() => openEdit(store)}
+          className="inline-flex items-center gap-1 h-[30px] px-2 text-[12px] font-semibold text-[#7C7C7C] hover:text-[#181725] hover:bg-[#F3F4F6] rounded-[6px]"
+        >
+          <Pencil size={12} />
+          Edit
+        </button>
+        <button
+          type="button"
+          disabled={isLastStore || submitting}
+          onClick={() => void handleDeleteStore(store)}
+          className="inline-flex items-center gap-1 h-[30px] px-2 text-[12px] font-semibold text-[#E74C3C] hover:bg-[#FEE2E2] disabled:opacity-40 rounded-[6px]"
+          title={isLastStore ? 'Cannot delete the last store under this business' : 'Delete store'}
+          data-testid="delete-store"
+        >
+          <Trash2 size={12} />
+          Delete
+        </button>
+      </div>
+    );
+  };
 
   const renderStoreStatus = (store: StoreRow) => {
     const isSession = store.id === activeVendorId;

@@ -23,7 +23,7 @@ function slugify(name: string, salt: string): string {
 
 export async function listSupplierBusinesses(userId: string) {
   const memberships = await prisma.businessAccountMember.findMany({
-    where: { userId, businessAccount: { isVendor: true } },
+    where: { userId, businessAccount: { isVendor: true, status: { not: 'deactivated' } } },
     orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
     select: {
       isPrimary: true,
@@ -421,11 +421,7 @@ export async function updateOnlineStore(
   return updated;
 }
 
-export async function updateBusiness(
-  userId: string,
-  businessAccountId: string,
-  input: { legalName?: string; displayName?: string; gstin?: string },
-) {
+async function assertCanManageBusiness(userId: string, businessAccountId: string) {
   const membership = await prisma.businessAccountMember.findUnique({
     where: { userId_businessAccountId: { userId, businessAccountId } },
     select: { id: true },
@@ -442,8 +438,213 @@ export async function updateBusiness(
     select: { id: true },
   });
   if (!businessWide) {
-    throw Errors.forbidden('Store-level roles cannot edit Business details.');
+    throw Errors.forbidden('Store-level roles cannot manage Business / Online Stores.');
   }
+}
+
+/**
+ * Hard-delete an Online Store and related rows that lack FK Cascade.
+ * Caller must already enforce order / last-store rules.
+ */
+async function purgeOnlineStoreInTx(
+  tx: Prisma.TransactionClient,
+  vendor: { id: string; businessAccountId: string; defaultOutletId: string | null; isPrimaryStore: boolean },
+) {
+  const vendorId = vendor.id;
+
+  await tx.vendor.update({
+    where: { id: vendorId },
+    data: { defaultOutletId: null },
+  });
+
+  // Non-cascade children (order already verified empty)
+  await tx.inventory.deleteMany({ where: { vendorId } });
+  await tx.cartItem.deleteMany({ where: { vendorId } });
+  await tx.priceSlab.deleteMany({ where: { vendorId } });
+  await tx.collectionProduct.deleteMany({ where: { vendorId } });
+  await tx.review.deleteMany({ where: { vendorId } });
+  await tx.payment.deleteMany({ where: { vendorId } });
+  await tx.quickOrderListItem.deleteMany({ where: { vendorId } });
+  await tx.quickOrderList.deleteMany({ where: { vendorId } });
+  await tx.creditTransaction.deleteMany({ where: { vendorId } });
+  await tx.creditAccount.deleteMany({ where: { vendorId } });
+  await tx.creditWallet.deleteMany({ where: { vendorId } });
+  await tx.vendorTeamMember.deleteMany({ where: { vendorId } });
+  await tx.vendorDocument.deleteMany({ where: { vendorId } });
+  await tx.vendorCustomer.deleteMany({ where: { vendorId } });
+  await tx.vendorCustomerPrice.deleteMany({ where: { vendorId } });
+  await tx.vendorCustomerTask.deleteMany({ where: { vendorId } });
+  await tx.customerVendor.deleteMany({ where: { vendorId } });
+  await tx.vendorSettlement.deleteMany({ where: { vendorId } });
+  await tx.promotion.deleteMany({ where: { vendorId } });
+  await tx.coupon.deleteMany({ where: { vendorId } });
+  await tx.cashbackCampaign.deleteMany({ where: { vendorId } });
+  await tx.customerGroup.deleteMany({ where: { vendorId } });
+  await tx.productCombo.deleteMany({ where: { vendorId } });
+  await tx.salesperson.deleteMany({ where: { vendorId } });
+  await tx.commissionRule.deleteMany({ where: { vendorId } });
+  await tx.commissionAccrual.deleteMany({ where: { vendorId } });
+  await tx.priceList.deleteMany({ where: { vendorId } });
+  await tx.vendorClaim.deleteMany({ where: { vendorId } });
+  await tx.picklist.deleteMany({ where: { vendorId } });
+  await tx.dispatch.deleteMany({ where: { vendorId } });
+  await tx.goodsReceipt.deleteMany({ where: { vendorId } });
+  await tx.stockTransfer.deleteMany({ where: { vendorId } });
+  await tx.brandAuthorizedDistributor.deleteMany({ where: { vendorId } });
+  await tx.vendorWallet.deleteMany({ where: { vendorId } });
+
+  // Products cascade many children; delete explicitly for clarity
+  await tx.product.deleteMany({ where: { vendorId } });
+
+  await tx.vendor.delete({ where: { id: vendorId } });
+
+  if (vendor.defaultOutletId) {
+    const outletId = vendor.defaultOutletId;
+    const ba = await tx.businessAccount.findUnique({
+      where: { id: vendor.businessAccountId },
+      select: { primaryOutletId: true },
+    });
+    if (ba?.primaryOutletId === outletId) {
+      await tx.businessAccount.update({
+        where: { id: vendor.businessAccountId },
+        data: { primaryOutletId: null },
+      });
+    }
+    // Inventory already cleared; outlets may still be referenced — delete if unused
+    await tx.outlet.delete({ where: { id: outletId } }).catch(() => undefined);
+  }
+}
+
+export async function deleteOnlineStore(
+  userId: string,
+  vendorId: string,
+  opts?: { allowLastStore?: boolean },
+) {
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: {
+      id: true,
+      userId: true,
+      businessAccountId: true,
+      defaultOutletId: true,
+      isPrimaryStore: true,
+    },
+  });
+  if (!vendor) throw Errors.notFound('Online Store');
+
+  await assertCanManageBusiness(userId, vendor.businessAccountId);
+
+  const orderCount = await prisma.order.count({ where: { vendorId } });
+  if (orderCount > 0) {
+    throw Errors.badRequest(
+      'Cannot delete this Online Store because it has orders. Contact support if you need it removed.',
+    );
+  }
+
+  const storeCount = await prisma.vendor.count({
+    where: { businessAccountId: vendor.businessAccountId },
+  });
+  if (!opts?.allowLastStore && storeCount <= 1) {
+    throw Errors.badRequest(
+      'Cannot delete the last Online Store under a Business. Delete the Business instead, or add another store first.',
+    );
+  }
+
+  return prisma.$transaction(async (tx) => {
+    await purgeOnlineStoreInTx(tx, vendor);
+
+    if (vendor.isPrimaryStore) {
+      const next = await tx.vendor.findFirst({
+        where: { businessAccountId: vendor.businessAccountId },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (next) {
+        await tx.vendor.update({
+          where: { id: next.id },
+          data: { isPrimaryStore: true },
+        });
+      }
+    }
+
+    return { deleted: true as const, vendorId };
+  });
+}
+
+export async function deleteBusiness(userId: string, businessAccountId: string) {
+  await assertCanManageBusiness(userId, businessAccountId);
+
+  const stores = await prisma.vendor.findMany({
+    where: { businessAccountId },
+    select: {
+      id: true,
+      defaultOutletId: true,
+      isPrimaryStore: true,
+      businessAccountId: true,
+    },
+  });
+
+  if (stores.length > 0) {
+    const orderCount = await prisma.order.count({
+      where: { vendorId: { in: stores.map((s) => s.id) } },
+    });
+    if (orderCount > 0) {
+      throw Errors.badRequest(
+        'Cannot delete this Business because one or more Online Stores have orders.',
+      );
+    }
+  }
+
+  // Also block if BA itself has customer orders (multi-actor BA)
+  const baOrderCount = await prisma.order.count({ where: { businessAccountId } });
+  if (baOrderCount > 0) {
+    throw Errors.badRequest(
+      'Cannot delete this Business because it has order history.',
+    );
+  }
+
+  return prisma.$transaction(async (tx) => {
+    for (const store of stores) {
+      await purgeOnlineStoreInTx(tx, store);
+    }
+
+    await tx.userRole.deleteMany({ where: { businessAccountId } });
+    await tx.businessAccountMember.deleteMany({ where: { businessAccountId } });
+
+    const ba = await tx.businessAccount.findUnique({
+      where: { id: businessAccountId },
+      select: { primaryOutletId: true },
+    });
+    if (ba?.primaryOutletId) {
+      await tx.businessAccount.update({
+        where: { id: businessAccountId },
+        data: { primaryOutletId: null },
+      });
+    }
+
+    await tx.outlet.deleteMany({ where: { businessAccountId } });
+
+    try {
+      await tx.businessAccount.delete({ where: { id: businessAccountId } });
+    } catch {
+      // FK constraints from other domains — soft-deactivate instead
+      await tx.businessAccount.update({
+        where: { id: businessAccountId },
+        data: { status: 'deactivated', isVendor: false },
+      });
+      return { deleted: true as const, businessAccountId, soft: true as const };
+    }
+
+    return { deleted: true as const, businessAccountId, soft: false as const };
+  });
+}
+
+export async function updateBusiness(
+  userId: string,
+  businessAccountId: string,
+  input: { legalName?: string; displayName?: string; gstin?: string },
+) {
+  await assertCanManageBusiness(userId, businessAccountId);
 
   return prisma.businessAccount.update({
     where: { id: businessAccountId },

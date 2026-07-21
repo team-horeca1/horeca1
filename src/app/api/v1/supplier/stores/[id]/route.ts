@@ -1,12 +1,13 @@
 /**
- * PATCH /api/v1/supplier/stores/[id] — update / disable Online Store
+ * PATCH /api/v1/supplier/stores/[id] — update Online Store
+ * DELETE /api/v1/supplier/stores/[id] — delete Online Store (no orders; not last store)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
-import { updateOnlineStore } from '@/modules/supplier/supplier.service';
+import { deleteOnlineStore, updateOnlineStore } from '@/modules/supplier/supplier.service';
 import { resolveSupplierActorUserId } from '@/lib/resolveVendorId';
 
 const Body = z.object({
@@ -26,6 +27,18 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
     const actorId = await resolveSupplierActorUserId(ctx, req);
     const body = Body.parse(await req.json());
     const data = await updateOnlineStore(actorId, id, body);
+    return NextResponse.json({ success: true, data });
+  } catch (err) {
+    return errorResponse(err);
+  }
+});
+
+export const DELETE = withAuth(async (req: NextRequest, ctx) => {
+  try {
+    const id = new URL(req.url).pathname.split('/').filter(Boolean).at(-1);
+    if (!id) throw Errors.badRequest('Store id required');
+    const actorId = await resolveSupplierActorUserId(ctx, req);
+    const data = await deleteOnlineStore(actorId, id);
     return NextResponse.json({ success: true, data });
   } catch (err) {
     return errorResponse(err);
