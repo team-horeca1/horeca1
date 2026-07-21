@@ -324,40 +324,35 @@ export default function VendorBusinessesPage() {
             return (
               <div
                 key={ba.id}
-                className="bg-white border border-[#EEEEEE] rounded-[12px] p-4 hover:border-[#299E60]/40 hover:shadow-sm transition-all cursor-pointer"
+                className="bg-white border border-[#EEEEEE] rounded-[10px] p-3.5 hover:border-[#299E60]/40 hover:shadow-sm transition-all cursor-pointer"
                 data-testid="business-card"
                 onClick={() => router.push(`/vendor/businesses/${ba.id}`)}
               >
-                <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-start justify-between gap-2 mb-1.5">
                   <div className="min-w-0">
                     <p className="font-semibold text-[14px] text-[#181725] truncate">
                       {ba.displayName ?? ba.legalName}
                     </p>
-                    {ba.displayName && ba.displayName !== ba.legalName && (
+                    {ba.isPrimary && (
+                      <p className="text-[10px] font-bold uppercase text-[#AEAEAE]">Primary</p>
+                    )}
+                    {!ba.isPrimary && ba.displayName && ba.displayName !== ba.legalName && (
                       <p className="text-[11px] text-[#AEAEAE] truncate">{ba.legalName}</p>
                     )}
                   </div>
-                  {ba.isPrimary ? (
-                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#E8F7EF] text-[#299E60]">
-                      Primary
-                    </span>
-                  ) : (
-                    <span className="shrink-0 text-[11px] text-[#AEAEAE] capitalize">
-                      {ba.status || '—'}
+                  {!ba.isPrimary && (
+                    <span className="shrink-0 text-[11px] font-semibold text-[#AEAEAE] capitalize">
+                      {ba.status || 'Active'}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3 text-[12px] text-[#7C7C7C] mb-3">
-                  <span className="font-mono">{ba.gstin ?? 'No GST'}</span>
-                  <span>
-                    <span className="font-semibold text-[#299E60]">{activeCount}</span>
-                    <span className="text-[#AEAEAE]"> / {ba.storeCount} stores</span>
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                <p className="text-[#AEAEAE] font-mono text-[12px] truncate mb-3">
+                  {activeCount} / {ba.storeCount} stores
+                </p>
+                <div className="inline-flex items-center gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
                   <Link
                     href={`/vendor/businesses/${ba.id}`}
-                    className="inline-flex items-center h-[30px] px-2.5 text-[12px] font-bold text-white bg-[#299E60] hover:bg-[#238a54] rounded-[6px]"
+                    className="inline-flex items-center gap-1 h-[30px] px-2.5 text-[12px] font-bold text-white bg-[#299E60] hover:bg-[#238a54] rounded-[6px]"
                     data-testid="view-business"
                   >
                     View
@@ -412,31 +407,27 @@ export default function VendorBusinessesPage() {
                         <p className="font-semibold text-[#181725] truncate">
                           {ba.displayName ?? ba.legalName}
                         </p>
-                        {ba.displayName && ba.displayName !== ba.legalName && (
+                        {ba.isPrimary && (
+                          <p className="text-[10px] font-bold uppercase text-[#AEAEAE]">Primary</p>
+                        )}
+                        {!ba.isPrimary && ba.displayName && ba.displayName !== ba.legalName && (
                           <p className="text-[11px] text-[#AEAEAE] truncate">{ba.legalName}</p>
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-[#7C7C7C] font-mono text-[12px] whitespace-nowrap">
-                        {ba.gstin ?? '—'}
+                        {ba.gstin || '—'}
                       </td>
-                      <td className="px-4 py-2.5 text-[#181725] whitespace-nowrap">
-                        <span className="font-semibold text-[#299E60]">{activeCount}</span>
-                        <span className="text-[#AEAEAE]"> / {ba.storeCount}</span>
+                      <td className="px-4 py-2.5 text-[#AEAEAE] font-mono text-[12px] whitespace-nowrap">
+                        {activeCount} / {ba.storeCount}
                       </td>
                       <td className="px-4 py-2.5">
-                        {ba.isPrimary ? (
-                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#E8F7EF] text-[#299E60]">
-                            Primary
-                          </span>
-                        ) : (
-                          <span className="text-[11px] text-[#AEAEAE] capitalize">{ba.status || '—'}</span>
-                        )}
+                        <span className="text-[11px] text-[#AEAEAE] capitalize">{ba.status || '—'}</span>
                       </td>
                       <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="inline-flex items-center gap-1.5">
+                        <div className="inline-flex items-center gap-1 flex-wrap justify-end">
                           <Link
                             href={`/vendor/businesses/${ba.id}`}
-                            className="inline-flex items-center h-[30px] px-2.5 text-[12px] font-bold text-white bg-[#299E60] hover:bg-[#238a54] rounded-[6px]"
+                            className="inline-flex items-center gap-1 h-[30px] px-2.5 text-[12px] font-bold text-white bg-[#299E60] hover:bg-[#238a54] rounded-[6px]"
                             data-testid="view-business"
                           >
                             View
