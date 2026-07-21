@@ -1,6 +1,9 @@
 /** First URL segment after /vendor/ for dashboard portal routes (not public vendor stores). */
 const VENDOR_PORTAL_SEGMENTS = new Set([
   'dashboard',
+  'overview',
+  'all-orders',
+  'businesses',
   'orders',
   'products',
   'inventory',
