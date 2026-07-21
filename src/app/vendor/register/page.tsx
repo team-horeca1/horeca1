@@ -154,6 +154,8 @@ export default function VendorRegisterPage() {
   const { switchAccount } = useBusinessAccountSwitcher();
 
   const [step, setStep] = useState(1);
+  /** Highest step unlocked via Continue / OTP — caps forward stepper jumps. */
+  const [maxReached, setMaxReached] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState<{ hcid: string } | null>(null);
@@ -263,6 +265,7 @@ export default function VendorRegisterPage() {
     setPhoneVerified(true);
     setOtpSent(true);
     setStep(2);
+    setMaxReached((m) => Math.max(m, 2));
     // Best-effort prefill of known details. Functional updaters avoid
     // clobbering anything the user may have already typed on a later step
     // while this request was in flight. Submit in auth mode uses the session,
@@ -511,6 +514,7 @@ export default function VendorRegisterPage() {
         }));
       }
       setStep(2);
+      setMaxReached((m) => Math.max(m, 2));
     } catch { setError('Verification failed. Please try again.'); }
     finally { setOtpLoading(false); }
   };
@@ -668,8 +672,11 @@ export default function VendorRegisterPage() {
     }
     setError('');
     setFieldErrors({});
-    if (step < 7) setStep(step + 1);
-    else handleSubmit();
+    if (step < 7) {
+      const next = step + 1;
+      setStep(next);
+      setMaxReached((m) => Math.max(m, next));
+    } else handleSubmit();
   };
 
   const handleBack = () => {
@@ -679,6 +686,13 @@ export default function VendorRegisterPage() {
     // that doesn't apply to them.
     const floor = isAuthMode ? 2 : 1;
     if (step > floor) setStep(step - 1);
+  };
+
+  const goToStep = (target: number) => {
+    const floor = isAuthMode ? 2 : 1;
+    if (target < floor || target > maxReached || target === step) return;
+    setError('');
+    setStep(target);
   };
 
   // ─── Final submit ───────────────────────────────────────────────────────
@@ -1027,21 +1041,49 @@ export default function VendorRegisterPage() {
           </div>
           <div className="mt-3 hidden md:flex items-center justify-between">
             {STEP_TITLES.map((s) => {
+              const floor = isAuthMode ? 2 : 1;
               const done = s.id < step;
               const active = s.id === step;
+              const clickable = s.id >= floor && s.id <= maxReached;
               const Icon = s.icon;
-              return (
-                <div key={s.id} className="flex flex-col items-center text-center flex-1">
+              const inner = (
+                <>
                   <div className={cn(
                     'w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold transition-colors',
                     done ? 'bg-[#299E60] text-white' :
                     active ? 'bg-[#299E60]/10 text-[#299E60] ring-2 ring-[#299E60]' :
+                    clickable ? 'bg-[#EEF8F1] text-[#299E60]' :
                     'bg-gray-100 text-gray-400',
                   )}>
                     {done ? <CheckCircle2 size={16} /> : <Icon size={14} />}
                   </div>
-                  <span className={cn('mt-1.5 text-[10px]', active ? 'text-[#299E60] font-bold' : 'text-gray-400')}>{s.label}</span>
-                </div>
+                  <span className={cn(
+                    'mt-1.5 text-[10px]',
+                    active ? 'text-[#299E60] font-bold' : clickable ? 'text-[#299E60]/80' : 'text-gray-400',
+                  )}>{s.label}</span>
+                </>
+              );
+              if (!clickable) {
+                return (
+                  <div key={s.id} className="flex flex-col items-center text-center flex-1 cursor-default">
+                    {inner}
+                  </div>
+                );
+              }
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => goToStep(s.id)}
+                  className={cn(
+                    'flex flex-col items-center text-center flex-1 rounded-lg py-1 transition-colors',
+                    active ? 'cursor-default' : 'cursor-pointer hover:bg-[#EEF8F1]/60',
+                  )}
+                  aria-current={active ? 'step' : undefined}
+                  aria-label={`Go to ${s.label}`}
+                >
+                  {inner}
+                </button>
               );
             })}
           </div>

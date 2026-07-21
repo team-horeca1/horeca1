@@ -66,6 +66,7 @@ type Props = {
 
 export function StoreSetupWizard({ submitting = false, onCancel, onSubmit }: Props) {
   const [step, setStep] = useState(1);
+  const [maxReached, setMaxReached] = useState(1);
   const [storeName, setStoreName] = useState('');
   const [profile, setProfile] = useState<VendorProfileValues>({ ...EMPTY_VENDOR_PROFILE });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -143,10 +144,17 @@ export function StoreSetupWizard({ submitting = false, onCancel, onSubmit }: Pro
 
   const goNext = () => {
     if (!validateStep(step)) return;
-    setStep((s) => Math.min(5, s + 1));
+    const next = Math.min(5, step + 1);
+    setStep(next);
+    setMaxReached((m) => Math.max(m, next));
   };
 
   const goBack = () => setStep((s) => Math.max(1, s - 1));
+
+  const goToStep = (target: number) => {
+    if (target < 1 || target > maxReached || target === step) return;
+    setStep(target);
+  };
 
   const handleSubmit = async () => {
     if (!validateStep(5)) return;
@@ -196,21 +204,39 @@ export function StoreSetupWizard({ submitting = false, onCancel, onSubmit }: Pro
           Same setup as register (Steps 3–7). This store stays off the marketplace until a super-admin Approve &amp; Verify.
         </p>
         <div className="mt-3 flex gap-1.5 flex-wrap">
-          {STEPS.map((s) => (
-            <span
-              key={s.id}
-              className={cn(
-                'text-[11px] font-bold px-2.5 py-1 rounded-full',
-                step === s.id
-                  ? 'bg-[#299E60] text-white'
-                  : step > s.id
-                    ? 'bg-[#E8F7EF] text-[#299E60]'
-                    : 'bg-[#F3F4F6] text-[#AEAEAE]',
-              )}
-            >
-              {s.id}. {s.label}
-            </span>
-          ))}
+          {STEPS.map((s) => {
+            const clickable = s.id <= maxReached;
+            const active = step === s.id;
+            const done = step > s.id;
+            const className = cn(
+              'text-[11px] font-bold px-2.5 py-1 rounded-full transition-colors',
+              active
+                ? 'bg-[#299E60] text-white'
+                : done || clickable
+                  ? 'bg-[#E8F7EF] text-[#299E60]'
+                  : 'bg-[#F3F4F6] text-[#AEAEAE]',
+              clickable && !active && 'hover:bg-[#D1FAE5] cursor-pointer',
+              !clickable && 'cursor-default',
+            );
+            if (!clickable) {
+              return (
+                <span key={s.id} className={className}>
+                  {s.id}. {s.label}
+                </span>
+              );
+            }
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => goToStep(s.id)}
+                className={className}
+                aria-current={active ? 'step' : undefined}
+              >
+                {s.id}. {s.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
