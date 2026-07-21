@@ -139,9 +139,7 @@ export default function BusinessDetailPage() {
     setEnteringId(store.id);
     try {
       setEnteredStore(true);
-      if (store.id !== activeVendorId) {
-        await switchOnlineStore(store.id);
-      }
+      await switchOnlineStore(store.id, businessId);
       toast.success(`Entered ${store.name}`);
       window.location.assign('/vendor/dashboard');
     } catch (err) {

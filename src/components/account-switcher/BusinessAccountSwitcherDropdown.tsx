@@ -213,7 +213,7 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
     }
     setIsOpen(false);
     try {
-      await switchOnlineStore(vendorId);
+      await switchOnlineStore(vendorId, currentAccount?.id);
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to switch online store');

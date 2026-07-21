@@ -1,8 +1,9 @@
 /**
  * POST /api/v1/auth/switch-online-store
  *
- * Switch the active Online Store (Vendor) within the current Business.
- * Client follows with session.update({ activeVendorId }).
+ * Switch the active Online Store (Vendor). The store's BusinessAccount is the
+ * source of truth — do not prefer a stale JWT activeBusinessAccountId.
+ * Client follows with session.update({ activeVendorId, activeBusinessAccountId }).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,25 +22,17 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const json = await req.json().catch(() => ({}));
     const { vendorId, businessAccountId } = Body.parse(json);
 
-    // Resolve store first so admin impersonation (JWT BA ≠ vendor BA) still works.
     const store = await prisma.vendor.findUnique({
       where: { id: vendorId },
       select: { id: true, defaultOutletId: true, userId: true, businessAccountId: true },
     });
     if (!store) throw Errors.notFound('Online Store');
 
-    const impersonatedVendorId = req.cookies.get('admin_impersonate_vendor_id')?.value;
-    const baId =
-      businessAccountId
-      ?? (ctx.role === 'admin' && impersonatedVendorId === vendorId
-        ? store.businessAccountId
-        : null)
-      ?? ctx.activeBusinessAccountId
-      ?? store.businessAccountId;
-
-    if (store.businessAccountId !== baId) {
+    // Optional body BA must match the store; otherwise always use the store's BA.
+    if (businessAccountId && businessAccountId !== store.businessAccountId) {
       throw Errors.badRequest('Online Store does not belong to this Business');
     }
+    const baId = store.businessAccountId;
 
     const membership = await prisma.businessAccountMember.findUnique({
       where: { userId_businessAccountId: { userId: ctx.userId, businessAccountId: baId } },

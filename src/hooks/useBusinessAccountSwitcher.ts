@@ -420,10 +420,12 @@ export function useBusinessAccountSwitcher() {
   );
 
   const switchOnlineStore = useCallback(
-    async (vendorId: string) => {
+    async (vendorId: string, businessAccountId?: string) => {
       if (switching) return;
       const currentId = vendorImpersonating ? vendorImpersonationVendorId : activeVendorId;
-      if (vendorId === currentId) return;
+      const sameStore = vendorId === currentId;
+      const sameBa = !businessAccountId || businessAccountId === activeBusinessAccountId;
+      if (sameStore && sameBa) return;
 
       // Admin View: update impersonation cookie to sibling Online Store
       if (isAdminVendorImpersonationActive()) {
@@ -465,7 +467,10 @@ export function useBusinessAccountSwitcher() {
         const res = await fetch('/api/v1/auth/switch-online-store', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ vendorId }),
+          body: JSON.stringify({
+            vendorId,
+            ...(businessAccountId ? { businessAccountId } : {}),
+          }),
         });
         const json = await res.json().catch(() => null);
         if (!res.ok || !json?.success) {
