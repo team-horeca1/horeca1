@@ -198,8 +198,8 @@ export default function VendorLayout({
         if (!firstAllowedRoute) return;
         // Wait until brand-mapping access is known so we don't bounce /brand-mappings → dashboard → setup
         if (hasBrandMappings === null && pathname.startsWith('/vendor/brand-mappings')) return;
-        // Allow business detail dynamic routes under supplier nav
-        if (pathname.startsWith('/vendor/businesses/')) return;
+        // Allow businesses list + detail under supplier nav (avoid store-nav race → dashboard)
+        if (pathname === '/vendor/businesses' || pathname.startsWith('/vendor/businesses/')) return;
         if (pathname === '/vendor/setup') return;
         const allHrefs = visibleGroups.flatMap((g) => g.links.map((l) => l.href));
         if (!allHrefs.some((h) => pathname === h || pathname.startsWith(`${h}/`))) {
@@ -451,7 +451,9 @@ export default function VendorLayout({
                                 <>
                                     <span className="text-[#AEAEAE]">›</span>
                                     <Link
-                                        href="/vendor/businesses"
+                                        href={currentAccount?.id
+                                          ? `/vendor/businesses/${currentAccount.id}`
+                                          : '/vendor/businesses'}
                                         onClick={() => {
                                             setEnteredStore(false);
                                             setEnteredStoreState(false);

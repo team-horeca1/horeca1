@@ -101,8 +101,9 @@ export const SUPPLIER_NAV_GROUPS: PortalNavGroup[] = [
       { name: 'Orders', icon: ShoppingBag, href: '/vendor/all-orders', feature: 'orders', requiredPerm: 'orders.view' },
       { name: 'Businesses', icon: Building2, href: '/vendor/businesses', feature: 'dashboard', requiredPerm: ['dashboard.view', 'settings.view'] },
       { name: 'Team Members', icon: Users, href: '/vendor/team', feature: 'users', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
-      { name: 'Reports', icon: BarChart3, href: '/vendor/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
-      { name: 'Ledger', icon: BookOpen, href: '/vendor/ledger', feature: 'payments', requiredPerm: 'payments.view' },
+      // Hidden for now — re-enable when supplier-level reports/ledger ship
+      // { name: 'Reports', icon: BarChart3, href: '/vendor/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
+      // { name: 'Ledger', icon: BookOpen, href: '/vendor/ledger', feature: 'payments', requiredPerm: 'payments.view' },
       { name: 'Settings', icon: Settings, href: '/vendor/account', feature: 'dashboard', requiredPerm: 'dashboard.view' },
     ],
   },
