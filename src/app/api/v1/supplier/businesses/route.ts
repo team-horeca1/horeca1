@@ -1,6 +1,6 @@
 /**
  * GET  /api/v1/supplier/businesses — list supplier Businesses + Online Stores
- * POST /api/v1/supplier/businesses — create Business + first Online Store
+ * POST /api/v1/supplier/businesses — create Business only (stores via .../stores)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
 import {
-  createBusinessWithStore,
+  createBusiness,
   listSupplierBusinesses,
 } from '@/modules/supplier/supplier.service';
 import { resolveSupplierActorUserId } from '@/lib/resolveVendorId';
@@ -18,26 +18,12 @@ const CreateBody = z.object({
   legalName: z.string().min(2).max(255),
   displayName: z.string().max(255).optional(),
   gstin: z.string().max(20).optional(),
-  // Optional — the mandatory first Online Store defaults to the business legal name
-  storeName: z.string().min(2).max(255).optional(),
-  storeDisplayName: z.string().max(255).optional(),
-  addressLine: z.string().max(2000).optional(),
-  city: z.string().max(100).optional(),
-  state: z.string().max(100).optional(),
-  pincode: z.string().max(10).optional(),
-  // Business Profile (wizard Step 2)
   vendorTypeSelections: z.array(z.object({
     type: z.string().min(1),
     slug: z.string().optional(),
     subTypes: z.array(z.string()).default([]),
   })).optional(),
-  categoriesHandled: z.array(z.string()).optional(),
   businessSize: z.string().max(50).optional(),
-  coverage: z.string().max(120).optional(),
-  warehouseCount: z.number().int().min(0).max(9999).optional(),
-  deliveryFleet: z.boolean().optional(),
-  monthlySupplyBand: z.string().max(50).optional(),
-  vendorType: z.string().max(50).optional(),
 });
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
@@ -55,9 +41,11 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const actorId = await resolveSupplierActorUserId(ctx, req);
     const body = CreateBody.parse(await req.json());
     const typeSelections = normalizeVendorTypeSelections(body.vendorTypeSelections);
-    const data = await createBusinessWithStore(actorId, {
-      ...body,
-      storeName: body.storeName?.trim() || body.legalName.trim(),
+    const data = await createBusiness(actorId, {
+      legalName: body.legalName,
+      displayName: body.displayName,
+      gstin: body.gstin,
+      businessSize: body.businessSize,
       vendorTypeSelections: typeSelections.length > 0 ? typeSelections : undefined,
     });
     // Ensure User.role can access vendor portal (skip when Admin View)

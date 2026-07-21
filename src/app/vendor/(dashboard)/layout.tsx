@@ -430,14 +430,14 @@ export default function VendorLayout({
                                 <>
                                     <span className="text-[#AEAEAE]">›</span>
                                     <Link
-                                        href="/vendor/overview"
+                                        href="/vendor/businesses"
                                         onClick={() => {
                                             setEnteredStore(false);
                                             setEnteredStoreState(false);
                                         }}
                                         className={cn(
                                             'font-semibold truncate max-w-[180px]',
-                                            (portalLevel === 'supplier' || onBusinessesList)
+                                            onBusinessesList
                                               ? 'text-[#181725]'
                                               : 'text-[#299E60] hover:text-[#238a54]',
                                         )}

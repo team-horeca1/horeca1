@@ -15,9 +15,9 @@ import {
 import { EMPTY_VENDOR_PROFILE } from '@/components/features/vendor/vendorProfileDefaults';
 import {
   getEffectiveVendorTypeSelections,
-  resolveVendorTypeSlug,
   validateFieldBlur as validateVendorFieldBlur,
 } from '@/lib/validators/vendor-profile';
+import { normalizeVendorTypeSelections } from '@/lib/constants/vendorProfile';
 
 const VIEW_STORAGE_KEY = 'horeca_vendor_businesses_view';
 
@@ -40,6 +40,8 @@ interface BusinessRow {
   gstin: string | null;
   status: string;
   isPrimary: boolean;
+  vendorTypeSelections?: unknown;
+  businessSize?: string | null;
   stores: StoreRow[];
   storeCount: number;
 }
@@ -56,8 +58,8 @@ export default function VendorBusinessesPage() {
 
   const [profile, setProfile] = useState<VendorProfileValues>({ ...EMPTY_VENDOR_PROFILE });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [editLegalName, setEditLegalName] = useState('');
-  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editProfile, setEditProfile] = useState<VendorProfileValues>({ ...EMPTY_VENDOR_PROFILE });
+  const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string>>({});
 
   const fetchBusinesses = useCallback(async () => {
     try {
@@ -124,25 +126,24 @@ export default function VendorBusinessesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           legalName,
+          displayName: (profile.displayName ?? profile.tradeName ?? '').trim() || undefined,
+          gstin: (profile.gstin ?? profile.gstNumber ?? '').trim() || undefined,
           vendorTypeSelections: typeSelections,
-          categoriesHandled: profile.categoriesHandled ?? [],
           businessSize: profile.businessSize || undefined,
-          coverage: profile.coverage || undefined,
-          warehouseCount: profile.warehouseCount != null && profile.warehouseCount !== ''
-            ? Number(profile.warehouseCount)
-            : undefined,
-          deliveryFleet: profile.deliveryFleet ?? undefined,
-          monthlySupplyBand: profile.monthlySupplyBand || undefined,
-          vendorType: resolveVendorTypeSlug(profile) ?? undefined,
         }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        toast.error(json.error?.message ?? json.error?.fields?.storeName ?? 'Failed to create business');
+        toast.error(json.error?.message ?? 'Failed to create business');
         return;
       }
-      toast.success('Business created');
+      toast.success('Business created — add an Online Store when ready');
+      const newId = json.data?.businessAccountId as string | undefined;
       resetAddBusiness();
+      if (newId) {
+        router.push(`/vendor/businesses/${newId}`);
+        return;
+      }
       setLoading(true);
       await fetchBusinesses();
     } catch {
@@ -155,14 +156,28 @@ export default function VendorBusinessesPage() {
   const handleEditBusiness = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editBusiness || submitting) return;
+
+    const legalName = (editProfile.legalName ?? editProfile.businessName ?? '').trim();
+    const errors: Record<string, string> = {};
+    if (legalName.length < 2) errors.legalName = 'Legal business name is required';
+    const typeSelections = getEffectiveVendorTypeSelections(editProfile);
+    if (typeSelections.length === 0) {
+      errors.vendorTypeSelections = 'Select at least one vendor type and sub-type';
+    }
+    setEditFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setSubmitting(true);
     try {
       const res = await fetch(`/api/v1/supplier/businesses/${editBusiness.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          legalName: editLegalName.trim(),
-          displayName: editDisplayName.trim() || undefined,
+          legalName,
+          displayName: (editProfile.displayName ?? editProfile.tradeName ?? '').trim() || legalName,
+          gstin: (editProfile.gstin ?? editProfile.gstNumber ?? '').trim() || undefined,
+          vendorTypeSelections: typeSelections,
+          businessSize: editProfile.businessSize || null,
         }),
       });
       const json = await res.json();
@@ -181,9 +196,20 @@ export default function VendorBusinessesPage() {
   };
 
   const openEdit = (ba: BusinessRow) => {
+    const selections = normalizeVendorTypeSelections(ba.vendorTypeSelections);
     setEditBusiness(ba);
-    setEditLegalName(ba.legalName);
-    setEditDisplayName(ba.displayName ?? '');
+    setEditFieldErrors({});
+    setEditProfile({
+      ...EMPTY_VENDOR_PROFILE,
+      legalName: ba.legalName,
+      businessName: ba.legalName,
+      displayName: ba.displayName ?? '',
+      tradeName: ba.displayName ?? '',
+      gstin: ba.gstin ?? '',
+      gstNumber: ba.gstin ?? '',
+      vendorTypeSelections: selections,
+      businessSize: ba.businessSize ?? '',
+    });
   };
 
   const handleDeleteBusiness = async (ba: BusinessRow) => {
@@ -450,8 +476,7 @@ export default function VendorBusinessesPage() {
             <div className="px-5 py-4 border-b border-[#F0F0F0] sticky top-0 bg-white z-10">
               <h3 className="text-[16px] font-bold text-[#181725]">Add Business</h3>
               <p className="text-[12px] text-[#7C7C7C] mt-0.5">
-                Business is for mapping only — no admin approval needed. Your first online store
-                is created from the legal name and stays pending until a super-admin Approve &amp; Verify.
+                Mapping only — no admin approval. Add Online Stores from the business page when you are ready.
               </p>
             </div>
             <form onSubmit={handleAddBusiness} className="px-5 py-4 space-y-4">
@@ -491,31 +516,26 @@ export default function VendorBusinessesPage() {
 
       {editBusiness && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-[16px] w-full max-w-[420px] shadow-xl border border-[#EEEEEE]">
-            <div className="px-5 py-4 border-b border-[#F0F0F0]">
+          <div className="bg-white rounded-[16px] w-full max-w-[720px] max-h-[90vh] overflow-y-auto shadow-xl border border-[#EEEEEE]">
+            <div className="px-5 py-4 border-b border-[#F0F0F0] sticky top-0 bg-white z-10">
               <h3 className="text-[16px] font-bold text-[#181725]">Edit Business</h3>
+              <p className="text-[12px] text-[#7C7C7C] mt-0.5">
+                Update legal name, display name, and business profile.
+              </p>
             </div>
-            <form onSubmit={handleEditBusiness} className="px-5 py-4 space-y-3">
-              <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">Legal name</label>
-                <input
-                  required
-                  minLength={2}
-                  value={editLegalName}
-                  onChange={(e) => setEditLegalName(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">Display name</label>
-                <input
-                  value={editDisplayName}
-                  onChange={(e) => setEditDisplayName(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                  placeholder="Optional"
-                />
-              </div>
-              <div className="flex gap-2 pt-1">
+            <form onSubmit={handleEditBusiness} className="px-5 py-4 space-y-4">
+              <VendorProfileForm
+                value={editProfile}
+                onChange={(patch) => setEditProfile((prev) => ({ ...prev, ...patch }))}
+                errors={editFieldErrors}
+                onFieldBlur={(field, value) => {
+                  const msg = validateVendorFieldBlur(field, value);
+                  setEditFieldErrors((prev) => ({ ...prev, [field]: msg }));
+                }}
+                visibleSections={{ identity: true, ops: true }}
+                layout="wide"
+              />
+              <div className="flex gap-2 pt-1 sticky bottom-0 bg-white pb-1">
                 <button
                   type="button"
                   onClick={() => setEditBusiness(null)}

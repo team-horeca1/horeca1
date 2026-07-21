@@ -21,6 +21,8 @@ function slugify(name: string, salt: string): string {
   return `${base || 'store'}-${salt.slice(0, 8)}`;
 }
 
+type VendorTypeSelectionInput = Array<{ type: string; slug?: string; subTypes: string[] }>;
+
 export async function listSupplierBusinesses(userId: string) {
   const memberships = await prisma.businessAccountMember.findMany({
     where: { userId, businessAccount: { isVendor: true, status: { not: 'deactivated' } } },
@@ -34,6 +36,8 @@ export async function listSupplierBusinesses(userId: string) {
           displayName: true,
           gstin: true,
           status: true,
+          vendorTypeSelections: true,
+          businessSize: true,
           vendors: {
             orderBy: [{ isPrimaryStore: 'desc' }, { createdAt: 'asc' }],
             select: {
@@ -45,6 +49,10 @@ export async function listSupplierBusinesses(userId: string) {
               isVerified: true,
               isPrimaryStore: true,
               logoUrl: true,
+              addressLine: true,
+              city: true,
+              state: true,
+              addressPincode: true,
             },
           },
         },
@@ -59,6 +67,8 @@ export async function listSupplierBusinesses(userId: string) {
     gstin: m.businessAccount.gstin,
     status: m.businessAccount.status,
     isPrimary: m.isPrimary,
+    vendorTypeSelections: m.businessAccount.vendorTypeSelections,
+    businessSize: m.businessAccount.businessSize,
     stores: m.businessAccount.vendors.map((v) => ({
       id: v.id,
       name: storeDisplayName(v),
@@ -67,40 +77,29 @@ export async function listSupplierBusinesses(userId: string) {
       isVerified: v.isVerified,
       isPrimaryStore: v.isPrimaryStore,
       logoUrl: v.logoUrl,
+      addressLine: v.addressLine,
+      city: v.city,
+      state: v.state,
+      pincode: v.addressPincode,
     })),
     storeCount: m.businessAccount.vendors.length,
   }));
 }
 
-export async function createBusinessWithStore(
+/** Create BusinessAccount only — Online Stores are added separately via createOnlineStore. */
+export async function createBusiness(
   userId: string,
   input: {
     legalName: string;
     displayName?: string;
     gstin?: string;
-    storeName: string;
-    storeDisplayName?: string;
-    addressLine?: string;
-    city?: string;
-    state?: string;
-    pincode?: string;
-    vendorTypeSelections?: Array<{ type: string; slug?: string; subTypes: string[] }>;
-    categoriesHandled?: string[];
+    vendorTypeSelections?: VendorTypeSelectionInput;
     businessSize?: string;
-    coverage?: string;
-    warehouseCount?: number;
-    deliveryFleet?: boolean;
-    monthlySupplyBand?: string;
-    vendorType?: string;
   },
 ) {
-  const storeName = input.storeName.trim();
-  if (!storeName) throw Errors.fieldError('storeName', 'Online Store name is required');
-
-  const slug = slugify(storeName, userId);
-  const slugTaken = await prisma.vendor.findUnique({ where: { slug }, select: { id: true } });
-  if (slugTaken) {
-    throw Errors.fieldError('storeName', 'An Online Store with a similar name already exists. Try a different name.', 409);
+  const legalName = input.legalName.trim();
+  if (legalName.length < 2) {
+    throw Errors.fieldError('legalName', 'Legal business name is required');
   }
 
   const vendorAdminTemplate = await prisma.accountRole.findFirst({
@@ -115,8 +114,8 @@ export async function createBusinessWithStore(
   return prisma.$transaction(async (tx) => {
     const ba = await tx.businessAccount.create({
       data: {
-        legalName: input.legalName.trim(),
-        displayName: input.displayName?.trim() || input.legalName.trim(),
+        legalName,
+        displayName: input.displayName?.trim() || legalName,
         gstin: input.gstin?.trim() || null,
         isCustomer: true,
         isVendor: true,
@@ -144,45 +143,55 @@ export async function createBusinessWithStore(
       });
     }
 
-    const vendor = await tx.vendor.create({
-      data: {
-        userId,
-        businessAccountId: ba.id,
-        businessName: storeName,
-        displayName: input.storeDisplayName?.trim() || storeName,
-        slug,
-        isPrimaryStore: true,
-        isActive: false,
-        isVerified: false,
-        multiWarehouseEnabled: false,
-        addressLine: input.addressLine ?? null,
-        city: input.city ?? null,
-        state: input.state ?? null,
-        addressPincode: input.pincode ?? null,
-        setupProgress: { business: true, online_store: true },
-        vendorType: input.vendorType?.trim() || null,
-        vendorTypeSelections: typeSelections,
-        categoriesHandled: input.categoriesHandled ?? [],
-        businessSize: input.businessSize?.trim() || null,
-        coverage: input.coverage?.trim() || null,
-        warehouseCount: input.warehouseCount ?? null,
-        deliveryFleet: input.deliveryFleet ?? null,
-        monthlySupplyBand: input.monthlySupplyBand?.trim() || null,
-      },
-    });
-
-    await ensureDefaultOutletForStore(tx, {
-      businessAccountId: ba.id,
-      vendorId: vendor.id,
-      name: storeName,
-      addressLine: input.addressLine,
-      city: input.city,
-      state: input.state,
-      pincode: input.pincode,
-    });
-
-    return { businessAccountId: ba.id, vendorId: vendor.id, slug: vendor.slug };
+    return { businessAccountId: ba.id };
   });
+}
+
+/** @deprecated Prefer createBusiness + createOnlineStore. Kept for any legacy callers. */
+export async function createBusinessWithStore(
+  userId: string,
+  input: {
+    legalName: string;
+    displayName?: string;
+    gstin?: string;
+    storeName: string;
+    storeDisplayName?: string;
+    addressLine?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    vendorTypeSelections?: VendorTypeSelectionInput;
+    categoriesHandled?: string[];
+    businessSize?: string;
+    coverage?: string;
+    warehouseCount?: number;
+    deliveryFleet?: boolean;
+    monthlySupplyBand?: string;
+    vendorType?: string;
+  },
+) {
+  const created = await createBusiness(userId, {
+    legalName: input.legalName,
+    displayName: input.displayName,
+    gstin: input.gstin,
+    vendorTypeSelections: input.vendorTypeSelections,
+    businessSize: input.businessSize,
+  });
+
+  const store = await createOnlineStore(userId, created.businessAccountId, {
+    storeName: input.storeName,
+    storeDisplayName: input.storeDisplayName,
+    addressLine: input.addressLine,
+    city: input.city,
+    state: input.state,
+    pincode: input.pincode,
+  });
+
+  return {
+    businessAccountId: created.businessAccountId,
+    vendorId: store.vendorId,
+    slug: store.slug,
+  };
 }
 
 export async function createOnlineStore(
@@ -544,11 +553,9 @@ export async function deleteOnlineStore(
   const storeCount = await prisma.vendor.count({
     where: { businessAccountId: vendor.businessAccountId },
   });
-  if (!opts?.allowLastStore && storeCount <= 1) {
-    throw Errors.badRequest(
-      'Cannot delete the last Online Store under a Business. Delete the Business instead, or add another store first.',
-    );
-  }
+  // Business may have zero stores — last-store delete is allowed when there are no orders
+  void storeCount;
+  void opts;
 
   return prisma.$transaction(async (tx) => {
     await purgeOnlineStoreInTx(tx, vendor);
@@ -642,9 +649,21 @@ export async function deleteBusiness(userId: string, businessAccountId: string) 
 export async function updateBusiness(
   userId: string,
   businessAccountId: string,
-  input: { legalName?: string; displayName?: string; gstin?: string },
+  input: {
+    legalName?: string;
+    displayName?: string;
+    gstin?: string;
+    vendorTypeSelections?: VendorTypeSelectionInput;
+    businessSize?: string | null;
+  },
 ) {
   await assertCanManageBusiness(userId, businessAccountId);
+
+  const typeSelections = input.vendorTypeSelections?.length
+    ? (input.vendorTypeSelections as Prisma.InputJsonValue)
+    : input.vendorTypeSelections !== undefined
+      ? []
+      : undefined;
 
   return prisma.businessAccount.update({
     where: { id: businessAccountId },
@@ -652,8 +671,19 @@ export async function updateBusiness(
       ...(input.legalName !== undefined ? { legalName: input.legalName.trim() } : {}),
       ...(input.displayName !== undefined ? { displayName: input.displayName.trim() } : {}),
       ...(input.gstin !== undefined ? { gstin: input.gstin.trim() || null } : {}),
+      ...(typeSelections !== undefined ? { vendorTypeSelections: typeSelections } : {}),
+      ...(input.businessSize !== undefined
+        ? { businessSize: input.businessSize?.trim() || null }
+        : {}),
     },
-    select: { id: true, legalName: true, displayName: true, gstin: true },
+    select: {
+      id: true,
+      legalName: true,
+      displayName: true,
+      gstin: true,
+      vendorTypeSelections: true,
+      businessSize: true,
+    },
   });
 }
 

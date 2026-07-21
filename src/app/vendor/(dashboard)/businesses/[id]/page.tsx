@@ -22,6 +22,16 @@ import {
   StoreSetupWizard,
   type StoreSetupPayload,
 } from '@/components/features/vendor/StoreSetupWizard';
+import {
+  VendorProfileForm,
+  type VendorProfileValues,
+} from '@/components/features/vendor/VendorProfileForm';
+import { EMPTY_VENDOR_PROFILE } from '@/components/features/vendor/vendorProfileDefaults';
+import {
+  getEffectiveVendorTypeSelections,
+  validateFieldBlur as validateVendorFieldBlur,
+} from '@/lib/validators/vendor-profile';
+import { normalizeVendorTypeSelections } from '@/lib/constants/vendorProfile';
 
 const VIEW_STORAGE_KEY = 'horeca_vendor_stores_view';
 
@@ -35,6 +45,10 @@ interface StoreRow {
   isVerified: boolean;
   isPrimaryStore: boolean;
   logoUrl: string | null;
+  addressLine?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
 }
 
 interface BusinessRow {
@@ -44,6 +58,8 @@ interface BusinessRow {
   gstin: string | null;
   status: string;
   isPrimary: boolean;
+  vendorTypeSelections?: unknown;
+  businessSize?: string | null;
   stores: StoreRow[];
   storeCount: number;
 }
@@ -60,6 +76,13 @@ export default function BusinessDetailPage() {
   const [addStoreOpen, setAddStoreOpen] = useState(false);
   const [editStore, setEditStore] = useState<StoreRow | null>(null);
   const [editStoreName, setEditStoreName] = useState('');
+  const [editAddressLine, setEditAddressLine] = useState('');
+  const [editCity, setEditCity] = useState('');
+  const [editState, setEditState] = useState('');
+  const [editPincode, setEditPincode] = useState('');
+  const [editBusinessOpen, setEditBusinessOpen] = useState(false);
+  const [editProfile, setEditProfile] = useState<VendorProfileValues>({ ...EMPTY_VENDOR_PROFILE });
+  const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [enteringId, setEnteringId] = useState<string | null>(null);
 
@@ -155,14 +178,23 @@ export default function BusinessDetailPage() {
   const handleEditStore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editStore || submitting) return;
+    const name = editStoreName.trim();
+    if (name.length < 2) {
+      toast.error('Store name is required');
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch(`/api/v1/supplier/stores/${editStore.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          storeName: editStoreName.trim(),
-          storeDisplayName: editStoreName.trim(),
+          storeName: name,
+          storeDisplayName: name,
+          addressLine: editAddressLine.trim() || undefined,
+          city: editCity.trim() || undefined,
+          state: editState.trim() || undefined,
+          pincode: editPincode.trim() || undefined,
         }),
       });
       const json = await res.json();
@@ -183,13 +215,72 @@ export default function BusinessDetailPage() {
   const openEdit = (store: StoreRow) => {
     setEditStore(store);
     setEditStoreName(store.name);
+    setEditAddressLine(store.addressLine ?? '');
+    setEditCity(store.city ?? '');
+    setEditState(store.state ?? '');
+    setEditPincode(store.pincode ?? '');
+  };
+
+  const openEditBusiness = () => {
+    if (!business) return;
+    const selections = normalizeVendorTypeSelections(business.vendorTypeSelections);
+    setEditFieldErrors({});
+    setEditProfile({
+      ...EMPTY_VENDOR_PROFILE,
+      legalName: business.legalName,
+      businessName: business.legalName,
+      displayName: business.displayName ?? '',
+      tradeName: business.displayName ?? '',
+      gstin: business.gstin ?? '',
+      gstNumber: business.gstin ?? '',
+      vendorTypeSelections: selections,
+      businessSize: business.businessSize ?? '',
+    });
+    setEditBusinessOpen(true);
+  };
+
+  const handleEditBusiness = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!business || submitting) return;
+    const legalName = (editProfile.legalName ?? editProfile.businessName ?? '').trim();
+    const errors: Record<string, string> = {};
+    if (legalName.length < 2) errors.legalName = 'Legal business name is required';
+    const typeSelections = getEffectiveVendorTypeSelections(editProfile);
+    if (typeSelections.length === 0) {
+      errors.vendorTypeSelections = 'Select at least one vendor type and sub-type';
+    }
+    setEditFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/v1/supplier/businesses/${business.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          legalName,
+          displayName: (editProfile.displayName ?? editProfile.tradeName ?? '').trim() || legalName,
+          gstin: (editProfile.gstin ?? editProfile.gstNumber ?? '').trim() || undefined,
+          vendorTypeSelections: typeSelections,
+          businessSize: editProfile.businessSize || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        toast.error(json.error?.message ?? 'Failed to update business');
+        return;
+      }
+      toast.success('Business updated');
+      setEditBusinessOpen(false);
+      await fetchBusiness();
+    } catch {
+      toast.error('Failed to update business');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleDeleteStore = async (store: StoreRow) => {
-    if (!business || business.storeCount <= 1) {
-      toast.error('Cannot delete the last Online Store. Delete the Business instead, or add another store first.');
-      return;
-    }
     const ok = await confirm({
       title: 'Delete Online Store?',
       message: `Delete “${store.name}”? This cannot be undone. Stores with orders cannot be deleted.`,
@@ -215,7 +306,6 @@ export default function BusinessDetailPage() {
   };
 
   const renderStoreActions = (store: StoreRow) => {
-    const isLastStore = (business?.storeCount ?? 0) <= 1;
     return (
       <div className="inline-flex items-center gap-1 flex-wrap">
         <button
@@ -243,10 +333,10 @@ export default function BusinessDetailPage() {
         </button>
         <button
           type="button"
-          disabled={isLastStore || submitting}
+          disabled={submitting}
           onClick={() => void handleDeleteStore(store)}
           className="inline-flex items-center gap-1 h-[30px] px-2 text-[12px] font-semibold text-[#E74C3C] hover:bg-[#FEE2E2] disabled:opacity-40 rounded-[6px]"
-          title={isLastStore ? 'Cannot delete the last store under this business' : 'Delete store'}
+          title="Delete store"
           data-testid="delete-store"
         >
           <Trash2 size={12} />
@@ -327,6 +417,14 @@ export default function BusinessDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
+          <button
+            type="button"
+            onClick={openEditBusiness}
+            className="inline-flex items-center gap-1.5 h-[36px] px-3 border border-[#EEEEEE] text-[#7C7C7C] hover:text-[#181725] hover:bg-[#F8F9FB] text-[13px] font-bold rounded-[8px] transition-colors"
+          >
+            <Pencil size={14} />
+            Edit Business
+          </button>
           {business.stores.length > 0 && (
             <div className="flex items-center bg-[#F3F4F6] border border-[#D1D5DB] rounded-[10px] p-1">
               <button
@@ -456,11 +554,58 @@ export default function BusinessDetailPage() {
         </div>
       )}
 
+      {editBusinessOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40">
+          <div className="bg-white rounded-[16px] w-full max-w-[720px] max-h-[90vh] overflow-y-auto shadow-xl border border-[#EEEEEE]">
+            <div className="px-5 py-4 border-b border-[#F0F0F0] sticky top-0 bg-white z-10">
+              <h3 className="text-[16px] font-bold text-[#181725]">Edit Business</h3>
+              <p className="text-[12px] text-[#7C7C7C] mt-0.5">
+                Update legal name, display name, and business profile.
+              </p>
+            </div>
+            <form onSubmit={handleEditBusiness} className="px-5 py-4 space-y-4">
+              <VendorProfileForm
+                value={editProfile}
+                onChange={(patch) => setEditProfile((prev) => ({ ...prev, ...patch }))}
+                errors={editFieldErrors}
+                onFieldBlur={(field, value) => {
+                  const msg = validateVendorFieldBlur(field, value);
+                  setEditFieldErrors((prev) => ({ ...prev, [field]: msg }));
+                }}
+                visibleSections={{ identity: true, ops: true }}
+                layout="wide"
+              />
+              <div className="flex gap-2 pt-1 sticky bottom-0 bg-white pb-1">
+                <button
+                  type="button"
+                  onClick={() => setEditBusinessOpen(false)}
+                  disabled={submitting}
+                  className="flex-1 h-[36px] border border-[#EEEEEE] rounded-[8px] text-[13px] font-semibold text-[#7C7C7C] hover:bg-[#F8F9FB]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 h-[36px] bg-[#299E60] hover:bg-[#238a54] text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {submitting && <Loader2 size={14} className="animate-spin" />}
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {editStore && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-[16px] w-full max-w-[400px] shadow-xl border border-[#EEEEEE]">
-            <div className="px-5 py-4 border-b border-[#F0F0F0]">
+          <div className="bg-white rounded-[16px] w-full max-w-[520px] max-h-[90vh] overflow-y-auto shadow-xl border border-[#EEEEEE]">
+            <div className="px-5 py-4 border-b border-[#F0F0F0] sticky top-0 bg-white z-10">
               <h3 className="text-[16px] font-bold text-[#181725]">Edit Online Store</h3>
+              <p className="text-[12px] text-[#7C7C7C] mt-0.5">
+                Update the storefront name and address shown for this store.
+              </p>
             </div>
             <form onSubmit={handleEditStore} className="px-5 py-4 space-y-3">
               <div>
@@ -471,12 +616,50 @@ export default function BusinessDetailPage() {
                   value={editStoreName}
                   onChange={(e) => setEditStoreName(e.target.value)}
                   className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
+                  placeholder="Customer-facing store name"
                 />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-[#181725] mb-1">Address line</label>
+                <input
+                  value={editAddressLine}
+                  onChange={(e) => setEditAddressLine(e.target.value)}
+                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
+                  placeholder="Street / building"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#181725] mb-1">City</label>
+                  <input
+                    value={editCity}
+                    onChange={(e) => setEditCity(e.target.value)}
+                    className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[#181725] mb-1">State</label>
+                  <input
+                    value={editState}
+                    onChange={(e) => setEditState(e.target.value)}
+                    className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[#181725] mb-1">Pincode</label>
+                  <input
+                    value={editPincode}
+                    onChange={(e) => setEditPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
+                    inputMode="numeric"
+                  />
+                </div>
               </div>
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setEditStore(null)}
+                  disabled={submitting}
                   className="flex-1 h-[36px] border border-[#EEEEEE] rounded-[8px] text-[13px] font-semibold text-[#7C7C7C]"
                 >
                   Cancel
@@ -484,9 +667,10 @@ export default function BusinessDetailPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 h-[36px] bg-[#299E60] text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50"
+                  className="flex-1 h-[36px] bg-[#299E60] text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {submitting ? 'Saving…' : 'Save'}
+                  {submitting && <Loader2 size={14} className="animate-spin" />}
+                  Save
                 </button>
               </div>
             </form>
