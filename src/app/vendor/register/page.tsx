@@ -385,6 +385,18 @@ export default function VendorRegisterPage() {
 
   const handleSendOtp = async () => {
     setError('');
+    const supplierName = fullName.trim();
+    if (supplierName.length < 2) {
+      setError('Enter your full name to continue');
+      return;
+    }
+    // Keep Step 3 authorized-person fields in sync when the supplier typed their name on Step 1
+    setAuthorizedPersonName(prev => prev.trim() || supplierName);
+    setVendorProfile(prev => ({
+      ...prev,
+      fullName: supplierName,
+      authorizedPersonName: (prev.authorizedPersonName ?? '').trim() || supplierName,
+    }));
     const email = registerEmail.trim().toLowerCase();
     const channel = resolveRegisterVerifyChannel({
       email,
@@ -488,6 +500,15 @@ export default function VendorRegisterPage() {
         setAuthorizedPersonEmail(email);
       } else {
         setPhoneVerified(true);
+      }
+      const supplierName = fullName.trim();
+      if (supplierName.length >= 2) {
+        setAuthorizedPersonName(prev => prev.trim() || supplierName);
+        setVendorProfile(prev => ({
+          ...prev,
+          fullName: supplierName,
+          authorizedPersonName: (prev.authorizedPersonName ?? '').trim() || supplierName,
+        }));
       }
       setStep(2);
     } catch { setError('Verification failed. Please try again.'); }
@@ -1047,12 +1068,28 @@ export default function VendorRegisterPage() {
               </h2>
               <p className="text-[13px] text-gray-500 mb-6">
                 {EMAIL_REGISTER_ALLOWED
-                  ? 'We\'ll send a 4-digit OTP to your mobile or email.'
-                  : 'We\'ll send a 4-digit OTP to confirm.'}
+                  ? 'Tell us your name, then we\'ll send a 4-digit OTP to your mobile or email.'
+                  : 'Tell us your name, then we\'ll send a 4-digit OTP to confirm.'}
               </p>
 
+              <Field label="Your name" required dataField="fullName">
+                <input
+                  type="text"
+                  autoComplete="name"
+                  value={fullName}
+                  onChange={e => {
+                    const next = e.target.value;
+                    setFullName(next);
+                    setError('');
+                  }}
+                  placeholder="Full name (e.g. Rahul Sharma)"
+                  className={inputClass(false)}
+                  data-testid="supplier-register-name"
+                />
+              </Field>
+
               {EMAIL_REGISTER_ALLOWED && (
-                <div className="flex gap-2 mb-5 p-1 bg-gray-100 rounded-xl">
+                <div className="flex gap-2 mb-5 mt-4 p-1 bg-gray-100 rounded-xl">
                   {(['phone', 'email'] as const).map(ch => (
                     <button
                       key={ch}
@@ -1117,6 +1154,7 @@ export default function VendorRegisterPage() {
                   onClick={handleSendOtp}
                   disabled={
                     otpLoading
+                    || fullName.trim().length < 2
                     || !resolveRegisterVerifyChannel({
                       email: registerEmail,
                       phone,
@@ -1533,8 +1571,12 @@ export default function VendorRegisterPage() {
             <ArrowLeft size={16} /> Back
           </button>
 
-          {step === 1 && !phoneVerified ? (
-            <span className="text-[12px] text-gray-400">Verify your number to continue</span>
+          {step === 1 && !(phoneVerified || emailVerified) ? (
+            <span className="text-[12px] text-gray-400">
+              {fullName.trim().length < 2
+                ? 'Enter your name to continue'
+                : 'Verify your contact to continue'}
+            </span>
           ) : (
             <button onClick={handleNext} disabled={submitting}
               className={cn(FORM.primaryBtn, 'px-6 py-3')}>
