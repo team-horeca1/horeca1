@@ -143,20 +143,30 @@ async function listBusinessStores(page: Page, businessAccountId: string) {
 }
 
 async function dismissWelcomePicker(page: Page) {
-  const welcome = page.getByRole('heading', { name: /Welcome back|Select your outlet/i });
-  for (let i = 0; i < 3; i++) {
-    if (!(await welcome.isVisible({ timeout: 1_500 }).catch(() => false))) return;
+  for (let i = 0; i < 5; i++) {
+    const welcome = page.getByRole('heading', { name: /Welcome back|Select your outlet/i });
+    if (!(await welcome.isVisible({ timeout: 1_200 }).catch(() => false))) return;
+
+    const skip = page.getByRole('button', { name: /^(Skip|Continue with current account)$/i });
     const closeBtn = page.getByRole('button', { name: /^Close$/i });
-    const skipBtn = page.getByRole('button', { name: /^Skip$/i });
-    if (await closeBtn.isVisible({ timeout: 800 }).catch(() => false)) {
+    if (await skip.first().isVisible({ timeout: 800 }).catch(() => false)) {
+      await skip.first().click();
+    } else if (await closeBtn.isVisible({ timeout: 500 }).catch(() => false)) {
       await closeBtn.click();
-    } else if (await skipBtn.isVisible({ timeout: 800 }).catch(() => false)) {
-      await skipBtn.click();
     } else {
       await page.locator('ul button').first().click({ timeout: 3_000 }).catch(() => {});
     }
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(400);
   }
+  // Last resort: hide overlay via DOM so Enter can receive clicks
+  await page.evaluate(() => {
+    document.querySelectorAll('div.fixed.inset-0').forEach((el) => {
+      const t = el.textContent ?? '';
+      if (/Welcome back|Select your outlet/i.test(t)) {
+        (el as HTMLElement).style.display = 'none';
+      }
+    });
+  });
 }
 
 async function enterStoreViaUi(page: Page, businessAccountId: string) {
