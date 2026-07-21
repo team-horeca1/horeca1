@@ -43,7 +43,6 @@ export default function VendorBusinessesPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const [legalName, setLegalName] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [gstin, setGstin] = useState('');
   const [editLegalName, setEditLegalName] = useState('');
   const [editDisplayName, setEditDisplayName] = useState('');
@@ -88,7 +87,6 @@ export default function VendorBusinessesPage() {
 
   const resetAddBusiness = () => {
     setLegalName('');
-    setDisplayName('');
     setGstin('');
     setShowAddBusiness(false);
   };
@@ -103,7 +101,6 @@ export default function VendorBusinessesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           legalName: legalName.trim(),
-          displayName: displayName.trim() || undefined,
           gstin: gstin.trim().toUpperCase() || undefined,
         }),
       });
@@ -390,17 +387,6 @@ export default function VendorBusinessesPage() {
                   onChange={(e) => setLegalName(e.target.value)}
                   className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
                   placeholder="e.g. Acme Foods Pvt Ltd"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">
-                  Display / trade name <span className="font-normal text-[#AEAEAE]">(optional)</span>
-                </label>
-                <input
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                  placeholder="Storefront name, e.g. Acme Foods"
                 />
               </div>
               <div>

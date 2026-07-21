@@ -139,12 +139,6 @@ export function VendorProfileForm({
               onChange={v => set({ legalName: v, businessName: v })}
               onBlur={() => blur('legalName', value.legalName ?? value.businessName ?? '')}
               placeholder="Registered company name" />
-            <TextField label="Trade / Display Name" required value={value.tradeName ?? value.displayName ?? ''}
-              dataField="tradeName"
-              error={errors.tradeName}
-              onChange={v => set({ tradeName: v, displayName: v })}
-              onBlur={() => blur('tradeName', value.tradeName ?? value.displayName ?? '')}
-              placeholder="Storefront name" />
             <VendorTypeMatrix
               value={value}
               onChange={onChange}

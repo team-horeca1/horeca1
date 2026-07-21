@@ -269,9 +269,8 @@ export function validateVendorProfile(
   if (checkIdentity) {
     Object.assign(errors, validateVendorTypeSelections(data));
     const enteredLegal = derivedLegalName(data);
-    const enteredTrade = rawTradeName(data);
     if (!enteredLegal || enteredLegal.length < 2) errors.legalName = 'Legal business name is required';
-    if (!enteredTrade || enteredTrade.length < 2) errors.tradeName = 'Trade / display name is required';
+    // Trade/display/storefront name is store-level — defaulted from legal name; not required here
   }
 
   if (checkContact) {
@@ -314,7 +313,8 @@ export function validateFieldBlur(field: string, value: string): string {
       return v.length > 0 && v.length < 2 ? 'Legal business name is required' : v.length === 0 ? 'Legal business name is required' : '';
     case 'tradeName':
     case 'displayName':
-      return v.length > 0 && v.length < 2 ? 'Trade / display name is required' : v.length === 0 ? 'Trade / display name is required' : '';
+      // Optional at business create — storefront name lives on Online Store
+      return v.length > 0 && v.length < 2 ? 'Name must be at least 2 characters' : '';
     case 'firstName':
       return v.length > 0 && v.length < 2 ? 'First name is required' : v.length === 0 ? 'First name is required' : '';
     case 'authorizedPersonName':

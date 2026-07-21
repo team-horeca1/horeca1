@@ -66,7 +66,7 @@ const BodyBase = z.object({
   // Step 3 — basic details
   fullName: z.string().min(2).max(255),
   businessName: z.string().min(2).max(255),
-  tradeName: z.string().min(2).max(255),
+  tradeName: z.string().min(2).max(255).optional().or(z.literal('')),
   email: z.string().email().optional().or(z.literal('')),
   password: z.string().min(6).optional().or(z.literal('')),
   authorizedPersonName: z.string().min(2).max(255),
@@ -147,6 +147,8 @@ function parseBody(raw: unknown) {
     email: ownerEmail || null,
     verifiedEmail: verifiedEmail || ownerEmail || null,
     authorizedPersonPhone: PHONE_RE.test(authPhone) ? authPhone : '',
+    // Storefront/trade name is store-level — default silently to legal business name
+    tradeName: (parsed.tradeName || '').trim() || parsed.businessName.trim(),
     vendorTypeSelections: selections as VendorTypeSelection[],
     vendorBusinessType: legacy?.vendorBusinessType ?? parsed.vendorBusinessType,
     vendorType: legacy?.vendorType ?? parsed.vendorType,
