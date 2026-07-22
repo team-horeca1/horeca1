@@ -42,6 +42,7 @@ export async function listSupplierBusinesses(userId: string) {
             orderBy: [{ isPrimaryStore: 'desc' }, { createdAt: 'asc' }],
             select: {
               id: true,
+              userId: true,
               businessName: true,
               displayName: true,
               slug: true,
@@ -60,30 +61,62 @@ export async function listSupplierBusinesses(userId: string) {
     },
   });
 
-  return memberships.map((m) => ({
-    id: m.businessAccount.id,
-    legalName: m.businessAccount.legalName,
-    displayName: m.businessAccount.displayName,
-    gstin: m.businessAccount.gstin,
-    status: m.businessAccount.status,
-    isPrimary: m.isPrimary,
-    vendorTypeSelections: m.businessAccount.vendorTypeSelections,
-    businessSize: m.businessAccount.businessSize,
-    stores: m.businessAccount.vendors.map((v) => ({
-      id: v.id,
-      name: storeDisplayName(v),
-      slug: v.slug,
-      isActive: v.isActive,
-      isVerified: v.isVerified,
-      isPrimaryStore: v.isPrimaryStore,
-      logoUrl: v.logoUrl,
-      addressLine: v.addressLine,
-      city: v.city,
-      state: v.state,
-      pincode: v.addressPincode,
-    })),
-    storeCount: m.businessAccount.vendors.length,
-  }));
+  const userRoles = await prisma.userRole.findMany({
+    where: {
+      userId,
+      role: { name: { not: { startsWith: 'Storefront' } } },
+    },
+    select: { businessAccountId: true, vendorId: true },
+  });
+
+  const teamMemberships = await prisma.vendorTeamMember.findMany({
+    where: { userId },
+    select: { vendorId: true },
+  });
+
+  return memberships.map((m) => {
+    const ba = m.businessAccount;
+    const baUserRoles = userRoles.filter((r) => r.businessAccountId === ba.id);
+    const hasBusinessWideRole = baUserRoles.some((r) => r.vendorId === null);
+    const storeScopedRoleVendorIds = new Set(
+      baUserRoles.filter((r) => r.vendorId !== null).map((r) => r.vendorId!),
+    );
+    const teamVendorIds = new Set(teamMemberships.map((t) => t.vendorId));
+    const isStoreScopedOnly = !hasBusinessWideRole && (storeScopedRoleVendorIds.size > 0 || teamVendorIds.size > 0);
+
+    const accessibleStores = ba.vendors.filter((v) => {
+      if (v.userId === userId) return true;
+      if (isStoreScopedOnly) {
+        return storeScopedRoleVendorIds.has(v.id) || teamVendorIds.has(v.id);
+      }
+      return true;
+    });
+
+    return {
+      id: ba.id,
+      legalName: ba.legalName,
+      displayName: ba.displayName,
+      gstin: ba.gstin,
+      status: ba.status,
+      isPrimary: m.isPrimary,
+      vendorTypeSelections: ba.vendorTypeSelections,
+      businessSize: ba.businessSize,
+      stores: accessibleStores.map((v) => ({
+        id: v.id,
+        name: storeDisplayName(v),
+        slug: v.slug,
+        isActive: v.isActive,
+        isVerified: v.isVerified,
+        isPrimaryStore: v.isPrimaryStore,
+        logoUrl: v.logoUrl,
+        addressLine: v.addressLine,
+        city: v.city,
+        state: v.state,
+        pincode: v.addressPincode,
+      })),
+      storeCount: accessibleStores.length,
+    };
+  });
 }
 
 /** Create BusinessAccount only — Online Stores are added separately via createOnlineStore. */
