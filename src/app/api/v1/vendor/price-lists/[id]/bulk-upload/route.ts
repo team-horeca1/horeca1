@@ -58,7 +58,7 @@ function extractListId(req: NextRequest): string {
 
 export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    requirePermission(ctx, 'products.edit');
+    requirePermission(ctx, 'priceLists.edit');
     const vendorId = await resolveVendorId(ctx, req);
     const listId = extractListId(req);
     const body = bodySchema.parse(await req.json());

@@ -101,10 +101,31 @@ test('RBAC matrix sidebar order — vendor + admin + storefront placement', asyn
   const moduleRows = page.locator('tbody tr').filter({ has: page.locator('td').first() }).filter({
     hasNot: page.locator('td[colspan]'),
   });
-  await expect(moduleRows.first().locator('td').first()).toHaveText('Dashboard');
-  await expect(page.getByRole('row', { name: /Wallet & Ledger/i })).toBeVisible();
+  // Sidebar order: Dashboard → Orders → Inventory → Returns → Claims → …
+  await expect(moduleRows.nth(0).locator('td').first()).toHaveText('Dashboard');
+  await expect(moduleRows.nth(1).locator('td').first()).toHaveText('Orders');
+  await expect(moduleRows.nth(2).locator('td').first()).toHaveText('Inventory');
+  await expect(moduleRows.nth(3).locator('td').first()).toHaveText('Returns');
+  await expect(moduleRows.nth(4).locator('td').first()).toHaveText('Claims');
+  await expect(page.locator('table tbody td').filter({ hasText: /^Price Lists$/ })).toBeVisible();
+  await expect(page.locator('table tbody td').filter({ hasText: /^Wallet$/ })).toBeVisible();
+  await expect(page.locator('table tbody td').filter({ hasText: /^Ledger$/ })).toBeVisible();
+  await expect(page.locator('table tbody td').filter({ hasText: /^Notifications$/ })).toBeVisible();
+  await expect(page.locator('table tbody td').filter({ hasText: /^Store Settings$/ })).toBeVisible();
+  await expect(page.locator('table tbody td').filter({ hasText: /Wallet & Ledger/ })).toHaveCount(0);
   await expect(page.locator('table tbody td').filter({ hasText: /^Payments$/ })).toHaveCount(0);
   await expect(page.getByRole('row', { name: /Repeat Orders/i })).toHaveCount(0);
+  await expect(page.locator('table tbody td').filter({ hasText: /^Back to Supplier$/ })).toHaveCount(0);
+
+  // Independent modules: toggling Orders view must not flip Returns
+  const ordersRow = page.getByRole('row').filter({ has: page.locator('td').filter({ hasText: /^Orders$/ }) });
+  const returnsRow = page.getByRole('row').filter({ has: page.locator('td').filter({ hasText: /^Returns$/ }) });
+  const ordersView = ordersRow.locator('button').first();
+  const returnsView = returnsRow.locator('button').first();
+  const returnsBefore = await returnsView.getAttribute('style');
+  await ordersView.click();
+  await expect(returnsView).toHaveAttribute('style', returnsBefore ?? '');
+  await ordersView.click(); // restore
 
   await page.keyboard.press('Escape');
   await page.goto('/vendor/team', { waitUntil: 'domcontentloaded' });

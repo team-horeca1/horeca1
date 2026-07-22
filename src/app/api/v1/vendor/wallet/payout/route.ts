@@ -9,7 +9,7 @@ import { Errors } from '@/middleware/errorHandler';
 
 export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    requirePermission(ctx, 'payments.view');
+    requirePermission(ctx, 'wallet.view');
     const vendorId = await resolveVendorId(ctx, req);
     const result = await vendorSettlementService.requestInstantPayout(vendorId);
     if (!result) {

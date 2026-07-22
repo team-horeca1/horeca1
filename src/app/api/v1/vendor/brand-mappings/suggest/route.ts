@@ -21,7 +21,7 @@ const suggestSchema = z.object({
 export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
-    requirePermission(ctx, 'products.edit');
+    requirePermission(ctx, 'brandMappings.edit');
 
     const body = await req.json();
     const { brandId, productId } = suggestSchema.parse(body);

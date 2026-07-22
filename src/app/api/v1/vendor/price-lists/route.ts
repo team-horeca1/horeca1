@@ -20,7 +20,7 @@ const createSchema = z.object({
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    requirePermission(ctx, 'products.view');
+    requirePermission(ctx, 'priceLists.view');
     const vendorId = await resolveVendorId(ctx, req);
 
     const priceLists = await prisma.priceList.findMany({
@@ -40,7 +40,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
 export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    requirePermission(ctx, 'products.create');
+    requirePermission(ctx, 'priceLists.create');
     const vendorId = await resolveVendorId(ctx, req);
     const body = createSchema.parse(await req.json());
 

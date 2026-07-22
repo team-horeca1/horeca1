@@ -22,7 +22,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     // Wallet exposes balance + payout/settlement history — finance data that
     // storefront-only buyers and Viewers shouldn't see.
-    requirePermission(ctx, 'payments.view');
+    requirePermission(ctx, 'wallet.view');
     const vendorId = await resolveVendorId(ctx, req);
     const url = new URL(req.url);
     const cursor = url.searchParams.get('cursor');
@@ -148,7 +148,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       throw Errors.forbidden('Admin only');
     }
     // Finance mutation — scoped to impersonated/owned vendor only (no body.vendorId bypass).
-    requirePermission(ctx, 'payments.create');
+    requirePermission(ctx, 'wallet.create');
     const body = adjustmentSchema.parse(await req.json());
     const vendorId = await resolveVendorId(ctx, req);
 

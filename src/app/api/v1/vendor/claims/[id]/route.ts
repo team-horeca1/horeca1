@@ -17,7 +17,7 @@ const patchSchema = z.object({
 
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    requirePermission(ctx, 'orders.edit');
+    requirePermission(ctx, 'claims.edit');
     const vendorId = await resolveVendorId(ctx, req);
     const id = extractId(req);
     const body = patchSchema.parse(await req.json());

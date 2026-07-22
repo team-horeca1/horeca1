@@ -74,7 +74,7 @@ function walletTxnToEntry(
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    requirePermission(ctx, 'payments.view');
+    requirePermission(ctx, 'ledger.view');
     const vendorId = await resolveVendorId(ctx, req);
     const url = new URL(req.url);
     const from = url.searchParams.get('from');

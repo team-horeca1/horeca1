@@ -15,7 +15,7 @@ import { resolveVendorNotificationUserId } from '@/lib/resolveVendorId';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
-    requirePermission(ctx, 'settings.view');
+    requirePermission(ctx, 'notifications.view');
     const userId = await resolveVendorNotificationUserId(ctx, req);
 
     const notifications = await prisma.notification.findMany({
@@ -38,7 +38,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
 
 export const PATCH = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
-    requirePermission(ctx, 'settings.view');
+    requirePermission(ctx, 'notifications.view');
     const userId = await resolveVendorNotificationUserId(ctx, req);
 
     await prisma.notification.updateMany({

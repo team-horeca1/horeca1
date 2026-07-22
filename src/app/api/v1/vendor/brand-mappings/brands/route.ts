@@ -12,7 +12,7 @@ import type { AuthContext } from '@/middleware/auth';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
-    requirePermission(ctx, 'products.view');
+    requirePermission(ctx, 'brandMappings.view');
     const { vendorId } = await resolveVendorContext(ctx, req);
 
     const rows = await prisma.brandAuthorizedDistributor.findMany({

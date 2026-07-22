@@ -29,7 +29,7 @@ const reviewSchema = z.object({
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
-    requirePermission(ctx, 'orders.edit');
+    requirePermission(ctx, 'returns.edit');
 
     const returnId = extractId(req);
     const body = reviewSchema.parse(await req.json());

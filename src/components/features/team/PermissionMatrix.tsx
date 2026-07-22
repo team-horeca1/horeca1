@@ -3,7 +3,6 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 import {
-  moduleLabel,
   scopeActionColumns,
   scopeModuleActions,
   scopeModuleGroups,
@@ -35,6 +34,7 @@ export { scopeModuleLabels };
 function PermissionRow({
   scope,
   moduleKey,
+  label,
   columns,
   permissions,
   readOnly,
@@ -43,6 +43,7 @@ function PermissionRow({
 }: {
   scope: RoleScope;
   moduleKey: string;
+  label: string;
   columns: string[];
   permissions: PermissionsMap;
   readOnly: boolean;
@@ -53,7 +54,7 @@ function PermissionRow({
 
   return (
     <tr className="border-t border-gray-50 hover:bg-gray-50/50">
-      <td className="px-4 py-2.5 font-bold text-[#181725]">{moduleLabel(scope, moduleKey)}</td>
+      <td className="px-4 py-2.5 font-bold text-[#181725]">{label}</td>
       {columns.map((a) => {
         const isAllowed = allowed.includes(a);
         const on = !!permissions[moduleKey]?.[a];
@@ -136,11 +137,12 @@ export function PermissionMatrix({
                   {group.label}
                 </td>
               </tr>
-              {group.modules.map((m) => (
+              {group.rows.map((row) => (
                 <PermissionRow
-                  key={m}
+                  key={row.id}
                   scope={scope}
-                  moduleKey={m}
+                  moduleKey={row.module}
+                  label={row.label}
                   columns={columns}
                   permissions={permissions}
                   readOnly={readOnly}

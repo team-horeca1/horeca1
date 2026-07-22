@@ -79,7 +79,7 @@ const patchSchema = z.object({
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    requirePermission(ctx, 'products.view');
+    requirePermission(ctx, 'priceLists.view');
     const vendorId = await resolveVendorId(ctx, req);
     const id = extractId(req);
 
@@ -120,6 +120,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'priceLists.edit');
     const vendorId = await resolveVendorId(ctx, req);
     const id = extractId(req);
     const body = patchSchema.parse(await req.json());
@@ -290,6 +291,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
 
 export const DELETE = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'priceLists.delete');
     const vendorId = await resolveVendorId(ctx, req);
     const id = extractId(req);
 

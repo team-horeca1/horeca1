@@ -11,7 +11,7 @@ import { resolveVendorId } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
-  requirePermission(ctx, 'orders.view');
+  requirePermission(ctx, 'returns.view');
   try {
     const vendorId = await resolveVendorId(ctx, req);
     const { searchParams } = new URL(req.url);

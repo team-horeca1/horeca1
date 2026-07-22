@@ -119,16 +119,16 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
       { name: 'Inventory', icon: Warehouse, href: '/vendor/inventory', feature: 'inventory', requiredPerm: 'inventory.view' },
       // Hidden for now — re-enable with warehouse ops
       // { name: 'Warehouse', icon: Container, href: '/vendor/warehouse', feature: 'grn', requiredPerm: 'inventory.view' },
-      { name: 'Returns', icon: RotateCcw, href: '/vendor/returns', feature: 'orders', requiredPerm: 'orders.view' },
-      { name: 'Claims', icon: ShieldAlert, href: '/vendor/claims', feature: 'orders', requiredPerm: 'orders.view' },
+      { name: 'Returns', icon: RotateCcw, href: '/vendor/returns', feature: 'returns', requiredPerm: 'returns.view' },
+      { name: 'Claims', icon: ShieldAlert, href: '/vendor/claims', feature: 'claims', requiredPerm: 'claims.view' },
     ],
   },
   {
     label: 'Catalog',
     links: [
       { name: 'Products', icon: Package, href: '/vendor/products', feature: 'products', requiredPerm: 'products.view' },
-      { name: 'Brand Mappings', icon: GitMerge, href: '/vendor/brand-mappings', feature: 'products', requiredPerm: 'products.view' },
-      { name: 'Price Lists', icon: Tag, href: '/vendor/price-lists', feature: 'products', requiredPerm: 'products.edit' },
+      { name: 'Brand Mappings', icon: GitMerge, href: '/vendor/brand-mappings', feature: 'brandMappings', requiredPerm: 'brandMappings.view' },
+      { name: 'Price Lists', icon: Tag, href: '/vendor/price-lists', feature: 'priceLists', requiredPerm: 'priceLists.view' },
       { name: 'Promotions', icon: Gift, href: '/vendor/promotions', feature: 'promotions', requiredPerm: 'promotions.view' },
     ],
   },
@@ -144,15 +144,15 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
     label: 'Finance',
     links: [
       { name: 'Credit & Collections', icon: CreditCard, href: '/vendor/credit', feature: 'creditLine', requiredPerm: ['creditLine.view', 'creditLine.approve'] },
-      { name: 'Wallet', icon: Wallet, href: '/vendor/wallet', feature: 'payments', requiredPerm: 'payments.view' },
-      { name: 'Ledger', icon: BookOpen, href: '/vendor/ledger', feature: 'payments', requiredPerm: 'payments.view' },
+      { name: 'Wallet', icon: Wallet, href: '/vendor/wallet', feature: 'wallet', requiredPerm: 'wallet.view' },
+      { name: 'Ledger', icon: BookOpen, href: '/vendor/ledger', feature: 'ledger', requiredPerm: 'ledger.view' },
       { name: 'Reports', icon: BarChart3, href: '/vendor/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
     ],
   },
   {
     label: 'Account',
     links: [
-      { name: 'Notifications', icon: Bell, href: '/vendor/notifications', feature: 'settings', requiredPerm: 'settings.view' },
+      { name: 'Notifications', icon: Bell, href: '/vendor/notifications', feature: 'notifications', requiredPerm: 'notifications.view' },
       { name: 'Back to Supplier', icon: Building2, href: '/vendor/overview', feature: 'dashboard', requiredPerm: 'dashboard.view', matrixExclude: true },
       { name: 'Store Settings', icon: Settings, href: '/vendor/settings', feature: 'settings', requiredPerm: 'settings.view' },
     ],

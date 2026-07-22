@@ -29,6 +29,7 @@ const createMappingSchema = z.object({
 
 export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    requirePermission(ctx, 'brandMappings.view');
     const { vendorId } = await resolveVendorContext(ctx, req);
     const view = req.nextUrl.searchParams.get('view');
     const brandFilter = req.nextUrl.searchParams.get('brandId') ?? undefined;
@@ -274,7 +275,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
 export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
-    requirePermission(ctx, 'products.edit');
+    requirePermission(ctx, 'brandMappings.create');
 
     const body = await req.json();
     const { distributorProductId, brandMasterProductId } = createMappingSchema.parse(body);

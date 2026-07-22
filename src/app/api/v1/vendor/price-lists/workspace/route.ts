@@ -175,7 +175,7 @@ const patchSchema = z.object({
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
-    requirePermission(ctx, 'products.edit');
+    requirePermission(ctx, 'priceLists.edit');
     const { cells } = patchSchema.parse(await req.json());
 
     // Authorize every referenced list + product against this vendor in two

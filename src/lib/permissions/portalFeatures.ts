@@ -8,9 +8,10 @@ import {
   scopeModuleGroups,
   scopeModuleLabels,
   type MatrixModuleGroup,
+  type MatrixRow,
 } from './matrixGroups';
 
-export type { MatrixModuleGroup };
+export type { MatrixModuleGroup, MatrixRow };
 export {
   orderedScopeModuleKeys as scopeModuleKeys,
   scopeModuleGroups,
@@ -20,39 +21,48 @@ export {
 export type RoleScope = 'account' | 'vendor' | 'brand' | 'admin' | 'delivery';
 
 export type Module =
-  | 'dashboard' | 'products' | 'brandStore' | 'orders' | 'repeatOrders'
-  | 'inventory' | 'grn' | 'dispatch' | 'deliveries' | 'payments' | 'creditLine'
+  | 'dashboard' | 'products' | 'brandMappings' | 'priceLists' | 'brandStore'
+  | 'orders' | 'returns' | 'claims' | 'repeatOrders'
+  | 'inventory' | 'grn' | 'dispatch' | 'deliveries'
+  | 'payments' | 'wallet' | 'ledger' | 'creditLine'
   | 'customers' | 'vendors' | 'brands' | 'users' | 'outlets' | 'analytics'
-  | 'promotions' | 'support' | 'logistics' | 'auditLogs' | 'settings'
+  | 'promotions' | 'support' | 'logistics' | 'auditLogs' | 'settings' | 'notifications'
   | 'storefront' | 'salespersons' | 'commissions';
 
 /** Registry action lists — duplicated here to avoid circular import with registry.ts */
 const MODULE_ACTIONS: Record<Module, readonly string[]> = {
-  dashboard:    ['view'],
-  products:     ['view', 'create', 'edit', 'delete', 'approve'],
-  brandStore:   ['view', 'edit'],
-  orders:       ['view', 'create', 'edit', 'delete', 'approve'],
-  repeatOrders: ['view', 'create', 'edit'],
-  inventory:    ['view', 'create', 'edit', 'delete'],
-  grn:          ['view', 'create', 'edit'],
-  dispatch:     ['view', 'create', 'edit'],
-  deliveries:   ['view', 'edit', 'approve'],
-  payments:     ['view', 'create', 'approve'],
-  creditLine:   ['view', 'approve'],
-  customers:    ['view', 'create', 'edit', 'delete'],
-  vendors:      ['view', 'create', 'edit', 'delete', 'approve'],
-  brands:       ['view', 'create', 'edit', 'delete', 'approve'],
-  users:        ['view', 'create', 'edit', 'delete'],
-  outlets:      ['view', 'create', 'edit', 'delete'],
-  analytics:    ['view'],
-  promotions:   ['view', 'create', 'edit', 'delete'],
-  support:      ['view', 'edit'],
-  logistics:    ['view', 'edit'],
-  auditLogs:    ['view'],
-  settings:     ['view', 'edit'],
-  storefront:   ['view', 'order', 'pay'],
-  salespersons: ['view', 'create', 'edit', 'delete'],
-  commissions:  ['view', 'edit', 'approve'],
+  dashboard:     ['view'],
+  products:      ['view', 'create', 'edit', 'delete', 'approve'],
+  brandMappings: ['view', 'create', 'edit', 'delete'],
+  priceLists:    ['view', 'create', 'edit', 'delete'],
+  brandStore:    ['view', 'edit'],
+  orders:        ['view', 'create', 'edit', 'delete', 'approve'],
+  returns:       ['view', 'create', 'edit', 'delete', 'approve'],
+  claims:        ['view', 'create', 'edit', 'approve'],
+  repeatOrders:  ['view', 'create', 'edit'],
+  inventory:     ['view', 'create', 'edit', 'delete'],
+  grn:           ['view', 'create', 'edit'],
+  dispatch:      ['view', 'create', 'edit'],
+  deliveries:    ['view', 'edit', 'approve'],
+  payments:      ['view', 'create', 'approve'],
+  wallet:        ['view', 'create', 'approve'],
+  ledger:        ['view'],
+  creditLine:    ['view', 'approve'],
+  customers:     ['view', 'create', 'edit', 'delete'],
+  vendors:       ['view', 'create', 'edit', 'delete', 'approve'],
+  brands:        ['view', 'create', 'edit', 'delete', 'approve'],
+  users:         ['view', 'create', 'edit', 'delete'],
+  outlets:       ['view', 'create', 'edit', 'delete'],
+  analytics:     ['view'],
+  promotions:    ['view', 'create', 'edit', 'delete'],
+  support:       ['view', 'edit'],
+  logistics:     ['view', 'edit'],
+  auditLogs:     ['view'],
+  settings:      ['view', 'edit'],
+  notifications: ['view', 'edit'],
+  storefront:    ['view', 'order', 'pay'],
+  salespersons:  ['view', 'create', 'edit', 'delete'],
+  commissions:   ['view', 'edit', 'approve'],
 };
 
 export interface PortalFeature {
@@ -93,23 +103,29 @@ const ACCOUNT_FEATURES: PortalFeatureMap = {
 // ─── Vendor (selling-side) ──────────────────────────────────────────────────
 
 const VENDOR_FEATURES: PortalFeatureMap = {
-  dashboard:    { label: 'Dashboard', actions: MODULE_ACTIONS.dashboard, routes: ['/vendor/dashboard', '/vendor/overview', '/vendor/businesses'] },
-  products:     { label: 'Products', actions: MODULE_ACTIONS.products, routes: ['/vendor/products', '/vendor/price-lists'] },
-  orders:       { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/vendor/orders', '/vendor/all-orders'] },
-  inventory:    { label: 'Inventory', actions: MODULE_ACTIONS.inventory, routes: ['/vendor/inventory'] },
-  grn:          { label: 'Warehouse', actions: MODULE_ACTIONS.grn, routes: ['/vendor/warehouse'] },
-  dispatch:     { label: 'Dispatch', actions: MODULE_ACTIONS.dispatch, routes: ['/vendor/warehouse'] },
-  deliveries:   { label: 'Deliveries', actions: MODULE_ACTIONS.deliveries, routes: ['/vendor/warehouse'] },
-  payments:     { label: 'Wallet & Ledger', actions: MODULE_ACTIONS.payments, routes: ['/vendor/wallet', '/vendor/ledger'] },
-  creditLine:   { label: 'Credit & Collections', actions: MODULE_ACTIONS.creditLine, routes: ['/vendor/credit', '/vendor/collections'] },
-  customers:    { label: 'Customers', actions: MODULE_ACTIONS.customers, routes: ['/vendor/customers'] },
-  users:        { label: 'Team', actions: MODULE_ACTIONS.users, routes: ['/vendor/team'] },
-  outlets:      { label: 'Outlets', actions: MODULE_ACTIONS.outlets, routes: ['/vendor/outlets'] },
-  analytics:    { label: 'Reports', actions: MODULE_ACTIONS.analytics, routes: ['/vendor/reports'] },
-  promotions:   { label: 'Promotions', actions: MODULE_ACTIONS.promotions, routes: ['/vendor/promotions'] },
-  salespersons: { label: 'Sales Team', actions: MODULE_ACTIONS.salespersons, routes: ['/vendor/sales-team'] },
-  commissions:  { label: 'Commissions', actions: MODULE_ACTIONS.commissions, routes: ['/vendor/sales-team'] },
-  settings:     { label: 'Settings', actions: MODULE_ACTIONS.settings, routes: ['/vendor/settings'] },
+  dashboard:     { label: 'Dashboard', actions: MODULE_ACTIONS.dashboard, routes: ['/vendor/dashboard', '/vendor/overview', '/vendor/businesses'] },
+  products:      { label: 'Products', actions: MODULE_ACTIONS.products, routes: ['/vendor/products'] },
+  brandMappings: { label: 'Brand Mappings', actions: MODULE_ACTIONS.brandMappings, routes: ['/vendor/brand-mappings'] },
+  priceLists:    { label: 'Price Lists', actions: MODULE_ACTIONS.priceLists, routes: ['/vendor/price-lists'] },
+  orders:        { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/vendor/orders', '/vendor/all-orders'] },
+  returns:       { label: 'Returns', actions: MODULE_ACTIONS.returns, routes: ['/vendor/returns'] },
+  claims:        { label: 'Claims', actions: MODULE_ACTIONS.claims, routes: ['/vendor/claims'] },
+  inventory:     { label: 'Inventory', actions: MODULE_ACTIONS.inventory, routes: ['/vendor/inventory'] },
+  grn:           { label: 'Warehouse', actions: MODULE_ACTIONS.grn, routes: ['/vendor/warehouse'] },
+  dispatch:      { label: 'Dispatch', actions: MODULE_ACTIONS.dispatch, routes: ['/vendor/warehouse'] },
+  deliveries:    { label: 'Deliveries', actions: MODULE_ACTIONS.deliveries, routes: ['/vendor/warehouse'] },
+  wallet:        { label: 'Wallet', actions: MODULE_ACTIONS.wallet, routes: ['/vendor/wallet'] },
+  ledger:        { label: 'Ledger', actions: MODULE_ACTIONS.ledger, routes: ['/vendor/ledger'] },
+  creditLine:    { label: 'Credit & Collections', actions: MODULE_ACTIONS.creditLine, routes: ['/vendor/credit', '/vendor/collections'] },
+  customers:     { label: 'Customers', actions: MODULE_ACTIONS.customers, routes: ['/vendor/customers'] },
+  users:         { label: 'Team', actions: MODULE_ACTIONS.users, routes: ['/vendor/team'] },
+  outlets:       { label: 'Outlets', actions: MODULE_ACTIONS.outlets, routes: ['/vendor/outlets'] },
+  analytics:     { label: 'Reports', actions: MODULE_ACTIONS.analytics, routes: ['/vendor/reports'] },
+  promotions:    { label: 'Promotions', actions: MODULE_ACTIONS.promotions, routes: ['/vendor/promotions'] },
+  salespersons:  { label: 'Sales Team', actions: MODULE_ACTIONS.salespersons, routes: ['/vendor/sales-team'] },
+  commissions:   { label: 'Commissions', actions: MODULE_ACTIONS.commissions, routes: ['/vendor/sales-team'] },
+  notifications: { label: 'Notifications', actions: MODULE_ACTIONS.notifications, routes: ['/vendor/notifications'] },
+  settings:      { label: 'Store Settings', actions: MODULE_ACTIONS.settings, routes: ['/vendor/settings'] },
 };
 
 // ─── Brand ──────────────────────────────────────────────────────────────────

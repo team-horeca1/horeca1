@@ -23,7 +23,7 @@ const reviewSchema = z.object({
 export const PATCH = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
-    requirePermission(ctx, 'products.edit');
+    requirePermission(ctx, 'brandMappings.edit');
 
     const id = req.nextUrl.pathname.split('/').at(-1)!;
     const body = await req.json();
@@ -74,7 +74,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
 export const DELETE = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
-    requirePermission(ctx, 'products.delete');
+    requirePermission(ctx, 'brandMappings.delete');
 
     const id = req.nextUrl.pathname.split('/').at(-1)!;
 
