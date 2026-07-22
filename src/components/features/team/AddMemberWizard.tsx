@@ -13,6 +13,12 @@ import { InviteSuccessModal, type InviteMeta } from '@/components/features/team/
 import { PermissionMatrix, countMatrixPermissions } from '@/components/features/team/PermissionMatrix';
 import { toast } from 'sonner';
 import type { RoleScope } from '@/lib/permissions/portalFeatures';
+import {
+  businessIdsMatchingStoreSelection,
+  countVisibleSelectedStores,
+  pruneOutletIds,
+  resolveStoreScopeAccess,
+} from '@/components/features/team/teamStoreSelection';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -192,6 +198,43 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   );
 
   useEffect(() => {
+    if (!isSupplierInvite || allOutlets) return;
+    setSelectedOutletIds((prev) => {
+      const pruned = pruneOutletIds(selectedBusinessIds, businesses, prev);
+      if (pruned.size === prev.size && [...pruned].every((id) => prev.has(id))) return prev;
+      return pruned;
+    });
+  }, [isSupplierInvite, allOutlets, selectedBusinessIds, businesses]);
+
+  useEffect(() => {
+    if (!isSupplierInvite || allOutlets) return;
+    if (selectedOutletIds.size === 0) return;
+    const nextBa = businessIdsMatchingStoreSelection(
+      selectedBusinessIds,
+      businesses,
+      selectedOutletIds,
+    );
+    if (
+      nextBa.size === selectedBusinessIds.size
+      && [...nextBa].every((id) => selectedBusinessIds.has(id))
+    ) {
+      return;
+    }
+    setSelectedBusinessIds(nextBa);
+    setBaName(
+      businesses.filter((b) => nextBa.has(b.id)).map((b) => b.name).join(', ')
+      || businessAccountLabel,
+    );
+  }, [
+    isSupplierInvite,
+    allOutlets,
+    selectedOutletIds,
+    selectedBusinessIds,
+    businesses,
+    businessAccountLabel,
+  ]);
+
+  useEffect(() => {
     const outletStep = skipOutletStep ? -1 : 2;
     if (step !== outletStep || accessLoaded || accessLoading) return;
 
@@ -313,16 +356,9 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
       || businessAccountLabel,
     );
 
-    // Keep current store-scope mode; only drop picks for stores no longer visible.
-    const validStoreIds = new Set(
-      businesses
-        .filter((b) => nextIds.has(b.id))
-        .flatMap((b) => b.stores.map((s) => s.id)),
-    );
     setSelectedOutletIds((prevIds) => {
-      if (prevIds.size === 0) return prevIds;
-      const pruned = new Set([...prevIds].filter((id) => validStoreIds.has(id)));
-      if (pruned.size === prevIds.size) return prevIds;
+      const pruned = pruneOutletIds(nextIds, businesses, prevIds);
+      if (pruned.size === prevIds.size && [...pruned].every((id) => prevIds.has(id))) return prevIds;
       return pruned;
     });
   };
@@ -396,19 +432,6 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
           });
           return;
         }
-        if (!allOutlets) {
-          const baMissingStore = selectedBusinesses.some(
-            (b) => b.stores.length > 0 && !b.stores.some((s) => selectedOutletIds.has(s.id)),
-          );
-          if (baMissingStore) {
-            applyValidationErrors(
-              { storeIds: 'Select at least one store for each selected business' },
-              undefined,
-              { dataField: true },
-            );
-            return;
-          }
-        }
       } else if (!allOutlets && selectedOutletIds.size === 0) {
         applyValidationErrors({ outlets: 'Select at least one outlet, or choose "All outlets"' }, undefined, {
           dataField: true,
@@ -451,12 +474,25 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
       if (fullName.trim()) body.fullName = fullName.trim();
       if (password) body.password = password;
       if (isSupplierInvite && selectedBusinessIds.size > 0) {
-        body.businessAccountIds = Array.from(selectedBusinessIds);
         if (allOutlets) {
+          body.businessAccountIds = Array.from(selectedBusinessIds);
           body.scope = 'business';
         } else {
+          const scoped = resolveStoreScopeAccess(
+            selectedBusinessIds,
+            businesses,
+            selectedOutletIds,
+          );
+          if (!scoped) {
+            applyValidationErrors({ storeIds: 'Select at least one store, or choose "All stores"' }, undefined, {
+              dataField: true,
+            });
+            setSubmitting(false);
+            return;
+          }
+          body.businessAccountIds = scoped.businessAccountIds;
           body.scope = 'store';
-          body.storeIds = Array.from(selectedOutletIds);
+          body.storeIds = scoped.storeIds;
         }
       } else if (!allOutlets && selectedOutletIds.size > 0) {
         body.outletIds = Array.from(selectedOutletIds);
@@ -769,6 +805,10 @@ export function Step2Outlets({
   const flatStores = isSupplier
     ? storeGroups.flatMap((g) => g.stores)
     : outlets;
+  const visibleSelectedCount = countVisibleSelectedStores(
+    flatStores.map((s) => s.id),
+    selectedOutletIds,
+  );
   const accessLabel = isSupplier ? 'Store Access' : 'Outlet Access';
   const allLabel = isSupplier ? 'All stores (across selected businesses)' : 'All outlets (account-wide)';
   const allHint = isSupplier
@@ -856,9 +896,9 @@ export function Step2Outlets({
           <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider">
             {accessLabel} {flatStores.length > 0 && `(${flatStores.length})`}
           </p>
-          {!allOutlets && selectedOutletIds.size > 0 && (
+          {!allOutlets && visibleSelectedCount > 0 && (
             <span className="text-[10px] font-bold text-[#299E60] bg-[#ECFDF5] px-2 py-0.5 rounded-full">
-              {selectedOutletIds.size} selected
+              {visibleSelectedCount} selected
             </span>
           )}
         </div>

@@ -8,6 +8,11 @@ import {
 } from 'lucide-react';
 import type { RoleItem } from './AddMemberWizard';
 import { Step2Outlets, type SupplierBusinessItem } from './AddMemberWizard';
+import {
+  businessIdsMatchingStoreSelection,
+  pruneOutletIds,
+  resolveStoreScopeAccess,
+} from './teamStoreSelection';
 import { PermissionMatrix, countMatrixPermissions } from './PermissionMatrix';
 import type { RoleScope } from '@/lib/permissions/portalFeatures';
 import { sortPermissionJson } from '@/lib/permissions/sortPermissionJson';
@@ -282,6 +287,50 @@ export function EditMemberModal({
 
   const selectedStores = selectedBusinesses.flatMap((b) => b.stores);
 
+  // Drop store ids from deselected businesses (fixes "2 selected" + API mismatch).
+  useEffect(() => {
+    if (!isSupplierEdit || allOutlets) return;
+    setSelectedOutletIds((prev) => {
+      const pruned = pruneOutletIds(selectedBusinessIds, businesses, prev);
+      if (pruned.size === prev.size && [...pruned].every((id) => prev.has(id))) return prev;
+      return pruned;
+    });
+  }, [isSupplierEdit, allOutlets, selectedBusinessIds, businesses]);
+
+  useEffect(() => {
+    if (!isSupplierEdit || allOutlets) return;
+    if (selectedOutletIds.size === 0) return;
+    const nextBa = businessIdsMatchingStoreSelection(
+      selectedBusinessIds,
+      businesses,
+      selectedOutletIds,
+    );
+    if (
+      nextBa.size === selectedBusinessIds.size
+      && [...nextBa].every((id) => selectedBusinessIds.has(id))
+    ) {
+      return;
+    }
+    setSelectedBusinessIds(nextBa);
+    setBaName(
+      businesses.filter((b) => nextBa.has(b.id)).map((b) => b.name).join(', ')
+      || 'Vendor Account',
+    );
+  }, [
+    isSupplierEdit,
+    allOutlets,
+    selectedOutletIds,
+    selectedBusinessIds,
+    businesses,
+  ]);
+
+  const syncBaName = (ids: Set<string>) => {
+    setBaName(
+      businesses.filter((b) => ids.has(b.id)).map((b) => b.name).join(', ')
+      || 'Vendor Account',
+    );
+  };
+
   const toggleBusiness = (businessId: string) => {
     let didChange = false;
     let nextIds = new Set<string>();
@@ -299,21 +348,11 @@ export function EditMemberModal({
 
     if (!didChange) return;
 
-    setBaName(
-      businesses.filter((b) => nextIds.has(b.id)).map((b) => b.name).join(', ')
-      || 'Vendor Account',
-    );
+    syncBaName(nextIds);
 
-    // Keep current store-scope mode; only drop picks for stores no longer visible.
-    const validStoreIds = new Set(
-      businesses
-        .filter((b) => nextIds.has(b.id))
-        .flatMap((b) => b.stores.map((s) => s.id)),
-    );
     setSelectedOutletIds((prevIds) => {
-      if (prevIds.size === 0) return prevIds;
-      const pruned = new Set([...prevIds].filter((id) => validStoreIds.has(id)));
-      if (pruned.size === prevIds.size) return prevIds;
+      const pruned = pruneOutletIds(nextIds, businesses, prevIds);
+      if (pruned.size === prevIds.size && [...pruned].every((id) => prevIds.has(id))) return prevIds;
       return pruned;
     });
   };
@@ -379,31 +418,32 @@ export function EditMemberModal({
           setSubmitting(false);
           return;
         }
-        if (!allOutlets) {
-          const baMissingStore = selectedBusinesses.some(
-            (b) => b.stores.length > 0 && !b.stores.some((s) => selectedOutletIds.has(s.id)),
-          );
-          if (baMissingStore) {
-            applyValidationErrors(
-              { storeIds: 'Select at least one store for each selected business' },
-              'Select at least one store for each selected business',
-            );
-            setSubmitting(false);
-            return;
-          }
-        }
         if (!selectedRoleId && Object.keys(permissions).length === 0) {
           applyValidationErrors({}, 'Select at least one permission');
           setSubmitting(false);
           return;
         }
         body = isDirty || !selectedRoleId ? { permissions } : { roleId: selectedRoleId };
-        body.businessAccountIds = Array.from(selectedBusinessIds);
         if (allOutlets) {
+          body.businessAccountIds = Array.from(selectedBusinessIds);
           body.scope = 'business';
         } else {
+          const scoped = resolveStoreScopeAccess(
+            selectedBusinessIds,
+            businesses,
+            selectedOutletIds,
+          );
+          if (!scoped) {
+            applyValidationErrors(
+              { storeIds: 'Select at least one store, or choose "All stores"' },
+              'Select at least one store, or choose "All stores"',
+            );
+            setSubmitting(false);
+            return;
+          }
+          body.businessAccountIds = scoped.businessAccountIds;
           body.scope = 'store';
-          body.storeIds = Array.from(selectedOutletIds);
+          body.storeIds = scoped.storeIds;
         }
         if (showStorefront) {
           body.storefrontAccess = { view: sfView, order: sfOrder, pay: sfPay };
