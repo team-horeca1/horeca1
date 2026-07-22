@@ -97,14 +97,16 @@ export const SUPPLIER_NAV_GROUPS: PortalNavGroup[] = [
   {
     label: 'Supplier',
     links: [
-      { name: 'Dashboard', icon: LayoutDashboard, href: '/vendor/overview', feature: 'dashboard', requiredPerm: 'dashboard.view' },
+      // Always available for team members — not gated by Store Dashboard (dashboard.view).
+      { name: 'Dashboard', icon: LayoutDashboard, href: '/vendor/overview' },
       { name: 'Orders', icon: ShoppingBag, href: '/vendor/all-orders', feature: 'orders', requiredPerm: 'orders.view' },
-      { name: 'Businesses', icon: Building2, href: '/vendor/businesses', feature: 'dashboard', requiredPerm: ['dashboard.view', 'settings.view'] },
+      // Always available — needed to enter stores even when Store Dashboard is off.
+      { name: 'Businesses', icon: Building2, href: '/vendor/businesses' },
       { name: 'Team Members', icon: Users, href: '/vendor/team', feature: 'users', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
       // Hidden for now — re-enable when supplier-level reports/ledger ship
       // { name: 'Reports', icon: BarChart3, href: '/vendor/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
       // { name: 'Ledger', icon: BookOpen, href: '/vendor/ledger', feature: 'payments', requiredPerm: 'payments.view' },
-      { name: 'Settings', icon: Settings, href: '/vendor/account', feature: 'dashboard', requiredPerm: 'dashboard.view' },
+      { name: 'Settings', icon: Settings, href: '/vendor/account', feature: 'settings', requiredPerm: 'settings.view' },
     ],
   },
 ];
@@ -114,6 +116,7 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
   {
     label: 'Operations',
     links: [
+      // Matrix "Dashboard" / dashboard.view gates Store Ops only — not supplier overview.
       { name: 'Dashboard', icon: LayoutDashboard, href: '/vendor/dashboard', feature: 'dashboard', requiredPerm: 'dashboard.view' },
       { name: 'Orders', icon: ShoppingBag, href: '/vendor/orders', feature: 'orders', requiredPerm: 'orders.view' },
       { name: 'Inventory', icon: Warehouse, href: '/vendor/inventory', feature: 'inventory', requiredPerm: 'inventory.view' },
@@ -153,7 +156,8 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
     label: 'Account',
     links: [
       { name: 'Notifications', icon: Bell, href: '/vendor/notifications', feature: 'notifications', requiredPerm: 'notifications.view' },
-      { name: 'Back to Supplier', icon: Building2, href: '/vendor/overview', feature: 'dashboard', requiredPerm: 'dashboard.view', matrixExclude: true },
+      // Always available — supplier home is not gated by Store Dashboard permission.
+      { name: 'Back to Supplier', icon: Building2, href: '/vendor/overview', matrixExclude: true },
       { name: 'Store Settings', icon: Settings, href: '/vendor/settings', feature: 'settings', requiredPerm: 'settings.view' },
     ],
   },

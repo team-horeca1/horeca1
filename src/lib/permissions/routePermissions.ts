@@ -40,8 +40,9 @@ const ADMIN_EXTRA: RouteRule[] = [
 const VENDOR_EXTRA: RouteRule[] = [
   { prefix: '/vendor/customer-groups', perm: 'customers.view' },
   { prefix: '/vendor/collections', perm: 'creditLine.view' },
-  { prefix: '/vendor/account', perm: 'dashboard.view' },
+  { prefix: '/vendor/account', perm: 'settings.view' },
   { prefix: '/vendor/setup', perm: 'dashboard.view' },
+  // /vendor/overview has no rule — supplier dashboard is always allowed for team members.
 ];
 
 const BRAND_EXTRA: RouteRule[] = [];
@@ -157,6 +158,6 @@ export function getVendorAccountTabPermission(tab: string): RoutePermission | nu
       return 'outlets.view';
     case 'overview':
     default:
-      return 'dashboard.view';
+      return 'settings.view';
   }
 }

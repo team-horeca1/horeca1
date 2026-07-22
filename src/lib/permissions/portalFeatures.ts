@@ -103,7 +103,8 @@ const ACCOUNT_FEATURES: PortalFeatureMap = {
 // ─── Vendor (selling-side) ──────────────────────────────────────────────────
 
 const VENDOR_FEATURES: PortalFeatureMap = {
-  dashboard:     { label: 'Dashboard', actions: MODULE_ACTIONS.dashboard, routes: ['/vendor/dashboard', '/vendor/overview', '/vendor/businesses'] },
+  // Store Ops dashboard only — supplier /overview is always available (no matrix gate).
+  dashboard:     { label: 'Store Dashboard', actions: MODULE_ACTIONS.dashboard, routes: ['/vendor/dashboard'] },
   products:      { label: 'Products', actions: MODULE_ACTIONS.products, routes: ['/vendor/products'] },
   brandMappings: { label: 'Brand Mappings', actions: MODULE_ACTIONS.brandMappings, routes: ['/vendor/brand-mappings'] },
   priceLists:    { label: 'Price Lists', actions: MODULE_ACTIONS.priceLists, routes: ['/vendor/price-lists'] },

@@ -283,28 +283,59 @@ export function EditMemberModal({
   const selectedStores = selectedBusinesses.flatMap((b) => b.stores);
 
   const toggleBusiness = (businessId: string) => {
+    let didChange = false;
+    let nextIds = new Set<string>();
+
     setSelectedBusinessIds((prev) => {
+      // Keep at least one business — and do NOT wipe store picks on a no-op click.
+      if (prev.has(businessId) && prev.size === 1) return prev;
       const next = new Set(prev);
-      if (next.has(businessId)) {
-        if (next.size === 1) return prev;
-        next.delete(businessId);
-      } else {
-        next.add(businessId);
-      }
-      const names = businesses.filter((b) => next.has(b.id)).map((b) => b.name);
-      setBaName(names.join(', ') || 'Vendor Account');
+      if (next.has(businessId)) next.delete(businessId);
+      else next.add(businessId);
+      didChange = true;
+      nextIds = next;
       return next;
     });
-    setAllOutlets(true);
-    setSelectedOutletIds(new Set());
+
+    if (!didChange) return;
+
+    setBaName(
+      businesses.filter((b) => nextIds.has(b.id)).map((b) => b.name).join(', ')
+      || 'Vendor Account',
+    );
+
+    // Keep current store-scope mode; only drop picks for stores no longer visible.
+    const validStoreIds = new Set(
+      businesses
+        .filter((b) => nextIds.has(b.id))
+        .flatMap((b) => b.stores.map((s) => s.id)),
+    );
+    setSelectedOutletIds((prevIds) => {
+      if (prevIds.size === 0) return prevIds;
+      const pruned = new Set([...prevIds].filter((id) => validStoreIds.has(id)));
+      if (pruned.size === prevIds.size) return prevIds;
+      return pruned;
+    });
   };
 
   const toggleOutlet = (id: string) => {
-    setAllOutlets(false);
+    // Leaving "All stores": treat the click as unchecking that store from the full set
+    // (stores look unchecked while allOutlets=true, so "select" felt broken).
+    if (allOutlets) {
+      const allIds = selectedStores.map((s) => s.id);
+      setAllOutlets(false);
+      setSelectedOutletIds(new Set(allIds.filter((sid) => sid !== id)));
+      return;
+    }
     setSelectedOutletIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      // Re-enter "All stores" when every visible store is checked again.
+      if (selectedStores.length > 0 && selectedStores.every((s) => next.has(s.id))) {
+        setAllOutlets(true);
+        return new Set();
+      }
       return next;
     });
   };
