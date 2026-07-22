@@ -43,15 +43,21 @@ export default function LoginPageInner() {
   // Already signed in — land on explicit redirect or role/portal default.
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
+    const role = session?.user?.role ?? null;
+    // Admin wins over inherited shopping BA (isCustomer) — never send them to /.
+    if (role === 'admin') {
+      window.location.href = resolvePostLoginDestination(redirectTo, null, role);
+      return;
+    }
     const caps = (session?.user?.activeBusinessAccountType as AccountPortalCaps | null | undefined)
-      ?? (session?.user?.role === 'vendor'
+      ?? (role === 'vendor'
         ? { isCustomer: false, isVendor: true, isBrand: false }
-        : session?.user?.role === 'brand'
+        : role === 'brand'
           ? { isCustomer: false, isVendor: false, isBrand: true }
-          : session?.user?.role === 'customer'
+          : role === 'customer'
             ? { isCustomer: true, isVendor: false, isBrand: false }
             : null);
-    window.location.href = resolvePostLoginDestination(redirectTo, caps);
+    window.location.href = resolvePostLoginDestination(redirectTo, caps, role);
   }, [sessionStatus, redirectTo, session?.user?.activeBusinessAccountType, session?.user?.role]);
 
   const [identifier, setIdentifier] = useState(prefilledPhone || prefilledEmail);

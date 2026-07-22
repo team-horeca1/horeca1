@@ -96,6 +96,7 @@ export function Navbar() {
     const [isSearchOverlayOpen, setIsSearchOverlayOpen] = React.useState(false);
     const [isLocationOverlayOpen, setIsLocationOverlayOpen] = React.useState(false);
     const { data: session, status: sessionStatus } = useSession();
+    const sessionReady = sessionStatus !== 'loading';
     const isLoggedIn = sessionStatus === 'authenticated';
     const userRole = (session?.user as { role?: string })?.role;
     const activeAccountType = (session?.user as {
@@ -149,19 +150,30 @@ export function Navbar() {
     const isBrandPortal = pathname?.startsWith('/brand/portal');
     const isAccountPage = pathname?.startsWith('/account');
 
-    const desktopNavItems = React.useMemo(() => [
-        ...(isLoggedIn && activeAccountType?.isVendor && !isAdminImpersonating
-            ? [{ name: 'Dashboard', href: '/vendor/dashboard', Icon: LayoutDashboard }]
-            : []),
-        ...(isLoggedIn && userRole === 'admin' && !isAdminImpersonating
-            ? [{ name: 'Dashboard', href: '/admin/dashboard', Icon: LayoutDashboard }]
-            : []),
-        ...(isLoggedIn && activeAccountType?.isBrand && !isAdminImpersonating
-            ? [{ name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard }]
-            : []),
-        ...DESKTOP_NAV,
-        ...(isLoggedIn ? [{ name: 'Rewards', href: '/rewards', Icon: Gift }] : []),
-    ], [isLoggedIn, activeAccountType?.isVendor, activeAccountType?.isBrand, userRole, isAdminImpersonating]);
+    // Wait until session settles before injecting Dashboard / Rewards — otherwise
+    // the flex-1 search bar jumps as icons appear (login glitch).
+    // Admin: only Admin Dashboard (not vendor/brand), so shopping BA inheritance
+    // does not also inject a supplier Dashboard link.
+    const desktopNavItems = React.useMemo(() => {
+        if (!sessionReady) return DESKTOP_NAV;
+
+        const portalLinks: typeof DESKTOP_NAV = [];
+        if (isLoggedIn && !isAdminImpersonating) {
+            if (userRole === 'admin') {
+                portalLinks.push({ name: 'Dashboard', href: '/admin/dashboard', Icon: LayoutDashboard });
+            } else if (activeAccountType?.isVendor) {
+                portalLinks.push({ name: 'Dashboard', href: '/vendor/dashboard', Icon: LayoutDashboard });
+            } else if (activeAccountType?.isBrand) {
+                portalLinks.push({ name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard });
+            }
+        }
+
+        return [
+            ...portalLinks,
+            ...DESKTOP_NAV,
+            ...(isLoggedIn ? [{ name: 'Rewards', href: '/rewards', Icon: Gift }] : []),
+        ];
+    }, [sessionReady, isLoggedIn, activeAccountType?.isVendor, activeAccountType?.isBrand, userRole, isAdminImpersonating]);
 
     if (isAdminPage || isVendorDashboard || isBrandPortal || isShipmentPage || isAccountPage) return null;
 
@@ -285,8 +297,8 @@ export function Navbar() {
                             {/* Divider */}
                             <div className="h-9 w-px bg-gray-200 shrink-0" />
 
-                            {/* Iconized nav — scroll when Dashboard+Rewards crowd the row */}
-                            <div className="flex items-center gap-1 min-w-0 max-w-[min(42vw,420px)] overflow-x-auto scrollbar-none">
+                            {/* Iconized nav — shrink-0 so Dashboard never clips; search yields space */}
+                            <div className="flex items-center gap-1 shrink-0">
                                 {desktopNavItems.map(({ name, href, Icon }) => {
                                     const isActive = pathname === href;
                                     return (
@@ -319,8 +331,12 @@ export function Navbar() {
                                 </Link>
                                 <button
                                     onClick={() => {
-                                        if (isLoggedIn) router.push('/profile');
-                                        else router.push('/login');
+                                        if (isLoggedIn) {
+                                            if (userRole === 'admin') router.push('/admin/dashboard');
+                                            else router.push('/profile');
+                                        } else {
+                                            router.push('/login');
+                                        }
                                     }}
                                     className="p-2.5 hover:bg-gray-50 rounded-full transition-all group cursor-pointer"
                                 >

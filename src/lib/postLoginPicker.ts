@@ -49,12 +49,19 @@ export function sanitizeRedirect(url: string | null | undefined): string | null 
   return trimmed;
 }
 
+/**
+ * Prefer an explicit safe redirect; otherwise role/portal default.
+ * Admin role wins over inherited shopping BA caps (isCustomer) so admins
+ * never land on the marketplace homepage by accident.
+ */
 export function resolvePostLoginDestination(
   redirectTo: string | null | undefined,
   caps: AccountPortalCaps | null | undefined,
+  role?: string | null,
 ): string {
   const safe = sanitizeRedirect(redirectTo);
   if (safe) return safe;
+  if (role === 'admin') return '/admin/dashboard';
   if (caps) return defaultPortalPath(caps);
   return '/';
 }
@@ -63,6 +70,8 @@ function capsFromSessionUser(user: {
   role?: string;
   activeBusinessAccountType?: AccountPortalCaps | null;
 } | null | undefined): AccountPortalCaps | null {
+  // Never derive portal caps from BA for admins — they inherit a shopping BA.
+  if (user?.role === 'admin') return null;
   if (user?.activeBusinessAccountType) return user.activeBusinessAccountType;
   const role = user?.role;
   if (role === 'vendor') return { isCustomer: false, isVendor: true, isBrand: false };
@@ -88,8 +97,9 @@ export async function prepareFreshLoginNavigation(redirectTo: string | null): Pr
     await new Promise((r) => setTimeout(r, 150));
     session = await getSession();
   }
+  const role = session?.user?.role ?? null;
   const caps = capsFromSessionUser(session?.user ?? null);
-  window.location.href = resolvePostLoginDestination(redirectTo, caps);
+  window.location.href = resolvePostLoginDestination(redirectTo, caps, role);
 }
 
 /** Clear any leftover picker state after overlay / in-page login. */

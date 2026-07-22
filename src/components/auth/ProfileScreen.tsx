@@ -23,6 +23,7 @@ import {
     Building2,
     BadgeCheck,
     Mail,
+    LayoutDashboard,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -334,23 +335,27 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         }
     ];
 
-    // Business Account management (V2.2) — only show when the user has an active account
-    // resolved on the session. Each card jumps straight into the matching tab on
-    // /account/[id]/... so this profile screen acts as the customer's dashboard.
-    // Roles & Permissions used to be its own sidebar entry; folded into the
-    // Team page's "Manage Roles" button so there's one entry per concept.
-    // RolesPermissionsOverlay still mounts below for the ?open=roles deep-link
-    // fallback, but isn't surfaced as a top-level item.
-    // Gate each card by the perms attached to the current session so a teammate
-    // with view-only Orders doesn't see Outlets or Team Members in the sidebar.
+    // Business Account management — hide for platform admins (they use /admin).
+    // Still show while admin is viewing-as-customer.
     const canSeeOutlets = has('outlets.view');
     const canSeeTeam = hasAny('users.view', 'users.create', 'users.edit', 'users.delete');
     const canSeeOverview = has('settings.view');
-    const businessAccountItems = activeAccountIdForLinks ? [
+    const hideBusinessAccountForAdmin = sessionRole === 'admin' && !customerImpersonating;
+    const businessAccountItems = (!hideBusinessAccountForAdmin && activeAccountIdForLinks) ? [
         ...(canSeeOutlets ? [{ id: 'outlets', label: 'Outlets & Delivery', desc: 'Branches and where orders are delivered', icon: MapPin, onClick: () => setIsOutletsOpen(true) }] : []),
         ...(!customerImpersonating && canSeeTeam ? [{ id: 'team-members', label: 'Team Members', desc: 'Invite users, manage roles & access', icon: Users, onClick: () => router.push('/profile/team') }] : []),
         ...(canSeeOverview ? [{ id: 'account-overview', label: 'Account Overview', desc: 'GST, business type, members', icon: Building2, onClick: () => setIsOverviewOpen(true) }] : []),
     ] : [];
+
+    const adminPortalItem = hideBusinessAccountForAdmin
+        ? [{
+            id: 'admin-dashboard',
+            label: 'Admin Dashboard',
+            desc: 'Orders, vendors, finance & approvals',
+            icon: LayoutDashboard,
+            onClick: () => { onClose(); router.push('/admin/dashboard'); },
+          }]
+        : [];
 
     const otherInfoItems = [
         { id: 'notifications', label: 'Notification', desc: 'Push & email preferences', icon: Bell, onClick: () => setIsNotificationOpen(true) },
@@ -533,6 +538,30 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 </div>
                             )}
 
+                            {/* Admin portal — platform admins go here instead of Business Account */}
+                            {adminPortalItem.length > 0 && (
+                                <div className="mb-6">
+                                    <h4 className="text-[12px] font-[800] text-gray-400 uppercase tracking-wider mb-2 px-1">Platform</h4>
+                                    <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                                        {adminPortalItem.map((item, idx) => {
+                                            const Icon = item.icon;
+                                            return (
+                                                <button key={item.id} onClick={item.onClick} className={cn("w-full flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 transition-colors text-left cursor-pointer", idx < adminPortalItem.length - 1 && "border-b border-gray-50")}>
+                                                    <span className="w-8 h-8 rounded-lg bg-[#53B175]/10 text-[#53B175] flex items-center justify-center shrink-0">
+                                                        <Icon size={15} />
+                                                    </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[13px] font-[700] text-[#181725] leading-tight">{item.label}</p>
+                                                        <p className="text-[11px] text-gray-400 font-medium mt-0.5 truncate">{item.desc}</p>
+                                                    </div>
+                                                    <ChevronRight size={16} className="text-gray-300" />
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Business Account management — V2.2 */}
                             {businessAccountItems.length > 0 && (
                                 <div className="mb-6">
@@ -656,6 +685,30 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                             );
                                         })}
                                     </ul>
+
+                                    {/* Platform admin — dashboard entry */}
+                                    {adminPortalItem.length > 0 && (
+                                        <>
+                                            <p className="text-[10px] font-[700] text-gray-400 uppercase tracking-[0.12em] px-2 pt-3 pb-1.5">Platform</p>
+                                            <ul className="space-y-0.5">
+                                                {adminPortalItem.map((item) => {
+                                                    const Icon = item.icon;
+                                                    return (
+                                                        <li key={item.id}>
+                                                            <button
+                                                                onClick={item.onClick}
+                                                                className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[#53B175]/8 text-[#181725] hover:text-[#53B175] transition-colors group cursor-pointer"
+                                                            >
+                                                                <Icon size={15} className="text-gray-400 group-hover:text-[#53B175] shrink-0" />
+                                                                <span className="text-[13px] font-[600] flex-1 text-left">{item.label}</span>
+                                                                <ChevronRight size={13} className="text-gray-300 group-hover:text-[#53B175]" />
+                                                            </button>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </>
+                                    )}
 
                                     {/* V2.2: Business Account management — only renders if user has an active account */}
                                     {businessAccountItems.length > 0 && (
@@ -894,6 +947,35 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                         })}
                                     </div>
                                 </section>
+
+                                {/* Admin Dashboard shortcut on profile home */}
+                                {adminPortalItem.length > 0 && (
+                                    <section>
+                                        <div className="flex items-baseline justify-between mb-3 px-1">
+                                            <h3 className="text-[15px] font-[700] text-[#181725]">Platform</h3>
+                                            <span className="text-[11px] font-medium text-gray-400">Admin tools</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+                                            {adminPortalItem.map((item) => {
+                                                const Icon = item.icon;
+                                                return (
+                                                    <button
+                                                        key={item.id}
+                                                        onClick={item.onClick}
+                                                        className="group relative text-left bg-white border border-gray-100 rounded-2xl p-5 hover:border-[#53B175]/40 hover:shadow-[0_8px_24px_rgba(83,177,117,0.12)] hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] cursor-pointer overflow-hidden"
+                                                    >
+                                                        <div className="w-11 h-11 rounded-xl bg-[#53B175]/10 text-[#53B175] flex items-center justify-center mb-4 group-hover:bg-[#53B175] group-hover:text-white transition-colors">
+                                                            <Icon size={20} strokeWidth={2.3} />
+                                                        </div>
+                                                        <p className="text-[14px] font-[700] text-[#181725] leading-tight">{item.label}</p>
+                                                        <p className="text-[11.5px] text-gray-400 font-medium mt-1 line-clamp-2">{item.desc}</p>
+                                                        <ChevronRight size={16} className="absolute top-5 right-5 text-gray-200 group-hover:text-[#53B175] transition-colors" />
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </section>
+                                )}
 
                                 {/* Business Account — V2.2 multi-account / multi-outlet management */}
                                 {businessAccountItems.length > 0 && (
