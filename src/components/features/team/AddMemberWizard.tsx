@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   X, ChevronLeft, ChevronRight, UserPlus, Building2, Check,
-  Loader2, AlertCircle, Store, ShoppingCart, CreditCard, Eye,
+  Loader2, Store, ShoppingCart, CreditCard, Eye,
   Crown, Shield, Users, DollarSign, Package, Archive, Edit3,
 } from 'lucide-react';
 import { PasswordField, FormErrorBanner, useFormFeedback } from '@/components/ui/form';
@@ -22,6 +23,24 @@ interface OutletItem {
   addressLine: string;
   city: string | null;
   pincode: string | null;
+}
+
+interface SupplierStoreItem {
+  id: string;
+  name: string;
+  isActive: boolean;
+  isPrimaryStore: boolean;
+  addressLine: string | null;
+  city: string | null;
+  pincode: string | null;
+}
+
+interface SupplierBusinessItem {
+  id: string;
+  name: string;
+  isPrimary: boolean;
+  status: string;
+  stores: SupplierStoreItem[];
 }
 
 export interface RoleItem {
@@ -102,7 +121,11 @@ function parseIdentifier(raw: string): { type: 'email'; value: string } | { type
 // ─── Main wizard ──────────────────────────────────────────────────────────────
 
 export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMemberWizardProps) {
+  const { data: session } = useSession();
+  const activeBusinessAccountId = (session?.user as { activeBusinessAccountId?: string } | undefined)
+    ?.activeBusinessAccountId;
   const scope = config?.scope ?? 'vendor';
+  const isSupplierInvite = scope === 'vendor';
   // accent is accepted on AddMemberWizardConfig for future use (custom per-
   // portal coloring of the chrome) but the wizard intentionally keeps all
   // green chrome today so the 4 team pages share one visual rhythm.
@@ -119,7 +142,9 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   const totalSteps = skipOutletStep ? 2 : 3;
   const stepLabels = skipOutletStep
     ? ['Member Info', 'Role & Permissions']
-    : STEP_LABELS;
+    : isSupplierInvite
+      ? ['Member Info', 'Store Access', 'Role & Permissions']
+      : STEP_LABELS;
 
   const [step, setStep] = useState(1);
 
@@ -129,10 +154,13 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
 
-  // Step 2
+  // Step 2 — account/brand use outlets; vendor/supplier lists every Business + Online Stores
   const [baName, setBaName] = useState('');
   const [outlets, setOutlets] = useState<OutletItem[]>([]);
-  const [outletsLoading, setOutletsLoading] = useState(false);
+  const [businesses, setBusinesses] = useState<SupplierBusinessItem[]>([]);
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
+  const [accessLoading, setAccessLoading] = useState(false);
+  const [accessLoaded, setAccessLoaded] = useState(false);
   const [allOutlets, setAllOutlets] = useState(true);
   const [selectedOutletIds, setSelectedOutletIds] = useState<Set<string>>(new Set());
 
@@ -150,7 +178,6 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   const {
     bannerError,
     fieldErrors,
-    setFieldErrors,
     clearErrors,
     applyApiError,
     applyValidationErrors,
@@ -159,27 +186,90 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   const [invitedMemberName, setInvitedMemberName] = useState('');
   const [savedMemberData, setSavedMemberData] = useState<unknown>(null);
 
+  const selectedBusiness = businesses.find((b) => b.id === selectedBusinessId) ?? null;
+  const selectedStores = selectedBusiness?.stores ?? [];
+
   useEffect(() => {
     const outletStep = skipOutletStep ? -1 : 2;
-    if (step === outletStep && outlets.length === 0 && !outletsLoading) {
-      setOutletsLoading(true);
-      fetch(outletsEndpoint)
-        .then(r => r.json())
-        .then(j => {
-          if (!j.success) return;
-          // Vendor endpoint returns { businessAccount: {...}, outlets: [...] }.
-          // Account endpoint returns a plain array. Handle both shapes.
-          if (Array.isArray(j.data)) {
-            setBaName(businessAccountLabel);
-            setOutlets(j.data ?? []);
-          } else {
-            setBaName(j.data.businessAccount?.name ?? businessAccountLabel);
-            setOutlets(j.data.outlets ?? []);
-          }
+    if (step !== outletStep || accessLoaded || accessLoading) return;
+
+    setAccessLoading(true);
+
+    if (isSupplierInvite) {
+      fetch('/api/v1/supplier/businesses')
+        .then((r) => r.json())
+        .then((j: {
+          success?: boolean;
+          data?: Array<{
+            id: string;
+            legalName: string;
+            displayName: string | null;
+            status: string;
+            isPrimary: boolean;
+            stores: Array<{
+              id: string;
+              name: string;
+              isActive: boolean;
+              isPrimaryStore: boolean;
+              addressLine: string | null;
+              city: string | null;
+              pincode: string | null;
+            }>;
+          }>;
+        }) => {
+          if (!j.success || !Array.isArray(j.data)) return;
+          const mapped: SupplierBusinessItem[] = j.data.map((b) => ({
+            id: b.id,
+            name: b.displayName?.trim() || b.legalName,
+            isPrimary: b.isPrimary,
+            status: b.status,
+            stores: (b.stores ?? []).map((s) => ({
+              id: s.id,
+              name: s.name,
+              isActive: s.isActive,
+              isPrimaryStore: s.isPrimaryStore,
+              addressLine: s.addressLine,
+              city: s.city,
+              pincode: s.pincode,
+            })),
+          }));
+          setBusinesses(mapped);
+          const preferred =
+            mapped.find((b) => b.id === activeBusinessAccountId)
+            ?? mapped.find((b) => b.isPrimary)
+            ?? mapped[0]
+            ?? null;
+          setSelectedBusinessId(preferred?.id ?? null);
+          setBaName(preferred?.name ?? businessAccountLabel);
+          setAllOutlets(true);
+          setSelectedOutletIds(new Set());
         })
         .catch(() => {})
-        .finally(() => setOutletsLoading(false));
+        .finally(() => {
+          setAccessLoading(false);
+          setAccessLoaded(true);
+        });
+      return;
     }
+
+    fetch(outletsEndpoint)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j.success) return;
+        // Vendor/account outlet endpoints: { businessAccount, outlets } or plain array.
+        if (Array.isArray(j.data)) {
+          setBaName(businessAccountLabel);
+          setOutlets(j.data ?? []);
+        } else {
+          setBaName(j.data.businessAccount?.name ?? businessAccountLabel);
+          setOutlets(j.data.outlets ?? []);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        setAccessLoading(false);
+        setAccessLoaded(true);
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
@@ -199,20 +289,14 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
     setSelectedRoleId('');
   }, []);
 
-  const handleTogglePermission = useCallback((mod: string, action: string) => {
-    setPermissions(prev => {
-      const next: PermissionsMap = { ...prev, [mod]: { ...(prev[mod] ?? {}) } };
-      if (next[mod][action]) {
-        delete next[mod][action];
-        if (Object.keys(next[mod]).length === 0) delete next[mod];
-      } else {
-        next[mod][action] = true;
-      }
-      return next;
-    });
-    // Deselect chip highlight when matrix is manually edited
-    setSelectedRoleId('');
-  }, []);
+  const selectBusiness = (businessId: string) => {
+    const biz = businesses.find((b) => b.id === businessId);
+    if (!biz) return;
+    setSelectedBusinessId(businessId);
+    setBaName(biz.name);
+    setAllOutlets(true);
+    setSelectedOutletIds(new Set());
+  };
 
   const toggleOutlet = (id: string) => {
     setAllOutlets(false);
@@ -229,7 +313,9 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
       setStep(1);
       return;
     }
-    if (!skipOutletStep && field === 'outlets') setStep(2);
+    if (!skipOutletStep && (field === 'outlets' || field === 'storeIds' || field === 'businessAccountId')) {
+      setStep(2);
+    }
   };
 
   const handleNext = () => {
@@ -254,7 +340,26 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
       }
       setStep(2);
     } else if (!skipOutletStep && step === 2) {
-      if (!allOutlets && selectedOutletIds.size === 0) {
+      if (isSupplierInvite) {
+        if (!selectedBusinessId) {
+          applyValidationErrors({ businessAccountId: 'Select a business account' }, undefined, { dataField: true });
+          return;
+        }
+        if (selectedStores.length === 0) {
+          applyValidationErrors(
+            { storeIds: 'This business has no Online Stores yet — create a store first' },
+            undefined,
+            { dataField: true },
+          );
+          return;
+        }
+        if (!allOutlets && selectedOutletIds.size === 0) {
+          applyValidationErrors({ storeIds: 'Select at least one store, or choose "All stores"' }, undefined, {
+            dataField: true,
+          });
+          return;
+        }
+      } else if (!allOutlets && selectedOutletIds.size === 0) {
         applyValidationErrors({ outlets: 'Select at least one outlet, or choose "All outlets"' }, undefined, {
           dataField: true,
         });
@@ -295,7 +400,17 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
       }
       if (fullName.trim()) body.fullName = fullName.trim();
       if (password) body.password = password;
-      if (!allOutlets && selectedOutletIds.size > 0) body.outletIds = Array.from(selectedOutletIds);
+      if (isSupplierInvite && selectedBusinessId) {
+        body.businessAccountId = selectedBusinessId;
+        if (allOutlets) {
+          body.scope = 'business';
+        } else {
+          body.scope = 'store';
+          body.storeIds = Array.from(selectedOutletIds);
+        }
+      } else if (!allOutlets && selectedOutletIds.size > 0) {
+        body.outletIds = Array.from(selectedOutletIds);
+      }
       if (showStorefront && (sfView || sfOrder || sfPay)) {
         body.storefrontAccess = { view: sfView, order: sfOrder, pay: sfPay };
       }
@@ -403,9 +518,22 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
           )}
           {isOutletStep && (
             <Step2Outlets
+              mode={isSupplierInvite ? 'supplier' : 'outlets'}
               baName={baName}
-              outlets={outlets}
-              outletsLoading={outletsLoading}
+              businesses={businesses}
+              selectedBusinessId={selectedBusinessId}
+              onSelectBusiness={selectBusiness}
+              outlets={isSupplierInvite
+                ? selectedStores.map((s) => ({
+                    id: s.id,
+                    name: s.name,
+                    code: s.isPrimaryStore ? 'Primary' : null,
+                    addressLine: s.addressLine ?? '',
+                    city: s.city,
+                    pincode: s.pincode,
+                  }))
+                : outlets}
+              outletsLoading={accessLoading}
               allOutlets={allOutlets}
               selectedOutletIds={selectedOutletIds}
               onToggleAll={() => { setAllOutlets(true); setSelectedOutletIds(new Set()); }}
@@ -548,45 +676,122 @@ function Step1UserInfo({
   );
 }
 
-// ─── Step 2: Outlet Access ────────────────────────────────────────────────────
+// ─── Step 2: Outlet / Store Access ────────────────────────────────────────────
 
 function Step2Outlets({
-  baName, outlets, outletsLoading, allOutlets, selectedOutletIds, onToggleAll, onToggleOutlet,
+  mode = 'outlets',
+  baName,
+  businesses = [],
+  selectedBusinessId = null,
+  onSelectBusiness,
+  outlets,
+  outletsLoading,
+  allOutlets,
+  selectedOutletIds,
+  onToggleAll,
+  onToggleOutlet,
 }: {
-  baName: string; outlets: OutletItem[]; outletsLoading: boolean;
-  allOutlets: boolean; selectedOutletIds: Set<string>;
-  onToggleAll: () => void; onToggleOutlet: (id: string) => void;
+  mode?: 'outlets' | 'supplier';
+  baName: string;
+  businesses?: SupplierBusinessItem[];
+  selectedBusinessId?: string | null;
+  onSelectBusiness?: (id: string) => void;
+  outlets: OutletItem[];
+  outletsLoading: boolean;
+  allOutlets: boolean;
+  selectedOutletIds: Set<string>;
+  onToggleAll: () => void;
+  onToggleOutlet: (id: string) => void;
 }) {
+  const isSupplier = mode === 'supplier';
+  const accessLabel = isSupplier ? 'Store Access' : 'Outlet Access';
+  const allLabel = isSupplier ? 'All stores (business-wide)' : 'All outlets (account-wide)';
+  const allHint = isSupplier
+    ? 'Access all current and future Online Stores under this business'
+    : 'Access all current and future outlets';
+  const emptyTitle = isSupplier ? 'No Online Stores yet' : 'No outlets configured';
+  const emptyHint = isSupplier
+    ? 'Create a store under this business before inviting team members.'
+    : 'Member will have account-wide access.';
+
   return (
     <div className="flex gap-5 h-[360px]">
-      {/* Left: Business account */}
-      <div className="w-[200px] shrink-0">
+      {/* Left: Business account(s) */}
+      <div className="w-[220px] shrink-0 flex flex-col min-h-0">
         <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-2">Business Account</p>
-        <div className="border-2 border-[#299E60] bg-[#F0FBF5] rounded-[12px] p-4 flex flex-col gap-2">
-          <div className="w-9 h-9 bg-[#299E60] rounded-[10px] flex items-center justify-center">
-            <Building2 size={16} className="text-white" />
+        {outletsLoading ? (
+          <div className="flex-1 flex items-center justify-center border border-[#EEEEEE] rounded-[12px]">
+            <Loader2 size={20} className="animate-spin text-[#299E60]" />
           </div>
-          <div>
-            <p className="text-[13px] font-bold text-[#181725] leading-snug">{baName || 'Vendor Account'}</p>
-            <p className="text-[11px] text-[#7C7C7C] mt-0.5">Primary account</p>
+        ) : isSupplier && businesses.length > 0 ? (
+          <div className="flex-1 overflow-y-auto space-y-2 pr-0.5">
+            {businesses.map((biz) => {
+              const selected = biz.id === selectedBusinessId;
+              return (
+                <button
+                  key={biz.id}
+                  type="button"
+                  onClick={() => onSelectBusiness?.(biz.id)}
+                  className={`w-full text-left rounded-[12px] p-3.5 flex flex-col gap-2 border-2 transition-colors ${
+                    selected
+                      ? 'border-[#299E60] bg-[#F0FBF5]'
+                      : 'border-[#EEEEEE] bg-white hover:border-[#299E60]/40 hover:bg-[#FAFAFA]'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center ${
+                    selected ? 'bg-[#299E60]' : 'bg-[#F3F4F6]'
+                  }`}>
+                    <Building2 size={15} className={selected ? 'text-white' : 'text-[#7C7C7C]'} />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-bold text-[#181725] leading-snug">{biz.name}</p>
+                    <p className="text-[11px] text-[#7C7C7C] mt-0.5">
+                      {biz.isPrimary ? 'Primary account' : 'Business account'}
+                      {' · '}
+                      {biz.stores.length} {biz.stores.length === 1 ? 'store' : 'stores'}
+                    </p>
+                  </div>
+                  {selected && (
+                    <div className="flex items-center gap-1">
+                      <div className="w-4 h-4 bg-[#299E60] rounded-full flex items-center justify-center">
+                        <Check size={10} className="text-white" />
+                      </div>
+                      <span className="text-[10px] font-bold text-[#299E60]">Selected</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
-          <div className="flex items-center gap-1 mt-1">
-            <div className="w-4 h-4 bg-[#299E60] rounded-full flex items-center justify-center">
-              <Check size={10} className="text-white" />
+        ) : (
+          <div className="border-2 border-[#299E60] bg-[#F0FBF5] rounded-[12px] p-4 flex flex-col gap-2">
+            <div className="w-9 h-9 bg-[#299E60] rounded-[10px] flex items-center justify-center">
+              <Building2 size={16} className="text-white" />
             </div>
-            <span className="text-[10px] font-bold text-[#299E60]">Selected</span>
+            <div>
+              <p className="text-[13px] font-bold text-[#181725] leading-snug">{baName || 'Vendor Account'}</p>
+              <p className="text-[11px] text-[#7C7C7C] mt-0.5">Primary account</p>
+            </div>
+            <div className="flex items-center gap-1 mt-1">
+              <div className="w-4 h-4 bg-[#299E60] rounded-full flex items-center justify-center">
+                <Check size={10} className="text-white" />
+              </div>
+              <span className="text-[10px] font-bold text-[#299E60]">Selected</span>
+            </div>
           </div>
-        </div>
+        )}
         <p className="text-[10px] text-[#AEAEAE] mt-2 leading-relaxed">
-          This member will be added to your vendor team under this business account.
+          {isSupplier
+            ? 'Pick which business this member joins. Store access on the right applies only to that business.'
+            : 'This member will be added to your vendor team under this business account.'}
         </p>
       </div>
 
-      {/* Right: Outlets */}
+      {/* Right: Outlets / Online Stores */}
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between mb-2">
           <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider">
-            Outlet Access {outlets.length > 0 && `(${outlets.length})`}
+            {accessLabel} {outlets.length > 0 && `(${outlets.length})`}
           </p>
           {!allOutlets && selectedOutletIds.size > 0 && (
             <span className="text-[10px] font-bold text-[#299E60] bg-[#ECFDF5] px-2 py-0.5 rounded-full">
@@ -604,8 +809,8 @@ function Step2Outlets({
             <button onClick={onToggleAll} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[#FAFAFA] transition-colors text-left">
               <Checkbox checked={allOutlets} accent="#299E60" />
               <div>
-                <p className="text-[13px] font-bold text-[#181725]">All outlets (account-wide)</p>
-                <p className="text-[11px] text-[#7C7C7C]">Access all current and future outlets</p>
+                <p className="text-[13px] font-bold text-[#181725]">{allLabel}</p>
+                <p className="text-[11px] text-[#7C7C7C]">{allHint}</p>
               </div>
             </button>
             {outlets.map(outlet => (
@@ -627,8 +832,8 @@ function Step2Outlets({
             ))}
             {outlets.length === 0 && (
               <div className="px-4 py-10 text-center">
-                <p className="text-[13px] font-bold text-[#AEAEAE]">No outlets configured</p>
-                <p className="text-[11px] text-[#AEAEAE] mt-1">Member will have account-wide access.</p>
+                <p className="text-[13px] font-bold text-[#AEAEAE]">{emptyTitle}</p>
+                <p className="text-[11px] text-[#AEAEAE] mt-1">{emptyHint}</p>
               </div>
             )}
           </div>

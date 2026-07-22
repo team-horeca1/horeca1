@@ -13,6 +13,19 @@ function getNotifications(): Promise<NotificationService> {
   return notificationsPromise;
 }
 
+/**
+ * Notifications must target a User id, but order/inventory event payloads carry
+ * the Vendor entity id. Resolve the store's owning user (fallback to the raw id
+ * so a missing vendor row degrades to a no-op notification rather than a throw).
+ */
+async function resolveVendorUserId(vendorId: string): Promise<string> {
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: { userId: true },
+  });
+  return vendor?.userId ?? vendorId;
+}
+
 // Idempotency lives on globalThis (not a module-scoped boolean): the bus is a
 // process-wide singleton, so its listeners must be registered exactly once even
 // if Next.js evaluates this module in more than one bundle. A module-local flag
@@ -39,11 +52,7 @@ export function registerEventListeners(): void {
         import('@/modules/order/order.service'),
       ]);
       // Vendor's owning user gets the in-app + email alert
-      const vendor = await prisma.vendor.findUnique({
-        where: { id: payload.vendorId },
-        select: { userId: true },
-      });
-      const vendorUserId = vendor?.userId ?? payload.vendorId;
+      const vendorUserId = await resolveVendorUserId(payload.vendorId);
 
       const { otp } = await orderService.issueDeliveryOtp(payload.orderId, payload.vendorId, {
         emitEvent: false,
@@ -246,9 +255,9 @@ export function registerEventListeners(): void {
         referenceType: 'order',
       });
 
-      // Notify vendor
+      // Notify vendor (resolve the store's owning user — vendorId is not a User id)
       await notifications.send({
-        userId: payload.vendorId,
+        userId: await resolveVendorUserId(payload.vendorId),
         type: 'order',
         channel: 'in_app',
         title: 'Order Cancelled',
@@ -307,7 +316,7 @@ export function registerEventListeners(): void {
     try {
       const notifications = await getNotifications();
       await notifications.send({
-        userId: payload.vendorId,
+        userId: await resolveVendorUserId(payload.vendorId),
         type: 'payment',
         channel: 'in_app',
         title: 'Payment Received',
@@ -402,7 +411,7 @@ export function registerEventListeners(): void {
 
       const notifications = await getNotifications();
       await notifications.send({
-        userId: payload.vendorId,
+        userId: await resolveVendorUserId(payload.vendorId),
         type: 'inventory',
         channel: 'in_app',
         title: 'Low Stock Alert',

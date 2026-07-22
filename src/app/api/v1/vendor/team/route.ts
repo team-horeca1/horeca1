@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { vendorOnly } from '@/middleware/rbac';
-import { resolveVendorContext } from '@/lib/resolveVendorId';
+import { resolveVendorContext, resolveSupplierActorUserId } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
@@ -34,7 +34,11 @@ const inviteSchema = z.object({
   roleId: z.string().uuid().optional(),
   permissions: z.record(z.string(), z.record(z.string(), z.boolean())).optional(),
   outletIds: z.array(z.string().uuid()).optional(),
-  /** Supplier Foundation: business = all Online Stores; store = current store only. */
+  /** Target Business (must be one the actor belongs to). Defaults to current store's Business. */
+  businessAccountId: z.string().uuid().optional(),
+  /** Specific Online Stores under the target Business (implies scope='store'). */
+  storeIds: z.array(z.string().uuid()).optional(),
+  /** Supplier Foundation: business = all Online Stores; store = selected/current store(s). */
   scope: z.enum(['business', 'store']).optional().default('store'),
   storefrontAccess: z.object({
     view: z.boolean().optional(),
@@ -144,7 +148,53 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       select: { businessAccountId: true, businessName: true },
     });
     if (!vendor) throw Errors.notFound('Vendor not found');
-    const businessAccountId = vendor.businessAccountId;
+
+    // ── Resolve the target Business ────────────────────────────────────────────
+    // The wizard lets the supplier pick ANY Business they belong to (not just the
+    // one behind the currently active store). Validate membership before honoring.
+    let businessAccountId = vendor.businessAccountId;
+    if (input.businessAccountId && input.businessAccountId !== vendor.businessAccountId) {
+      const actorId = await resolveSupplierActorUserId(ctx, req);
+      const membership = await prisma.businessAccountMember.findUnique({
+        where: { userId_businessAccountId: { userId: actorId, businessAccountId: input.businessAccountId } },
+        select: { id: true },
+      });
+      if (!membership) throw Errors.forbidden('You are not a member of the selected business');
+      businessAccountId = input.businessAccountId;
+    }
+
+    const businessAccount = await prisma.businessAccount.findUnique({
+      where: { id: businessAccountId },
+      select: { displayName: true, legalName: true },
+    });
+    const businessLabel = businessAccount?.displayName ?? businessAccount?.legalName ?? vendor.businessName;
+
+    // Online Stores under the target Business (primary first).
+    const baStores = await prisma.vendor.findMany({
+      where: { businessAccountId },
+      orderBy: [{ isPrimaryStore: 'desc' }, { createdAt: 'asc' }],
+      select: { id: true, businessName: true },
+    });
+    if (baStores.length === 0) {
+      throw Errors.badRequest('The selected business has no Online Stores yet — create a store first');
+    }
+
+    // ── Resolve target stores ──────────────────────────────────────────────────
+    // business  → member joins every current + future store under the Business.
+    // store     → member joins only the selected stores (default: current store).
+    const inviteScope = input.scope ?? 'store';
+    const validStoreIds = new Set(baStores.map((s) => s.id));
+    let targetStoreIds: string[];
+    if (inviteScope === 'business') {
+      targetStoreIds = baStores.map((s) => s.id);
+    } else if (input.storeIds && input.storeIds.length > 0) {
+      if (input.storeIds.some((id) => !validStoreIds.has(id))) {
+        throw Errors.badRequest('One or more selected stores do not belong to the selected business');
+      }
+      targetStoreIds = [...new Set(input.storeIds)];
+    } else {
+      targetStoreIds = validStoreIds.has(vendorId) ? [vendorId] : [baStores[0].id];
+    }
 
     // ── Resolve the role ───────────────────────────────────────────────────────
     // If roleId provided, use it directly. Otherwise derive from permissions JSON:
@@ -154,10 +204,20 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     if (input.roleId) {
       const found = await prisma.accountRole.findUnique({
         where: { id: input.roleId },
-        select: { id: true, name: true, scope: true, description: true },
+        select: { id: true, name: true, scope: true, description: true, businessAccountId: true, permissions: true },
       });
       if (!found || found.scope !== 'vendor') throw Errors.badRequest('roleId must reference a vendor-scope role');
-      role = found;
+      if (found.businessAccountId && found.businessAccountId !== businessAccountId) {
+        // Custom role from another Business — clone its permissions into the target.
+        role = await resolveTeamMemberRoleFromPermissions({
+          scope: 'vendor',
+          permissions: (found.permissions ?? {}) as Record<string, Record<string, boolean>>,
+          businessAccountId,
+          createdBy: ctx.userId,
+        });
+      } else {
+        role = found;
+      }
     } else {
       role = await resolveTeamMemberRoleFromPermissions({
         scope: 'vendor',
@@ -215,8 +275,8 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       isNewUser = true;
     }
 
-    const existingMember = await prisma.vendorTeamMember.findUnique({
-      where: { vendorId_userId: { vendorId, userId: user.id } },
+    const existingMember = await prisma.vendorTeamMember.findFirst({
+      where: { vendorId: { in: targetStoreIds }, userId: user.id },
       select: { id: true },
     });
     if (existingMember) {
@@ -228,39 +288,32 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     const outletTargets: (string | null)[] =
       input.outletIds && input.outletIds.length > 0 ? input.outletIds : [null];
 
-    const inviteScope = input.scope ?? 'store';
-
     // ── Transactional write ────────────────────────────────────────────────────
     const member = await prisma.$transaction(async (tx) => {
-      const m = await tx.vendorTeamMember.create({
-        data: { vendorId, userId, role: legacyEnum, roleId: role.id, invitedBy: ctx.userId },
-        include: teamMemberInclude,
-      });
-
-      // Business-level invite: cascade VendorTeamMember to every Online Store under BA
-      if (inviteScope === 'business') {
-        const siblingStores = await tx.vendor.findMany({
-          where: { businessAccountId, id: { not: vendorId } },
+      // One VendorTeamMember row per target Online Store (business scope = all).
+      let firstMember: {
+        id: string;
+        createdAt: Date;
+        role: TeamRole;
+        user: { id: string; fullName: string; email: string | null; phone: string | null; hcidDisplay: string | null; isActive: boolean };
+        roleRef: { id: string; name: string; scope: string; description: string | null } | null;
+      } | null = null;
+      for (const storeId of targetStoreIds) {
+        const exists = await tx.vendorTeamMember.findUnique({
+          where: { vendorId_userId: { vendorId: storeId, userId } },
           select: { id: true },
         });
-        for (const s of siblingStores) {
-          const exists = await tx.vendorTeamMember.findUnique({
-            where: { vendorId_userId: { vendorId: s.id, userId } },
-            select: { id: true },
-          });
-          if (!exists) {
-            await tx.vendorTeamMember.create({
-              data: {
-                vendorId: s.id,
-                userId,
-                role: legacyEnum,
-                roleId: role.id,
-                invitedBy: ctx.userId,
-              },
-            });
-          }
-        }
+        if (exists) continue;
+        const created = await tx.vendorTeamMember.create({
+          data: { vendorId: storeId, userId, role: legacyEnum, roleId: role.id, invitedBy: ctx.userId },
+          include: teamMemberInclude,
+        });
+        if (!firstMember) firstMember = created;
       }
+      if (!firstMember) {
+        throw Errors.fieldError('identifier', 'User is already on this vendor team — update their role instead', 409);
+      }
+      const m = firstMember;
 
       await upsertTeamAccountMembership(tx, {
         userId,
@@ -278,7 +331,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       });
 
       if (inviteScope === 'business') {
-        // Business-wide: vendorId null → all Online Stores
+        // Business-wide: vendorId null → all current + future Online Stores
         await tx.userRole.create({
           data: {
             userId,
@@ -289,16 +342,18 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
           },
         });
       } else {
-        // Store-only: confined to this Online Store
-        await tx.userRole.create({
-          data: {
-            userId,
-            businessAccountId,
-            outletId: null,
-            vendorId,
-            roleId: role.id,
-          },
-        });
+        // Store-scoped: one grant per selected Online Store
+        for (const storeId of targetStoreIds) {
+          await tx.userRole.create({
+            data: {
+              userId,
+              businessAccountId,
+              outletId: null,
+              vendorId: storeId,
+              roleId: role.id,
+            },
+          });
+        }
         // Legacy outlet targets ignored for supplier multi-warehouse retirement
         void outletTargets;
       }
@@ -375,7 +430,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
           recipientEmail,
           tempPassword,
           scope: 'vendor',
-          businessName: vendor.businessName,
+          businessName: businessLabel,
           loginUrl,
           inviterName,
         });
@@ -387,7 +442,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
           recipientName,
           loginIdentifier: recipientPhone,
           tempPassword,
-          businessName: vendor.businessName,
+          businessName: businessLabel,
           loginUrl,
           inviterName,
         });
@@ -402,7 +457,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       });
     } else {
       const inviterId = ctx.userId;
-      const businessName = vendor.businessName;
+      const businessName = businessLabel;
       const recipientEmail = user.email;
       const recipientPhone = user.phone;
       const recipientName = user.fullName ?? '';

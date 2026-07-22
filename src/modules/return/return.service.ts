@@ -206,7 +206,11 @@ export async function adminProcessReturnRefund(
   const capturedPayment = order.payments[0] ?? null;
   let razorpayRefundId: string | null = null;
 
-  const isRazorpay = order.paymentMethod === 'razorpay' && !!capturedPayment?.razorpayPaymentId;
+  // Gateway refund whenever a captured Razorpay payment exists for the order.
+  // Checkout stores paymentMethod 'online' (seeds may use 'razorpay'/'prepaid'), so we
+  // must not gate on the method string — COD/credit/wallet orders never have a
+  // captured Razorpay payment, so this check is sufficient on its own.
+  const isRazorpay = !!capturedPayment?.razorpayPaymentId;
   if (isRazorpay) {
     const amountPaise = Math.round(refundAmount * 100);
     const refund = await getRazorpay().payments.refund(capturedPayment!.razorpayPaymentId!, {

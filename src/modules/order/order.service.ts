@@ -31,6 +31,10 @@ import {
 const CREDIT_PAYMENTS = ['credit', 'vendor_credit', 'h1_wallet', 'wallet', 'discco'];
 const isCreditPayment = (m: string | null | undefined): boolean => !!m && CREDIT_PAYMENTS.includes(m);
 
+// VendorCustomer.status values that stop the customer from placing orders with
+// that vendor. Scoped per relationship — other vendors are unaffected.
+const BLOCKED_CUSTOMER_STATUSES = ['blocked', 'suspended'];
+
 /** Map checkout payment methods to VendorCustomer.allowedPaymentModes values. */
 function normalizeVendorPaymentMode(method: string): string {
   if (method === 'vendor_credit' || method === 'discco') return 'credit';
@@ -248,8 +252,16 @@ export class OrderService {
         //    commission attribution at order creation time.
         const vendorCustomer = await tx.vendorCustomer.findUnique({
           where: { vendorId_userId: { vendorId: vo.vendorId, userId } },
-          select: { salespersonId: true, tags: true, allowedPaymentModes: true },
+          select: { salespersonId: true, tags: true, allowedPaymentModes: true, status: true },
         });
+
+        // CRM block/suspend is per supplier-customer relationship: a customer
+        // blocked by one vendor can still order from every other vendor.
+        if (!isDraft && vendorCustomer && BLOCKED_CUSTOMER_STATUSES.includes(vendorCustomer.status)) {
+          throw Errors.forbidden(
+            `Ordering from ${vendor.businessName} is currently unavailable for your account. Please contact the vendor.`,
+          );
+        }
 
         if (!isDraft && vendorCustomer?.allowedPaymentModes?.length) {
           const normalized = normalizeVendorPaymentMode(input.paymentMethod);
@@ -798,6 +810,18 @@ export class OrderService {
       if (!vendor) throw Errors.notFound('Vendor');
       if (Number(order.subtotal) < Number(vendor.minOrderValue)) {
         throw Errors.belowMOV(vendor.businessName, Number(vendor.minOrderValue), Number(order.subtotal));
+      }
+
+      // Same CRM block gate as createOrder — a draft saved before the vendor
+      // blocked the customer must not slip through at submit time.
+      const vendorCustomer = await tx.vendorCustomer.findUnique({
+        where: { vendorId_userId: { vendorId: order.vendorId, userId: ctx.userId } },
+        select: { status: true },
+      });
+      if (vendorCustomer && BLOCKED_CUSTOMER_STATUSES.includes(vendorCustomer.status)) {
+        throw Errors.forbidden(
+          `Ordering from ${vendor.businessName} is currently unavailable for your account. Please contact the vendor.`,
+        );
       }
 
       await this.inventoryService.reserveStock(items, fulfillOutlet, tx);

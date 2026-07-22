@@ -337,6 +337,96 @@ export async function createOnlineStore(
   });
 }
 
+/** Full Online Store fields for edit prefill (mirrors create payload). */
+export async function getOnlineStore(userId: string, vendorId: string) {
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: {
+      id: true,
+      userId: true,
+      businessAccountId: true,
+      businessName: true,
+      displayName: true,
+      addressLine: true,
+      city: true,
+      state: true,
+      addressPincode: true,
+      pickupAddressLine: true,
+      pickupCity: true,
+      pickupState: true,
+      pickupPincode: true,
+      authorizedPersonName: true,
+      authorizedPersonPhone: true,
+      authorizedPersonEmail: true,
+      gstNumber: true,
+      panNumber: true,
+      fssaiNumber: true,
+      udyamNumber: true,
+      cinNumber: true,
+      bankAccountName: true,
+      bankAccountNumber: true,
+      bankIfsc: true,
+      bankName: true,
+      bankAccountType: true,
+      deliveryCapability: true,
+      serviceAreas: {
+        where: { isActive: true },
+        select: { pincode: true },
+        orderBy: { pincode: 'asc' },
+      },
+    },
+  });
+  if (!vendor) throw Errors.notFound('Online Store');
+
+  const membership = await prisma.businessAccountMember.findUnique({
+    where: {
+      userId_businessAccountId: { userId, businessAccountId: vendor.businessAccountId },
+    },
+    select: { id: true },
+  });
+  if (!membership && vendor.userId !== userId) {
+    throw Errors.forbidden('You cannot view this Online Store');
+  }
+
+  const storeName = vendor.displayName?.trim() || vendor.businessName;
+  return {
+    id: vendor.id,
+    storeName,
+    storeDisplayName: storeName,
+    authorizedPersonName: vendor.authorizedPersonName ?? undefined,
+    authorizedPersonPhone: vendor.authorizedPersonPhone ?? undefined,
+    authorizedPersonEmail: vendor.authorizedPersonEmail ?? undefined,
+    gstNumber: vendor.gstNumber ?? undefined,
+    panNumber: vendor.panNumber ?? undefined,
+    fssaiNumber: vendor.fssaiNumber ?? undefined,
+    udyamNumber: vendor.udyamNumber ?? undefined,
+    cinNumber: vendor.cinNumber ?? undefined,
+    bankAccountName: vendor.bankAccountName ?? undefined,
+    bankAccountNumber: vendor.bankAccountNumber ?? undefined,
+    bankIfsc: vendor.bankIfsc ?? undefined,
+    bankName: vendor.bankName ?? undefined,
+    bankAccountType:
+      vendor.bankAccountType === 'savings' || vendor.bankAccountType === 'current'
+        ? vendor.bankAccountType
+        : undefined,
+    addressLine: vendor.addressLine ?? undefined,
+    city: vendor.city ?? undefined,
+    state: vendor.state ?? undefined,
+    pincode: vendor.addressPincode ?? undefined,
+    pickupAddressLine: vendor.pickupAddressLine ?? undefined,
+    pickupCity: vendor.pickupCity ?? undefined,
+    pickupState: vendor.pickupState ?? undefined,
+    pickupPincode: vendor.pickupPincode ?? undefined,
+    deliveryCapability:
+      vendor.deliveryCapability === 'own_fleet' ||
+      vendor.deliveryCapability === 'third_party' ||
+      vendor.deliveryCapability === 'both'
+        ? vendor.deliveryCapability
+        : undefined,
+    serviceablePincodes: Array.from(new Set(vendor.serviceAreas.map((a) => a.pincode))),
+  };
+}
+
 export async function updateOnlineStore(
   userId: string,
   vendorId: string,
@@ -348,6 +438,25 @@ export async function updateOnlineStore(
     state?: string;
     pincode?: string;
     isActive?: boolean;
+    authorizedPersonName?: string;
+    authorizedPersonPhone?: string;
+    authorizedPersonEmail?: string;
+    gstNumber?: string;
+    panNumber?: string;
+    fssaiNumber?: string;
+    udyamNumber?: string;
+    cinNumber?: string;
+    bankAccountName?: string;
+    bankAccountNumber?: string;
+    bankIfsc?: string;
+    bankName?: string;
+    bankAccountType?: string;
+    pickupAddressLine?: string;
+    pickupCity?: string;
+    pickupState?: string;
+    pickupPincode?: string;
+    deliveryCapability?: string;
+    serviceablePincodes?: string[];
   },
 ) {
   const vendor = await prisma.vendor.findUnique({
@@ -395,12 +504,54 @@ export async function updateOnlineStore(
     multiWarehouseEnabled: false,
   };
   if (input.storeName !== undefined) data.businessName = input.storeName.trim();
-  if (input.storeDisplayName !== undefined) data.displayName = input.storeDisplayName.trim();
+  if (input.storeDisplayName !== undefined) {
+    data.displayName = input.storeDisplayName.trim();
+    data.tradeName = input.storeDisplayName.trim();
+  }
   if (input.addressLine !== undefined) data.addressLine = input.addressLine;
   if (input.city !== undefined) data.city = input.city;
   if (input.state !== undefined) data.state = input.state;
   if (input.pincode !== undefined) data.addressPincode = input.pincode;
   if (input.isActive !== undefined) data.isActive = input.isActive;
+  if (input.authorizedPersonName !== undefined) {
+    data.authorizedPersonName = input.authorizedPersonName.trim() || null;
+  }
+  if (input.authorizedPersonPhone !== undefined) {
+    data.authorizedPersonPhone =
+      input.authorizedPersonPhone.replace(/\D/g, '').slice(-10) || null;
+  }
+  if (input.authorizedPersonEmail !== undefined) {
+    data.authorizedPersonEmail = input.authorizedPersonEmail.trim().toLowerCase() || null;
+  }
+  if (input.gstNumber !== undefined) {
+    data.gstNumber = input.gstNumber.trim().toUpperCase() || null;
+  }
+  if (input.panNumber !== undefined) {
+    data.panNumber = input.panNumber.trim().toUpperCase() || null;
+  }
+  if (input.fssaiNumber !== undefined) data.fssaiNumber = input.fssaiNumber.trim() || null;
+  if (input.udyamNumber !== undefined) data.udyamNumber = input.udyamNumber.trim() || null;
+  if (input.cinNumber !== undefined) data.cinNumber = input.cinNumber.trim() || null;
+  if (input.bankAccountName !== undefined) {
+    data.bankAccountName = input.bankAccountName.trim() || null;
+  }
+  if (input.bankAccountNumber !== undefined) {
+    data.bankAccountNumber = input.bankAccountNumber.replace(/\D/g, '') || null;
+  }
+  if (input.bankIfsc !== undefined) {
+    data.bankIfsc = input.bankIfsc.trim().toUpperCase() || null;
+  }
+  if (input.bankName !== undefined) data.bankName = input.bankName.trim() || null;
+  if (input.bankAccountType !== undefined) {
+    data.bankAccountType = input.bankAccountType.trim() || null;
+  }
+  if (input.pickupAddressLine !== undefined) data.pickupAddressLine = input.pickupAddressLine;
+  if (input.pickupCity !== undefined) data.pickupCity = input.pickupCity;
+  if (input.pickupState !== undefined) data.pickupState = input.pickupState;
+  if (input.pickupPincode !== undefined) data.pickupPincode = input.pickupPincode;
+  if (input.deliveryCapability !== undefined) {
+    data.deliveryCapability = input.deliveryCapability.trim() || null;
+  }
 
   const updated = await prisma.vendor.update({
     where: { id: vendorId },
@@ -414,17 +565,50 @@ export async function updateOnlineStore(
     },
   });
 
-  if (vendor.defaultOutletId && (input.addressLine || input.city || input.state || input.pincode || input.storeName)) {
-    await prisma.outlet.update({
-      where: { id: vendor.defaultOutletId },
-      data: {
-        ...(input.storeName ? { name: input.storeName.trim().slice(0, 255) } : {}),
-        ...(input.addressLine !== undefined ? { addressLine: input.addressLine || 'Address pending' } : {}),
-        ...(input.city !== undefined ? { city: input.city } : {}),
-        ...(input.state !== undefined ? { state: input.state } : {}),
-        ...(input.pincode !== undefined ? { pincode: input.pincode } : {}),
-      },
-    }).catch(() => undefined);
+  const outletAddressLine = input.pickupAddressLine ?? input.addressLine;
+  const outletCity = input.pickupCity ?? input.city;
+  const outletState = input.pickupState ?? input.state;
+  const outletPincode = input.pickupPincode ?? input.pincode;
+  if (
+    vendor.defaultOutletId &&
+    (outletAddressLine !== undefined ||
+      outletCity !== undefined ||
+      outletState !== undefined ||
+      outletPincode !== undefined ||
+      input.storeName)
+  ) {
+    await prisma.outlet
+      .update({
+        where: { id: vendor.defaultOutletId },
+        data: {
+          ...(input.storeName ? { name: input.storeName.trim().slice(0, 255) } : {}),
+          ...(outletAddressLine !== undefined
+            ? { addressLine: outletAddressLine || 'Address pending' }
+            : {}),
+          ...(outletCity !== undefined ? { city: outletCity } : {}),
+          ...(outletState !== undefined ? { state: outletState } : {}),
+          ...(outletPincode !== undefined ? { pincode: outletPincode } : {}),
+        },
+      })
+      .catch(() => undefined);
+  }
+
+  if (input.serviceablePincodes !== undefined) {
+    const uniquePincodes = Array.from(
+      new Set(input.serviceablePincodes.map((p) => p.trim()).filter(Boolean)),
+    );
+    await prisma.serviceArea.deleteMany({ where: { vendorId } });
+    if (uniquePincodes.length > 0) {
+      await prisma.serviceArea.createMany({
+        data: uniquePincodes.map((pincode) => ({
+          vendorId,
+          outletId: vendor.defaultOutletId,
+          pincode,
+          isActive: true,
+        })),
+        skipDuplicates: true,
+      });
+    }
   }
 
   return updated;

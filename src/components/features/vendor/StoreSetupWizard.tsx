@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Multi-step Add Online Store wizard — mirrors register Steps 3–7.
+ * Multi-step Add / Edit Online Store wizard — mirrors register Steps 3–7.
  * Reuses VendorProfileForm for contact / tax / addresses.
  */
 
@@ -59,30 +59,116 @@ export type StoreSetupPayload = {
 };
 
 type Props = {
+  mode?: 'create' | 'edit';
+  initialValues?: Partial<StoreSetupPayload>;
   submitting?: boolean;
   onCancel: () => void;
   onSubmit: (payload: StoreSetupPayload) => Promise<void>;
 };
 
-export function StoreSetupWizard({ submitting = false, onCancel, onSubmit }: Props) {
+function addressesMatch(
+  a?: { line?: string; city?: string; state?: string; pin?: string },
+  b?: { line?: string; city?: string; state?: string; pin?: string },
+): boolean {
+  const norm = (s?: string) => (s ?? '').trim().toLowerCase();
+  return (
+    norm(a?.line) === norm(b?.line) &&
+    norm(a?.city) === norm(b?.city) &&
+    norm(a?.state) === norm(b?.state) &&
+    norm(a?.pin) === norm(b?.pin)
+  );
+}
+
+function profileFromInitial(v?: Partial<StoreSetupPayload>): VendorProfileValues {
+  const nameParts = (v?.authorizedPersonName ?? '').trim().split(/\s+/).filter(Boolean);
+  const firstName = nameParts[0] ?? '';
+  const lastName = nameParts.slice(1).join(' ');
+  const billing = {
+    addressLine: v?.addressLine ?? '',
+    city: v?.city ?? '',
+    state: v?.state ?? '',
+    pincode: v?.pincode ?? '',
+  };
+  return {
+    ...EMPTY_VENDOR_PROFILE,
+    firstName,
+    lastName,
+    phone: v?.authorizedPersonPhone ?? '',
+    email: v?.authorizedPersonEmail ?? '',
+    authorizedPersonName: v?.authorizedPersonName ?? '',
+    authorizedPersonPhone: v?.authorizedPersonPhone ?? '',
+    authorizedPersonEmail: v?.authorizedPersonEmail ?? '',
+    gstin: v?.gstNumber ?? '',
+    gstNumber: v?.gstNumber ?? '',
+    pan: v?.panNumber ?? '',
+    panNumber: v?.panNumber ?? '',
+    fssaiNumber: v?.fssaiNumber ?? '',
+    billingAddressLine: billing.addressLine,
+    billingCity: billing.city,
+    billingState: billing.state,
+    billingPincode: billing.pincode,
+    billingAddress: billing,
+    pickupAddressLine: v?.pickupAddressLine ?? '',
+    pickupCity: v?.pickupCity ?? '',
+    pickupState: v?.pickupState ?? '',
+    pickupPincode: v?.pickupPincode ?? '',
+  };
+}
+
+export function StoreSetupWizard({
+  mode = 'create',
+  initialValues,
+  submitting = false,
+  onCancel,
+  onSubmit,
+}: Props) {
+  const isEdit = mode === 'edit';
   const [step, setStep] = useState(1);
-  const [maxReached, setMaxReached] = useState(1);
-  const [storeName, setStoreName] = useState('');
-  const [profile, setProfile] = useState<VendorProfileValues>({ ...EMPTY_VENDOR_PROFILE });
+  const [maxReached, setMaxReached] = useState(isEdit ? 5 : 1);
+  const [storeName, setStoreName] = useState(initialValues?.storeName ?? '');
+  const [profile, setProfile] = useState<VendorProfileValues>(() => profileFromInitial(initialValues));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [pickupSameAsBilling, setPickupSameAsBilling] = useState(true);
+  const [pickupSameAsBilling, setPickupSameAsBilling] = useState(() => {
+    if (!initialValues) return true;
+    const hasPickup = Boolean(
+      (initialValues.pickupAddressLine ?? '').trim() ||
+        (initialValues.pickupCity ?? '').trim() ||
+        (initialValues.pickupPincode ?? '').trim(),
+    );
+    if (!hasPickup) return true;
+    return addressesMatch(
+      {
+        line: initialValues.addressLine,
+        city: initialValues.city,
+        state: initialValues.state,
+        pin: initialValues.pincode,
+      },
+      {
+        line: initialValues.pickupAddressLine,
+        city: initialValues.pickupCity,
+        state: initialValues.pickupState,
+        pin: initialValues.pickupPincode,
+      },
+    );
+  });
 
-  const [bankAccountName, setBankAccountName] = useState('');
-  const [bankAccountNumber, setBankAccountNumber] = useState('');
-  const [bankIfsc, setBankIfsc] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [bankAccountType, setBankAccountType] = useState<'savings' | 'current' | ''>('');
+  const [bankAccountName, setBankAccountName] = useState(initialValues?.bankAccountName ?? '');
+  const [bankAccountNumber, setBankAccountNumber] = useState(initialValues?.bankAccountNumber ?? '');
+  const [bankIfsc, setBankIfsc] = useState(initialValues?.bankIfsc ?? '');
+  const [bankName, setBankName] = useState(initialValues?.bankName ?? '');
+  const [bankAccountType, setBankAccountType] = useState<'savings' | 'current' | ''>(
+    initialValues?.bankAccountType ?? '',
+  );
 
-  const [pincodes, setPincodes] = useState<string[]>([]);
+  const [pincodes, setPincodes] = useState<string[]>(() =>
+    Array.from(new Set(initialValues?.serviceablePincodes ?? [])),
+  );
   const [pincodeInput, setPincodeInput] = useState('');
-  const [deliveryCapability, setDeliveryCapability] = useState<'own_fleet' | 'third_party' | 'both' | ''>('');
-  const [udyamNumber, setUdyamNumber] = useState('');
-  const [cinNumber, setCinNumber] = useState('');
+  const [deliveryCapability, setDeliveryCapability] = useState<
+    'own_fleet' | 'third_party' | 'both' | ''
+  >(initialValues?.deliveryCapability ?? '');
+  const [udyamNumber, setUdyamNumber] = useState(initialValues?.udyamNumber ?? '');
+  const [cinNumber, setCinNumber] = useState(initialValues?.cinNumber ?? '');
 
   const setFE = (field: string, msg: string) => {
     setFieldErrors((prev) => ({ ...prev, [field]: msg }));
@@ -204,9 +290,13 @@ export function StoreSetupWizard({ submitting = false, onCancel, onSubmit }: Pro
   return (
     <div className="bg-white rounded-[16px] w-full max-w-[720px] max-h-[90vh] overflow-y-auto shadow-xl border border-[#EEEEEE]">
       <div className="px-5 py-4 border-b border-[#F0F0F0] sticky top-0 bg-white z-10">
-        <h3 className="text-[16px] font-bold text-[#181725]">Add Online Store</h3>
+        <h3 className="text-[16px] font-bold text-[#181725]">
+          {isEdit ? 'Edit Online Store' : 'Add Online Store'}
+        </h3>
         <p className="text-[12px] text-[#7C7C7C] mt-0.5">
-          Same setup as register (Steps 3–7). This store stays off the marketplace until a super-admin Approve &amp; Verify.
+          {isEdit
+            ? 'Update contact, tax, bank, addresses, and service areas for this store.'
+            : 'Same setup as register (Steps 3–7). This store stays off the marketplace until a super-admin Approve & Verify.'}
         </p>
         <div className="mt-3 flex gap-1.5 flex-wrap">
           {STEPS.map((s) => {
@@ -432,7 +522,7 @@ export function StoreSetupWizard({ submitting = false, onCancel, onSubmit }: Pro
               className="flex-1 h-[36px] bg-[#299E60] hover:bg-[#238a54] text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
-              Create store
+              {isEdit ? 'Save changes' : 'Create store'}
             </button>
           )}
         </div>

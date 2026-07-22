@@ -74,12 +74,9 @@ export default function BusinessDetailPage() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [addStoreOpen, setAddStoreOpen] = useState(false);
-  const [editStore, setEditStore] = useState<StoreRow | null>(null);
-  const [editStoreName, setEditStoreName] = useState('');
-  const [editAddressLine, setEditAddressLine] = useState('');
-  const [editCity, setEditCity] = useState('');
-  const [editState, setEditState] = useState('');
-  const [editPincode, setEditPincode] = useState('');
+  const [editStoreId, setEditStoreId] = useState<string | null>(null);
+  const [editStoreInitial, setEditStoreInitial] = useState<Partial<StoreSetupPayload> | null>(null);
+  const [editStoreLoading, setEditStoreLoading] = useState(false);
   const [editBusinessOpen, setEditBusinessOpen] = useState(false);
   const [editProfile, setEditProfile] = useState<VendorProfileValues>({ ...EMPTY_VENDOR_PROFILE });
   const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string>>({});
@@ -173,27 +170,14 @@ export default function BusinessDetailPage() {
     }
   };
 
-  const handleEditStore = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editStore || submitting) return;
-    const name = editStoreName.trim();
-    if (name.length < 2) {
-      toast.error('Store name is required');
-      return;
-    }
+  const handleEditStore = async (payload: StoreSetupPayload) => {
+    if (!editStoreId || submitting) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/v1/supplier/stores/${editStore.id}`, {
+      const res = await fetch(`/api/v1/supplier/stores/${editStoreId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storeName: name,
-          storeDisplayName: name,
-          addressLine: editAddressLine.trim() || undefined,
-          city: editCity.trim() || undefined,
-          state: editState.trim() || undefined,
-          pincode: editPincode.trim() || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
@@ -201,7 +185,8 @@ export default function BusinessDetailPage() {
         return;
       }
       toast.success('Online store updated');
-      setEditStore(null);
+      setEditStoreId(null);
+      setEditStoreInitial(null);
       await fetchBusiness();
     } catch {
       toast.error('Failed to update store');
@@ -210,13 +195,23 @@ export default function BusinessDetailPage() {
     }
   };
 
-  const openEdit = (store: StoreRow) => {
-    setEditStore(store);
-    setEditStoreName(store.name);
-    setEditAddressLine(store.addressLine ?? '');
-    setEditCity(store.city ?? '');
-    setEditState(store.state ?? '');
-    setEditPincode(store.pincode ?? '');
+  const openEdit = async (store: StoreRow) => {
+    if (editStoreLoading) return;
+    setEditStoreLoading(true);
+    try {
+      const res = await fetch(`/api/v1/supplier/stores/${store.id}`);
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        toast.error(json.error?.message ?? 'Failed to load store details');
+        return;
+      }
+      setEditStoreId(store.id);
+      setEditStoreInitial(json.data as Partial<StoreSetupPayload>);
+    } catch {
+      toast.error('Failed to load store details');
+    } finally {
+      setEditStoreLoading(false);
+    }
   };
 
   const openEditBusiness = () => {
@@ -333,10 +328,11 @@ export default function BusinessDetailPage() {
         </button>
         <button
           type="button"
-          onClick={() => openEdit(store)}
-          className="inline-flex items-center gap-1 h-[30px] px-2 text-[12px] font-semibold text-[#7C7C7C] hover:text-[#181725] hover:bg-[#F3F4F6] rounded-[6px]"
+          disabled={editStoreLoading}
+          onClick={() => void openEdit(store)}
+          className="inline-flex items-center gap-1 h-[30px] px-2 text-[12px] font-semibold text-[#7C7C7C] hover:text-[#181725] hover:bg-[#F3F4F6] disabled:opacity-50 rounded-[6px]"
         >
-          <Pencil size={12} />
+          {editStoreLoading ? <Loader2 size={12} className="animate-spin" /> : <Pencil size={12} />}
           Edit
         </button>
         <button
@@ -607,83 +603,18 @@ export default function BusinessDetailPage() {
         </div>
       )}
 
-      {editStore && (
+      {editStoreId && editStoreInitial && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-[16px] w-full max-w-[520px] max-h-[90vh] overflow-y-auto shadow-xl border border-[#EEEEEE]">
-            <div className="px-5 py-4 border-b border-[#F0F0F0] sticky top-0 bg-white z-10">
-              <h3 className="text-[16px] font-bold text-[#181725]">Edit Online Store</h3>
-              <p className="text-[12px] text-[#7C7C7C] mt-0.5">
-                Update the storefront name and address shown for this store.
-              </p>
-            </div>
-            <form onSubmit={handleEditStore} className="px-5 py-4 space-y-3">
-              <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">Store name</label>
-                <input
-                  required
-                  minLength={2}
-                  value={editStoreName}
-                  onChange={(e) => setEditStoreName(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                  placeholder="Customer-facing store name"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-[#181725] mb-1">Address line</label>
-                <input
-                  value={editAddressLine}
-                  onChange={(e) => setEditAddressLine(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                  placeholder="Street / building"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-[#181725] mb-1">City</label>
-                  <input
-                    value={editCity}
-                    onChange={(e) => setEditCity(e.target.value)}
-                    className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-[#181725] mb-1">State</label>
-                  <input
-                    value={editState}
-                    onChange={(e) => setEditState(e.target.value)}
-                    className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-[#181725] mb-1">Pincode</label>
-                  <input
-                    value={editPincode}
-                    onChange={(e) => setEditPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="w-full px-3 py-2 border border-[#EEEEEE] rounded-[8px] text-[13px] outline-none focus:border-[#299E60]"
-                    inputMode="numeric"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setEditStore(null)}
-                  disabled={submitting}
-                  className="flex-1 h-[36px] border border-[#EEEEEE] rounded-[8px] text-[13px] font-semibold text-[#7C7C7C]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 h-[36px] bg-[#299E60] text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {submitting && <Loader2 size={14} className="animate-spin" />}
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
+          <StoreSetupWizard
+            mode="edit"
+            initialValues={editStoreInitial}
+            submitting={submitting}
+            onCancel={() => {
+              setEditStoreId(null);
+              setEditStoreInitial(null);
+            }}
+            onSubmit={handleEditStore}
+          />
         </div>
       )}
     </div>
