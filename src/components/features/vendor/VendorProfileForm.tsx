@@ -55,6 +55,8 @@ export interface VendorProfileFormProps {
   onPickupSameAsBillingChange?: (v: boolean) => void;
   className?: string;
   layout?: 'default' | 'wide';
+  /** Show the optional Display Name field in the identity section (Businesses pages). */
+  showDisplayName?: boolean;
 }
 
 function SectionHeader({ icon: Icon, children, spanClass }: {
@@ -88,6 +90,7 @@ export function VendorProfileForm({
   onPickupSameAsBillingChange,
   className,
   layout = 'default',
+  showDisplayName = false,
 }: VendorProfileFormProps) {
   const set = (patch: Partial<VendorProfileValues>) => onChange(patch);
   const blur = (field: string, v: string) => onFieldBlur?.(field, v);
@@ -139,6 +142,14 @@ export function VendorProfileForm({
               onChange={v => set({ legalName: v, businessName: v })}
               onBlur={() => blur('legalName', value.legalName ?? value.businessName ?? '')}
               placeholder="Registered company name" />
+            {showDisplayName && (
+              <TextField label="Display Name (optional)" value={value.displayName ?? value.tradeName ?? ''}
+                dataField="displayName"
+                error={errors.displayName}
+                onChange={v => set({ displayName: v, tradeName: v })}
+                onBlur={() => blur('displayName', value.displayName ?? value.tradeName ?? '')}
+                placeholder="Shown to customers (defaults to legal name)" />
+            )}
             <VendorTypeMatrix
               value={value}
               onChange={onChange}

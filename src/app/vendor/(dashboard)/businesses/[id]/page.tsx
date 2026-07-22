@@ -222,13 +222,23 @@ export default function BusinessDetailPage() {
   const openEditBusiness = () => {
     if (!business) return;
     const selections = normalizeVendorTypeSelections(business.vendorTypeSelections);
+    // Treat displayName that merely mirrors legalName (or a store name copied in
+    // during registration) as "not set", so legal-name edits propagate to the
+    // displayed name instead of being shadowed by the stale copy.
+    const storeNames = business.stores.map((s) => s.name);
+    const customDisplayName =
+      business.displayName &&
+      business.displayName !== business.legalName &&
+      !storeNames.includes(business.displayName)
+        ? business.displayName
+        : '';
     setEditFieldErrors({});
     setEditProfile({
       ...EMPTY_VENDOR_PROFILE,
       legalName: business.legalName,
       businessName: business.legalName,
-      displayName: business.displayName ?? '',
-      tradeName: business.displayName ?? '',
+      displayName: customDisplayName,
+      tradeName: customDisplayName,
       gstin: business.gstin ?? '',
       gstNumber: business.gstin ?? '',
       vendorTypeSelections: selections,
@@ -572,6 +582,7 @@ export default function BusinessDetailPage() {
                 }}
                 visibleSections={{ identity: true, ops: true }}
                 layout="wide"
+                showDisplayName
               />
               <div className="flex gap-2 pt-1 sticky bottom-0 bg-white pb-1">
                 <button
