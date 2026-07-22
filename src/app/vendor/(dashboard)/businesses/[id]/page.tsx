@@ -129,10 +129,11 @@ export default function BusinessDetailPage() {
   };
 
   const handleEnterStore = async (store: StoreRow) => {
-    if (!store.isVerified || !store.isActive) {
-      toast.error('This store is pending admin approval');
+    if (!store.isActive) {
+      toast.error('This store is inactive');
       return;
     }
+    // Pending approval: still allow Enter for team ops (marketplace visibility is separate).
     setEnteringId(store.id);
     try {
       setEnteredStore(true);
@@ -313,11 +314,11 @@ export default function BusinessDetailPage() {
       <div className="inline-flex items-center gap-1 flex-wrap">
         <button
           type="button"
-          disabled={!store.isVerified || !store.isActive || enteringId === store.id}
+          disabled={!store.isActive || enteringId === store.id}
           onClick={() => void handleEnterStore(store)}
           className="inline-flex items-center gap-1 h-[30px] px-2.5 text-[12px] font-bold text-white bg-[#299E60] hover:bg-[#238a54] disabled:opacity-50 rounded-[6px]"
           data-testid="enter-store"
-          title={!store.isVerified ? 'Pending admin approval' : undefined}
+          title={!store.isVerified ? 'Pending marketplace approval — ops access still available' : undefined}
         >
           {enteringId === store.id ? (
             <Loader2 size={12} className="animate-spin" />

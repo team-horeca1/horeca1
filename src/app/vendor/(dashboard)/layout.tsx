@@ -63,6 +63,7 @@ import {
   readEnteredStore,
   setEnteredStore,
   resolvePortalLevel,
+  needsStorePicker,
 } from '@/lib/supplierPortalLevel';
 
 export default function VendorLayout({
@@ -98,6 +99,7 @@ export default function VendorLayout({
     const availableStores = switcherStores.length > 0
       ? switcherStores
       : (sessionUser?.availableStores ?? []);
+    const allowStorePicker = needsStorePicker({ isStoreScopedOnly });
     const activeVendorId = switcherVendorId ?? sessionUser?.activeVendorId ?? null;
     const activeStoreName =
         availableStores.find((s) => s.id === activeVendorId)?.displayName
@@ -148,9 +150,10 @@ export default function VendorLayout({
 
     const portalLevel = resolvePortalLevel(pathname, {
         isStoreScopedOnly,
-        enteredStore: isStoreScopedOnly ? true : enteredStore,
+        enteredStore,
+        allowStorePicker,
     });
-    const showStoreNav = portalLevel === 'store' || isStoreScopedOnly;
+    const showStoreNav = portalLevel === 'store';
 
     const { can } = usePermissions();
     const firstAllowedRoute = getFirstAllowedRoute('vendor', can, {
@@ -162,25 +165,32 @@ export default function VendorLayout({
       links: filterNavLinks(g.links, can, 'vendor', (link) =>
         // Hide only after we know there are no authorized brands (null = still loading)
         (link.href === '/vendor/brand-mappings' && hasBrandMappings === false)
-        // Store-scoped staff: no supplier hierarchy links
-        || (isStoreScopedOnly && (
-          link.href === '/vendor/businesses'
-          || link.href === '/vendor/overview'
-          || link.name === 'Back to Supplier'
+        // Store-scoped picker: Businesses only (no team / supplier overview)
+        || (allowStorePicker && !showStoreNav && (
+          link.href === '/vendor/overview'
+          || link.href === '/vendor/team'
+          || link.href === '/vendor/account'
+          || link.href === '/vendor/all-orders'
+          || link.href === '/vendor/reports'
+          || link.href === '/vendor/ledger'
         )),
       ),
     })).filter((g) => g.links.length > 0);
 
-    // Hierarchy routing: store-scoped stay in ops; business-wide need Enter Store for ops
+    // Hierarchy routing:
+    // - store-scoped team → Businesses picker until Enter Store
+    // - business-wide → overview until Enter Store
     React.useEffect(() => {
         if (status !== 'authenticated') return;
         if (isApplicationPending) return;
         if (!isAdmin && !isActiveVendor) return;
         if (pathname === '/vendor/setup') return;
 
-        if (isStoreScopedOnly) {
-            if (pathname === '/vendor/overview' || pathname.startsWith('/vendor/businesses')) {
-                router.replace('/vendor/dashboard');
+        if (allowStorePicker) {
+            if (isStoreOpsPath(pathname) && !readEnteredStore()) {
+                router.replace('/vendor/businesses');
+            } else if (pathname === '/vendor/overview') {
+                router.replace('/vendor/businesses');
             }
             return;
         }
@@ -188,7 +198,7 @@ export default function VendorLayout({
         if (isStoreOpsPath(pathname) && !readEnteredStore()) {
             router.replace('/vendor/overview');
         }
-    }, [status, isApplicationPending, isAdmin, isActiveVendor, isStoreScopedOnly, pathname, router]);
+    }, [status, isApplicationPending, isAdmin, isActiveVendor, allowStorePicker, pathname, router]);
 
     React.useEffect(() => {
         if (status !== 'authenticated') return;
@@ -404,78 +414,74 @@ export default function VendorLayout({
             <div className="w-full bg-emerald-50/70 border-b border-emerald-100 px-[clamp(1rem,2.5vw,2rem)] py-2.5 flex items-center gap-3 text-[13px]">
                 <Building2 size={14} className="text-[#299E60] shrink-0" />
                 <nav className="flex items-center gap-1.5 min-w-0 flex-wrap" aria-label="Portal level">
-                    {!isStoreScopedOnly && (
-                        <>
-                            <Link
-                                href="/vendor/overview"
-                                className={cn(
-                                    'font-semibold shrink-0',
-                                    portalLevel === 'supplier' && !supplierPersonName
-                                      ? 'text-[#181725]'
-                                      : 'text-[#299E60] hover:text-[#238a54]',
-                                )}
-                            >
-                                Supplier
-                            </Link>
-                            {supplierPersonName && (
-                                <>
-                                    <span className="text-[#AEAEAE]">›</span>
-                                    <Link
-                                        href="/vendor/businesses"
-                                        className={cn(
-                                            'font-semibold truncate max-w-[180px]',
-                                            onBusinessesList
-                                              ? 'text-[#181725]'
-                                              : 'text-[#299E60] hover:text-[#238a54]',
-                                        )}
-                                        title={supplierPersonName}
-                                    >
-                                        {supplierPersonName}
-                                    </Link>
-                                </>
-                            )}
-                            {(portalLevel === 'business' || portalLevel === 'store') && !onBusinessesList && (
-                                <>
-                                    <span className="text-[#AEAEAE]">›</span>
-                                    <Link
-                                        href={currentAccount?.id
-                                          ? `/vendor/businesses/${currentAccount.id}`
-                                          : '/vendor/businesses'}
-                                        className={cn(
-                                            'font-semibold truncate max-w-[160px]',
-                                            portalLevel === 'business' ? 'text-[#181725]' : 'text-[#299E60] hover:text-[#238a54]',
-                                        )}
-                                        title={activeBusinessName ?? 'Business'}
-                                    >
-                                        {activeBusinessName ?? 'Business'}
-                                    </Link>
-                                </>
-                            )}
-                            {portalLevel === 'store' && activeStoreName && (
-                                <>
-                                    <span className="text-[#AEAEAE]">›</span>
-                                    <span className="text-[#181725] font-semibold truncate max-w-[160px]" title={activeStoreName}>
-                                        {activeStoreName}
-                                    </span>
-                                </>
-                            )}
-                        </>
-                    )}
-                    {isStoreScopedOnly && (
-                        <span className="font-semibold text-[#181725] truncate">
-                            {activeStoreName ?? activeBusinessName ?? 'Store'}
-                        </span>
-                    )}
+                    <>
+                        {!allowStorePicker && (
+                          <Link
+                              href="/vendor/overview"
+                              className={cn(
+                                  'font-semibold shrink-0',
+                                  portalLevel === 'supplier' && !supplierPersonName
+                                    ? 'text-[#181725]'
+                                    : 'text-[#299E60] hover:text-[#238a54]',
+                              )}
+                          >
+                              Supplier
+                          </Link>
+                        )}
+                        {(supplierPersonName || allowStorePicker) && (
+                            <>
+                                {!allowStorePicker && <span className="text-[#AEAEAE]">›</span>}
+                                <Link
+                                    href="/vendor/businesses"
+                                    className={cn(
+                                        'font-semibold truncate max-w-[180px]',
+                                        onBusinessesList || (!showStoreNav && allowStorePicker)
+                                          ? 'text-[#181725]'
+                                          : 'text-[#299E60] hover:text-[#238a54]',
+                                    )}
+                                    title={supplierPersonName ?? 'Businesses'}
+                                >
+                                    {allowStorePicker ? 'My businesses' : (supplierPersonName ?? 'Businesses')}
+                                </Link>
+                            </>
+                        )}
+                        {(portalLevel === 'business' || portalLevel === 'store') && !onBusinessesList && (
+                            <>
+                                <span className="text-[#AEAEAE]">›</span>
+                                <Link
+                                    href={currentAccount?.id
+                                      ? `/vendor/businesses/${currentAccount.id}`
+                                      : '/vendor/businesses'}
+                                    className={cn(
+                                        'font-semibold truncate max-w-[160px]',
+                                        portalLevel === 'business' ? 'text-[#181725]' : 'text-[#299E60] hover:text-[#238a54]',
+                                    )}
+                                    title={activeBusinessName ?? 'Business'}
+                                >
+                                    {activeBusinessName ?? 'Business'}
+                                </Link>
+                            </>
+                        )}
+                        {portalLevel === 'store' && activeStoreName && (
+                            <>
+                                <span className="text-[#AEAEAE]">›</span>
+                                <span className="text-[#181725] font-semibold truncate max-w-[160px]" title={activeStoreName}>
+                                    {activeStoreName}
+                                </span>
+                            </>
+                        )}
+                    </>
                 </nav>
-                {showStoreNav && !isStoreScopedOnly && (
+                {showStoreNav && (
                     <Link
-                        href="/vendor/overview"
+                        href={allowStorePicker ? '/vendor/businesses' : '/vendor/overview'}
+                        onClick={() => setEnteredStore(false)}
                         className="ml-auto text-[12px] font-bold text-[#299E60] hover:text-[#238a54] shrink-0"
                     >
-                        Back to Supplier
+                        {allowStorePicker ? 'Switch store' : 'Back to Supplier'}
                     </Link>
                 )}
-                {!showStoreNav && !isStoreScopedOnly && (
+                {!showStoreNav && (
                     <Link
                         href="/vendor/businesses"
                         className="ml-auto text-[12px] font-bold text-[#299E60] hover:text-[#238a54] shrink-0"

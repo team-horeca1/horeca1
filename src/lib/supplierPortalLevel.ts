@@ -74,14 +74,32 @@ export function setEnteredStore(entered: boolean): void {
 }
 
 /**
+ * Store-scoped team members always use the Businesses picker (Enter Store),
+ * even with a single store — so they can switch if access grows, and never
+ * get locked into Store Ops with no way back.
+ */
+export function needsStorePicker(opts: {
+  isStoreScopedOnly: boolean;
+  availableStoreCount?: number;
+}): boolean {
+  return opts.isStoreScopedOnly;
+}
+
+/**
  * Resolve UI level for sidebar/header.
- * Store-scoped staff always see store ops.
+ * Single-store scoped staff always see store ops.
+ * Multi-store scoped staff use Enter Store / picker like business-wide users.
  */
 export function resolvePortalLevel(
   pathname: string,
-  opts: { isStoreScopedOnly: boolean; enteredStore: boolean },
+  opts: {
+    isStoreScopedOnly: boolean;
+    enteredStore: boolean;
+    /** When true, do not force store level until Enter Store. */
+    allowStorePicker?: boolean;
+  },
 ): SupplierPortalLevel {
-  if (opts.isStoreScopedOnly) return 'store';
+  if (opts.isStoreScopedOnly && !opts.allowStorePicker) return 'store';
   if (pathname.startsWith('/vendor/businesses/') && pathname !== '/vendor/businesses') {
     return opts.enteredStore && isStoreOpsPath(pathname) ? 'store' : 'business';
   }

@@ -1,17 +1,18 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSession } from 'next-auth/react';
 import {
-  X, Check, Loader2, AlertCircle, Store, ShoppingCart,
+  X, Check, Loader2, Store, ShoppingCart,
   CreditCard, Eye, Crown, Shield, Users, DollarSign, Package, Archive, Edit3, Pencil,
 } from 'lucide-react';
 import type { RoleItem } from './AddMemberWizard';
+import { Step2Outlets, type SupplierBusinessItem } from './AddMemberWizard';
 import { PermissionMatrix, countMatrixPermissions } from './PermissionMatrix';
 import type { RoleScope } from '@/lib/permissions/portalFeatures';
 import { sortPermissionJson } from '@/lib/permissions/sortPermissionJson';
 import { FormErrorBanner, useFormFeedback } from '@/components/ui/form';
 import { parseJsonResponse } from '@/lib/apiError';
-import { toast } from 'sonner';
 
 interface OutletItem {
   id: string;
@@ -26,6 +27,9 @@ interface MemberDetails {
   user: { fullName: string; email: string | null; phone: string | null };
   role: { id: string | null; name: string };
   outletIds: string[];
+  businessAccountIds?: string[];
+  storeIds?: string[];
+  scope?: 'business' | 'store';
   storefrontAccess: { view: boolean; order: boolean; pay: boolean };
 }
 
@@ -89,12 +93,20 @@ export function EditMemberModal({
   onClose,
   onSaved,
 }: EditMemberModalProps) {
+  const { data: session } = useSession();
+  const activeBusinessAccountId =
+    (session?.user as { activeBusinessAccountId?: string } | undefined)?.activeBusinessAccountId;
+
   const isPortalScope = scope === 'admin' || scope === 'brand';
   const isAccountScope = scope === 'account';
+  const isSupplierEdit = scope === 'vendor';
   const hasMemberGet = scope === 'vendor';
 
-  const [loading, setLoading] = useState(hasMemberGet);
+  const [loading, setLoading] = useState(hasMemberGet || isSupplierEdit);
   const [outlets, setOutlets] = useState<OutletItem[]>(outletsProp);
+  const [businesses, setBusinesses] = useState<SupplierBusinessItem[]>([]);
+  const [selectedBusinessIds, setSelectedBusinessIds] = useState<Set<string>>(new Set());
+  const [baName, setBaName] = useState('Vendor Account');
 
   const seedRoleId = initialRoleId ?? userRoles?.[0]?.role.id ?? roles[0]?.id ?? '';
   const [allOutlets, setAllOutlets] = useState(true);
@@ -113,7 +125,7 @@ export function EditMemberModal({
   const { bannerError, clearErrors, applyApiError, applyValidationErrors } = useFormFeedback();
 
   useEffect(() => {
-    if (!hasMemberGet) {
+    if (!hasMemberGet && !isSupplierEdit) {
       setLoading(false);
       return;
     }
@@ -121,24 +133,92 @@ export function EditMemberModal({
     const memberUrl = teamMemberEndpoint || `/api/v1/vendor/team/${memberId}`;
     const outletsUrl = outletsEndpoint ?? '/api/v1/vendor/outlets';
 
-    Promise.all([
-      fetch(memberUrl).then((r) => r.json()),
-      fetch(outletsUrl).then((r) => r.json()),
-    ])
-      .then(([memberJson, outletsJson]) => {
-        if (outletsJson.success) {
-          const data = outletsJson.data;
+    const load = async () => {
+      try {
+        const fetches: Promise<Response>[] = [fetch(memberUrl)];
+        if (isSupplierEdit) {
+          fetches.push(fetch('/api/v1/supplier/businesses'));
+        } else {
+          fetches.push(fetch(outletsUrl));
+        }
+
+        const [memberRes, accessRes] = await Promise.all(fetches);
+        const memberJson = await memberRes.json();
+        const accessJson = await accessRes.json();
+
+        let mappedBusinesses: SupplierBusinessItem[] = [];
+        if (isSupplierEdit && accessJson.success && Array.isArray(accessJson.data)) {
+          mappedBusinesses = accessJson.data.map((b: {
+            id: string;
+            legalName: string;
+            displayName: string | null;
+            status: string;
+            isPrimary: boolean;
+            stores: Array<{
+              id: string;
+              name: string;
+              isActive: boolean;
+              isPrimaryStore: boolean;
+              addressLine: string | null;
+              city: string | null;
+              pincode: string | null;
+            }>;
+          }) => ({
+            id: b.id,
+            name: b.displayName?.trim() || b.legalName,
+            isPrimary: b.isPrimary,
+            status: b.status,
+            stores: (b.stores ?? []).map((s) => ({
+              id: s.id,
+              name: s.name,
+              isActive: s.isActive,
+              isPrimaryStore: s.isPrimaryStore,
+              addressLine: s.addressLine,
+              city: s.city,
+              pincode: s.pincode,
+            })),
+          }));
+          setBusinesses(mappedBusinesses);
+        } else if (accessJson.success) {
+          const data = accessJson.data;
           setOutlets(Array.isArray(data) ? data : (data.outlets ?? []));
         }
+
         if (memberJson.success) {
           const d = memberJson.data as MemberDetails;
-          if (d.outletIds.length === 0) {
+
+          if (isSupplierEdit) {
+            const baIds = d.businessAccountIds?.length
+              ? d.businessAccountIds
+              : (() => {
+                  const preferred =
+                    mappedBusinesses.find((b) => b.id === activeBusinessAccountId)
+                    ?? mappedBusinesses.find((b) => b.isPrimary)
+                    ?? mappedBusinesses[0];
+                  return preferred ? [preferred.id] : [];
+                })();
+            setSelectedBusinessIds(new Set(baIds));
+            setBaName(
+              mappedBusinesses.filter((b) => baIds.includes(b.id)).map((b) => b.name).join(', ')
+              || 'Vendor Account',
+            );
+
+            const isBusinessWide = d.scope === 'business' || !d.storeIds || d.storeIds.length === 0;
+            if (isBusinessWide) {
+              setAllOutlets(true);
+              setSelectedOutletIds(new Set());
+            } else {
+              setAllOutlets(false);
+              setSelectedOutletIds(new Set(d.storeIds));
+            }
+          } else if (d.outletIds.length === 0) {
             setAllOutlets(true);
             setSelectedOutletIds(new Set());
           } else {
             setAllOutlets(false);
             setSelectedOutletIds(new Set(d.outletIds));
           }
+
           const matchingRole = roles.find((r) => r.id === d.role.id);
           if (matchingRole) {
             setSelectedRoleId(matchingRole.id);
@@ -148,14 +228,16 @@ export function EditMemberModal({
           setSfOrder(d.storefrontAccess.order);
           setSfPay(d.storefrontAccess.pay);
         }
-      })
-      .catch(() => {
+      } catch {
         applyValidationErrors({ _server: 'Failed to load member details' }, 'Failed to load member details');
-      })
-      .finally(() => {
+      } finally {
         setLoading(false);
-      });
-  }, [hasMemberGet, memberId, teamMemberEndpoint, outletsEndpoint, roles]);
+      }
+    };
+
+    void load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMemberGet, isSupplierEdit, memberId, teamMemberEndpoint, outletsEndpoint, roles]);
 
   const templates = roles.filter((r) => !r.name.startsWith('Storefront'));
   const selectedRole = selectedRoleId ? roles.find((r) => r.id === selectedRoleId) : null;
@@ -176,6 +258,46 @@ export function EditMemberModal({
   }, []);
 
   const totalSelected = countMatrixPermissions(permissions, scope);
+
+  const selectedBusinesses = useMemo(
+    () => businesses.filter((b) => selectedBusinessIds.has(b.id)),
+    [businesses, selectedBusinessIds],
+  );
+
+  const storeGroups = useMemo(
+    () => selectedBusinesses.map((b) => ({
+      businessId: b.id,
+      businessName: b.name,
+      stores: b.stores.map((s) => ({
+        id: s.id,
+        name: s.name,
+        code: null as string | null,
+        addressLine: s.addressLine ?? '',
+        city: s.city,
+        pincode: s.pincode,
+      })),
+    })),
+    [selectedBusinesses],
+  );
+
+  const selectedStores = selectedBusinesses.flatMap((b) => b.stores);
+
+  const toggleBusiness = (businessId: string) => {
+    setSelectedBusinessIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(businessId)) {
+        if (next.size === 1) return prev;
+        next.delete(businessId);
+      } else {
+        next.add(businessId);
+      }
+      const names = businesses.filter((b) => next.has(b.id)).map((b) => b.name);
+      setBaName(names.join(', ') || 'Vendor Account');
+      return next;
+    });
+    setAllOutlets(true);
+    setSelectedOutletIds(new Set());
+  };
 
   const toggleOutlet = (id: string) => {
     setAllOutlets(false);
@@ -209,6 +331,44 @@ export function EditMemberModal({
           return;
         }
         body = isDirty || !selectedRoleId ? { permissions } : { roleId: selectedRoleId };
+      } else if (isSupplierEdit) {
+        if (selectedBusinessIds.size === 0) {
+          applyValidationErrors({ businessAccountIds: 'Select at least one business account' }, 'Select at least one business');
+          setSubmitting(false);
+          return;
+        }
+        if (selectedStores.length === 0) {
+          applyValidationErrors(
+            { storeIds: 'Selected business(es) have no Online Stores yet' },
+            'Selected business(es) have no Online Stores yet',
+          );
+          setSubmitting(false);
+          return;
+        }
+        if (!allOutlets && selectedOutletIds.size === 0) {
+          applyValidationErrors(
+            { storeIds: 'Select at least one store, or choose "All stores"' },
+            'Select at least one store, or choose "All stores"',
+          );
+          setSubmitting(false);
+          return;
+        }
+        if (!selectedRoleId && Object.keys(permissions).length === 0) {
+          applyValidationErrors({}, 'Select at least one permission');
+          setSubmitting(false);
+          return;
+        }
+        body = isDirty || !selectedRoleId ? { permissions } : { roleId: selectedRoleId };
+        body.businessAccountIds = Array.from(selectedBusinessIds);
+        if (allOutlets) {
+          body.scope = 'business';
+        } else {
+          body.scope = 'store';
+          body.storeIds = Array.from(selectedOutletIds);
+        }
+        if (showStorefront) {
+          body.storefrontAccess = { view: sfView, order: sfOrder, pay: sfPay };
+        }
       } else {
         if (!selectedRoleId && Object.keys(permissions).length === 0) {
           applyValidationErrors({}, 'Select at least one permission');
@@ -256,7 +416,11 @@ export function EditMemberModal({
               <h3 className="text-[16px] font-bold text-[#181725]">Edit Team Member</h3>
               <p className="text-[11px] text-[#AEAEAE] font-medium">
                 {memberName}
-                {isAccountScope ? ' — role & outlet' : ' — outlet access & role'}
+                {isAccountScope
+                  ? ' — role & outlet'
+                  : isSupplierEdit
+                    ? ' — business, store access & role'
+                    : ' — outlet access & role'}
               </p>
             </div>
           </div>
@@ -273,7 +437,29 @@ export function EditMemberModal({
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto px-6 py-5 min-h-0 space-y-6">
-            {showOutlets && !isPortalScope && !isAccountScope && (
+            {showOutlets && isSupplierEdit && (
+              <section>
+                <Step2Outlets
+                  mode="supplier"
+                  baName={baName}
+                  businesses={businesses}
+                  selectedBusinessIds={selectedBusinessIds}
+                  onToggleBusiness={toggleBusiness}
+                  storeGroups={storeGroups}
+                  outlets={[]}
+                  outletsLoading={false}
+                  allOutlets={allOutlets}
+                  selectedOutletIds={selectedOutletIds}
+                  onToggleAll={() => {
+                    setAllOutlets(true);
+                    setSelectedOutletIds(new Set());
+                  }}
+                  onToggleOutlet={toggleOutlet}
+                />
+              </section>
+            )}
+
+            {showOutlets && !isPortalScope && !isAccountScope && !isSupplierEdit && (
               <section>
                 <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-2">
                   Outlet Access
@@ -351,7 +537,6 @@ export function EditMemberModal({
                   value={accountOutletId}
                   onChange={(e) => setAccountOutletId(e.target.value)}
                   className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none bg-[#FAFAFA] focus:bg-white transition-colors"
-                  style={{ borderColor: undefined }}
                 >
                   <option value="">All outlets</option>
                   {displayOutlets.map((o) => (

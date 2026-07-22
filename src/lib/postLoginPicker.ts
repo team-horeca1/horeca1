@@ -10,6 +10,7 @@
 import { getSession } from 'next-auth/react';
 import { broadcastAuthEvent } from '@/lib/authTabSync';
 import { defaultPortalPath, type AccountPortalCaps } from '@/lib/portalRouting';
+import { setEnteredStore } from '@/lib/supplierPortalLevel';
 
 export const FORCE_PICKER_COOKIE = 'horeca_force_account_picker';
 export const PENDING_REDIRECT_KEY = 'horeca_pending_post_login_redirect';
@@ -89,6 +90,9 @@ export async function prepareFreshLoginNavigation(redirectTo: string | null): Pr
   } catch {
     /* ignore */
   }
+  // Never resume a previous "Entered Store" session after a fresh login —
+  // multi-store team members must land on the business/store picker.
+  setEnteredStore(false);
   broadcastAuthEvent('session-changed');
 
   let session = await getSession();
@@ -99,6 +103,14 @@ export async function prepareFreshLoginNavigation(redirectTo: string | null): Pr
   }
   const role = session?.user?.role ?? null;
   const caps = capsFromSessionUser(session?.user ?? null);
+  const user = session?.user as {
+    isStoreScopedOnly?: boolean;
+  } | null | undefined;
+  // Store-scoped team members → Businesses picker (Enter the store they need).
+  if (!sanitizeRedirect(redirectTo) && role !== 'admin' && user?.isStoreScopedOnly) {
+    window.location.href = '/vendor/businesses';
+    return;
+  }
   window.location.href = resolvePostLoginDestination(redirectTo, caps, role);
 }
 

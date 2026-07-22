@@ -35,7 +35,7 @@ interface SupplierStoreItem {
   pincode: string | null;
 }
 
-interface SupplierBusinessItem {
+export interface SupplierBusinessItem {
   id: string;
   name: string;
   isPrimary: boolean;
@@ -697,7 +697,8 @@ function Step1UserInfo({
 
 // ─── Step 2: Outlet / Store Access ────────────────────────────────────────────
 
-function Step2Outlets({
+/** Shared business + store picker used by Add Member and Edit Member. */
+export function Step2Outlets({
   mode = 'outlets',
   baName,
   businesses = [],
