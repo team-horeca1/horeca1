@@ -34,9 +34,11 @@ const inviteSchema = z.object({
   roleId: z.string().uuid().optional(),
   permissions: z.record(z.string(), z.record(z.string(), z.boolean())).optional(),
   outletIds: z.array(z.string().uuid()).optional(),
-  /** Target Business (must be one the actor belongs to). Defaults to current store's Business. */
+  /** Legacy single Business target. Prefer businessAccountIds. */
   businessAccountId: z.string().uuid().optional(),
-  /** Specific Online Stores under the target Business (implies scope='store'). */
+  /** One or more Businesses the actor belongs to. */
+  businessAccountIds: z.array(z.string().uuid()).min(1).optional(),
+  /** Specific Online Stores under the target Business(es) (implies scope='store'). */
   storeIds: z.array(z.string().uuid()).optional(),
   /** Supplier Foundation: business = all Online Stores; store = selected/current store(s). */
   scope: z.enum(['business', 'store']).optional().default('store'),
@@ -149,57 +151,102 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     });
     if (!vendor) throw Errors.notFound('Vendor not found');
 
-    // ── Resolve the target Business ────────────────────────────────────────────
-    // The wizard lets the supplier pick ANY Business they belong to (not just the
-    // one behind the currently active store). Validate membership before honoring.
-    let businessAccountId = vendor.businessAccountId;
-    if (input.businessAccountId && input.businessAccountId !== vendor.businessAccountId) {
-      const actorId = await resolveSupplierActorUserId(ctx, req);
+    // ── Resolve target Business(es) ────────────────────────────────────────────
+    // Wizard may pick one or many Businesses the actor belongs to.
+    const requestedBaIds = [
+      ...new Set([
+        ...(input.businessAccountIds ?? []),
+        ...(input.businessAccountId ? [input.businessAccountId] : []),
+      ]),
+    ];
+    const targetBaIds = requestedBaIds.length > 0 ? requestedBaIds : [vendor.businessAccountId];
+
+    const actorId = await resolveSupplierActorUserId(ctx, req);
+    for (const baId of targetBaIds) {
+      if (baId === vendor.businessAccountId) continue;
       const membership = await prisma.businessAccountMember.findUnique({
-        where: { userId_businessAccountId: { userId: actorId, businessAccountId: input.businessAccountId } },
+        where: { userId_businessAccountId: { userId: actorId, businessAccountId: baId } },
         select: { id: true },
       });
-      if (!membership) throw Errors.forbidden('You are not a member of the selected business');
-      businessAccountId = input.businessAccountId;
+      if (!membership) throw Errors.forbidden('You are not a member of one of the selected businesses');
     }
 
-    const businessAccount = await prisma.businessAccount.findUnique({
-      where: { id: businessAccountId },
-      select: { displayName: true, legalName: true },
+    const businessAccounts = await prisma.businessAccount.findMany({
+      where: { id: { in: targetBaIds } },
+      select: { id: true, displayName: true, legalName: true },
     });
-    const businessLabel = businessAccount?.displayName ?? businessAccount?.legalName ?? vendor.businessName;
+    if (businessAccounts.length !== targetBaIds.length) {
+      throw Errors.badRequest('One or more selected businesses were not found');
+    }
+    const baLabelById = new Map(
+      businessAccounts.map((ba) => [ba.id, ba.displayName ?? ba.legalName ?? vendor.businessName]),
+    );
+    const businessLabel = targetBaIds.map((id) => baLabelById.get(id) ?? vendor.businessName).join(', ');
 
-    // Online Stores under the target Business (primary first).
-    const baStores = await prisma.vendor.findMany({
-      where: { businessAccountId },
+    // Online Stores under each target Business (primary first).
+    const allBaStores = await prisma.vendor.findMany({
+      where: { businessAccountId: { in: targetBaIds } },
       orderBy: [{ isPrimaryStore: 'desc' }, { createdAt: 'asc' }],
-      select: { id: true, businessName: true },
+      select: { id: true, businessName: true, businessAccountId: true },
     });
-    if (baStores.length === 0) {
-      throw Errors.badRequest('The selected business has no Online Stores yet — create a store first');
+    if (allBaStores.length === 0) {
+      throw Errors.badRequest('The selected business(es) have no Online Stores yet — create a store first');
     }
 
-    // ── Resolve target stores ──────────────────────────────────────────────────
-    // business  → member joins every current + future store under the Business.
-    // store     → member joins only the selected stores (default: current store).
-    const inviteScope = input.scope ?? 'store';
-    const validStoreIds = new Set(baStores.map((s) => s.id));
-    let targetStoreIds: string[];
-    if (inviteScope === 'business') {
-      targetStoreIds = baStores.map((s) => s.id);
-    } else if (input.storeIds && input.storeIds.length > 0) {
-      if (input.storeIds.some((id) => !validStoreIds.has(id))) {
-        throw Errors.badRequest('One or more selected stores do not belong to the selected business');
+    const storesByBa = new Map<string, typeof allBaStores>();
+    for (const s of allBaStores) {
+      const list = storesByBa.get(s.businessAccountId) ?? [];
+      list.push(s);
+      storesByBa.set(s.businessAccountId, list);
+    }
+    for (const baId of targetBaIds) {
+      if ((storesByBa.get(baId) ?? []).length === 0) {
+        throw Errors.badRequest('One of the selected businesses has no Online Stores yet — create a store first');
       }
-      targetStoreIds = [...new Set(input.storeIds)];
-    } else {
-      targetStoreIds = validStoreIds.has(vendorId) ? [vendorId] : [baStores[0].id];
     }
 
-    // ── Resolve the role ───────────────────────────────────────────────────────
-    // If roleId provided, use it directly. Otherwise derive from permissions JSON:
-    // find a vendor-scope role with matching permissions or create a new one.
-    let role: { id: string; name: string; scope: string; description: string | null };
+    // ── Resolve target stores per Business ─────────────────────────────────────
+    const inviteScope = input.scope ?? 'store';
+    const validStoreIds = new Set(allBaStores.map((s) => s.id));
+    if (inviteScope === 'store' && input.storeIds && input.storeIds.length > 0) {
+      if (input.storeIds.some((id) => !validStoreIds.has(id))) {
+        throw Errors.badRequest('One or more selected stores do not belong to the selected business(es)');
+      }
+    }
+
+    type BaTarget = { businessAccountId: string; storeIds: string[] };
+    const baTargets: BaTarget[] = targetBaIds.map((baId) => {
+      const baStores = storesByBa.get(baId) ?? [];
+      if (inviteScope === 'business') {
+        return { businessAccountId: baId, storeIds: baStores.map((s) => s.id) };
+      }
+      if (input.storeIds && input.storeIds.length > 0) {
+        const filtered = input.storeIds.filter((id) => baStores.some((s) => s.id === id));
+        return { businessAccountId: baId, storeIds: filtered };
+      }
+      // Default: current store if it belongs to this BA, else primary/first store.
+      const fallback = validStoreIds.has(vendorId) && baStores.some((s) => s.id === vendorId)
+        ? [vendorId]
+        : [baStores[0].id];
+      return { businessAccountId: baId, storeIds: fallback };
+    }).filter((t) => t.storeIds.length > 0);
+
+    if (baTargets.length === 0) {
+      throw Errors.badRequest('Select at least one store under the selected business(es)');
+    }
+
+    const allTargetStoreIds = [...new Set(baTargets.flatMap((t) => t.storeIds))];
+
+    // ── Resolve a base role (cloned per-BA when needed) ────────────────────────
+    let baseRoleTemplate: {
+      id: string;
+      name: string;
+      scope: string;
+      description: string | null;
+      businessAccountId: string | null;
+      permissions: Record<string, Record<string, boolean>> | null;
+    } | null = null;
+    let permissionsInput: Record<string, Record<string, boolean>> | null = null;
 
     if (input.roleId) {
       const found = await prisma.accountRole.findUnique({
@@ -207,24 +254,38 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         select: { id: true, name: true, scope: true, description: true, businessAccountId: true, permissions: true },
       });
       if (!found || found.scope !== 'vendor') throw Errors.badRequest('roleId must reference a vendor-scope role');
+      baseRoleTemplate = {
+        ...found,
+        permissions: (found.permissions ?? null) as Record<string, Record<string, boolean>> | null,
+      };
+    } else {
+      permissionsInput = input.permissions!;
+    }
+
+    async function resolveRoleForBa(businessAccountId: string): Promise<{ id: string; name: string; scope: string; description: string | null }> {
+      if (permissionsInput) {
+        return resolveTeamMemberRoleFromPermissions({
+          scope: 'vendor',
+          permissions: permissionsInput,
+          businessAccountId,
+          createdBy: ctx.userId,
+        });
+      }
+      const found = baseRoleTemplate!;
       if (found.businessAccountId && found.businessAccountId !== businessAccountId) {
-        // Custom role from another Business — clone its permissions into the target.
-        role = await resolveTeamMemberRoleFromPermissions({
+        return resolveTeamMemberRoleFromPermissions({
           scope: 'vendor',
           permissions: (found.permissions ?? {}) as Record<string, Record<string, boolean>>,
           businessAccountId,
           createdBy: ctx.userId,
         });
-      } else {
-        role = found;
       }
-    } else {
-      role = await resolveTeamMemberRoleFromPermissions({
-        scope: 'vendor',
-        permissions: input.permissions!,
-        businessAccountId,
-        createdBy: ctx.userId,
-      });
+      return found;
+    }
+
+    const roleByBa = new Map<string, { id: string; name: string; scope: string; description: string | null }>();
+    for (const target of baTargets) {
+      roleByBa.set(target.businessAccountId, await resolveRoleForBa(target.businessAccountId));
     }
 
     // ── Resolve / create the user ──────────────────────────────────────────────
@@ -276,21 +337,19 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     }
 
     const existingMember = await prisma.vendorTeamMember.findFirst({
-      where: { vendorId: { in: targetStoreIds }, userId: user.id },
+      where: { vendorId: { in: allTargetStoreIds }, userId: user.id },
       select: { id: true },
     });
     if (existingMember) {
       throw Errors.fieldError('identifier', 'User is already on this vendor team — update their role instead', 409);
     }
 
-    const legacyEnum: TeamRole = VENDOR_ROLE_TO_ENUM[role.name] ?? 'viewer';
     const userId = user.id;
     const outletTargets: (string | null)[] =
       input.outletIds && input.outletIds.length > 0 ? input.outletIds : [null];
 
-    // ── Transactional write ────────────────────────────────────────────────────
+    // ── Transactional write across all selected Businesses ─────────────────────
     const member = await prisma.$transaction(async (tx) => {
-      // One VendorTeamMember row per target Online Store (business scope = all).
       let firstMember: {
         id: string;
         createdAt: Date;
@@ -298,104 +357,105 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         user: { id: string; fullName: string; email: string | null; phone: string | null; hcidDisplay: string | null; isActive: boolean };
         roleRef: { id: string; name: string; scope: string; description: string | null } | null;
       } | null = null;
-      for (const storeId of targetStoreIds) {
-        const exists = await tx.vendorTeamMember.findUnique({
-          where: { vendorId_userId: { vendorId: storeId, userId } },
-          select: { id: true },
-        });
-        if (exists) continue;
-        const created = await tx.vendorTeamMember.create({
-          data: { vendorId: storeId, userId, role: legacyEnum, roleId: role.id, invitedBy: ctx.userId },
-          include: teamMemberInclude,
-        });
-        if (!firstMember) firstMember = created;
-      }
-      if (!firstMember) {
-        throw Errors.fieldError('identifier', 'User is already on this vendor team — update their role instead', 409);
-      }
-      const m = firstMember;
 
-      await upsertTeamAccountMembership(tx, {
-        userId,
-        businessAccountId,
-        invitedBy: ctx.userId,
-      });
+      for (const target of baTargets) {
+        const { businessAccountId, storeIds: targetStoreIds } = target;
+        const role = roleByBa.get(businessAccountId)!;
+        const legacyEnum: TeamRole = VENDOR_ROLE_TO_ENUM[role.name] ?? 'viewer';
 
-      // Replace prior vendor-scope roles for this user+account (keep storefront roles).
-      await tx.userRole.deleteMany({
-        where: {
+        for (const storeId of targetStoreIds) {
+          const exists = await tx.vendorTeamMember.findUnique({
+            where: { vendorId_userId: { vendorId: storeId, userId } },
+            select: { id: true },
+          });
+          if (exists) continue;
+          const created = await tx.vendorTeamMember.create({
+            data: { vendorId: storeId, userId, role: legacyEnum, roleId: role.id, invitedBy: ctx.userId },
+            include: teamMemberInclude,
+          });
+          if (!firstMember) firstMember = created;
+        }
+
+        await upsertTeamAccountMembership(tx, {
           userId,
           businessAccountId,
-          role: { scope: 'vendor', name: { not: { startsWith: 'Storefront' } } },
-        },
-      });
+          invitedBy: ctx.userId,
+        });
 
-      if (inviteScope === 'business') {
-        // Business-wide: vendorId null → all current + future Online Stores
-        await tx.userRole.create({
-          data: {
+        await tx.userRole.deleteMany({
+          where: {
             userId,
             businessAccountId,
-            outletId: null,
-            vendorId: null,
-            roleId: role.id,
+            role: { scope: 'vendor', name: { not: { startsWith: 'Storefront' } } },
           },
         });
-      } else {
-        // Store-scoped: one grant per selected Online Store
-        for (const storeId of targetStoreIds) {
+
+        if (inviteScope === 'business') {
           await tx.userRole.create({
             data: {
               userId,
               businessAccountId,
               outletId: null,
-              vendorId: storeId,
+              vendorId: null,
               roleId: role.id,
             },
           });
+        } else {
+          for (const storeId of targetStoreIds) {
+            await tx.userRole.create({
+              data: {
+                userId,
+                businessAccountId,
+                outletId: null,
+                vendorId: storeId,
+                roleId: role.id,
+              },
+            });
+          }
+          void outletTargets;
         }
-        // Legacy outlet targets ignored for supplier multi-warehouse retirement
-        void outletTargets;
-      }
 
-      // Storefront access — find or create a per-account role with just storefront perms.
-      const sf = input.storefrontAccess;
-      if (sf && (sf.view || sf.order || sf.pay)) {
-        const sfPermissions = {
-          storefront: {
-            ...(sf.view  && { view:  true }),
-            ...(sf.order && { order: true }),
-            ...(sf.pay   && { pay:   true }),
-          },
-        };
-        const parts = Object.keys(sfPermissions.storefront);
-        const sfRoleName = `Storefront (${parts.join('+')})`;
-
-        let sfRole = await tx.accountRole.findFirst({
-          where: { businessAccountId, scope: 'vendor', name: sfRoleName },
-          select: { id: true },
-        });
-        if (!sfRole) {
-          sfRole = await tx.accountRole.create({
-            data: {
-              businessAccountId, name: sfRoleName, scope: 'vendor',
-              permissions: sfPermissions, isTemplate: false, description: 'Storefront buyer access',
+        const sf = input.storefrontAccess;
+        if (sf && (sf.view || sf.order || sf.pay)) {
+          const sfPermissions = {
+            storefront: {
+              ...(sf.view  && { view:  true }),
+              ...(sf.order && { order: true }),
+              ...(sf.pay   && { pay:   true }),
             },
+          };
+          const parts = Object.keys(sfPermissions.storefront);
+          const sfRoleName = `Storefront (${parts.join('+')})`;
+
+          let sfRole = await tx.accountRole.findFirst({
+            where: { businessAccountId, scope: 'vendor', name: sfRoleName },
             select: { id: true },
           });
-        }
-        const existingSf = await tx.userRole.findFirst({
-          where: { userId, businessAccountId, outletId: null, roleId: sfRole.id },
-          select: { id: true },
-        });
-        if (!existingSf) {
-          await tx.userRole.create({
-            data: { userId, businessAccountId, outletId: null, roleId: sfRole.id },
+          if (!sfRole) {
+            sfRole = await tx.accountRole.create({
+              data: {
+                businessAccountId, name: sfRoleName, scope: 'vendor',
+                permissions: sfPermissions, isTemplate: false, description: 'Storefront buyer access',
+              },
+              select: { id: true },
+            });
+          }
+          const existingSf = await tx.userRole.findFirst({
+            where: { userId, businessAccountId, outletId: null, roleId: sfRole.id },
+            select: { id: true },
           });
+          if (!existingSf) {
+            await tx.userRole.create({
+              data: { userId, businessAccountId, outletId: null, roleId: sfRole.id },
+            });
+          }
         }
       }
 
-      return m;
+      if (!firstMember) {
+        throw Errors.fieldError('identifier', 'User is already on this vendor team — update their role instead', 409);
+      }
+      return firstMember;
     }, { timeout: 30_000 });
 
     const dto = toTeamMemberDTO({

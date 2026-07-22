@@ -158,7 +158,7 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   const [baName, setBaName] = useState('');
   const [outlets, setOutlets] = useState<OutletItem[]>([]);
   const [businesses, setBusinesses] = useState<SupplierBusinessItem[]>([]);
-  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
+  const [selectedBusinessIds, setSelectedBusinessIds] = useState<Set<string>>(new Set());
   const [accessLoading, setAccessLoading] = useState(false);
   const [accessLoaded, setAccessLoaded] = useState(false);
   const [allOutlets, setAllOutlets] = useState(true);
@@ -186,8 +186,10 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   const [invitedMemberName, setInvitedMemberName] = useState('');
   const [savedMemberData, setSavedMemberData] = useState<unknown>(null);
 
-  const selectedBusiness = businesses.find((b) => b.id === selectedBusinessId) ?? null;
-  const selectedStores = selectedBusiness?.stores ?? [];
+  const selectedBusinesses = businesses.filter((b) => selectedBusinessIds.has(b.id));
+  const selectedStores = selectedBusinesses.flatMap((b) =>
+    b.stores.map((s) => ({ ...s, businessId: b.id, businessName: b.name })),
+  );
 
   useEffect(() => {
     const outletStep = skipOutletStep ? -1 : 2;
@@ -239,7 +241,7 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
             ?? mapped.find((b) => b.isPrimary)
             ?? mapped[0]
             ?? null;
-          setSelectedBusinessId(preferred?.id ?? null);
+          setSelectedBusinessIds(preferred ? new Set([preferred.id]) : new Set());
           setBaName(preferred?.name ?? businessAccountLabel);
           setAllOutlets(true);
           setSelectedOutletIds(new Set());
@@ -289,11 +291,19 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
     setSelectedRoleId('');
   }, []);
 
-  const selectBusiness = (businessId: string) => {
-    const biz = businesses.find((b) => b.id === businessId);
-    if (!biz) return;
-    setSelectedBusinessId(businessId);
-    setBaName(biz.name);
+  const toggleBusiness = (businessId: string) => {
+    setSelectedBusinessIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(businessId)) {
+        if (next.size === 1) return prev; // keep at least one selected
+        next.delete(businessId);
+      } else {
+        next.add(businessId);
+      }
+      const names = businesses.filter((b) => next.has(b.id)).map((b) => b.name);
+      setBaName(names.join(', ') || businessAccountLabel);
+      return next;
+    });
     setAllOutlets(true);
     setSelectedOutletIds(new Set());
   };
@@ -313,7 +323,7 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
       setStep(1);
       return;
     }
-    if (!skipOutletStep && (field === 'outlets' || field === 'storeIds' || field === 'businessAccountId')) {
+    if (!skipOutletStep && (field === 'outlets' || field === 'storeIds' || field === 'businessAccountId' || field === 'businessAccountIds')) {
       setStep(2);
     }
   };
@@ -341,13 +351,13 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
       setStep(2);
     } else if (!skipOutletStep && step === 2) {
       if (isSupplierInvite) {
-        if (!selectedBusinessId) {
-          applyValidationErrors({ businessAccountId: 'Select a business account' }, undefined, { dataField: true });
+        if (selectedBusinessIds.size === 0) {
+          applyValidationErrors({ businessAccountIds: 'Select at least one business account' }, undefined, { dataField: true });
           return;
         }
         if (selectedStores.length === 0) {
           applyValidationErrors(
-            { storeIds: 'This business has no Online Stores yet — create a store first' },
+            { storeIds: 'Selected business(es) have no Online Stores yet — create a store first' },
             undefined,
             { dataField: true },
           );
@@ -400,8 +410,8 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
       }
       if (fullName.trim()) body.fullName = fullName.trim();
       if (password) body.password = password;
-      if (isSupplierInvite && selectedBusinessId) {
-        body.businessAccountId = selectedBusinessId;
+      if (isSupplierInvite && selectedBusinessIds.size > 0) {
+        body.businessAccountIds = Array.from(selectedBusinessIds);
         if (allOutlets) {
           body.scope = 'business';
         } else {
@@ -521,18 +531,23 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
               mode={isSupplierInvite ? 'supplier' : 'outlets'}
               baName={baName}
               businesses={businesses}
-              selectedBusinessId={selectedBusinessId}
-              onSelectBusiness={selectBusiness}
-              outlets={isSupplierInvite
-                ? selectedStores.map((s) => ({
-                    id: s.id,
-                    name: s.name,
-                    code: s.isPrimaryStore ? 'Primary' : null,
-                    addressLine: s.addressLine ?? '',
-                    city: s.city,
-                    pincode: s.pincode,
+              selectedBusinessIds={selectedBusinessIds}
+              onToggleBusiness={toggleBusiness}
+              storeGroups={isSupplierInvite
+                ? selectedBusinesses.map((b) => ({
+                    businessId: b.id,
+                    businessName: b.name,
+                    stores: b.stores.map((s) => ({
+                      id: s.id,
+                      name: s.name,
+                      code: s.isPrimaryStore ? 'Primary' : null,
+                      addressLine: s.addressLine ?? '',
+                      city: s.city,
+                      pincode: s.pincode,
+                    })),
                   }))
-                : outlets}
+                : []}
+              outlets={isSupplierInvite ? [] : outlets}
               outletsLoading={accessLoading}
               allOutlets={allOutlets}
               selectedOutletIds={selectedOutletIds}
@@ -667,7 +682,11 @@ function Step1UserInfo({
           <PasswordField
             name="newMemberPassword" autoComplete="new-password"
             value={password} onChange={setPassword}
-            inputClassName={fieldErrors.password ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : undefined}
+            inputClassName={`w-full h-[46px] border rounded-[10px] px-4 text-[14px] outline-none focus:ring-2 bg-[#FAFAFA] focus:bg-white transition-all ${
+              fieldErrors.password
+                ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                : 'border-[#EEEEEE] focus:border-[#299E60]/40 focus:ring-[#299E60]/10'
+            }`}
           />
           {fieldErrors.password && <p className="text-[11px] text-red-600 mt-1.5">{fieldErrors.password}</p>}
         </div>
@@ -682,8 +701,9 @@ function Step2Outlets({
   mode = 'outlets',
   baName,
   businesses = [],
-  selectedBusinessId = null,
-  onSelectBusiness,
+  selectedBusinessIds = new Set<string>(),
+  onToggleBusiness,
+  storeGroups = [],
   outlets,
   outletsLoading,
   allOutlets,
@@ -694,8 +714,9 @@ function Step2Outlets({
   mode?: 'outlets' | 'supplier';
   baName: string;
   businesses?: SupplierBusinessItem[];
-  selectedBusinessId?: string | null;
-  onSelectBusiness?: (id: string) => void;
+  selectedBusinessIds?: Set<string>;
+  onToggleBusiness?: (id: string) => void;
+  storeGroups?: Array<{ businessId: string; businessName: string; stores: OutletItem[] }>;
   outlets: OutletItem[];
   outletsLoading: boolean;
   allOutlets: boolean;
@@ -704,21 +725,27 @@ function Step2Outlets({
   onToggleOutlet: (id: string) => void;
 }) {
   const isSupplier = mode === 'supplier';
+  const flatStores = isSupplier
+    ? storeGroups.flatMap((g) => g.stores)
+    : outlets;
   const accessLabel = isSupplier ? 'Store Access' : 'Outlet Access';
-  const allLabel = isSupplier ? 'All stores (business-wide)' : 'All outlets (account-wide)';
+  const allLabel = isSupplier ? 'All stores (across selected businesses)' : 'All outlets (account-wide)';
   const allHint = isSupplier
-    ? 'Access all current and future Online Stores under this business'
+    ? 'Access all current and future Online Stores under every selected business'
     : 'Access all current and future outlets';
   const emptyTitle = isSupplier ? 'No Online Stores yet' : 'No outlets configured';
   const emptyHint = isSupplier
-    ? 'Create a store under this business before inviting team members.'
+    ? 'Select a business with stores, or create a store first.'
     : 'Member will have account-wide access.';
+  const showGrouped = isSupplier && storeGroups.length > 1;
 
   return (
     <div className="flex gap-5 h-[360px]">
       {/* Left: Business account(s) */}
       <div className="w-[220px] shrink-0 flex flex-col min-h-0">
-        <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-2">Business Account</p>
+        <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-2">
+          Business Account{isSupplier && businesses.length > 1 ? 's' : ''}
+        </p>
         {outletsLoading ? (
           <div className="flex-1 flex items-center justify-center border border-[#EEEEEE] rounded-[12px]">
             <Loader2 size={20} className="animate-spin text-[#299E60]" />
@@ -726,22 +753,25 @@ function Step2Outlets({
         ) : isSupplier && businesses.length > 0 ? (
           <div className="flex-1 overflow-y-auto space-y-2 pr-0.5">
             {businesses.map((biz) => {
-              const selected = biz.id === selectedBusinessId;
+              const selected = selectedBusinessIds.has(biz.id);
               return (
                 <button
                   key={biz.id}
                   type="button"
-                  onClick={() => onSelectBusiness?.(biz.id)}
+                  onClick={() => onToggleBusiness?.(biz.id)}
                   className={`w-full text-left rounded-[12px] p-3.5 flex flex-col gap-2 border-2 transition-colors ${
                     selected
                       ? 'border-[#299E60] bg-[#F0FBF5]'
                       : 'border-[#EEEEEE] bg-white hover:border-[#299E60]/40 hover:bg-[#FAFAFA]'
                   }`}
                 >
-                  <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center ${
-                    selected ? 'bg-[#299E60]' : 'bg-[#F3F4F6]'
-                  }`}>
-                    <Building2 size={15} className={selected ? 'text-white' : 'text-[#7C7C7C]'} />
+                  <div className="flex items-start justify-between gap-2">
+                    <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center ${
+                      selected ? 'bg-[#299E60]' : 'bg-[#F3F4F6]'
+                    }`}>
+                      <Building2 size={15} className={selected ? 'text-white' : 'text-[#7C7C7C]'} />
+                    </div>
+                    <Checkbox checked={selected} accent="#299E60" />
                   </div>
                   <div>
                     <p className="text-[13px] font-bold text-[#181725] leading-snug">{biz.name}</p>
@@ -751,14 +781,6 @@ function Step2Outlets({
                       {biz.stores.length} {biz.stores.length === 1 ? 'store' : 'stores'}
                     </p>
                   </div>
-                  {selected && (
-                    <div className="flex items-center gap-1">
-                      <div className="w-4 h-4 bg-[#299E60] rounded-full flex items-center justify-center">
-                        <Check size={10} className="text-white" />
-                      </div>
-                      <span className="text-[10px] font-bold text-[#299E60]">Selected</span>
-                    </div>
-                  )}
                 </button>
               );
             })}
@@ -782,7 +804,7 @@ function Step2Outlets({
         )}
         <p className="text-[10px] text-[#AEAEAE] mt-2 leading-relaxed">
           {isSupplier
-            ? 'Pick which business this member joins. Store access on the right applies only to that business.'
+            ? 'Select one or more businesses. Store access on the right applies to every selected business.'
             : 'This member will be added to your vendor team under this business account.'}
         </p>
       </div>
@@ -791,7 +813,7 @@ function Step2Outlets({
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between mb-2">
           <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider">
-            {accessLabel} {outlets.length > 0 && `(${outlets.length})`}
+            {accessLabel} {flatStores.length > 0 && `(${flatStores.length})`}
           </p>
           {!allOutlets && selectedOutletIds.size > 0 && (
             <span className="text-[10px] font-bold text-[#299E60] bg-[#ECFDF5] px-2 py-0.5 rounded-full">
@@ -813,24 +835,56 @@ function Step2Outlets({
                 <p className="text-[11px] text-[#7C7C7C]">{allHint}</p>
               </div>
             </button>
-            {outlets.map(outlet => (
-              <button key={outlet.id} onClick={() => onToggleOutlet(outlet.id)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAFAFA] transition-colors text-left">
-                <Checkbox checked={!allOutlets && selectedOutletIds.has(outlet.id)} accent="#299E60" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-bold text-[#181725] flex items-center gap-2">
-                    {outlet.name}
-                    {outlet.code && (
-                      <span className="text-[10px] text-[#AEAEAE] font-mono bg-[#F5F5F5] px-1.5 py-0.5 rounded">{outlet.code}</span>
+            {showGrouped
+              ? storeGroups.map((group) => (
+                  <div key={group.businessId}>
+                    <div className="px-4 py-2 bg-[#FAFAFA]">
+                      <p className="text-[10px] font-bold text-[#AEAEAE] uppercase tracking-wider">
+                        {group.businessName}
+                      </p>
+                    </div>
+                    {group.stores.map((outlet) => (
+                      <button key={outlet.id} onClick={() => onToggleOutlet(outlet.id)}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAFAFA] transition-colors text-left">
+                        <Checkbox checked={!allOutlets && selectedOutletIds.has(outlet.id)} accent="#299E60" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-bold text-[#181725] flex items-center gap-2">
+                            {outlet.name}
+                            {outlet.code && (
+                              <span className="text-[10px] text-[#AEAEAE] font-mono bg-[#F5F5F5] px-1.5 py-0.5 rounded">{outlet.code}</span>
+                            )}
+                          </p>
+                          <p className="text-[11px] text-[#7C7C7C] truncate">
+                            {outlet.addressLine}{outlet.city ? `, ${outlet.city}` : ''}{outlet.pincode ? ` — ${outlet.pincode}` : ''}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                    {group.stores.length === 0 && (
+                      <div className="px-4 py-3">
+                        <p className="text-[11px] text-[#AEAEAE]">No stores under this business</p>
+                      </div>
                     )}
-                  </p>
-                  <p className="text-[11px] text-[#7C7C7C] truncate">
-                    {outlet.addressLine}{outlet.city ? `, ${outlet.city}` : ''}{outlet.pincode ? ` — ${outlet.pincode}` : ''}
-                  </p>
-                </div>
-              </button>
-            ))}
-            {outlets.length === 0 && (
+                  </div>
+                ))
+              : flatStores.map((outlet) => (
+                  <button key={outlet.id} onClick={() => onToggleOutlet(outlet.id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAFAFA] transition-colors text-left">
+                    <Checkbox checked={!allOutlets && selectedOutletIds.has(outlet.id)} accent="#299E60" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-bold text-[#181725] flex items-center gap-2">
+                        {outlet.name}
+                        {outlet.code && (
+                          <span className="text-[10px] text-[#AEAEAE] font-mono bg-[#F5F5F5] px-1.5 py-0.5 rounded">{outlet.code}</span>
+                        )}
+                      </p>
+                      <p className="text-[11px] text-[#7C7C7C] truncate">
+                        {outlet.addressLine}{outlet.city ? `, ${outlet.city}` : ''}{outlet.pincode ? ` — ${outlet.pincode}` : ''}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+            {flatStores.length === 0 && (
               <div className="px-4 py-10 text-center">
                 <p className="text-[13px] font-bold text-[#AEAEAE]">{emptyTitle}</p>
                 <p className="text-[11px] text-[#AEAEAE] mt-1">{emptyHint}</p>

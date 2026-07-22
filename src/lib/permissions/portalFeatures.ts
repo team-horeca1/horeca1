@@ -96,7 +96,6 @@ const VENDOR_FEATURES: PortalFeatureMap = {
   dashboard:    { label: 'Dashboard', actions: MODULE_ACTIONS.dashboard, routes: ['/vendor/dashboard', '/vendor/overview', '/vendor/businesses'] },
   products:     { label: 'Products', actions: MODULE_ACTIONS.products, routes: ['/vendor/products', '/vendor/price-lists'] },
   orders:       { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/vendor/orders', '/vendor/all-orders'] },
-  repeatOrders: { label: 'Repeat Orders', actions: MODULE_ACTIONS.repeatOrders, routes: [] },
   inventory:    { label: 'Inventory', actions: MODULE_ACTIONS.inventory, routes: ['/vendor/inventory'] },
   grn:          { label: 'Warehouse', actions: MODULE_ACTIONS.grn, routes: ['/vendor/warehouse'] },
   dispatch:     { label: 'Dispatch', actions: MODULE_ACTIONS.dispatch, routes: ['/vendor/warehouse'] },

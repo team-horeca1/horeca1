@@ -49,20 +49,6 @@ function buildGroupsFromNav(
   return groups;
 }
 
-function insertAfter(groups: MatrixModuleGroup[], groupLabel: string, afterModule: Module, toInsert: Module[]): void {
-  const group = groups.find((g) => g.label === groupLabel);
-  if (!group) return;
-
-  const idx = group.modules.indexOf(afterModule);
-  let at = idx === -1 ? group.modules.length : idx + 1;
-  for (const mod of toInsert) {
-    if (!group.modules.includes(mod)) {
-      group.modules.splice(at, 0, mod);
-      at++;
-    }
-  }
-}
-
 function appendMissing(scope: RoleScope, groups: MatrixModuleGroup[]): MatrixModuleGroup[] {
   const allowed = scopeFeatures(scope);
   const placed = new Set(groups.flatMap((g) => g.modules));
@@ -102,13 +88,10 @@ function splitVendorWarehouseGroup(groups: MatrixModuleGroup[]): void {
 }
 
 function vendorModuleGroups(): MatrixModuleGroup[] {
+  // Strict Store Ops sidebar parity — no injected extras (Repeat Orders, etc.).
   const groups = buildGroupsFromNav('vendor', VENDOR_NAV_GROUPS);
-
-  insertAfter(groups, 'Operations', 'orders', ['repeatOrders']);
   splitVendorWarehouseGroup(groups);
-  insertAfter(groups, 'Customers', 'salespersons', ['commissions']);
-
-  return appendMissing('vendor', groups);
+  return groups;
 }
 
 function adminModuleGroups(): MatrixModuleGroup[] {
