@@ -443,7 +443,7 @@ test.describe('supplier team edit store access', () => {
 
     // Wait for hydrate — avoid matching the subtitle "store access & role"
     const allStores = modal.getByRole('button', {
-      name: /All stores \(across selected businesses\)/i,
+      name: /All stores/i,
     });
     await expect(allStores).toBeVisible({ timeout: 30_000 });
 

@@ -29,7 +29,7 @@ import { NotificationBell } from '../features/NotificationBell';
 import { dal } from '@/lib/dal';
 import type { Category } from '@/types';
 import { NavDeliverySelector } from './NavDeliverySelector';
-import { isAnyAdminImpersonationActive } from '@/lib/clearImpersonation';
+import { isAdminCustomerImpersonationActive, isAnyAdminImpersonationActive } from '@/lib/clearImpersonation';
 
 const CATEGORY_STYLE: Record<string, { image: string; bgColor: string }> = {
     'vegetables': { image: '/images/category/vegitable.png', bgColor: '#e8f9e9' },
@@ -119,9 +119,11 @@ export function Navbar() {
 
     const [apiCategories, setApiCategories] = React.useState<(Category & { image: string; bgColor: string })[]>([]);
     const [isAdminImpersonating, setIsAdminImpersonating] = React.useState(false);
+    const [isCustomerImpersonating, setIsCustomerImpersonating] = React.useState(false);
 
     React.useEffect(() => {
         setIsAdminImpersonating(isAnyAdminImpersonationActive());
+        setIsCustomerImpersonating(isAdminCustomerImpersonationActive());
     }, [pathname, sessionStatus]);
 
     React.useEffect(() => {
@@ -162,20 +164,18 @@ export function Navbar() {
         || userRole === 'brand'
         || (availableAccounts?.some((a) => a.isBrand === true) ?? false);
 
-    // Wait until session settles before injecting Dashboard / Rewards — otherwise
-    // the flex-1 search bar jumps as icons appear (login glitch).
-    // Admin: only Admin Dashboard. Team members: Dashboard when they have any
-    // vendor BA membership (not only when that BA is already active in JWT).
+    // Simple portal links: Admin → Admin Dashboard, vendor/brand membership → their portal.
+    // Only hide Admin Dashboard while actively viewing-as-customer.
     const desktopNavItems = React.useMemo(() => {
         if (!sessionReady) return DESKTOP_NAV;
 
         const portalLinks: typeof DESKTOP_NAV = [];
-        if (isLoggedIn && !isAdminImpersonating) {
-            if (userRole === 'admin') {
+        if (isLoggedIn) {
+            if (userRole === 'admin' && !isCustomerImpersonating) {
                 portalLinks.push({ name: 'Dashboard', href: '/admin/dashboard', Icon: LayoutDashboard });
-            } else if (hasVendorAccount) {
+            } else if (!isAdminImpersonating && hasVendorAccount) {
                 portalLinks.push({ name: 'Dashboard', href: '/vendor/dashboard', Icon: LayoutDashboard });
-            } else if (hasBrandAccount) {
+            } else if (!isAdminImpersonating && hasBrandAccount) {
                 portalLinks.push({ name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard });
             }
         }
@@ -185,7 +185,7 @@ export function Navbar() {
             ...DESKTOP_NAV,
             ...(isLoggedIn ? [{ name: 'Rewards', href: '/rewards', Icon: Gift }] : []),
         ];
-    }, [sessionReady, isLoggedIn, hasVendorAccount, hasBrandAccount, userRole, isAdminImpersonating]);
+    }, [sessionReady, isLoggedIn, hasVendorAccount, hasBrandAccount, userRole, isAdminImpersonating, isCustomerImpersonating]);
 
     if (isAdminPage || isVendorDashboard || isBrandPortal || isShipmentPage || isAccountPage) return null;
 
@@ -343,12 +343,8 @@ export function Navbar() {
                                 </Link>
                                 <button
                                     onClick={() => {
-                                        if (isLoggedIn) {
-                                            if (userRole === 'admin') router.push('/admin/dashboard');
-                                            else router.push('/profile');
-                                        } else {
-                                            router.push('/login');
-                                        }
+                                        if (isLoggedIn) router.push('/profile');
+                                        else router.push('/login');
                                     }}
                                     className="p-2.5 hover:bg-gray-50 rounded-full transition-all group cursor-pointer"
                                 >

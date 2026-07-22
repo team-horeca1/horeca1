@@ -773,6 +773,53 @@ function Step1UserInfo({
 
 // ─── Step 2: Outlet / Store Access ────────────────────────────────────────────
 
+function storeLocationLabel(outlet: OutletItem): string {
+  const city = outlet.city?.trim() || '';
+  const pin = outlet.pincode?.trim() || '';
+  if (city && pin) return `${city} · ${pin}`;
+  if (city) return city;
+  if (pin) return pin;
+  const line = (outlet.addressLine ?? '').trim().replace(/\s+/g, ' ');
+  if (!line) return '';
+  return line.length > 40 ? `${line.slice(0, 37)}…` : line;
+}
+
+function StoreRow({
+  outlet,
+  checked,
+  muted,
+  onToggle,
+}: {
+  outlet: OutletItem;
+  checked: boolean;
+  muted?: boolean;
+  onToggle: () => void;
+}) {
+  const location = storeLocationLabel(outlet);
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left transition-colors ${
+        muted ? 'bg-[#FAFAFA]/80 hover:bg-[#F5F5F5]' : 'hover:bg-[#FAFAFA]'
+      }`}
+    >
+      <Checkbox checked={checked} accent="#299E60" />
+      <div className="min-w-0 flex-1">
+        <p className={`text-[13px] font-bold truncate ${muted ? 'text-[#4B5563]' : 'text-[#181725]'}`}>
+          {outlet.name}
+          {outlet.code ? (
+            <span className="ml-1.5 text-[10px] font-mono font-medium text-[#AEAEAE]">{outlet.code}</span>
+          ) : null}
+        </p>
+        {location ? (
+          <p className="text-[11px] text-[#AEAEAE] truncate mt-0.5">{location}</p>
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
 /** Shared business + store picker used by Add Member and Edit Member. */
 export function Step2Outlets({
   mode = 'outlets',
@@ -810,10 +857,10 @@ export function Step2Outlets({
     selectedOutletIds,
   );
   const accessLabel = isSupplier ? 'Store Access' : 'Outlet Access';
-  const allLabel = isSupplier ? 'All stores (across selected businesses)' : 'All outlets (account-wide)';
+  const allLabel = isSupplier ? 'All stores' : 'All outlets';
   const allHint = isSupplier
-    ? 'Access all current and future Online Stores under every selected business'
-    : 'Access all current and future outlets';
+    ? 'Current and future stores under selected businesses'
+    : 'Current and future outlets';
   const emptyTitle = isSupplier ? 'No Online Stores yet' : 'No outlets configured';
   const emptyHint = isSupplier
     ? 'Select a business with stores, or create a store first.'
@@ -821,18 +868,18 @@ export function Step2Outlets({
   const showGrouped = isSupplier && storeGroups.length > 1;
 
   return (
-    <div className="flex gap-5 h-[360px]">
+    <div className="flex gap-4 h-[min(320px,42vh)] min-h-[240px]">
       {/* Left: Business account(s) */}
-      <div className="w-[220px] shrink-0 flex flex-col min-h-0">
+      <div className="w-[200px] shrink-0 flex flex-col min-h-0">
         <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-2">
-          Business Account{isSupplier && businesses.length > 1 ? 's' : ''}
+          Business{isSupplier && businesses.length > 1 ? 'es' : ''}
         </p>
         {outletsLoading ? (
           <div className="flex-1 flex items-center justify-center border border-[#EEEEEE] rounded-[12px]">
             <Loader2 size={20} className="animate-spin text-[#299E60]" />
           </div>
         ) : isSupplier && businesses.length > 0 ? (
-          <div className="flex-1 overflow-y-auto space-y-2 pr-0.5">
+          <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5">
             {businesses.map((biz) => {
               const selected = selectedBusinessIds.has(biz.id);
               return (
@@ -840,67 +887,64 @@ export function Step2Outlets({
                   key={biz.id}
                   type="button"
                   onClick={() => onToggleBusiness?.(biz.id)}
-                  className={`w-full text-left rounded-[12px] p-3.5 flex flex-col gap-2 border-2 transition-colors ${
+                  className={`w-full text-left rounded-[10px] px-3 py-2.5 flex items-center gap-2.5 border transition-colors ${
                     selected
                       ? 'border-[#299E60] bg-[#F0FBF5]'
                       : 'border-[#EEEEEE] bg-white hover:border-[#299E60]/40 hover:bg-[#FAFAFA]'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center ${
-                      selected ? 'bg-[#299E60]' : 'bg-[#F3F4F6]'
-                    }`}>
-                      <Building2 size={15} className={selected ? 'text-white' : 'text-[#7C7C7C]'} />
-                    </div>
-                    <Checkbox checked={selected} accent="#299E60" />
+                  <div className={`w-7 h-7 rounded-[8px] flex items-center justify-center shrink-0 ${
+                    selected ? 'bg-[#299E60]' : 'bg-[#F3F4F6]'
+                  }`}>
+                    <Building2 size={13} className={selected ? 'text-white' : 'text-[#7C7C7C]'} />
                   </div>
-                  <div>
-                    <p className="text-[13px] font-bold text-[#181725] leading-snug">{biz.name}</p>
-                    <p className="text-[11px] text-[#7C7C7C] mt-0.5">
-                      {biz.isPrimary ? 'Primary account' : 'Business account'}
-                      {' · '}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-bold text-[#181725] truncate leading-tight">{biz.name}</p>
+                    <p className="text-[10px] text-[#AEAEAE] mt-0.5">
                       {biz.stores.length} {biz.stores.length === 1 ? 'store' : 'stores'}
+                      {biz.isPrimary ? ' · Primary' : ''}
                     </p>
                   </div>
+                  <Checkbox checked={selected} accent="#299E60" />
                 </button>
               );
             })}
           </div>
         ) : (
-          <div className="border-2 border-[#299E60] bg-[#F0FBF5] rounded-[12px] p-4 flex flex-col gap-2">
-            <div className="w-9 h-9 bg-[#299E60] rounded-[10px] flex items-center justify-center">
-              <Building2 size={16} className="text-white" />
+          <div className="border border-[#299E60] bg-[#F0FBF5] rounded-[10px] px-3 py-2.5 flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-[#299E60] rounded-[8px] flex items-center justify-center shrink-0">
+              <Building2 size={13} className="text-white" />
             </div>
-            <div>
-              <p className="text-[13px] font-bold text-[#181725] leading-snug">{baName || 'Vendor Account'}</p>
-              <p className="text-[11px] text-[#7C7C7C] mt-0.5">Primary account</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-bold text-[#181725] truncate">{baName || 'Vendor Account'}</p>
+              <p className="text-[10px] text-[#AEAEAE] mt-0.5">Primary</p>
             </div>
-            <div className="flex items-center gap-1 mt-1">
-              <div className="w-4 h-4 bg-[#299E60] rounded-full flex items-center justify-center">
-                <Check size={10} className="text-white" />
-              </div>
-              <span className="text-[10px] font-bold text-[#299E60]">Selected</span>
-            </div>
+            <Checkbox checked accent="#299E60" />
           </div>
         )}
-        <p className="text-[10px] text-[#AEAEAE] mt-2 leading-relaxed">
-          {isSupplier
-            ? 'Select one or more businesses. Store access on the right applies to every selected business.'
-            : 'This member will be added to your vendor team under this business account.'}
-        </p>
+        {isSupplier && (
+          <p className="text-[10px] text-[#AEAEAE] mt-2 leading-snug">
+            Pick businesses, then stores on the right.
+          </p>
+        )}
       </div>
 
       {/* Right: Outlets / Online Stores */}
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-2 gap-2">
           <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider">
-            {accessLabel} {flatStores.length > 0 && `(${flatStores.length})`}
+            {accessLabel}
+            {flatStores.length > 0 ? ` (${flatStores.length})` : ''}
           </p>
-          {!allOutlets && visibleSelectedCount > 0 && (
-            <span className="text-[10px] font-bold text-[#299E60] bg-[#ECFDF5] px-2 py-0.5 rounded-full">
+          {allOutlets ? (
+            <span className="text-[10px] font-bold text-[#299E60] bg-[#ECFDF5] px-2 py-0.5 rounded-full shrink-0">
+              All included
+            </span>
+          ) : visibleSelectedCount > 0 ? (
+            <span className="text-[10px] font-bold text-[#299E60] bg-[#ECFDF5] px-2 py-0.5 rounded-full shrink-0">
               {visibleSelectedCount} selected
             </span>
-          )}
+          ) : null}
         </div>
 
         {outletsLoading ? (
@@ -908,63 +952,59 @@ export function Step2Outlets({
             <Loader2 size={22} className="animate-spin text-[#299E60]" />
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto border border-[#EEEEEE] rounded-[12px] divide-y divide-[#F5F5F5]">
-            <button onClick={onToggleAll} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[#FAFAFA] transition-colors text-left">
+          <div className="flex-1 overflow-y-auto border border-[#EEEEEE] rounded-[12px]">
+            <button
+              type="button"
+              onClick={onToggleAll}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 text-left border-b border-[#F0F0F0] transition-colors ${
+                allOutlets ? 'bg-[#F0FBF5]' : 'hover:bg-[#FAFAFA]'
+              }`}
+            >
               <Checkbox checked={allOutlets} accent="#299E60" />
-              <div>
+              <div className="min-w-0">
                 <p className="text-[13px] font-bold text-[#181725]">{allLabel}</p>
-                <p className="text-[11px] text-[#7C7C7C]">{allHint}</p>
+                <p className="text-[11px] text-[#7C7C7C] leading-snug">{allHint}</p>
+                {allOutlets && (
+                  <p className="text-[10px] text-[#299E60] font-medium mt-1">
+                    Click a store below to limit access
+                  </p>
+                )}
               </div>
             </button>
+
             {showGrouped
-              ? storeGroups.map((group) => (
-                  <div key={group.businessId}>
-                    <div className="px-4 py-2 bg-[#FAFAFA]">
-                      <p className="text-[10px] font-bold text-[#AEAEAE] uppercase tracking-wider">
+              ? storeGroups.map((group, idx) => (
+                  <div key={group.businessId} className={idx > 0 ? 'border-t border-[#F0F0F0]' : ''}>
+                    <div className="px-3.5 py-1.5 bg-[#FAFAFA] sticky top-0 z-[1]">
+                      <p className="text-[10px] font-bold text-[#AEAEAE] uppercase tracking-wider truncate">
                         {group.businessName}
                       </p>
                     </div>
-                    {group.stores.map((outlet) => (
-                      <button key={outlet.id} onClick={() => onToggleOutlet(outlet.id)}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAFAFA] transition-colors text-left">
-                        <Checkbox checked={allOutlets || selectedOutletIds.has(outlet.id)} accent="#299E60" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-bold text-[#181725] flex items-center gap-2">
-                            {outlet.name}
-                            {outlet.code && (
-                              <span className="text-[10px] text-[#AEAEAE] font-mono bg-[#F5F5F5] px-1.5 py-0.5 rounded">{outlet.code}</span>
-                            )}
-                          </p>
-                          <p className="text-[11px] text-[#7C7C7C] truncate">
-                            {outlet.addressLine}{outlet.city ? `, ${outlet.city}` : ''}{outlet.pincode ? ` — ${outlet.pincode}` : ''}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                    {group.stores.length === 0 && (
-                      <div className="px-4 py-3">
-                        <p className="text-[11px] text-[#AEAEAE]">No stores under this business</p>
-                      </div>
+                    {group.stores.length === 0 ? (
+                      <p className="px-3.5 py-2.5 text-[11px] text-[#AEAEAE]">No stores</p>
+                    ) : (
+                      group.stores.map((outlet) => (
+                        <StoreRow
+                          key={outlet.id}
+                          outlet={outlet}
+                          checked={allOutlets || selectedOutletIds.has(outlet.id)}
+                          muted={allOutlets}
+                          onToggle={() => onToggleOutlet(outlet.id)}
+                        />
+                      ))
                     )}
                   </div>
                 ))
               : flatStores.map((outlet) => (
-                  <button key={outlet.id} onClick={() => onToggleOutlet(outlet.id)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAFAFA] transition-colors text-left">
-                    <Checkbox checked={allOutlets || selectedOutletIds.has(outlet.id)} accent="#299E60" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-bold text-[#181725] flex items-center gap-2">
-                        {outlet.name}
-                        {outlet.code && (
-                          <span className="text-[10px] text-[#AEAEAE] font-mono bg-[#F5F5F5] px-1.5 py-0.5 rounded">{outlet.code}</span>
-                        )}
-                      </p>
-                      <p className="text-[11px] text-[#7C7C7C] truncate">
-                        {outlet.addressLine}{outlet.city ? `, ${outlet.city}` : ''}{outlet.pincode ? ` — ${outlet.pincode}` : ''}
-                      </p>
-                    </div>
-                  </button>
+                  <StoreRow
+                    key={outlet.id}
+                    outlet={outlet}
+                    checked={allOutlets || selectedOutletIds.has(outlet.id)}
+                    muted={allOutlets}
+                    onToggle={() => onToggleOutlet(outlet.id)}
+                  />
                 ))}
+
             {flatStores.length === 0 && (
               <div className="px-4 py-10 text-center">
                 <p className="text-[13px] font-bold text-[#AEAEAE]">{emptyTitle}</p>
