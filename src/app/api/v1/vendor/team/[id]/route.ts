@@ -91,12 +91,6 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     const { vendorId } = await resolveVendorContext(ctx, req);
     const id = extractId(req);
 
-    const member = await prisma.vendorTeamMember.findFirst({
-      where: { id, vendorId },
-      include: teamMemberInclude,
-    });
-    if (!member) throw Errors.notFound('Team member not found');
-
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
       select: { businessAccountId: true },
@@ -105,6 +99,15 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
 
     const actorBaIds = await actorBusinessIds(ctx, req);
     const baScope = actorBaIds.length > 0 ? actorBaIds : [vendor.businessAccountId];
+
+    const member = await prisma.vendorTeamMember.findFirst({
+      where: {
+        id,
+        vendor: { businessAccountId: { in: baScope } },
+      },
+      include: teamMemberInclude,
+    });
+    if (!member) throw Errors.notFound('Team member not found');
 
     const userRoles = await prisma.userRole.findMany({
       where: {
@@ -215,8 +218,20 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     requirePermission(ctx, 'users.edit');
     const id = extractId(req);
 
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { businessAccountId: true },
+    });
+    if (!vendor) throw Errors.notFound('Vendor not found');
+
+    const actorBaIds = await actorBusinessIds(ctx, req);
+    const baScope = actorBaIds.length > 0 ? actorBaIds : [vendor.businessAccountId];
+
     const member = await prisma.vendorTeamMember.findFirst({
-      where: { id, vendorId },
+      where: {
+        id,
+        vendor: { businessAccountId: { in: baScope } },
+      },
       select: { id: true, role: true, roleId: true, userId: true },
     });
     if (!member) throw Errors.notFound('Team member not found');
@@ -228,12 +243,6 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         throw Errors.forbidden('You cannot change the role of a peer or higher-ranked team member');
       }
     }
-
-    const vendor = await prisma.vendor.findUnique({
-      where: { id: vendorId },
-      select: { businessAccountId: true },
-    });
-    if (!vendor) throw Errors.notFound('Vendor not found');
     const userId = member.userId;
 
     const body = await req.json();
@@ -675,8 +684,20 @@ export const DELETE = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     requirePermission(ctx, 'users.delete');
     const id = extractId(req);
 
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { businessAccountId: true },
+    });
+    if (!vendor) throw Errors.notFound('Vendor not found');
+
+    const actorBaIds = await actorBusinessIds(ctx, req);
+    const baScope = actorBaIds.length > 0 ? actorBaIds : [vendor.businessAccountId];
+
     const member = await prisma.vendorTeamMember.findFirst({
-      where: { id, vendorId },
+      where: {
+        id,
+        vendor: { businessAccountId: { in: baScope } },
+      },
       select: { id: true, userId: true, role: true },
     });
     if (!member) throw Errors.notFound('Team member not found');
@@ -690,12 +711,6 @@ export const DELETE = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     if (callerRank <= targetRank) {
       throw Errors.forbidden('You cannot remove a peer or higher-ranked team member');
     }
-
-    const vendor = await prisma.vendor.findUnique({
-      where: { id: vendorId },
-      select: { businessAccountId: true },
-    });
-    if (!vendor) throw Errors.notFound('Vendor not found');
 
     // Remove across all Online Stores under this Business (and BA membership).
     const baStores = await prisma.vendor.findMany({

@@ -56,6 +56,13 @@ const VENDOR_ROLE_TO_ENUM: Record<string, TeamRole> = {
   'Vendor Viewer': 'viewer',
 };
 
+async function actorBusinessIds(ctx: AuthContext, req: NextRequest): Promise<string[]> {
+  const actorId = await resolveSupplierActorUserId(ctx, req);
+  const { listSupplierBusinesses } = await import('@/modules/supplier/supplier.service');
+  const businesses = await listSupplierBusinesses(actorId);
+  return businesses.map((b) => b.id);
+}
+
 export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
     // Team list returns every member's name/email/phone/HCID — gate so a
@@ -73,21 +80,35 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     });
     if (!vendor) throw Errors.notFound('Vendor not found');
 
+    const actorBaIds = await actorBusinessIds(ctx, req);
+    const targetBaIds = actorBaIds.length > 0 ? actorBaIds : [vendor.businessAccountId];
+
     const outlets = await prisma.outlet.findMany({
-      where: { businessAccountId: vendor.businessAccountId, isActive: true },
+      where: { businessAccountId: { in: targetBaIds }, isActive: true },
       select: { id: true, name: true },
     });
     const outletNames = new Map(outlets.map((o) => [o.id, o.name]));
 
-    const members = await prisma.vendorTeamMember.findMany({
-      where: { vendorId },
+    const rawMembers = await prisma.vendorTeamMember.findMany({
+      where: {
+        vendor: { businessAccountId: { in: targetBaIds } },
+        userId: { not: vendor.userId },
+      },
       orderBy: { createdAt: 'asc' },
       include: teamMemberInclude,
     });
 
+    const memberByUserId = new Map<string, typeof rawMembers[0]>();
+    for (const m of rawMembers) {
+      if (!memberByUserId.has(m.userId)) {
+        memberByUserId.set(m.userId, m);
+      }
+    }
+    const members = Array.from(memberByUserId.values());
+
     const userRoles = await prisma.userRole.findMany({
       where: {
-        businessAccountId: vendor.businessAccountId,
+        businessAccountId: { in: targetBaIds },
         userId: { in: members.map((m) => m.userId) },
         role: { scope: 'vendor' },
       },
@@ -120,13 +141,13 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
 
     const others: TeamMemberDTO[] = members.map((m) => {
       const dto = toTeamMemberDTO({
-      id: m.id,
-      createdAt: m.createdAt,
-      legacyRole: m.role,
-      isOwner: false,
-      user: m.user,
-      roleRef: m.roleRef,
-    });
+        id: m.id,
+        createdAt: m.createdAt,
+        legacyRole: m.role,
+        isOwner: false,
+        user: m.user,
+        roleRef: m.roleRef,
+      });
       dto.outletAccess = outletLabel(m.userId);
       return dto;
     });
