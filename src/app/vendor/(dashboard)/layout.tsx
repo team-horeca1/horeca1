@@ -301,7 +301,10 @@ export default function VendorLayout({
 
     React.useEffect(() => {
         if (status !== 'authenticated' || isAdmin || isActiveVendor) return;
-        if (!activeAccountType) return;
+        if (!activeAccountType) {
+            router.replace('/login');
+            return;
+        }
         router.replace(defaultPortalPath(activeAccountType));
     }, [status, isAdmin, isActiveVendor, activeAccountType, router]);
 
@@ -339,9 +342,11 @@ export default function VendorLayout({
     }
 
     if (!isAdmin && !isActiveVendor) {
+        // Redirect is handled in the useEffect above — never call router during render.
         return (
-            <div className="flex items-center justify-center min-h-[50vh] bg-[#F8F9FB]">
+            <div className="flex flex-col items-center justify-center min-h-[50vh] bg-[#F8F9FB] gap-4">
                 <Loader2 className="animate-spin text-[#299E60]" size={36} />
+                <p className="text-[14px] text-[#7C7C7C]">Redirecting…</p>
             </div>
         );
     }
