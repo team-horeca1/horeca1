@@ -110,37 +110,6 @@ export async function assertStoreContext(ctx: AuthContext): Promise<StoreContext
   };
 }
 
-/**
- * Pincode conflict within the same Supplier (HCID): another Online Store
- * owned by the same user already serves this pincode.
- */
-export async function assertPincodeAvailableForSupplier(
-  supplierUserId: string,
-  pincode: string,
-  excludeVendorId?: string,
-): Promise<void> {
-  const conflict = await prisma.serviceArea.findFirst({
-    where: {
-      pincode,
-      isActive: true,
-      vendor: {
-        userId: supplierUserId,
-        ...(excludeVendorId ? { id: { not: excludeVendorId } } : {}),
-      },
-    },
-    select: {
-      vendorId: true,
-      vendor: { select: { businessName: true, displayName: true } },
-    },
-  });
-  if (conflict) {
-    const name = conflict.vendor.displayName ?? conflict.vendor.businessName;
-    throw Errors.conflict(
-      `Pincode ${pincode} is already assigned to Online Store "${name}". Remove it there first.`,
-    );
-  }
-}
-
 export type GoLiveCheck = {
   ready: boolean;
   missing: string[];

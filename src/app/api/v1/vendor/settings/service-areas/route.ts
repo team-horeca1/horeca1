@@ -8,9 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorOutletContext } from '@/lib/resolveVendorOutletContext';
-import { resolveSupplierActorUserId } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
-import { assertPincodeAvailableForSupplier } from '@/modules/supplier/foundation.service';
 
 const addSchema = z.object({
   pincode: z.string().min(4).max(10),
@@ -35,9 +33,8 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     const { pincode } = addSchema.parse(body);
     const trimmed = pincode.trim();
 
-    const supplierUserId = await resolveSupplierActorUserId(ctx, req);
-    await assertPincodeAvailableForSupplier(supplierUserId, trimmed, outletCtx.vendorId);
-
+    // Stores are independent — the same pincode may be served by multiple
+    // Online Stores of the same supplier. Only block duplicates within a store.
     const existing = await prisma.serviceArea.findFirst({
       where: {
         vendorId: outletCtx.vendorId,
@@ -84,11 +81,6 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
 
     const area = await prisma.serviceArea.findFirst({ where: { id, vendorId: outletCtx.vendorId } });
     if (!area) throw Errors.notFound('Service area');
-
-    if (isActive) {
-      const supplierUserId = await resolveSupplierActorUserId(ctx, req);
-      await assertPincodeAvailableForSupplier(supplierUserId, area.pincode, outletCtx.vendorId);
-    }
 
     const updated = await prisma.serviceArea.update({
       where: { id },

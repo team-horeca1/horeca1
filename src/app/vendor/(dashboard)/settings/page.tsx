@@ -52,7 +52,7 @@ function VendorSettingsContent() {
   const [savingSlot, setSavingSlot] = useState(false);
   const [paymentModes, setPaymentModes] = useState<string[]>(['cod', 'prepaid']);
   const [vendorType, setVendorType] = useState<'distributor' | 'wholesaler' | 'dark_store'>('distributor');
-  const [multiWarehouseEnabled, setMultiWarehouseEnabled] = useState(true);
+  const [multiWarehouseEnabled, setMultiWarehouseEnabled] = useState(false);
   const [configOutlets, setConfigOutlets] = useState<Array<{ id: string; name: string }>>([]);
   const [configOutletId, setConfigOutletId] = useState<string | null>(searchParams.get('outletId'));
   const [bankAccountName, setBankAccountName] = useState('');
@@ -110,7 +110,10 @@ function VendorSettingsContent() {
         if (data.vendorType === 'distributor' || data.vendorType === 'wholesaler' || data.vendorType === 'dark_store') {
           setVendorType(data.vendorType);
         }
-        setMultiWarehouseEnabled(true);
+        // Multi-warehouse is retired — each Online Store manages its own single
+        // default outlet, so never show the outlet picker (it would list sibling
+        // stores' outlets from the same business account).
+        setMultiWarehouseEnabled(Boolean(data.multiWarehouseEnabled));
         setBankAccountName(data.bankAccountName || '');
         setBankAccountNumber(data.bankAccountNumber || '');
         setBankIfsc(data.bankIfsc || '');
