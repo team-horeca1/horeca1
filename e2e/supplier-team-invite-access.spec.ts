@@ -326,11 +326,12 @@ test.describe('supplier team invite + access', () => {
     await expect(page.getByRole('row', { name: /Repeat Orders/i })).toHaveCount(0);
 
     const groupHeaders = page.locator('tbody tr td[colspan]').filter({
-      hasText: /Operations|Warehouse|Catalog/,
+      hasText: /Operations|Catalog|Customers|Finance|Account/,
     });
     await expect(groupHeaders.nth(0)).toHaveText('Operations');
-    await expect(groupHeaders.nth(1)).toHaveText('Warehouse');
-    await expect(groupHeaders.nth(2)).toHaveText('Catalog');
+    await expect(groupHeaders.nth(1)).toHaveText('Catalog');
+    await expect(page.getByRole('row', { name: /^Warehouse\b/i })).toHaveCount(0);
+    await expect(page.getByRole('row', { name: /Sales Team/i })).toHaveCount(0);
 
     await page.keyboard.press('Escape').catch(() => {});
     await page.evaluate(() =>

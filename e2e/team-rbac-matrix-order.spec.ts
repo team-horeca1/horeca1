@@ -79,7 +79,7 @@ async function openRoleEditorMatrix(page: Page, teamPath: string) {
 
 function matrixGroupHeaders(page: Page) {
   return page.locator('tbody tr td[colspan]').filter({
-    hasText: /Operations|Warehouse|Catalog|Customers|Finance|Account|Platform|Marketplace|Credit|Storefront|Portal/,
+    hasText: /Operations|Catalog|Customers|Finance|Account|Platform|Marketplace|Credit|Storefront|Portal/,
   });
 }
 
@@ -90,12 +90,12 @@ test('RBAC matrix sidebar order — vendor + admin + storefront placement', asyn
 
   const vendorGroups = matrixGroupHeaders(page);
   await expect(vendorGroups.nth(0)).toHaveText('Operations');
-  await expect(vendorGroups.nth(1)).toHaveText('Warehouse');
-  await expect(vendorGroups.nth(2)).toHaveText('Catalog');
-  await expect(vendorGroups.nth(3)).toHaveText('Customers');
-  await expect(vendorGroups.nth(4)).toHaveText('Finance');
-  await expect(vendorGroups.nth(5)).toHaveText('Account');
-  await expect(page.locator('tbody tr').filter({ hasNot: page.locator('td[colspan]') }).getByRole('cell', { name: 'Warehouse', exact: true })).toBeVisible();
+  await expect(vendorGroups.nth(1)).toHaveText('Catalog');
+  await expect(vendorGroups.nth(2)).toHaveText('Customers');
+  await expect(vendorGroups.nth(3)).toHaveText('Finance');
+  await expect(vendorGroups.nth(4)).toHaveText('Account');
+  await expect(page.getByRole('row', { name: /^Warehouse\b/i })).toHaveCount(0);
+  await expect(page.getByRole('row', { name: /Sales Team/i })).toHaveCount(0);
   await expect(page.locator('table tbody td').filter({ hasText: /^GRN$/ })).toHaveCount(0);
 
   const moduleRows = page.locator('tbody tr').filter({ has: page.locator('td').first() }).filter({
