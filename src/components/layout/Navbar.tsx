@@ -150,10 +150,22 @@ export function Navbar() {
     const isBrandPortal = pathname?.startsWith('/brand/portal');
     const isAccountPage = pathname?.startsWith('/account');
 
+    const availableAccounts = (session?.user as {
+        availableAccounts?: Array<{ isVendor?: boolean; isBrand?: boolean }>;
+    } | undefined)?.availableAccounts;
+    const hasVendorAccount =
+        activeAccountType?.isVendor === true
+        || userRole === 'vendor'
+        || (availableAccounts?.some((a) => a.isVendor === true) ?? false);
+    const hasBrandAccount =
+        activeAccountType?.isBrand === true
+        || userRole === 'brand'
+        || (availableAccounts?.some((a) => a.isBrand === true) ?? false);
+
     // Wait until session settles before injecting Dashboard / Rewards — otherwise
     // the flex-1 search bar jumps as icons appear (login glitch).
-    // Admin: only Admin Dashboard (not vendor/brand), so shopping BA inheritance
-    // does not also inject a supplier Dashboard link.
+    // Admin: only Admin Dashboard. Team members: Dashboard when they have any
+    // vendor BA membership (not only when that BA is already active in JWT).
     const desktopNavItems = React.useMemo(() => {
         if (!sessionReady) return DESKTOP_NAV;
 
@@ -161,9 +173,9 @@ export function Navbar() {
         if (isLoggedIn && !isAdminImpersonating) {
             if (userRole === 'admin') {
                 portalLinks.push({ name: 'Dashboard', href: '/admin/dashboard', Icon: LayoutDashboard });
-            } else if (activeAccountType?.isVendor) {
+            } else if (hasVendorAccount) {
                 portalLinks.push({ name: 'Dashboard', href: '/vendor/dashboard', Icon: LayoutDashboard });
-            } else if (activeAccountType?.isBrand) {
+            } else if (hasBrandAccount) {
                 portalLinks.push({ name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard });
             }
         }
@@ -173,7 +185,7 @@ export function Navbar() {
             ...DESKTOP_NAV,
             ...(isLoggedIn ? [{ name: 'Rewards', href: '/rewards', Icon: Gift }] : []),
         ];
-    }, [sessionReady, isLoggedIn, activeAccountType?.isVendor, activeAccountType?.isBrand, userRole, isAdminImpersonating]);
+    }, [sessionReady, isLoggedIn, hasVendorAccount, hasBrandAccount, userRole, isAdminImpersonating]);
 
     if (isAdminPage || isVendorDashboard || isBrandPortal || isShipmentPage || isAccountPage) return null;
 

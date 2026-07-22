@@ -107,8 +107,9 @@ export async function loadActiveContext(
 
     // Pick the active account: explicit target wins. Otherwise prefer the
     // primary membership (team invites set the owner's BA as primary so
-    // members inherit that business's outlets/address). Fall back to any
-    // membership that already has a usable delivery outlet.
+    // members inherit that business). Never let a personal shopping BA with a
+    // usable delivery address steal the session from a primary vendor/brand BA —
+    // that hid Dashboard for team members on the marketplace homepage.
     const memberships = user.accountMemberships;
     let chosen = targetAccountId
       ? memberships.find((m) => m.businessAccount.id === targetAccountId)
@@ -129,12 +130,20 @@ export async function loadActiveContext(
         if (hasUsableDeliveryLocation(o)) usableAccountIds.add(o.businessAccountId);
       }
       const primary = memberships.find((m) => m.isPrimary);
-      if (primary && usableAccountIds.has(primary.businessAccount.id)) {
-        chosen = primary;
+      if (primary) {
+        const ba = primary.businessAccount;
+        if (ba.isVendor || ba.isBrand || usableAccountIds.has(ba.id)) {
+          chosen = primary;
+        } else {
+          // Customer primary with no usable address — fall back to any usable BA.
+          chosen =
+            memberships.find((m) => usableAccountIds.has(m.businessAccount.id))
+            ?? primary;
+        }
       } else {
         chosen =
-          memberships.find((m) => usableAccountIds.has(m.businessAccount.id))
-          ?? primary
+          memberships.find((m) => m.businessAccount.isVendor || m.businessAccount.isBrand)
+          ?? memberships.find((m) => usableAccountIds.has(m.businessAccount.id))
           ?? memberships[0];
       }
     }

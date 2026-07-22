@@ -357,6 +357,30 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
           }]
         : [];
 
+    const sessionAcctType = (session?.user as {
+        activeBusinessAccountType?: { isVendor?: boolean; isBrand?: boolean };
+        availableAccounts?: Array<{ isVendor?: boolean; isBrand?: boolean }>;
+    } | undefined);
+    const showVendorDashboardCta =
+        !customerImpersonating
+        && !hideBusinessAccountForAdmin
+        && (
+            sessionAcctType?.activeBusinessAccountType?.isVendor === true
+            || sessionRole === 'vendor'
+            || (sessionAcctType?.availableAccounts?.some((a) => a.isVendor === true) ?? false)
+        );
+    const vendorPortalItem = showVendorDashboardCta
+        ? [{
+            id: 'vendor-dashboard',
+            label: 'Supplier Dashboard',
+            desc: 'Inventory, orders & store operations',
+            icon: LayoutDashboard,
+            onClick: () => { onClose(); router.push('/vendor/dashboard'); },
+          }]
+        : [];
+
+    const portalItems = [...adminPortalItem, ...vendorPortalItem];
+
     const otherInfoItems = [
         { id: 'notifications', label: 'Notification', desc: 'Push & email preferences', icon: Bell, onClick: () => setIsNotificationOpen(true) },
         { id: 'general', label: 'General Information', desc: 'About, terms & policies', icon: Info, onClick: () => setIsGeneralInfoOpen(true) },
@@ -539,14 +563,14 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                             )}
 
                             {/* Admin portal — platform admins go here instead of Business Account */}
-                            {adminPortalItem.length > 0 && (
+                            {portalItems.length > 0 && (
                                 <div className="mb-6">
                                     <h4 className="text-[12px] font-[800] text-gray-400 uppercase tracking-wider mb-2 px-1">Platform</h4>
                                     <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-                                        {adminPortalItem.map((item, idx) => {
+                                        {portalItems.map((item, idx) => {
                                             const Icon = item.icon;
                                             return (
-                                                <button key={item.id} onClick={item.onClick} className={cn("w-full flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 transition-colors text-left cursor-pointer", idx < adminPortalItem.length - 1 && "border-b border-gray-50")}>
+                                                <button key={item.id} onClick={item.onClick} className={cn("w-full flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 transition-colors text-left cursor-pointer", idx < portalItems.length - 1 && "border-b border-gray-50")}>
                                                     <span className="w-8 h-8 rounded-lg bg-[#53B175]/10 text-[#53B175] flex items-center justify-center shrink-0">
                                                         <Icon size={15} />
                                                     </span>
@@ -687,11 +711,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                     </ul>
 
                                     {/* Platform admin — dashboard entry */}
-                                    {adminPortalItem.length > 0 && (
+                                    {portalItems.length > 0 && (
                                         <>
                                             <p className="text-[10px] font-[700] text-gray-400 uppercase tracking-[0.12em] px-2 pt-3 pb-1.5">Platform</p>
                                             <ul className="space-y-0.5">
-                                                {adminPortalItem.map((item) => {
+                                                {portalItems.map((item) => {
                                                     const Icon = item.icon;
                                                     return (
                                                         <li key={item.id}>
@@ -949,14 +973,14 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 </section>
 
                                 {/* Admin Dashboard shortcut on profile home */}
-                                {adminPortalItem.length > 0 && (
+                                {portalItems.length > 0 && (
                                     <section>
                                         <div className="flex items-baseline justify-between mb-3 px-1">
                                             <h3 className="text-[15px] font-[700] text-[#181725]">Platform</h3>
-                                            <span className="text-[11px] font-medium text-gray-400">Admin tools</span>
+                                            <span className="text-[11px] font-medium text-gray-400">Your workspace</span>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-                                            {adminPortalItem.map((item) => {
+                                            {portalItems.map((item) => {
                                                 const Icon = item.icon;
                                                 return (
                                                     <button

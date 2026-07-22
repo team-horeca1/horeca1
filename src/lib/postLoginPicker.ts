@@ -70,10 +70,22 @@ export function resolvePostLoginDestination(
 function capsFromSessionUser(user: {
   role?: string;
   activeBusinessAccountType?: AccountPortalCaps | null;
+  availableAccounts?: Array<{ isVendor?: boolean; isBrand?: boolean }> | null;
 } | null | undefined): AccountPortalCaps | null {
   // Never derive portal caps from BA for admins — they inherit a shopping BA.
   if (user?.role === 'admin') return null;
-  if (user?.activeBusinessAccountType) return user.activeBusinessAccountType;
+  const active = user?.activeBusinessAccountType;
+  if (active?.isVendor || active?.isBrand) return active;
+  // Team members may briefly have a shopping BA active while availableAccounts
+  // already lists their vendor membership — prefer portal work on login.
+  const accounts = user?.availableAccounts ?? [];
+  if (accounts.some((a) => a.isVendor)) {
+    return { isCustomer: true, isVendor: true, isBrand: false };
+  }
+  if (accounts.some((a) => a.isBrand)) {
+    return { isCustomer: false, isVendor: false, isBrand: true };
+  }
+  if (active) return active;
   const role = user?.role;
   if (role === 'vendor') return { isCustomer: false, isVendor: true, isBrand: false };
   if (role === 'brand') return { isCustomer: false, isVendor: false, isBrand: true };

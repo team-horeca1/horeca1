@@ -10,10 +10,8 @@ import {
 import { cn } from '@/lib/utils';
 import {
   prepareFreshLoginNavigation,
-  resolvePostLoginDestination,
   sanitizeRedirect,
 } from '@/lib/postLoginPicker';
-import type { AccountPortalCaps } from '@/lib/portalRouting';
 
 const RESEND_COOLDOWN = 60;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -34,31 +32,17 @@ export default function LoginPageInner() {
   // number they just verified.
   const prefilledPhone = params?.get('phone')?.replace(/\D/g, '').slice(0, 10) ?? '';
   const prefilledEmail = params?.get('email') ?? '';
-  const { data: session, status: sessionStatus } = useSession();
+  const { status: sessionStatus } = useSession();
 
   const [step, setStep] = useState<Step>('form');
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  // Already signed in — land on explicit redirect or role/portal default.
+  // Already signed in — same portal landing as fresh OTP/password login.
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
-    const role = session?.user?.role ?? null;
-    // Admin wins over inherited shopping BA (isCustomer) — never send them to /.
-    if (role === 'admin') {
-      window.location.href = resolvePostLoginDestination(redirectTo, null, role);
-      return;
-    }
-    const caps = (session?.user?.activeBusinessAccountType as AccountPortalCaps | null | undefined)
-      ?? (role === 'vendor'
-        ? { isCustomer: false, isVendor: true, isBrand: false }
-        : role === 'brand'
-          ? { isCustomer: false, isVendor: false, isBrand: true }
-          : role === 'customer'
-            ? { isCustomer: true, isVendor: false, isBrand: false }
-            : null);
-    window.location.href = resolvePostLoginDestination(redirectTo, caps, role);
-  }, [sessionStatus, redirectTo, session?.user?.activeBusinessAccountType, session?.user?.role]);
+    void prepareFreshLoginNavigation(redirectTo);
+  }, [sessionStatus, redirectTo]);
 
   const [identifier, setIdentifier] = useState(prefilledPhone || prefilledEmail);
   const [usePassword, setUsePassword] = useState(false);

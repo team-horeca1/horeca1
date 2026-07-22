@@ -597,10 +597,9 @@ export function useBusinessAccountSwitcher() {
     ],
   );
 
-  // Bootstrap session when JWT is missing account/outlet but memberships exist.
-  // Cross-tab lock prevents multiple tabs from racing switchAccount(primary).
-  // Skip entirely while viewing as a customer/vendor — bootstrap would clear
-  // impersonation cookies and rewrite the admin JWT.
+  // Bootstrap session when JWT is missing account/outlet, or when the active BA
+  // is not the primary (e.g. team member stuck on a personal shopping BA while
+  // their primary vendor membership is where Dashboard lives).
   useEffect(() => {
     if (customerImpersonating || vendorImpersonating) return;
     if (!userId || loading || switching || accounts.length === 0) return;
@@ -609,8 +608,14 @@ export function useBusinessAccountSwitcher() {
     const primary = accounts.find((a) => a.isPrimary) ?? accounts[0];
     const defaultOutletId =
       primary.primaryOutletId ?? primary.outlets[0]?.id ?? null;
+    const needsPrimarySwitch =
+      !activeBusinessAccountId
+      || (
+        activeBusinessAccountId !== primary.id
+        && (primary.isVendor || primary.isBrand)
+      );
 
-    if (!activeBusinessAccountId) {
+    if (needsPrimarySwitch) {
       if (!tryAcquireBootstrapLock()) return;
       bootstrapAttempted.current = true;
       void switchAccount(primary.id, defaultOutletId ?? undefined).catch(() => {
