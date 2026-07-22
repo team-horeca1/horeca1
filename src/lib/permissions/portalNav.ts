@@ -20,12 +20,10 @@ import {
   Gift,
   FileWarning,
   Warehouse,
-  Container,
   GitMerge,
   Bell,
   Building2,
   UserCircle,
-  BadgeIndianRupee,
   ShieldAlert,
   ScrollText,
 } from 'lucide-react';
@@ -38,6 +36,8 @@ export interface PortalNavLink {
   href: string;
   feature?: Module;
   requiredPerm?: PermissionKey | PermissionKey[];
+  /** When true, link stays in sidebar but is skipped in the permission matrix. */
+  matrixExclude?: boolean;
 }
 
 export interface PortalNavGroup {
@@ -117,7 +117,8 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
       { name: 'Dashboard', icon: LayoutDashboard, href: '/vendor/dashboard', feature: 'dashboard', requiredPerm: 'dashboard.view' },
       { name: 'Orders', icon: ShoppingBag, href: '/vendor/orders', feature: 'orders', requiredPerm: 'orders.view' },
       { name: 'Inventory', icon: Warehouse, href: '/vendor/inventory', feature: 'inventory', requiredPerm: 'inventory.view' },
-      { name: 'Warehouse', icon: Container, href: '/vendor/warehouse', feature: 'grn', requiredPerm: 'inventory.view' },
+      // Hidden for now — re-enable with warehouse ops
+      // { name: 'Warehouse', icon: Container, href: '/vendor/warehouse', feature: 'grn', requiredPerm: 'inventory.view' },
       { name: 'Returns', icon: RotateCcw, href: '/vendor/returns', feature: 'orders', requiredPerm: 'orders.view' },
       { name: 'Claims', icon: ShieldAlert, href: '/vendor/claims', feature: 'orders', requiredPerm: 'orders.view' },
     ],
@@ -135,7 +136,8 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
     label: 'Customers',
     links: [
       { name: 'Customers', icon: UserCircle, href: '/vendor/customers', feature: 'customers', requiredPerm: 'customers.view' },
-      { name: 'Sales Team', icon: BadgeIndianRupee, href: '/vendor/sales-team', feature: 'salespersons', requiredPerm: ['salespersons.view', 'commissions.view'] },
+      // Hidden for now — re-enable with sales-team / commissions
+      // { name: 'Sales Team', icon: BadgeIndianRupee, href: '/vendor/sales-team', feature: 'salespersons', requiredPerm: ['salespersons.view', 'commissions.view'] },
     ],
   },
   {
@@ -151,7 +153,7 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
     label: 'Account',
     links: [
       { name: 'Notifications', icon: Bell, href: '/vendor/notifications', feature: 'settings', requiredPerm: 'settings.view' },
-      { name: 'Back to Supplier', icon: Building2, href: '/vendor/overview', feature: 'dashboard', requiredPerm: 'dashboard.view' },
+      { name: 'Back to Supplier', icon: Building2, href: '/vendor/overview', feature: 'dashboard', requiredPerm: 'dashboard.view', matrixExclude: true },
       { name: 'Store Settings', icon: Settings, href: '/vendor/settings', feature: 'settings', requiredPerm: 'settings.view' },
     ],
   },

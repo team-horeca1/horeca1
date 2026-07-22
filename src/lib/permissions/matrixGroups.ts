@@ -35,6 +35,7 @@ function buildGroupsFromNav(
     const seen = new Set<Module>();
 
     for (const link of navGroup.links) {
+      if (link.matrixExclude) continue;
       const mod = link.feature;
       if (!mod || !allowed.has(mod) || seen.has(mod)) continue;
       seen.add(mod);
@@ -66,32 +67,9 @@ function appendMissing(scope: RoleScope, groups: MatrixModuleGroup[]): MatrixMod
   return groups;
 }
 
-const VENDOR_WAREHOUSE_MODULES: Module[] = ['grn', 'dispatch', 'deliveries'];
-
-/** Pull warehouse-tab modules into their own matrix section (matches sidebar "Warehouse"). */
-function splitVendorWarehouseGroup(groups: MatrixModuleGroup[]): void {
-  const ops = groups.find((g) => g.label === 'Operations');
-  if (!ops) return;
-
-  const warehouse: Module[] = [];
-  for (const mod of VENDOR_WAREHOUSE_MODULES) {
-    const idx = ops.modules.indexOf(mod);
-    if (idx !== -1) {
-      warehouse.push(mod);
-      ops.modules.splice(idx, 1);
-    }
-  }
-  if (warehouse.length === 0) return;
-
-  const opsIdx = groups.findIndex((g) => g.label === 'Operations');
-  groups.splice(opsIdx + 1, 0, { label: 'Warehouse', modules: warehouse });
-}
-
 function vendorModuleGroups(): MatrixModuleGroup[] {
-  // Strict Store Ops sidebar parity — no injected extras (Repeat Orders, etc.).
-  const groups = buildGroupsFromNav('vendor', VENDOR_NAV_GROUPS);
-  splitVendorWarehouseGroup(groups);
-  return groups;
+  // Strict Store Ops sidebar parity (Warehouse / Sales Team commented out in nav).
+  return buildGroupsFromNav('vendor', VENDOR_NAV_GROUPS);
 }
 
 function adminModuleGroups(): MatrixModuleGroup[] {
