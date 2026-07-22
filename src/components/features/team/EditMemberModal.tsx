@@ -9,7 +9,6 @@ import {
 import type { RoleItem } from './AddMemberWizard';
 import { Step2Outlets, type SupplierBusinessItem } from './AddMemberWizard';
 import {
-  businessIdsMatchingStoreSelection,
   pruneOutletIds,
   resolveStoreScopeAccess,
 } from './teamStoreSelection';
@@ -297,33 +296,6 @@ export function EditMemberModal({
     });
   }, [isSupplierEdit, allOutlets, selectedBusinessIds, businesses]);
 
-  useEffect(() => {
-    if (!isSupplierEdit || allOutlets) return;
-    if (selectedOutletIds.size === 0) return;
-    const nextBa = businessIdsMatchingStoreSelection(
-      selectedBusinessIds,
-      businesses,
-      selectedOutletIds,
-    );
-    if (
-      nextBa.size === selectedBusinessIds.size
-      && [...nextBa].every((id) => selectedBusinessIds.has(id))
-    ) {
-      return;
-    }
-    setSelectedBusinessIds(nextBa);
-    setBaName(
-      businesses.filter((b) => nextBa.has(b.id)).map((b) => b.name).join(', ')
-      || 'Vendor Account',
-    );
-  }, [
-    isSupplierEdit,
-    allOutlets,
-    selectedOutletIds,
-    selectedBusinessIds,
-    businesses,
-  ]);
-
   const syncBaName = (ids: Set<string>) => {
     setBaName(
       businesses.filter((b) => ids.has(b.id)).map((b) => b.name).join(', ')
@@ -333,14 +305,20 @@ export function EditMemberModal({
 
   const toggleBusiness = (businessId: string) => {
     let didChange = false;
+    let isAdding = false;
     let nextIds = new Set<string>();
 
     setSelectedBusinessIds((prev) => {
       // Keep at least one business — and do NOT wipe store picks on a no-op click.
       if (prev.has(businessId) && prev.size === 1) return prev;
       const next = new Set(prev);
-      if (next.has(businessId)) next.delete(businessId);
-      else next.add(businessId);
+      if (next.has(businessId)) {
+        next.delete(businessId);
+        isAdding = false;
+      } else {
+        next.add(businessId);
+        isAdding = true;
+      }
       didChange = true;
       nextIds = next;
       return next;
@@ -351,6 +329,13 @@ export function EditMemberModal({
     syncBaName(nextIds);
 
     setSelectedOutletIds((prevIds) => {
+      if (isAdding && !allOutlets) {
+        const biz = businesses.find((b) => b.id === businessId);
+        const bizStoreIds = biz?.stores.map((s) => s.id) ?? [];
+        const next = new Set(prevIds);
+        bizStoreIds.forEach((id) => next.add(id));
+        return next;
+      }
       const pruned = pruneOutletIds(nextIds, businesses, prevIds);
       if (pruned.size === prevIds.size && [...pruned].every((id) => prevIds.has(id))) return prevIds;
       return pruned;

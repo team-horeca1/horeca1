@@ -52,18 +52,3 @@ export function resolveStoreScopeAccess(
   return { businessAccountIds, storeIds };
 }
 
-/** Drop selected businesses that have no checked stores (explicit store mode only). */
-export function businessIdsMatchingStoreSelection(
-  businessIds: Set<string>,
-  businesses: BusinessWithStores[],
-  outletIds: Set<string>,
-): Set<string> {
-  const pruned = pruneOutletIds(businessIds, businesses, outletIds);
-  if (pruned.size === 0) return businessIds;
-
-  const withStore = businesses.filter(
-    (b) => businessIds.has(b.id) && b.stores.some((s) => pruned.has(s.id)),
-  );
-  if (withStore.length === 0) return businessIds;
-  return new Set(withStore.map((b) => b.id));
-}

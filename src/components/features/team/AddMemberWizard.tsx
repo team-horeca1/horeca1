@@ -14,7 +14,6 @@ import { PermissionMatrix, countMatrixPermissions } from '@/components/features/
 import { toast } from 'sonner';
 import type { RoleScope } from '@/lib/permissions/portalFeatures';
 import {
-  businessIdsMatchingStoreSelection,
   countVisibleSelectedStores,
   pruneOutletIds,
   resolveStoreScopeAccess,
@@ -206,33 +205,6 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
     });
   }, [isSupplierInvite, allOutlets, selectedBusinessIds, businesses]);
 
-  useEffect(() => {
-    if (!isSupplierInvite || allOutlets) return;
-    if (selectedOutletIds.size === 0) return;
-    const nextBa = businessIdsMatchingStoreSelection(
-      selectedBusinessIds,
-      businesses,
-      selectedOutletIds,
-    );
-    if (
-      nextBa.size === selectedBusinessIds.size
-      && [...nextBa].every((id) => selectedBusinessIds.has(id))
-    ) {
-      return;
-    }
-    setSelectedBusinessIds(nextBa);
-    setBaName(
-      businesses.filter((b) => nextBa.has(b.id)).map((b) => b.name).join(', ')
-      || businessAccountLabel,
-    );
-  }, [
-    isSupplierInvite,
-    allOutlets,
-    selectedOutletIds,
-    selectedBusinessIds,
-    businesses,
-    businessAccountLabel,
-  ]);
 
   useEffect(() => {
     const outletStep = skipOutletStep ? -1 : 2;
@@ -336,14 +308,20 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
 
   const toggleBusiness = (businessId: string) => {
     let didChange = false;
+    let isAdding = false;
     let nextIds = new Set<string>();
 
     setSelectedBusinessIds((prev) => {
       // Keep at least one business — and do NOT wipe store picks on a no-op click.
       if (prev.has(businessId) && prev.size === 1) return prev;
       const next = new Set(prev);
-      if (next.has(businessId)) next.delete(businessId);
-      else next.add(businessId);
+      if (next.has(businessId)) {
+        next.delete(businessId);
+        isAdding = false;
+      } else {
+        next.add(businessId);
+        isAdding = true;
+      }
       didChange = true;
       nextIds = next;
       return next;
@@ -357,6 +335,13 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
     );
 
     setSelectedOutletIds((prevIds) => {
+      if (isAdding && !allOutlets) {
+        const biz = businesses.find((b) => b.id === businessId);
+        const bizStoreIds = biz?.stores.map((s) => s.id) ?? [];
+        const next = new Set(prevIds);
+        bizStoreIds.forEach((id) => next.add(id));
+        return next;
+      }
       const pruned = pruneOutletIds(nextIds, businesses, prevIds);
       if (pruned.size === prevIds.size && [...pruned].every((id) => prevIds.has(id))) return prevIds;
       return pruned;
