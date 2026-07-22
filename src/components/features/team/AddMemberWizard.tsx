@@ -328,8 +328,8 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
   };
 
   const toggleOutlet = (id: string) => {
-    // Leaving "All stores": treat the click as unchecking that store from the full set
-    // (stores look unchecked while allOutlets=true, so "select" felt broken).
+    // Leaving "All stores": uncheck the clicked store and keep the rest explicitly selected.
+    // "All stores" is only re-entered via the explicit All toggle (covers future stores).
     if (allOutlets) {
       const allIds = selectedStores.map((s) => s.id);
       setAllOutlets(false);
@@ -340,11 +340,6 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      // Re-enter "All stores" when every visible store is checked again.
-      if (selectedStores.length > 0 && selectedStores.every((s) => next.has(s.id))) {
-        setAllOutlets(true);
-        return new Set();
-      }
       return next;
     });
   };
@@ -400,6 +395,19 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
             dataField: true,
           });
           return;
+        }
+        if (!allOutlets) {
+          const baMissingStore = selectedBusinesses.some(
+            (b) => b.stores.length > 0 && !b.stores.some((s) => selectedOutletIds.has(s.id)),
+          );
+          if (baMissingStore) {
+            applyValidationErrors(
+              { storeIds: 'Select at least one store for each selected business' },
+              undefined,
+              { dataField: true },
+            );
+            return;
+          }
         }
       } else if (!allOutlets && selectedOutletIds.size === 0) {
         applyValidationErrors({ outlets: 'Select at least one outlet, or choose "All outlets"' }, undefined, {
@@ -879,7 +887,7 @@ export function Step2Outlets({
                     {group.stores.map((outlet) => (
                       <button key={outlet.id} onClick={() => onToggleOutlet(outlet.id)}
                         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAFAFA] transition-colors text-left">
-                        <Checkbox checked={!allOutlets && selectedOutletIds.has(outlet.id)} accent="#299E60" />
+                        <Checkbox checked={allOutlets || selectedOutletIds.has(outlet.id)} accent="#299E60" />
                         <div className="min-w-0 flex-1">
                           <p className="text-[13px] font-bold text-[#181725] flex items-center gap-2">
                             {outlet.name}
@@ -903,7 +911,7 @@ export function Step2Outlets({
               : flatStores.map((outlet) => (
                   <button key={outlet.id} onClick={() => onToggleOutlet(outlet.id)}
                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAFAFA] transition-colors text-left">
-                    <Checkbox checked={!allOutlets && selectedOutletIds.has(outlet.id)} accent="#299E60" />
+                    <Checkbox checked={allOutlets || selectedOutletIds.has(outlet.id)} accent="#299E60" />
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] font-bold text-[#181725] flex items-center gap-2">
                         {outlet.name}

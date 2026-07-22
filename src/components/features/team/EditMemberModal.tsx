@@ -319,8 +319,8 @@ export function EditMemberModal({
   };
 
   const toggleOutlet = (id: string) => {
-    // Leaving "All stores": treat the click as unchecking that store from the full set
-    // (stores look unchecked while allOutlets=true, so "select" felt broken).
+    // Leaving "All stores": uncheck the clicked store and keep the rest explicitly selected.
+    // "All stores" is only re-entered via the explicit All toggle (covers future stores).
     if (allOutlets) {
       const allIds = selectedStores.map((s) => s.id);
       setAllOutlets(false);
@@ -331,11 +331,6 @@ export function EditMemberModal({
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      // Re-enter "All stores" when every visible store is checked again.
-      if (selectedStores.length > 0 && selectedStores.every((s) => next.has(s.id))) {
-        setAllOutlets(true);
-        return new Set();
-      }
       return next;
     });
   };
@@ -383,6 +378,19 @@ export function EditMemberModal({
           );
           setSubmitting(false);
           return;
+        }
+        if (!allOutlets) {
+          const baMissingStore = selectedBusinesses.some(
+            (b) => b.stores.length > 0 && !b.stores.some((s) => selectedOutletIds.has(s.id)),
+          );
+          if (baMissingStore) {
+            applyValidationErrors(
+              { storeIds: 'Select at least one store for each selected business' },
+              'Select at least one store for each selected business',
+            );
+            setSubmitting(false);
+            return;
+          }
         }
         if (!selectedRoleId && Object.keys(permissions).length === 0) {
           applyValidationErrors({}, 'Select at least one permission');
@@ -516,7 +524,7 @@ export function EditMemberModal({
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAFAFA] transition-colors text-left"
                     >
                       <Checkbox
-                        checked={!allOutlets && selectedOutletIds.has(outlet.id)}
+                        checked={allOutlets || selectedOutletIds.has(outlet.id)}
                         accent={accent}
                       />
                       <div className="min-w-0 flex-1">

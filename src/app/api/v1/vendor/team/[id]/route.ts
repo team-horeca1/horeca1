@@ -128,17 +128,48 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       ...teamRows.map((t) => t.vendor.businessAccountId),
     ])];
 
-    const hasBusinessWide = userRoles.some((r) => r.vendorId === null);
-    const storeIds = hasBusinessWide
-      ? []
-      : [...new Set([
-          ...userRoles.filter((r) => r.vendorId).map((r) => r.vendorId!),
-          ...teamRows.map((t) => t.vendor.id),
-        ])];
+    const resolvedBaIds = businessAccountIds.length > 0 ? businessAccountIds : [vendor.businessAccountId];
+
+    // Per-BA scope: business-wide only when that BA has vendorId=null roles.
+    // Mixed access (one BA business-wide, another store-scoped) must return
+    // scope='store' with expanded store IDs so Edit does not snap back to All.
+    const baIdsWithBusinessWide = new Set(
+      userRoles.filter((r) => r.vendorId === null).map((r) => r.businessAccountId),
+    );
+    const allBaStores = resolvedBaIds.length > 0
+      ? await prisma.vendor.findMany({
+          where: { businessAccountId: { in: resolvedBaIds } },
+          select: { id: true, businessAccountId: true },
+        })
+      : [];
+    const storesByBa = new Map<string, string[]>();
+    for (const s of allBaStores) {
+      const list = storesByBa.get(s.businessAccountId) ?? [];
+      list.push(s.id);
+      storesByBa.set(s.businessAccountId, list);
+    }
+
+    const storeIdsSet = new Set<string>();
+    for (const baId of resolvedBaIds) {
+      if (baIdsWithBusinessWide.has(baId)) {
+        for (const sid of storesByBa.get(baId) ?? []) storeIdsSet.add(sid);
+        continue;
+      }
+      for (const r of userRoles) {
+        if (r.businessAccountId === baId && r.vendorId) storeIdsSet.add(r.vendorId);
+      }
+      for (const t of teamRows) {
+        if (t.vendor.businessAccountId === baId) storeIdsSet.add(t.vendor.id);
+      }
+    }
+    const storeIds = [...storeIdsSet];
+    const allBasBusinessWide =
+      resolvedBaIds.length > 0 && resolvedBaIds.every((baId) => baIdsWithBusinessWide.has(baId));
+    const scope: 'business' | 'store' = allBasBusinessWide || storeIds.length === 0 ? 'business' : 'store';
 
     // Legacy outlet-scoped rows (customer warehouses) — keep for older clients.
     const hasAccountWideOutlet = userRoles.some((r) => r.outletId === null && r.vendorId === null);
-    const outletIds = hasAccountWideOutlet || hasBusinessWide
+    const outletIds = hasAccountWideOutlet || allBasBusinessWide
       ? []
       : [...new Set(userRoles.filter((r) => r.outletId !== null).map((r) => r.outletId!))];
 
@@ -165,9 +196,10 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       success: true,
       data: {
         ...dto,
-        businessAccountIds: businessAccountIds.length > 0 ? businessAccountIds : [vendor.businessAccountId],
-        storeIds,
-        scope: hasBusinessWide || storeIds.length === 0 ? 'business' : 'store',
+        businessAccountIds: resolvedBaIds,
+        // When fully business-wide, keep storeIds empty so Edit hydrates allOutlets=true.
+        storeIds: scope === 'business' ? [] : storeIds,
+        scope,
         outletIds,
         storefrontAccess: { view: !!sfPerms.view, order: !!sfPerms.order, pay: !!sfPerms.pay },
       },
@@ -269,9 +301,16 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
           return { businessAccountId: baId, storeIds: filtered };
         }
         return { businessAccountId: baId, storeIds: [baStores[0].id] };
-      }).filter((t) => t.storeIds.length > 0);
+      });
 
-      if (baTargets.length === 0) {
+      if (inviteScope === 'store') {
+        const emptyBa = baTargets.find((t) => t.storeIds.length === 0);
+        if (emptyBa) {
+          throw Errors.badRequest('Select at least one store for each selected business');
+        }
+      }
+
+      if (baTargets.length === 0 || baTargets.every((t) => t.storeIds.length === 0)) {
         throw Errors.badRequest('Select at least one store under the selected business(es)');
       }
 
