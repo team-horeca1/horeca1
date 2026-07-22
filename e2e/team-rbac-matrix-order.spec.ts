@@ -24,14 +24,39 @@ async function passwordLogin(page: Page, email: string, password: string) {
 }
 
 async function adminImpersonateFirstVendor(page: Page) {
-  const vendorId = await page.evaluate(async () => {
-    const list = await fetch('/api/v1/admin/vendors?limit=5', { credentials: 'include' });
-    const json = await list.json();
-    const vendors = json.data?.vendors ?? [];
-    const active = vendors.find((v: { isActive?: boolean }) => v.isActive !== false);
-    return active?.id ?? vendors[0]?.id ?? null;
+  // Re-confirm admin session — prior tests may leave cookies in a weird state.
+  const role = await page.evaluate(async () => {
+    const r = await fetch('/api/auth/session', { credentials: 'include' });
+    const j = await r.json();
+    return (j?.user?.role as string | undefined) ?? '';
   });
-  expect(vendorId).toBeTruthy();
+  if (role !== 'admin') {
+    await passwordLogin(page, 'admin@horeca1.com', 'admin123');
+  }
+
+  const vendorId = await page.evaluate(async () => {
+    const flat = await fetch('/api/v1/admin/vendors?limit=20', { credentials: 'include' });
+    const flatJson = await flat.json();
+    const vendors = (flatJson.data?.vendors ?? []) as Array<{ id?: string; isActive?: boolean }>;
+    const active = vendors.find((v) => v.isActive !== false && v.id);
+    if (active?.id) return active.id;
+    if (vendors[0]?.id) return vendors[0].id;
+
+    // Fallback: suppliers hierarchy embeds Online Store ids
+    const hier = await fetch('/api/v1/admin/vendors?view=suppliers&limit=20', { credentials: 'include' });
+    const hierJson = await hier.json();
+    const suppliers = (hierJson.data?.suppliers ?? []) as Array<{
+      businesses?: Array<{ stores?: Array<{ id?: string }> }>;
+    }>;
+    for (const s of suppliers) {
+      for (const b of s.businesses ?? []) {
+        const sid = b.stores?.[0]?.id;
+        if (sid) return sid;
+      }
+    }
+    return null;
+  });
+  expect(vendorId, 'admin vendors list returned no vendor id').toBeTruthy();
   const status = await page.evaluate(async (id) => {
     const res = await fetch('/api/v1/admin/impersonate', {
       method: 'POST',
@@ -79,6 +104,7 @@ test('RBAC matrix sidebar order — vendor + admin + storefront placement', asyn
   await expect(moduleRows.first().locator('td').first()).toHaveText('Dashboard');
   await expect(page.getByRole('row', { name: /Wallet & Ledger/i })).toBeVisible();
   await expect(page.locator('table tbody td').filter({ hasText: /^Payments$/ })).toHaveCount(0);
+  await expect(page.getByRole('row', { name: /Repeat Orders/i })).toHaveCount(0);
 
   await page.keyboard.press('Escape');
   await page.goto('/vendor/team', { waitUntil: 'domcontentloaded' });
@@ -89,8 +115,11 @@ test('RBAC matrix sidebar order — vendor + admin + storefront placement', asyn
   await page.getByPlaceholder('e.g. Rahul Sharma').fill('Matrix Test User');
   await page.locator('[data-field="password"] input').fill('matrix123');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(page.getByText(/Step 2 of 3/i)).toBeVisible({ timeout: 20_000 });
+  // Wait for supplier businesses/stores to finish loading before advancing
+  await expect(page.getByText(/All stores/i).first()).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Next', exact: true }).click();
-  await expect(page.getByText('Step 3 of 3')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/Step 3 of 3/i)).toBeVisible({ timeout: 20_000 });
 
   const storefrontHeading = page.getByText('Storefront Access');
   const permissionsTable = page.locator('table').filter({ hasText: 'Module' }).first();
@@ -102,6 +131,8 @@ test('RBAC matrix sidebar order — vendor + admin + storefront placement', asyn
   if (tableBox && sfBox) {
     expect(sfBox.y).toBeGreaterThan(tableBox.y + tableBox.height - 20);
   }
+
+  await expect(page.getByRole('row', { name: /Repeat Orders/i })).toHaveCount(0);
 
   await page.keyboard.press('Escape');
   await page.evaluate(() => fetch('/api/v1/admin/impersonate', { method: 'DELETE', credentials: 'include' }));

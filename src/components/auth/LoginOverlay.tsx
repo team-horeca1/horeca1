@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { FormErrorBanner } from '@/components/ui/form';
 import { toast } from 'sonner';
 import { signIn } from 'next-auth/react';
-import { markFreshLoginPendingPicker } from '@/lib/postLoginPicker';
+import { clearPostLoginPickerState } from '@/lib/postLoginPicker';
 
 interface LoginOverlayProps {
   isOpen: boolean;
@@ -146,7 +146,7 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
         setOtp(['', '', '', '']);
         setTimeout(() => otpRefs[0].current?.focus(), 50);
       } else {
-        markFreshLoginPendingPicker();
+        clearPostLoginPickerState();
         router.refresh();
         onLoginSuccess();
       }

@@ -2,8 +2,7 @@
 
 /**
  * Forces a logged-in customer who has no *usable* delivery address to set one
- * before using the storefront. Mounted in the root layout next to
- * PostLoginAccountSelector.
+ * before using the storefront. Mounted in the root layout.
  *
  * Trigger: authenticated + active account is a pure customer (not a vendor /
  * brand account, which also carry isCustomer=true) + no saved address with a
@@ -13,15 +12,13 @@
  * a usable address (valid 6-digit pincode OR non-zero coordinates).
  *
  * Users may skip for this session via "Skip for now" — the orange banner and
- * navbar nudge remain as soft reminders. Stays shut while the post-login account
- * picker is still pending (force-picker cookie) so the two modals never stack.
+ * navbar nudge remain as soft reminders.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useAddress, type Address } from '@/context/AddressContext';
-import { readForcePickerCookie } from '@/lib/postLoginPicker';
 import { AddNewAddressOverlay } from '@/components/layout/AddNewAddressOverlay';
 import {
   isUsableSavedAddress,
@@ -71,7 +68,6 @@ export function MandatoryAddressGate() {
       status === 'authenticated' &&
       isCustomerContext &&
       !onExcludedRoute &&
-      !readForcePickerCookie() &&
       !skipped &&
       !isAdminCustomerImpersonationActive();
 

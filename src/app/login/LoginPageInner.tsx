@@ -10,10 +10,10 @@ import {
 import { cn } from '@/lib/utils';
 import {
   prepareFreshLoginNavigation,
-  readForcePickerCookie,
+  resolvePostLoginDestination,
   sanitizeRedirect,
-  setPendingRedirect,
 } from '@/lib/postLoginPicker';
+import type { AccountPortalCaps } from '@/lib/portalRouting';
 
 const RESEND_COOLDOWN = 60;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -34,24 +34,25 @@ export default function LoginPageInner() {
   // number they just verified.
   const prefilledPhone = params?.get('phone')?.replace(/\D/g, '').slice(0, 10) ?? '';
   const prefilledEmail = params?.get('email') ?? '';
-  const { status: sessionStatus } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
 
   const [step, setStep] = useState<Step>('form');
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  // Defer deep-link redirect until the post-login account picker completes.
+  // Already signed in — land on explicit redirect or role/portal default.
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
-    if (readForcePickerCookie()) {
-      // Picker still pending — go straight to the destination; the global picker
-      // overlays it and completePostLoginPicker handles any post-pick reload.
-      setPendingRedirect(redirectTo);
-      window.location.href = redirectTo || '/';
-      return;
-    }
-    window.location.href = redirectTo || '/';
-  }, [sessionStatus, redirectTo]);
+    const caps = (session?.user?.activeBusinessAccountType as AccountPortalCaps | null | undefined)
+      ?? (session?.user?.role === 'vendor'
+        ? { isCustomer: false, isVendor: true, isBrand: false }
+        : session?.user?.role === 'brand'
+          ? { isCustomer: false, isVendor: false, isBrand: true }
+          : session?.user?.role === 'customer'
+            ? { isCustomer: true, isVendor: false, isBrand: false }
+            : null);
+    window.location.href = resolvePostLoginDestination(redirectTo, caps);
+  }, [sessionStatus, redirectTo, session?.user?.activeBusinessAccountType, session?.user?.role]);
 
   const [identifier, setIdentifier] = useState(prefilledPhone || prefilledEmail);
   const [usePassword, setUsePassword] = useState(false);
@@ -83,10 +84,8 @@ export default function LoginPageInner() {
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
   // Hard-navigate so the new session cookie is picked up by SSR.
-  // Multi-account users land on / and must pick via PostLoginAccountSelector
-  // before any redirect param is honored.
-  const goPostLogin = useCallback(() => {
-    prepareFreshLoginNavigation(redirectTo);
+  const goPostLogin = useCallback(async () => {
+    await prepareFreshLoginNavigation(redirectTo);
   }, [redirectTo]);
 
   const handleSendOtp = async () => {

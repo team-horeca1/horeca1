@@ -16,7 +16,6 @@ import { cn } from '@/lib/utils';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { buildPromotionPayload, promotionPublishSuccessMessage } from '@/lib/promotionVendorUi';
 import { useVendorOutletScope } from '@/hooks/useVendorOutletScope';
-import { openAccountSwitcher } from '@/lib/accountSwitcherEvents';
 import { toast } from 'sonner';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -2452,7 +2451,7 @@ function FinancialDetailDrawer({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function VendorDashboardPage() {
     const { data: session } = useSession();
-    const { currentOutlet } = useBusinessAccountSwitcher();
+    const { currentOutlet, signOut } = useBusinessAccountSwitcher();
     const { outletQuery, scopeVersion, currentOutlet: scopedOutlet } = useVendorOutletScope();
     const activeAccountType = (session?.user as {
         activeBusinessAccountType?: { isVendor: boolean; isBrand: boolean };
@@ -2671,7 +2670,7 @@ export default function VendorDashboardPage() {
                         </p>
                         <p className="text-[13px] text-gray-400 font-medium mt-0.5">
                             {isWrongAccountError
-                                ? 'The selected business account does not have a vendor profile. Switch to a vendor account to view this dashboard.'
+                                ? 'This session is not a vendor business. Sign out and log in with a supplier account, or open the brand portal if that fits your account.'
                                 : error}
                         </p>
                     </div>
@@ -2679,10 +2678,10 @@ export default function VendorDashboardPage() {
                         {isWrongAccountError ? (
                             <>
                                 <button
-                                    onClick={() => openAccountSwitcher()}
+                                    onClick={() => signOut()}
                                     className="h-10 px-6 bg-emerald-600 text-white rounded-xl text-[13px] font-bold hover:bg-emerald-700 transition-colors shadow-md"
                                 >
-                                    Switch Business Account
+                                    Sign out
                                 </button>
                                 {activeAccountType?.isBrand && (
                                     <Link

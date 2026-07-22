@@ -1,18 +1,19 @@
 /**
- * Fresh-login account picker — cookie + sessionStorage coordination.
+ * Post-login navigation helpers.
  *
- * sessionStorage dismiss alone survives logout/login in the same tab; the
- * short-lived force-pick cookie is set on sign-in (server + client) so every
- * fresh login with 2+ business accounts must pick before redirect.
+ * Account-picker UI was removed — after sign-in we land on an explicit
+ * redirect (when safe) or the portal default for the active account type.
+ * Legacy force-picker cookie / dismiss helpers remain so old cookies and
+ * sessionStorage keys can still be cleared.
  */
 
+import { getSession } from 'next-auth/react';
 import { broadcastAuthEvent } from '@/lib/authTabSync';
+import { defaultPortalPath, type AccountPortalCaps } from '@/lib/portalRouting';
 
 export const FORCE_PICKER_COOKIE = 'horeca_force_account_picker';
 export const PENDING_REDIRECT_KEY = 'horeca_pending_post_login_redirect';
 export const DISMISS_KEY = 'horeca_post_login_selector_dismissed';
-
-const COOKIE_MAX_AGE_SEC = 5 * 60;
 
 export function readForcePickerCookie(): boolean {
   if (typeof document === 'undefined') return false;
@@ -20,16 +21,6 @@ export function readForcePickerCookie(): boolean {
     return document.cookie.split(';').some((c) => c.trim().startsWith(`${FORCE_PICKER_COOKIE}=1`));
   } catch {
     return false;
-  }
-}
-
-export function setForcePickerCookie(): void {
-  if (typeof document === 'undefined') return;
-  try {
-    const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; secure' : '';
-    document.cookie = `${FORCE_PICKER_COOKIE}=1; path=/; max-age=${COOKIE_MAX_AGE_SEC}; samesite=lax${secure}`;
-  } catch {
-    /* ignore */
   }
 }
 
@@ -58,72 +49,52 @@ export function sanitizeRedirect(url: string | null | undefined): string | null 
   return trimmed;
 }
 
-export function setPendingRedirect(url: string | null): void {
-  if (typeof sessionStorage === 'undefined') return;
-  try {
-    const safe = sanitizeRedirect(url);
-    if (safe) sessionStorage.setItem(PENDING_REDIRECT_KEY, safe);
-    else sessionStorage.removeItem(PENDING_REDIRECT_KEY);
-  } catch {
-    /* ignore */
-  }
+export function resolvePostLoginDestination(
+  redirectTo: string | null | undefined,
+  caps: AccountPortalCaps | null | undefined,
+): string {
+  const safe = sanitizeRedirect(redirectTo);
+  if (safe) return safe;
+  if (caps) return defaultPortalPath(caps);
+  return '/';
 }
 
-export function consumePendingRedirect(): string | null {
-  if (typeof sessionStorage === 'undefined') return null;
-  try {
-    const url = sessionStorage.getItem(PENDING_REDIRECT_KEY);
-    sessionStorage.removeItem(PENDING_REDIRECT_KEY);
-    return url;
-  } catch {
-    return null;
-  }
+function capsFromSessionUser(user: {
+  role?: string;
+  activeBusinessAccountType?: AccountPortalCaps | null;
+} | null | undefined): AccountPortalCaps | null {
+  if (user?.activeBusinessAccountType) return user.activeBusinessAccountType;
+  const role = user?.role;
+  if (role === 'vendor') return { isCustomer: false, isVendor: true, isBrand: false };
+  if (role === 'brand') return { isCustomer: false, isVendor: false, isBrand: true };
+  if (role === 'customer') return { isCustomer: true, isVendor: false, isBrand: false };
+  return null;
 }
 
-/** Called after OTP/password sign-in on the login page — defer redirect until picker completes. */
-export function prepareFreshLoginNavigation(redirectTo: string | null): void {
+/** Called after OTP/password sign-in on the login page. */
+export async function prepareFreshLoginNavigation(redirectTo: string | null): Promise<void> {
   clearDismissFlag();
-  setPendingRedirect(redirectTo);
-  setForcePickerCookie();
-  broadcastAuthEvent('session-changed');
-  // Go straight to the destination (e.g. /checkout) instead of bouncing through
-  // the homepage — the account picker is global and overlays whatever page we
-  // land on. The pending redirect is still stashed so completePostLoginPicker
-  // can reload the destination IF the picker changes the active context.
-  window.location.href = sanitizeRedirect(redirectTo) ?? '/';
-}
-
-/**
- * Called when the picker finishes (or when no pick is needed).
- *
- * `contextChanged` — whether the user actually switched account/outlet. We now
- * navigate straight to the destination after login, so when nothing changed the
- * current page is already correct for this session and we skip the redundant
- * reload (the fast path). We only hard-reload when the context changed (so
- * server-rendered, account-scoped data refreshes) or we're not on the
- * destination yet.
- */
-export function completePostLoginPicker(contextChanged = true): void {
   clearForcePickerCookie();
   try {
-    sessionStorage.setItem(DISMISS_KEY, '1');
+    sessionStorage.removeItem(PENDING_REDIRECT_KEY);
   } catch {
     /* ignore */
   }
-  const safe = sanitizeRedirect(consumePendingRedirect());
-  if (!safe) return;
-  const here =
-    typeof window !== 'undefined'
-      ? window.location.pathname + window.location.search
-      : '';
-  if (contextChanged || safe !== here) {
-    window.location.href = safe;
+  broadcastAuthEvent('session-changed');
+
+  let session = await getSession();
+  // Cookie/JWT can lag a tick right after signIn — retry once before falling back to /.
+  if (!session?.user) {
+    await new Promise((r) => setTimeout(r, 150));
+    session = await getSession();
   }
+  const caps = capsFromSessionUser(session?.user ?? null);
+  window.location.href = resolvePostLoginDestination(redirectTo, caps);
 }
 
-/** Overlay / in-page login — no navigation, just arm the picker. */
-export function markFreshLoginPendingPicker(): void {
+/** Clear any leftover picker state after overlay / in-page login. */
+export function clearPostLoginPickerState(): void {
   clearDismissFlag();
-  setForcePickerCookie();
+  clearForcePickerCookie();
   broadcastAuthEvent('session-changed');
 }
