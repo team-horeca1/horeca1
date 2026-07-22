@@ -96,8 +96,10 @@ export default withSentryConfig(nextConfig, {
   // Upload wider set of client source files for better stack traces
   widenClientFileUpload: true,
 
-  // Proxy route to bypass ad-blockers
-  tunnelRoute: "/monitoring",
+  // Proxy route to bypass ad-blockers (prod only — in local dev the tunnel
+  // repeatedly ECONNRESET's when Sentry ingest is unreachable and adds noise
+  // while the event loop is already under compile pressure).
+  ...(isDev ? {} : { tunnelRoute: "/monitoring" }),
 
   // Suppress non-CI output
   silent: !process.env.CI,
