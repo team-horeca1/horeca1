@@ -51,7 +51,7 @@ type EditableField =
   | 'inventoryAccount' | 'inventoryAccountCode' | 'inventoryValuationMethod' | 'reorderPoint' | 'openingStock'
   | 'stockOnHand' | 'itemType' | 'sellable' | 'purchasable' | 'trackInventory' | 'platformCommission'
   | 'packageWeight' | 'packageLength' | 'packageWidth' | 'packageHeight' | 'dimensionUnit' | 'weightUnit'
-  | 'aliasName' | 'upc' | 'ean' | 'isbn' | 'countryOfOrigin' | 'variantMapping' | 'substituteMapping'
+  | 'aliasName' | 'upc' | 'ean' | 'isbn' | 'countryOfOrigin' | 'substituteMapping'
   | 'bulkQty1Quantity' | 'bulkQty1NetRate';
 
 type RowEdits = Partial<Record<EditableField, any>>;
@@ -113,7 +113,6 @@ const META_MAP: Partial<Record<string, [section: string, key: string]>> = {
   lastSyncTime: ['attributes', 'lastSync'],
   sellable: ['attributes', 'sellable'],
   purchasable: ['attributes', 'purchasable'],
-  variantMapping: ['attributes', 'variantMapping'],
   itemStatus: ['attributes', 'itemStatus'],
 };
 
@@ -210,7 +209,6 @@ export default function VendorBulkGrid({
     { key: 'vegNonVeg', label: 'Veg / Non-Veg', width: 'w-[120px]', type: 'select', options: ['', 'veg', 'nonveg', 'egg'] },
     { key: 'storageType', label: 'Storage type', width: 'w-[120px]', type: 'text' },
     { key: 'minOrderQty', label: 'MOQ', width: 'w-[90px]', type: 'number' },
-    { key: 'variantMapping', label: 'Variant Mapping', width: 'w-[140px]', type: 'text' },
     { key: 'substituteMapping', label: 'Substitute Mapping', width: 'w-[150px]', type: 'text' },
     { key: 'bulkQty1Quantity', label: 'Bulk Qty 1 - Quantity', width: 'w-[150px]', type: 'number' },
     { key: 'bulkQty1NetRate', label: 'Bulk Qty 1 - Net Rate / Pc', width: 'w-[160px]', type: 'number' },

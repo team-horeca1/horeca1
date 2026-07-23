@@ -7,10 +7,16 @@ import {
 } from '@/modules/fulfillment/fulfillmentStock';
 import { Prisma, type ApprovalStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { Errors } from '@/middleware/errorHandler';
+import { ApiError, Errors } from '@/middleware/errorHandler';
 import { emitEvent } from '@/events/emitter';
 import { runMappingForVendorProduct, embedDistributorProduct } from '@/modules/brand/brand-mapper';
-import { formatVendorSku, nextMasterSku, resolveVendorCode, validateMasterSku } from '@/lib/sku';
+import {
+  formatVendorSku,
+  nextMasterSku,
+  posSkuMatchesListing,
+  resolveVendorCode,
+  validateMasterSku,
+} from '@/lib/sku';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import {
   detectMaterialChanges,
@@ -30,11 +36,15 @@ type Db = Prisma.TransactionClient | typeof prisma;
  * the approvals queue for admin-assigned catalog SKUs instead.
  */
 export async function findOrCreateMaster(input: { name: string; brand: string | null; categoryId: string }): Promise<string> {
+  const masterMatchWhere = {
+    name: { equals: input.name, mode: 'insensitive' as const },
+    brand: input.brand ? { equals: input.brand, mode: 'insensitive' as const } : null,
+    approvalStatus: 'approved' as const,
+    isActive: true,
+  };
+
   const existing = await prisma.masterProduct.findFirst({
-    where: {
-      name: { equals: input.name, mode: 'insensitive' },
-      brand: input.brand ? { equals: input.brand, mode: 'insensitive' } : null,
-    },
+    where: masterMatchWhere,
     select: { id: true },
   });
   if (existing) return existing.id;
@@ -45,10 +55,7 @@ export async function findOrCreateMaster(input: { name: string; brand: string | 
 
     // Re-check existence inside lock to avoid duplicates from concurrent creators
     const doubleCheck = await tx.masterProduct.findFirst({
-      where: {
-        name: { equals: input.name, mode: 'insensitive' },
-        brand: input.brand ? { equals: input.brand, mode: 'insensitive' } : null,
-      },
+      where: masterMatchWhere,
       select: { id: true },
     });
     if (doubleCheck) return doubleCheck.id;
@@ -480,22 +487,41 @@ async function composeVendorProductSku(
   return composed;
 }
 
-async function assertVendorPosSkuUnique(
+/** Find another listing for this vendor that already uses the same POS code. */
+export async function findVendorListingWithPosSku(
+  vendorId: string,
+  posSku: string,
+  excludeProductId?: string,
+): Promise<{ id: string; name: string } | null> {
+  const trimmed = posSku.trim();
+  if (!trimmed) return null;
+
+  const vendorCode = await getVendorCode(vendorId);
+  const candidates = await prisma.product.findMany({
+    where: {
+      vendorId,
+      slug: { not: { startsWith: TOMBSTONE_PREFIX } },
+      ...(excludeProductId ? { id: { not: excludeProductId } } : {}),
+    },
+    select: { id: true, name: true, vendorSku: true, sku: true },
+  });
+
+  for (const row of candidates) {
+    if (posSkuMatchesListing(trimmed, row, vendorCode)) {
+      return { id: row.id, name: row.name };
+    }
+  }
+  return null;
+}
+
+export async function assertVendorPosSkuUnique(
   vendorId: string,
   posSku: string,
   excludeProductId?: string,
 ): Promise<void> {
   const trimmed = posSku.trim();
   if (!trimmed) return;
-  const dup = await prisma.product.findFirst({
-    where: {
-      vendorId,
-      vendorSku: { equals: trimmed, mode: 'insensitive' },
-      slug: { not: { startsWith: TOMBSTONE_PREFIX } },
-      ...(excludeProductId ? { id: { not: excludeProductId } } : {}),
-    },
-    select: { id: true, name: true },
-  });
+  const dup = await findVendorListingWithPosSku(vendorId, trimmed, excludeProductId);
   if (dup) {
     throw Errors.conflict(
       `You already have a product with POS SKU "${trimmed}" (${dup.name}).`,
@@ -541,6 +567,59 @@ export async function findApprovedMasterByCatalogSku(sku: string) {
   });
 }
 
+/**
+ * One active (non-tombstone) listing per vendor per master catalog item.
+ * Mirrors the guard on vendor create — also enforced on approve / import link.
+ */
+export async function assertVendorMasterListingUnique(
+  vendorId: string,
+  masterProductId: string,
+  excludeProductId?: string,
+): Promise<void> {
+  const dup = await prisma.product.findFirst({
+    where: {
+      vendorId,
+      masterProductId,
+      slug: { not: { startsWith: TOMBSTONE_PREFIX } },
+      ...(excludeProductId ? { id: { not: excludeProductId } } : {}),
+    },
+    select: { id: true, name: true },
+  });
+  if (dup) {
+    throw Errors.conflict(
+      `You already list this catalog item as "${dup.name}". Edit that product instead of assigning the same catalog SKU again.`,
+    );
+  }
+}
+
+function normalizeProductName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function assertConfirmLinkIfNameMismatch(input: {
+  listingName: string;
+  master: { id: string; name: string; sku: string };
+  confirmLink?: boolean;
+}): void {
+  if (normalizeProductName(input.listingName) === normalizeProductName(input.master.name)) return;
+  if (input.confirmLink) return;
+  throw new ApiError(
+    'CONFIRM_LINK_REQUIRED',
+    `Catalog SKU "${input.master.sku}" belongs to "${input.master.name}", which differs from this listing ("${input.listingName}"). Confirm to link anyway.`,
+    409,
+    {
+      requireConfirmLink: true,
+      masterId: input.master.id,
+      masterName: input.master.name,
+      masterSku: input.master.sku,
+    },
+  );
+}
+
+function isPrismaUniqueViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && (error as { code: string }).code === 'P2002';
+}
+
 /** Match vendor submissions to an existing approved master by (name, brand). */
 export async function findApprovedMasterByNameBrand(
   name: string,
@@ -577,6 +656,7 @@ type VendorProductForMasterAssign = {
 /**
  * Resolve which master catalog SKU a pending vendor listing should map to when
  * admin approves it. Creates a new approved master when the SKU is new.
+ * Reusing an existing SKU links across vendors; same vendor cannot list twice.
  */
 export async function resolveMasterForVendorApproval(input: {
   product: VendorProductForMasterAssign;
@@ -584,8 +664,10 @@ export async function resolveMasterForVendorApproval(input: {
   catalogSku?: string;
   masterProductId?: string;
   categoryIds?: string[];
+  /** Required when linking to an existing master whose name differs from the listing. */
+  confirmLink?: boolean;
 }): Promise<string> {
-  const { product, adminUserId } = input;
+  const { product, adminUserId, confirmLink } = input;
   const categoryIds =
     input.categoryIds && input.categoryIds.length > 0
       ? input.categoryIds
@@ -598,21 +680,35 @@ export async function resolveMasterForVendorApproval(input: {
   }
   await assertLeafCategory(categoryIds);
 
+  const finalizeExistingMaster = async (master: { id: string; name: string; sku: string }) => {
+    await assertVendorMasterListingUnique(product.vendorId, master.id, product.id);
+    assertConfirmLinkIfNameMismatch({
+      listingName: product.name,
+      master,
+      confirmLink,
+    });
+    return master.id;
+  };
+
   if (input.masterProductId) {
     const linked = await prisma.masterProduct.findFirst({
       where: { id: input.masterProductId, approvalStatus: 'approved', isActive: true },
-      select: { id: true },
+      select: { id: true, name: true, sku: true },
     });
     if (!linked) throw Errors.badRequest('Master product not found or not approved.');
-    return linked.id;
+    return finalizeExistingMaster(linked);
   }
 
   if (product.masterProductId && !input.catalogSku?.trim()) {
     const existing = await prisma.masterProduct.findFirst({
       where: { id: product.masterProductId, approvalStatus: 'approved', isActive: true },
-      select: { id: true },
+      select: { id: true, name: true, sku: true },
     });
-    if (existing) return existing.id;
+    if (existing) {
+      // Already linked — keep without re-prompting name mismatch.
+      await assertVendorMasterListingUnique(product.vendorId, existing.id, product.id);
+      return existing.id;
+    }
   }
 
   const catalogSku = input.catalogSku?.trim();
@@ -625,46 +721,57 @@ export async function resolveMasterForVendorApproval(input: {
   const skuCheck = validateMasterSku(catalogSku);
   if (!skuCheck.ok) throw Errors.badRequest(skuCheck.message);
 
-  const existingBySku = await prisma.masterProduct.findFirst({
-    where: { sku: { equals: skuCheck.normalized, mode: 'insensitive' } },
-    select: { id: true, approvalStatus: true, isActive: true },
-  });
-
-  if (existingBySku) {
+  const linkExistingByNormalizedSku = async (normalizedSku: string) => {
+    const existingBySku = await prisma.masterProduct.findFirst({
+      where: { sku: { equals: normalizedSku, mode: 'insensitive' } },
+      select: { id: true, name: true, sku: true, approvalStatus: true, isActive: true },
+    });
+    if (!existingBySku) return null;
     if (existingBySku.approvalStatus !== 'approved' || !existingBySku.isActive) {
-      throw Errors.conflict(`SKU "${skuCheck.normalized}" exists but is not an approved catalog item yet.`);
+      throw Errors.conflict(`SKU "${normalizedSku}" exists but is not an approved catalog item yet.`);
     }
-    return existingBySku.id;
+    return finalizeExistingMaster(existingBySku);
+  };
+
+  const already = await linkExistingByNormalizedSku(skuCheck.normalized);
+  if (already) return already;
+
+  try {
+    const master = await prisma.masterProduct.create({
+      data: {
+        sku: skuCheck.normalized,
+        name: product.name.trim(),
+        brand: product.brand?.trim() || null,
+        categoryId: categoryIds[0],
+        imageUrl: product.imageUrl,
+        uom: product.unit ?? product.packSize,
+        approvalStatus: 'approved',
+        approvedBy: adminUserId,
+        approvedAt: new Date(),
+        isActive: true,
+      },
+    });
+    await syncMasterProductCategories(master.id, categoryIds);
+
+    syncProductToBrand(
+      master.brand,
+      master.name,
+      master.categoryId,
+      master.imageUrl,
+      master.packSize,
+      master.uom,
+      master.sku,
+      master.id,
+    ).catch(console.error);
+
+    return master.id;
+  } catch (error) {
+    // Concurrent approve of the same new SKU — treat as link to the winner.
+    if (!isPrismaUniqueViolation(error)) throw error;
+    const raced = await linkExistingByNormalizedSku(skuCheck.normalized);
+    if (raced) return raced;
+    throw error;
   }
-
-  const master = await prisma.masterProduct.create({
-    data: {
-      sku: skuCheck.normalized,
-      name: product.name.trim(),
-      brand: product.brand?.trim() || null,
-      categoryId: categoryIds[0],
-      imageUrl: product.imageUrl,
-      uom: product.unit ?? product.packSize,
-      approvalStatus: 'approved',
-      approvedBy: adminUserId,
-      approvedAt: new Date(),
-      isActive: true,
-    },
-  });
-  await syncMasterProductCategories(master.id, categoryIds);
-
-  syncProductToBrand(
-    master.brand,
-    master.name,
-    master.categoryId,
-    master.imageUrl,
-    master.packSize,
-    master.uom,
-    master.sku,
-    master.id,
-  ).catch(console.error);
-
-  return master.id;
 }
 
 /** Link an approved master to a vendor product and compose vendor POS SKU when present. */
@@ -684,6 +791,8 @@ export async function applyMasterLinkToVendorProduct(
     select: { id: true, name: true, brand: true, categoryId: true, imageUrl: true, images: true },
   });
   if (!master) throw Errors.badRequest('Master product not found or not approved.');
+
+  await assertVendorMasterListingUnique(vendorId, master.id, productId);
 
   const posSku = product.vendorSku?.trim() || product.sku?.trim() || '';
   let composedSku: string | null = product.sku;
@@ -1159,7 +1268,11 @@ export class CatalogService {
         throw Errors.conflict(`You already list "${dup.name}" for this master SKU. Edit the existing product instead.`);
       }
     } else if (approvalStatus === 'pending' && !isDraft) {
-      // New vendor submission — admin reviews and assigns SKU before it goes live.
+      // New vendor submission — admin reviews and assigns catalog SKU before it goes live.
+      // Treat body.sku as the vendor POS code when vendorSku was not sent explicitly.
+      if (!resolvedVendorSku && typeof productData.sku === 'string' && productData.sku.trim()) {
+        resolvedVendorSku = productData.sku.trim();
+      }
       delete productData.masterProductId;
       delete productData.sku;
 
@@ -1174,7 +1287,15 @@ export class CatalogService {
         throw Errors.conflict(`You already have a product named "${dupSlug.name}". Edit it instead.`);
       }
     } else if (isDraft) {
+      if (!resolvedVendorSku && typeof productData.sku === 'string' && productData.sku.trim()) {
+        resolvedVendorSku = productData.sku.trim();
+      }
       delete productData.sku;
+    }
+
+    // Block duplicate POS codes at create/draft time — don't wait until admin approve.
+    if (resolvedVendorSku) {
+      await assertVendorPosSkuUnique(vendorId, resolvedVendorSku);
     }
 
     // Vendor single-add loophole: a brand typed freely (not picked from the
@@ -1393,11 +1514,29 @@ export class CatalogService {
       delete data.masterProductId;
     }
 
-    // Compose vendor SKU when POS code changes
+    // Compose vendor SKU when POS code changes (approved / catalog-linked listings).
+    // Pending/draft listings store POS in vendorSku and get composed sku on approve.
     if (typeof data.vendorSku === 'string' && data.vendorSku.trim()) {
       const posSku = data.vendorSku.trim();
-      data.sku = await composeVendorProductSku(vendorId, posSku, productId);
+      await assertVendorPosSkuUnique(vendorId, posSku, productId);
       data.vendorSku = posSku;
+      if (product.approvalStatus === 'approved' || product.masterProductId) {
+        data.sku = await composeVendorProductSku(vendorId, posSku, productId);
+      } else {
+        // Keep listing sku unset until catalog approval composes it.
+        data.sku = null;
+      }
+    } else if (
+      typeof data.sku === 'string' &&
+      data.sku.trim() &&
+      product.approvalStatus !== 'approved' &&
+      !product.masterProductId
+    ) {
+      // Vendor form sends POS in `sku` for standalone pending/draft products.
+      const posSku = data.sku.trim();
+      await assertVendorPosSkuUnique(vendorId, posSku, productId);
+      data.vendorSku = posSku;
+      data.sku = null;
     }
 
     const existingCategoryRows = await prisma.productCategory.findMany({

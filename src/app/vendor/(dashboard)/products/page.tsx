@@ -55,6 +55,9 @@ interface VendorProduct {
     vendorSku?: string | null;
     aliasNames?: string[];
     countryOfOrigin?: string | null;
+    shelfLifeDays?: number | null;
+    fssaiRef?: string | null;
+    substituteIds?: string[];
     taxPercent?: number | null;
     minOrderQty?: number | null;
     tags?: string[] | null;
@@ -147,7 +150,6 @@ interface ProductForm {
     weightUnit: string;
     ean: string;
     isbn: string;
-    variantMapping: string;
     platformCommission: string;
     itemStatus: string;
     activeOnlineStore: boolean;
@@ -215,7 +217,6 @@ const EMPTY_FORM: ProductForm = {
     weightUnit: 'kg',
     ean: '',
     isbn: '',
-    variantMapping: '',
     platformCommission: '',
     itemStatus: 'Active',
     activeOnlineStore: true,
@@ -267,6 +268,17 @@ type FormSnapshotMeta = {
 
 function serializeFormSnapshot(form: ProductForm, meta: FormSnapshotMeta): string {
     return JSON.stringify({ form, ...meta });
+}
+
+function logisticsFieldsFromListProduct(product: VendorProduct) {
+    return {
+        countryOfOrigin: product.countryOfOrigin ?? '',
+        shelfLifeDays: product.shelfLifeDays != null ? String(product.shelfLifeDays) : '',
+        vegNonVeg: (product.vegNonVeg || '') as '' | 'veg' | 'nonveg' | 'egg',
+        storageType: product.storageType || '',
+        minOrderQty: product.minOrderQty != null ? String(product.minOrderQty) : '1',
+        vendorSku: product.vendorSku?.trim() ?? '',
+    };
 }
 
 const DRAFT_AUTOSAVE_MS = 2000;
@@ -1045,7 +1057,6 @@ export default function VendorProductsPage() {
                 lastSync: form.lastSync.trim(),
                 sellable: form.sellable,
                 purchasable: form.purchasable,
-                variantMapping: form.variantMapping.trim(),
                 itemStatus: form.itemStatus.trim(),
                 activeOnlineStore: form.activeOnlineStore,
             }
@@ -1083,8 +1094,10 @@ export default function VendorProductsPage() {
             tags: form.tags.length > 0 ? form.tags : undefined,
             aliasNames: form.aliasNames.length > 0 ? form.aliasNames : undefined,
             substituteIds: form.substituteIds.length > 0 ? form.substituteIds : undefined,
-            shelfLifeDays: form.shelfLifeDays ? parseInt(form.shelfLifeDays, 10) : undefined,
-            countryOfOrigin: form.countryOfOrigin || undefined,
+            shelfLifeDays: form.shelfLifeDays.trim() !== '' && !Number.isNaN(Number(form.shelfLifeDays))
+                ? parseInt(form.shelfLifeDays, 10)
+                : undefined,
+            countryOfOrigin: form.countryOfOrigin.trim() || undefined,
             vegNonVeg: form.vegNonVeg || undefined,
             storageType: form.storageType || undefined,
             images: form.images.filter(Boolean).length > 0 ? form.images.filter(Boolean) : undefined,
@@ -1135,6 +1148,23 @@ export default function VendorProductsPage() {
                 body.vendorSku = form.vendorSku.trim();
             }
             delete body.sku;
+        } else {
+            // Standalone pending/draft: form.sku is the POS code. Never treat an
+            // approved listing's composed sku (e.g. VCODE-123) as POS.
+            const useSkuAsPos =
+                !editingProduct ||
+                editingProduct.listingStatus === 'draft' ||
+                editingProduct.approvalStatus === 'pending' ||
+                editingProduct.approvalStatus === 'rejected';
+            const pos = useSkuAsPos
+                ? (form.sku.trim() || form.vendorSku.trim())
+                : form.vendorSku.trim();
+            if (pos) {
+                body.vendorSku = pos;
+                if (!opts.isDraft && isNewSubmission) {
+                    delete body.sku;
+                }
+            }
         }
 
         if (isNewSubmission && !opts.isDraft) {
@@ -1279,7 +1309,19 @@ export default function VendorProductsPage() {
                 setEditingProduct(prev => prev ? { ...prev, listingStatus: 'draft', isActive: false } : prev);
                 setProducts(prev => prev.map(existing =>
                     existing.id === p.id
-                        ? { ...existing, name: p.name, basePrice: Number(p.basePrice), listingStatus: 'draft', isActive: false }
+                        ? {
+                            ...existing,
+                            name: p.name,
+                            basePrice: Number(p.basePrice),
+                            listingStatus: 'draft',
+                            isActive: false,
+                            countryOfOrigin: p.countryOfOrigin ?? existing.countryOfOrigin ?? null,
+                            shelfLifeDays:
+                                p.shelfLifeDays != null ? Number(p.shelfLifeDays) : existing.shelfLifeDays ?? null,
+                            vegNonVeg: p.vegNonVeg ?? existing.vegNonVeg ?? null,
+                            storageType: p.storageType ?? existing.storageType ?? null,
+                            vendorSku: p.vendorSku ?? existing.vendorSku ?? null,
+                        }
                         : existing
                 ));
             }
@@ -1375,7 +1417,11 @@ export default function VendorProductsPage() {
         try {
             const res = await fetch(`/api/v1/vendor/products/${product.id}`);
             const json = await res.json();
+            if (!json.success) {
+                toast.error('Could not load full product details — showing saved list data.');
+            }
             const p = json.success ? json.data : product;
+            const listLogistics = logisticsFieldsFromListProduct(product);
 
             const auditRes = await fetch(`/api/v1/vendor/products/${product.id}/audit`);
             const auditJson = await auditRes.json();
@@ -1403,7 +1449,13 @@ export default function VendorProductsPage() {
 
             const masterRow = p.masterProduct as { sku?: string } | null | undefined;
             const catalogSku = masterRow?.sku ?? '';
-            const { posSku } = parseVendorSku(p.sku ?? '', vendorCodePreview);
+            const posSku =
+                (typeof p.vendorSku === 'string' && p.vendorSku.trim()) ||
+                parseVendorSku(p.sku ?? '', vendorCodePreview).posSku;
+            const isCatalogLinked =
+                Boolean(typeof p.masterProductId === 'string' && p.masterProductId) ||
+                p.approvalStatus === 'approved';
+            const displaySku = isCatalogLinked ? (p.sku || '') : (posSku || p.sku || '');
 
             const meta = (p.metadata && typeof p.metadata === 'object' ? p.metadata : {}) as Record<string, any>;
             const acc = meta.accounting || {};
@@ -1420,7 +1472,7 @@ export default function VendorProductsPage() {
                 originalPrice: p.originalPrice != null ? String(p.originalPrice) : '',
                 packSize: p.packSize || '',
                 unit: p.unit || '',
-                sku: p.sku || '',
+                sku: displaySku,
                 catalogSku,
                 vendorSku: posSku,
                 hsn: p.hsn || '',
@@ -1432,13 +1484,19 @@ export default function VendorProductsPage() {
                 images: Array.isArray(p.images) ? p.images : [],
                 tags: Array.isArray(p.tags) ? p.tags : [],
                 aliasNames: Array.isArray(p.aliasNames) ? p.aliasNames : [],
-                substituteIds: Array.isArray((p as { substituteIds?: string[] }).substituteIds) ? (p as { substituteIds?: string[] }).substituteIds! : [],
-                vegNonVeg: (p.vegNonVeg || '') as '' | 'veg' | 'nonveg' | 'egg',
-                storageType: p.storageType || '',
-                shelfLifeDays: p.shelfLifeDays != null ? String(p.shelfLifeDays) : '',
-                countryOfOrigin: p.countryOfOrigin || '',
+                substituteIds: Array.isArray(p.substituteIds) ? p.substituteIds : [],
+                vegNonVeg: (p.vegNonVeg || listLogistics.vegNonVeg || '') as '' | 'veg' | 'nonveg' | 'egg',
+                storageType: p.storageType || listLogistics.storageType || '',
+                shelfLifeDays:
+                    p.shelfLifeDays != null
+                        ? String(p.shelfLifeDays)
+                        : listLogistics.shelfLifeDays,
+                countryOfOrigin: p.countryOfOrigin || listLogistics.countryOfOrigin || '',
                 taxPercent: p.taxPercent != null ? String(p.taxPercent) : '0',
-                minOrderQty: p.minOrderQty != null ? String(p.minOrderQty) : '1',
+                minOrderQty:
+                    p.minOrderQty != null
+                        ? String(p.minOrderQty)
+                        : listLogistics.minOrderQty,
                 creditEligible: !!p.creditEligible,
                 isFeatured: !!p.isFeatured,
                 priceSlabs: Array.isArray(p.priceSlabs)
@@ -1473,7 +1531,6 @@ export default function VendorProductsPage() {
                 weightUnit: pkg.weightUnit || 'kg',
                 ean: ids.ean || '',
                 isbn: ids.isbn || '',
-                variantMapping: att.variantMapping || '',
                 platformCommission: acc.platformCommission != null ? String(acc.platformCommission) : '',
                 itemStatus: att.itemStatus || 'Active',
                 activeOnlineStore: att.activeOnlineStore ?? true,
@@ -1496,6 +1553,10 @@ export default function VendorProductsPage() {
             const fallbackMatch = product.category?.slug
                 ? categories.find(c => c.slug === product.category!.slug)
                 : null;
+            const listLogistics = logisticsFieldsFromListProduct(product);
+            const fallbackPos =
+                listLogistics.vendorSku ||
+                parseVendorSku(product.sku ?? '', vendorCodePreview).posSku;
             setForm({
                 ...EMPTY_FORM,
                 name: product.name,
@@ -1505,28 +1566,33 @@ export default function VendorProductsPage() {
                 originalPrice: '',
                 packSize: product.packSize || '',
                 unit: product.unit || '',
-                sku: product.sku || '',
+                sku: fallbackPos || product.sku || '',
                 catalogSku: '',
-                vendorSku: '',
-                hsn: '',
-                fssaiRef: '',
-                brand: '',
-                barcode: '',
+                vendorSku: fallbackPos,
+                hsn: product.hsn || '',
+                fssaiRef: product.fssaiRef || '',
+                brand: product.brand || '',
+                barcode: product.barcode || '',
                 description: product.description || '',
                 imageUrl: product.imageUrl || '',
-                images: [],
-                tags: [],
-                aliasNames: [],
-                vegNonVeg: '',
-                storageType: '',
-                shelfLifeDays: '',
-                countryOfOrigin: '',
-                taxPercent: '0',
-                minOrderQty: '1',
+                images: product.images ?? [],
+                tags: product.tags ?? [],
+                aliasNames: product.aliasNames ?? [],
+                vegNonVeg: listLogistics.vegNonVeg,
+                storageType: listLogistics.storageType,
+                shelfLifeDays: listLogistics.shelfLifeDays,
+                countryOfOrigin: listLogistics.countryOfOrigin,
+                taxPercent: product.taxPercent != null ? String(product.taxPercent) : '0',
+                minOrderQty: listLogistics.minOrderQty,
                 creditEligible: product.creditEligible,
                 isFeatured: product.isFeatured,
-                substituteIds: [],
-                priceSlabs: [],
+                substituteIds: product.substituteIds ?? [],
+                priceSlabs: product.priceSlabs
+                    ? product.priceSlabs.map((s) => ({
+                        minQty: String(s.minQty),
+                        price: String(s.price),
+                    }))
+                    : [],
             });
             setCategoryPickerKey((k) => k + 1);
             syncSavedSnapshot();
@@ -1699,7 +1765,12 @@ export default function VendorProductsPage() {
         const m = msg.toLowerCase();
         if (m.includes('hsn')) return 'hsn';
         if (m.includes('image')) return 'imageUrl';
-        if (m.includes('pos sku') || m.includes('vendor sku')) return 'vendorSku';
+        if (m.includes('pos sku') || m.includes('vendor sku')) {
+            if (typeof document !== 'undefined' && document.getElementById('ff-vendorSku')) {
+                return 'vendorSku';
+            }
+            return 'sku';
+        }
         if (m.includes('sku')) return 'sku';
         if (m.includes('categor')) return 'categoryIds';
         if (m.includes('brand')) return 'brand';
@@ -1852,6 +1923,12 @@ export default function VendorProductsPage() {
                     approvalStatus: p.approvalStatus ?? existing.approvalStatus,
                     approvalNote: p.approvalNote ?? null,
                     listingStatus: p.listingStatus ?? 'submitted',
+                    countryOfOrigin: p.countryOfOrigin ?? existing.countryOfOrigin ?? null,
+                    shelfLifeDays:
+                        p.shelfLifeDays != null ? Number(p.shelfLifeDays) : existing.shelfLifeDays ?? null,
+                    vegNonVeg: p.vegNonVeg ?? existing.vegNonVeg ?? null,
+                    storageType: p.storageType ?? existing.storageType ?? null,
+                    vendorSku: p.vendorSku ?? existing.vendorSku ?? null,
                 } : existing));
             } else {
                 // Prepend new product so it appears at the top immediately
@@ -2653,10 +2730,6 @@ export default function VendorProductsPage() {
                                                 <div id="ff-minOrderQty">
                                                     <FieldLabel required>MOQ</FieldLabel>
                                                     <input type="number" min="1" value={form.minOrderQty} onChange={e => updateField('minOrderQty', e.target.value)} className={cn(inputCls, fieldErrors.minOrderQty && 'border-[#E74C3C]')} />
-                                                </div>
-                                                <div id="ff-variantMapping">
-                                                    <FieldLabel required>Variant Mapping</FieldLabel>
-                                                    <input type="text" value={form.variantMapping} onChange={e => updateField('variantMapping', e.target.value)} className={cn(inputCls, fieldErrors.variantMapping && 'border-[#E74C3C]')} />
                                                 </div>
                                             </div>
 

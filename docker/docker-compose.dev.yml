@@ -1,0 +1,56 @@
+# Local Next.js Turbopack in Linux (avoids Windows Turbopack hang).
+# Requires Postgres + Redis already up:
+#   docker compose -f docker/docker-compose.yml up -d
+#
+# Usage:
+#   docker compose -f docker/docker-compose.dev.yml up
+#   # → http://localhost:3000  (Next.js 16 Turbopack)
+
+services:
+  app-dev:
+    image: node:22-bookworm
+    container_name: horeca1-app-dev
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../.env
+      - ../.env.local
+    environment:
+      # Reach host-published postgres/redis from the container
+      DATABASE_URL: postgresql://horeca1:horeca1_dev@host.docker.internal:5432/horeca1
+      REDIS_URL: redis://host.docker.internal:6379
+      AUTH_URL: http://localhost:3000
+      HOSTNAME: "0.0.0.0"
+      NODE_ENV: development
+      # Windows bind-mount file watching
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      # Keep heap headroom; disable Next memory-watcher restarts
+      NODE_OPTIONS: "--max-old-space-size=4096"
+      __NEXT_DISABLE_MEMORY_WATCHER: "1"
+      SENTRY_DSN: ""
+      NEXT_PUBLIC_SENTRY_DSN: ""
+    volumes:
+      - ..:/app
+      # Linux node_modules (host Windows modules are incompatible)
+      - horeca1_dev_node_modules:/app/node_modules
+      - horeca1_dev_next_cache:/app/.next
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - bash
+      - -lc
+      - |
+        set -euo pipefail
+        if [ ! -x node_modules/.bin/next ]; then
+          echo "[app-dev] Installing deps (first run)…"
+          npm ci
+          npx prisma generate
+        fi
+        echo "[app-dev] Starting Next.js Turbopack on :3000…"
+        exec npx next dev --turbopack --hostname 0.0.0.0 --port 3000
+
+volumes:
+  horeca1_dev_node_modules:
+  horeca1_dev_next_cache:

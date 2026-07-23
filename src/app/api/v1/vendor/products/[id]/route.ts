@@ -41,6 +41,10 @@ const updateProductSchema = z.object({
   isFeatured: z.boolean().optional(),
   vegNonVeg: z.enum(['veg', 'nonveg', 'egg']).optional(),
   storageType: z.string().max(50).optional(),
+  shelfLifeDays: z.number().int().min(0).optional(),
+  countryOfOrigin: z.string().max(100).optional(),
+  aliasNames: z.array(z.string()).optional(),
+  substituteIds: z.array(z.string().uuid()).optional(),
   // Allow re-linking to a different Horeca1 master SKU on edit (not forced).
   masterProductId: z.string().uuid().optional(),
   categoryId: z.string().uuid().optional(),

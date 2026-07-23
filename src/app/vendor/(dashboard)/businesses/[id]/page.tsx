@@ -67,7 +67,7 @@ interface BusinessRow {
 export default function BusinessDetailPage() {
   const params = useParams();
   const businessId = typeof params?.id === 'string' ? params.id : '';
-  const { switchOnlineStore, activeVendorId } = useBusinessAccountSwitcher();
+  const { switchOnlineStore } = useBusinessAccountSwitcher();
   const confirm = useConfirm();
 
   const [business, setBusiness] = useState<BusinessRow | null>(null);
@@ -351,30 +351,6 @@ export default function BusinessDetailPage() {
     );
   };
 
-  const renderStoreStatus = (store: StoreRow) => {
-    const isSession = store.id === activeVendorId;
-    return (
-      <>
-        {isSession && (
-          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#EEF8F1] text-[#299E60] mr-1">
-            Session
-          </span>
-        )}
-        {!store.isVerified ? (
-          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#FFF7E6] text-[#F59E0B]">
-            Pending approval
-          </span>
-        ) : !store.isActive ? (
-          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#F5F5F5] text-[#AEAEAE]">
-            Disabled
-          </span>
-        ) : !isSession ? (
-          <span className="text-[11px] font-semibold text-[#299E60]">Active</span>
-        ) : null}
-      </>
-    );
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center py-16">
@@ -503,7 +479,6 @@ export default function BusinessDetailPage() {
                       <p className="text-[10px] font-bold uppercase text-[#AEAEAE]">Primary</p>
                     )}
                   </div>
-                  <div className="shrink-0 whitespace-nowrap">{renderStoreStatus(store)}</div>
                 </div>
                 <p className="text-[#AEAEAE] font-mono text-[12px] truncate mb-3">/{store.slug}</p>
                 {renderStoreActions(store)}
@@ -517,7 +492,6 @@ export default function BusinessDetailPage() {
                 <tr>
                   <th className="px-4 py-2.5 font-bold">Store</th>
                   <th className="px-4 py-2.5 font-bold">Slug</th>
-                  <th className="px-4 py-2.5 font-bold">Status</th>
                   <th className="px-4 py-2.5 font-bold text-right">Actions</th>
                 </tr>
               </thead>
@@ -537,7 +511,6 @@ export default function BusinessDetailPage() {
                     <td className="px-4 py-2.5 text-[#AEAEAE] font-mono text-[12px] truncate max-w-[160px]">
                       /{store.slug}
                     </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap">{renderStoreStatus(store)}</td>
                     <td className="px-4 py-2.5 text-right">
                       <div className="inline-flex justify-end">{renderStoreActions(store)}</div>
                     </td>

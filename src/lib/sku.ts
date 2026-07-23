@@ -119,3 +119,28 @@ export function parseVendorSku(
 
   return { vendorCode: vendorCode?.toUpperCase() ?? '', posSku: trimmed };
 }
+
+function normPos(s: string): string {
+  return s.trim().toLowerCase();
+}
+
+/** True when a vendor listing row represents the same POS code (vendorSku, legacy sku, or composed sku). */
+export function posSkuMatchesListing(
+  posSku: string,
+  listing: { vendorSku?: string | null; sku?: string | null },
+  vendorCode: string,
+): boolean {
+  const target = posSku.trim();
+  if (!target) return false;
+  const t = normPos(target);
+
+  if (listing.vendorSku && normPos(listing.vendorSku) === t) return true;
+
+  const sku = listing.sku?.trim() ?? '';
+  if (!sku) return false;
+  if (normPos(sku) === t) return true;
+  if (normPos(sku) === normPos(formatVendorSku(vendorCode, target))) return true;
+
+  const parsed = parseVendorSku(sku, vendorCode);
+  return Boolean(parsed.posSku && normPos(parsed.posSku) === t);
+}

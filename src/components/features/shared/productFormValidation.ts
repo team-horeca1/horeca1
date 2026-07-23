@@ -16,7 +16,6 @@ export const PRODUCT_REQUIRED_FIELD_ORDER = [
   'storageType',
   'shelfLifeDays',
   'minOrderQty',
-  'variantMapping',
 ] as const;
 
 export type ProductValidationField = (typeof PRODUCT_REQUIRED_FIELD_ORDER)[number];
@@ -35,7 +34,6 @@ export interface ProductEssentialsForm {
   storageType: string;
   shelfLifeDays: string;
   minOrderQty: string;
-  variantMapping: string;
   substituteIds: string[];
   basePrice?: string;
   vendorId?: string;
@@ -113,8 +111,6 @@ export function validateProductEssentials(
   if (!form.minOrderQty?.trim() || Number.isNaN(Number(form.minOrderQty)) || Number(form.minOrderQty) < 1) {
     errors.minOrderQty = 'MOQ is required (minimum 1)';
   }
-
-  req(errors, 'variantMapping', form.variantMapping, 'Variant mapping is required');
 
   return errors;
 }

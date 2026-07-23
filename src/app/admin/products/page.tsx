@@ -186,7 +186,6 @@ interface ProductFormData {
     weightUnit: string;
     ean: string;
     isbn: string;
-    variantMapping: string;
     platformCommission: string;
     itemStatus: string;
     activeOnlineStore: boolean;
@@ -263,7 +262,6 @@ const EMPTY_FORM: ProductFormData = {
     weightUnit: 'kg',
     ean: '',
     isbn: '',
-    variantMapping: '',
     platformCommission: '',
     itemStatus: 'Active',
     activeOnlineStore: true,
@@ -1072,7 +1070,6 @@ export default function ProductsPage() {
                     weightUnit: pkg.weightUnit || 'kg',
                     ean: ids.ean || '',
                     isbn: ids.isbn || '',
-                    variantMapping: att.variantMapping || '',
                     platformCommission: acc.platformCommission != null ? String(acc.platformCommission) : '',
                     itemStatus: att.itemStatus || 'Active',
                     activeOnlineStore: att.activeOnlineStore ?? true,
@@ -1147,7 +1144,6 @@ export default function ProductsPage() {
                 weightUnit: pkg.weightUnit || 'kg',
                 ean: ids.ean || '',
                 isbn: ids.isbn || '',
-                variantMapping: att.variantMapping || '',
                 platformCommission: acc.platformCommission != null ? String(acc.platformCommission) : '',
                 itemStatus: att.itemStatus || 'Active',
                 activeOnlineStore: att.activeOnlineStore ?? true,
@@ -1253,7 +1249,6 @@ export default function ProductsPage() {
             lastSync: formData.lastSync.trim(),
             sellable: formData.sellable,
             purchasable: formData.purchasable,
-            variantMapping: formData.variantMapping.trim(),
             itemStatus: formData.itemStatus.trim(),
             activeOnlineStore: formData.activeOnlineStore,
         },
@@ -1309,7 +1304,9 @@ export default function ProductsPage() {
         if (formData.aliasNames.length > 0) payload.aliasNames = formData.aliasNames;
         if (formData.vegNonVeg) payload.vegNonVeg = formData.vegNonVeg;
         if (formData.storageType) payload.storageType = formData.storageType;
-        if (formData.shelfLifeDays) payload.shelfLifeDays = parseInt(formData.shelfLifeDays, 10);
+        if (formData.shelfLifeDays.trim() !== '' && !Number.isNaN(Number(formData.shelfLifeDays))) {
+            payload.shelfLifeDays = parseInt(formData.shelfLifeDays, 10);
+        }
         if (formData.countryOfOrigin.trim()) payload.countryOfOrigin = formData.countryOfOrigin.trim();
         if (formData.substituteIds.length > 0) {
             payload.substituteIds = formData.substituteIds;
@@ -2538,11 +2535,6 @@ export default function ProductsPage() {
                                             <FieldLabel required>MOQ</FieldLabel>
                                             <input type="number" min="1" value={formData.minOrderQty} onChange={e => updateField('minOrderQty', e.target.value)} className={cn(inputCls, formErrors.minOrderQty && 'border-[#E74C3C]')} />
                                             {formErrors.minOrderQty && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.minOrderQty}</p>}
-                                        </div>
-                                        <div id="ff-variantMapping">
-                                            <FieldLabel required>Variant Mapping</FieldLabel>
-                                            <input type="text" value={formData.variantMapping} onChange={e => updateField('variantMapping', e.target.value)} placeholder="e.g. size:large" className={cn(inputCls, formErrors.variantMapping && 'border-[#E74C3C]')} />
-                                            {formErrors.variantMapping && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{formErrors.variantMapping}</p>}
                                         </div>
                                     </div>
 

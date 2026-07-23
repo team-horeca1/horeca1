@@ -640,7 +640,6 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
           lastSync: r['Last Sync'],
           sellable: r['Sellable'],
           purchasable: r['Purchasable'],
-          variantMapping: r['Variant Mapping'],
           itemStatus: r['Item Status'],
           activeOnlineStore: r['Active on Online Store'],
         }
@@ -811,7 +810,6 @@ function mapProductToImportColumns(p: ProductExportRow): Record<string, string |
     'Weight Unit': String(pkg.weightUnit || ''),
     'EAN': String(ids.ean || ''),
     'ISBN': String(ids.isbn || ''),
-    'Variant Mapping': String(att.variantMapping || ''),
     'Platform Commission': exportCell(acc.platformCommission),
     'Item Status': String(att.itemStatus || ''),
     'Active on Online Store': exportCell(att.activeOnlineStore),

@@ -35,6 +35,8 @@ const approvalSchema = z
     catalogSku: z.string().min(2).max(40).optional(),
     /** Link to an existing approved master instead of creating one. */
     masterProductId: z.string().uuid().optional(),
+    /** Required when linking to an existing master whose name differs from the listing. */
+    confirmLink: z.boolean().optional(),
   })
   .refine((d) => d.action !== 'reject' || (d.note?.trim().length ?? 0) > 0, {
     message: 'Rejection reason is required',
@@ -47,7 +49,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     requirePermission(ctx, 'products.approve');
     const id = extractId(req);
     const body = await req.json();
-    const { action, note, catalogSku, masterProductId } = approvalSchema.parse(body);
+    const { action, note, catalogSku, masterProductId, confirmLink } = approvalSchema.parse(body);
 
     // Verify product exists
     const existing = await prisma.product.findUnique({
@@ -160,6 +162,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         catalogSku,
         masterProductId,
         categoryIds,
+        confirmLink,
       });
 
       await applyMasterLinkToVendorProduct(id, existing.vendorId, resolvedMasterId);

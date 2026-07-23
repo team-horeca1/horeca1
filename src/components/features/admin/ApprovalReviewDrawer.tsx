@@ -175,6 +175,11 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
     const [productForm, setProductForm] = useState({ name: '', brand: '', basePrice: '', categoryId: '', categoryName: '', imageUrl: '' });
     const [catalogSkuInput, setCatalogSkuInput] = useState('');
     const [linkMasterId, setLinkMasterId] = useState('');
+    const [catalogSkuLookup, setCatalogSkuLookup] = useState<{
+        status: 'idle' | 'loading' | 'new' | 'link';
+        master?: { id: string; sku: string; name: string };
+    }>({ status: 'idle' });
+    const [confirmLinkAnyway, setConfirmLinkAnyway] = useState(false);
     const [categoryForm, setCategoryForm] = useState({ name: '', slug: '', parentId: '', imageUrl: '', isActive: true });
     const [brandForm, setBrandForm] = useState({ name: '', tagline: '', logoUrl: '' });
 
@@ -190,6 +195,8 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
         setBrand(null);
         setCatalogSkuInput('');
         setLinkMasterId('');
+        setCatalogSkuLookup({ status: 'idle' });
+        setConfirmLinkAnyway(false);
         setAllCategories([]);
         setTitle('');
         setStatusLabel('');
@@ -337,6 +344,55 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
         return () => document.removeEventListener('keydown', handler);
     }, [open, showRejectModal, onClose]);
 
+    // Preview whether Assign Catalog SKU will create a master or link an existing one.
+    useEffect(() => {
+        const sku = catalogSkuInput.trim();
+        const canLookup =
+            target?.type === 'product' &&
+            target.kind === 'vendor' &&
+            vendorProduct?.approvalStatus === 'pending' &&
+            !vendorProduct.masterProduct;
+
+        if (!canLookup || sku.length < 2) {
+            setCatalogSkuLookup({ status: 'idle' });
+            return;
+        }
+
+        let cancelled = false;
+        setCatalogSkuLookup({ status: 'loading' });
+        const timer = setTimeout(async () => {
+            try {
+                const res = await fetch(
+                    `/api/v1/master-products?exact=true&search=${encodeURIComponent(sku)}&limit=1`,
+                );
+                const json = await res.json();
+                if (cancelled) return;
+                const hit = Array.isArray(json.data) ? json.data[0] : null;
+                if (hit?.id && hit?.sku && hit?.name) {
+                    setCatalogSkuLookup({
+                        status: 'link',
+                        master: { id: hit.id, sku: hit.sku, name: hit.name },
+                    });
+                } else {
+                    setCatalogSkuLookup({ status: 'new' });
+                }
+            } catch {
+                if (!cancelled) setCatalogSkuLookup({ status: 'idle' });
+            }
+        }, 350);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [catalogSkuInput, target, vendorProduct]);
+
+    const catalogNameMismatch =
+        catalogSkuLookup.status === 'link' &&
+        !!vendorProduct &&
+        !!catalogSkuLookup.master &&
+        vendorProduct.name.trim().toLowerCase() !== catalogSkuLookup.master.name.trim().toLowerCase();
+
     const handleSave = async () => {
         if (!target) return;
         setSaving(true);
@@ -450,6 +506,10 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                         toast.error('Assign a catalog SKU before approving this vendor listing.');
                         return;
                     }
+                    if (catalogNameMismatch && !confirmLinkAnyway) {
+                        toast.error('Catalog SKU matches a different product name — confirm the link before approving.');
+                        return;
+                    }
                 }
                 if (target.kind === 'master' && masterProduct?.approvalStatus === 'pending' && !masterForm.sku.trim()) {
                     toast.error('Enter a catalog SKU before approving this master item.');
@@ -463,6 +523,9 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                     } else if (catalogSkuInput.trim()) {
                         approvalBody.catalogSku = catalogSkuInput.trim().toUpperCase();
                     }
+                    if (confirmLinkAnyway) {
+                        approvalBody.confirmLink = true;
+                    }
                 } else if (target.kind === 'master' && masterForm.sku.trim()) {
                     approvalBody.catalogSku = masterForm.sku.trim().toUpperCase();
                 }
@@ -475,7 +538,27 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                     body: JSON.stringify(approvalBody),
                 });
                 const json = await res.json();
-                if (!res.ok || !json.success) throw new Error(json.error?.message || 'Could not approve product');
+                if (!res.ok || !json.success) {
+                    if (json.error?.code === 'CONFIRM_LINK_REQUIRED') {
+                        const details = json.error?.details as
+                            | { masterId?: string; masterName?: string; masterSku?: string }
+                            | undefined;
+                        if (details?.masterId && details.masterName && details.masterSku) {
+                            setCatalogSkuLookup({
+                                status: 'link',
+                                master: {
+                                    id: details.masterId,
+                                    name: details.masterName,
+                                    sku: details.masterSku,
+                                },
+                            });
+                        }
+                        setConfirmLinkAnyway(false);
+                        toast.error(json.error?.message || 'Confirm linking to this catalog SKU.');
+                        return;
+                    }
+                    throw new Error(json.error?.message || 'Could not approve product');
+                }
                 toast.success('Product approved');
                 onComplete();
             } else if (target.type === 'category' && category) {
@@ -957,12 +1040,45 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                                     onChange={(e) => {
                                         setCatalogSkuInput(e.target.value.toUpperCase());
                                         setLinkMasterId('');
+                                        setConfirmLinkAnyway(false);
                                     }}
                                     placeholder="e.g., RIC-BAS-001"
                                 />
                                 <p className="text-[11px] text-[#AEAEAE] font-medium mt-1.5">
-                                    Creates or links the global master catalog item. Required to approve this listing.
+                                    Creates a new master when the SKU is unused, or links to the existing catalog item when it already exists.
                                 </p>
+                                {catalogSkuLookup.status === 'loading' && (
+                                    <p className="text-[11px] text-[#7C7C7C] font-semibold mt-2 flex items-center gap-1.5">
+                                        <Loader2 size={12} className="animate-spin" /> Checking catalog…
+                                    </p>
+                                )}
+                                {catalogSkuLookup.status === 'new' && (
+                                    <p className="text-[11px] text-[#299E60] font-bold mt-2">
+                                        Creates new master catalog item for this listing.
+                                    </p>
+                                )}
+                                {catalogSkuLookup.status === 'link' && catalogSkuLookup.master && (
+                                    <div className="mt-2 space-y-2">
+                                        <p className="text-[11px] text-[#1A6BB5] font-bold">
+                                            Links to existing master: {catalogSkuLookup.master.name} ({catalogSkuLookup.master.sku})
+                                        </p>
+                                        {catalogNameMismatch && (
+                                            <label className="flex items-start gap-2 rounded-[10px] border border-[#F0D8A8] bg-[#FFF8E1] p-3 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    className="mt-0.5"
+                                                    checked={confirmLinkAnyway}
+                                                    onChange={(e) => setConfirmLinkAnyway(e.target.checked)}
+                                                />
+                                                <span className="text-[11px] text-[#8B6914] font-semibold leading-snug">
+                                                    Listing name &quot;{vendorProduct.name}&quot; differs from master
+                                                    &quot;{catalogSkuLookup.master.name}&quot;. Confirm link anyway
+                                                    (listing name/category will follow the master).
+                                                </span>
+                                            </label>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

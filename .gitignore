@@ -66,6 +66,7 @@ test-results/
 /test-results/
 /e2e/.auth/
 tmp-*.json
+tmp-local-db/
 *_probe.json
 oversell*.json
 login-resp.txt

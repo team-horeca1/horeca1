@@ -94,7 +94,6 @@ type EditRow = Partial<{
   lastSync: string;
   sellable: boolean;
   purchasable: boolean;
-  variantMapping: string;
   itemStatus: string;
   activeOnlineStore: boolean;
 }>;
@@ -324,7 +323,6 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
       { key: 'lastSync', label: 'Last Sync', width: 'w-[150px]', type: 'text' },
       { key: 'sellable', label: 'Sellable', width: 'w-[85px]', type: 'checkbox' },
       { key: 'purchasable', label: 'Purchasable', width: 'w-[85px]', type: 'checkbox' },
-      { key: 'variantMapping', label: 'Variant Mapping', width: 'w-[145px]', type: 'text' },
       { key: 'itemStatus', label: 'Item Status', width: 'w-[110px]', type: 'text' },
       { key: 'activeOnlineStore', label: 'Active on Online Store', width: 'w-[140px]', type: 'checkbox' },
     ];
@@ -404,7 +402,6 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
     if (field === 'weightUnit') return pkg.weightUnit ?? '';
     if (field === 'ean') return ids.ean ?? '';
     if (field === 'isbn') return ids.isbn ?? '';
-    if (field === 'variantMapping') return att.variantMapping ?? '';
     if (field === 'platformCommission') return acc.platformCommission ?? '';
     if (field === 'itemStatus') return att.itemStatus ?? '';
     if (field === 'activeOnlineStore') return att.activeOnlineStore ?? false;

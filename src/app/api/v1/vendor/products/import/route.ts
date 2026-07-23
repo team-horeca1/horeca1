@@ -33,6 +33,7 @@ import { totalStockQty } from '@/lib/inventoryHelpers';
 import { requirePermission } from '@/lib/permissions/engine';
 import {
   assertLeafCategory,
+  assertVendorMasterListingUnique,
   composeVendorListingSku,
   findApprovedMasterByNameBrand,
   resolveImportCategoryIds,
@@ -681,6 +682,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
           if (categoryId) {
             const matched = await findApprovedMasterByNameBrand(r.name, r.brand ?? null);
             if (matched) {
+              await assertVendorMasterListingUnique(vendorId, matched.id);
               masterProductId = matched.id;
               approvalStatus = 'approved';
             }
