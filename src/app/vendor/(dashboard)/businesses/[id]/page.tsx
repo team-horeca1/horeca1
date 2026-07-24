@@ -18,6 +18,8 @@ import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { setEnteredStore } from '@/lib/supplierPortalLevel';
 import { cn } from '@/lib/utils';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { FormErrorBanner } from '@/components/ui/form';
+import { extractApiError, parseJsonResponse } from '@/lib/apiError';
 import {
   StoreSetupWizard,
   type StoreSetupPayload,
@@ -80,6 +82,7 @@ export default function BusinessDetailPage() {
   const [editBusinessOpen, setEditBusinessOpen] = useState(false);
   const [editProfile, setEditProfile] = useState<VendorProfileValues>({ ...EMPTY_VENDOR_PROFILE });
   const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string>>({});
+  const [editBannerError, setEditBannerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [enteringId, setEnteringId] = useState<string | null>(null);
 
@@ -229,6 +232,7 @@ export default function BusinessDetailPage() {
         ? business.displayName
         : '';
     setEditFieldErrors({});
+    setEditBannerError(null);
     setEditProfile({
       ...EMPTY_VENDOR_PROFILE,
       legalName: business.legalName,
@@ -254,6 +258,7 @@ export default function BusinessDetailPage() {
       errors.vendorTypeSelections = 'Select at least one vendor type and sub-type';
     }
     setEditFieldErrors(errors);
+    setEditBannerError(null);
     if (Object.keys(errors).length > 0) return;
 
     setSubmitting(true);
@@ -263,22 +268,29 @@ export default function BusinessDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           legalName,
-          displayName: (editProfile.displayName ?? editProfile.tradeName ?? '').trim() || legalName,
+          // Empty custom display → sync to legal (also clears store-name bleed)
+          displayName: (editProfile.displayName ?? '').trim() || legalName,
           gstin: (editProfile.gstin ?? editProfile.gstNumber ?? '').trim() || undefined,
           vendorTypeSelections: typeSelections,
           businessSize: editProfile.businessSize || null,
         }),
       });
-      const json = await res.json();
+      const json = await parseJsonResponse(res);
       if (!res.ok || !json.success) {
-        toast.error(json.error?.message ?? 'Failed to update business');
+        const parsed = extractApiError(json, 'Failed to update business');
+        setEditBannerError(parsed.message);
+        if (parsed.fields) setEditFieldErrors((prev) => ({ ...prev, ...parsed.fields }));
+        toast.error(parsed.message);
         return;
       }
       toast.success('Business updated');
       setEditBusinessOpen(false);
+      setEditBannerError(null);
       await fetchBusiness();
-    } catch {
-      toast.error('Failed to update business');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to update business';
+      setEditBannerError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -387,7 +399,9 @@ export default function BusinessDetailPage() {
           </h1>
           <p className="text-[12px] text-[#7C7C7C] mt-0.5 truncate">
             {[
-              business.displayName && business.displayName !== business.legalName
+              business.displayName
+                && business.displayName !== business.legalName
+                && !business.stores.some((s) => s.name === business.displayName)
                 ? business.legalName
                 : null,
               business.gstin ? `GST ${business.gstin}` : null,
@@ -542,6 +556,7 @@ export default function BusinessDetailPage() {
               </p>
             </div>
             <form onSubmit={handleEditBusiness} className="px-5 py-4 space-y-4">
+              <FormErrorBanner message={editBannerError} />
               <VendorProfileForm
                 value={editProfile}
                 onChange={(patch) => setEditProfile((prev) => ({ ...prev, ...patch }))}

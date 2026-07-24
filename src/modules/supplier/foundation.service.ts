@@ -263,3 +263,20 @@ export async function ensureDefaultOutletForStore(
 export function storeDisplayName(v: { displayName?: string | null; businessName: string }): string {
   return (v.displayName?.trim() || v.businessName).trim();
 }
+
+/**
+ * Business-facing label for supplier UI / JWT.
+ * Ignores a displayName that is empty, equal to legalName, or equal to an
+ * Online Store name (common registration bleed where trade/store was written
+ * onto BusinessAccount.displayName).
+ */
+export function businessFacingName(
+  ba: { legalName: string; displayName?: string | null },
+  storeNames: string[] = [],
+): string {
+  const legal = ba.legalName.trim();
+  const display = ba.displayName?.trim() || '';
+  if (!display || display === legal) return legal;
+  if (storeNames.some((n) => n.trim() === display)) return legal;
+  return display;
+}

@@ -31,6 +31,7 @@ export function BecomeVendorModal({
 }: BecomeVendorModalProps) {
   const { data: session, update: updateSession } = useSession();
   const [businessName, setBusinessName] = useState(defaultBusinessName);
+  const [storeName, setStoreName] = useState(defaultBusinessName);
   const [description, setDescription] = useState('');
   const [gstNumber, setGstNumber] = useState(defaultGstNumber);
   const [minOrderValue, setMinOrderValue] = useState<string>('');
@@ -61,6 +62,15 @@ export function BecomeVendorModal({
       );
       return;
     }
+    const effectiveStore = storeName.trim() || businessName.trim();
+    if (effectiveStore.length < 2) {
+      applyValidationErrors(
+        { storeName: 'Store name is required (at least 2 characters)' },
+        'Store name is required (at least 2 characters)',
+        { dataField: true },
+      );
+      return;
+    }
     setSubmitting(true);
     clearErrors();
     try {
@@ -69,6 +79,7 @@ export function BecomeVendorModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessName: businessName.trim(),
+          storeName: effectiveStore,
           description: description.trim() || undefined,
           gstNumber: gstNumber.trim() || undefined,
           minOrderValue: minOrderValue ? Number(minOrderValue) : undefined,
@@ -77,7 +88,7 @@ export function BecomeVendorModal({
       const json = await parseJsonResponse(res);
       if (!json.success) {
         applyApiError(json, {
-          fieldOrder: ['businessName'],
+          fieldOrder: ['businessName', 'storeName'],
           dataField: true,
         });
         setSubmitting(false);
@@ -96,7 +107,9 @@ export function BecomeVendorModal({
       toast.success('Vendor application submitted — admin will review shortly.');
       onSubmitted?.();
       onClose();
-      window.location.assign('/vendor/dashboard');
+      // Stay on the marketplace until a store is approved — homepage banner
+      // shows pending/OK status; do not open the supplier panel yet.
+      window.location.assign('/');
     } catch {
       applyValidationErrors({ _server: 'Network error — try again' }, 'Network error — try again');
       setSubmitting(false);
@@ -133,10 +146,33 @@ export function BecomeVendorModal({
               label="Legal Business Name"
               required
               value={businessName}
-              onChange={v => { setBusinessName(v); if (fieldErrors.businessName) clearFieldError('businessName'); }}
+              onChange={v => {
+                setBusinessName(v);
+                // Keep store in sync while it still mirrors the legal name default
+                if (!storeName.trim() || storeName === businessName) {
+                  setStoreName(v);
+                }
+                if (fieldErrors.businessName) clearFieldError('businessName');
+              }}
               placeholder="e.g. Dairy Direct Wholesale"
               error={fieldErrors.businessName}
             />
+          </div>
+          <div data-field="storeName">
+            <TextField
+              label="Primary Online Store name"
+              required
+              value={storeName}
+              onChange={v => {
+                setStoreName(v);
+                if (fieldErrors.storeName) clearFieldError('storeName');
+              }}
+              placeholder="e.g. Dairy Direct — Mumbai Hub"
+              error={fieldErrors.storeName}
+            />
+            <p className="mt-1 text-[11px] text-gray-400">
+              Defaults to the legal business name if left blank. Shown as your Online Store in the supplier panel.
+            </p>
           </div>
           <Field
             label="Short description"

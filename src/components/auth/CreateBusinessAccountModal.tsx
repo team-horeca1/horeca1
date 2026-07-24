@@ -251,12 +251,7 @@ export function CreateBusinessAccountModal({
 
       onCreated?.();
       onClose();
-
-      if (isVendor) {
-        window.location.assign('/vendor/dashboard');
-      } else {
-        window.location.assign('/');
-      }
+      window.location.assign('/');
     } catch {
       applyValidationErrors({ _server: 'Network error — please try again.' }, 'Network error — please try again.');
       setSubmitting(false);

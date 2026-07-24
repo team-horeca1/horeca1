@@ -23,6 +23,7 @@ import type { Prisma } from '@prisma/client';
 import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 import { softDeactivateDuplicateActiveOutlets } from '@/lib/outletWrites';
+import { businessFacingName, storeDisplayName } from '@/modules/supplier/foundation.service';
 
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
   try {
@@ -58,6 +59,9 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
             billingState: true, billingPincode: true, businessType: true,
             isCustomer: true, isVendor: true, isBrand: true, status: true,
             primaryOutletId: true,
+            vendors: {
+              select: { businessName: true, displayName: true },
+            },
             outlets: {
               where: { isActive: true },
               orderBy: { createdAt: 'asc' },
@@ -76,17 +80,23 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
     });
     return NextResponse.json({
       success: true,
-      data: memberships.map((m) => ({
-        ...m.businessAccount,
-        outlets: m.businessAccount.outlets.map((o) => ({
-          id: o.id,
-          name: o.name,
-          pincode: o.pincode,
-          requiresAddressUpdate: !hasUsableDeliveryLocation(o),
-        })),
-        isPrimary: m.isPrimary,
-        joinedAt: m.createdAt,
-      })),
+      data: memberships.map((m) => {
+        const { vendors, ...ba } = m.businessAccount;
+        const storeNames = vendors.map((v) => storeDisplayName(v));
+        const facingName = businessFacingName(ba, storeNames);
+        return {
+          ...ba,
+          displayName: facingName,
+          outlets: ba.outlets.map((o) => ({
+            id: o.id,
+            name: o.name,
+            pincode: o.pincode,
+            requiresAddressUpdate: !hasUsableDeliveryLocation(o),
+          })),
+          isPrimary: m.isPrimary,
+          joinedAt: m.createdAt,
+        };
+      }),
     });
   } catch (err) {
     return errorResponse(err);
@@ -187,7 +197,12 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       const account = await tx.businessAccount.create({
         data: {
           legalName: body.legalName,
-          displayName: body.displayName,
+          // Vendor register sends trade/store as displayName — keep that on the
+          // Vendor row only. BusinessAccount display stays legal unless this is
+          // a non-vendor BA create with an explicit business display name.
+          displayName: body.isVendor
+            ? body.legalName
+            : (body.displayName?.trim() || body.legalName),
           companyName: body.legalName,
           gstin: body.gstin || null,
           pan: body.pan || null,

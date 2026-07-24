@@ -261,7 +261,7 @@ async function postHandler(req: NextRequest) {
       const account = await tx.businessAccount.create({
         data: {
           legalName: input.businessName,
-          displayName: input.tradeName,
+          displayName: input.businessName,
           gstin: input.gstNumber || null,
           pan: input.panNumber || null,
           businessType: input.vendorBusinessType || input.vendorType || 'vendor',

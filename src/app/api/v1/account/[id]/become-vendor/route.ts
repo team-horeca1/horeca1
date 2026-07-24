@@ -5,7 +5,8 @@
  * as a vendor. Per the V2.2 model, vendor + customer are flags on the same
  * BusinessAccount, so this is just:
  *   - flip BusinessAccount.isVendor = true
- *   - create the Vendor extension row (pending admin approval)
+ *   - sync BusinessAccount legal/display names from the submitted legal name
+ *   - create the Vendor (Online Store) row (pending admin approval)
  *   - assign the caller the Vendor Admin role on this account
  *   - update User.role to 'vendor' (legacy field still consumed by old code)
  *
@@ -25,6 +26,8 @@ import { assertAccountPermission } from '@/lib/accountAccess';
 
 const Body = z.object({
   businessName: z.string().min(2).max(255),
+  /** Primary Online Store name; defaults to businessName when omitted/blank. */
+  storeName: z.string().max(255).optional(),
   description: z.string().max(2000).optional(),
   gstNumber: z.string().max(20).optional(),
   minOrderValue: z.number().min(0).optional(),
@@ -48,6 +51,8 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     await assertAccountPermission(ctx.userId, accountId, 'settings.edit', ctx.activeOutletId);
 
     const body = Body.parse(await req.json());
+    const legalName = body.businessName.trim();
+    const storeName = (body.storeName?.trim() || legalName);
 
     // One Business may have multiple Online Stores — but become-vendor only
     // creates the first store when none exist yet.
@@ -60,16 +65,16 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     }
 
     // Confirm slug is free (extremely unlikely collision, but cheap to check).
-    const slug = slugify(body.businessName, ctx.userId);
+    const slug = slugify(storeName, ctx.userId);
     const slugTaken = await prisma.vendor.findUnique({ where: { slug }, select: { id: true } });
     if (slugTaken) {
-      throw Errors.fieldError('businessName', 'A vendor with this business name already exists. Try a different name.', 409);
+      throw Errors.fieldError('storeName', 'An Online Store with this name already exists. Try a different store name.', 409);
     }
 
     // Confirm the account isn't already a vendor account (defensive — shouldn't happen if no Vendor row).
     const account = await prisma.businessAccount.findUnique({
       where: { id: accountId },
-      select: { id: true, isVendor: true, legalName: true },
+      select: { id: true, isVendor: true, legalName: true, displayName: true },
     });
     if (!account) throw Errors.notFound('BusinessAccount');
     if (account.isVendor) throw Errors.conflict('This account is already marked as a vendor');
@@ -83,20 +88,32 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       throw Errors.badRequest('Vendor Admin role template missing. Run prisma/migrations/.../data_migrate.ts first.');
     }
 
+    // Preserve a true custom BA display name; otherwise sync display to legal.
+    const prevDisplay = account.displayName?.trim() || '';
+    const prevLegal = account.legalName?.trim() || '';
+    const shouldSyncDisplay =
+      !prevDisplay
+      || prevDisplay === prevLegal;
+
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Flip the flag on the BusinessAccount.
+      // 1. Flip vendor flag + sync Business names (legal on BA, store on Vendor).
       await tx.businessAccount.update({
         where: { id: accountId },
-        data: { isVendor: true },
+        data: {
+          isVendor: true,
+          legalName,
+          ...(shouldSyncDisplay ? { displayName: legalName } : {}),
+        },
       });
 
-      // 2. Create the Vendor extension row (pending admin approval).
+      // 2. Create the Vendor (Online Store) row — naming matches createOnlineStore.
       const vendor = await tx.vendor.create({
         data: {
           userId: ctx.userId,
           businessAccountId: accountId,
-          businessName: body.businessName,
-          displayName: body.businessName,
+          businessName: storeName,
+          displayName: storeName,
+          tradeName: storeName,
           slug,
           description: body.description ?? null,
           gstNumber: body.gstNumber ?? null,
@@ -108,14 +125,14 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
           multiWarehouseEnabled: false,
           setupProgress: { business: true, online_store: true },
         },
-        select: { id: true, businessName: true, slug: true, isVerified: true, isActive: true },
+        select: { id: true, businessName: true, displayName: true, slug: true, isVerified: true, isActive: true },
       });
 
       const { ensureDefaultOutletForStore } = await import('@/modules/supplier/foundation.service');
       await ensureDefaultOutletForStore(tx, {
         businessAccountId: accountId,
         vendorId: vendor.id,
-        name: body.businessName,
+        name: storeName,
       });
 
       // 3. Grant the caller the Vendor Admin role (additive — they keep their existing Owner role too).

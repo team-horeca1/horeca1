@@ -8,6 +8,7 @@ import {
   cascadeBusinessTeamToStore,
   ensureDefaultOutletForStore,
   storeDisplayName,
+  businessFacingName,
 } from '@/modules/supplier/foundation.service';
 import type { OrderStatus, PaymentState, Prisma } from '@prisma/client';
 
@@ -92,28 +93,41 @@ export async function listSupplierBusinesses(userId: string) {
       return true;
     });
 
+    const stores = accessibleStores.map((v) => ({
+      id: v.id,
+      name: storeDisplayName(v),
+      slug: v.slug,
+      isActive: v.isActive,
+      isVerified: v.isVerified,
+      isPrimaryStore: v.isPrimaryStore,
+      logoUrl: v.logoUrl,
+      addressLine: v.addressLine,
+      city: v.city,
+      state: v.state,
+      pincode: v.addressPincode,
+    }));
+
+    const allStoreNames = ba.vendors.map((v) => storeDisplayName(v));
+    const facingName = businessFacingName(ba, allStoreNames);
+    // Heal registration bleed: store/trade name written onto BA.displayName
+    const rawDisplay = ba.displayName?.trim() || '';
+    if (rawDisplay && rawDisplay !== facingName) {
+      void prisma.businessAccount.update({
+        where: { id: ba.id },
+        data: { displayName: facingName },
+      }).catch(() => { /* non-blocking heal */ });
+    }
+
     return {
       id: ba.id,
       legalName: ba.legalName,
-      displayName: ba.displayName,
+      displayName: facingName,
       gstin: ba.gstin,
       status: ba.status,
       isPrimary: m.isPrimary,
       vendorTypeSelections: ba.vendorTypeSelections,
       businessSize: ba.businessSize,
-      stores: accessibleStores.map((v) => ({
-        id: v.id,
-        name: storeDisplayName(v),
-        slug: v.slug,
-        isActive: v.isActive,
-        isVerified: v.isVerified,
-        isPrimaryStore: v.isPrimaryStore,
-        logoUrl: v.logoUrl,
-        addressLine: v.addressLine,
-        city: v.city,
-        state: v.state,
-        pincode: v.addressPincode,
-      })),
+      stores,
       storeCount: accessibleStores.length,
     };
   });
@@ -882,11 +896,30 @@ export async function updateBusiness(
       ? []
       : undefined;
 
+  let displayName = input.displayName !== undefined ? input.displayName.trim() : undefined;
+  if (displayName !== undefined) {
+    const [baRow, stores] = await Promise.all([
+      prisma.businessAccount.findUnique({
+        where: { id: businessAccountId },
+        select: { legalName: true },
+      }),
+      prisma.vendor.findMany({
+        where: { businessAccountId },
+        select: { businessName: true, displayName: true },
+      }),
+    ]);
+    const legal = (input.legalName?.trim() || baRow?.legalName || '').trim();
+    displayName = businessFacingName(
+      { legalName: legal || displayName, displayName },
+      stores.map((v) => storeDisplayName(v)),
+    );
+  }
+
   return prisma.businessAccount.update({
     where: { id: businessAccountId },
     data: {
       ...(input.legalName !== undefined ? { legalName: input.legalName.trim() } : {}),
-      ...(input.displayName !== undefined ? { displayName: input.displayName.trim() } : {}),
+      ...(displayName !== undefined ? { displayName } : {}),
       ...(input.gstin !== undefined ? { gstin: input.gstin.trim() || null } : {}),
       ...(typeSelections !== undefined ? { vendorTypeSelections: typeSelections } : {}),
       ...(input.businessSize !== undefined
