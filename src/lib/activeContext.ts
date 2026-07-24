@@ -11,6 +11,7 @@ import { flatten, mergePermissions } from '@/lib/permissions/engine';
 import { ALL_PERMISSION_KEYS, type PermissionKey, type PermissionsJson } from '@/lib/permissions/registry';
 import { isOwnerRoleName } from '@/lib/permissions/portalFeatures';
 import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
+import { businessFacingName, storeDisplayName } from '@/modules/supplier/foundation.service';
 import type { TeamRole } from '@prisma/client';
 
 const MAX_AVAILABLE_ACCOUNTS = 20;
@@ -95,6 +96,12 @@ export async function loadActiveContext(
                 isVendor: true,
                 isBrand: true,
                 primaryOutletId: true,
+                vendors: {
+                  select: {
+                    businessName: true,
+                    displayName: true,
+                  },
+                },
               },
             },
           },
@@ -340,12 +347,16 @@ export async function loadActiveContext(
     const totalAccountCount = memberships.length;
     const availableAccounts: AvailableAccountSummary[] = memberships
       .slice(0, MAX_AVAILABLE_ACCOUNTS)
-      .map((m) => ({
-        id: m.businessAccount.id,
-        displayName: m.businessAccount.displayName ?? m.businessAccount.legalName,
-        isVendor: m.businessAccount.isVendor,
-        isBrand: m.businessAccount.isBrand,
-      }));
+      .map((m) => {
+        const ba = m.businessAccount;
+        const storeNames = ba.vendors.map((v) => storeDisplayName(v));
+        return {
+          id: ba.id,
+          displayName: businessFacingName(ba, storeNames),
+          isVendor: ba.isVendor,
+          isBrand: ba.isBrand,
+        };
+      });
     const availableAccountsTruncated = totalAccountCount > MAX_AVAILABLE_ACCOUNTS;
 
     return {

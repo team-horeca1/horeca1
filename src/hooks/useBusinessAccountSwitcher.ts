@@ -21,6 +21,7 @@ import {
 } from '@/lib/authTabSync';
 import { clearUserClientStores } from '@/lib/userScopedStorage';
 import { clientLogout, markSigningOut } from '@/lib/clientLogout';
+import { readEnteredStore } from '@/lib/supplierPortalLevel';
 import { toast } from 'sonner';
 
 /** Same-tab sync: each useBusinessAccountSwitcher() has its own state — broadcast outlet switches. */
@@ -421,7 +422,9 @@ export function useBusinessAccountSwitcher() {
 
   const switchOnlineStore = useCallback(
     async (vendorId: string, businessAccountId?: string) => {
-      if (switching) return;
+      if (switching) {
+        throw new AccountSwitchError('Account switch already in progress');
+      }
       const currentId = vendorImpersonating ? vendorImpersonationVendorId : activeVendorId;
       const sameStore = vendorId === currentId;
       const sameBa = !businessAccountId || businessAccountId === activeBusinessAccountId;
@@ -598,21 +601,28 @@ export function useBusinessAccountSwitcher() {
   );
 
   // Bootstrap session when JWT is missing account/outlet, or when the active BA
-  // is not the primary (e.g. team member stuck on a personal shopping BA while
-  // their primary vendor membership is where Dashboard lives).
+  // is a personal shopping BA while primary is vendor/brand (Dashboard lives there).
+  // Do NOT snap away from another intentional vendor/brand business (multi-BA Enter).
   useEffect(() => {
     if (customerImpersonating || vendorImpersonating) return;
     if (!userId || loading || switching || accounts.length === 0) return;
     if (bootstrapAttempted.current) return;
+    // Store Ops Enter already set JWT BA/store — do not undo on remount/reload.
+    if (readEnteredStore()) return;
 
     const primary = accounts.find((a) => a.isPrimary) ?? accounts[0];
     const defaultOutletId =
       primary.primaryOutletId ?? primary.outlets[0]?.id ?? null;
+    const activeAccount =
+      accounts.find((a) => a.id === activeBusinessAccountId) ?? null;
+    const stuckOnShoppingBa =
+      !!activeAccount && !activeAccount.isVendor && !activeAccount.isBrand;
     const needsPrimarySwitch =
       !activeBusinessAccountId
       || (
         activeBusinessAccountId !== primary.id
         && (primary.isVendor || primary.isBrand)
+        && stuckOnShoppingBa
       );
 
     if (needsPrimarySwitch) {

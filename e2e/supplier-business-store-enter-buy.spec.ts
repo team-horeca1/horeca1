@@ -342,6 +342,7 @@ test.describe('@enter-buy supplier business → store → Enter → buy', () => 
 
   test('5) UI Enter while session BA may still be primary (regression)', async ({ browser }) => {
     expect(secondBusinessId).toBeTruthy();
+    expect(secondVendorId).toBeTruthy();
     const { context, page } = await pageFromState(browser, VENDOR_STATE);
     try {
       await page.goto('/vendor/overview', { waitUntil: 'domcontentloaded' });
@@ -361,6 +362,23 @@ test.describe('@enter-buy supplier business → store → Enter → buy', () => 
 
       await enterStoreViaUi(page, secondBusinessId);
       await expect(page.getByText('Store Ops')).toBeVisible({ timeout: 20_000 });
+
+      // Bootstrap must not snap back to primary BA / Store01 after Enter
+      await refreshAuthSession(page);
+      const ctx = await page.evaluate(async () => {
+        const session = await (await fetch('/api/auth/session', { credentials: 'include' })).json();
+        return {
+          activeVendorId: session?.user?.activeVendorId as string | undefined,
+          activeBusinessAccountId: session?.user?.activeBusinessAccountId as string | undefined,
+        };
+      });
+      expect(ctx.activeVendorId, 'JWT must stay on second-business store after Enter').toBe(secondVendorId);
+      expect(
+        ctx.activeBusinessAccountId,
+        'JWT must stay on second business after Enter',
+      ).toBe(secondBusinessId);
+      await expect(page.getByText(secondStoreName).first()).toBeVisible({ timeout: 15_000 });
+
       await page.context().storageState({ path: VENDOR_STATE });
     } finally {
       await context.close();
