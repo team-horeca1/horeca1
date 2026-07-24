@@ -21,7 +21,10 @@ import {
   type PortalRole,
   type TeamPanelScope,
 } from '@/components/features/team/teamPanelConfig';
-import { isAdminCustomerImpersonationActive } from '@/lib/clearImpersonation';
+import {
+  isAdminCustomerImpersonationActive,
+  isAdminVendorImpersonationActive,
+} from '@/lib/clearImpersonation';
 import { toast } from 'sonner';
 
 interface AccountMemberApiRow {
@@ -76,7 +79,15 @@ export function TeamPanel({
     activeBusinessAccountId?: string;
   } | undefined;
   const currentUserId = sessionUser?.id;
-  const isAdminImpersonating = sessionUser?.role === 'admin' && scope !== 'admin';
+  // Cookie is client-only — read after mount to avoid hydration mismatch.
+  const [vendorAdminView, setVendorAdminView] = useState(false);
+  useEffect(() => {
+    setVendorAdminView(isAdminVendorImpersonationActive());
+  }, []);
+  // JWT role stays admin under Admin View; cookie covers brief session.role lag.
+  const isAdminImpersonating =
+    scope !== 'admin'
+    && (sessionUser?.role === 'admin' || vendorAdminView);
   // URL accountId wins (Admin View deep-link). Under customer Admin View the JWT
   // still holds the admin's BA — resolve the impersonated BA from /api/v1/account.
   const urlAccountId = scope === 'account' ? (searchParams.get('accountId') ?? undefined) : undefined;
@@ -363,7 +374,7 @@ export function TeamPanel({
         currentUserId={currentUserId}
         getRoleStyle={getRoleStyle}
         canEdit={canEdit || isAdminImpersonating}
-        canDelete={canDelete && !isAdminImpersonating}
+        canDelete={canDelete || isAdminImpersonating}
         allowOwnerPasswordReset={isAdminImpersonating || scope === 'admin'}
         onEdit={(m) => setEditingMember(m as TeamMemberRow)}
         onResetPassword={(m) => setPasswordMember(m as TeamMemberRow)}

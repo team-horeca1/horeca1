@@ -732,11 +732,11 @@ export const DELETE = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
         },
       });
 
+      // Invites set isPrimary: true — always remove BAM for this BA.
       await tx.businessAccountMember.deleteMany({
         where: {
           userId: member.userId,
           businessAccountId: vendor.businessAccountId,
-          isPrimary: false,
         },
       });
     });

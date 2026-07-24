@@ -77,13 +77,16 @@ export function TeamMemberList({
             const isSelf = member.user.id === currentUserId;
             const isOwnerRow = member.isOwner;
             return (
-              <li key={member.id} className="px-4 md:px-6 py-4 flex items-center gap-3 md:gap-4">
+              <li
+                key={member.id}
+                className="px-4 md:px-6 py-4 flex flex-wrap items-center gap-x-3 gap-y-2 md:gap-x-4 md:flex-nowrap"
+              >
                 <div className="w-[40px] h-[40px] rounded-full flex items-center justify-center text-[13px] font-[900] shrink-0"
                   style={{ backgroundColor: look.bg, color: look.color }}>
                   {initials(member.user.fullName)}
                 </div>
 
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 basis-[min(100%,12rem)] md:basis-auto">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-[14px] font-bold text-[#181725] truncate">{member.user.fullName}</p>
                     {isOwnerRow && (
@@ -104,17 +107,21 @@ export function TeamMemberList({
                   )}
                 </div>
 
-                <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] shrink-0"
-                  style={{ backgroundColor: look.bg, color: look.color }}>
-                  <look.Icon size={13} />
-                  <span className="text-[12px] font-bold">{member.role.name}</span>
+                <div
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] shrink min-w-0 max-w-[10rem] lg:max-w-[14rem]"
+                  style={{ backgroundColor: look.bg, color: look.color }}
+                  title={member.role.name}
+                >
+                  <look.Icon size={13} className="shrink-0" />
+                  <span className="text-[12px] font-bold truncate">{member.role.name}</span>
                 </div>
 
-                <span className="text-[12px] text-[#AEAEAE] hidden md:block shrink-0 w-[90px] text-right">
+                <span className="text-[12px] text-[#AEAEAE] hidden lg:block shrink-0 w-[90px] text-right">
                   {new Date(member.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
                 </span>
 
-                <div className="shrink-0 flex items-center gap-1">
+                {/* Actions last + ml-auto so Key/Trash never clip behind long role names */}
+                <div className="shrink-0 flex items-center gap-1 ml-auto">
                   {isOwnerRow ? (
                     (allowOwnerPasswordReset || isSelf) && canEdit && onResetPassword ? (
                       <>
@@ -163,10 +170,10 @@ export function TeamMemberList({
                         <button
                           onClick={() => onRemove(member)}
                           className="p-2 rounded-[8px] hover:bg-red-50 transition-colors"
-                          title="Remove member"
-                          aria-label={`Remove ${member.user.fullName}`}
+                          title="Remove team member"
+                          aria-label={`Remove team member ${member.user.fullName}`}
                         >
-                          <Trash2 size={14} style={{ color: accent }} />
+                          <Trash2 size={14} className="text-red-500" />
                         </button>
                       )}
                     </>

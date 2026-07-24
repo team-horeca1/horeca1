@@ -247,8 +247,8 @@ export interface TeamRemovalResult {
 
 /**
  * Call after the team-membership row (and scoped UserRoles) are already removed.
- * Wipes invite-only users; otherwise invalidates their session and optionally
- * demotes ex-admin staff back to customer.
+ * Wipes invite-only users; otherwise force-revokes their JWT and demotes to
+ * customer when they no longer own stores / hold vendor or brand team seats.
  */
 export async function finalizeTeamMemberRemoval(
   userId: string,
@@ -265,13 +265,29 @@ export async function finalizeTeamMemberRemoval(
     return { hardDeleted: true, preserved: false };
   }
 
-  if (opts?.demoteFromAdmin && user.role === 'admin') {
-    await prisma.user.update({ where: { id: userId }, data: { role: 'customer' } });
-  } else {
-    // Bump updatedAt so JWT reload fires even if Redis stale flag is missed.
-    await prisma.user.update({ where: { id: userId }, data: { updatedAt: new Date() } });
-  }
-  await markSessionStale(userId);
+  const [ownedVendors, vendorTeam, brandTeam, brandOwned] = await Promise.all([
+    prisma.vendor.count({ where: { userId } }),
+    prisma.vendorTeamMember.count({ where: { userId } }),
+    prisma.brandTeamMember.count({ where: { userId } }),
+    prisma.brand.count({ where: { userId } }),
+  ]);
+  const noPortalSeats =
+    ownedVendors === 0 && vendorTeam === 0 && brandTeam === 0 && brandOwned === 0;
+
+  const shouldDemoteToCustomer =
+    (opts?.demoteFromAdmin && user.role === 'admin')
+    || (noPortalSeats && (user.role === 'vendor' || user.role === 'brand' || user.role === 'admin'));
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(shouldDemoteToCustomer ? { role: 'customer' as const } : {}),
+      updatedAt: new Date(),
+    },
+  });
+
+  // Force logout — stale reload alone leaves vendor JWT usable until next sync.
+  await markSessionRevoked(userId);
   return { hardDeleted: false, preserved: true };
 }
 
