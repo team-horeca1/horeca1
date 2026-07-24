@@ -120,11 +120,30 @@ export function Navbar() {
     const [apiCategories, setApiCategories] = React.useState<(Category & { image: string; bgColor: string })[]>([]);
     const [isAdminImpersonating, setIsAdminImpersonating] = React.useState(false);
     const [isCustomerImpersonating, setIsCustomerImpersonating] = React.useState(false);
+    const [vendorAppApproved, setVendorAppApproved] = React.useState(false);
 
     React.useEffect(() => {
         setIsAdminImpersonating(isAnyAdminImpersonationActive());
         setIsCustomerImpersonating(isAdminCustomerImpersonationActive());
     }, [pathname, sessionStatus]);
+
+    React.useEffect(() => {
+        if (sessionStatus !== 'authenticated') {
+            setVendorAppApproved(false);
+            return;
+        }
+        let cancelled = false;
+        fetch('/api/v1/vendor/application-status', { credentials: 'include' })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((json) => {
+                if (cancelled || !json?.success) return;
+                setVendorAppApproved(json.data?.status === 'approved');
+            })
+            .catch(() => {
+                if (!cancelled) setVendorAppApproved(false);
+            });
+        return () => { cancelled = true; };
+    }, [sessionStatus, pathname]);
 
     React.useEffect(() => {
         dal.categories.list().then((cats) => {
@@ -173,7 +192,7 @@ export function Navbar() {
         if (isLoggedIn) {
             if (userRole === 'admin' && !isCustomerImpersonating) {
                 portalLinks.push({ name: 'Dashboard', href: '/admin/dashboard', Icon: LayoutDashboard });
-            } else if (!isAdminImpersonating && hasVendorAccount) {
+            } else if (!isAdminImpersonating && hasVendorAccount && vendorAppApproved) {
                 portalLinks.push({ name: 'Dashboard', href: '/vendor/dashboard', Icon: LayoutDashboard });
             } else if (!isAdminImpersonating && hasBrandAccount) {
                 portalLinks.push({ name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard });
@@ -185,7 +204,7 @@ export function Navbar() {
             ...DESKTOP_NAV,
             ...(isLoggedIn ? [{ name: 'Rewards', href: '/rewards', Icon: Gift }] : []),
         ];
-    }, [sessionReady, isLoggedIn, hasVendorAccount, hasBrandAccount, userRole, isAdminImpersonating, isCustomerImpersonating]);
+    }, [sessionReady, isLoggedIn, hasVendorAccount, hasBrandAccount, vendorAppApproved, userRole, isAdminImpersonating, isCustomerImpersonating]);
 
     if (isAdminPage || isVendorDashboard || isBrandPortal || isShipmentPage || isAccountPage) return null;
 

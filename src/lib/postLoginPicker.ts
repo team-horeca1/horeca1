@@ -118,6 +118,21 @@ export async function prepareFreshLoginNavigation(redirectTo: string | null): Pr
   const user = session?.user as {
     isStoreScopedOnly?: boolean;
   } | null | undefined;
+
+  // New / unapproved suppliers: stay on marketplace until admin Approve & Verify.
+  if (role !== 'admin' && (caps?.isVendor || role === 'vendor' || user?.isStoreScopedOnly)) {
+    try {
+      const res = await fetch('/api/v1/vendor/application-status', { credentials: 'include' });
+      const json = await res.json().catch(() => null);
+      if (json?.success && json.data?.hasApplication && json.data?.status === 'pending') {
+        window.location.href = sanitizeRedirect(redirectTo) || '/';
+        return;
+      }
+    } catch {
+      /* fall through to normal portal routing */
+    }
+  }
+
   // Store-scoped team members → Businesses picker (Enter the store they need).
   if (!sanitizeRedirect(redirectTo) && role !== 'admin' && user?.isStoreScopedOnly) {
     window.location.href = '/vendor/businesses';

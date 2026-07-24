@@ -849,8 +849,8 @@ export default function VendorRegisterPage() {
         // New account is now active — attach any KYC files the user picked.
         await uploadAuthedDocs();
         setSubmitted({ hcid: '' });
-        // Redirect after a brief moment so the success screen is visible.
-        setTimeout(() => { window.location.assign('/vendor/dashboard'); }, 1200);
+        // Pending application — homepage banner; no supplier panel until approved.
+        setTimeout(() => { window.location.assign('/'); }, 1200);
         return;
       }
 
@@ -977,7 +977,7 @@ export default function VendorRegisterPage() {
           {isAuthMode ? (
             <div className="flex items-center justify-center gap-2 text-[13px] text-gray-500">
               <Loader2 size={16} className="animate-spin" />
-              Redirecting to your vendor dashboard…
+              Taking you home — we&apos;ll notify you when approved…
             </div>
           ) : (
             <>

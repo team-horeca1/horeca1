@@ -277,9 +277,10 @@ export default function VendorLayout({
         };
     }, [status, isAdmin, isActiveVendor]);
 
-    // Redirect to setup wizard until complete — verified vendors are never forced (AUD-005)
+    // Redirect to setup wizard until complete — verified vendors only (pending apps stay out)
     React.useEffect(() => {
         if (status !== 'authenticated' || isAdmin || !isActiveVendor) return;
+        if (isApplicationPending) return;
         if (pathname === '/vendor/setup') return;
         fetch('/api/v1/vendor/setup')
             .then((r) => r.json())
@@ -291,7 +292,7 @@ export default function VendorLayout({
                 }
             })
             .catch(() => {});
-    }, [status, isAdmin, isActiveVendor, pathname, router]);
+    }, [status, isAdmin, isActiveVendor, isApplicationPending, pathname, router]);
 
     const handleExitAdminView = async () => {
         await clearAllAdminImpersonation();
@@ -351,8 +352,40 @@ export default function VendorLayout({
         );
     }
 
-    // Pending stores no longer lock the whole supplier panel — Businesses/Team stay usable.
-    // isApplicationPending drives a non-blocking banner only (see main return).
+    // Pending first application: block the whole supplier panel until admin
+    // Approve & Verify. Homepage VendorApplicationBanner is the waiting UX.
+    if (!isAdmin && isApplicationPending) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-[#F8F9FB] gap-5 px-6">
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center">
+                    <Clock size={28} className="text-[#F59E0B]" />
+                </div>
+                <div className="text-center max-w-md space-y-2">
+                    <h1 className="text-[22px] font-bold text-[#181725]">Application under review</h1>
+                    <p className="text-[14px] text-[#7C7C7C] leading-relaxed">
+                        Thanks for applying. Your Online Store is waiting for super-admin Approve &amp; Verify.
+                        You&apos;ll get full supplier dashboard access once approved — this is normal for new suppliers.
+                    </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                    <Link
+                        href="/"
+                        className="inline-flex items-center gap-2 h-[42px] px-5 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] transition-colors"
+                    >
+                        <Home size={16} />
+                        Back to marketplace
+                    </Link>
+                    <button
+                        type="button"
+                        onClick={() => window.location.reload()}
+                        className="inline-flex items-center gap-2 h-[42px] px-5 rounded-[10px] border border-[#EEEEEE] text-[#7C7C7C] text-[13px] font-bold hover:bg-white transition-colors"
+                    >
+                        Check again
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     if (visibleGroups.length === 0) {
         return (
@@ -495,26 +528,6 @@ export default function VendorLayout({
                     </Link>
                 )}
             </div>
-
-            {isApplicationPending && (
-                <div className="w-full bg-[#FFF7E6] border-b border-[#F59E0B]/30 px-[clamp(1rem,2.5vw,2rem)] py-2.5 flex items-start gap-2.5">
-                    <Clock size={16} className="text-[#F59E0B] shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-semibold text-[#92400E]">
-                            Online Store(s) pending admin approval
-                        </p>
-                        <p className="text-[12px] text-[#B45309] mt-0.5">
-                            You can manage businesses and team now. Stores appear on the marketplace only after a super-admin Approve &amp; Verify.
-                        </p>
-                    </div>
-                    <Link
-                        href="/vendor/businesses"
-                        className="text-[12px] font-bold text-[#92400E] hover:text-[#78350F] shrink-0 underline-offset-2 hover:underline"
-                    >
-                        View stores
-                    </Link>
-                </div>
-            )}
 
             {/* Body: Sidebar + Content */}
             <div className="flex flex-1">

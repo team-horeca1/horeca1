@@ -85,6 +85,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const [isRolesOpen, setIsRolesOpen] = useState(false);
     const [isOverviewOpen, setIsOverviewOpen] = useState(false);
     const [hasVendorApplication, setHasVendorApplication] = useState<boolean | null>(null);
+    const [vendorAppApproved, setVendorAppApproved] = useState(false);
     const [creditSummary, setCreditSummary] = useState<{
         totalLimit: number;
         totalAvailable: number;
@@ -174,7 +175,10 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
             .then(([profileJson, addrJson, vendorJson, walletJson]) => {
                 if (cancelled) return;
                 if (vendorJson?.success) {
-                    Promise.resolve().then(() => setHasVendorApplication(!!vendorJson.data.hasApplication));
+                    Promise.resolve().then(() => {
+                        setHasVendorApplication(!!vendorJson.data.hasApplication);
+                        setVendorAppApproved(vendorJson.data?.status === 'approved');
+                    });
                 }
                 if (walletJson?.success && Array.isArray(walletJson.data)) {
                     const wallets = walletJson.data;
@@ -364,6 +368,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const showVendorDashboardCta =
         !customerImpersonating
         && !hideBusinessAccountForAdmin
+        && vendorAppApproved
         && (
             sessionAcctType?.activeBusinessAccountType?.isVendor === true
             || sessionRole === 'vendor'
@@ -1121,11 +1126,19 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                 }}
             />
 
-            {/* Become a Vendor Modal */}
+            {/* Become a Vendor Modal — prefer active BA display name over User.businessName */}
             <BecomeVendorModal
                 isOpen={isBecomeVendorOpen}
                 onClose={() => setIsBecomeVendorOpen(false)}
-                defaultBusinessName={userData.businessName}
+                defaultBusinessName={
+                    (session?.user as {
+                        activeBusinessAccountId?: string;
+                        availableAccounts?: Array<{ id: string; displayName?: string }>;
+                    } | undefined)?.availableAccounts?.find(
+                        (a) => a.id === (session?.user as { activeBusinessAccountId?: string } | undefined)?.activeBusinessAccountId,
+                    )?.displayName
+                    || userData.businessName
+                }
                 onSubmitted={() => setHasVendorApplication(true)}
             />
 
