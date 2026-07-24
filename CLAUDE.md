@@ -120,8 +120,11 @@ PostgreSQL 16 (self-hosted, Docker). 37 Prisma models. Core groupings:
 
 ## RECURRING COMMANDS
 ```bash
-npm run dev                    # Local dev server (localhost:3000)
-npm run build                  # Production build (Next.js webpack)
+npm run dev:db                 # Postgres + Redis (Docker, once per session)
+npm run dev                    # Next.js Turbopack in Docker → localhost:3000
+npm run dev:tunnel             # Same + prod DB via `npm run tunnel` in another terminal
+npm run dev:webpack            # Fallback: Webpack on the host (Windows only if Docker unavailable)
+npm run build                  # Production build (Turbopack — Next.js 16 default)
 npm run lint                   # ESLint — 0 errors currently, ~246 warnings (<img> in admin/brand pages + unused)
 npx tsc --noEmit               # Type check (always run before commit)
 npx prisma migrate dev         # Apply migrations locally

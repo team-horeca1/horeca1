@@ -1,0 +1,11 @@
+# Use with prod SSH tunnels (`npm run tunnel` in another terminal).
+# Ports 5433 / 6380 are forwarded on the host; reach them from the app container via host.docker.internal.
+#
+#   npm run tunnel
+#   npm run dev:tunnel
+
+services:
+  app-dev:
+    environment:
+      DATABASE_URL: ${TUNNEL_DATABASE_URL:-postgresql://horeca1:horeca1_dev@host.docker.internal:5433/horeca1}
+      REDIS_URL: ${TUNNEL_REDIS_URL:-redis://host.docker.internal:6380}

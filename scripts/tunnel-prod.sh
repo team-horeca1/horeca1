@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Opens SSH tunnels to the production database and Redis.
-# Run this in a terminal, then use `npm run dev` normally.
+# Run this in a terminal, then use `npm run dev:tunnel` (Turbopack in Docker).
+# For local DB only (lighter on memory): `npm run dev:db` then `npm run dev`.
 #
 # Local ports:
 #   5433 → prod Postgres (64.227.187.210:5432)

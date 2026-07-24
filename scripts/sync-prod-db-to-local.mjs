@@ -92,4 +92,5 @@ run('docker', [
   "SELECT pg_size_pretty(pg_database_size('horeca1')) AS size, (SELECT count(*) FROM users) AS users, (SELECT count(*) FROM vendors) AS vendors, (SELECT count(*) FROM products) AS products;",
 ]);
 
-console.log('\nDone. Ensure .env.local uses 127.0.0.1:5432 + redis://127.0.0.1:6379, then restart npm run dev.');
+console.log('\nDone. Start local DB with `npm run dev:db`, then `npm run dev`.');
+console.log('With prod tunnel: `npm run tunnel` + set TUNNEL_* URLs in .env (host.docker.internal:5433), then `npm run dev:tunnel`.');
