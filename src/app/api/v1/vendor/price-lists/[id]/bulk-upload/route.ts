@@ -35,6 +35,7 @@ import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
+import { logPriceHistory, type PriceHistoryEntry } from '@/lib/priceHistory';
 
 const rowSchema = z.object({
   sku: z.string().max(100).optional(),
@@ -152,8 +153,44 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
 
     // Single transaction so the upsert is all-or-nothing per request.
     let upsertedCount = 0;
+    const productIds = [...byProduct.keys()];
+    const existingItems = await prisma.priceListItem.findMany({
+      where: { priceListId: listId, productId: { in: productIds } },
+      select: { productId: true, customPrice: true, discountPercent: true },
+    });
+    const existingByProduct = new Map(existingItems.map((e) => [e.productId, e]));
+    const priceHistoryEntries: PriceHistoryEntry[] = [];
+
     await prisma.$transaction(async (tx) => {
       for (const r of byProduct.values()) {
+        const prev = existingByProduct.get(r.productId);
+        const oldCustom = prev?.customPrice != null ? Number(prev.customPrice) : null;
+        const oldDiscount = prev?.discountPercent != null ? Number(prev.discountPercent) : null;
+        if (oldCustom !== r.customPrice) {
+          priceHistoryEntries.push({
+            vendorId,
+            productId: r.productId,
+            priceListId: listId,
+            field: 'customPrice',
+            oldValue: oldCustom,
+            newValue: r.customPrice,
+            source: 'pricelist',
+            changedBy: ctx.userId,
+          });
+        }
+        if (oldDiscount !== r.discountPercent) {
+          priceHistoryEntries.push({
+            vendorId,
+            productId: r.productId,
+            priceListId: listId,
+            field: 'discountPercent',
+            oldValue: oldDiscount,
+            newValue: r.discountPercent,
+            source: 'pricelist',
+            changedBy: ctx.userId,
+          });
+        }
+
         await tx.priceListItem.upsert({
           where: { priceListId_productId: { priceListId: listId, productId: r.productId } },
           create: {
@@ -174,6 +211,10 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
           },
         });
         upsertedCount++;
+      }
+
+      if (priceHistoryEntries.length > 0) {
+        await logPriceHistory(priceHistoryEntries, tx);
       }
     });
 

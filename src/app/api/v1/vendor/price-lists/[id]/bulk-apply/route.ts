@@ -23,6 +23,7 @@ import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
+import { logPriceHistory, type PriceHistoryEntry } from '@/lib/priceHistory';
 
 const bodySchema = z.object({
   productIds: z.array(z.string().uuid()).min(1).max(500),
@@ -59,6 +60,13 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     const { type, value } = body.action;
     let upserted = 0;
 
+    const existingItems = await prisma.priceListItem.findMany({
+      where: { priceListId: listId, productId: { in: products.map((p) => p.id) } },
+      select: { productId: true, customPrice: true, discountPercent: true },
+    });
+    const existingByProduct = new Map(existingItems.map((e) => [e.productId, e]));
+    const priceHistoryEntries: PriceHistoryEntry[] = [];
+
     await prisma.$transaction(async (tx) => {
       for (const p of products) {
         let data: { pricingType: 'fixed' | 'discount'; customPrice: number | null; discountPercent: number | null };
@@ -69,12 +77,45 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
         } else {
           data = { pricingType: 'fixed', customPrice: Math.max(0.01, round(value)), discountPercent: null };
         }
+
+        const prev = existingByProduct.get(p.id);
+        const oldCustom = prev?.customPrice != null ? Number(prev.customPrice) : null;
+        const oldDiscount = prev?.discountPercent != null ? Number(prev.discountPercent) : null;
+        if (oldCustom !== data.customPrice) {
+          priceHistoryEntries.push({
+            vendorId,
+            productId: p.id,
+            priceListId: listId,
+            field: 'customPrice',
+            oldValue: oldCustom,
+            newValue: data.customPrice,
+            source: 'pricelist',
+            changedBy: ctx.userId,
+          });
+        }
+        if (oldDiscount !== data.discountPercent) {
+          priceHistoryEntries.push({
+            vendorId,
+            productId: p.id,
+            priceListId: listId,
+            field: 'discountPercent',
+            oldValue: oldDiscount,
+            newValue: data.discountPercent,
+            source: 'pricelist',
+            changedBy: ctx.userId,
+          });
+        }
+
         await tx.priceListItem.upsert({
           where: { priceListId_productId: { priceListId: listId, productId: p.id } },
           create: { priceListId: listId, productId: p.id, ...data },
           update: data,
         });
         upserted++;
+      }
+
+      if (priceHistoryEntries.length > 0) {
+        await logPriceHistory(priceHistoryEntries, tx);
       }
     });
 

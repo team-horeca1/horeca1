@@ -16,6 +16,7 @@ import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId, resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
+import { logPriceHistory, type PriceHistoryEntry } from '@/lib/priceHistory';
 
 const NOT_TOMBSTONED = { slug: { not: { startsWith: '_deleted_' } } } as const;
 
@@ -204,6 +205,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     });
 
     let upserted = 0, cleared = 0, skipped = 0;
+    const priceHistoryEntries: PriceHistoryEntry[] = [];
     await prisma.$transaction(async (tx) => {
       for (const c of cells) {
         if (!okList.has(c.priceListId) || !okProduct.has(c.productId)) { skipped++; continue; }
@@ -216,6 +218,20 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
                              c.scheduledPrice === null;
 
         if (shouldDelete) {
+          const existing = existingItems.find(item => item.priceListId === c.priceListId && item.productId === c.productId);
+          const oldPrice = existing?.customPrice != null ? Number(existing.customPrice) : null;
+          if (oldPrice !== null) {
+            priceHistoryEntries.push({
+              vendorId,
+              productId: c.productId,
+              priceListId: c.priceListId,
+              field: 'customPrice',
+              oldValue: oldPrice,
+              newValue: null,
+              source: 'pricelist',
+              changedBy: ctx.userId,
+            });
+          }
           const res = await tx.priceListItem.deleteMany({ where: { priceListId: c.priceListId, productId: c.productId } });
           cleared += res.count;
         } else {
@@ -232,6 +248,16 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
               oldPrice,
               newPrice,
               user: 'Vendor (Self)',
+            });
+            priceHistoryEntries.push({
+              vendorId,
+              productId: c.productId,
+              priceListId: c.priceListId,
+              field: 'customPrice',
+              oldValue: oldPrice,
+              newValue: newPrice,
+              source: 'pricelist',
+              changedBy: ctx.userId,
             });
           }
 
@@ -275,6 +301,10 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
           });
           upserted++;
         }
+      }
+
+      if (priceHistoryEntries.length > 0) {
+        await logPriceHistory(priceHistoryEntries, tx);
       }
     });
 

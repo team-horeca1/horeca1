@@ -11,6 +11,7 @@ import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
+import { logPriceHistory, type PriceHistoryEntry } from '@/lib/priceHistory';
 
 function extractId(req: NextRequest) {
   return new URL(req.url).pathname.split('/').at(-1) ?? '';
@@ -209,12 +210,83 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         //      touching an advanced field when the payload explicitly
         //      carries it (otherwise the grid's value is preserved).
         const keepIds = resolvedItems.map((i) => i.productId!);
+        const existingItems = await tx.priceListItem.findMany({
+          where: { priceListId: id },
+          select: {
+            productId: true,
+            customPrice: true,
+            discountPercent: true,
+            pricingType: true,
+          },
+        });
+        const existingByProduct = new Map(existingItems.map((e) => [e.productId, e]));
+        const priceHistoryEntries: PriceHistoryEntry[] = [];
+
+        const removed = existingItems.filter((e) => !keepIds.includes(e.productId));
+        for (const r of removed) {
+          if (r.customPrice != null) {
+            priceHistoryEntries.push({
+              vendorId,
+              productId: r.productId,
+              priceListId: id,
+              field: 'customPrice',
+              oldValue: Number(r.customPrice),
+              newValue: null,
+              source: 'pricelist',
+              changedBy: ctx.userId,
+            });
+          }
+          if (r.discountPercent != null) {
+            priceHistoryEntries.push({
+              vendorId,
+              productId: r.productId,
+              priceListId: id,
+              field: 'discountPercent',
+              oldValue: Number(r.discountPercent),
+              newValue: null,
+              source: 'pricelist',
+              changedBy: ctx.userId,
+            });
+          }
+        }
+
         await tx.priceListItem.deleteMany({
           where: { priceListId: id, productId: { notIn: keepIds.length > 0 ? keepIds : ['00000000-0000-0000-0000-000000000000'] } },
         });
 
         const toDate = (v: string | null | undefined) => (v ? new Date(v) : null);
         for (const item of resolvedItems) {
+          const prev = existingByProduct.get(item.productId!);
+          const oldCustom = prev?.customPrice != null ? Number(prev.customPrice) : null;
+          const newCustom = item.customPrice ?? null;
+          const oldDiscount = prev?.discountPercent != null ? Number(prev.discountPercent) : null;
+          const newDiscount = item.discountPercent ?? null;
+
+          if (oldCustom !== newCustom) {
+            priceHistoryEntries.push({
+              vendorId,
+              productId: item.productId!,
+              priceListId: id,
+              field: 'customPrice',
+              oldValue: oldCustom,
+              newValue: newCustom,
+              source: 'pricelist',
+              changedBy: ctx.userId,
+            });
+          }
+          if (oldDiscount !== newDiscount) {
+            priceHistoryEntries.push({
+              vendorId,
+              productId: item.productId!,
+              priceListId: id,
+              field: 'discountPercent',
+              oldValue: oldDiscount,
+              newValue: newDiscount,
+              source: 'pricelist',
+              changedBy: ctx.userId,
+            });
+          }
+
           await tx.priceListItem.upsert({
             where: { priceListId_productId: { priceListId: id, productId: item.productId! } },
             create: {
@@ -250,6 +322,10 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
               ...(item.scheduledTo !== undefined && { scheduledTo: toDate(item.scheduledTo) }),
             },
           });
+        }
+
+        if (priceHistoryEntries.length > 0) {
+          await logPriceHistory(priceHistoryEntries, tx);
         }
       }
 
