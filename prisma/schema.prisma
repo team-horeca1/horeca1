@@ -118,6 +118,7 @@ model User {
   cashbackEntries        CashbackEntry[]
 
   productAuditLogs       ProductAuditLog[] @relation("ProductAuditActor")
+  priceHistoryChanges    PriceHistory[]    @relation("PriceHistoryActor")
   masterProductRevisions MasterProductRevision[] @relation("MasterRevisionActor")
   stockTransfersCreated  StockTransfer[]         @relation("StockTransferCreator")
 
@@ -235,6 +236,7 @@ model Vendor {
   vendorWallet       VendorWallet?
   vendorCustomers    VendorCustomer[]    @relation("VendorCustomerMapping")
   priceLists         PriceList[]
+  priceHistory       PriceHistory[]
   settlements        VendorSettlement[]
   promotions         Promotion[]
   customerTasks      VendorCustomerTask[]
@@ -491,6 +493,7 @@ model Product {
   customerPrices      VendorCustomerPrice[]
   comboItems          ComboItem[]
   auditLogs           ProductAuditLog[]
+  priceHistory        PriceHistory[]
 
   @@unique([vendorId, slug])
   @@index([vendorId])
@@ -539,6 +542,32 @@ model ProductAuditLog {
 
   @@index([productId, changedAt(sort: Desc)])
   @@map("product_audit_logs")
+}
+
+// Dedicated price change history (Section 4 Rule 7 / flows 22–23).
+// Covers default store prices and customer pricelist special prices.
+model PriceHistory {
+  id          String   @id @default(uuid()) @db.Uuid
+  vendorId    String   @map("vendor_id") @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  priceListId String?  @map("price_list_id") @db.Uuid
+  field       String   @db.VarChar(64)
+  oldValue    String?  @map("old_value") @db.Text
+  newValue    String?  @map("new_value") @db.Text
+  source      String   @db.VarChar(32)
+  reason      String?  @db.VarChar(200)
+  changedBy  String?  @map("changed_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  vendor    Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priceList PriceList? @relation(fields: [priceListId], references: [id], onDelete: SetNull)
+  actor     User?      @relation("PriceHistoryActor", fields: [changedBy], references: [id], onDelete: SetNull)
+
+  @@index([productId, createdAt(sort: Desc)])
+  @@index([vendorId, createdAt(sort: Desc)])
+  @@index([priceListId, createdAt(sort: Desc)])
+  @@map("price_history")
 }
 
 // Snapshot of master catalog before admin edit — supports 7-day rollback.
@@ -2130,6 +2159,7 @@ model PriceList {
   items       PriceListItem[]
   customers   VendorCustomer[]
   assignments PriceListAssignment[]
+  priceHistory PriceHistory[]
 
   @@unique([vendorId, name])
   @@index([vendorId])
