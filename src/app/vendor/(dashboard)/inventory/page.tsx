@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import {
     Loader2, Package, AlertTriangle, Search, Upload, Download,
-    ChevronDown, ChevronUp, X, FileText, Check,
+    ChevronDown, ChevronUp, X, FileText, Check, History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -31,6 +31,9 @@ interface InventoryItem {
         imageUrl: string | null;
         isActive: boolean;
         basePrice: number;
+        brand?: string | null;
+        tags?: string[];
+        category?: { id: string; name: string } | null;
     };
     outlet?: { id: string; name: string } | null;
 }
@@ -125,6 +128,7 @@ function BulkUploadModal({
 }) {
     const [rows, setRows] = useState<ImportRow[]>([]);
     const [uploading, setUploading] = useState(false);
+    const [serverErrors, setServerErrors] = useState<Array<{ sku: string; error: string }>>([]);
     const fileRef = useRef<HTMLInputElement>(null);
 
     const downloadExport = () => {
@@ -135,6 +139,14 @@ function BulkUploadModal({
 
     const downloadTemplate = () => {
         window.open('/api/v1/vendor/inventory/import?template=true', '_blank');
+    };
+
+    const downloadErrorReport = async (errors: Array<{ sku: string; error: string }>) => {
+        const XLSX = await import('xlsx');
+        const ws = XLSX.utils.json_to_sheet(errors.map((e) => ({ SKU: e.sku, Error: e.error })));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Import Errors');
+        XLSX.writeFile(wb, 'inventory_import_errors.xlsx');
     };
 
     const handleFile = async (file: File) => {
@@ -175,12 +187,14 @@ function BulkUploadModal({
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.error?.message || 'Upload failed');
-            const errCount = json.errors?.length ?? 0;
+            const errList = (json.errors ?? []) as Array<{ sku: string; error: string }>;
+            setServerErrors(errList);
+            const errCount = errList.length;
             if (json.updated === 0) {
-                throw new Error(errCount > 0 ? json.errors[0]?.error : 'No products were updated');
+                throw new Error(errCount > 0 ? errList[0]?.error : 'No products were updated');
             }
             toast.success(`Updated ${json.updated} product${json.updated !== 1 ? 's' : ''}${errCount ? ` (${errCount} skipped)` : ''}`);
-            onSuccess();
+            if (errCount === 0) onSuccess();
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Upload failed');
         } finally {
@@ -223,6 +237,22 @@ function BulkUploadModal({
                             <FileText size={13} />
                             Download template
                         </button>
+                        {(serverErrors.length > 0 || errorCount > 0) && (
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    void downloadErrorReport(
+                                        serverErrors.length > 0
+                                            ? serverErrors
+                                            : rows.filter((r) => r.error).map((r) => ({ sku: r.sku, error: r.error! })),
+                                    )
+                                }
+                                className="h-[36px] px-3 rounded-[8px] border border-[#E74C3C]/40 text-[12px] font-bold text-[#E74C3C] hover:bg-red-50 flex items-center gap-1.5"
+                            >
+                                <Download size={13} />
+                                Download error report
+                            </button>
+                        )}
                     </div>
 
                     <div
@@ -295,6 +325,89 @@ function BulkUploadModal({
     );
 }
 
+// ─── History panel (Section 3 Expected Outcome: complete inventory history) ───
+
+interface HistoryLog {
+    id: string;
+    field: string;
+    oldValue: number;
+    newValue: number;
+    reason: string | null;
+    createdAt: string;
+}
+
+function InventoryHistoryPanel({
+    inventoryId,
+    productName,
+    onClose,
+}: {
+    inventoryId: string;
+    productName: string;
+    onClose: () => void;
+}) {
+    const [logs, setLogs] = useState<HistoryLog[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        void (async () => {
+            try {
+                const res = await fetch(`/api/v1/vendor/inventory/history?inventoryId=${inventoryId}&limit=50`);
+                const json = await res.json();
+                if (json.success) setLogs(json.data);
+            } catch {
+                toast.error('Failed to load history');
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, [inventoryId]);
+
+    return (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-[560px] overflow-hidden max-h-[80vh] flex flex-col">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[#F5F5F5]">
+                    <div>
+                        <p className="text-[15px] font-bold text-[#181725]">Inventory history</p>
+                        <p className="text-[12px] text-[#AEAEAE] mt-0.5 truncate max-w-[400px]">{productName}</p>
+                    </div>
+                    <button type="button" onClick={onClose} className="p-1.5 rounded-[8px] hover:bg-[#F5F5F5]">
+                        <X size={16} className="text-[#7C7C7C]" />
+                    </button>
+                </div>
+                <div className="overflow-y-auto flex-1 p-4">
+                    {loading ? (
+                        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#299E60]" size={22} /></div>
+                    ) : logs.length === 0 ? (
+                        <p className="text-[13px] text-[#AEAEAE] text-center py-8">No stock movements recorded yet.</p>
+                    ) : (
+                        <ul className="space-y-2">
+                            {logs.map((log) => (
+                                <li key={log.id} className="rounded-[10px] border border-[#EEEEEE] px-3 py-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[12px] font-bold text-[#181725]">{log.field}</span>
+                                        <span className="text-[11px] text-[#AEAEAE]">
+                                            {new Date(log.createdAt).toLocaleString('en-IN')}
+                                        </span>
+                                    </div>
+                                    <p className="text-[13px] text-[#181725] mt-0.5">
+                                        {log.oldValue} → <span className="font-bold">{log.newValue}</span>
+                                    </p>
+                                    {log.reason && (
+                                        <p className="text-[11px] text-[#7C7C7C] mt-0.5">{log.reason}</p>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* Stock-take / Count UI removed from Section 3 brief scope (not in current brief flows).
+   API POST /api/v1/vendor/inventory/stock-take remains available if needed later. */
+
 // ─── Inline row component ─────────────────────────────────────────────────────
 
 type StockPatch = {
@@ -324,6 +437,8 @@ function InventoryRow({
     const [editingThreshold, setEditingThreshold] = useState(false);
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
+    const [orderingBusy, setOrderingBusy] = useState(false);
     const dirtyRef = useRef(false);
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingPayload = useRef<StockPatch | null>(null);
@@ -494,6 +609,7 @@ function InventoryRow({
                         <p className="text-[13px] font-bold text-[#181725] leading-tight">{item.product.name}</p>
                         <p className="text-[11px] text-[#AEAEAE]">
                             {item.product.sku ? `SKU ${item.product.sku}` : `₹${Number(item.product.basePrice).toLocaleString('en-IN')}`}
+                            {item.product.brand ? ` · ${item.product.brand}` : ''}
                             {item.product.unit ? ` · ${item.product.unit}` : ''}
                         </p>
                     </div>
@@ -605,6 +721,117 @@ function InventoryRow({
                     <span className="inline-flex items-center bg-[#EEF8F1] text-[#299E60] text-[11px] font-[900] px-2.5 py-1 rounded-[6px] uppercase">
                         OK
                     </span>
+                )}
+            </td>
+
+            {/* Actions — Section 3 brief flows only */}
+            <td className="px-3 py-3.5">
+                <div className="flex flex-col gap-1 min-w-[150px]">
+                    <div className="flex flex-wrap items-center gap-1 justify-center">
+                        <button
+                            type="button"
+                            onClick={() => setShowHistory(true)}
+                            className="h-7 px-2 rounded-[6px] border border-[#EEEEEE] text-[11px] font-bold text-[#181725] hover:bg-[#F5F5F5] flex items-center gap-1"
+                            title="View inventory history"
+                        >
+                            <History size={12} /> Log
+                        </button>
+                        <button
+                            type="button"
+                            disabled={saving || qty === 0}
+                            onClick={() => {
+                                setQty(0);
+                                scheduleAutoSave({ qtyAvailable: 0, lowStockThreshold: threshold });
+                                toast.message('Marked out of stock');
+                            }}
+                            className="h-7 px-2 rounded-[6px] border border-[#E74C3C]/30 text-[11px] font-bold text-[#E74C3C] hover:bg-red-50 disabled:opacity-40"
+                            title="Mark product out of stock (qty = 0)"
+                        >
+                            Mark OOS
+                        </button>
+                        <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => {
+                                const next = Math.max(qty, item.qtyReserved) + 20;
+                                setQty(next);
+                                scheduleAutoSave({ qtyAvailable: next, lowStockThreshold: threshold });
+                                toast.success(`Restocked to ${next}`);
+                            }}
+                            className="h-7 px-2 rounded-[6px] border border-[#299E60]/40 text-[11px] font-bold text-[#299E60] hover:bg-[#EEF8F1]"
+                            title="Add stock (restock +20)"
+                        >
+                            Restock
+                        </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1 justify-center">
+                        {item.product.isActive ? (
+                            <button
+                                type="button"
+                                disabled={orderingBusy}
+                                onClick={async () => {
+                                    setOrderingBusy(true);
+                                    try {
+                                        const res = await fetch(`/api/v1/vendor/products/${item.productId}`, {
+                                            method: 'PATCH',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ isActive: false }),
+                                        });
+                                        const json = await res.json();
+                                        if (!json.success) throw new Error(json.error?.message || 'Failed');
+                                        onSaved({
+                                            id: item.id,
+                                            product: { ...item.product, isActive: false },
+                                        } as Partial<InventoryItem> & { id: string });
+                                        toast.success('Ordering disabled');
+                                    } catch (err) {
+                                        toast.error(err instanceof Error ? err.message : 'Failed');
+                                    } finally {
+                                        setOrderingBusy(false);
+                                    }
+                                }}
+                                className="h-7 px-2 rounded-[6px] border border-[#EEEEEE] text-[11px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5]"
+                            >
+                                Disable ordering
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                disabled={orderingBusy}
+                                onClick={async () => {
+                                    setOrderingBusy(true);
+                                    try {
+                                        const res = await fetch(`/api/v1/vendor/products/${item.productId}`, {
+                                            method: 'PATCH',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ isActive: true }),
+                                        });
+                                        const json = await res.json();
+                                        if (!json.success) throw new Error(json.error?.message || 'Failed');
+                                        onSaved({
+                                            id: item.id,
+                                            product: { ...item.product, isActive: true },
+                                        } as Partial<InventoryItem> & { id: string });
+                                        toast.success('Ordering enabled');
+                                    } catch (err) {
+                                        toast.error(err instanceof Error ? err.message : 'Failed');
+                                    } finally {
+                                        setOrderingBusy(false);
+                                    }
+                                }}
+                                className="h-7 px-2 rounded-[6px] border border-[#299E60]/40 text-[11px] font-bold text-[#299E60] hover:bg-[#EEF8F1]"
+                            >
+                                Enable ordering
+                            </button>
+                        )}
+                    </div>
+                </div>
+                {showHistory && (
+                    <InventoryHistoryPanel
+                        inventoryId={item.id}
+                        productName={item.product.name}
+                        onClose={() => setShowHistory(false)}
+                    />
                 )}
             </td>
         </tr>
@@ -720,6 +947,9 @@ export default function VendorInventoryPage() {
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [brandFilter, setBrandFilter] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('');
+    const [tagFilter, setTagFilter] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
     const [showCsvModal, setShowCsvModal] = useState(false);
     const [alertCollapsed, setAlertCollapsed] = useState(false);
@@ -760,22 +990,50 @@ export default function VendorInventoryPage() {
     }, [fetchInventory, switching]);
 
     const handleRowSaved = useCallback((updated: Partial<InventoryItem> & { id: string }) => {
-        setItems(prev => prev.map(i => i.id === updated.id ? { ...i, ...updated } : i));
+        setItems(prev => prev.map(i => {
+            if (i.id !== updated.id) return i;
+            const next = { ...i, ...updated };
+            if (updated.product) {
+                next.product = { ...i.product, ...updated.product };
+            }
+            return next;
+        }));
     }, []);
 
     // Derived counts
     const lowStockItems = items.filter(i => i.isLowStock && i.qtyAvailable - i.qtyReserved > 0);
     const outOfStockItems = items.filter(i => i.qtyAvailable - i.qtyReserved <= 0);
 
+    const brandOptions = Array.from(
+        new Set(items.map((i) => i.product.brand?.trim()).filter((b): b is string => Boolean(b))),
+    ).sort((a, b) => a.localeCompare(b));
+    const categoryOptions = Array.from(
+        new Map(
+            items
+                .filter((i) => i.product.category?.id && i.product.category?.name)
+                .map((i) => [i.product.category!.id, i.product.category!.name]),
+        ).entries(),
+    ).sort((a, b) => a[1].localeCompare(b[1]));
+    const tagOptions = Array.from(
+        new Set(items.flatMap((i) => i.product.tags ?? []).filter(Boolean)),
+    ).sort((a, b) => a.localeCompare(b));
+
     const filtered = items.filter(item => {
-        const matchSearch = item.product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (item.product.sku ?? '').toLowerCase().includes(searchQuery.toLowerCase());
+        const q = searchQuery.toLowerCase();
+        const matchSearch =
+            !q ||
+            item.product.name.toLowerCase().includes(q) ||
+            (item.product.sku ?? '').toLowerCase().includes(q) ||
+            (item.product.brand ?? '').toLowerCase().includes(q) ||
+            (item.product.category?.name ?? '').toLowerCase().includes(q);
         if (!matchSearch) return false;
+        if (brandFilter && (item.product.brand ?? '') !== brandFilter) return false;
+        if (categoryFilter && item.product.category?.id !== categoryFilter) return false;
+        if (tagFilter && !(item.product.tags ?? []).includes(tagFilter)) return false;
         if (activeFilter === 'low_stock') return item.isLowStock && item.qtyAvailable - item.qtyReserved > 0;
         if (activeFilter === 'out_of_stock') return item.qtyAvailable - item.qtyReserved <= 0;
         return true;
     });
-
     const FILTER_TABS: { key: FilterTab; label: string; count: number }[] = [
         { key: 'all', label: 'All', count: items.length },
         { key: 'low_stock', label: 'Low Stock', count: lowStockItems.length },
@@ -797,12 +1055,45 @@ export default function VendorInventoryPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEAEAE]" size={14} />
                         <input
                             type="text"
-                            placeholder="Search products..."
+                            placeholder="Search SKU / name / brand..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="h-[38px] w-[min(200px,100%)] max-w-full bg-white border border-[#EEEEEE] rounded-[10px] pl-9 pr-3 text-[12px] outline-none placeholder:text-[#AEAEAE] focus:border-[#299E60]/40 shadow-sm"
                         />
                     </div>
+                    <select
+                        aria-label="Filter by brand"
+                        value={brandFilter}
+                        onChange={(e) => setBrandFilter(e.target.value)}
+                        className="h-[38px] max-w-[140px] bg-white border border-[#EEEEEE] rounded-[10px] px-2 text-[12px] outline-none focus:border-[#299E60]/40 shadow-sm"
+                    >
+                        <option value="">All brands</option>
+                        {brandOptions.map((b) => (
+                            <option key={b} value={b}>{b}</option>
+                        ))}
+                    </select>
+                    <select
+                        aria-label="Filter by category"
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        className="h-[38px] max-w-[160px] bg-white border border-[#EEEEEE] rounded-[10px] px-2 text-[12px] outline-none focus:border-[#299E60]/40 shadow-sm"
+                    >
+                        <option value="">All categories</option>
+                        {categoryOptions.map(([id, name]) => (
+                            <option key={id} value={id}>{name}</option>
+                        ))}
+                    </select>
+                    <select
+                        aria-label="Filter by tag"
+                        value={tagFilter}
+                        onChange={(e) => setTagFilter(e.target.value)}
+                        className="h-[38px] max-w-[140px] bg-white border border-[#EEEEEE] rounded-[10px] px-2 text-[12px] outline-none focus:border-[#299E60]/40 shadow-sm"
+                    >
+                        <option value="">All tags</option>
+                        {tagOptions.map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                        ))}
+                    </select>
                     <button
                         type="button"
                         onClick={() => {
@@ -936,6 +1227,7 @@ export default function VendorInventoryPage() {
                                     <th className="px-5 py-3 text-center text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">Net</th>
                                     <th className="px-5 py-3 text-center text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">Threshold</th>
                                     <th className="px-5 py-3 text-center text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">Status</th>
+                                    <th className="px-3 py-3 text-center text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[#F5F5F5]">
