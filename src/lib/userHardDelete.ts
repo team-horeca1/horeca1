@@ -200,6 +200,7 @@ export async function hardDeleteUserInTransaction(
   await tx.account.deleteMany({ where: { userId } });
 
   await tx.productAuditLog.deleteMany({ where: { changedBy: userId } }).catch(() => {});
+  await tx.priceHistory.updateMany({ where: { changedBy: userId }, data: { changedBy: null } }).catch(() => {});
   await tx.masterProductRevision.deleteMany({ where: { createdBy: userId } }).catch(() => {});
 
   await tx.brand.deleteMany({ where: { userId } }).catch(() => {});
