@@ -275,7 +275,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         compact ? "text-[10px] py-2 px-1.5" : "text-[11px] py-2.5 px-2"
                     )}
                 >
-                    {compact ? 'Find vendor' : <>Find at another vendor <Navigation size={12} strokeWidth={2.5} className="shrink-0" /></>}
+                    {compact ? 'Find store' : <>Find at another store <Navigation size={12} strokeWidth={2.5} className="shrink-0" /></>}
                 </button>
             );
         }
@@ -356,7 +356,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
     //    Compact "+" when nothing in cart; small stepper pill when qty > 0.
     //    Used by the grid variant to keep cards short — no giant bottom button. ──
     const renderFloatingCTA = () => {
-        if (isOutOfStock) return null; // OOS uses the bottom "Find vendor" CTA instead
+        if (isOutOfStock) return null; // OOS uses the bottom "Find store" CTA instead
         if (currentQty === 0) {
             return (
                 <button
@@ -591,7 +591,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     Unavailable
                                 </span>
                                 <p className="text-[12px] font-bold text-gray-400 leading-normal">
-                                    This item is currently out of stock. You can request alternatives from other vendors.
+                                    This item is currently out of stock. You can request alternatives from other stores.
                                 </p>
                             </div>
                         ) : bulkTiers.length > 0 ? (
@@ -1039,14 +1039,14 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="flex items-center justify-between mb-5">
-                        <h3 className="text-[18px] font-black text-[#181725]">Alternate Vendors</h3>
+                        <h3 className="text-[18px] font-black text-[#181725]">Alternate Stores</h3>
                         <button onClick={() => setShowAlternates(false)}
                             className="p-2 rounded-xl bg-gray-50 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
                             <X size={18} strokeWidth={2.5} />
                         </button>
                     </div>
                     <p className="text-[13px] font-bold text-gray-500 mb-4">
-                        &ldquo;{product.name}&rdquo; is available from these vendors:
+                        &ldquo;{product.name}&rdquo; is available from these stores:
                     </p>
                     {alternatesLoading ? (
                         <div className="flex items-center justify-center py-10">
@@ -1054,7 +1054,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         </div>
                     ) : alternateVendors.length === 0 ? (
                         <div className="text-center py-8 text-gray-400 font-bold text-[14px]">
-                            No alternate vendors found at this time.
+                            No alternate stores found at this time.
                         </div>
                     ) : (
                         <div className="flex flex-col gap-3">

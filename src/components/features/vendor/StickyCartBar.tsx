@@ -57,7 +57,7 @@ export function StickyCartBar() {
                     <div className="flex-1 min-w-0 leading-tight">
                         <p className="text-white text-[13px] font-bold truncate">
                             {totalItems} item{totalItems > 1 ? 's' : ''}
-                            {vendorCount > 1 ? ` · ${vendorCount} vendors` : ''}
+                            {vendorCount > 1 ? ` · ${vendorCount} stores` : ''}
                         </p>
                         <p className="text-green-100 text-[11px] font-semibold">
                             ₹{totalAmount.toLocaleString('en-IN')}

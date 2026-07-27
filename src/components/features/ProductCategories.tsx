@@ -89,7 +89,7 @@ const ProductCard = ({ product }: { product: Product }) => (
         <div className="flex items-center gap-1.5 mb-2">
             <img src="/images/shop.svg" alt="shop" className="w-[11px] h-[13px]" />
             <span className="text-[10px] md:text-[12px] text-gray-400">
-                Sold by: {product.soldBy} venders
+                Sold by: {product.soldBy} stores
             </span>
         </div>
 

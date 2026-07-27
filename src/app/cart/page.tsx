@@ -723,10 +723,10 @@ export default function CartPage() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-[13px] md:text-[14px] font-black text-[#181725] leading-snug">
-                                        {shipments.length} vendors · Pay separately or together
+                                        {shipments.length} stores · Pay separately or together
                                     </p>
                                     <p className="text-[12px] md:text-[13px] text-[#4C4F4D] font-medium mt-0.5 leading-snug">
-                                        Each vendor&apos;s items become a separate order. Pick which ones to pay for at checkout — skip the rest for later.
+                                        Each store&apos;s items become a separate order. Pick which ones to pay for at checkout — skip the rest for later.
                                     </p>
                                 </div>
                             </div>

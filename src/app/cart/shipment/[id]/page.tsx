@@ -142,7 +142,7 @@ export default function ShipmentDetailPage() {
                             <div className="flex-1 pr-4">
                                 <h3 className="text-[17px] md:text-[20px] font-bold text-[#181725] leading-tight">{shipment.vendor}</h3>
                                 <p className="text-[12px] md:text-[13px] text-[#7C7C7C] font-medium mt-1 leading-tight">
-                                    Items from this vendor will be packed separately
+                                    Items from this store will be packed separately
                                 </p>
                             </div>
                             <button className="flex items-center gap-1.5 border border-[#EEEEEE] px-3 py-1 rounded-full text-[11px] md:text-[12px] font-bold text-[#181725] bg-white whitespace-nowrap shadow-sm active:scale-95 hover:border-primary/30 hover:text-primary transition-all">

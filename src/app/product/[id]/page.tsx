@@ -345,7 +345,7 @@ export default function ProductDetailPage() {
                                     <Image src={item.image || '/placeholder.png'} alt={item.name} fill className="object-contain" sizes="150px" />
                                 </div>
                                 <h3 className="text-[13px] font-bold text-[#181725] leading-tight line-clamp-1 mb-1">{item.name}</h3>
-                                <p className="text-[10px] text-[#7C7C7C] font-medium">Sold by {item.vendorCount || 3} vendors</p>
+                                <p className="text-[10px] text-[#7C7C7C] font-medium">Sold by {item.vendorCount || 3} stores</p>
                             </Link>
                         ))}
                     </div>
@@ -545,7 +545,7 @@ export default function ProductDetailPage() {
                                     </div>
                                     <h3 className="text-[18px] font-black text-[#181725] leading-tight line-clamp-2 mb-4 group-hover:text-[#53B175] transition-colors">{item.name}</h3>
                                     <div className="mt-auto flex items-center justify-between border-t border-gray-50 pt-6">
-                                        <span className="text-[14px] text-[#7C7C7C] font-bold">Sold by {item.vendorCount || 3} vendors</span>
+                                        <span className="text-[14px] text-[#7C7C7C] font-bold">Sold by {item.vendorCount || 3} stores</span>
                                         <div className="w-11 h-11 rounded-2xl bg-[#EAF6EF] flex items-center justify-center text-[#53B175] group-hover:bg-[#53B175] group-hover:text-white transition-all shadow-sm">
                                             <Plus size={22} strokeWidth={3} />
                                         </div>

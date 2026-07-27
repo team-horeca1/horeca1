@@ -400,7 +400,7 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
                                             {totalItemCount} item{totalItemCount !== 1 ? 's' : ''} added
                                         </span>
                                         <span className="text-gray-400 text-[11px]">
-                                            from {vendorCount} vendor{vendorCount !== 1 ? 's' : ''}
+                                            from {vendorCount} store{vendorCount !== 1 ? 's' : ''}
                                         </span>
                                     </div>
                                 )}
