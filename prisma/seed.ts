@@ -348,13 +348,42 @@ async function main() {
       const categoryId = subCat[sub];
       if (!categoryId) throw new Error(`Unknown sub-category "${sub}" for product "${name}"`);
       const sku = `H1-SEED-${String(++skuSeq).padStart(4, '0')}`;
-      const master = await prisma.masterProduct.upsert({ where: { sku }, update: {}, create: { sku, name, uom: unit, categoryId, isActive: true } });
+      const posSku = `POS-${String(skuSeq).padStart(4, '0')}`;
+      const master = await prisma.masterProduct.upsert({
+        where: { sku },
+        update: { brand: v.name },
+        create: { sku, name, brand: v.name, uom: unit, categoryId, isActive: true },
+      });
       const slug = `${v.slug}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`.slice(0, 90);
       const imageUrl = pickImage(sub);
       const product = await prisma.product.upsert({
         where: { vendorId_slug: { vendorId: vendor.id, slug } },
-        update: { imageUrl, masterProductId: master.id, categoryId },
-        create: { vendorId: vendor.id, masterProductId: master.id, categoryId, name, slug, basePrice: price, packSize, unit, imageUrl, creditEligible: v.credit, approvalStatus: 'approved' },
+        update: {
+          imageUrl,
+          masterProductId: master.id,
+          categoryId,
+          sku,
+          vendorSku: posSku,
+          brand: v.name,
+          tags: [sub, v.city],
+        },
+        create: {
+          vendorId: vendor.id,
+          masterProductId: master.id,
+          categoryId,
+          name,
+          slug,
+          sku,
+          vendorSku: posSku,
+          brand: v.name,
+          tags: [sub, v.city],
+          basePrice: price,
+          packSize,
+          unit,
+          imageUrl,
+          creditEligible: v.credit,
+          approvalStatus: 'approved',
+        },
       });
       await prisma.priceSlab.upsert({ where: { productId_minQty: { productId: product.id, minQty: 1 } }, update: {}, create: { productId: product.id, vendorId: vendor.id, minQty: 1, maxQty: 9, price, sortOrder: 0 } });
       await prisma.priceSlab.upsert({ where: { productId_minQty: { productId: product.id, minQty: 10 } }, update: {}, create: { productId: product.id, vendorId: vendor.id, minQty: 10, maxQty: 49, price: Math.round(price * 0.95), sortOrder: 1 } });
