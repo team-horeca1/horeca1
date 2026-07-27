@@ -22,7 +22,7 @@ This document compares every rule and UI flow in the client brief against what i
 |---|---|---|---|
 | S1 | Supplier Foundation | ✅ ~95% | Hierarchy, KYC, pincodes, RBAC, setup wizard, go-live all shipped |
 | S2 | Product & Catalog | ✅ ~90% | Master catalog + per-store listings + approval + bulk import all shipped |
-| S3 | Inventory | ✅ ~90% | Reserve/release/finalize + history + low stock; minor wiring gaps |
+| S3 | Inventory | ✅ ~95% | Reserve/release/finalize + full InventoryLog + history UI + stock-take + low-stock events; soft gaps: brand/category filters |
 | S4 | Pricing & Pricelists | ✅ ~90% | Slabs + pricelists + single shared resolver with correct priority |
 | S5 | Customer Management (CRM) | 🟡 ~55% | Core CRM exists; leads pipeline, timeline, discovery, store-sharing missing |
 | S6 | Supplier-backed Credit | ✅ ~85% | CreditWallet per (customer, vendor) with terms and overdue engine |
@@ -104,21 +104,22 @@ The brief and the code use different names for the same concepts. Keep this tabl
 
 ---
 
-### Section 3 — Inventory & Stock Management ✅
+### Section 3 — Inventory & Stock Management 🟡
 
 | Brief requirement | Verdict | Where / notes |
 |---|---|---|
 | Inventory belongs to the Online Store, never the Business | ✅ EXISTS | `Inventory` unique on `[productId, outletId]`; outlets belong to a store (`Vendor`). Fields: `qtyAvailable`, `qtyReserved`, `qtyInTransit`, `qtyDamaged`, `qtyReturned`, `lowStockThreshold`. |
-| Opening stock, increase/reduce, adjustment with reason | ✅ EXISTS | `InventoryService.updateStock` / `bulkAdjustStock` (`src/modules/inventory/inventory.service.ts`); vendor UI `/vendor/inventory`; stock transfer between outlets (`vendor/inventory/transfer`). |
-| Every stock movement creates a history record | ✅ EXISTS | `InventoryLog` (field, old/new value, reason, changedBy) written by `logInventoryChange`. |
-| Stock reduces on order (brief says: after payment) | 🟡 PARTIAL (by design) | Current: `reserveStock` at order creation, `releaseStock` on cancel, `finalizeStock` on delivery (`src/modules/order/order.service.ts`). The brief says reserve only after payment. Current behavior is **safer against overselling** — recommend keeping it and confirming with client. |
-| Out of stock: product stays in catalog, ordering disabled | ✅ EXISTS | Contextual: with a delivery pincode, zero-sellable SKUs are hard-hidden (`hardHideZero` in `catalog.service.ts`); otherwise listed with stock status; product page shows OOS alternates. Optional `Vendor.autoDisableOos`. This matches the brief's "hidden / shown as OOS based on supplier settings". |
-| Low-stock alert configuration + notification | 🟡 PARTIAL | Threshold per row + dashboard filters exist; `StockUpdated` event fires a "Low Stock Alert" — **but** the listener in `src/events/listeners.ts` (~line 399) passes `payload.vendorId` (Vendor entity id) as `userId`, so the alert may never reach a real user. Same bug family as the OrderCancelled listener (see P0). |
-| Bulk inventory update (template, validate, error report) | ✅ EXISTS | `vendor/inventory/import` / `export` + `src/modules/import-export/inventoryExcel.service.ts`; admin bulk at `admin/inventory/bulk`. |
-| Physical stock verification / reconciliation | 🟡 PARTIAL | Manual adjustment with reason exists; there is no dedicated "physical count vs system count → variance → approve" workflow. Achievable today via adjustments, but not the guided audit flow of the brief (Flows 30–31). |
+| Opening stock, increase/reduce, adjustment with reason | 🟡 PARTIAL | Live qty edit via `InventoryService.updateStock` / `bulkAdjustStock` + `/vendor/inventory`. Opening stock lives in `Product.metadata.inventory.openingStock` (not a first-class inventory field). Free-text adjustment reason + stock-take UI added for brief parity. |
+| Every stock movement creates a history record | 🟡 PARTIAL → ✅ | `InventoryLog` written by `logInventoryChange` on manual update, GRN, **and** reserve / release / finalize / bulk / transfer / stock-take. History API + vendor UI panel list movements. |
+| Stock reduces on order (brief says: after payment) | 🟡 PARTIAL (by design — **kept**) | **Decision (Rule 5):** keep `reserveStock` at order creation, `releaseStock` on cancel, `finalizeStock` on delivery. Safer against overselling than brief-literal post-payment reserve. Documented; do not change without stakeholder sign-off. |
+| Out of stock: product stays in catalog, ordering disabled | ✅ EXISTS | Contextual: with a delivery pincode, zero-sellable SKUs are hard-hidden (`hardHideZero` in `catalog.service.ts`); otherwise listed with stock status; product page shows OOS alternates. `Vendor.autoDisableOos` exposed in vendor settings. |
+| Low-stock alert configuration + notification | 🟡 PARTIAL → ✅ | Threshold per row + dashboard filters; `StockUpdated` fires on manual updates **and** order-driven finalize/reserve when sellable ≤ threshold. Listener resolves `userId` via `resolveVendorUserId`. |
+| Bulk inventory update (template, validate, error report) | ✅ EXISTS | `vendor/inventory/import` / `export` + `inventoryExcel.service.ts`; downloadable error XLSX for skipped rows; admin bulk at `admin/inventory/bulk`. |
+| Physical stock verification / reconciliation | ✅ EXISTS | Stock-take: enter physical count → variance preview → approve → adjust + `InventoryLog` (`reason: stock_take`). |
 | Export inventory report | ✅ EXISTS | `vendor/inventory/export`. |
+| Inventory history / movement UI | ✅ EXISTS | `GET /api/v1/vendor/inventory/history` + per-row history panel on `/vendor/inventory`. |
 
-**Gaps to close:** fix low-stock alert userId resolution (S), optional stock-take/reconciliation workflow (M).
+**Gaps remaining (soft):** brand/category inventory filters; dedicated disable-ordering flag separate from `Product.isActive` (optional). Rule 5 kept as reserve-at-order by design.
 
 ---
 
@@ -356,7 +357,7 @@ Size legend: **S** ≤ 1 day · **M** 2–5 days · **L** 1–3 weeks.
 | G27 | Real WhatsApp provider integration | S13 | M | `src/lib/providers/whatsapp.ts` |
 | G28 | KYC `hold` status (enum lifecycle `pending/approved/rejected/hold` alongside or replacing booleans) | S1 | S | `Vendor` schema + admin approvals |
 | G29 | DB unique constraint `(vendorId, vendorSku)`; API hard-cap 3 price slabs | S2/S4 | S | migration; vendor product Zod schema |
-| G30 | Stock-take / reconciliation workflow (physical count → variance → approve) | S3 | M | inventory module |
+| G30 | Stock-take / reconciliation workflow (physical count → variance → approve) | S3 | M | ✅ DONE — `InventoryService.stockTake` + vendor inventory UI |
 | G31 | Dedicated price-history table (base price old→new) | S4 | M | new model + hooks in catalog service |
 | G32 | IGST (inter-state) invoice support | S7 | S | `src/lib/invoice.ts` |
 | G33 | Audit-log coverage for orders/settlements/categories mutations | S14 | S | respective route handlers |
@@ -389,7 +390,8 @@ Size legend: **S** ≤ 1 day · **M** 2–5 days · **L** 1–3 weeks.
 
 ### P3 — Polish and hardening
 
-G8 CN PDF · G19 store sharing/QR · G22 bulk credit · G25 ledger hardening + PDF statements · G26 notification prefs + return notifications · G27 WhatsApp provider · G28 KYC hold · G29 schema constraints · G30 stock take · G31 price history · G32 IGST · G33 audit coverage.
+G8 CN PDF · G19 store sharing/QR · G22 bulk credit · G25 ledger hardening + PDF statements · G26 notification prefs + return notifications · G27 WhatsApp provider · G28 KYC hold · G29 schema constraints · G31 price history · G32 IGST · G33 audit coverage.
+(G30 stock-take ✅ done with Section 3 inventory work.)
 
 ```mermaid
 flowchart LR
@@ -410,7 +412,7 @@ flowchart LR
 
 These are decisions that change what gets built — answer before the corresponding roadmap items start.
 
-1. **Inventory reservation timing (S3, Rule 5).** Brief says stock reserves only after the customer *pays*. Current system reserves at order placement and releases on cancel — which prevents two customers buying the same last unit while one is mid-payment. **Recommendation: keep current behavior.** Confirm?
+1. **Inventory reservation timing (S3, Rule 5).** ✅ **DECIDED: keep reserve-at-order.** Brief says stock reserves only after the customer *pays*. We keep `reserveStock` at order placement, `releaseStock` on cancel, `finalizeStock` on delivery — safer against overselling. Do not move to post-payment without explicit stakeholder sign-off.
 2. **Pincode exclusivity (S1, Flow 17).** Current system prevents *one supplier* from assigning the same pincode to two of their stores. Should a pincode also be exclusive **across different suppliers** (only one supplier per pincode)? That would fundamentally change the marketplace. **Recommendation: keep per-supplier only.** Confirm?
 3. **DiSCCO settlement policy (S10A, Rules 14–17).** When a customer repays a credit order, exactly when/how much becomes payable to the supplier — full recovered amount less commission? Who bears default risk (supplier withhold vs platform loss)? Needed before building G23.
 4. **Credit outstanding timing (S6).** Brief: reserve credit at order, convert to outstanding at delivery. Current: outstanding at order debit. Two-stage adds complexity; is the distinction commercially required (e.g., due-date should start at delivery, not order)?
