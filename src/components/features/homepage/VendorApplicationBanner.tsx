@@ -102,7 +102,7 @@ export function VendorApplicationBanner() {
             </div>
             <p className="text-[clamp(12px,2vw,14px)] font-medium">
               <span className="font-bold">Congratulations!</span>
-              <span className="hidden sm:inline"> Your vendor profile <span className="font-bold">{appStatus.businessName}</span> has been approved. You now have full access to the vendor dashboard.</span>
+              <span className="hidden sm:inline"> Your supplier profile <span className="font-bold">{appStatus.businessName}</span> has been approved. You now have full access to the supplier dashboard.</span>
               <span className="sm:hidden"> <span className="font-bold">{appStatus.businessName}</span> is approved!</span>
             </p>
           </div>
@@ -145,7 +145,7 @@ export function VendorApplicationBanner() {
           </div>
           <p className="text-[clamp(12px,2vw,14px)] font-medium truncate">
             <span className="font-bold">{appStatus.businessName}</span>
-            <span className="hidden sm:inline"> — Your vendor application is under review. You&apos;ll get dashboard access once approved.</span>
+            <span className="hidden sm:inline"> — Your supplier application is under review. You&apos;ll get dashboard access once approved.</span>
             <span className="sm:hidden"> — Application under review</span>
           </p>
         </div>

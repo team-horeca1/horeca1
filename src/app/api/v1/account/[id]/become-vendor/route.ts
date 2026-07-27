@@ -171,7 +171,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       success: true,
       data: {
         vendor: result,
-        message: 'Vendor application submitted. Admin will review shortly.',
+        message: 'Supplier application submitted. Admin will review shortly.',
       },
     }, { status: 201 });
   } catch (err) {

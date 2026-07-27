@@ -63,10 +63,10 @@ export function VendorTypeMatrix({ value, onChange, error, className }: VendorTy
   };
 
   return (
-    <FormField label="Vendor Type & Sub-types" required className={className} dataField="vendorTypeSelections">
+    <FormField label="Supplier Type & Sub-types" required className={className} dataField="vendorTypeSelections">
       <div className="rounded-xl border border-[#EEEEEE] overflow-hidden">
         <div className="hidden sm:grid sm:grid-cols-[minmax(140px,1fr)_2fr] bg-[#FAFAFA] border-b border-[#EEEEEE] px-3 py-2">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Vendor Type</span>
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Supplier Type</span>
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sub-types (select all that apply)</span>
         </div>
         <div className="divide-y divide-[#EEEEEE]">
@@ -113,7 +113,7 @@ export function VendorTypeMatrix({ value, onChange, error, className }: VendorTy
         </div>
       </div>
       <p className="text-[11px] text-gray-400 mt-1.5">
-        You can select multiple vendor types and multiple sub-types per type.
+        You can select multiple supplier types and multiple sub-types per type.
       </p>
       {error && <p className="text-[11px] text-red-600 font-medium mt-1">{error}</p>}
     </FormField>

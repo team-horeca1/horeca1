@@ -171,7 +171,7 @@ export function MyBusinessAccountsOverlay({ isOpen, onClose, onAccountDeleted }:
                           )}
                           {acc.isVendor && (
                             <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                              <Store size={10} /> Vendor
+                              <Store size={10} /> Supplier
                             </span>
                           )}
                           {acc.isBrand && (
@@ -207,7 +207,7 @@ export function MyBusinessAccountsOverlay({ isOpen, onClose, onAccountDeleted }:
                           <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
                           <div className="text-[12px] text-[#181725] leading-relaxed">
                             Deletes <strong>{acc.legalName}</strong> and everything attached: outlets, members,
-                            roles, vendor/brand profile, products, inventory. Cannot be undone.
+                            roles, supplier/brand profile, products, inventory. Cannot be undone.
                           </div>
                         </div>
                         <div>

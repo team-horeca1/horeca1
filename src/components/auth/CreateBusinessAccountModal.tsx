@@ -325,7 +325,7 @@ export function CreateBusinessAccountModal({
                       : 'border-[#EEEEEE] bg-white hover:border-gray-300 text-gray-500'
                   }`}
                 >
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                  {t === 'vendor' ? 'Supplier' : t.charAt(0).toUpperCase() + t.slice(1)}
                 </button>
               ))}
             </div>
@@ -338,9 +338,9 @@ export function CreateBusinessAccountModal({
                   <ShieldCheck size={18} className="text-[#53B175]" />
                 </div>
                 <div>
-                  <p className="font-bold text-[13.5px] text-[#181725] mb-1">Vendor onboarding needs full KYC</p>
+                  <p className="font-bold text-[13.5px] text-[#181725] mb-1">Supplier onboarding needs full KYC</p>
                   <p className="text-[11.5px] text-gray-600 leading-relaxed">
-                    A vendor profile needs GST, PAN, bank details, billing &amp; pickup
+                    A supplier profile needs GST, PAN, bank details, billing &amp; pickup
                     addresses, serviceable pincodes and delivery capability — collected in
                     a 7-step wizard.
                   </p>
@@ -351,7 +351,7 @@ export function CreateBusinessAccountModal({
                 onClick={() => { onClose(); router.push('/vendor/register'); }}
                 className="w-full bg-[#53B175] hover:bg-[#48a068] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md shadow-green-100 transition-colors"
               >
-                Continue to vendor onboarding <ArrowRight size={16} />
+                Continue to supplier onboarding <ArrowRight size={16} />
               </button>
             </div>
           )}

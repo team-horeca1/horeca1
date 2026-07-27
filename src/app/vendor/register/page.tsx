@@ -965,8 +965,8 @@ export default function VendorRegisterPage() {
           <h1 className="text-[24px] font-[800] text-gray-800 mb-3">Application Submitted</h1>
           <p className="text-[14px] text-gray-500 mb-6 leading-relaxed">
             {isAuthMode
-              ? 'Your new vendor business is created and under review. Switching you to the new account now…'
-              : 'Thank you for applying! Your vendor account is under review. Log in below to track your application status — our team will verify your KYC documents and contact you shortly.'}
+              ? 'Your new supplier business is created and under review. Switching you to the new account now…'
+              : 'Thank you for applying! Your supplier account is under review. Log in below to track your application status — our team will verify your KYC documents and contact you shortly.'}
           </p>
           {submitted.hcid && !isAuthMode && (
             <div className="bg-gray-50 rounded-lg px-4 py-3 mb-6">

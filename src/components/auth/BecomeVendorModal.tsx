@@ -104,7 +104,7 @@ export function BecomeVendorModal({
       // Toast BEFORE navigation so the user sees confirmation, then we do a full
       // page navigation (not router.push) so the browser actually re-reads the
       // freshly-rotated session cookie and the vendor portal gates re-evaluate.
-      toast.success('Vendor application submitted — admin will review shortly.');
+      toast.success('Supplier application submitted — admin will review shortly.');
       onSubmitted?.();
       onClose();
       // Stay on the marketplace until a store is approved — homepage banner
@@ -126,7 +126,7 @@ export function BecomeVendorModal({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-[17px] font-[800] text-[#181725] flex items-center gap-1.5 leading-snug">
-              Become a vendor
+              Become a supplier
               <Sparkles size={14} className="text-amber-500" />
             </h3>
             <p className="text-[12px] text-gray-400 mt-0.5 leading-normal">
@@ -203,7 +203,7 @@ export function BecomeVendorModal({
             <ol className="text-[11.5px] text-emerald-900/80 space-y-1.5 list-decimal list-inside">
               <li>You stay logged in to the same account.</li>
               <li>Admin reviews your application (usually within 24 hours).</li>
-              <li>Once approved, the <strong className="text-emerald-950">Vendor</strong> portal becomes available in the navbar.</li>
+              <li>Once approved, the <strong className="text-emerald-950">Supplier</strong> portal becomes available in the navbar.</li>
               <li>You can keep buying as a customer the whole time.</li>
             </ol>
           </div>

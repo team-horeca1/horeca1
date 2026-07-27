@@ -70,14 +70,14 @@ export function AccountTypeSelection({ isOpen, onClose, onContinue }: AccountTyp
                         <div className="flex items-center justify-center shrink-0">
                             <img
                                 src="/images/login/vendor.png"
-                                alt="Vendor Icon"
+                                alt="Supplier Icon"
                                 className={cn(
                                     "w-10 h-10 object-contain transition-all",
                                     selectedType === 'vendor' ? "brightness-0 invert" : "opacity-70"
                                 )}
                             />
                         </div>
-                        <span className="text-[18px] font-bold">Vendor</span>
+                        <span className="text-[18px] font-bold">Supplier</span>
                     </button>
                 </div>
             </div>

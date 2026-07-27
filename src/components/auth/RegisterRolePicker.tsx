@@ -25,7 +25,7 @@ const ROLES = [
     href: (redirect: string | null) =>
       redirect ? `/vendor/register?redirect=${encodeURIComponent(redirect)}` : '/vendor/register',
     icon: Store,
-    title: 'Onboard as Vendor',
+    title: 'Onboard as Supplier',
     subtitle: 'Sell on Horeca1 — full KYC, about 5 minutes',
   },
   {

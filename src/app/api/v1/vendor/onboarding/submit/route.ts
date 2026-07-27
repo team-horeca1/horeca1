@@ -402,7 +402,7 @@ async function postHandler(req: NextRequest) {
         data: {
           vendorId: result.vendor.id,
           hcidDisplay: result.user.hcidDisplay,
-          message: 'Vendor application submitted. Our team will review and contact you shortly.',
+          message: 'Supplier application submitted. Our team will review and contact you shortly.',
         },
       },
       { status: 201 },

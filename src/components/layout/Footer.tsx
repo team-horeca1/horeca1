@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 
 const FOOTER_LINKS = {
     information: [
-        'Become a Vendor',
+        'Become a Supplier',
         'Affiliate Program',
         'Privacy Policy',
         'Our Suppliers',

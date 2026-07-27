@@ -35,8 +35,8 @@ function intentCopy(
   if (intent === 'vendor') {
     return {
       title: `This ${contactWord} is already registered`,
-      body: `This ${contactWord} is already linked to an existing account as a ${accountLabel}. Log in to register a new vendor business under your HCID.`,
-      cta: 'Log in & continue vendor setup',
+      body: `This ${contactWord} is already linked to an existing account as a ${accountLabel}. Log in to register a new supplier business under your HCID.`,
+      cta: 'Log in & continue supplier setup',
       contactLabel,
       useDifferent,
     };

@@ -210,7 +210,7 @@ export function AccountOverviewOverlay({
                     label="Account type"
                     value={[
                       account.isCustomer && 'Customer',
-                      account.isVendor && 'Vendor',
+                      account.isVendor && 'Supplier',
                       account.isBrand && 'Brand',
                     ]
                       .filter(Boolean)
@@ -231,7 +231,7 @@ export function AccountOverviewOverlay({
                 </div>
                 <p className="text-[12px] text-red-600/90 mb-4 leading-relaxed">
                   Permanently deletes this business account and everything attached to it — outlets,
-                  members, custom roles, vendor/brand profile, products, inventory. This cannot be undone.
+                  members, custom roles, supplier/brand profile, products, inventory. This cannot be undone.
                 </p>
 
                 {isActive && (

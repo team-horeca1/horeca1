@@ -936,10 +936,10 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-[14px] font-bold text-emerald-900 leading-tight">
-                                                    Want to sell on Horeca1? Become a vendor.
+                                                    Want to sell on Horeca1? Become a supplier.
                                                 </p>
                                                 <p className="text-[12px] text-emerald-800/70 mt-0.5">
-                                                    Keep your account — just unlock the vendor portal. Admin reviews in ~24h.
+                                                    Keep your account — just unlock the supplier portal. Admin reviews in ~24h.
                                                 </p>
                                             </div>
                                             <span className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-[12px] font-bold group-hover:bg-emerald-700 shrink-0">

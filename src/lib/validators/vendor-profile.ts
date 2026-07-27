@@ -231,12 +231,12 @@ function validateVendorTypeSelections(data: VendorProfileInput): Record<string, 
   const errors: Record<string, string> = {};
   const selections = getEffectiveVendorTypeSelections(data);
   if (selections.length === 0) {
-    errors.vendorTypeSelections = 'Select at least one vendor type and sub-type';
+    errors.vendorTypeSelections = 'Select at least one supplier type and sub-type';
     return errors;
   }
   for (const row of selections) {
     if (!(VENDOR_BUSINESS_TYPES as readonly string[]).includes(row.type)) {
-      errors.vendorTypeSelections = 'Select a valid vendor type';
+      errors.vendorTypeSelections = 'Select a valid supplier type';
       break;
     }
     const allowed = subTypesForVendorType(row.type);
