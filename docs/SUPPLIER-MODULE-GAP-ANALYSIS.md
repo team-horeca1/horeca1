@@ -123,19 +123,23 @@ The brief and the code use different names for the same concepts. Keep this tabl
 
 ---
 
-### Section 4 — Pricing, Bulk Pricing & Pricelists ✅
+### Section 4 — Pricing, Bulk Pricing & Pricelists 🟡 (~90% core; history/template gaps)
+
+Full scorecard: [`docs/SECTION4-PRICING-GAP-ANALYSIS.md`](SECTION4-PRICING-GAP-ANALYSIS.md) · Manual guide: [`docs/SECTION4-PRICING-TEST-GUIDE.md`](SECTION4-PRICING-TEST-GUIDE.md) · E2E: `e2e/vendor-pricing-section4.spec.ts`
 
 | Brief requirement | Verdict | Where / notes |
 |---|---|---|
-| Default selling price per Online Store product | ✅ EXISTS | `Product.basePrice`; product without price cannot be sold. |
-| Bulk pricing slabs (3 tiers, qty ranges) | ✅ EXISTS | `PriceSlab` (`minQty`, `maxQty?`, `price`, `promoPrice?`, unique `[productId, minQty]`). UI caps at 3 tiers; **API Zod schema does not enforce `.max(3)`** — soft gap. |
-| Customer-specific pricelists override default | ✅ EXISTS | `PriceList` / `PriceListItem` / `PriceListAssignment` (customer, outlet, pincode, area, segment, brand, group) + per-product `VendorCustomerPrice`; vendor UI `/vendor/price-lists`. |
-| Single price-resolution helper reused everywhere | ✅ EXISTS | `resolveUnitPrice` / `resolveCatalogPrices` in `src/modules/pricing/pricing.service.ts`, used by cart, order, catalog listing/detail/search/deals. Priority: outlet → customer → segment → pincode → area → brand → legacy pricelist → `VendorCustomerPrice` → `PriceSlab` → `basePrice`. This matches (and exceeds) the brief's required hierarchy: customer price > bulk price > default. |
-| Bulk price update via Excel | ✅ EXISTS | `vendor/products/bulk-price` (% / fixed adjust) + import flow. |
-| Price history | 🟡 PARTIAL | Field-level edits captured in `ProductAuditLog` (`GET /api/v1/vendor/products/:id/audit`) and `PriceListItem.history` JSON. **No dedicated base-price history table** with old→new price rows as the brief envisions. |
-| Price calculation flows (product page, cart, checkout) | ✅ EXISTS | Shared resolver + `attachCustomerPricing` bridge (`src/modules/pricing/catalog-pricing.ts`). |
+| Default selling price per Online Store product | ✅ EXISTS | `Product.basePrice`; product form Pricing & GST; publish requires price &gt; 0. |
+| Bulk pricing slabs (3 tiers, qty ranges) | ✅ EXISTS | `PriceSlab`. UI + **API Zod `.max(3)`**. |
+| Customer-specific pricelists override default | ✅ EXISTS (brief said “later”) | `PriceList` / items / assignments + `VendorCustomerPrice`; UI `/vendor/price-lists`. |
+| Single price-resolution helper reused everywhere | ✅ EXISTS | `resolveUnitPrice` + `attachCustomerPricing`. Priority: customer → slab → base. |
+| Bulk price update via Excel | ✅ EXISTS | **Replace Prices** + `GET/POST /api/v1/vendor/products/price-update` (price-only). |
+| Price history | ✅ Done | Dedicated `PriceHistory` table; dual-write on product + pricelist edits; product + customer history UIs |
+| Pricing search / brand-category-pricelist filters | 🟡 | Brand + Category filters on Products; pricelist filter still open. |
+| Price calculation (PDP, cart, checkout) | ✅ EXISTS | Shared resolver. |
+| Playwright coverage | ✅ | `e2e/vendor-pricing-section4.spec.ts`. |
 
-**Gaps to close:** hard-cap slabs at 3 in the API schema (S), optional dedicated price-history table (M).
+**Still open:** pricelist filter on Products.
 
 ---
 
@@ -358,7 +362,7 @@ Size legend: **S** ≤ 1 day · **M** 2–5 days · **L** 1–3 weeks.
 | G28 | KYC `hold` status (enum lifecycle `pending/approved/rejected/hold` alongside or replacing booleans) | S1 | S | `Vendor` schema + admin approvals |
 | G29 | DB unique constraint `(vendorId, vendorSku)`; API hard-cap 3 price slabs | S2/S4 | S | migration; vendor product Zod schema |
 | G30 | Stock-take / reconciliation workflow (physical count → variance → approve) | S3 | M | ✅ DONE — `InventoryService.stockTake` + vendor inventory UI |
-| G31 | Dedicated price-history table (base price old→new) | S4 | M | new model + hooks in catalog service |
+| G31 | Dedicated price-history table (base price old→new) | S4 | M | **Done** — `PriceHistory` + dual-write |
 | G32 | IGST (inter-state) invoice support | S7 | S | `src/lib/invoice.ts` |
 | G33 | Audit-log coverage for orders/settlements/categories mutations | S14 | S | respective route handlers |
 
