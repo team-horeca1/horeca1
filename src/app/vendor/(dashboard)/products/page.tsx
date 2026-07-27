@@ -13,6 +13,7 @@ import { parseVendorSku, resolveVendorCode } from '@/lib/sku';
 import { toast } from 'sonner';
 import { ProductEssentialsFields } from '@/components/features/shared/productForm/ProductEssentialsFields';
 import VendorProductImportModal from '@/components/features/vendor/VendorProductImportModal';
+import VendorPriceReplaceModal from '@/components/features/vendor/VendorPriceReplaceModal';
 import VendorBulkEngine from '@/components/features/vendor/VendorBulkEngine';
 import VendorBulkGrid from '@/components/features/vendor/VendorBulkGrid';
 import FormSection, {
@@ -508,6 +509,9 @@ export default function VendorProductsPage() {
 
     // Bulk import
     const [showBulkImport, setShowBulkImport] = useState(false);
+    const [showPriceReplace, setShowPriceReplace] = useState(false);
+    const [brandFilter, setBrandFilter] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('');
     const [importRows, setImportRows] = useState<Array<{ name: string; sku: string; basePrice: number; packSize?: string; unit?: string; error?: string }>>([]);
     const [importSaving, setImportSaving] = useState(false);
     const importFileRef = useRef<HTMLInputElement>(null);
@@ -526,6 +530,8 @@ export default function VendorProductsPage() {
         newValue: string | null;
         changedAt: string;
         source: string;
+        priceListName?: string | null;
+        actorName?: string | null;
     }>>([]);
     const [lastSavedSnapshot, setLastSavedSnapshot] = useState('');
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -620,10 +626,27 @@ export default function VendorProductsPage() {
     }, [fetchProducts]);
 
     // Reset to page 1 when search or filter changes
-    useEffect(() => { setCurrentPage(1); }, [searchQuery, statusFilter, approvalFilter]);
+    useEffect(() => { setCurrentPage(1); }, [searchQuery, statusFilter, approvalFilter, brandFilter, categoryFilter]);
+
+    const brandFilterOptions = Array.from(
+        new Set(products.map((p) => p.brand?.trim()).filter((b): b is string => Boolean(b))),
+    ).sort((a, b) => a.localeCompare(b));
+    const categoryFilterOptions = Array.from(
+        new Map(
+            products
+                .filter((p) => p.category?.id && (p.category?.name || p.categoryName))
+                .map((p) => [p.category!.id!, p.category?.name || p.categoryName]),
+        ).entries(),
+    ).sort((a, b) => a[1].localeCompare(b[1]));
 
     const filteredProducts = products.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const q = searchQuery.toLowerCase();
+        const matchesSearch =
+            !q ||
+            p.name.toLowerCase().includes(q) ||
+            (p.sku ?? '').toLowerCase().includes(q) ||
+            (p.vendorSku ?? '').toLowerCase().includes(q) ||
+            (p.brand ?? '').toLowerCase().includes(q);
         const matchesFilter =
             statusFilter === 'all' ? true :
             statusFilter === 'drafts' ? p.listingStatus === 'draft' :
@@ -637,7 +660,9 @@ export default function VendorProductsPage() {
             approvalFilter === 'rejected' ? p.approvalStatus === 'rejected' :
             approvalFilter === 'approved' ? p.approvalStatus === 'approved' :
             true;
-        return matchesSearch && matchesFilter && matchesApproval;
+        const matchesBrand = !brandFilter || (p.brand ?? '').trim() === brandFilter;
+        const matchesCategory = !categoryFilter || p.category?.id === categoryFilter;
+        return matchesSearch && matchesFilter && matchesApproval && matchesBrand && matchesCategory;
     });
     const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
     const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -1423,9 +1448,9 @@ export default function VendorProductsPage() {
             const p = json.success ? json.data : product;
             const listLogistics = logisticsFieldsFromListProduct(product);
 
-            const auditRes = await fetch(`/api/v1/vendor/products/${product.id}/audit`);
-            const auditJson = await auditRes.json();
-            setAuditLogs(auditJson.success ? auditJson.data : []);
+            const histRes = await fetch(`/api/v1/vendor/products/${product.id}/price-history`);
+            const histJson = await histRes.json();
+            setAuditLogs(histJson.success ? histJson.data : []);
 
             setEditingProduct({
                 ...product,
@@ -2182,6 +2207,13 @@ export default function VendorProductsPage() {
                         Import
                     </button>
                     <button
+                        onClick={() => setShowPriceReplace(true)}
+                        className="h-[40px] px-3.5 border border-[#EEEEEE] bg-white rounded-[10px] text-[12px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] transition-all flex items-center gap-1.5 shrink-0"
+                    >
+                        <Percent size={13} className="text-[#299E60]" />
+                        Replace Prices
+                    </button>
+                    <button
                         onClick={() => setGridOpen(true)}
                         className="h-[40px] px-3.5 border border-[#EEEEEE] bg-white rounded-[10px] text-[12px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] transition-all flex items-center gap-1.5 shrink-0"
                     >
@@ -2212,6 +2244,28 @@ export default function VendorProductsPage() {
 
             {/* Filter Tabs */}
             <div className="flex items-center gap-1 flex-wrap">
+                <select
+                    aria-label="Filter by brand"
+                    value={brandFilter}
+                    onChange={(e) => setBrandFilter(e.target.value)}
+                    className="h-[34px] px-2 rounded-[8px] text-[12px] font-bold border border-[#EEEEEE] bg-white text-[#7C7C7C]"
+                >
+                    <option value="">All brands</option>
+                    {brandFilterOptions.map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                    ))}
+                </select>
+                <select
+                    aria-label="Filter by category"
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="h-[34px] px-2 rounded-[8px] text-[12px] font-bold border border-[#EEEEEE] bg-white text-[#7C7C7C]"
+                >
+                    <option value="">All categories</option>
+                    {categoryFilterOptions.map(([id, name]) => (
+                        <option key={id} value={id}>{name}</option>
+                    ))}
+                </select>
                 {(['all', 'drafts', 'active', 'inactive', 'featured'] as const).map(tab => (
                     <button
                         key={tab}
@@ -3268,9 +3322,38 @@ export default function VendorProductsPage() {
                                             </div>
                                 </FormSection>
 
-                                    {editingProduct && auditLogs.length > 0 && (
+                                    {editingProduct && (
                                         <div className="border border-[#EEEEEE] rounded-[12px] p-4 space-y-2">
-                                            <h3 className="text-[13px] font-bold text-[#181725]">Change history</h3>
+                                            <h3 className="text-[13px] font-bold text-[#181725]">Price history</h3>
+                                            {auditLogs.length === 0 ? (
+                                                <p className="text-[12px] text-[#AEAEAE]">No price changes recorded yet.</p>
+                                            ) : (
+                                                <ul className="space-y-2 max-h-[220px] overflow-y-auto">
+                                                    {auditLogs.slice(0, 40).map((log, idx) => (
+                                                        <li
+                                                            key={`${log.field}-${log.changedAt}-${idx}`}
+                                                            className="text-[11px] text-[#7C7C7C] border-b border-[#F5F5F5] pb-1.5 last:border-0"
+                                                        >
+                                                            <span className="font-bold text-[#181725]">{log.field}</span>
+                                                            {log.priceListName ? (
+                                                                <span className="text-[#299E60]"> · {log.priceListName}</span>
+                                                            ) : null}
+                                                            {' · '}
+                                                            <span className="text-[#AEAEAE]">{log.source}</span>
+                                                            {' · '}
+                                                            {new Date(log.changedAt).toLocaleString()}
+                                                            {log.actorName ? (
+                                                                <span className="text-[#AEAEAE]"> · {log.actorName}</span>
+                                                            ) : null}
+                                                            <div className="mt-0.5 font-mono text-[10px] break-all">
+                                                                <span className="text-[#E74C3C]">{log.oldValue ?? '—'}</span>
+                                                                {' → '}
+                                                                <span className="text-[#299E60]">{log.newValue ?? '—'}</span>
+                                                            </div>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
                                         </div>
                                     )}
                                     </>
@@ -3409,6 +3492,12 @@ export default function VendorProductsPage() {
             <VendorProductImportModal
                 open={showBulkImport}
                 onClose={() => setShowBulkImport(false)}
+                onComplete={() => fetchProducts(false)}
+            />
+
+            <VendorPriceReplaceModal
+                open={showPriceReplace}
+                onClose={() => setShowPriceReplace(false)}
                 onComplete={() => fetchProducts(false)}
             />
 

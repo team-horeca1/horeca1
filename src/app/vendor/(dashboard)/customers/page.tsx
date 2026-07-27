@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, Search, Loader2, MoreVertical, CheckCircle, XCircle,
-  PauseCircle, Tag, Bell, Trash2, Plus, CalendarDays, X, DollarSign,
+  PauseCircle, Tag, Bell, Trash2, Plus, CalendarDays, X, DollarSign, History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -549,6 +549,113 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
   );
 }
 
+// ─── Price History Modal (flow 23) ────────────────────────────────────────────
+
+interface PriceHistoryModalProps {
+  customer: VendorCustomer;
+  onClose: () => void;
+}
+
+function PriceHistoryModal({ customer, onClose }: PriceHistoryModalProps) {
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState<string | null>(null);
+  const [priceListName, setPriceListName] = useState<string | null>(null);
+  const [entries, setEntries] = useState<Array<{
+    id: string;
+    field: string;
+    oldValue: string | null;
+    newValue: string | null;
+    source: string;
+    productName: string;
+    productSku: string | null;
+    changedAt: string;
+    actorName: string | null;
+  }>>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/v1/vendor/price-history?customerId=${customer.id}`);
+        const json = await res.json();
+        if (cancelled) return;
+        if (json.success) {
+          setEntries(json.data.entries ?? []);
+          setPriceListName(json.data.priceListName ?? null);
+          setMessage(json.data.message ?? null);
+        } else {
+          setMessage(json.error ?? 'Could not load price history');
+        }
+      } catch {
+        if (!cancelled) setMessage('Could not load price history');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [customer.id]);
+
+  return (
+    <div className="fixed inset-0 z-[10001] bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-[16px] w-full max-w-[640px] shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-[#EEEEEE] flex items-start justify-between gap-3 flex-shrink-0">
+          <div>
+            <h2 className="text-[16px] font-bold text-[#181725]">Price history</h2>
+            <p className="text-[12px] text-[#AEAEAE]">
+              {customer.user.businessName ?? customer.user.fullName}
+              {priceListName ? ` · ${priceListName}` : ''}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-[8px] hover:bg-[#F5F5F5] text-[#7C7C7C]"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="px-6 py-4 overflow-y-auto flex-1">
+          {loading ? (
+            <div className="flex items-center justify-center py-12 text-[#AEAEAE]">
+              <Loader2 size={20} className="animate-spin" />
+            </div>
+          ) : message && entries.length === 0 ? (
+            <p className="text-[13px] text-[#7C7C7C] py-8 text-center">{message}</p>
+          ) : entries.length === 0 ? (
+            <p className="text-[13px] text-[#AEAEAE] py-8 text-center">No pricelist price changes recorded yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {entries.map((e) => (
+                <li key={e.id} className="border-b border-[#F5F5F5] pb-2 last:border-0">
+                  <div className="text-[12px] text-[#181725] font-semibold">
+                    {e.productName}
+                    {e.productSku ? <span className="text-[#AEAEAE] font-normal"> · {e.productSku}</span> : null}
+                  </div>
+                  <div className="text-[11px] text-[#7C7C7C]">
+                    <span className="font-bold text-[#181725]">{e.field}</span>
+                    {' · '}
+                    {e.source}
+                    {' · '}
+                    {new Date(e.changedAt).toLocaleString()}
+                    {e.actorName ? ` · ${e.actorName}` : ''}
+                  </div>
+                  <div className="mt-0.5 font-mono text-[10px] break-all">
+                    <span className="text-[#E74C3C]">{e.oldValue ?? '—'}</span>
+                    {' → '}
+                    <span className="text-[#299E60]">{e.newValue ?? '—'}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function VendorCustomersPage() {
@@ -558,6 +665,7 @@ export default function VendorCustomersPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [editCustomer, setEditCustomer] = useState<VendorCustomer | null>(null);
+  const [historyCustomer, setHistoryCustomer] = useState<VendorCustomer | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
   // Set of VendorCustomer.id (not userId) that have overdue/today tasks
@@ -731,12 +839,25 @@ export default function VendorCustomersPage() {
                       {c.lastOrderAt ? relativeTime(c.lastOrderAt) : '—'}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <button
-                        onClick={() => setEditCustomer(c)}
-                        className="p-1.5 rounded-[6px] hover:bg-[#F5F5F5] transition-colors text-[#7C7C7C]"
-                      >
-                        <MoreVertical size={14} />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setHistoryCustomer(c)}
+                          className="p-1.5 rounded-[6px] hover:bg-[#F5F5F5] transition-colors text-[#7C7C7C]"
+                          title="Price history"
+                          aria-label="View price history"
+                        >
+                          <History size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditCustomer(c)}
+                          className="p-1.5 rounded-[6px] hover:bg-[#F5F5F5] transition-colors text-[#7C7C7C]"
+                          aria-label="Edit customer"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -752,6 +873,12 @@ export default function VendorCustomersPage() {
           priceLists={priceLists}
           onClose={() => setEditCustomer(null)}
           onSave={handleCustomerSaved}
+        />
+      )}
+      {historyCustomer && (
+        <PriceHistoryModal
+          customer={historyCustomer}
+          onClose={() => setHistoryCustomer(null)}
         />
       )}
     </div>
