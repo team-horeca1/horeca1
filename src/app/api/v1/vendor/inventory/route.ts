@@ -21,6 +21,7 @@ const updateInventorySchema = z.object({
   qtyDamaged: z.number().int().min(0).optional(),
   qtyReturned: z.number().int().min(0).optional(),
   lowStockThreshold: z.number().int().min(0).optional(),
+  reason: z.string().max(180).optional(),
 });
 
 const bulkUpdateSchema = z.object({
@@ -52,7 +53,18 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       where: { vendorId: voc.vendorId, ...outletWhere },
       include: {
         product: {
-          select: { id: true, name: true, sku: true, unit: true, imageUrl: true, isActive: true, basePrice: true },
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            unit: true,
+            imageUrl: true,
+            isActive: true,
+            basePrice: true,
+            brand: true,
+            tags: true,
+            category: { select: { id: true, name: true } },
+          },
         },
         outlet: { select: { id: true, name: true } },
       },
@@ -84,6 +96,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
       qtyDamaged,
       qtyReturned,
       lowStockThreshold,
+      reason,
     } = updateInventorySchema.parse(body);
 
     let targetOutletId = voc.outletId;
@@ -106,6 +119,9 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     }
 
     const inventoryService = new InventoryService();
+    const logReason = reason?.trim()
+      ? `manual_update: ${reason.trim()}`.slice(0, 200)
+      : 'manual_update';
     const updated = await inventoryService.updateStock(
       productId,
       voc.vendorId,
@@ -118,6 +134,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         ...(lowStockThreshold !== undefined && { lowStockThreshold }),
       },
       ctx.userId,
+      logReason,
     );
 
     return NextResponse.json({ success: true, data: updated });
@@ -135,7 +152,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     const inventoryService = new InventoryService();
 
     if (body.items) {
-      await inventoryService.bulkUpdateStock(voc.vendorId, voc.outletId, body.items);
+      await inventoryService.bulkUpdateStock(voc.vendorId, voc.outletId, body.items, ctx.userId);
       void logAction(ctx, req, {
         action: AUDIT_ACTIONS.inventoryBulkUpdate,
         entity: 'inventory',
@@ -153,6 +170,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       value: body.value,
       lowStockThreshold: body.lowStockThreshold,
       scopeVendorId: voc.vendorId,
+      changedBy: ctx.userId,
     });
     void logAction(ctx, req, {
       action: AUDIT_ACTIONS.inventoryBulkUpdate,

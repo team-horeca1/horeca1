@@ -25,6 +25,7 @@ export interface VendorSettings {
   creditEnabled: boolean;
   vendorType: string | null;
   multiWarehouseEnabled: boolean;
+  autoDisableOos: boolean;
   deliveryFee: number;
   freeDeliveryAbove: number | null;
   addressLine: string | null;

@@ -66,6 +66,7 @@ function VendorSettingsContent() {
   const [freeDeliveryAbove, setFreeDeliveryAbove] = useState('');
   const [returnPolicy, setReturnPolicy] = useState('');
   const [cancellationPolicy, setCancellationPolicy] = useState('');
+  const [autoDisableOos, setAutoDisableOos] = useState(false);
   const [documents, setDocuments] = useState<VendorDocument[]>([]);
   const [docType, setDocType] = useState<VendorDocument['type']>('fssai');
   const [docFile, setDocFile] = useState<File | null>(null);
@@ -106,6 +107,7 @@ function VendorSettingsContent() {
         setFreeDeliveryAbove(data.freeDeliveryAbove != null ? String(data.freeDeliveryAbove) : '');
         setReturnPolicy(data.returnPolicy || '');
         setCancellationPolicy(data.cancellationPolicy || '');
+        setAutoDisableOos(Boolean(data.autoDisableOos));
         if (Array.isArray(data.paymentModes) && data.paymentModes.length > 0) setPaymentModes(data.paymentModes);
         if (data.vendorType === 'distributor' || data.vendorType === 'wholesaler' || data.vendorType === 'dark_store') {
           setVendorType(data.vendorType);
@@ -209,6 +211,7 @@ function VendorSettingsContent() {
           freeDeliveryAbove: freeDeliveryAbove ? parseFloat(freeDeliveryAbove) : undefined,
           returnPolicy: returnPolicy || undefined,
           cancellationPolicy: cancellationPolicy || undefined,
+          autoDisableOos,
           bankAccountName: bankAccountName || null,
           bankAccountNumber: bankAccountNumber || null,
           bankIfsc: bankIfsc || null,
@@ -475,6 +478,7 @@ function VendorSettingsContent() {
           <PoliciesTab
             returnPolicy={returnPolicy} setReturnPolicy={setReturnPolicy}
             cancellationPolicy={cancellationPolicy} setCancellationPolicy={setCancellationPolicy}
+            autoDisableOos={autoDisableOos} setAutoDisableOos={setAutoDisableOos}
             {...saveProps}
           />
         )}

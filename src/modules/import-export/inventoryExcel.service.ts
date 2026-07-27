@@ -93,6 +93,20 @@ export function generateInventoryImportTemplate(opts?: { multiWarehouse?: boolea
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }
 
+export function generateInventoryImportErrorReport(
+  errors: Array<{ sku: string; error: string }>,
+): Buffer {
+  const wb = XLSX.utils.book_new();
+  const data =
+    errors.length > 0
+      ? errors.map((e) => ({ SKU: e.sku, Error: e.error }))
+      : [{ SKU: '', Error: '' }];
+  const ws = XLSX.utils.json_to_sheet(data, { header: ['SKU', 'Error'] });
+  ws['!cols'] = [{ wch: 20 }, { wch: 48 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Import Errors');
+  return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+}
+
 export function parseInventoryImportCsv(text: string): Array<Record<string, string>> {
   const wb = XLSX.read(text, { type: 'string' });
   const sheet = wb.Sheets[wb.SheetNames[0]];

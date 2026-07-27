@@ -5,7 +5,7 @@ import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorOutletContext } from '@/lib/resolveVendorOutletContext';
 import { InventoryService } from '@/modules/inventory/inventory.service';
-import { generateInventoryImportTemplate } from '@/modules/import-export/inventoryExcel.service';
+import { generateInventoryImportTemplate, generateInventoryImportErrorReport } from '@/modules/import-export/inventoryExcel.service';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
 const skuImportItemSchema = z.object({
@@ -23,8 +23,33 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     requirePermission(ctx, 'inventory.view');
     const template = req.nextUrl.searchParams.get('template') === 'true';
+    const errorReport = req.nextUrl.searchParams.get('errorReport') === 'true';
+
+    if (errorReport) {
+      requirePermission(ctx, 'inventory.edit');
+      const raw = req.nextUrl.searchParams.get('errors');
+      if (!raw) {
+        return NextResponse.json({ success: false, error: { message: 'Pass errors= JSON array' } }, { status: 400 });
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return NextResponse.json({ success: false, error: { message: 'Invalid errors JSON' } }, { status: 400 });
+      }
+      const errorsSchema = z.array(z.object({ sku: z.string(), error: z.string() }));
+      const errors = errorsSchema.parse(parsed);
+      const buffer = generateInventoryImportErrorReport(errors);
+      return new NextResponse(new Uint8Array(buffer), {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': 'attachment; filename="inventory_import_errors.xlsx"',
+        },
+      });
+    }
+
     if (!template) {
-      return NextResponse.json({ success: false, error: { message: 'Use ?template=true' } }, { status: 400 });
+      return NextResponse.json({ success: false, error: { message: 'Use ?template=true or ?errorReport=true' } }, { status: 400 });
     }
 
     const voc = await resolveVendorOutletContext(ctx, req);
@@ -53,6 +78,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       defaultOutletId: voc.outletId,
       multiWarehouse: voc.multiWarehouseEnabled,
       items: body.items,
+      changedBy: ctx.userId,
     });
 
     void logAction(ctx, req, {

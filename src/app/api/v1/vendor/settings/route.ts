@@ -54,6 +54,7 @@ const updateSettingsSchema = z.object({
   vendorType: z.enum(['distributor', 'wholesaler', 'dark_store']).optional(),
   multiWarehouseEnabled: z.boolean().optional(),
   notificationPrefs: z.record(z.string(), z.array(z.string())).optional(),
+  autoDisableOos: z.boolean().optional(),
 });
 
 // GET — full vendor profile with service areas, delivery slots, and account info
