@@ -13,6 +13,7 @@ import { CatalogService, getCategoryPickerMeta } from '@/modules/catalog/catalog
 import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
+import { logProductFieldChanges, summarizePriceSlabs } from '@/lib/product-audit';
 
 // Validation schema for product updates (all fields optional)
 const updateProductSchema = z.object({
@@ -56,7 +57,7 @@ const updateProductSchema = z.object({
     maxQty: z.number().int().min(1).optional(),
     price: z.number().positive(),
     promoPrice: z.number().positive().optional(),
-  })).optional(),
+  })).max(3).optional(),
   listingStatus: z.enum(['draft', 'submitted']).optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
@@ -84,6 +85,11 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
 
     // Replace price slabs if provided
     if (priceSlabs !== undefined) {
+      const oldSlabs = await prisma.priceSlab.findMany({
+        where: { productId, vendorId },
+        orderBy: { sortOrder: 'asc' },
+        select: { minQty: true, maxQty: true, price: true, promoPrice: true },
+      });
       await prisma.priceSlab.deleteMany({ where: { productId, vendorId } });
       if (priceSlabs.length > 0) {
         await prisma.priceSlab.createMany({
@@ -98,6 +104,13 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
           })),
         });
       }
+      void logProductFieldChanges(productId, ctx.userId, 'vendor_edit', [
+        {
+          field: 'priceSlabs',
+          oldValue: summarizePriceSlabs(oldSlabs),
+          newValue: summarizePriceSlabs(priceSlabs),
+        },
+      ]).catch(console.error);
     }
 
     if (updated.approvalStatus === 'approved' && updated.brand) {

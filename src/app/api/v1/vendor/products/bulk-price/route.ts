@@ -10,6 +10,7 @@ import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
+import { logProductFieldChanges, summarizePriceSlabs } from '@/lib/product-audit';
 
 const bulkPriceSchema = z.object({
   // null = apply to all products; uuid = apply only to this category
@@ -69,6 +70,33 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         return ops;
       }),
     );
+
+    // Audit after commit (fire-and-forget per product)
+    for (const p of products) {
+      const oldBase = Number(p.basePrice);
+      const newBase = apply(oldBase);
+      const changes: Array<{ field: string; oldValue: unknown; newValue: unknown }> = [
+        { field: 'basePrice', oldValue: oldBase, newValue: newBase },
+      ];
+      if (body.applyToSlabs && 'priceSlabs' in p && Array.isArray(p.priceSlabs) && p.priceSlabs.length > 0) {
+        const oldSlabs = p.priceSlabs as Array<{
+          minQty: number;
+          maxQty: number | null;
+          price: unknown;
+          promoPrice?: unknown;
+        }>;
+        const newSlabs = oldSlabs.map((s) => ({
+          ...s,
+          price: apply(Number(s.price)),
+        }));
+        changes.push({
+          field: 'priceSlabs',
+          oldValue: summarizePriceSlabs(oldSlabs),
+          newValue: summarizePriceSlabs(newSlabs),
+        });
+      }
+      void logProductFieldChanges(p.id, ctx.userId, 'bulk_price', changes).catch(console.error);
+    }
 
     return NextResponse.json({ success: true, updated: products.length });
   } catch (error) {

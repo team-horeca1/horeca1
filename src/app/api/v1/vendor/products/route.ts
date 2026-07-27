@@ -63,7 +63,7 @@ const createProductSchema = z.object({
     maxQty: z.number().int().min(1).optional(),
     price: z.number().positive(),
     promoPrice: z.number().positive().optional(),
-  })).optional(),
+  })).max(3).optional(),
   listingStatus: z.enum(['draft', 'submitted']).optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 }).superRefine((data, ctx) => {

@@ -943,6 +943,124 @@ export function generateImportTemplate(): Buffer {
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }
 
+/** Price-only Excel template (SKU / POS SKU / Net Rate / up to 3 bulk slabs). */
+export function generatePriceUpdateTemplate(): Buffer {
+  const wb = XLSX.utils.book_new();
+  const headers = [
+    'SKU',
+    'Your POS SKU',
+    'Net Rate',
+    'Bulk Qty 1 - Quantity',
+    'Bulk Qty 1 - Net Rate / Pc',
+    'Bulk Qty 2 - Quantity',
+    'Bulk Qty 2 - Net Rate / Pc',
+    'Bulk Qty 3 - Quantity',
+    'Bulk Qty 3 - Net Rate / Pc',
+  ];
+  const instructionRow: Record<string, string> = {
+    SKU: 'Catalog SKU (or leave blank if POS SKU set)',
+    'Your POS SKU': 'Vendor POS code',
+    'Net Rate': 'Default selling price (ex-GST)',
+    'Bulk Qty 1 - Quantity': 'Min qty for slab 1',
+    'Bulk Qty 1 - Net Rate / Pc': 'Unit price for slab 1',
+    'Bulk Qty 2 - Quantity': 'Min qty for slab 2',
+    'Bulk Qty 2 - Net Rate / Pc': 'Unit price for slab 2',
+    'Bulk Qty 3 - Quantity': 'Min qty for slab 3',
+    'Bulk Qty 3 - Net Rate / Pc': 'Unit price for slab 3',
+  };
+  const sampleRow: Record<string, string | number> = {
+    SKU: 'H1-SEED-0001',
+    'Your POS SKU': 'POS-0001',
+    'Net Rate': 100,
+    'Bulk Qty 1 - Quantity': 1,
+    'Bulk Qty 1 - Net Rate / Pc': 100,
+    'Bulk Qty 2 - Quantity': 12,
+    'Bulk Qty 2 - Net Rate / Pc': 95,
+    'Bulk Qty 3 - Quantity': 48,
+    'Bulk Qty 3 - Net Rate / Pc': 90,
+  };
+  const ws = XLSX.utils.json_to_sheet([instructionRow, sampleRow], { header: headers });
+  ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
+  XLSX.utils.book_append_sheet(wb, ws, 'Prices');
+  return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+}
+
+export type PriceUpdateRow = {
+  row: number;
+  sku?: string;
+  vendorSku?: string;
+  basePrice: number;
+  slabs: Array<{ minQty: number; price: number }>;
+};
+
+export function parsePriceUpdate(buffer: Buffer): {
+  rows: PriceUpdateRow[];
+  errors: ImportError[];
+} {
+  const wb = XLSX.read(buffer, { type: 'buffer' });
+  const sheetName =
+    wb.SheetNames.find((n) => n.toLowerCase() === 'prices') ||
+    wb.SheetNames.find((n) => n.toLowerCase() !== 'categories') ||
+    wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawRows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet);
+  const rows: PriceUpdateRow[] = [];
+  const errors: ImportError[] = [];
+
+  rawRows.forEach((raw, idx) => {
+    const rowNum = idx + 2;
+    const cleaned = cleanRow(raw);
+    // Skip instruction row
+    const sku = String(cleaned['SKU'] ?? cleaned['sku'] ?? '').trim();
+    const vendorSku = String(cleaned['Your POS SKU'] ?? cleaned['POS SKU'] ?? cleaned['vendorSku'] ?? '').trim();
+    if (
+      !sku &&
+      !vendorSku &&
+      cleaned['Net Rate'] == null
+    ) {
+      return;
+    }
+    if (
+      /catalog sku/i.test(sku) ||
+      /leave blank/i.test(sku) ||
+      /instruction/i.test(sku)
+    ) {
+      return;
+    }
+
+    const net = Number(cleaned['Net Rate'] ?? cleaned['net rate']);
+    if (!Number.isFinite(net) || net <= 0) {
+      errors.push({ row: rowNum, field: 'Net Rate', message: 'must be a positive number' });
+      return;
+    }
+    if (!sku && !vendorSku) {
+      errors.push({ row: rowNum, message: 'SKU or Your POS SKU is required' });
+      return;
+    }
+
+    const slabs: Array<{ minQty: number; price: number }> = [];
+    for (let i = 1; i <= 3; i++) {
+      const qty = Number(cleaned[`Bulk Qty ${i} - Quantity`]);
+      const price = Number(cleaned[`Bulk Qty ${i} - Net Rate / Pc`]);
+      if (Number.isFinite(qty) && qty >= 1 && Number.isFinite(price) && price > 0) {
+        slabs.push({ minQty: Math.floor(qty), price });
+      }
+    }
+    if (slabs.length > 3) slabs.length = 3;
+
+    rows.push({
+      row: rowNum,
+      sku: sku || undefined,
+      vendorSku: vendorSku || undefined,
+      basePrice: net,
+      slabs,
+    });
+  });
+
+  return { rows, errors };
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Category Import/Export (unchanged column format)
 // ══════════════════════════════════════════════════════════════════════════════

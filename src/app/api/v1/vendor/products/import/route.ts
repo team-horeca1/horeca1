@@ -25,7 +25,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse, friendlyErrorMessage } from '@/middleware/errorHandler';
-import { parseProductImport, generateImportTemplate, type ParsedProductRow } from '@/modules/import-export/excel.service';
+import { parseProductImport, generateImportTemplate, generatePriceUpdateTemplate, type ParsedProductRow } from '@/modules/import-export/excel.service';
 import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { resolveVendorOutletContext } from '@/lib/resolveVendorOutletContext';
 import { ensureInventoryForAllOutlets } from '@/lib/inventoryOutlet';
@@ -52,6 +52,7 @@ import {
   resolveRowImageUrl,
   validateImportCategoryColumns,
 } from '@/modules/import-export/import-helpers';
+import { logProductFieldChanges, summarizePriceSlabs } from '@/lib/product-audit';
 import { Prisma } from '@prisma/client';
 
 // ── Response shapes — kept identical to the admin importer so the review
@@ -132,8 +133,18 @@ function toSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
-export const GET = vendorOnly(async () => {
+export const GET = vendorOnly(async (req: NextRequest) => {
   try {
+    const kind = req.nextUrl.searchParams.get('template');
+    if (kind === 'price') {
+      const buffer = generatePriceUpdateTemplate();
+      return new NextResponse(new Uint8Array(buffer), {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': 'attachment; filename="price_update_template.xlsx"',
+        },
+      });
+    }
     // Static import template — same canonical generator the admin uses, so
     // the column headers the parser expects never drift from the template.
     const buffer = generateImportTemplate();
@@ -237,7 +248,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     // common export artifact), the second row wouldn't see the product the
     // first row just created and would insert a DUPLICATE. Tracking in-run
     // creations lets the duplicate row update that product instead.
-    const createdThisRun = new Map<string, { id: string; sku: string | null; vendorSku?: string | null; categoryId: string | null }>();
+    const createdThisRun = new Map<string, { id: string; sku: string | null; vendorSku?: string | null; categoryId: string | null; basePrice: number }>();
     function findCreated(row: { sku?: string; name: string }) {
       if (row.sku) {
         const bySku = createdThisRun.get('sku:' + row.sku.toLowerCase());
@@ -245,8 +256,21 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       }
       return createdThisRun.get('name:' + row.name.toLowerCase());
     }
-    function registerCreated(p: { id: string; sku: string | null; vendorSku?: string | null; name: string; categoryId: string | null }) {
-      const ref = { id: p.id, sku: p.sku, vendorSku: p.vendorSku, categoryId: p.categoryId };
+    function registerCreated(p: {
+      id: string;
+      sku: string | null;
+      vendorSku?: string | null;
+      name: string;
+      categoryId: string | null;
+      basePrice: unknown;
+    }) {
+      const ref = {
+        id: p.id,
+        sku: p.sku,
+        vendorSku: p.vendorSku,
+        categoryId: p.categoryId,
+        basePrice: Number(p.basePrice),
+      };
       if (p.sku) createdThisRun.set('sku:' + p.sku.toLowerCase(), ref);
       if (p.vendorSku) createdThisRun.set('sku:' + p.vendorSku.toLowerCase(), ref);
       createdThisRun.set('name:' + p.name.toLowerCase(), ref);
@@ -831,6 +855,29 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
             await updatePriceSlabs(existing.id, vendorId, r, tx);
             if (p.categoryIds.length > 0) {
               await syncImportProductCategories(existing.id, p.categoryIds, tx);
+            }
+            // Price history for import updates (Rule 7)
+            const oldBase = Number(existing.basePrice);
+            if (oldBase !== Number(r.basePrice)) {
+              await logProductFieldChanges(existing.id, ctx.userId, 'import', [
+                { field: 'basePrice', oldValue: oldBase, newValue: r.basePrice },
+              ], tx);
+            }
+            if (r.bulkSlabs?.length) {
+              await logProductFieldChanges(existing.id, ctx.userId, 'import', [
+                {
+                  field: 'priceSlabs',
+                  oldValue: '(before import)',
+                  newValue: summarizePriceSlabs(
+                    r.bulkSlabs.map((s) => ({
+                      minQty: s.minQty,
+                      maxQty: null,
+                      price: s.taxableRate,
+                      promoPrice: s.promoTaxableRate,
+                    })),
+                  ),
+                },
+              ], tx);
             }
             updated++;
           } else {
