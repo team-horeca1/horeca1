@@ -100,6 +100,7 @@ model User {
   adminInvitesSent  AdminTeamMember[]  @relation("AdminInvites")
   savedAddresses    SavedAddress[]
   returnRequests    ReturnRequest[] @relation("CustomerReturnRequests")
+  cancelRequests    CancelRequest[] @relation("CustomerCancelRequests")
   pushSubscriptions PushSubscription[]
 
   // V2.2 — multi-account access
@@ -119,6 +120,7 @@ model User {
 
   productAuditLogs       ProductAuditLog[] @relation("ProductAuditActor")
   priceHistoryChanges    PriceHistory[]    @relation("PriceHistoryActor")
+  orderEvents            OrderEvent[]      @relation("OrderEventActor")
   masterProductRevisions MasterProductRevision[] @relation("MasterRevisionActor")
   stockTransfersCreated  StockTransfer[]         @relation("StockTransferCreator")
 
@@ -875,6 +877,8 @@ model Order {
   vendorClaims       VendorClaim[]
   picklists          Picklist[]
   dispatches         Dispatch[]
+  events             OrderEvent[]
+  cancelRequest      CancelRequest?
 
   @@index([userId])
   @@index([vendorId])
@@ -885,6 +889,44 @@ model Order {
   @@index([salespersonId])
   @@index([createdAt(sort: Desc)])
   @@map("orders")
+}
+
+// Section 7 — append-only order audit trail (status + line changes + cancellations).
+model OrderEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  orderId    String   @map("order_id") @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String   @db.VarChar(64)
+  fromStatus String?  @map("from_status") @db.VarChar(40)
+  toStatus   String?  @map("to_status") @db.VarChar(40)
+  payload    Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actor User? @relation("OrderEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt(sort: Desc)])
+  @@index([actorId])
+  @@map("order_events")
+}
+
+// Section 7 Flow 18 — customer cancellation request (vendor approve/reject while pending).
+model CancelRequest {
+  id         String   @id @default(uuid()) @db.Uuid
+  orderId    String   @unique @map("order_id") @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  reason     String   @db.Text
+  status     String   @default("pending") @db.VarChar(20)
+  vendorNote String?  @map("vendor_note") @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  order    Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer User  @relation("CustomerCancelRequests", fields: [customerId], references: [id])
+
+  @@index([status])
+  @@index([customerId])
+  @@map("cancel_requests")
 }
 
 enum OrderStatus {
