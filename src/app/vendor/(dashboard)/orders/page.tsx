@@ -7,6 +7,7 @@ import { Search, Loader2, Eye, CheckCircle2, ChevronRight, ChevronLeft, AlertTri
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useVendorOutletScope } from '@/hooks/useVendorOutletScope';
+import OrderWorkspace from '@/components/features/vendor/OrderWorkspace';
 
 interface VendorOrder {
     id: string;
@@ -117,6 +118,7 @@ export default function VendorOrdersPage() {
 
     // Read initial status from URL (e.g., ?status=pending from dashboard)
     const initialStatus = searchParams.get('status') || 'all';
+    const isWorkspace = searchParams.get('view') === 'workspace';
 
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<string>(initialStatus);
@@ -358,17 +360,18 @@ export default function VendorOrdersPage() {
                 const blob = await res.blob();
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
-                a.download = `invoices-bulk-${selectedIds.length}.pdf`;
+                a.download = `invoices-${new Date().toISOString().slice(0, 10)}.pdf`;
                 a.click();
                 URL.revokeObjectURL(a.href);
-                toast.success(`Downloaded ${selectedIds.length} invoice(s)`);
+                toast.success('Invoices PDF downloaded');
+                setSelectedIds([]);
                 return;
             }
             const json = await res.json();
-            if (!json.success) throw new Error(json.error?.message || 'Bulk update failed');
-            const failed = json.data?.failed?.length ?? 0;
-            const ok = json.data?.succeeded?.length ?? 0;
-            toast.success(failed ? `Updated ${ok}, ${failed} failed` : `Updated ${ok} order(s)`);
+            if (!res.ok || !json.success) throw new Error(json.error?.message || 'Bulk update failed');
+            const failed = (json.data?.results as Array<{ ok: boolean }> | undefined)?.filter((r) => !r.ok).length ?? 0;
+            toast.success(failed ? `Updated with ${failed} failure(s)` : 'Bulk status updated');
+            setSelectedIds([]);
             fetchOrders({
                 tab: activeTab,
                 q: searchQuery,
@@ -384,13 +387,23 @@ export default function VendorOrdersPage() {
         }
     };
 
+    if (isWorkspace) {
+        return <OrderWorkspace />;
+    }
+
     return (
         <div className="space-y-5 pb-10">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-[24px] font-bold text-[#181725]">Orders</h1>
-                    <p className="text-[12px] text-[#AEAEAE]">Manage and fulfil customer orders</p>
+                    <p className="text-[12px] text-[#AEAEAE]">
+                      Manage and fulfil customer orders
+                      {' · '}
+                      <Link href="/vendor/orders?view=workspace" className="font-semibold text-[#299E60] hover:underline" data-testid="orders-workspace-link">
+                        Order Workspace
+                      </Link>
+                    </p>
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="relative w-full max-w-[260px]">

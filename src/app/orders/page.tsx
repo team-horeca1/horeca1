@@ -44,7 +44,7 @@ interface ApiOrder {
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
     draft:                { label: 'Draft',               color: 'text-gray-600',    bg: 'bg-gray-100',   icon: <Clock size={10} /> },
-    pending:              { label: 'Pending Approval',    color: 'text-amber-600',   bg: 'bg-amber-50',   icon: <Clock size={10} /> },
+    pending:              { label: 'Pending',             color: 'text-amber-600',   bg: 'bg-amber-50',   icon: <Clock size={10} /> },
     confirmed:            { label: 'Accepted',            color: 'text-blue-600',    bg: 'bg-blue-50',    icon: <CheckCircle2 size={10} /> },
     processing:           { label: 'Packing',             color: 'text-indigo-600',  bg: 'bg-indigo-50',  icon: <Loader2 size={10} /> },
     ready_for_dispatch:   { label: 'Ready for Dispatch',  color: 'text-cyan-600',    bg: 'bg-cyan-50',    icon: <Package size={10} /> },
