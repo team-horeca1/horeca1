@@ -1,15 +1,16 @@
-// GET /api/v1/vendor/orders — List vendor's orders
-// WHY: Vendor order management — view all orders placed with this vendor,
-//      filter by status, search by order number, with cursor pagination
-// PROTECTED: Vendor only (vendors + admins)
-// SUPPORTS: ?status=&search=&cursor=&limit=20
+// GET /api/v1/vendor/orders/export — Full CSV of filtered orders (not page-only)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
-import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorOutletContext, buildFulfillmentOutletWhere } from '@/lib/resolveVendorOutletContext';
 import { requirePermission } from '@/lib/permissions/engine';
+import { prisma } from '@/lib/prisma';
+
+function csvEscape(v: string | number | null | undefined): string {
+  const s = v == null ? '' : String(v);
+  return `"${s.replace(/"/g, '""')}"`;
+}
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   requirePermission(ctx, 'orders.view');
@@ -19,35 +20,24 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     const vendorId = voc.vendorId;
     const orderScope = buildFulfillmentOutletWhere(voc, allOutlets);
 
-    // Parse query params — brief filter aliases (Section 7) map to DB fields.
     const params = req.nextUrl.searchParams;
     const statusParam = params.get('status') || undefined;
     const search = params.get('search') || undefined;
-    const cursor = params.get('cursor') || undefined;
-    const limit = Math.min(Number(params.get('limit')) || 20, 50);
     const dateFrom = params.get('dateFrom') || undefined;
     const dateTo = params.get('dateTo') || undefined;
     const paymentStatus = params.get('paymentStatus') || undefined;
     const paymentMethod = params.get('paymentMethod') || undefined;
 
-    // Build createdAt filter — merge dateFrom + dateTo into one object
     const createdAtFilter: { gte?: Date; lte?: Date } = {};
     if (dateFrom) createdAtFilter.gte = new Date(dateFrom);
     if (dateTo) createdAtFilter.lte = new Date(dateTo + 'T23:59:59Z');
 
-    // Brief filter → Prisma where fragment
     const NEW_WINDOW_MS = 2 * 60 * 60 * 1000;
     let statusWhere: Record<string, unknown> = { status: { not: 'draft' } };
     if (statusParam && statusParam !== 'all' && statusParam !== 'draft') {
       switch (statusParam) {
         case 'new':
-          statusWhere = {
-            status: 'pending',
-            createdAt: { gte: new Date(Date.now() - NEW_WINDOW_MS) },
-          };
-          break;
-        case 'pending':
-          statusWhere = { status: 'pending' };
+          statusWhere = { status: 'pending', createdAt: { gte: new Date(Date.now() - NEW_WINDOW_MS) } };
           break;
         case 'accepted':
           statusWhere = { status: 'confirmed' };
@@ -65,30 +55,15 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
           statusWhere = { status: 'delivered' };
           break;
         default:
-          // Native enum values: confirmed, processing, ready_for_dispatch, shipped, …
           statusWhere = { status: statusParam };
           break;
       }
     }
 
     if (dateFrom || dateTo) {
-      const existingCreated = (statusWhere.createdAt as { gte?: Date; lte?: Date } | undefined) ?? {};
-      statusWhere = {
-        ...statusWhere,
-        createdAt: {
-          ...existingCreated,
-          ...createdAtFilter,
-          ...(existingCreated.gte && createdAtFilter.gte
-            ? { gte: existingCreated.gte > createdAtFilter.gte ? existingCreated.gte : createdAtFilter.gte }
-            : {}),
-          ...(existingCreated.lte && createdAtFilter.lte
-            ? { lte: existingCreated.lte < createdAtFilter.lte ? existingCreated.lte : createdAtFilter.lte }
-            : {}),
-        },
-      };
+      statusWhere = { ...statusWhere, createdAt: { ...(statusWhere.createdAt as object || {}), ...createdAtFilter } };
     }
 
-    // Build where clause — customer drafts are private until submitted
     const where: Record<string, unknown> = {
       vendorId,
       ...orderScope,
@@ -112,11 +87,9 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
     const orders = await prisma.order.findMany({
       where,
-      take: limit + 1,
-      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       orderBy: { createdAt: 'desc' },
+      take: 5000,
       select: {
-        id: true,
         orderNumber: true,
         status: true,
         isPartial: true,
@@ -124,29 +97,46 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         paymentStatus: true,
         paymentMethod: true,
         createdAt: true,
-        acceptedAt: true,
-        outlet: { select: { name: true } },
-        deliveryAddressSnapshot: true,
-        fulfillmentOutletId: true,
-        fulfillmentOutlet: { select: { id: true, name: true } },
-        user: {
-          select: { fullName: true, email: true, businessName: true },
-        },
+        user: { select: { fullName: true, businessName: true, phone: true, email: true } },
         _count: { select: { items: true } },
       },
     });
 
-    const hasMore = orders.length > limit;
-    if (hasMore) orders.pop();
+    const header = [
+      'Order / Invoice Number',
+      'Customer',
+      'Business',
+      'Phone',
+      'Email',
+      'Items',
+      'Amount',
+      'Payment Method',
+      'Payment Status',
+      'Order Status',
+      'Partial',
+      'Date',
+    ];
+    const rows = orders.map((o) => [
+      o.orderNumber,
+      o.user.fullName,
+      o.user.businessName ?? '',
+      o.user.phone ?? '',
+      o.user.email ?? '',
+      o._count.items,
+      Number(o.totalAmount).toFixed(2),
+      o.paymentMethod ?? '',
+      o.paymentStatus,
+      o.status,
+      o.isPartial ? 'yes' : 'no',
+      o.createdAt.toISOString(),
+    ]);
 
-    const nextCursor = hasMore ? orders[orders.length - 1].id : null;
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        orders,
-        nextCursor,
-        hasMore,
+    const csv = [header, ...rows].map((r) => r.map(csvEscape).join(',')).join('\n');
+    return new NextResponse(csv, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="orders-export-${new Date().toISOString().slice(0, 10)}.csv"`,
       },
     });
   } catch (error) {

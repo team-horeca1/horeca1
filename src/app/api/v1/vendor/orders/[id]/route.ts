@@ -91,6 +91,13 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
             slotEnd: true,
           },
         },
+        events: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            actor: { select: { id: true, fullName: true, email: true } },
+          },
+        },
+        cancelRequest: true,
       },
     });
 
@@ -145,14 +152,26 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     const body = await req.json();
     const orderService = new OrderService();
 
+    // Apply substitute on a pending line
+    if (body.action === 'substitute' && body.itemId && body.substituteProductId) {
+      const updated = await orderService.applySubstitute(
+        orderId,
+        vendorId,
+        body.itemId as string,
+        body.substituteProductId as string,
+        ctx.userId,
+      );
+      return NextResponse.json({ success: true, data: updated });
+    }
+
     // Partial accept (pending) or post-confirm amend
     if (Array.isArray(body.items)) {
       const { items } = partialAcceptSchema.parse(body);
       if (body.mode === 'amend') {
-        const updated = await orderService.amendOrderLines(orderId, vendorId, items);
+        const updated = await orderService.amendOrderLines(orderId, vendorId, items, ctx.userId);
         return NextResponse.json({ success: true, data: updated });
       }
-      const updated = await orderService.partialAccept(orderId, vendorId, items);
+      const updated = await orderService.partialAccept(orderId, vendorId, items, ctx.userId);
       return NextResponse.json({ success: true, data: updated });
     }
 
@@ -178,7 +197,15 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
 
     // Standard status transition path
     const { status, reason, proof, force } = updateStatusSchema.parse(body);
-    const updated = await orderService.updateStatus(orderId, vendorId, status, reason, proof, force === true);
+    const updated = await orderService.updateStatus(
+      orderId,
+      vendorId,
+      status,
+      reason,
+      proof,
+      force === true,
+      ctx.userId,
+    );
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     return errorResponse(error);

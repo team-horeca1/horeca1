@@ -149,6 +149,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       reason ?? 'Updated by admin',
       proof,
       true, // admin override — allow any status; side-effects stay idempotent + guarded
+      ctx.userId,
     );
 
     return NextResponse.json({ success: true, data: updated });
