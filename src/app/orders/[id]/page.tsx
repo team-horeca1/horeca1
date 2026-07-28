@@ -58,7 +58,7 @@ interface ApiOrder {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; textColor: string; bgColor: string; borderColor: string; icon: React.ReactNode }> = {
-    pending:    { label: 'Pending Confirmation', textColor: 'text-amber-700',  bgColor: 'bg-amber-50',   borderColor: 'border-amber-200', icon: <Clock size={14} /> },
+    pending:    { label: 'Pending',              textColor: 'text-amber-700',  bgColor: 'bg-amber-50',   borderColor: 'border-amber-200', icon: <Clock size={14} /> },
     confirmed:  { label: 'Confirmed',            textColor: 'text-blue-700',   bgColor: 'bg-blue-50',    borderColor: 'border-blue-200',  icon: <CheckCircle2 size={14} /> },
     processing: { label: 'Being Processed',       textColor: 'text-purple-700', bgColor: 'bg-purple-50',  borderColor: 'border-purple-200',icon: <Loader2 size={14} /> },
     shipped:    { label: 'Out for Delivery',      textColor: 'text-indigo-700', bgColor: 'bg-indigo-50',  borderColor: 'border-indigo-200',icon: <Truck size={14} /> },
@@ -121,6 +121,17 @@ export default function OrderDetailPage() {
     const [isSubmittingReturn, setIsSubmittingReturn] = React.useState(false);
     const [returnRequest, setReturnRequest] = React.useState<{ status: string } | null>(null);
 
+    // Cancel request state (Section 7 Flow 18)
+    const [showCancelForm, setShowCancelForm] = React.useState(false);
+    const [cancelReason, setCancelReason] = React.useState('');
+    const [isSubmittingCancel, setIsSubmittingCancel] = React.useState(false);
+    const [cancelRequest, setCancelRequest] = React.useState<{
+        id: string;
+        status: string;
+        reason: string;
+        vendorNote?: string | null;
+    } | null>(null);
+
     React.useEffect(() => {
         if (sessionStatus === 'unauthenticated') { router.push('/'); return; }
         if (sessionStatus !== 'authenticated') return;
@@ -177,6 +188,35 @@ export default function OrderDetailPage() {
             .then(json => { if (json.success && json.data) setReturnRequest(json.data); })
             .catch(() => {});
     }, [order, orderId]);
+
+    React.useEffect(() => {
+        if (!order || (order.status !== 'pending' && order.status !== 'cancelled')) return;
+        fetch(`/api/v1/orders/${orderId}/cancel-request`)
+            .then((r) => r.json())
+            .then((json) => { if (json.success && json.data) setCancelRequest(json.data); })
+            .catch(() => {});
+    }, [order, orderId]);
+
+    const handleSubmitCancelRequest = async () => {
+        if (cancelReason.trim().length < 10) return;
+        setIsSubmittingCancel(true);
+        try {
+            const res = await fetch(`/api/v1/orders/${orderId}/cancel-request`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: cancelReason.trim() }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error?.message || 'Request failed');
+            setCancelRequest(json.data);
+            setShowCancelForm(false);
+            toast.success('Cancellation request submitted. Waiting for store review.');
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Failed to submit');
+        } finally {
+            setIsSubmittingCancel(false);
+        }
+    };
 
     const handleSubmitReturn = async () => {
         if (!order || !returnReason.trim()) return;
@@ -520,6 +560,56 @@ export default function OrderDetailPage() {
                                     <Star size={16} />
                                     Rate This Order
                                 </button>
+                            )}
+                            {order.status === 'pending' && !cancelRequest && !showCancelForm && (
+                                <button
+                                    onClick={() => setShowCancelForm(true)}
+                                    data-testid="request-cancel-btn"
+                                    className="w-full py-3.5 border-2 border-red-200 text-red-600 text-[14px] font-black rounded-2xl hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <XCircle size={16} />
+                                    Request Cancellation
+                                </button>
+                            )}
+                            {cancelRequest && (
+                                <div className="space-y-2 p-4 border-2 border-amber-100 bg-amber-50/40 rounded-2xl" data-testid="cancel-request-status">
+                                    <p className="text-[13px] font-bold text-[#181725]">
+                                        Cancellation request: <span className="capitalize">{cancelRequest.status}</span>
+                                    </p>
+                                    <p className="text-[12px] text-gray-600">{cancelRequest.reason}</p>
+                                    {cancelRequest.vendorNote && (
+                                        <p className="text-[12px] text-gray-500">Store note: {cancelRequest.vendorNote}</p>
+                                    )}
+                                </div>
+                            )}
+                            {showCancelForm && (
+                                <div className="space-y-3 p-4 border-2 border-red-100 rounded-2xl" data-testid="cancel-request-form">
+                                    <p className="text-[13px] font-bold text-[#181725]">Why do you want to cancel?</p>
+                                    <textarea
+                                        value={cancelReason}
+                                        onChange={(e) => setCancelReason(e.target.value)}
+                                        rows={3}
+                                        placeholder="Please explain (at least 10 characters)..."
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-[#299e60]/40 resize-none"
+                                        data-testid="cancel-reason-input"
+                                    />
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleSubmitCancelRequest}
+                                            disabled={isSubmittingCancel || cancelReason.trim().length < 10}
+                                            data-testid="submit-cancel-request"
+                                            className="flex-1 py-2.5 bg-red-600 text-white text-[13px] font-black rounded-xl disabled:opacity-50"
+                                        >
+                                            {isSubmittingCancel ? 'Submitting...' : 'Submit Request'}
+                                        </button>
+                                        <button
+                                            onClick={() => setShowCancelForm(false)}
+                                            className="px-4 py-2.5 border border-gray-200 text-[13px] font-bold rounded-xl"
+                                        >
+                                            Back
+                                        </button>
+                                    </div>
+                                </div>
                             )}
                             {order.status === 'delivered' && !returnRequest && !showReturnForm && (
                                 <button onClick={() => setShowReturnForm(true)}

@@ -98,6 +98,22 @@ interface OrderData {
     items: OrderItem[];
     payments: OrderPayment[];
     deliverySlot: { dayOfWeek: string; slotStart: string; slotEnd: string } | null;
+    events?: Array<{
+        id: string;
+        action: string;
+        fromStatus: string | null;
+        toStatus: string | null;
+        payload: Record<string, unknown> | null;
+        createdAt: string;
+        actor: { id: string; fullName: string; email: string | null } | null;
+    }>;
+    cancelRequest?: {
+        id: string;
+        status: string;
+        reason: string;
+        vendorNote: string | null;
+        createdAt: string;
+    } | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -105,10 +121,16 @@ interface OrderData {
 const DAY_NAMES = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const STATUS_FLOW = ['pending', 'confirmed', 'processing', 'ready_for_dispatch', 'shipped', 'delivered'] as const;
 const STATUS_LABELS: Record<string, string> = {
-    draft: 'Draft', pending: 'Pending Approval', confirmed: 'Accepted', processing: 'Packing',
-    ready_for_dispatch: 'Ready for Dispatch', shipped: 'Out for Delivery',
-    partially_delivered: 'Partially Delivered', delivered: 'Delivered',
-    returned: 'Returned', cancelled: 'Cancelled',
+    draft: 'Draft',
+    pending: 'Pending',
+    confirmed: 'Accepted',
+    processing: 'Packed',
+    ready_for_dispatch: 'Ready for Dispatch',
+    shipped: 'Dispatched',
+    partially_delivered: 'Partially Delivered',
+    delivered: 'Delivered',
+    returned: 'Returned',
+    cancelled: 'Cancelled',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -177,6 +199,168 @@ function formatSnapshotAddress(snapshot: any): { address: string; pincode: strin
 }
 
 // ─── StatusTimeline ───────────────────────────────────────────────────────────
+
+function OrderEventsPanel({
+    events,
+}: {
+    events: NonNullable<OrderData['events']>;
+}) {
+    const [tab, setTab] = useState<'timeline' | 'status' | 'activity'>('timeline');
+
+    const statusEvents = events.filter(
+        (e) => e.action === 'status.changed' || e.action === 'order.auto_accepted' || e.action === 'order.cancelled',
+    );
+    const rows =
+        tab === 'status' ? statusEvents :
+            tab === 'activity' ? events :
+                events;
+
+    const ACTION_LABELS: Record<string, string> = {
+        'order.created': 'Order created',
+        'order.auto_accepted': 'Auto-accepted',
+        'status.changed': 'Status changed',
+        'item.qty_adjusted': 'Quantity adjusted',
+        'item.rejected': 'Item rejected',
+        'item.substituted': 'Item substituted',
+        'order.partial_fulfilment': 'Partial fulfilment',
+        'order.cancelled': 'Order cancelled',
+        'cancel.requested': 'Cancellation requested',
+        'cancel.approved': 'Cancellation approved',
+        'cancel.rejected': 'Cancellation declined',
+        'invoice.generated': 'Invoice generated',
+    };
+
+    return (
+        <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden print:hidden" data-testid="order-events-panel">
+            <div className="px-5 py-3 border-b border-[#EEEEEE] flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-[15px] font-bold text-[#181725]">Order history</h3>
+                <div className="flex gap-1 flex-wrap">
+                    {([
+                        ['timeline', 'Timeline'],
+                        ['status', 'Status History'],
+                        ['activity', 'Activity Log'],
+                    ] as const).map(([id, label]) => (
+                        <button
+                            key={id}
+                            type="button"
+                            onClick={() => setTab(id)}
+                            className={cn(
+                                'px-3 py-1.5 rounded-[8px] text-[12px] font-bold transition-colors',
+                                tab === id ? 'bg-[#299E60] text-white' : 'bg-[#F5F5F5] text-[#7C7C7C] hover:bg-[#EEEEEE]',
+                            )}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <div className="p-4 max-h-[320px] overflow-y-auto space-y-2">
+                {rows.length === 0 ? (
+                    <p className="text-[13px] text-[#AEAEAE] py-4 text-center">No events recorded yet.</p>
+                ) : (
+                    rows.map((ev) => (
+                        <div key={ev.id} className="flex gap-3 items-start border-b border-[#F5F5F5] last:border-0 pb-2 last:pb-0">
+                            <div className="w-2 h-2 rounded-full bg-[#299E60] mt-1.5 shrink-0" />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[13px] font-semibold text-[#181725]">
+                                    {ACTION_LABELS[ev.action] ?? ev.action}
+                                    {ev.fromStatus && ev.toStatus && ev.fromStatus !== ev.toStatus && (
+                                        <span className="font-normal text-[#7C7C7C]">
+                                            {' '}({STATUS_LABELS[ev.fromStatus] ?? ev.fromStatus} → {STATUS_LABELS[ev.toStatus] ?? ev.toStatus})
+                                        </span>
+                                    )}
+                                </p>
+                                <p className="text-[11px] text-[#AEAEAE]">
+                                    {formatDateTime(ev.createdAt)}
+                                    {ev.actor?.fullName ? ` · ${ev.actor.fullName}` : ''}
+                                </p>
+                                {tab === 'activity' && ev.payload && (
+                                    <p className="text-[11px] text-[#7C7C7C] mt-0.5 truncate">
+                                        {typeof ev.payload.productName === 'string' ? String(ev.payload.productName) : ''}
+                                        {typeof ev.payload.reason === 'string' ? ` — ${String(ev.payload.reason)}` : ''}
+                                        {ev.payload.fromQty != null && ev.payload.toQty != null
+                                            ? ` qty ${String(ev.payload.fromQty)} → ${String(ev.payload.toQty)}`
+                                            : ''}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+}
+
+function CancelRequestBanner({
+    request,
+    onReviewed,
+}: {
+    request: NonNullable<OrderData['cancelRequest']>;
+    onReviewed: () => void;
+}) {
+    const [note, setNote] = useState('');
+    const [busy, setBusy] = useState(false);
+
+    const review = async (status: 'approved' | 'rejected') => {
+        setBusy(true);
+        try {
+            const res = await fetch(`/api/v1/vendor/cancel-requests/${request.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status, vendorNote: note.trim() || undefined }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error?.message || 'Review failed');
+            toast.success(status === 'approved' ? 'Order cancelled for customer.' : 'Cancellation declined.');
+            onReviewed();
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Failed');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div
+            className="bg-[#FFF8EB] border border-[#F59E0B]/40 rounded-[14px] p-5 space-y-3 print:hidden"
+            data-testid="vendor-cancel-request-banner"
+        >
+            <div>
+                <p className="text-[15px] font-bold text-[#181725]">Customer cancellation request</p>
+                <p className="text-[13px] text-[#7C7C7C] mt-1">{request.reason}</p>
+            </div>
+            <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                placeholder="Optional note to customer..."
+                data-testid="vendor-cancel-note"
+                className="w-full border border-[#EEEEEE] rounded-[10px] px-3 py-2 text-[13px] outline-none focus:border-[#299E60]/40 resize-none bg-white"
+            />
+            <div className="flex flex-wrap gap-2">
+                <button
+                    type="button"
+                    disabled={busy}
+                    data-testid="approve-cancel-request"
+                    onClick={() => review('approved')}
+                    className="h-[40px] px-5 rounded-[10px] bg-[#E74C3C] text-white text-[13px] font-bold disabled:opacity-50"
+                >
+                    Approve cancel
+                </button>
+                <button
+                    type="button"
+                    disabled={busy}
+                    data-testid="reject-cancel-request"
+                    onClick={() => review('rejected')}
+                    className="h-[40px] px-5 rounded-[10px] border border-[#EEEEEE] text-[13px] font-bold text-[#7C7C7C] hover:bg-white disabled:opacity-50"
+                >
+                    Decline request
+                </button>
+            </div>
+        </div>
+    );
+}
 
 function StatusTimeline({
     status,
@@ -310,11 +494,17 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
     if (order.status === 'delivered' || order.status === 'cancelled') return null;
 
     const hint =
-        order.status === 'pending' ? (isPartialAccept ? 'Adjust fulfilled quantities below, then confirm.' : 'Accept in full or reduce quantities for partial fulfilment.') :
-            order.status === 'confirmed' || order.status === 'processing' ? 'Adjust quantities if needed, then advance fulfilment.' :
-                order.status === 'shipped' ? 'Confirm full or partial delivery with optional proof.' :
-                order.status === 'partially_delivered' ? 'Complete remaining delivery when balance arrives.' :
-                    'Confirm delivery once the customer has received the goods.';
+        order.status === 'pending'
+            ? (isPartialAccept
+                ? 'Save quantity adjustments (order stays Pending until you advance status). Cancel is still allowed.'
+                : 'Auto-accepted on place. Adjust quantities, then Mark as Accepted or Packed. Cancel only while Pending.')
+            : order.status === 'confirmed' || order.status === 'processing'
+                ? 'Adjust quantities if needed, then advance fulfilment.'
+                : order.status === 'shipped'
+                    ? 'Confirm full or partial delivery with optional proof.'
+                    : order.status === 'partially_delivered'
+                        ? 'Complete remaining delivery when balance arrives.'
+                        : 'Confirm delivery once the customer has received the goods.';
 
     return (
         <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
@@ -375,19 +565,29 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
                     </div>
                 ) : (
                     <div className="flex flex-wrap gap-3">
-                        {/* Accept (pending) */}
-                        {order.status === 'pending' && (
+                        {/* Pending: save qty adjustments (no approval gate) */}
+                        {order.status === 'pending' && isPartialAccept && (
                             <button
                                 onClick={runAccept}
                                 disabled={busy}
                                 className="h-[48px] px-8 rounded-[12px] bg-[#299E60] text-white text-[15px] font-bold hover:bg-[#238a54] transition-all shadow-sm flex items-center gap-2 disabled:opacity-60"
                             >
                                 {busy ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-                                {isPartialAccept ? 'Accept Partial Order' : 'Accept Order'}
+                                Save Quantity Adjustments
                             </button>
                         )}
-                        {/* Mark as Packed (confirmed) */}
-                        {order.status === 'confirmed' && (
+                        {order.status === 'pending' && (
+                            <button
+                                onClick={() => run('confirmed')}
+                                disabled={busy}
+                                className="h-[48px] px-6 rounded-[12px] border border-[#299E60] text-[#299E60] text-[14px] font-bold hover:bg-[#EEF8F1] transition-all flex items-center gap-2 disabled:opacity-60"
+                            >
+                                {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                                Mark as Accepted
+                            </button>
+                        )}
+                        {/* Mark as Packed from pending or accepted */}
+                        {(order.status === 'pending' || order.status === 'confirmed') && (
                             <button
                                 onClick={() => run('processing')}
                                 disabled={busy}
@@ -397,8 +597,18 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
                                 Mark as Packed
                             </button>
                         )}
-                        {/* Mark as Dispatched (processing) */}
+                        {/* Ready for Dispatch */}
                         {order.status === 'processing' && (
+                            <button
+                                onClick={() => run('ready_for_dispatch')}
+                                disabled={busy}
+                                className="h-[48px] px-6 rounded-[12px] border border-[#0891B2] text-[#0891B2] text-[14px] font-bold hover:bg-cyan-50 flex items-center gap-2 disabled:opacity-60"
+                            >
+                                Ready for Dispatch
+                            </button>
+                        )}
+                        {/* Mark as Dispatched */}
+                        {(order.status === 'processing' || order.status === 'ready_for_dispatch') && (
                             <button
                                 onClick={() => run('shipped')}
                                 disabled={busy}
@@ -508,20 +718,15 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
                                 Save Quantity Changes
                             </button>
                         )}
-                        {/* Reject / Cancel */}
-                        {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing') && (
+                        {/* Reject / Cancel — Rule 12: pending only */}
+                        {order.status === 'pending' && (
                             <button
                                 onClick={() => setRejecting(true)}
                                 disabled={busy}
-                                className={cn(
-                                    'h-[48px] px-6 rounded-[12px] text-[14px] font-bold transition-all flex items-center gap-2 disabled:opacity-60',
-                                    order.status === 'pending'
-                                        ? 'bg-[#FFF0F0] text-[#E74C3C] hover:bg-[#FFE0E0]'
-                                        : 'bg-[#F5F5F5] text-[#7C7C7C] hover:bg-[#EEEEEE]'
-                                )}
+                                className="h-[48px] px-6 rounded-[12px] text-[14px] font-bold transition-all flex items-center gap-2 disabled:opacity-60 bg-[#FFF0F0] text-[#E74C3C] hover:bg-[#FFE0E0]"
                             >
                                 <XCircle size={16} />
-                                {order.status === 'pending' ? 'Reject Order' : 'Cancel Order'}
+                                Cancel Order
                             </button>
                         )}
                     </div>
@@ -653,6 +858,7 @@ export default function VendorOrderDetailPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [fulfilledQtys, setFulfilledQtys] = useState<Record<string, number>>({});
+    const [rejectReasons, setRejectReasons] = useState<Record<string, string>>({});
     const [ewayBill, setEwayBill] = useState('');
     const [ewaySaving, setEwaySaving] = useState(false);
     const [showClaimModal, setShowClaimModal] = useState(false);
@@ -740,8 +946,11 @@ export default function VendorOrderDetailPage() {
     useEffect(() => { fetchOrder(); }, [fetchOrder]);
 
     // Derived state for partial-fulfilment indicators
-    const isPartialAccept = order?.status === 'pending' && order.items.some(
-        item => (fulfilledQtys[item.id] ?? item.quantity) < item.quantity
+    const isPartialAccept = !!order && order.status === 'pending' && order.items.some(
+        (item) => {
+            const current = item.fulfilledQty > 0 ? item.fulfilledQty : item.quantity;
+            return (fulfilledQtys[item.id] ?? current) !== current;
+        },
     );
     const isAmendDirty = order && ['confirmed', 'processing', 'ready_for_dispatch'].includes(order.status) && order.items.some(
         item => (fulfilledQtys[item.id] ?? item.fulfilledQty ?? item.quantity) !== (item.fulfilledQty ?? item.quantity)
@@ -766,9 +975,9 @@ export default function VendorOrderDetailPage() {
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.error?.message || 'Update failed');
-            setOrder(prev => prev ? { ...prev, ...json.data } : prev);
+            await fetchOrder();
             toast.success(
-                status === 'cancelled' ? 'Order rejected. Inventory released.' :
+                status === 'cancelled' ? 'Order cancelled. Inventory released.' :
                     status === 'delivered' ? 'Delivery confirmed!' :
                         `Order marked as ${STATUS_LABELS[status] ?? status}.`
             );
@@ -776,33 +985,28 @@ export default function VendorOrderDetailPage() {
             toast.error(err instanceof Error ? err.message : 'Action failed');
             throw err;
         }
-    }, [order, orderId]);
+    }, [order, orderId, fetchOrder]);
 
     const handleTimelineStatusChange = useCallback(async (status: string) => {
-        if (!order) return;
-        try {
-            const res = await fetch(`/api/v1/vendor/orders/${orderId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status, force: true }),
-            });
-            const json = await res.json();
-            if (!json.success) throw new Error(json.error?.message || 'Update failed');
-            setOrder(prev => prev ? { ...prev, ...json.data } : prev);
-            toast.success(`Order status set to ${STATUS_LABELS[status] ?? status}.`);
-        } catch (err: unknown) {
-            toast.error(err instanceof Error ? err.message : 'Action failed');
-            throw err;
-        }
-    }, [order, orderId]);
+        await handleAction(status);
+    }, [handleAction]);
 
     const handleAccept = useCallback(async (qtys: Record<string, number>) => {
         if (!order) return;
         try {
-            // Build items array for the API
+            const zeroWithoutReason = order.items.filter((item) => {
+                const q = qtys[item.id] ?? item.quantity;
+                return q === 0 && !(rejectReasons[item.id]?.trim());
+            });
+            if (zeroWithoutReason.length > 0) {
+                throw new Error('Enter a rejection reason for each line set to quantity 0.');
+            }
             const items = order.items.map(item => ({
                 itemId: item.id,
                 fulfilledQty: qtys[item.id] ?? item.quantity,
+                ...(qtys[item.id] === 0 && rejectReasons[item.id]
+                    ? { reason: rejectReasons[item.id].trim() }
+                    : {}),
             }));
             const isAmend = order.status !== 'pending';
             const res = await fetch(`/api/v1/vendor/orders/${orderId}`, {
@@ -812,19 +1016,37 @@ export default function VendorOrderDetailPage() {
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.error?.message || 'Accept failed');
-            setOrder(prev => prev ? { ...prev, ...json.data } : prev);
+            await fetchOrder();
             toast.success(
                 isAmend
                     ? 'Order quantities updated.'
-                    : isPartialAccept
-                    ? 'Partial order accepted! Unfulfilled stock released.'
-                    : 'Order accepted! Inventory reserved.'
+                    : 'Quantity adjustments saved. Order remains Pending until you advance status.',
             );
         } catch (err: unknown) {
             toast.error(err instanceof Error ? err.message : 'Accept failed');
             throw err;
         }
-    }, [order, orderId, isPartialAccept]);
+    }, [order, orderId, fetchOrder, rejectReasons]);
+
+    const applySubstitute = async (itemId: string, substituteProductId: string) => {
+        try {
+            const res = await fetch(`/api/v1/vendor/orders/${orderId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'substitute',
+                    itemId,
+                    substituteProductId,
+                }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error?.message || 'Substitute failed');
+            await fetchOrder();
+            toast.success('Substitute applied.');
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Substitute failed');
+        }
+    };
 
     const saveEwayBill = async () => {
         if (!ewayBill.trim()) return;
@@ -960,6 +1182,15 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                     onChangeStatus={handleTimelineStatusChange}
                 />
             </div>
+
+            <OrderEventsPanel events={order.events ?? []} />
+
+            {order.cancelRequest?.status === 'pending' && order.status === 'pending' && (
+                <CancelRequestBanner
+                    request={order.cancelRequest}
+                    onReviewed={() => fetchOrder()}
+                />
+            )}
 
             {/* Delivery proof banner */}
             {order.status === 'delivered' && (order.deliveryProofType || order.deliveredAt) && (
@@ -1155,7 +1386,20 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                             <div className="bg-amber-50 border border-amber-200 rounded-[8px] px-3 py-2 text-[11px] text-amber-900">
                                                 <p className="font-bold flex items-center gap-1"><AlertTriangle size={12} /> Only {item.stockAvailable ?? 0} in stock</p>
                                                 {(item.substitutes?.length ?? 0) > 0 && (
-                                                    <p className="mt-1">Suggest: {item.substitutes!.map((s) => s.name).join(', ')}</p>
+                                                    <div className="mt-1 space-y-1">
+                                                        <p>Suggest: {item.substitutes!.map((s) => s.name).join(', ')}</p>
+                                                        {order.status === 'pending' && item.substitutes!.map((s) => (
+                                                            <button
+                                                                key={s.id}
+                                                                type="button"
+                                                                data-testid={`apply-sub-${item.id}-${s.id}`}
+                                                                onClick={() => applySubstitute(item.id, s.id)}
+                                                                className="block text-[#299E60] font-bold underline"
+                                                            >
+                                                                Apply {s.name}
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 )}
                                                 <button
                                                     type="button"
@@ -1174,6 +1418,16 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                 <button type="button" onClick={() => setFulfilledQty(item.id, fulfilled + 1, item.quantity)} className="w-7 h-7 rounded border border-[#EEEEEE] flex items-center justify-center"><Plus size={12} /></button>
                                                 {isReduced && <span className="text-[10px] text-amber-700 font-bold">partial</span>}
                                             </div>
+                                        )}
+                                        {canEditQty && fulfilled === 0 && (
+                                            <input
+                                                type="text"
+                                                data-testid={`reject-reason-${item.id}`}
+                                                placeholder="Rejection reason (required)"
+                                                value={rejectReasons[item.id] ?? ''}
+                                                onChange={(e) => setRejectReasons((p) => ({ ...p, [item.id]: e.target.value }))}
+                                                className="w-full mt-1 h-[34px] px-2 rounded-[8px] border border-red-200 text-[12px] outline-none"
+                                            />
                                         )}
                                     </div>
                                 );
@@ -1235,7 +1489,20 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                                         Only {item.stockAvailable ?? 0} available
                                                                     </p>
                                                                     {(item.substitutes?.length ?? 0) > 0 && (
-                                                                        <p className="mt-0.5">Suggest: {item.substitutes!.map((s) => s.name).join(', ')}</p>
+                                                                        <div className="mt-0.5 space-y-1">
+                                                                            <p>Suggest: {item.substitutes!.map((s) => s.name).join(', ')}</p>
+                                                                            {order.status === 'pending' && item.substitutes!.map((s) => (
+                                                                                <button
+                                                                                    key={s.id}
+                                                                                    type="button"
+                                                                                    data-testid={`apply-sub-desk-${item.id}-${s.id}`}
+                                                                                    onClick={() => applySubstitute(item.id, s.id)}
+                                                                                    className="block text-[#299E60] font-bold underline text-[11px]"
+                                                                                >
+                                                                                    Apply {s.name}
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
                                                                     )}
                                                                     <button
                                                                         type="button"
@@ -1298,6 +1565,16 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                         )}
                                                         {isSkipped && (
                                                             <p className="text-[10px] text-[#E74C3C] mt-0.5 font-bold">skipped</p>
+                                                        )}
+                                                        {isSkipped && (
+                                                            <input
+                                                                type="text"
+                                                                data-testid={`reject-reason-desk-${item.id}`}
+                                                                placeholder="Rejection reason"
+                                                                value={rejectReasons[item.id] ?? ''}
+                                                                onChange={(e) => setRejectReasons((p) => ({ ...p, [item.id]: e.target.value }))}
+                                                                className="mt-1 w-full max-w-[140px] mx-auto h-[28px] px-1.5 rounded border border-red-200 text-[10px] outline-none"
+                                                            />
                                                         )}
                                                     </td>
                                                 )}

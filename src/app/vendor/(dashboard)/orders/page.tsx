@@ -12,8 +12,10 @@ interface VendorOrder {
     id: string;
     orderNumber: string;
     status: string;
+    isPartial?: boolean;
     totalAmount: number;
     paymentStatus: string;
+    paymentMethod?: string | null;
     createdAt: string;
     outlet?: { name: string } | null;
     deliveryAddressSnapshot?: { name?: string } | null;
@@ -60,13 +62,19 @@ const PAYMENT_STYLE: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
     draft: 'Draft',
-    pending: 'Pending Approval',
+    new: 'New',
+    pending: 'Pending',
+    accepted: 'Accepted',
     confirmed: 'Accepted',
-    processing: 'Packing',
+    partially_accepted: 'Partially Accepted',
+    packed: 'Packed',
+    processing: 'Packed',
     ready_for_dispatch: 'Ready for Dispatch',
-    shipped: 'Out for Delivery',
+    dispatched: 'Dispatched',
+    shipped: 'Dispatched',
     partially_delivered: 'Partially Delivered',
     delivered: 'Delivered',
+    completed: 'Completed',
     returned: 'Returned',
     cancelled: 'Cancelled',
 };
@@ -76,7 +84,20 @@ const STATUS_OPTIONS = [
     'shipped', 'partially_delivered', 'delivered', 'returned', 'cancelled',
 ];
 
-const STATUS_TABS = ['all', 'pending', 'confirmed', 'processing', 'ready_for_dispatch', 'shipped', 'partially_delivered', 'delivered', 'returned', 'cancelled'] as const;
+/** Brief Section 7 filter tabs (API aliases + native statuses). */
+const STATUS_TABS = [
+    'all',
+    'new',
+    'pending',
+    'accepted',
+    'partially_accepted',
+    'packed',
+    'ready_for_dispatch',
+    'dispatched',
+    'delivered',
+    'completed',
+    'cancelled',
+] as const;
 const PAGE_SIZE = 20;
 
 function isOverSLA(dateStr: string): boolean {
@@ -107,13 +128,26 @@ export default function VendorOrdersPage() {
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+    const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [bulkBusy, setBulkBusy] = useState(false);
+    const [bulkStatus, setBulkStatus] = useState('confirmed');
 
     // Cursors stack for "back" pagination
     const [cursorStack, setCursorStack] = useState<string[]>([]);
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const fetchOrders = useCallback((opts: { tab: string; q: string; cur?: string | null; silent?: boolean; from?: string; to?: string; payment?: string }) => {
+    const fetchOrders = useCallback((opts: {
+        tab: string;
+        q: string;
+        cur?: string | null;
+        silent?: boolean;
+        from?: string;
+        to?: string;
+        payment?: string;
+        paymentMethod?: string;
+    }) => {
         if (!opts.silent) setLoading(true);
         const url = new URL('/api/v1/vendor/orders', window.location.origin);
         url.searchParams.set('limit', String(PAGE_SIZE));
@@ -123,6 +157,7 @@ export default function VendorOrdersPage() {
         if (opts.from) url.searchParams.set('dateFrom', opts.from);
         if (opts.to) url.searchParams.set('dateTo', opts.to);
         if (opts.payment) url.searchParams.set('paymentStatus', opts.payment);
+        if (opts.paymentMethod) url.searchParams.set('paymentMethod', opts.paymentMethod);
         const oq = outletQuery();
         if (oq) {
           new URLSearchParams(oq.slice(1)).forEach((v, k) => url.searchParams.set(k, v));
@@ -135,6 +170,7 @@ export default function VendorOrdersPage() {
                     setOrders(json.data.orders);
                     setCursor(json.data.nextCursor);
                     setHasMore(json.data.hasMore);
+                    setSelectedIds([]);
                 }
             })
             .catch(console.error)
@@ -144,7 +180,14 @@ export default function VendorOrdersPage() {
     // Re-fetch when tab changes (immediate)
     useEffect(() => {
         setCursorStack([]);
-        fetchOrders({ tab: activeTab, q: searchQuery, from: dateFrom, to: dateTo, payment: paymentStatusFilter });
+        fetchOrders({
+            tab: activeTab,
+            q: searchQuery,
+            from: dateFrom,
+            to: dateTo,
+            payment: paymentStatusFilter,
+            paymentMethod: paymentMethodFilter,
+        });
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab]);
 
@@ -153,7 +196,14 @@ export default function VendorOrdersPage() {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => {
             setCursorStack([]);
-            fetchOrders({ tab: activeTab, q: searchQuery, from: dateFrom, to: dateTo, payment: paymentStatusFilter });
+            fetchOrders({
+                tab: activeTab,
+                q: searchQuery,
+                from: dateFrom,
+                to: dateTo,
+                payment: paymentStatusFilter,
+                paymentMethod: paymentMethodFilter,
+            });
         }, 300);
         return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,9 +212,16 @@ export default function VendorOrdersPage() {
     // Re-fetch when date/payment filters change
     useEffect(() => {
         setCursorStack([]);
-        fetchOrders({ tab: activeTab, q: searchQuery, from: dateFrom, to: dateTo, payment: paymentStatusFilter });
+        fetchOrders({
+            tab: activeTab,
+            q: searchQuery,
+            from: dateFrom,
+            to: dateTo,
+            payment: paymentStatusFilter,
+            paymentMethod: paymentMethodFilter,
+        });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dateFrom, dateTo, paymentStatusFilter]);
+    }, [dateFrom, dateTo, paymentStatusFilter, paymentMethodFilter]);
 
     const handleTabChange = (tab: string) => {
         setActiveTab(tab);
@@ -179,14 +236,30 @@ export default function VendorOrdersPage() {
     const handleNextPage = () => {
         if (!cursor) return;
         setCursorStack(prev => [...prev, orders[0]?.id ?? '']);
-        fetchOrders({ tab: activeTab, q: searchQuery, cur: cursor, from: dateFrom, to: dateTo, payment: paymentStatusFilter });
+        fetchOrders({
+            tab: activeTab,
+            q: searchQuery,
+            cur: cursor,
+            from: dateFrom,
+            to: dateTo,
+            payment: paymentStatusFilter,
+            paymentMethod: paymentMethodFilter,
+        });
     };
 
     const handlePrevPage = () => {
         const stack = [...cursorStack];
         stack.pop();
         setCursorStack(stack);
-        fetchOrders({ tab: activeTab, q: searchQuery, cur: stack[stack.length - 1] ?? null, from: dateFrom, to: dateTo, payment: paymentStatusFilter });
+        fetchOrders({
+            tab: activeTab,
+            q: searchQuery,
+            cur: stack[stack.length - 1] ?? null,
+            from: dateFrom,
+            to: dateTo,
+            payment: paymentStatusFilter,
+            paymentMethod: paymentMethodFilter,
+        });
     };
 
     const updateOrderStatus = async (orderId: string, newStatus: string) => {
@@ -198,7 +271,7 @@ export default function VendorOrdersPage() {
             const res = await fetch(`/api/v1/vendor/orders/${orderId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: newStatus, force: true }),
+                body: JSON.stringify({ status: newStatus }),
             });
             const json = await res.json();
             if (!res.ok || !json.success) throw new Error(json.error?.message || json.message || 'Failed to update status');
@@ -213,37 +286,102 @@ export default function VendorOrdersPage() {
 
     const isFirstPage = cursorStack.length === 0;
     const today = new Date().toISOString().slice(0, 10);
-    const hasActiveFilters = dateFrom || dateTo || paymentStatusFilter;
+    const hasActiveFilters = dateFrom || dateTo || paymentStatusFilter || paymentMethodFilter;
 
     const clearFilters = () => {
         setDateFrom('');
         setDateTo('');
         setPaymentStatusFilter('');
+        setPaymentMethodFilter('');
     };
 
-    const exportCsv = () => {
-        if (orders.length === 0) return;
-        const rows = [
-            ['Order Number', 'Customer', 'Business', 'Items', 'Amount (₹)', 'Date', 'Payment Status', 'Order Status'],
-            ...orders.map(o => [
-                o.orderNumber,
-                o.user.fullName,
-                o.user.businessName ?? '',
-                String(o._count?.items ?? ''),
-                String(Number(o.totalAmount).toFixed(2)),
-                new Date(o.createdAt).toLocaleDateString('en-IN'),
-                o.paymentStatus,
-                o.status,
-            ]),
-        ];
-        const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `orders-${activeTab}-${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
+    const toggleSelect = (id: string) => {
+        setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    };
+    const allPageSelected = orders.length > 0 && orders.every((o) => selectedIds.includes(o.id));
+    const toggleSelectAll = () => {
+        if (allPageSelected) setSelectedIds([]);
+        else setSelectedIds(orders.map((o) => o.id));
+    };
+
+    const buildFilterParams = () => {
+        const url = new URL('/api/v1/vendor/orders/export', window.location.origin);
+        if (activeTab !== 'all') url.searchParams.set('status', activeTab);
+        if (searchQuery.trim()) url.searchParams.set('search', searchQuery.trim());
+        if (dateFrom) url.searchParams.set('dateFrom', dateFrom);
+        if (dateTo) url.searchParams.set('dateTo', dateTo);
+        if (paymentStatusFilter) url.searchParams.set('paymentStatus', paymentStatusFilter);
+        if (paymentMethodFilter) url.searchParams.set('paymentMethod', paymentMethodFilter);
+        const oq = outletQuery();
+        if (oq) {
+            new URLSearchParams(oq.slice(1)).forEach((v, k) => url.searchParams.set(k, v));
+        }
+        return url;
+    };
+
+    const exportCsv = async () => {
+        try {
+            const url = buildFilterParams();
+            const res = await fetch(url.toString(), { credentials: 'include' });
+            if (!res.ok) throw new Error('Export failed');
+            const blob = await res.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `orders-export-${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            toast.success('Export downloaded');
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Export failed');
+        }
+    };
+
+    const runBulk = async (action: 'update_status' | 'print_invoices') => {
+        if (selectedIds.length === 0) return;
+        setBulkBusy(true);
+        try {
+            const res = await fetch('/api/v1/vendor/orders/bulk', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action,
+                    orderIds: selectedIds,
+                    ...(action === 'update_status' ? { status: bulkStatus } : {}),
+                }),
+            });
+            if (action === 'print_invoices') {
+                if (!res.ok) {
+                    const json = await res.json().catch(() => ({}));
+                    throw new Error(json.error?.message || 'Print failed');
+                }
+                const blob = await res.blob();
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `invoices-bulk-${selectedIds.length}.pdf`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+                toast.success(`Downloaded ${selectedIds.length} invoice(s)`);
+                return;
+            }
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error?.message || 'Bulk update failed');
+            const failed = json.data?.failed?.length ?? 0;
+            const ok = json.data?.succeeded?.length ?? 0;
+            toast.success(failed ? `Updated ${ok}, ${failed} failed` : `Updated ${ok} order(s)`);
+            fetchOrders({
+                tab: activeTab,
+                q: searchQuery,
+                from: dateFrom,
+                to: dateTo,
+                payment: paymentStatusFilter,
+                paymentMethod: paymentMethodFilter,
+            });
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Bulk action failed');
+        } finally {
+            setBulkBusy(false);
+        }
     };
 
     return (
@@ -259,17 +397,18 @@ export default function VendorOrdersPage() {
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#AEAEAE]" size={15} />
                         <input
                             type="text"
-                            placeholder="Search order / customer..."
+                            placeholder="Order / Invoice / Customer..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
+                            data-testid="orders-search"
                             className="h-[40px] w-full bg-white border border-[#EEEEEE] rounded-[10px] pl-10 pr-4 text-[13px] outline-none placeholder:text-[#AEAEAE] focus:border-[#299E60]/40 shadow-sm"
                         />
                     </div>
                     <button
                         onClick={exportCsv}
-                        disabled={orders.length === 0}
-                        title="Export current view as CSV"
-                        className="h-[40px] px-3 rounded-[10px] bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5] disabled:opacity-50 flex items-center gap-1.5 text-[12px] font-semibold shadow-sm shrink-0"
+                        title="Export filtered orders as CSV"
+                        data-testid="orders-export"
+                        className="h-[40px] px-3 rounded-[10px] bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5] flex items-center gap-1.5 text-[12px] font-semibold shadow-sm shrink-0"
                     >
                         <Download size={14} />
                         Export
@@ -279,18 +418,18 @@ export default function VendorOrdersPage() {
 
             {/* Status Tabs */}
             <div className="flex items-center gap-2 flex-wrap">
-                {STATUS_TABS.map((tab) => (
+                        {STATUS_TABS.map((tab) => (
                     <button
                         key={tab}
                         onClick={() => handleTabChange(tab)}
                         className={cn(
-                            'px-4 py-2 rounded-[10px] text-[13px] font-bold capitalize transition-all',
+                            'px-4 py-2 rounded-[10px] text-[13px] font-bold transition-all',
                             activeTab === tab
                                 ? 'bg-[#299E60] text-white shadow-sm shadow-[#299E60]/30'
                                 : 'bg-white text-[#7C7C7C] border border-[#EEEEEE] hover:border-[#299E60]/30'
                         )}
                     >
-                        {tab.replace(/_/g, ' ')}
+                        {STATUS_LABELS[tab] || tab.replace(/_/g, ' ')}
                     </button>
                 ))}
             </div>
@@ -319,11 +458,23 @@ export default function VendorOrdersPage() {
                     onChange={e => setPaymentStatusFilter(e.target.value)}
                     className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#7C7C7C] outline-none focus:border-[#299E60]/40 bg-white shadow-sm"
                 >
-                    <option value="">All Payments</option>
+                    <option value="">All Payment Status</option>
                     <option value="paid">Paid</option>
                     <option value="unpaid">Unpaid</option>
                     <option value="partial">Partial</option>
                     <option value="refunded">Refunded</option>
+                </select>
+                <select
+                    value={paymentMethodFilter}
+                    onChange={(e) => setPaymentMethodFilter(e.target.value)}
+                    data-testid="payment-method-filter"
+                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#7C7C7C] outline-none focus:border-[#299E60]/40 bg-white shadow-sm"
+                >
+                    <option value="">All Methods</option>
+                    <option value="cod">Cash / COD</option>
+                    <option value="online">Online</option>
+                    <option value="credit">Credit</option>
+                    <option value="vendor_credit">Vendor Credit</option>
                 </select>
                 {hasActiveFilters && (
                     <button
@@ -335,6 +486,52 @@ export default function VendorOrdersPage() {
                     </button>
                 )}
             </div>
+
+            {selectedIds.length > 0 && (
+                <div
+                    className="flex flex-wrap items-center gap-3 bg-[#EEF8F1] border border-[#D1FAE5] rounded-[12px] px-4 py-3"
+                    data-testid="bulk-actions-bar"
+                >
+                    <span className="text-[13px] font-bold text-[#181725]">{selectedIds.length} selected</span>
+                    <select
+                        value={bulkStatus}
+                        onChange={(e) => setBulkStatus(e.target.value)}
+                        data-testid="bulk-status-select"
+                        className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] bg-white"
+                    >
+                        <option value="confirmed">Accepted</option>
+                        <option value="processing">Packed</option>
+                        <option value="ready_for_dispatch">Ready for Dispatch</option>
+                        <option value="shipped">Dispatched</option>
+                        <option value="delivered">Delivered</option>
+                    </select>
+                    <button
+                        type="button"
+                        disabled={bulkBusy}
+                        data-testid="bulk-update-status"
+                        onClick={() => runBulk('update_status')}
+                        className="h-[36px] px-4 rounded-[10px] bg-[#299E60] text-white text-[12px] font-bold disabled:opacity-50"
+                    >
+                        Update Status
+                    </button>
+                    <button
+                        type="button"
+                        disabled={bulkBusy}
+                        data-testid="bulk-print-invoices"
+                        onClick={() => runBulk('print_invoices')}
+                        className="h-[36px] px-4 rounded-[10px] border border-[#299E60] text-[#299E60] text-[12px] font-bold disabled:opacity-50"
+                    >
+                        Print Invoices
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setSelectedIds([])}
+                        className="h-[36px] px-3 text-[12px] font-bold text-[#7C7C7C]"
+                    >
+                        Clear
+                    </button>
+                </div>
+            )}
 
             {/* Table — desktop */}
             <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
@@ -359,7 +556,9 @@ export default function VendorOrdersPage() {
                                     <p className="text-[14px] font-bold text-[#181725]">{order.orderNumber}</p>
                                     {orderFulfillmentChip(order)}
                                     <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-[6px] uppercase', STATUS_STYLE[order.status] || 'bg-gray-100')}>
-                                        {STATUS_LABELS[order.status] ?? order.status}
+                                        {order.isPartial && order.status !== 'cancelled'
+                                            ? 'Partially Accepted'
+                                            : (STATUS_LABELS[order.status] ?? order.status)}
                                     </span>
                                 </div>
                                 <p className="text-[12px] text-[#7C7C7C]">{order.user.fullName}</p>
@@ -374,6 +573,15 @@ export default function VendorOrdersPage() {
                         <table className="w-full">
                             <thead>
                                 <tr className="bg-[#FAFAFA] border-b border-[#EEEEEE]">
+                                    <th className="px-3 py-3 text-center w-10">
+                                        <input
+                                            type="checkbox"
+                                            checked={allPageSelected}
+                                            onChange={toggleSelectAll}
+                                            data-testid="select-all-orders"
+                                            aria-label="Select all on page"
+                                        />
+                                    </th>
                                     <th className="px-5 py-3 text-left text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">Order</th>
                                     <th className="px-5 py-3 text-left text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">Customer</th>
                                     <th className="px-5 py-3 text-center text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">Items</th>
@@ -387,7 +595,7 @@ export default function VendorOrdersPage() {
                             <tbody className="divide-y divide-[#F5F5F5]">
                                 {orders.length === 0 ? (
                                     <tr>
-                                        <td colSpan={8} className="py-16 text-center text-[14px] text-[#AEAEAE]">
+                                        <td colSpan={9} className="py-16 text-center text-[14px] text-[#AEAEAE]">
                                             {searchQuery ? `No orders matching "${searchQuery}"` : `No ${activeTab === 'all' ? '' : activeTab + ' '}orders`}
                                         </td>
                                     </tr>
@@ -401,6 +609,15 @@ export default function VendorOrdersPage() {
                                                 overSLA && 'bg-[#FFF9F0]'
                                             )}
                                         >
+                                            <td className="px-3 py-4 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.includes(order.id)}
+                                                    onChange={() => toggleSelect(order.id)}
+                                                    data-testid={`select-order-${order.id}`}
+                                                    aria-label={`Select ${order.orderNumber}`}
+                                                />
+                                            </td>
                                             <td className="px-5 py-4">
                                                 <div className="flex items-center gap-2">
                                                     {overSLA && (
