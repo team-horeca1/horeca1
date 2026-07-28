@@ -116,9 +116,10 @@ export default function VendorOrdersPage() {
     const router = useRouter();
     const { outletQuery, scopeVersion, multiWarehouseEnabled } = useVendorOutletScope();
 
-    // Read initial status from URL (e.g., ?status=pending from dashboard)
+    // Default = Order Workspace (primary ops). List via ?view=list
+    const isListView = searchParams.get('view') === 'list';
+    const isWorkspace = !isListView;
     const initialStatus = searchParams.get('status') || 'all';
-    const isWorkspace = searchParams.get('view') === 'workspace';
 
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<string>(initialStatus);
@@ -230,6 +231,7 @@ export default function VendorOrdersPage() {
         setSearchQuery('');
         // Sync URL
         const params = new URLSearchParams(searchParams.toString());
+        params.set('view', 'list');
         if (tab === 'all') params.delete('status');
         else params.set('status', tab);
         router.replace(`/vendor/orders?${params.toString()}`, { scroll: false });
@@ -396,11 +398,11 @@ export default function VendorOrdersPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-[24px] font-bold text-[#181725]">Orders</h1>
+                    <h1 className="text-[24px] font-bold text-[#181725]">All orders</h1>
                     <p className="text-[12px] text-[#AEAEAE]">
-                      Manage and fulfil customer orders
+                      Filters, bulk actions, and export
                       {' · '}
-                      <Link href="/vendor/orders?view=workspace" className="font-semibold text-[#299E60] hover:underline" data-testid="orders-workspace-link">
+                      <Link href="/vendor/orders" className="font-semibold text-[#299E60] hover:underline" data-testid="orders-workspace-link">
                         Order Workspace
                       </Link>
                     </p>

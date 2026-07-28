@@ -5,7 +5,6 @@ import type { ComponentType } from 'react';
 import {
   LayoutDashboard,
   ShoppingBag,
-  ClipboardList,
   Users,
   Store,
   CheckSquare,
@@ -120,7 +119,6 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
       // Matrix "Dashboard" / dashboard.view gates Store Ops only — not supplier overview.
       { name: 'Dashboard', icon: LayoutDashboard, href: '/vendor/dashboard', feature: 'dashboard', requiredPerm: 'dashboard.view' },
       { name: 'Orders', icon: ShoppingBag, href: '/vendor/orders', feature: 'orders', requiredPerm: 'orders.view' },
-      { name: 'Order Workspace', icon: ClipboardList, href: '/vendor/orders?view=workspace', feature: 'orders', requiredPerm: 'orders.view' },
       { name: 'Inventory', icon: Warehouse, href: '/vendor/inventory', feature: 'inventory', requiredPerm: 'inventory.view' },
       // Hidden for now — re-enable with warehouse ops
       // { name: 'Warehouse', icon: Container, href: '/vendor/warehouse', feature: 'grn', requiredPerm: 'inventory.view' },
