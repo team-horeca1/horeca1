@@ -1,6 +1,5 @@
-// GET  /api/v1/vendor/products/price-update?template=true — price-only Excel template
-// POST /api/v1/vendor/products/price-update — Replace Prices (price fields only)
-// WHY: Section 4 bulk price update without touching stock/name/category.
+// GET  /api/v1/vendor/products/price-update — download current prices sheet
+// POST /api/v1/vendor/products/price-update — upload edited prices (MOQ / tax / optional slabs)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -9,22 +8,57 @@ import { Errors, errorResponse, friendlyErrorMessage } from '@/middleware/errorH
 import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import {
-  generatePriceUpdateTemplate,
+  exportPriceUpdateSheet,
   parsePriceUpdate,
 } from '@/modules/import-export/excel.service';
 import { buildImportErrorReportCsv, type ImportErrorRowData } from '@/modules/import-export/import-commit';
 import { logProductFieldChanges, summarizePriceSlabs } from '@/lib/product-audit';
 
-export const GET = vendorOnly(async (req: NextRequest) => {
+export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
-    if (req.nextUrl.searchParams.get('template') !== 'true') {
-      throw Errors.badRequest('Use ?template=true to download the price update template');
-    }
-    const buffer = generatePriceUpdateTemplate();
+    const { vendorId } = await resolveVendorContext(ctx, req);
+    requirePermission(ctx, 'products.view');
+
+    const products = await prisma.product.findMany({
+      where: {
+        vendorId,
+        slug: { not: { startsWith: '_deleted_' } },
+      },
+      select: {
+        name: true,
+        sku: true,
+        vendorSku: true,
+        minOrderQty: true,
+        basePrice: true,
+        taxPercent: true,
+        priceSlabs: {
+          orderBy: { sortOrder: 'asc' },
+          take: 3,
+          select: { minQty: true, price: true },
+        },
+      },
+      orderBy: { name: 'asc' },
+      take: 5000,
+    });
+
+    const rows = products.map((p) => ({
+      name: p.name,
+      sku: (p.vendorSku || p.sku || '').trim() || p.sku || '',
+      moq: p.minOrderQty ?? 1,
+      basePrice: Number(p.basePrice),
+      taxPercent: p.taxPercent != null ? Number(p.taxPercent) : 0,
+      slabs: p.priceSlabs.map((s) => ({
+        minQty: s.minQty,
+        price: Number(s.price),
+      })),
+    }));
+
+    const buffer = exportPriceUpdateSheet(rows);
+    const date = new Date().toISOString().slice(0, 10);
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename="price_update_template.xlsx"',
+        'Content-Disposition': `attachment; filename="price_bulk_update_${date}.xlsx"`,
       },
     });
   } catch (error) {
@@ -51,7 +85,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     for (const row of rows) {
       rowData.set(row.row, {
         name: '',
-        sku: row.sku ?? row.vendorSku ?? '',
+        sku: row.sku,
         netRate: row.basePrice,
       });
 
@@ -60,15 +94,15 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
           vendorId,
           slug: { not: { startsWith: '_deleted_' } },
           OR: [
-            ...(row.sku ? [{ sku: { equals: row.sku, mode: 'insensitive' as const } }] : []),
-            ...(row.vendorSku
-              ? [{ vendorSku: { equals: row.vendorSku, mode: 'insensitive' as const } }]
-              : []),
+            { sku: { equals: row.sku, mode: 'insensitive' as const } },
+            { vendorSku: { equals: row.sku, mode: 'insensitive' as const } },
           ],
         },
         select: {
           id: true,
           basePrice: true,
+          taxPercent: true,
+          minOrderQty: true,
           priceSlabs: {
             orderBy: { sortOrder: 'asc' },
             select: { minQty: true, maxQty: true, price: true, promoPrice: true },
@@ -79,21 +113,42 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       if (!product) {
         applyErrors.push({
           row: row.row,
-          message: `No product found for SKU "${row.sku ?? ''}" / POS "${row.vendorSku ?? ''}"`,
+          message: `No product found for SKU "${row.sku}"`,
         });
         continue;
       }
 
       try {
         const oldBase = Number(product.basePrice);
+        const oldTax = Number(product.taxPercent);
+        const oldMoq = product.minOrderQty;
+
+        const data: {
+          basePrice: number;
+          taxPercent: number;
+          minOrderQty?: number;
+        } = {
+          basePrice: row.basePrice,
+          taxPercent: row.taxPercent,
+        };
+        if (row.moq !== undefined) {
+          data.minOrderQty = row.moq;
+        }
+
         await prisma.product.update({
           where: { id: product.id },
-          data: { basePrice: row.basePrice },
+          data,
         });
 
         const changes: Array<{ field: string; oldValue: unknown; newValue: unknown }> = [];
         if (oldBase !== row.basePrice) {
           changes.push({ field: 'basePrice', oldValue: oldBase, newValue: row.basePrice });
+        }
+        if (oldTax !== row.taxPercent) {
+          changes.push({ field: 'taxPercent', oldValue: oldTax, newValue: row.taxPercent });
+        }
+        if (row.moq !== undefined && oldMoq !== row.moq) {
+          changes.push({ field: 'minOrderQty', oldValue: oldMoq, newValue: row.moq });
         }
 
         if (row.slabs.length > 0) {

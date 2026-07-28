@@ -338,15 +338,19 @@ const HEADER_MAP: Record<string, string> = (() => {
     'image name': 'Image Name',
     'image_url': 'Image URL',
     'net rate': 'Net Rate',
+    'taxable rate': 'Net Rate',
     'stock on hand': 'Stock On Hand',
     'usage unit': 'Usage unit',
     'unit name': 'Unit Name',
     'bulk qty 1 - quantity': 'Bulk Qty 1 - Quantity',
     'bulk qty 1 - net rate / pc': 'Bulk Qty 1 - Net Rate / Pc',
+    'bulk qty 1 - taxable rate / pc': 'Bulk Qty 1 - Net Rate / Pc',
     'bulk qty 2 - quantity': 'Bulk Qty 2 - Quantity',
     'bulk qty 2 - net rate / pc': 'Bulk Qty 2 - Net Rate / Pc',
+    'bulk qty 2 - taxable rate / pc': 'Bulk Qty 2 - Net Rate / Pc',
     'bulk qty 3 - quantity': 'Bulk Qty 3 - Quantity',
     'bulk qty 3 - net rate / pc': 'Bulk Qty 3 - Net Rate / Pc',
+    'bulk qty 3 - taxable rate / pc': 'Bulk Qty 3 - Net Rate / Pc',
     'additional sub-category': 'Additional Sub-Category',
     'additional sub category': 'Additional Sub-Category',
     'sub-category': 'Sub-Category',
@@ -699,6 +703,59 @@ export function getImportTemplateHeaders(): string[] {
   ];
 }
 
+/** Clean catalog export headers — no duplicate Net/Taxable/Bulk Rates/Stock/Unit columns. */
+export function getProductExportHeaders(): string[] {
+  return [
+    'Vendor ID',
+    'Item ID',
+    'Item Name',
+    'SKU',
+    'HSN Code',
+    'Brand',
+    'Parent Category',
+    'Sub-Category',
+    'Additional Sub-Category',
+    'Item Status',
+    'Active on Online Store',
+    'Taxable Rate',
+    'Tax %',
+    'Gross Rate 1Pc (visible to the Customer)',
+    'Bulk Qty 1 - Quantity',
+    'Bulk Qty 1 - Taxable Rate / Pc',
+    'Bulk Qty 2 - Quantity',
+    'Bulk Qty 2 - Taxable Rate / Pc',
+    'Bulk Qty 3 - Quantity',
+    'Bulk Qty 3 - Taxable Rate / Pc',
+    'MOQ',
+    'Stock On Hand',
+    'Image URL',
+    'Usage unit',
+    'Alias Name',
+    'UPC',
+    'EAN',
+    'Veg / Non-Veg',
+    'Storage type',
+    'Account',
+    'Account Code',
+    'Taxable',
+    'Exemption Reason',
+    'Taxability Type',
+    'Product Type',
+    'Platform Commission',
+    'Inventory Account',
+    'Inventory Account Code',
+    'Reorder Point',
+    'Opening Stock',
+    'Package Weight',
+    'Package Length',
+    'Package Width',
+    'Package Height',
+    'Dimension Unit',
+    'Weight Unit',
+    'Description',
+  ];
+}
+
 const TEMPLATE_INSTRUCTIONS: Record<string, string> = {
   'Vendor ID': 'System Fetched',
   'Item ID': 'System Generated',
@@ -715,6 +772,7 @@ const TEMPLATE_INSTRUCTIONS: Record<string, string> = {
   'Item Status': 'to make the item active / inactive',
   'Active on Online Store': 'to make it visible online',
   'Net Rate': 'Taxable rate; vendor provided',
+  'Taxable Rate': 'Taxable rate; vendor provided',
   'Taxable Rate (Amt)': 'Taxable rate; vendor provided',
   'Account Code': 'System generated',
   'Platform Commission': 'non-editable field only; Admin assigns from admin panel',
@@ -725,7 +783,9 @@ const TEMPLATE_INSTRUCTIONS: Record<string, string> = {
   'EAN': 'barcode',
   'Bulk Qty 1 - Quantity': 'Refer Hyperpure',
   'Bulk Qty 1 - Net Rate / Pc': 'Refer Hyperpure',
+  'Bulk Qty 1 - Taxable Rate / Pc': 'Refer Hyperpure',
   'Veg / Non-Veg': 'veg, nonveg, or egg',
+  'Storage type': 'Ambient / Chilled / Frozen',
 };
 
 function exportCell(v: unknown): string | number {
@@ -759,24 +819,20 @@ function mapProductToImportColumns(p: ProductExportRow): Record<string, string |
     'Additional Sub-Category': p.additionalSubCategories?.join(', ') || '',
     'Category': p.categoryName || '',
     'Net Rate': Number(p.basePrice),
-    'Taxable Rate (Amt)': Number(p.basePrice),
+    'Taxable Rate': Number(p.basePrice),
     'Tax %': tax,
     'Gross Rate 1Pc (visible to the Customer)': toGross(Number(p.basePrice), tax),
     'Bulk Qty 1 - Quantity': slab1?.minQty ?? '',
     'Bulk Qty 1 - Net Rate / Pc': slab1 ? Number(slab1.price) : '',
-    'Bulk Rates 1 - Qty': slab1?.minQty ?? '',
-    'Bulk Rates 1 - Gross Rate / Unit': slab1 ? toGross(Number(slab1.price), tax) : '',
+    'Bulk Qty 1 - Taxable Rate / Pc': slab1 ? Number(slab1.price) : '',
     'Bulk Qty 2 - Quantity': slab2?.minQty ?? '',
     'Bulk Qty 2 - Net Rate / Pc': slab2 ? Number(slab2.price) : '',
-    'Bulk Rates 2 - Qty': slab2?.minQty ?? '',
-    'Bulk Rates 2 - Gross Rate / Unit': slab2 ? toGross(Number(slab2.price), tax) : '',
+    'Bulk Qty 2 - Taxable Rate / Pc': slab2 ? Number(slab2.price) : '',
     'Bulk Qty 3 - Quantity': slab3?.minQty ?? '',
     'Bulk Qty 3 - Net Rate / Pc': slab3 ? Number(slab3.price) : '',
-    'Bulk Rates 3 - Qty': slab3?.minQty ?? '',
-    'Bulk Rates 3 - Gross Rate / Unit': slab3 ? toGross(Number(slab3.price), tax) : '',
+    'Bulk Qty 3 - Taxable Rate / Pc': slab3 ? Number(slab3.price) : '',
     '6pm to 9am Promo Rate - Single Unit': p.promoPrice ? toGross(Number(p.promoPrice), tax) : '',
     'Stock On Hand': p.stock ?? 0,
-    'Available Stock': p.stock ?? 0,
     'MOQ': p.minOrderQty ?? 1,
     'Image URL': p.imageUrl || '',
     'Image Name': p.imageName || '',
@@ -814,8 +870,7 @@ function mapProductToImportColumns(p: ProductExportRow): Record<string, string |
     'Item Status': String(att.itemStatus || ''),
     'Active on Online Store': exportCell(att.activeOnlineStore),
     'Usage unit': p.unit || '',
-    'Unit': p.unit || '',
-    'Unit Name': p.unit || '',
+    Description: p.description || '',
   };
 }
 
@@ -840,7 +895,7 @@ export function exportProductsToXlsx(
   categories?: CategoryExportRow[],
 ): Buffer {
   const wb = XLSX.utils.book_new();
-  const headers = getImportTemplateHeaders();
+  const headers = getProductExportHeaders();
 
   const productData = products.map((p) => {
     const row = mapProductToImportColumns(p);
@@ -878,7 +933,7 @@ export function exportProductsToXlsx(
 }
 
 export function exportProductsToCsv(products: ProductExportRow[]): string {
-  const headers = getImportTemplateHeaders();
+  const headers = getProductExportHeaders();
   const data = products.map((p) => {
     const row = mapProductToImportColumns(p);
     const ordered: Record<string, string | number> = {};
@@ -943,53 +998,92 @@ export function generateImportTemplate(): Buffer {
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }
 
-/** Price-only Excel template (SKU / POS SKU / Net Rate / up to 3 bulk slabs). */
-export function generatePriceUpdateTemplate(): Buffer {
+const PRICE_UPDATE_HEADERS = [
+  'Product Name',
+  'SKU',
+  'MOQ',
+  'Main Price',
+  'Tax %',
+  'Gross',
+  'Bulk Qty 1',
+  'Taxable Rate 1',
+  'Gross 1',
+  'Bulk Qty 2',
+  'Taxable Rate 2',
+  'Gross 2',
+  'Bulk Qty 3',
+  'Taxable Rate 3',
+  'Gross 3',
+] as const;
+
+export type PriceExportProduct = {
+  name: string;
+  sku: string;
+  moq: number;
+  basePrice: number;
+  taxPercent: number;
+  slabs: Array<{ minQty: number; price: number }>;
+};
+
+/** Live price sheet for Price Bulk Update — all current products, editable then re-upload. */
+export function exportPriceUpdateSheet(products: PriceExportProduct[]): Buffer {
   const wb = XLSX.utils.book_new();
-  const headers = [
-    'SKU',
-    'Your POS SKU',
-    'Net Rate',
-    'Bulk Qty 1 - Quantity',
-    'Bulk Qty 1 - Net Rate / Pc',
-    'Bulk Qty 2 - Quantity',
-    'Bulk Qty 2 - Net Rate / Pc',
-    'Bulk Qty 3 - Quantity',
-    'Bulk Qty 3 - Net Rate / Pc',
-  ];
-  const instructionRow: Record<string, string> = {
-    SKU: 'Catalog SKU (or leave blank if POS SKU set)',
-    'Your POS SKU': 'Vendor POS code',
-    'Net Rate': 'Default selling price (ex-GST)',
-    'Bulk Qty 1 - Quantity': 'Min qty for slab 1',
-    'Bulk Qty 1 - Net Rate / Pc': 'Unit price for slab 1',
-    'Bulk Qty 2 - Quantity': 'Min qty for slab 2',
-    'Bulk Qty 2 - Net Rate / Pc': 'Unit price for slab 2',
-    'Bulk Qty 3 - Quantity': 'Min qty for slab 3',
-    'Bulk Qty 3 - Net Rate / Pc': 'Unit price for slab 3',
-  };
-  const sampleRow: Record<string, string | number> = {
-    SKU: 'H1-SEED-0001',
-    'Your POS SKU': 'POS-0001',
-    'Net Rate': 100,
-    'Bulk Qty 1 - Quantity': 1,
-    'Bulk Qty 1 - Net Rate / Pc': 100,
-    'Bulk Qty 2 - Quantity': 12,
-    'Bulk Qty 2 - Net Rate / Pc': 95,
-    'Bulk Qty 3 - Quantity': 48,
-    'Bulk Qty 3 - Net Rate / Pc': 90,
-  };
-  const ws = XLSX.utils.json_to_sheet([instructionRow, sampleRow], { header: headers });
-  ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
+  const data =
+    products.length > 0
+      ? products.map((p) => {
+          const tax = p.taxPercent || 0;
+          const s1 = p.slabs[0];
+          const s2 = p.slabs[1];
+          const s3 = p.slabs[2];
+          return {
+            'Product Name': p.name,
+            SKU: p.sku,
+            MOQ: p.moq,
+            'Main Price': p.basePrice,
+            'Tax %': tax,
+            Gross: toGross(p.basePrice, tax),
+            'Bulk Qty 1': s1?.minQty ?? '',
+            'Taxable Rate 1': s1 ? Number(s1.price) : '',
+            'Gross 1': s1 ? toGross(Number(s1.price), tax) : '',
+            'Bulk Qty 2': s2?.minQty ?? '',
+            'Taxable Rate 2': s2 ? Number(s2.price) : '',
+            'Gross 2': s2 ? toGross(Number(s2.price), tax) : '',
+            'Bulk Qty 3': s3?.minQty ?? '',
+            'Taxable Rate 3': s3 ? Number(s3.price) : '',
+            'Gross 3': s3 ? toGross(Number(s3.price), tax) : '',
+          };
+        })
+      : [Object.fromEntries(PRICE_UPDATE_HEADERS.map((h) => [h, '']))];
+
+  const ws = XLSX.utils.json_to_sheet(data, { header: [...PRICE_UPDATE_HEADERS] });
+  ws['!cols'] = PRICE_UPDATE_HEADERS.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
   XLSX.utils.book_append_sheet(wb, ws, 'Prices');
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }
 
+/** Empty sample template (tests / docs). Prefer exportPriceUpdateSheet for vendors. */
+export function generatePriceUpdateTemplate(): Buffer {
+  return exportPriceUpdateSheet([
+    {
+      name: 'Sample Product',
+      sku: 'H1-SEED-0001',
+      moq: 1,
+      basePrice: 100,
+      taxPercent: 5,
+      slabs: [
+        { minQty: 10, price: 95 },
+        { minQty: 50, price: 90 },
+      ],
+    },
+  ]);
+}
+
 export type PriceUpdateRow = {
   row: number;
-  sku?: string;
-  vendorSku?: string;
+  sku: string;
+  moq?: number;
   basePrice: number;
+  taxPercent: number;
   slabs: Array<{ minQty: number; price: number }>;
 };
 
@@ -1011,38 +1105,61 @@ export function parsePriceUpdate(buffer: Buffer): {
   rawRows.forEach((raw, idx) => {
     const rowNum = idx + 2;
     const cleaned = cleanRow(raw);
-    // Skip instruction row
     const sku = String(cleaned['SKU'] ?? cleaned['sku'] ?? '').trim();
-    const vendorSku = String(cleaned['Your POS SKU'] ?? cleaned['POS SKU'] ?? cleaned['vendorSku'] ?? '').trim();
-    if (
-      !sku &&
-      !vendorSku &&
-      cleaned['Net Rate'] == null
-    ) {
+    const mainRaw = cleaned['Main Price'] ?? cleaned['main price'] ?? cleaned['Net Rate'] ?? cleaned['net rate'];
+    if (!sku && mainRaw == null) {
       return;
     }
     if (
-      /catalog sku/i.test(sku) ||
+      /catalog/i.test(sku) ||
+      /required/i.test(sku) ||
       /leave blank/i.test(sku) ||
       /instruction/i.test(sku)
     ) {
       return;
     }
 
-    const net = Number(cleaned['Net Rate'] ?? cleaned['net rate']);
-    if (!Number.isFinite(net) || net <= 0) {
-      errors.push({ row: rowNum, field: 'Net Rate', message: 'must be a positive number' });
+    if (!sku) {
+      errors.push({ row: rowNum, field: 'SKU', message: 'SKU is required' });
       return;
     }
-    if (!sku && !vendorSku) {
-      errors.push({ row: rowNum, message: 'SKU or Your POS SKU is required' });
+
+    const net = Number(mainRaw);
+    if (!Number.isFinite(net) || net <= 0) {
+      errors.push({ row: rowNum, field: 'Main Price', message: 'must be a positive number' });
       return;
+    }
+
+    const taxRaw = cleaned['Tax %'] ?? cleaned['Tax%'] ?? cleaned['tax %'] ?? cleaned['taxPercent'];
+    const taxPercent = Number(taxRaw);
+    if (!Number.isFinite(taxPercent) || taxPercent < 0) {
+      errors.push({ row: rowNum, field: 'Tax %', message: 'must be a number ≥ 0' });
+      return;
+    }
+
+    let moq: number | undefined;
+    const moqRaw = cleaned['MOQ'] ?? cleaned['moq'] ?? cleaned['Min Order Qty'];
+    if (moqRaw !== undefined && moqRaw !== null && String(moqRaw).trim() !== '') {
+      const m = Number(moqRaw);
+      if (!Number.isFinite(m) || m < 1) {
+        errors.push({ row: rowNum, field: 'MOQ', message: 'must be an integer ≥ 1' });
+        return;
+      }
+      moq = Math.floor(m);
     }
 
     const slabs: Array<{ minQty: number; price: number }> = [];
     for (let i = 1; i <= 3; i++) {
-      const qty = Number(cleaned[`Bulk Qty ${i} - Quantity`]);
-      const price = Number(cleaned[`Bulk Qty ${i} - Net Rate / Pc`]);
+      const qty = Number(
+        cleaned[`Bulk Qty ${i}`] ??
+          cleaned[`Bulk Qty ${i} - Quantity`] ??
+          cleaned[`bulk qty ${i}`],
+      );
+      const price = Number(
+        cleaned[`Taxable Rate ${i}`] ??
+          cleaned[`Bulk Qty ${i} - Net Rate / Pc`] ??
+          cleaned[`taxable rate ${i}`],
+      );
       if (Number.isFinite(qty) && qty >= 1 && Number.isFinite(price) && price > 0) {
         slabs.push({ minQty: Math.floor(qty), price });
       }
@@ -1051,9 +1168,10 @@ export function parsePriceUpdate(buffer: Buffer): {
 
     rows.push({
       row: rowNum,
-      sku: sku || undefined,
-      vendorSku: vendorSku || undefined,
+      sku,
+      moq,
       basePrice: net,
+      taxPercent,
       slabs,
     });
   });

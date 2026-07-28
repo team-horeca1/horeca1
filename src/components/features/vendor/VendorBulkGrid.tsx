@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Loader2, Search, Save, Wand2 } from 'lucide-react';
+import { X, Loader2, Search, Save, Wand2, Upload, FileDown, FileSpreadsheet, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -42,7 +42,7 @@ interface GridProduct {
 
 type EditableField =
   | 'name' | 'sku' | 'hsn' | 'brand' | 'parentCategory' | 'subCategory' | 'additionalSubCategory'
-  | 'basePrice' | 'taxPercent' | 'minOrderQty' | 'isActive' | 'creditEligible'
+  | 'basePrice' | 'taxPercent' | 'grossPrice' | 'minOrderQty' | 'isActive' | 'creditEligible'
   | 'unit' | 'packSize' | 'description' | 'imageUrl' | 'vegNonVeg' | 'storageType'
   // Metadata fields:
   | 'vendorId' | 'itemId' | 'itemStatus' | 'account' | 'accountCode'
@@ -52,7 +52,9 @@ type EditableField =
   | 'stockOnHand' | 'itemType' | 'sellable' | 'purchasable' | 'trackInventory' | 'platformCommission'
   | 'packageWeight' | 'packageLength' | 'packageWidth' | 'packageHeight' | 'dimensionUnit' | 'weightUnit'
   | 'aliasName' | 'upc' | 'ean' | 'isbn' | 'countryOfOrigin' | 'substituteMapping'
-  | 'bulkQty1Quantity' | 'bulkQty1NetRate';
+  | 'bulkQty1Quantity' | 'bulkQty1NetRate'
+  | 'bulkQty2Quantity' | 'bulkQty2NetRate'
+  | 'bulkQty3Quantity' | 'bulkQty3NetRate';
 
 type RowEdits = Partial<Record<EditableField, any>>;
 
@@ -125,6 +127,8 @@ export default function VendorBulkGrid({
   categories = [],
   brands = [],
   onOpenAdvanced,
+  onImport,
+  onExport,
   readOnlyCommission = true,
   isAdmin = false,
 }: {
@@ -136,6 +140,8 @@ export default function VendorBulkGrid({
   categories?: { id: string; name: string; parentId?: string | null }[];
   brands?: { name: string }[];
   onOpenAdvanced?: () => void;
+  onImport?: () => void;
+  onExport?: (format: 'csv' | 'xlsx') => void;
   /** When true, Platform Commission column is read-only (vendor portal default). */
   readOnlyCommission?: boolean;
   isAdmin?: boolean;
@@ -144,6 +150,19 @@ export default function VendorBulkGrid({
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [exportOpen]);
 
   const categoryNames = useMemo(() => {
     return Array.from(new Set(categories.filter((c) => !c.parentId).map((c) => c.name).filter(Boolean)));
@@ -162,6 +181,16 @@ export default function VendorBulkGrid({
     { key: 'itemId', label: 'Item ID', width: 'w-[200px]', type: 'text', readOnly: true },
     { key: 'name', label: 'Item Name', width: 'w-[280px]', type: 'text' },
     { key: 'sku', label: 'SKU', width: 'w-[140px]', type: 'text' },
+    { key: 'minOrderQty', label: 'MOQ', width: 'w-[90px]', type: 'number' },
+    { key: 'basePrice', label: 'Taxable', width: 'w-[110px]', type: 'number' },
+    { key: 'taxPercent', label: 'Tax % (GST)', width: 'w-[130px]', type: 'number' },
+    { key: 'grossPrice', label: 'Gross', width: 'w-[110px]', type: 'number', readOnly: true },
+    { key: 'bulkQty1Quantity', label: 'Bulk Qty 1 - Quantity', width: 'w-[150px]', type: 'number' },
+    { key: 'bulkQty1NetRate', label: 'Bulk Qty 1 - Net Rate / Pc', width: 'w-[160px]', type: 'number' },
+    { key: 'bulkQty2Quantity', label: 'Bulk Qty 2 - Quantity', width: 'w-[150px]', type: 'number' },
+    { key: 'bulkQty2NetRate', label: 'Bulk Qty 2 - Net Rate / Pc', width: 'w-[160px]', type: 'number' },
+    { key: 'bulkQty3Quantity', label: 'Bulk Qty 3 - Quantity', width: 'w-[150px]', type: 'number' },
+    { key: 'bulkQty3NetRate', label: 'Bulk Qty 3 - Net Rate / Pc', width: 'w-[160px]', type: 'number' },
     { key: 'hsn', label: 'HSN Code', width: 'w-[110px]', type: 'text' },
     { key: 'brand', label: 'Brand', width: 'w-[140px]', type: 'select', options: ['', ...brandNames] },
     { key: 'parentCategory', label: 'Parent Category', width: 'w-[160px]', type: 'select', options: ['', ...categoryNames] },
@@ -169,14 +198,12 @@ export default function VendorBulkGrid({
     { key: 'additionalSubCategory', label: 'Additional Sub-Category', width: 'w-[180px]', type: 'select', options: ['', ...subCategoryNames] },
     { key: 'itemStatus', label: 'Item Status', width: 'w-[110px]', type: 'select', options: ['', 'Active', 'Inactive', 'Draft'] },
     { key: 'isActive', label: 'Active on Online Store', width: 'w-[130px]', type: 'checkbox' },
-    { key: 'basePrice', label: 'Net Rate', width: 'w-[110px]', type: 'number' },
     { key: 'account', label: 'Account', width: 'w-[130px]', type: 'text' },
     { key: 'accountCode', label: 'Account Code', width: 'w-[110px]', type: 'text' },
     { key: 'taxable', label: 'Taxable', width: 'w-[85px]', type: 'checkbox' },
     { key: 'exemptionReason', label: 'Exemption Reason', width: 'w-[160px]', type: 'text' },
     { key: 'taxabilityType', label: 'Taxability Type', width: 'w-[130px]', type: 'text' },
     { key: 'productType', label: 'Product Type', width: 'w-[110px]', type: 'text' },
-    { key: 'taxPercent', label: 'Tax % (GST)', width: 'w-[130px]', type: 'number' },
     { key: 'source', label: 'Source', width: 'w-[110px]', type: 'text' },
     { key: 'referenceId', label: 'Reference ID', width: 'w-[130px]', type: 'text' },
     { key: 'lastSyncTime', label: 'Last Sync Time', width: 'w-[150px]', type: 'text' },
@@ -208,10 +235,7 @@ export default function VendorBulkGrid({
     { key: 'countryOfOrigin', label: 'Country of Origin', width: 'w-[140px]', type: 'text' },
     { key: 'vegNonVeg', label: 'Veg / Non-Veg', width: 'w-[120px]', type: 'select', options: ['', 'veg', 'nonveg', 'egg'] },
     { key: 'storageType', label: 'Storage type', width: 'w-[120px]', type: 'text' },
-    { key: 'minOrderQty', label: 'MOQ', width: 'w-[90px]', type: 'number' },
     { key: 'substituteMapping', label: 'Substitute Mapping', width: 'w-[150px]', type: 'text' },
-    { key: 'bulkQty1Quantity', label: 'Bulk Qty 1 - Quantity', width: 'w-[150px]', type: 'number' },
-    { key: 'bulkQty1NetRate', label: 'Bulk Qty 1 - Net Rate / Pc', width: 'w-[160px]', type: 'number' },
   ], [brandNames, categoryNames, subCategoryNames, readOnlyCommission]);
 
   const subCategoriesForParent = (parentName: string) => {
@@ -272,6 +296,16 @@ export default function VendorBulkGrid({
     if (field === 'taxPercent') {
       return p.taxPercent ?? 0;
     }
+    if (field === 'grossPrice') {
+      const taxable = Number(
+        edits[p.id]?.basePrice !== undefined ? edits[p.id].basePrice : p.basePrice,
+      ) || 0;
+      const tax = Number(
+        edits[p.id]?.taxPercent !== undefined ? edits[p.id].taxPercent : (p.taxPercent ?? 0),
+      ) || 0;
+      if (tax <= 0) return Math.round(taxable * 100) / 100;
+      return Math.round(taxable * (1 + tax / 100) * 100) / 100;
+    }
     if (field === 'minOrderQty') return p.minOrderQty ?? 1;
     if (field === 'isActive') return p.isActive;
     if (field === 'creditEligible') return p.creditEligible;
@@ -287,6 +321,10 @@ export default function VendorBulkGrid({
     if (field === 'upc') return p.barcode ?? '';
     if (field === 'bulkQty1Quantity') return p.priceSlabs?.[0]?.minQty ?? '';
     if (field === 'bulkQty1NetRate') return p.priceSlabs?.[0]?.price ?? '';
+    if (field === 'bulkQty2Quantity') return p.priceSlabs?.[1]?.minQty ?? '';
+    if (field === 'bulkQty2NetRate') return p.priceSlabs?.[1]?.price ?? '';
+    if (field === 'bulkQty3Quantity') return p.priceSlabs?.[2]?.minQty ?? '';
+    if (field === 'bulkQty3NetRate') return p.priceSlabs?.[2]?.price ?? '';
 
     if (field === 'parentCategory') {
       const metaVal = p.metadata?.['Parent Category'];
@@ -410,15 +448,32 @@ export default function VendorBulkGrid({
         }
       }
 
-      if (e.bulkQty1Quantity !== undefined || e.bulkQty1NetRate !== undefined) {
-        const existingSlab = p.priceSlabs?.[0];
+      const slabEdited =
+        e.bulkQty1Quantity !== undefined || e.bulkQty1NetRate !== undefined ||
+        e.bulkQty2Quantity !== undefined || e.bulkQty2NetRate !== undefined ||
+        e.bulkQty3Quantity !== undefined || e.bulkQty3NetRate !== undefined;
+      if (slabEdited) {
+        const resolveSlab = (
+          idx: number,
+          qtyKey: 'bulkQty1Quantity' | 'bulkQty2Quantity' | 'bulkQty3Quantity',
+          rateKey: 'bulkQty1NetRate' | 'bulkQty2NetRate' | 'bulkQty3NetRate',
+        ) => {
+          const existing = p.priceSlabs?.[idx];
+          const qtyRaw = e[qtyKey] !== undefined ? e[qtyKey] : existing?.minQty;
+          const rateRaw = e[rateKey] !== undefined ? e[rateKey] : existing?.price;
+          if (qtyRaw === '' || qtyRaw === undefined || qtyRaw === null) {
+            if (rateRaw === '' || rateRaw === undefined || rateRaw === null) return null;
+          }
+          const minQty = parseInt(String(qtyRaw ?? ''), 10);
+          const price = parseFloat(String(rateRaw ?? ''));
+          if (!Number.isFinite(minQty) || minQty <= 0 || !Number.isFinite(price) || price <= 0) return null;
+          return { minQty, price };
+        };
         body.priceSlabs = [
-          {
-            minQty: parseInt(String(e.bulkQty1Quantity ?? existingSlab?.minQty ?? 1), 10) || 1,
-            price: parseFloat(String(e.bulkQty1NetRate ?? existingSlab?.price ?? p.basePrice)) || p.basePrice,
-          },
-          ...(p.priceSlabs?.slice(1) ?? []),
-        ];
+          resolveSlab(0, 'bulkQty1Quantity', 'bulkQty1NetRate'),
+          resolveSlab(1, 'bulkQty2Quantity', 'bulkQty2NetRate'),
+          resolveSlab(2, 'bulkQty3Quantity', 'bulkQty3NetRate'),
+        ].filter((s): s is { minQty: number; price: number } => s != null);
       }
 
       let hasMetaChange = e.taxPercent !== undefined;
@@ -512,7 +567,55 @@ export default function VendorBulkGrid({
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-
+          {onExport && (
+            <div className="relative" ref={exportRef}>
+              <button
+                type="button"
+                onClick={() => setExportOpen((p) => !p)}
+                className="h-[38px] px-3.5 border border-[#EEEEEE] bg-white rounded-[10px] text-[12px] font-bold text-[#7C7C7C] hover:bg-gray-50 hover:text-[#181725] transition-all flex items-center gap-1.5 shrink-0"
+              >
+                <FileDown size={13} />
+                Export
+                <ChevronDown size={11} className={cn('transition-transform', exportOpen && 'rotate-180')} />
+              </button>
+              {exportOpen && (
+                <div className="absolute right-0 top-[44px] w-[150px] bg-white border border-[#EEEEEE] rounded-[10px] shadow-lg z-50 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onExport('csv');
+                      setExportOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-3 text-[12px] font-semibold text-[#181725] hover:bg-[#F5F5F5] transition-colors text-left"
+                  >
+                    <FileSpreadsheet size={13} className="text-[#299E60]" />
+                    Export CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onExport('xlsx');
+                      setExportOpen(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-3 text-[12px] font-semibold text-[#181725] hover:bg-[#F5F5F5] transition-colors border-t border-[#EEEEEE] text-left"
+                  >
+                    <FileSpreadsheet size={13} className="text-[#3B82F6]" />
+                    Export Excel
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {onImport && (
+            <button
+              type="button"
+              onClick={onImport}
+              className="h-[38px] px-3.5 border border-[#EEEEEE] bg-white rounded-[10px] text-[12px] font-bold text-[#7C7C7C] hover:bg-gray-50 hover:text-[#181725] transition-all flex items-center gap-1.5 shrink-0"
+            >
+              <Upload size={13} />
+              Import
+            </button>
+          )}
           {onOpenAdvanced && (
             <button
               type="button"

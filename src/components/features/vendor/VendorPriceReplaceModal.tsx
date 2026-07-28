@@ -22,7 +22,7 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
   if (!open) return null;
 
   const downloadTemplate = () => {
-    window.open('/api/v1/vendor/products/price-update?template=true', '_blank');
+    window.open('/api/v1/vendor/products/price-update', '_blank');
   };
 
   const onFile = async (file: File) => {
@@ -45,7 +45,7 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
       };
       setResult(data);
       if (data.updated > 0) {
-        toast.success(`Replace Prices: ${data.updated} product(s) updated`);
+        toast.success(`Price Bulk Update: ${data.updated} product(s) updated`);
         onComplete();
       }
       if (data.errors?.length) {
@@ -65,7 +65,7 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'price_update_errors.csv';
+    a.download = 'price_bulk_update_errors.csv';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -75,9 +75,9 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
       <div className="bg-white rounded-[16px] w-full max-w-[480px] shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#EEEEEE]">
           <div>
-            <h2 className="text-[16px] font-bold text-[#181725]">Replace Prices</h2>
+            <h2 className="text-[16px] font-bold text-[#181725]">Price Bulk Update</h2>
             <p className="text-[12px] text-[#7C7C7C] mt-0.5">
-              Updates selling price and bulk slabs only — not stock or product names.
+              Download your current products and prices, edit the sheet, then upload. Gross is auto — leave bulk slabs blank for a simple price update.
             </p>
           </div>
           <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#F5F5F5]">
@@ -91,7 +91,7 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
             className="w-full h-10 rounded-[10px] border border-[#EEEEEE] text-[13px] font-bold text-[#181725] hover:bg-[#F5F5F5] flex items-center justify-center gap-2"
           >
             <FileDown size={14} />
-            Download price template
+            Download current prices
           </button>
           <input
             ref={inputRef}
@@ -110,7 +110,7 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
             className="w-full h-11 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] flex items-center justify-center gap-2 disabled:opacity-60"
           >
             {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-            {uploading ? 'Applying…' : 'Upload & Replace Prices'}
+            {uploading ? 'Applying…' : 'Upload & update prices'}
           </button>
           {result && (
             <div className="rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] p-3 text-[12px] space-y-1">
@@ -118,13 +118,6 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
               {result.errors.length > 0 && (
                 <>
                   <p className="text-[#E74C3C] font-semibold">Errors: {result.errors.length}</p>
-                  <ul className="max-h-28 overflow-y-auto text-[#7C7C7C] space-y-0.5">
-                    {result.errors.slice(0, 8).map((e) => (
-                      <li key={`${e.row}-${e.message}`}>
-                        Row {e.row}: {e.message}
-                      </li>
-                    ))}
-                  </ul>
                   {result.errorReport && (
                     <button
                       type="button"
@@ -138,12 +131,10 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
               )}
             </div>
           )}
-        </div>
-        <div className="px-5 py-3 border-t border-[#EEEEEE] flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-4 rounded-[8px] text-[12px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5]"
+            className="w-full h-10 text-[13px] font-bold text-[#7C7C7C] hover:text-[#181725]"
           >
             Close
           </button>

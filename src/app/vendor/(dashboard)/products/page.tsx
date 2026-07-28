@@ -5,8 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import {
     Search, Plus, Loader2, Package, Pencil, X,
     ChevronRight, ChevronLeft, Info, ImageIcon, Settings as SettingsIcon, Trash2,
-    BarChart3, BoxIcon, Tag, Upload, Percent, Star, Wand2,
-    ChevronDown, FileDown, FileSpreadsheet, AlertCircle, Clock,
+    BarChart3, BoxIcon, Tag, Percent, Star, Wand2,
+    ChevronDown, FileSpreadsheet, AlertCircle, Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseVendorSku, resolveVendorCode } from '@/lib/sku';
@@ -516,9 +516,6 @@ export default function VendorProductsPage() {
     const [importSaving, setImportSaving] = useState(false);
     const importFileRef = useRef<HTMLInputElement>(null);
 
-    // Export dropdown state
-    const [exportOpen, setExportOpen] = useState(false);
-    const exportRef = useRef<HTMLDivElement>(null);
     const [vendorCodePreview, setVendorCodePreview] = useState('');
 
     // Draft autosave + unsaved-changes guard
@@ -1026,17 +1023,6 @@ export default function VendorProductsPage() {
         }
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    // Close export dropdown when clicking outside
-    useEffect(() => {
-        function handleClick(e: MouseEvent) {
-            if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
-                setExportOpen(false);
-            }
-        }
-        document.addEventListener('mousedown', handleClick);
-        return () => document.removeEventListener('mousedown', handleClick);
     }, []);
 
     /* ---- Draft autosave payload ---- */
@@ -2134,7 +2120,6 @@ export default function VendorProductsPage() {
         if (searchQuery) params.set('search', searchQuery);
 
         window.open(`/api/v1/vendor/products/export?${params.toString()}`, '_blank');
-        setExportOpen(false);
     };
 
     /* ---- Derived values ---- */
@@ -2168,50 +2153,13 @@ export default function VendorProductsPage() {
                             className="h-[40px] w-full bg-white border border-[#EEEEEE] rounded-[10px] pl-10 pr-4 text-[13px] outline-none transition-all placeholder:text-[#AEAEAE] font-medium focus:border-[#299E60]/40 shadow-sm"
                         />
                     </div>
-                    
-                    {/* Export Dropdown */}
-                    <div className="relative" ref={exportRef}>
-                        <button
-                            onClick={() => setExportOpen(prev => !prev)}
-                            className="h-[40px] px-3.5 bg-white border border-[#EEEEEE] rounded-[10px] text-[12px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] transition-all flex items-center gap-1.5 shadow-sm"
-                        >
-                            <FileDown size={13} />
-                            Export
-                            <ChevronDown size={11} className={cn('transition-transform', exportOpen && 'rotate-180')} />
-                        </button>
-                        {exportOpen && (
-                            <div className="absolute right-0 top-[48px] w-[150px] bg-white border border-[#EEEEEE] rounded-[10px] shadow-lg z-50 overflow-hidden">
-                                <button
-                                    onClick={() => handleExport('csv')}
-                                    className="w-full flex items-center gap-2.5 px-4 py-3 text-[12px] font-semibold text-[#181725] hover:bg-[#F5F5F5] transition-colors text-left"
-                                >
-                                    <FileSpreadsheet size={13} className="text-[#299E60]" />
-                                    Export CSV
-                                </button>
-                                <button
-                                    onClick={() => handleExport('xlsx')}
-                                    className="w-full flex items-center gap-2.5 px-4 py-3 text-[12px] font-semibold text-[#181725] hover:bg-[#F5F5F5] transition-colors border-t border-[#EEEEEE] text-left"
-                                >
-                                    <FileSpreadsheet size={13} className="text-[#3B82F6]" />
-                                    Export Excel
-                                </button>
-                            </div>
-                        )}
-                    </div>
 
-                    <button
-                        onClick={() => setShowBulkImport(true)}
-                        className="h-[40px] px-3.5 border border-[#EEEEEE] bg-white rounded-[10px] text-[12px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] transition-all flex items-center gap-1.5 shrink-0"
-                    >
-                        <Upload size={13} />
-                        Import
-                    </button>
                     <button
                         onClick={() => setShowPriceReplace(true)}
                         className="h-[40px] px-3.5 border border-[#EEEEEE] bg-white rounded-[10px] text-[12px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] transition-all flex items-center gap-1.5 shrink-0"
                     >
                         <Percent size={13} className="text-[#299E60]" />
-                        Replace Prices
+                        Price Bulk Update
                     </button>
                     <button
                         onClick={() => setGridOpen(true)}
@@ -2800,6 +2748,112 @@ export default function VendorProductsPage() {
                                             </div>
                                     </ProductEssentialsFields>
 
+                                <FormSection title="Bulk pricing tiers" icon={<Tag size={16} />} sectionId="bulk" className="!p-4 !space-y-3">
+                                            <div className="flex items-start justify-between gap-4 mb-2">
+                                                <p className="text-[12px] text-[#AEAEAE] font-medium">
+                                                    Each tier applies from its min quantity. Up to 3 tiers — taxable ex-GST; gross uses product GST %.
+                                                </p>
+                                                {form.priceSlabs.length < 3 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setForm(prev => ({
+                                                            ...prev,
+                                                            priceSlabs: [...prev.priceSlabs, { minQty: '', price: '' }],
+                                                        }))}
+                                                        className="h-[32px] px-3.5 bg-[#EEF8F1] hover:bg-[#53B175] text-[#299E60] hover:text-white rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-colors shrink-0"
+                                                    >
+                                                        <Plus size={13} /> Add Bulk Tier
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                {form.priceSlabs.map((slab, index) => (
+                                                    <div key={index} className="rounded-[14px] border border-[#EEEEEE] overflow-hidden">
+                                                        <div className="flex items-center justify-between px-5 py-3 bg-[#FAFAFA] border-b border-[#EEEEEE]">
+                                                            <div className="flex items-center gap-2.5">
+                                                                <span className="w-[28px] h-[28px] rounded-full bg-[#299E60] text-white text-[12px] font-bold flex items-center justify-center">
+                                                                    {index + 1}
+                                                                </span>
+                                                                <h4 className="text-[14px] font-bold text-[#181725]">Bulk Tier {index + 1}</h4>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                aria-label={`Remove bulk tier ${index + 1}`}
+                                                                onClick={() => setForm(prev => ({
+                                                                    ...prev,
+                                                                    priceSlabs: prev.priceSlabs.filter((_, idx) => idx !== index),
+                                                                }))}
+                                                                className="p-1.5 hover:bg-[#FFF0F0] rounded-[6px] transition-colors text-[#AEAEAE] hover:text-[#E74C3C]"
+                                                            >
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="p-5">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                                                <div>
+                                                                    <FieldLabel>Min Quantity</FieldLabel>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="1"
+                                                                        value={slab.minQty}
+                                                                        onChange={e => setForm(prev => ({
+                                                                            ...prev,
+                                                                            priceSlabs: prev.priceSlabs.map((s, idx) => idx === index ? { ...s, minQty: e.target.value } : s),
+                                                                        }))}
+                                                                        className={inputCls}
+                                                                        placeholder="e.g. 10"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <FieldLabel required>Taxable Rate (per Unit)</FieldLabel>
+                                                                    <div className="relative">
+                                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEAEAE] text-[14px]">₹</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            step="0.01"
+                                                                            min="0"
+                                                                            value={slab.price}
+                                                                            onChange={e => setForm(prev => ({
+                                                                                ...prev,
+                                                                                priceSlabs: prev.priceSlabs.map((s, idx) => idx === index ? { ...s, price: e.target.value } : s),
+                                                                            }))}
+                                                                            className={cn(inputCls, 'pl-8')}
+                                                                            placeholder="0.00"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <FieldLabel>Gross (incl. GST)</FieldLabel>
+                                                                    <div className="relative">
+                                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#299E60] font-bold text-[14px]">₹</span>
+                                                                        <input
+                                                                            type="text"
+                                                                            readOnly
+                                                                            value={calcGrossRate(slab.price, form.taxPercent)}
+                                                                            className={cn(inputCls, 'pl-8 font-bold text-[#299E60] bg-[#EEF8F1]/40')}
+                                                                            placeholder="—"
+                                                                        />
+                                                                    </div>
+                                                                    <p className="text-[11px] text-[#AEAEAE] mt-1">
+                                                                        Using product tax {form.taxPercent || '0'}%
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+
+                                                {form.priceSlabs.length === 0 && (
+                                                    <div className="text-center py-8 text-[#AEAEAE]">
+                                                        <BarChart3 size={32} className="mx-auto mb-2 text-[#E5E7EB]" />
+                                                        <p className="text-[13px] font-medium">No bulk tiers yet. Click &quot;Add Bulk Tier&quot; to add quantity-based pricing.</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                </FormSection>
+
                                 <FormSection title="Status & availability" icon={<Clock size={16} />} sectionId="status" className="!p-4 !space-y-3">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
@@ -3233,96 +3287,6 @@ export default function VendorProductsPage() {
                                             </div>
                                 </FormSection>
 
-                                <FormSection title="Bulk pricing tiers" icon={<Tag size={16} />} sectionId="bulk" className="!p-4 !space-y-3">
-                                            <div className="flex items-start justify-between gap-4 mb-2">
-                                                <p className="text-[12px] text-[#AEAEAE] font-medium">
-                                                    Each tier applies from its min quantity. Up to 3 tiers (taxable rate, ex-GST).
-                                                </p>
-                                                {form.priceSlabs.length < 3 && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setForm(prev => ({
-                                                            ...prev,
-                                                            priceSlabs: [...prev.priceSlabs, { minQty: '', price: '' }],
-                                                        }))}
-                                                        className="h-[32px] px-3.5 bg-[#EEF8F1] hover:bg-[#53B175] text-[#299E60] hover:text-white rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-colors shrink-0"
-                                                    >
-                                                        <Plus size={13} /> Add Bulk Tier
-                                                    </button>
-                                                )}
-                                            </div>
-
-                                            <div className="space-y-4">
-                                                {form.priceSlabs.map((slab, index) => (
-                                                    <div key={index} className="rounded-[14px] border border-[#EEEEEE] overflow-hidden">
-                                                        <div className="flex items-center justify-between px-5 py-3 bg-[#FAFAFA] border-b border-[#EEEEEE]">
-                                                            <div className="flex items-center gap-2.5">
-                                                                <span className="w-[28px] h-[28px] rounded-full bg-[#299E60] text-white text-[12px] font-bold flex items-center justify-center">
-                                                                    {index + 1}
-                                                                </span>
-                                                                <h4 className="text-[14px] font-bold text-[#181725]">Bulk Tier {index + 1}</h4>
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                aria-label={`Remove bulk tier ${index + 1}`}
-                                                                onClick={() => setForm(prev => ({
-                                                                    ...prev,
-                                                                    priceSlabs: prev.priceSlabs.filter((_, idx) => idx !== index),
-                                                                }))}
-                                                                className="p-1.5 hover:bg-[#FFF0F0] rounded-[6px] transition-colors text-[#AEAEAE] hover:text-[#E74C3C]"
-                                                            >
-                                                                <Trash2 size={15} />
-                                                            </button>
-                                                        </div>
-
-                                                        <div className="p-5">
-                                                            <div className="grid grid-cols-2 gap-4">
-                                                                <div>
-                                                                    <FieldLabel>Min Quantity</FieldLabel>
-                                                                    <input
-                                                                        type="number"
-                                                                        min="1"
-                                                                        value={slab.minQty}
-                                                                        onChange={e => setForm(prev => ({
-                                                                            ...prev,
-                                                                            priceSlabs: prev.priceSlabs.map((s, idx) => idx === index ? { ...s, minQty: e.target.value } : s),
-                                                                        }))}
-                                                                        className={inputCls}
-                                                                        placeholder="e.g. 10"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <FieldLabel required>Taxable Rate (per Unit)</FieldLabel>
-                                                                    <div className="relative">
-                                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEAEAE] text-[14px]">₹</span>
-                                                                        <input
-                                                                            type="number"
-                                                                            step="0.01"
-                                                                            min="0"
-                                                                            value={slab.price}
-                                                                            onChange={e => setForm(prev => ({
-                                                                                ...prev,
-                                                                                priceSlabs: prev.priceSlabs.map((s, idx) => idx === index ? { ...s, price: e.target.value } : s),
-                                                                            }))}
-                                                                            className={cn(inputCls, 'pl-8')}
-                                                                            placeholder="0.00"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-
-                                                {form.priceSlabs.length === 0 && (
-                                                    <div className="text-center py-8 text-[#AEAEAE]">
-                                                        <BarChart3 size={32} className="mx-auto mb-2 text-[#E5E7EB]" />
-                                                        <p className="text-[13px] font-medium">No bulk tiers yet. Click &quot;Add Bulk Tier&quot; to add quantity-based pricing.</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                </FormSection>
-
                                     {editingProduct && (
                                         <div className="border border-[#EEEEEE] rounded-[12px] p-4 space-y-2">
                                             <h3 className="text-[13px] font-bold text-[#181725]">Price history</h3>
@@ -3534,6 +3498,8 @@ export default function VendorProductsPage() {
                     );
                     setBulkOpen(true);
                 }}
+                onImport={() => setShowBulkImport(true)}
+                onExport={handleExport}
                 readOnlyCommission
             />
 
