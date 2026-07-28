@@ -119,7 +119,7 @@ export function outletServesPincode(
 /**
  * Outlet IDs whose stock should be shown / enforced for this delivery pin.
  * - No pincode → primary only (avoid summing all warehouses)
- * - Pincode with no serving outlet → [] (sellable 0 — hard-hide on browse)
+ * - Pincode with no serving outlet → [] (sellable 0 — catalog still shows OOS cards)
  * - One outlet / MW off path → primary
  */
 export function stockOutletIdsForDelivery(

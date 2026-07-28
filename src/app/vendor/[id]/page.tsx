@@ -191,7 +191,6 @@ export default function VendorStorePage() {
                 try {
                     const res = await fetch(`/api/v1/vendors/${vendorId}/previously-ordered`);
                     const json = await res.json();
-                    const pin = deliveryPincode;
                     setPrevOrderedProducts((json.data || json.items || []).map((p: { id: string; name: string; basePrice?: number | string; price?: number | string; imageUrl?: string; categoryName?: string; packSize?: string; lastOrderedQty?: number; lastOrderedDate?: string; stock?: number; qty_available?: number }) => {
                         const fromCatalog = products.find((c) => c.id === p.id);
                         const stock = fromCatalog?.stock
@@ -222,9 +221,6 @@ export default function VendorStorePage() {
                             lastOrderedQty: p.lastOrderedQty,
                             lastOrderedDate: p.lastOrderedDate,
                         } as VendorProduct;
-                    }).filter((p: VendorProduct) => {
-                        if (pin) return (p.stock ?? 0) > 0;
-                        return true;
                     }));
                 } catch { setPrevOrderedProducts([]); }
                 finally { setPrevOrderedLoading(false); }
@@ -307,20 +303,14 @@ export default function VendorStorePage() {
             );
         }
 
-        // Defense: when a delivery pin is known, never show zero-stock cards
-        // (server also hard-hides; this covers stale client state / prev-ordered tab).
-        if (deliveryPincode) {
-            result = result.filter(p => (p.stock ?? 0) > 0);
-        }
-
-        // Surface in-stock items first so buyers never hit a wall of sold-out cards.
-        // Stable sort preserves the server's original ordering within each bucket.
+        // Keep zero-stock products visible (VendorProductCard shows Out / grayed UI).
+        // Surface in-stock items first so buyers see available SKUs before sold-out ones.
         return [...result].sort((a, b) => {
             const aOut = (a.stock ?? 0) <= 0 ? 1 : 0;
             const bOut = (b.stock ?? 0) <= 0 ? 1 : 0;
             return aOut - bOut;
         });
-    }, [products, activeTab, searchQuery, prevOrderedProducts, deliveryPincode]);
+    }, [products, activeTab, searchQuery, prevOrderedProducts]);
 
     if (loading) {
         return (

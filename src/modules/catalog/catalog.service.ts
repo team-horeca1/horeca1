@@ -869,8 +869,6 @@ export class CatalogService {
     const stockCtx = useFulfillmentStock
       ? await loadFulfillmentStockContext(vendorId)
       : null;
-    /** Hard-hide zero-sellable SKUs when customer delivery pin is known */
-    const hardHideZero = Boolean(useFulfillmentStock && pincode && stockCtx);
 
     const include = {
       priceSlabs: { orderBy: { sortOrder: 'asc' as const } },
@@ -954,17 +952,16 @@ export class CatalogService {
       };
     };
 
-    // Fill a page, skipping zero-sellable rows when hard-hide is on.
+    // Fill a page. Zero-stock SKUs stay in the catalog (cards show Out / grayed UI).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const collected: any[] = [];
     let pageCursor = cursor;
     let dbExhausted = false;
     while (collected.length < limit + 1 && !dbExhausted) {
       const remaining = limit + 1 - collected.length;
-      const take = hardHideZero ? Math.min(Math.max(remaining * 4, remaining + 1), 200) : remaining;
       const batch = await prisma.product.findMany({
         where,
-        take,
+        take: remaining,
         ...(pageCursor ? { cursor: { id: pageCursor }, skip: 1 } : {}),
         orderBy: { name: 'asc' },
         include,
@@ -973,13 +970,11 @@ export class CatalogService {
         dbExhausted = true;
         break;
       }
-      if (batch.length < take) dbExhausted = true;
+      if (batch.length < remaining) dbExhausted = true;
       pageCursor = batch[batch.length - 1]!.id;
 
       for (const p of batch) {
-        const mapped = mapOne(p as Parameters<typeof mapOne>[0]);
-        if (hardHideZero && mapped.qty_available <= 0) continue;
-        collected.push(mapped);
+        collected.push(mapOne(p as Parameters<typeof mapOne>[0]));
         if (collected.length >= limit + 1) break;
       }
     }

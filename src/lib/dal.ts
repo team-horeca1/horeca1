@@ -125,26 +125,23 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
   const grossPromoPrice = toGrossOrNull(promoPrice);
   const grossMRP = toGrossOrNull(mrp);
 
-  let effectivePrice = priceSlabs.length > 0
-    ? Number(priceSlabs[0].promoPrice ?? priceSlabs[0].price)
-    : (promoPrice != null && promoPrice < basePrice ? promoPrice : basePrice);
-  
-  let effectivePriceGross = priceSlabs.length > 0
-    ? toGross(Number(priceSlabs[0].promoPrice ?? priceSlabs[0].price))
-    : (grossPromoPrice != null && grossPromoPrice < grossBasePrice ? grossPromoPrice : grossBasePrice);
+  // Card / single-unit price is always the product base (or promo) — never the
+  // first bulk slab. Slabs only apply when cart qty reaches each tier's minQty.
+  let effectivePrice =
+    promoPrice != null && promoPrice < basePrice ? promoPrice : basePrice;
 
-  // Strike-through shows the higher reference price (MRP wins if present, else base/slab when promo is active).
-  const firstSlabRegular = priceSlabs.length > 0 ? Number(priceSlabs[0].price) : null;
-  const firstSlabPromo = priceSlabs.length > 0 && priceSlabs[0].promoPrice != null
-    ? Number(priceSlabs[0].promoPrice)
-    : null;
-  const slabHasPromo = firstSlabPromo != null && firstSlabRegular != null && firstSlabPromo < firstSlabRegular;
+  let effectivePriceGross =
+    grossPromoPrice != null && grossPromoPrice < grossBasePrice
+      ? grossPromoPrice
+      : grossBasePrice;
 
-  let strikePriceGross = grossMRP && grossMRP > effectivePriceGross
-    ? grossMRP
-    : (slabHasPromo && firstSlabRegular != null
-      ? toGross(firstSlabRegular)
-      : (grossPromoPrice != null && grossPromoPrice < grossBasePrice ? grossBasePrice : undefined));
+  // Strike-through shows the higher reference price (MRP wins if present, else base when promo is active).
+  let strikePriceGross =
+    grossMRP && grossMRP > effectivePriceGross
+      ? grossMRP
+      : grossPromoPrice != null && grossPromoPrice < grossBasePrice
+        ? grossBasePrice
+        : undefined;
 
   // V2.2 Phase 4 — server-resolved customer-specific price (price list /
   // per-customer override) attached by the catalog APIs for logged-in
@@ -249,9 +246,7 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
       };
     }),
     creditBadge: (p.creditEligible as boolean) || false,
-    minOrderQuantity: customerPriceApplied
-      ? Number(p.minOrderQty) || 1
-      : priceSlabs.length > 0 ? Number(priceSlabs[0].minQty) : 1,
+    minOrderQuantity: Number(p.minOrderQty) || 1,
     frequentlyOrdered: false,
     storePromotion: p.storePromotion as VendorProduct['storePromotion'],
     hasStorePromotion: !!(p.storePromotion),

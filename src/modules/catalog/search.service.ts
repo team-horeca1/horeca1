@@ -149,15 +149,8 @@ export class SearchService {
       };
     });
 
-    // Hard-hide SKUs with no sellable stock for the customer's delivery pin.
-    if (pincode) {
-      products = products.filter((p) => {
-        const qty = (p.inventories?.[0] as { qtyAvailable?: number } | undefined)?.qtyAvailable ?? 0;
-        return qty > 0;
-      });
-    }
-
-    // Honour limit after stock rewrite / hard-hide
+    // Keep zero-stock SKUs visible; catalog UI shows Out / grayed cards.
+    // Honour limit after stock rewrite
     const hasMore = products.length > limit;
     if (hasMore) products = products.slice(0, limit);
 
