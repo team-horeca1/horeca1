@@ -71,7 +71,8 @@ async function prepVendorProduct(page: import('@playwright/test').Page): Promise
       body: JSON.stringify({
         productId: row.productId,
         outletId: row.outletId,
-        qtyAvailable: Math.max(row.qtyAvailable, 500),
+        // Keep headroom above reserved so placeCodOrder never starves mid-suite
+        qtyAvailable: Math.max(Number(row.qtyAvailable) || 0, 0) + Number(row.qtyReserved || 0) + 2000,
       }),
     });
     await fetch(`/api/v1/vendor/products/${row.productId}`, {
@@ -196,7 +197,7 @@ test.describe('Section 7 — Order Management', () => {
     // UI smoke — warm route then assert brief labels (Turbopack can abort first nav).
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        await page.goto('/vendor/orders?status=pending', {
+        await page.goto('/vendor/orders?view=list&status=pending', {
           waitUntil: 'domcontentloaded',
           timeout: 60_000,
         });
@@ -205,7 +206,7 @@ test.describe('Section 7 — Order Management', () => {
         await page.waitForTimeout(1500 * (attempt + 1));
       }
     }
-    await expect(page.getByRole('heading', { name: /^Orders$/i })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: /All orders|^Orders$/i })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByRole('button', { name: /^Pending$/i }).first()).toBeVisible();
     await expect(page.getByText('Pending Approval')).toHaveCount(0);
 
@@ -444,7 +445,7 @@ test.describe('Section 7 — Order Management', () => {
 
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        await page.goto('/vendor/orders?status=pending', {
+        await page.goto('/vendor/orders?view=list&status=pending', {
           waitUntil: 'domcontentloaded',
           timeout: 60_000,
         });
@@ -453,7 +454,7 @@ test.describe('Section 7 — Order Management', () => {
         await page.waitForTimeout(1500 * (attempt + 1));
       }
     }
-    await expect(page.getByRole('heading', { name: /^Orders$/i })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: /All orders|^Orders$/i })).toBeVisible({ timeout: 60_000 });
 
     await page.getByTestId('payment-method-filter').selectOption('cod');
     await page.waitForTimeout(1500);
@@ -479,8 +480,8 @@ test.describe('Section 7 — Order Management', () => {
     expect((bulk.json.data?.succeeded ?? []).length).toBe(2);
 
     // UI: select rows and show bulk bar when orders are on screen
-    await page.goto('/vendor/orders?status=accepted', { waitUntil: 'domcontentloaded', timeout: 60_000 });
-    await expect(page.getByRole('heading', { name: /^Orders$/i })).toBeVisible({ timeout: 60_000 });
+    await page.goto('/vendor/orders?view=list&status=accepted', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: /All orders|^Orders$/i })).toBeVisible({ timeout: 60_000 });
     const cbA = page.getByTestId(`select-order-${a.orderId}`);
     if (await cbA.isVisible({ timeout: 10_000 }).catch(() => false)) {
       await cbA.check({ force: true });
@@ -587,7 +588,7 @@ test.describe('Section 7 — Order Management', () => {
     }
   });
 
-  test('Order Workspace queues render + IGST supply matrix helper', async ({ page }) => {
+  test('Order Workspace primary hub + IGST helper + list secondary', async ({ page, browser }) => {
     const { normalizeIndianState, resolveSupplyType, splitGstTax, formatLineTaxRate, stateFromGstin } =
       await import('../src/lib/gstPlaceOfSupply');
 
@@ -602,13 +603,55 @@ test.describe('Section 7 — Order Management', () => {
 
     await enterStore(page);
     await page.goto('/vendor/orders', { waitUntil: 'domcontentloaded', timeout: 60_000 });
-    await expect(page.getByRole('heading', { name: /^Orders$/i })).toBeVisible({ timeout: 60_000 });
-    const wsLink = page.getByTestId('orders-workspace-link');
-    await expect(wsLink).toBeVisible({ timeout: 30_000 });
-    await wsLink.click();
     await expect(page.getByTestId('order-workspace')).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId('workspace-queue-pending')).toBeVisible();
-    await expect(page.getByTestId('workspace-queue-cancel')).toBeVisible();
     await expect(page.getByRole('heading', { name: /Order Workspace/i })).toBeVisible();
+    await expect(page.getByTestId('workspace-stage-pending')).toBeVisible();
+    await expect(page.getByTestId('workspace-queue-pending')).toBeVisible();
+    await expect(page.getByText(/Pending Approval/i)).toHaveCount(0);
+
+    // Place order so pending queue has a row to process
+    const prep = await prepVendorProduct(page);
+    test.skip(!prep.ok, 'No inventory/vendor');
+    const placed = await placeCodOrder(browser, prep as Prep);
+
+    await page.goto('/vendor/orders?status=pending', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await expect(page.getByTestId('order-workspace')).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('workspace-refresh').click();
+    await expect(page.getByTestId(`workspace-row-${placed.orderId}`)).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId(`workspace-row-${placed.orderId}`).click();
+    await expect(page.getByTestId('order-workbench')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('workbench-order-number')).toContainText(placed.orderNumber);
+    await expect(page.getByTestId('workbench-next-status')).toBeVisible();
+    await expect(page.getByTestId('workbench-invoice')).toBeVisible();
+    await expect(page.getByTestId('workbench-lines')).toBeVisible();
+
+    // Adjust qty in workbench and save
+    const qtyInput = page.getByTestId('order-workbench').locator('input[type="number"]').first();
+    if (await qtyInput.isVisible().catch(() => false)) {
+      const cur = Number(await qtyInput.inputValue());
+      if (cur > 0) {
+        await qtyInput.fill(String(Math.max(0, cur - 1)));
+        if (cur - 1 === 0) {
+          const reason = page.getByTestId(`reject-reason-desk-${placed.itemId}`);
+          if (await reason.isVisible().catch(() => false)) {
+            await reason.fill('Short stock from workspace');
+          }
+        }
+        const saveBtn = page.getByTestId('workbench-save-qty');
+        if (await saveBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+          await saveBtn.click();
+          await page.waitForTimeout(1500);
+        }
+      }
+    }
+
+    await page.getByTestId('workbench-next-status').click();
+    await expect(page.getByTestId('workbench-status')).toContainText(/Accepted|Packed/i, { timeout: 30_000 });
+
+    // All orders secondary list
+    await page.getByTestId('workspace-all-orders').click();
+    await expect(page.getByRole('heading', { name: /All orders/i })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('orders-export')).toBeVisible();
+    await expect(page.getByTestId('orders-workspace-link')).toBeVisible();
   });
 });
