@@ -19,17 +19,26 @@ async function pageJson<T>(
   url: string,
   init?: RequestInit,
 ): Promise<{ status: number; json: T }> {
-  return page.evaluate(
-    async ({ url, init }) => {
-      const res = await fetch(url, { credentials: 'include', ...init });
-      const text = await res.text();
-      if (text.trimStart().startsWith('<!DOCTYPE') || text.trimStart().startsWith('<html')) {
-        throw new Error(`Expected JSON from ${url} but got HTML (status ${res.status})`);
-      }
-      return { status: res.status, json: JSON.parse(text) as T };
-    },
-    { url, init },
-  );
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    try {
+      return await page.evaluate(
+        async ({ url, init }) => {
+          const res = await fetch(url, { credentials: 'include', ...init });
+          const text = await res.text();
+          if (text.trimStart().startsWith('<!DOCTYPE') || text.trimStart().startsWith('<html')) {
+            throw new Error(`Expected JSON from ${url} but got HTML (status ${res.status})`);
+          }
+          return { status: res.status, json: JSON.parse(text) as T };
+        },
+        { url, init },
+      );
+    } catch (err) {
+      lastErr = err;
+      await page.waitForTimeout(1000 * (attempt + 1));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 async function openProducts(page: import('@playwright/test').Page) {
@@ -47,6 +56,29 @@ async function openProducts(page: import('@playwright/test').Page) {
   await expect(page.getByRole('heading', { name: /Products/i }).first()).toBeVisible({
     timeout: 60_000,
   });
+
+  // Warm list + first product detail route (Turbopack can HTML-404 nested [id] until compile).
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const warm = await page.evaluate(async () => {
+      const listRes = await fetch('/api/v1/vendor/products?limit=3', { credentials: 'include' });
+      const listText = await listRes.text();
+      if (listText.trimStart().startsWith('<!DOCTYPE') || listText.trimStart().startsWith('<html')) {
+        return { list: listRes.status, detail: 404 };
+      }
+      const listJson = JSON.parse(listText) as {
+        data?: { products?: Array<{ id: string }> } | Array<{ id: string }>;
+      };
+      const products = Array.isArray(listJson.data)
+        ? listJson.data
+        : listJson.data?.products ?? [];
+      const id = products[0]?.id;
+      if (!id) return { list: listRes.status, detail: 204 };
+      const detailRes = await fetch(`/api/v1/vendor/products/${id}`, { credentials: 'include' });
+      return { list: listRes.status, detail: detailRes.status };
+    });
+    if (warm.list !== 404 && warm.detail !== 404) break;
+    await page.waitForTimeout(1500);
+  }
 }
 
 type VendorProduct = {
@@ -55,6 +87,9 @@ type VendorProduct = {
   basePrice: number | string;
   vendorId: string;
   isActive: boolean;
+  imageUrl?: string | null;
+  hsn?: string | null;
+  brand?: string | null;
   priceSlabs?: Array<{ minQty: number; maxQty: number | null; price: number | string }>;
 };
 
@@ -72,6 +107,166 @@ async function listVendorProducts(
   return data?.products ?? [];
 }
 
+async function openProductEditPanel(
+  page: import('@playwright/test').Page,
+  productName: string,
+) {
+  const row = page.locator('tbody tr').filter({ hasText: productName }).first();
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await row.getByTitle('Edit').click();
+  await expect(page.getByText('Pricing & GST')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('#ff-basePrice input')).toBeVisible({ timeout: 30_000 });
+}
+
+async function openFirstProductEditPanel(page: import('@playwright/test').Page) {
+  const editBtn = page.getByTitle('Edit').first();
+  await expect(editBtn).toBeVisible({ timeout: 30_000 });
+  await editBtn.click();
+  await expect(page.getByText('Pricing & GST')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('#ff-basePrice input')).toBeVisible({ timeout: 30_000 });
+}
+
+/** Fill fields required for Save. Prefer non-material logistics; fill HSN only if empty so Save can proceed. */
+async function ensureRequiredLogistics(page: import('@playwright/test').Page) {
+  const fillIfEmpty = async (selector: string, value: string) => {
+    const input = page.locator(selector).first();
+    if ((await input.count()) === 0) return;
+    const current = await input.inputValue().catch(() => '');
+    if (!current.trim()) await input.fill(value);
+  };
+  await fillIfEmpty('#ff-countryOfOrigin input', 'India');
+  await fillIfEmpty('#ff-shelfLifeDays input', '30');
+  await fillIfEmpty('#ff-minOrderQty input', '1');
+  // Seed rows often lack HSN — form validation requires it before Save.
+  await fillIfEmpty('#ff-hsn input', '21069099');
+
+  const veg = page.locator('#ff-vegNonVeg select');
+  if ((await veg.count()) > 0 && !(await veg.inputValue())) {
+    await veg.selectOption('veg');
+  }
+  const storage = page.locator('#ff-storageType select');
+  if ((await storage.count()) > 0 && !(await storage.inputValue())) {
+    await storage.selectOption('ambient');
+  }
+}
+
+type ProductDetail = VendorProduct & {
+  imageUrl?: string | null;
+  hsn?: string | null;
+  brand?: string | null;
+  sku?: string | null;
+  countryOfOrigin?: string | null;
+  vegNonVeg?: string | null;
+  storageType?: string | null;
+  shelfLifeDays?: number | null;
+  minOrderQty?: number | null;
+};
+
+/** Prefer a product whose form will pass essentials validation (esp. image + HSN). */
+async function findUiReadyProduct(
+  page: import('@playwright/test').Page,
+): Promise<ProductDetail | null> {
+  const products = await listVendorProducts(page, 50);
+  for (const p of products.filter((x) => x.isActive)) {
+    try {
+      const got = await pageJson<{
+        success?: boolean;
+        data?: ProductDetail & { approvalStatus?: string };
+      }>(page, `/api/v1/vendor/products/${p.id}`);
+      const d = got.json.data;
+      if (d?.imageUrl && d.brand && d.approvalStatus === 'approved') {
+        return d;
+      }
+    } catch {
+      /* keep trying */
+    }
+  }
+  return null;
+}
+
+async function saveProductPanel(page: import('@playwright/test').Page) {
+  await ensureRequiredLogistics(page);
+
+  const saveBtn = page.locator('button[type="submit"][form="vendor-product-form"]');
+  await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
+
+  const responsePromise = page.waitForResponse(
+    (r) =>
+      /\/api\/v1\/vendor\/products\/[^/]+$/.test(new URL(r.url()).pathname) &&
+      r.request().method() === 'PATCH',
+    { timeout: 60_000 },
+  );
+
+  await saveBtn.click();
+
+  // Client-side validation may block the request — surface field errors.
+  const toastOrField = page
+    .locator('[data-sonner-toast], #ff-imageUrl .text-\\[\\#E74C3C\\], [class*="text-[#E74C3C]"]')
+    .filter({ hasText: /required|failed|invalid|Pick a|must be|Primary image/i })
+    .first();
+
+  let response: import('@playwright/test').Response | null = null;
+  try {
+    response = await Promise.race([
+      responsePromise,
+      toastOrField.waitFor({ state: 'visible', timeout: 15_000 }).then(async () => {
+        const text = (await toastOrField.textContent()) ?? 'validation error';
+        throw new Error(`Save blocked before PATCH: ${text}`);
+      }),
+    ]);
+  } catch (err) {
+    // If PATCH never fired, try to read any visible error text
+    const anyErr = page.locator('[data-sonner-toast]').first();
+    if (await anyErr.isVisible().catch(() => false)) {
+      throw new Error(`Save failed: ${(await anyErr.textContent()) ?? String(err)}`);
+    }
+    throw err;
+  }
+
+  if (!response) throw new Error('Save did not issue product PATCH');
+  const status = response.status();
+  const json = (await response.json().catch(() => null)) as {
+    success?: boolean;
+    error?: { message?: string };
+  } | null;
+  if (!json?.success) {
+    throw new Error(`PATCH ${status} failed: ${json?.error?.message ?? JSON.stringify(json)}`);
+  }
+
+  await expect(page.locator('#ff-basePrice input')).toBeHidden({ timeout: 30_000 });
+}
+
+async function clearBulkTiers(page: import('@playwright/test').Page) {
+  const section = page.locator('#section-bulk');
+  for (let i = 0; i < 5; i++) {
+    const remove = section.getByLabel(/Remove bulk tier/i);
+    if ((await remove.count()) === 0) break;
+    await remove.first().click();
+  }
+}
+
+async function fillBulkTiers(
+  page: import('@playwright/test').Page,
+  tiers: Array<{ minQty: number; price: number }>,
+) {
+  const section = page.locator('#section-bulk');
+  await section.scrollIntoViewIfNeeded();
+  await clearBulkTiers(page);
+
+  for (let i = 0; i < tiers.length; i++) {
+    await page.getByRole('button', { name: /Add Bulk Tier/i }).click();
+  }
+
+  for (let i = 0; i < tiers.length; i++) {
+    const card = section
+      .locator('div.rounded-\\[14px\\]')
+      .filter({ has: page.getByRole('heading', { name: `Bulk Tier ${i + 1}` }) })
+      .first();
+    await card.getByPlaceholder('e.g. 10').fill(String(tiers[i].minQty));
+    await card.getByPlaceholder('0.00').fill(String(tiers[i].price));
+  }
+}
+
 test.describe('Section 4 — Pricing & bulk pricing', () => {
   test.beforeEach(async ({ page }) => {
     await passwordLogin(page, 'fresh@dailyfreshfoods.com', 'vendor123');
@@ -79,10 +274,90 @@ test.describe('Section 4 — Pricing & bulk pricing', () => {
     await enterStore(page);
   });
 
-  test('1 products page exposes Pricing & GST / bulk tier UI cues', async ({ page }) => {
+  test('1 products page opens product Pricing & GST panel', async ({ page }) => {
     await openProducts(page);
-    // List loads; search exists (pricing search path today)
     await expect(page.getByPlaceholder(/Search/i).first()).toBeVisible({ timeout: 30_000 });
+    await openFirstProductEditPanel(page);
+    await expect(page.getByText('Pricing & GST')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Bulk pricing tiers/i })).toBeVisible();
+    await page.locator('#section-bulk').scrollIntoViewIfNeeded();
+    // Button hidden when 3 tiers already exist — either Add control or an existing tier is enough.
+    const addCount = await page.getByRole('button', { name: /Add Bulk Tier/i }).count();
+    const tierCount = await page.getByRole('heading', { name: /Bulk Tier \d/i }).count();
+    const emptyCount = await page.getByText(/No bulk tiers yet/i).count();
+    expect(addCount + tierCount + emptyCount).toBeGreaterThan(0);
+  });
+
+  test('1-7 UI: set selling price, add/edit/delete bulk slabs in Chrome', async ({ page }) => {
+    await openProducts(page);
+
+    const product = await findUiReadyProduct(page);
+    test.skip(!product?.imageUrl, 'No product with imageUrl + logistics for UI save');
+
+    await openProductEditPanel(page, product!.name);
+
+    // Flow 1–3: set default selling price (Taxable ex-GST)
+    const baseInput = page.locator('#ff-basePrice input');
+    await baseInput.scrollIntoViewIfNeeded();
+    await baseInput.fill('100');
+    await expect(baseInput).toHaveValue('100');
+
+    // Flows 4–5: add three bulk slabs (client example mins)
+    await fillBulkTiers(page, [
+      { minQty: 1, price: 100 },
+      { minQty: 12, price: 95 },
+      { minQty: 48, price: 90 },
+    ]);
+    await expect(page.getByRole('heading', { name: 'Bulk Tier 3' })).toBeVisible();
+
+    await saveProductPanel(page);
+
+    // Reopen + view (flow 3) — assert persisted via UI + API
+    await openProductEditPanel(page, product!.name);
+    await expect(page.locator('#ff-basePrice input')).toHaveValue('100');
+    await expect(page.getByRole('heading', { name: 'Bulk Tier 1' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Bulk Tier 2' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Bulk Tier 3' })).toBeVisible();
+
+    const afterAdd = await pageJson<{
+      success?: boolean;
+      data?: VendorProduct;
+    }>(page, `/api/v1/vendor/products/${product!.id}`);
+    expect(Number(afterAdd.json.data?.basePrice)).toBe(100);
+    const slabsAfterAdd = afterAdd.json.data?.priceSlabs ?? [];
+    expect(slabsAfterAdd.length).toBeGreaterThanOrEqual(3);
+    expect(Number(slabsAfterAdd.find((s) => Number(s.minQty) === 12)?.price)).toBe(95);
+    expect(Number(slabsAfterAdd.find((s) => Number(s.minQty) === 48)?.price)).toBe(90);
+
+    // Flow 6: edit slab 2 taxable rate
+    const section = page.locator('#section-bulk');
+    const tier2 = section
+      .locator('div.rounded-\\[14px\\]')
+      .filter({ has: page.getByRole('heading', { name: 'Bulk Tier 2' }) })
+      .first();
+    await tier2.getByPlaceholder('0.00').fill('88');
+    await saveProductPanel(page);
+
+    const afterEdit = await pageJson<{ success?: boolean; data?: VendorProduct }>(
+      page,
+      `/api/v1/vendor/products/${product!.id}`,
+    );
+    const slabsAfterEdit = afterEdit.json.data?.priceSlabs ?? [];
+    expect(Number(slabsAfterEdit.find((s) => Number(s.minQty) === 12)?.price)).toBe(88);
+
+    // Flow 7: delete last slab
+    await openProductEditPanel(page, product!.name);
+    await page.getByLabel('Remove bulk tier 3').click();
+    await expect(page.getByRole('heading', { name: 'Bulk Tier 3' })).toHaveCount(0);
+    await saveProductPanel(page);
+
+    const afterDelete = await pageJson<{ success?: boolean; data?: VendorProduct }>(
+      page,
+      `/api/v1/vendor/products/${product!.id}`,
+    );
+    const slabsAfterDelete = afterDelete.json.data?.priceSlabs ?? [];
+    expect(slabsAfterDelete.length).toBe(2);
+    expect(slabsAfterDelete.some((s) => Number(s.minQty) === 48)).toBe(false);
   });
 
   test('1-7 set basePrice + three PriceSlabs via product PATCH', async ({ page }) => {
@@ -126,12 +401,30 @@ test.describe('Section 4 — Pricing & bulk pricing', () => {
   test('26-28 customer cart unitPrice follows bulk slab by quantity', async ({ page, browser }) => {
     await openProducts(page);
 
-    const products = await listVendorProducts(page, 20);
-    const product =
-      products.find((p) => p.isActive && Number(p.basePrice) > 0) ?? products[0] ?? null;
-    test.skip(!product, 'No product');
+    const products = await listVendorProducts(page, 50);
+    let product: ProductDetail | null = null;
+    for (const p of products.filter((x) => x.isActive && Number(x.basePrice) > 0)) {
+      try {
+        const got = await pageJson<{
+          success?: boolean;
+          data?: ProductDetail & { approvalStatus?: string };
+        }>(page, `/api/v1/vendor/products/${p.id}`);
+        const d = got.json.data;
+        if (d?.approvalStatus === 'approved' && d.isActive) {
+          product = d;
+          break;
+        }
+      } catch {
+        /* warm / skip */
+      }
+    }
+    test.skip(!product, 'No approved active product for cart pricing');
 
-    await pageJson(page, `/api/v1/vendor/products/${product!.id}`, {
+    const setup = await pageJson<{
+      success?: boolean;
+      error?: { message?: string };
+      data?: { id: string; isActive?: boolean; approvalStatus?: string };
+    }>(page, `/api/v1/vendor/products/${product!.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -144,6 +437,8 @@ test.describe('Section 4 — Pricing & bulk pricing', () => {
         ],
       }),
     });
+    expect(setup.json.success, setup.json.error?.message ?? 'setup patch failed').toBe(true);
+    expect(setup.json.data?.approvalStatus ?? 'approved').toBe('approved');
 
     await page.evaluate(async (productId) => {
       const inv = await (await fetch('/api/v1/vendor/inventory', { credentials: 'include' })).json();

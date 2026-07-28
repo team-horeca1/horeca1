@@ -18,9 +18,8 @@
 ## Simple: what’s missing / partial (don’t miss)
 
 1. Pricelist filter on Products not built (Brand + Category filters are live).
-2. Playwright — `e2e/vendor-pricing-section4.spec.ts` covers slab cap, price template, PriceHistory (22–23).
-3. Pricelist filter on Products not built (Brand + Category filters are live).  
-4. Automated tests — `e2e/vendor-pricing-section4.spec.ts`.
+2. Playwright — `e2e/vendor-pricing-section4.spec.ts` covers **Chromium UI flows 1–7** (open product → Pricing & GST → set selling price → Add Bulk Tier ×3 → edit/delete slab → Save) plus API checks for slab cap, cart qty→slab (R5), Replace Prices, and PriceHistory.
+3. Automated tests — `e2e/vendor-pricing-section4.spec.ts` (run with `PLAYWRIGHT_SKIP_WEBSERVER=1` against localhost:3000).
 
 **Closed this pass:** API slab cap (3), price audit logging, Change history rows, Replace Prices + price-only Excel, Brand/Category filters.
 
@@ -48,7 +47,7 @@ Full scorecard: [`SECTION4-PRICING-GAP-ANALYSIS.md`](./SECTION4-PRICING-GAP-ANAL
 | R3–R4 Customer override | Price Lists → special price → customer sees that price (not slab) |
 | R5 Slab by qty | Customer cart: qty 5 → high unit; qty 50 → lower unit (if no pricelist) |
 | R6 Bulk updates only pricing | Prefer `%` bulk-price or price columns in import — avoid stock columns |
-| R7 Price history | Audit API exists; UI incomplete — expect Partial |
+| R7 | Price history | Product **Price history** panel + Customers history; dedicated `PriceHistory` table |
 
 ---
 

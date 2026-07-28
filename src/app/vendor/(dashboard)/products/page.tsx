@@ -3264,6 +3264,7 @@ export default function VendorProductsPage() {
                                                             </div>
                                                             <button
                                                                 type="button"
+                                                                aria-label={`Remove bulk tier ${index + 1}`}
                                                                 onClick={() => setForm(prev => ({
                                                                     ...prev,
                                                                     priceSlabs: prev.priceSlabs.filter((_, idx) => idx !== index),
