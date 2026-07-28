@@ -2,9 +2,8 @@
 ## Gap analysis (codebase vs brief)
 
 **Date:** 2026-07-28  
-**Scope note:** Auto-accept, **OrderEvent** + Timeline/Status History/Activity Log, **Rule 12**, status filters, **Flow 18** CancelRequest, **flows 32–34** bulk print/status/CSV export, and polish (payment method filter, required per-item reject reason, invoice# search copy, apply substitute).  
-**Recommendation only (out of Section 7):** Order Workspace UI overhaul.  
-**Deferred (separate tax work):** IGST / inter-state invoice matrix.
+**Scope note:** Auto-accept, **OrderEvent** + Timeline/Status History/Activity Log, **Rule 12**, status filters, **Flow 18** CancelRequest, **flows 32–34** bulk print/status/CSV export, polish (payment method filter, required per-item reject reason, invoice# search copy, apply substitute), **Order Workspace** hub, and **IGST** place-of-supply on invoices.  
+**Optional (not required):** Dedicated Invoice table — `orderNumber` doubles as invoice #.
 
 **Out of scope for Section 7:** Delivery ops (S8), Returns (S9), Payment collection, Customer ledger.
 
@@ -38,7 +37,7 @@ Platform rule: place → `pending` + `acceptedAt` + `fulfilledQty = quantity` �
 | O3 | Accept, Reject or Partially Accept | **Pass** | Auto-accept on place; partial/reject via events; cancel while pending |
 | O4 | Manage Order Fulfilment | **Pass** | Status advances + warehouse (S8 depth separate) |
 | O5 | Update Order Status | **Pass** | `VALID_TRANSITIONS` + OrderEvents |
-| O6 | Generate Invoices | **Pass** | PDF from accepted/`fulfilledQty`; bulk merge via `pdf-lib` |
+| O6 | Generate Invoices | **Pass** | PDF from accepted/`fulfilledQty`; bulk merge via `pdf-lib`; CGST/SGST or IGST by place of supply |
 | O7 | Complete or cancel Orders | **Pass** | Delivered; cancel only pending (R12); CancelRequest review |
 | O8 | Complete Activity Timeline | **Pass** | `OrderEvent` + detail UI |
 
@@ -80,7 +79,7 @@ Platform rule: place → `pending` + `acceptedAt` + `fulfilledQty = quantity` �
 
 | # | Flow | Verdict | Notes |
 |---|------|---------|-------|
-| 1 | Open Order Management | **Pass** | `/vendor/orders` |
+| 1 | Open Order Management | **Pass** | `/vendor/orders` + `?view=workspace` hub |
 | 2 | View Orders | **Pass** | |
 | 3 | Filter (brief statuses) | **Pass** | New/Pending/Accepted/… tabs |
 | 4 | Receive New Order notification | **Pass** | `OrderCreated` |
@@ -119,19 +118,16 @@ Platform rule: place → `pending` + `acceptedAt` + `fulfilledQty = quantity` �
 
 ## What’s missing (simple)
 
-1. **Order Workspace** UI — recommendation only; later.  
-2. **IGST / inter-state invoice matrix** — separate tax work (CGST/SGST only today).  
-3. **Dedicated Invoice table** — optional; `orderNumber` doubles as invoice # today.
+1. **Dedicated Invoice table** — optional; `orderNumber` doubles as invoice # today.  
+2. **S8 Fulfilment Workspace depth** (executives, failed delivery, labels) — Section 8, not S7.
 
 ## What’s missing (detail)
 
 | ID | Item | Priority | Notes |
 |----|------|----------|-------|
-| S7-N3 | Order Workspace hub | Rec only | |
 | S7-N4 | Dedicated Invoice entity (optional) | S | Search uses `orderNumber` as invoice # |
-| S7-N7 | IGST inter-state invoice | Deferred | CGST/SGST only |
 
-Shipped this pass (no longer gaps): Flow 18 CancelRequest; bulk print/status/export; payment method filter; required per-item reject reason; apply substitute on pending; human Playwright UI journeys.
+Shipped: Flow 18 CancelRequest; bulk print/status/export; payment method filter; required per-item reject reason; apply substitute; Order Workspace hub; IGST place-of-supply matrix; human Playwright UI journeys.
 
 ---
 
@@ -141,7 +137,9 @@ Shipped this pass (no longer gaps): Flow 18 CancelRequest; bulk print/status/exp
 - `src/modules/order/order.service.ts` — create, transitions, partial, substitute, events
 - `src/modules/order/cancel-request.service.ts` — customer request + vendor review
 - `src/modules/order/order-events.ts` — emit helpers + action constants
-- `src/app/vendor/(dashboard)/orders/` — list (bulk/export) + detail
+- `src/lib/invoice.ts` / `src/lib/gstPlaceOfSupply.ts` — tax invoice + IGST/CGST/SGST
+- `src/app/vendor/(dashboard)/orders/` — list (bulk/export) + detail + `?view=workspace`
+- `src/components/features/vendor/OrderWorkspace.tsx` — next-action hub
 - `src/app/api/v1/vendor/orders/` — list/detail/PATCH/invoice/bulk/export
 - `src/app/api/v1/orders/[id]/cancel-request/` — customer cancel request
 - `src/app/api/v1/vendor/cancel-requests/` — vendor list + PATCH

@@ -206,14 +206,14 @@ The live system is `CreditWallet` (the older `CreditAccount`/`CreditTransaction`
 | Partial acceptance (accept some items, reduce quantities) | ✅ EXISTS | `OrderService.partialAccept()` — PATCH body `{ items: [{ itemId, fulfilledQty }] }`; post-confirm amendment via `amendOrderLines()`. |
 | **Order immutability + Order Events** | ❌ MISSING | The brief's central rule. Today partial acceptance and amendments **edit the order in place** (`fulfilledQty`, `subtotal`, `totalAmount` are mutated). There is **no `OrderEvent` / status-history table** — the timeline shown in UI (`src/components/features/finance/StatusTimeline.tsx`) is *derived* from current status, not recorded history. The generic `AuditLog` is not an order activity feed. This is the largest structural gap in S7. |
 | Pricing locked at order time | ✅ EXISTS | `OrderItem` snapshots (`productName`, `productSku`, `hsn`, `taxPercent`, `unitPrice`, …) via `src/modules/order/order-snapshots.ts`; invoices read snapshots (`src/lib/invoice-items.ts`). |
-| Invoice from accepted quantities | ✅ EXISTS | `src/lib/invoice.ts` (GST PDF) + `invoice-items.ts` bills `fulfilledQty` when `isPartial`. Customer/vendor/admin invoice routes exist. Note: CGST/SGST only — no IGST inter-state matrix yet. |
+| Invoice from accepted quantities | ✅ EXISTS | `src/lib/invoice.ts` (GST PDF) + `invoice-items.ts` bills `fulfilledQty` when `isPartial`. Customer/vendor/admin invoice routes exist. **IGST** when seller/buyer states differ (`gstPlaceOfSupply.ts`); else CGST+SGST. |
 | Vendor cancels pending order (with reason) | ✅ EXISTS | Any reserved state → `cancelled`; stock released, credit/promo reversed. |
 | **Customer cancellation / cancellation-request review** | ❌ MISSING | No customer cancel API at all. `DELETE /api/v1/orders/:id` only hard-deletes drafts or hides the order (`customerDeleted`). No request→vendor-review flow. |
 | Order timeline / status history / activity log views | ❌ MISSING | Depends on the missing Order Events model above. |
 | Bulk actions: accept, status update, invoice print, export | ❌ MISSING | No bulk order APIs or UI. Vendor reports are aggregates only. |
 | Who/when on every action | 🟡 PARTIAL | Some actions audited in `AuditLog`; no systematic per-order actor/time record (again → Order Events). |
 
-**Gaps to close:** `OrderEvent` table + emit on every transition/line change and render real timeline (L — the keystone item, also unblocks S8/S9 timelines), customer cancellation flow (M), bulk order actions + export (M), IGST support (S).
+**Gaps to close:** Fulfilment depth lives in S8. Section 7 order keystone (OrderEvent, cancel review, bulk, IGST) is shipped — see `docs/SECTION7-ORDER-GAP-ANALYSIS.md`.
 
 ---
 
@@ -363,7 +363,7 @@ Size legend: **S** ≤ 1 day · **M** 2–5 days · **L** 1–3 weeks.
 | G29 | DB unique constraint `(vendorId, vendorSku)`; API hard-cap 3 price slabs | S2/S4 | S | migration; vendor product Zod schema |
 | G30 | Stock-take / reconciliation workflow (physical count → variance → approve) | S3 | M | ✅ DONE — `InventoryService.stockTake` + vendor inventory UI |
 | G31 | Dedicated price-history table (base price old→new) | S4 | M | **Done** — `PriceHistory` + dual-write |
-| G32 | IGST (inter-state) invoice support | S7 | S | `src/lib/invoice.ts` |
+| G32 | IGST (inter-state) invoice support | S7 | ✅ | `gstPlaceOfSupply.ts` + invoice PDF |
 | G33 | Audit-log coverage for orders/settlements/categories mutations | S14 | S | respective route handlers |
 
 ---
@@ -394,7 +394,9 @@ Size legend: **S** ≤ 1 day · **M** 2–5 days · **L** 1–3 weeks.
 
 ### P3 — Polish and hardening
 
-G8 CN PDF · G19 store sharing/QR · G22 bulk credit · G25 ledger hardening + PDF statements · G26 notification prefs + return notifications · G27 WhatsApp provider · G28 KYC hold · G29 schema constraints · G31 price history · G32 IGST · G33 audit coverage.
+G8 CN PDF · G19 store sharing/QR · G22 bulk credit · G25 ledger hardening + PDF statements · G26 notification prefs + return notifications · G27 WhatsApp provider · G28 KYC hold · G29 schema constraints · G31 price history · G33 audit coverage.
+(G30 stock-take ✅ · G32 IGST ✅ with Section 7.)
+
 (G30 stock-take ✅ done with Section 3 inventory work.)
 
 ```mermaid

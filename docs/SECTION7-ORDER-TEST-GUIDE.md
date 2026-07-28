@@ -1,9 +1,9 @@
 # Section 7 — Order Management Test Guide
 
 **Date:** 2026-07-28  
-**Playwright:** `e2e/vendor-orders-section7.spec.ts` (8 tests)  
+**Playwright:** `e2e/vendor-orders-section7.spec.ts` (9 tests)  
 **Accounts:** vendor `fresh@dailyfreshfoods.com` / `vendor123` · customer `chef@tajpalace.com` / `customer123`  
-**Last verified:** 8 passed ×2 (Chromium, `--workers=1`, `PLAYWRIGHT_SKIP_WEBSERVER=1`)
+**Last verified:** 8 passed ×2 prior to Workspace/IGST leftover; re-run after leftover ship
 
 ## How to run
 
@@ -41,19 +41,20 @@ npx playwright test e2e/vendor-orders-section7.spec.ts --project=chromium --work
 | human UI: customer cancel request → vendor approve | Flow 18 |
 | human UI: bulk status + export + payment method filter | Flows 30, 32–34 |
 | human UI: reject line with typed reason + activity log | Flow 10 polish |
+| Order Workspace queues + IGST supply matrix helper | Workspace hub + IGST |
 
 ## Manual UI smoke
 
-1. `/vendor/orders` — tabs New / Pending / Accepted / … (not “Pending Approval”); payment method filter; Export CSV; row checkboxes + bulk bar.
-2. Open a pending order — no **Accept Order** approval CTA; **Mark as Accepted** / **Mark as Packed** / **Cancel Order**.
-3. Customer `/orders/[id]` — **Request Cancellation** while pending; vendor detail banner Approve/Reject.
-4. Reject a line (qty 0) — reason required; Activity Log shows it.
-5. **Order history** panel: Timeline / Status History / Activity Log from `OrderEvent`.
-6. Download invoice PDF from order detail; bulk Print invoices from list.
+1. `/vendor/orders?view=workspace` — queues for cancel / pending / accepted / packed / ready-for-dispatch with next-action buttons.
+2. `/vendor/orders` — tabs, payment method filter, Export CSV, row checkboxes + bulk bar; link to Workspace.
+3. Open a pending order — no **Accept Order** approval CTA; **Mark as Accepted** / **Mark as Packed** / **Cancel Order**.
+4. Customer `/orders/[id]` — **Request Cancellation** while pending; vendor detail banner Approve/Reject.
+5. Reject a line (qty 0) — reason required; Activity Log shows it.
+6. Invoice PDF: same-state vendor/buyer → CGST+SGST; different states (or GSTIN state codes) → IGST.
 
 ## What’s still missing (simple)
 
-1. Order Workspace overhaul — brief **recommendation** only  
-2. IGST / inter-state invoice matrix — deferred tax work  
+1. Dedicated Invoice table — optional (`orderNumber` = invoice #)  
+2. S8 fulfilment depth (executives, failed delivery) — next section  
 
 See also: [SECTION7-ORDER-GAP-ANALYSIS.md](./SECTION7-ORDER-GAP-ANALYSIS.md)

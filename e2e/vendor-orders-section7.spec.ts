@@ -380,18 +380,22 @@ test.describe('Section 7 — Order Management', () => {
     const customerPage = await customerCtx.newPage();
     await passwordLogin(customerPage, 'chef@tajpalace.com', 'customer123');
 
-    for (let attempt = 0; attempt < 4; attempt++) {
+    for (let attempt = 0; attempt < 6; attempt++) {
       try {
         await customerPage.goto(`/orders/${placed.orderId}`, {
           waitUntil: 'domcontentloaded',
           timeout: 60_000,
         });
-        break;
+        if (customerPage.url().includes(`/orders/${placed.orderId}`)) {
+          const btn = customerPage.getByTestId('request-cancel-btn');
+          if (await btn.isVisible({ timeout: 8_000 }).catch(() => false)) break;
+        }
       } catch {
-        await customerPage.waitForTimeout(1500 * (attempt + 1));
+        /* retry */
       }
+      await customerPage.waitForTimeout(2000 * (attempt + 1));
     }
-
+    await expect(customerPage).toHaveURL(new RegExp(`/orders/${placed.orderId}`));
     await expect(customerPage.getByTestId('request-cancel-btn')).toBeVisible({ timeout: 60_000 });
     await customerPage.getByTestId('request-cancel-btn').click();
     await customerPage.getByTestId('cancel-reason-input').fill('Changed my mind about this order quantity.');
@@ -581,5 +585,30 @@ test.describe('Section 7 — Order Management', () => {
         }
       }
     }
+  });
+
+  test('Order Workspace queues render + IGST supply matrix helper', async ({ page }) => {
+    const { normalizeIndianState, resolveSupplyType, splitGstTax, formatLineTaxRate, stateFromGstin } =
+      await import('../src/lib/gstPlaceOfSupply');
+
+    expect(normalizeIndianState('MH')).toBe('Maharashtra');
+    expect(stateFromGstin('29AABCT1332L1ZB')).toBe('Karnataka');
+    expect(resolveSupplyType('Maharashtra', 'Karnataka')).toBe('inter');
+    expect(resolveSupplyType('Maharashtra', 'MH')).toBe('intra');
+    expect(splitGstTax(100, 'inter')).toEqual({ cgst: 0, sgst: 0, igst: 100 });
+    expect(splitGstTax(100, 'intra').cgst + splitGstTax(100, 'intra').sgst).toBeCloseTo(100);
+    expect(formatLineTaxRate(18, 'inter')).toBe('0+0+18+0');
+    expect(formatLineTaxRate(18, 'intra')).toBe('9+9+0+0');
+
+    await enterStore(page);
+    await page.goto('/vendor/orders', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: /^Orders$/i })).toBeVisible({ timeout: 60_000 });
+    const wsLink = page.getByTestId('orders-workspace-link');
+    await expect(wsLink).toBeVisible({ timeout: 30_000 });
+    await wsLink.click();
+    await expect(page.getByTestId('order-workspace')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('workspace-queue-pending')).toBeVisible();
+    await expect(page.getByTestId('workspace-queue-cancel')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Order Workspace/i })).toBeVisible();
   });
 });
