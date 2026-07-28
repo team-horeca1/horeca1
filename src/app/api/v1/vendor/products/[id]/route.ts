@@ -15,14 +15,20 @@ import { requirePermission } from '@/lib/permissions/engine';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import { logProductFieldChanges, summarizePriceSlabs } from '@/lib/product-audit';
 
+/** Absolute http(s) URL or app-relative path (seeded products use /images/...). */
+const imageRef = z.string().refine(
+  (v) => v.startsWith('/') || /^https?:\/\//i.test(v),
+  { message: 'Invalid image URL' },
+);
+
 // Validation schema for product updates (all fields optional)
 const updateProductSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   basePrice: z.number().positive().optional(),
   originalPrice: z.number().positive().nullable().optional(),
-  imageUrl: z.string().url().optional(),
-  images: z.array(z.string().url()).optional(),
+  imageUrl: imageRef.optional(),
+  images: z.array(imageRef).optional(),
   packSize: z.string().optional(),
   unit: z.string().optional(),
   sku: z.string().optional(),

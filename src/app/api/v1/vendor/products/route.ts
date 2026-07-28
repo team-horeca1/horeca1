@@ -54,7 +54,10 @@ const createProductSchema = z.object({
   promoEndTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),   // HH:mm
   minOrderQty: z.number().int().min(1).optional(),
   description: z.string().optional(),
-  imageUrl: z.string().url().optional(),
+    imageUrl: z
+    .string()
+    .refine((v) => v.startsWith('/') || /^https?:\/\//i.test(v), { message: 'Invalid image URL' })
+    .optional(),
   creditEligible: z.boolean().optional(),
   basedOnProductId: z.string().uuid().optional(),
   basedOnBrandMasterProductId: z.string().uuid().optional(),
