@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import {
     Loader2, Package, AlertTriangle, Search, Upload, Download,
-    ChevronDown, ChevronUp, X, FileText, Check, History,
+    ChevronDown, ChevronUp, X, Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -131,16 +131,6 @@ function BulkUploadModal({
     const [serverErrors, setServerErrors] = useState<Array<{ sku: string; error: string }>>([]);
     const fileRef = useRef<HTMLInputElement>(null);
 
-    const downloadExport = () => {
-        const params = new URLSearchParams({ format: 'xlsx' });
-        if (viewAll) params.set('consolidated', 'true');
-        window.open(`/api/v1/vendor/inventory/export?${params}`, '_blank');
-    };
-
-    const downloadTemplate = () => {
-        window.open('/api/v1/vendor/inventory/import?template=true', '_blank');
-    };
-
     const downloadErrorReport = async (errors: Array<{ sku: string; error: string }>) => {
         const XLSX = await import('xlsx');
         const ws = XLSX.utils.json_to_sheet(errors.map((e) => ({ SKU: e.sku, Error: e.error })));
@@ -220,24 +210,8 @@ function BulkUploadModal({
                 </div>
 
                 <div className="p-6 space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            onClick={downloadExport}
-                            className="h-[36px] px-3 rounded-[8px] border border-[#EEEEEE] text-[12px] font-bold text-[#181725] hover:bg-[#F5F5F5] flex items-center gap-1.5"
-                        >
-                            <Download size={13} />
-                            Download current stock
-                        </button>
-                        <button
-                            type="button"
-                            onClick={downloadTemplate}
-                            className="h-[36px] px-3 rounded-[8px] border border-[#EEEEEE] text-[12px] font-bold text-[#181725] hover:bg-[#F5F5F5] flex items-center gap-1.5"
-                        >
-                            <FileText size={13} />
-                            Download template
-                        </button>
-                        {(serverErrors.length > 0 || errorCount > 0) && (
+                    {(serverErrors.length > 0 || errorCount > 0) && (
+                        <div className="flex flex-wrap gap-2">
                             <button
                                 type="button"
                                 onClick={() =>
@@ -252,8 +226,8 @@ function BulkUploadModal({
                                 <Download size={13} />
                                 Download error report
                             </button>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     <div
                         onDragOver={(e) => e.preventDefault()}
@@ -264,7 +238,8 @@ function BulkUploadModal({
                         <Upload size={24} className="text-[#AEAEAE] mx-auto mb-2" />
                         <p className="text-[13px] font-bold text-[#181725]">Drop CSV/XLSX here or click to browse</p>
                         <p className="text-[11px] text-[#AEAEAE] mt-1">
-                            Columns: <span className="font-mono">SKU, Qty Available</span>
+                            Use page <span className="font-semibold text-[#181725]">Export</span> for current stock, then re-upload with{' '}
+                            <span className="font-mono">SKU, Qty Available</span>
                             {multiWarehouse && <>, <span className="font-mono">Warehouse Pincode</span></>}
                         </p>
                         <input
@@ -327,84 +302,6 @@ function BulkUploadModal({
 
 // ─── History panel (Section 3 Expected Outcome: complete inventory history) ───
 
-interface HistoryLog {
-    id: string;
-    field: string;
-    oldValue: number;
-    newValue: number;
-    reason: string | null;
-    createdAt: string;
-}
-
-function InventoryHistoryPanel({
-    inventoryId,
-    productName,
-    onClose,
-}: {
-    inventoryId: string;
-    productName: string;
-    onClose: () => void;
-}) {
-    const [logs, setLogs] = useState<HistoryLog[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        void (async () => {
-            try {
-                const res = await fetch(`/api/v1/vendor/inventory/history?inventoryId=${inventoryId}&limit=50`);
-                const json = await res.json();
-                if (json.success) setLogs(json.data);
-            } catch {
-                toast.error('Failed to load history');
-            } finally {
-                setLoading(false);
-            }
-        })();
-    }, [inventoryId]);
-
-    return (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-[560px] overflow-hidden max-h-[80vh] flex flex-col">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-[#F5F5F5]">
-                    <div>
-                        <p className="text-[15px] font-bold text-[#181725]">Inventory history</p>
-                        <p className="text-[12px] text-[#AEAEAE] mt-0.5 truncate max-w-[400px]">{productName}</p>
-                    </div>
-                    <button type="button" onClick={onClose} className="p-1.5 rounded-[8px] hover:bg-[#F5F5F5]">
-                        <X size={16} className="text-[#7C7C7C]" />
-                    </button>
-                </div>
-                <div className="overflow-y-auto flex-1 p-4">
-                    {loading ? (
-                        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#299E60]" size={22} /></div>
-                    ) : logs.length === 0 ? (
-                        <p className="text-[13px] text-[#AEAEAE] text-center py-8">No stock movements recorded yet.</p>
-                    ) : (
-                        <ul className="space-y-2">
-                            {logs.map((log) => (
-                                <li key={log.id} className="rounded-[10px] border border-[#EEEEEE] px-3 py-2.5">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[12px] font-bold text-[#181725]">{log.field}</span>
-                                        <span className="text-[11px] text-[#AEAEAE]">
-                                            {new Date(log.createdAt).toLocaleString('en-IN')}
-                                        </span>
-                                    </div>
-                                    <p className="text-[13px] text-[#181725] mt-0.5">
-                                        {log.oldValue} → <span className="font-bold">{log.newValue}</span>
-                                    </p>
-                                    {log.reason && (
-                                        <p className="text-[11px] text-[#7C7C7C] mt-0.5">{log.reason}</p>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
-
 /* Stock-take / Count UI removed from Section 3 brief scope (not in current brief flows).
    API POST /api/v1/vendor/inventory/stock-take remains available if needed later. */
 
@@ -435,11 +332,10 @@ function InventoryRow({
     const [returned, setReturned] = useState(item.qtyReturned);
     const [threshold, setThreshold] = useState(item.lowStockThreshold);
     const [editingThreshold, setEditingThreshold] = useState(false);
-    const [dirty, setDirty] = useState(false);
+    const [qtyDirty, setQtyDirty] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [showHistory, setShowHistory] = useState(false);
-    const [orderingBusy, setOrderingBusy] = useState(false);
     const dirtyRef = useRef(false);
+    const qtyDirtyRef = useRef(false);
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingPayload = useRef<StockPatch | null>(null);
     const saveGen = useRef(0);
@@ -471,7 +367,7 @@ function InventoryRow({
 
     // Sync from parent only when this row has no pending edits
     useEffect(() => {
-        if (dirtyRef.current) return;
+        if (dirtyRef.current || qtyDirtyRef.current) return;
         setQty(item.qtyAvailable);
         setTransit(item.qtyInTransit);
         setDamaged(item.qtyDamaged);
@@ -502,17 +398,20 @@ function InventoryRow({
             if (gen !== saveGen.current) return;
             if (!json.success) throw new Error(json.error?.message || 'Save failed');
             dirtyRef.current = false;
-            setDirty(false);
             pendingPayload.current = null;
+            if (payload.qtyAvailable !== undefined) {
+                qtyDirtyRef.current = false;
+                setQtyDirty(false);
+            }
             const newQty = payload.qtyAvailable ?? snap.qty;
             const newThreshold = payload.lowStockThreshold ?? snap.threshold;
             snap.onSaved({
                 id: snap.id,
-                qtyAvailable: newQty,
-                qtyInTransit: payload.qtyInTransit ?? snap.transit,
-                qtyDamaged: payload.qtyDamaged ?? snap.damaged,
-                qtyReturned: payload.qtyReturned ?? snap.returned,
-                lowStockThreshold: newThreshold,
+                ...(payload.qtyAvailable !== undefined ? { qtyAvailable: payload.qtyAvailable } : {}),
+                ...(payload.qtyInTransit !== undefined ? { qtyInTransit: payload.qtyInTransit } : {}),
+                ...(payload.qtyDamaged !== undefined ? { qtyDamaged: payload.qtyDamaged } : {}),
+                ...(payload.qtyReturned !== undefined ? { qtyReturned: payload.qtyReturned } : {}),
+                ...(payload.lowStockThreshold !== undefined ? { lowStockThreshold: payload.lowStockThreshold } : {}),
                 isLowStock: newQty - snap.qtyReserved <= newThreshold,
             });
         } catch (err) {
@@ -527,7 +426,6 @@ function InventoryRow({
     const scheduleAutoSave = (fields: StockPatch) => {
         if (saveTimer.current) clearTimeout(saveTimer.current);
         dirtyRef.current = true;
-        setDirty(true);
         pendingPayload.current = fields;
         saveTimer.current = setTimeout(() => {
             saveTimer.current = null;
@@ -536,7 +434,7 @@ function InventoryRow({
         }, 900);
     };
 
-    // Flush or cancel pending save on unmount (warehouse switch / list reload)
+    // Flush pending bucket/threshold autosave on unmount (not Available — that needs explicit Save)
     useEffect(() => {
         return () => {
             if (saveTimer.current) {
@@ -545,7 +443,6 @@ function InventoryRow({
             }
             const pending = pendingPayload.current;
             if (pending && dirtyRef.current) {
-                // Fire-and-forget flush so stock lands on the correct outlet
                 const snap = latestRef.current;
                 const body: Record<string, unknown> = {
                     productId: snap.productId,
@@ -564,17 +461,24 @@ function InventoryRow({
         };
     }, []);
 
-    const nudgeQty = (delta: number) => {
-        const newQty = Math.max(0, qty + delta);
+    const markQtyDirty = (newQty: number) => {
         setQty(newQty);
-        scheduleAutoSave({ qtyAvailable: newQty, lowStockThreshold: threshold });
+        qtyDirtyRef.current = true;
+        setQtyDirty(true);
+    };
+
+    const nudgeQty = (delta: number) => {
+        markQtyDirty(Math.max(0, qty + delta));
     };
 
     const handleQtyInput = (v: string) => {
         const n = parseInt(v, 10);
         if (isNaN(n) || n < 0) return;
-        setQty(n);
-        scheduleAutoSave({ qtyAvailable: n, lowStockThreshold: threshold });
+        markQtyDirty(n);
+    };
+
+    const handleSaveQty = () => {
+        void persist({ qtyAvailable: qty, lowStockThreshold: threshold });
     };
 
     const handleBucket = (field: 'qtyInTransit' | 'qtyDamaged' | 'qtyReturned', value: number) => {
@@ -587,7 +491,7 @@ function InventoryRow({
 
     const handleThresholdBlur = () => {
         setEditingThreshold(false);
-        if (threshold !== item.lowStockThreshold) scheduleAutoSave({ qtyAvailable: qty, lowStockThreshold: threshold });
+        if (threshold !== item.lowStockThreshold) scheduleAutoSave({ lowStockThreshold: threshold });
     };
 
     const net = qty - item.qtyReserved;
@@ -624,10 +528,10 @@ function InventoryRow({
                 </td>
             )}
 
-            {/* Available — inline +/- */}
+            {/* Available — inline +/- with explicit Save */}
             <td className="px-5 py-3.5">
                 <div className="flex items-center gap-1 justify-center">
-                    <button onClick={() => nudgeQty(-1)} className="w-7 h-7 rounded-[6px] border border-[#EEEEEE] flex items-center justify-center text-[#7C7C7C] hover:bg-[#F5F5F5] hover:border-[#E74C3C]/40 hover:text-[#E74C3C] transition-all text-[14px] font-bold leading-none">−</button>
+                    <button type="button" onClick={() => nudgeQty(-1)} className="w-7 h-7 rounded-[6px] border border-[#EEEEEE] flex items-center justify-center text-[#7C7C7C] hover:bg-[#F5F5F5] hover:border-[#E74C3C]/40 hover:text-[#E74C3C] transition-all text-[14px] font-bold leading-none">−</button>
                     <input
                         type="number"
                         value={qty}
@@ -635,9 +539,17 @@ function InventoryRow({
                         className="w-[52px] h-7 text-center text-[13px] font-bold text-[#181725] border border-[#EEEEEE] rounded-[6px] outline-none focus:border-[#299E60]/50"
                         min={0}
                     />
-                    <button onClick={() => nudgeQty(1)} className="w-7 h-7 rounded-[6px] border border-[#EEEEEE] flex items-center justify-center text-[#7C7C7C] hover:bg-[#EEF8F1] hover:border-[#299E60]/40 hover:text-[#299E60] transition-all text-[14px] font-bold leading-none">+</button>
+                    <button type="button" onClick={() => nudgeQty(1)} className="w-7 h-7 rounded-[6px] border border-[#EEEEEE] flex items-center justify-center text-[#7C7C7C] hover:bg-[#EEF8F1] hover:border-[#299E60]/40 hover:text-[#299E60] transition-all text-[14px] font-bold leading-none">+</button>
+                    {qtyDirty && !saving && (
+                        <button
+                            type="button"
+                            onClick={handleSaveQty}
+                            className="h-7 px-2 ml-0.5 rounded-[6px] border border-[#299E60]/40 bg-[#EEF8F1] text-[11px] font-bold text-[#299E60] hover:bg-[#d9f0e3] transition-colors"
+                        >
+                            Save
+                        </button>
+                    )}
                     {saving && <Loader2 size={11} className="animate-spin text-[#299E60] ml-0.5" />}
-                    {dirty && !saving && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 ml-0.5" />}
                 </div>
             </td>
 
@@ -724,115 +636,31 @@ function InventoryRow({
                 )}
             </td>
 
-            {/* Actions — Section 3 brief flows only */}
+            {/* Actions — Mark OOS only */}
             <td className="px-3 py-3.5">
-                <div className="flex flex-col gap-1 min-w-[150px]">
-                    <div className="flex flex-wrap items-center gap-1 justify-center">
-                        <button
-                            type="button"
-                            onClick={() => setShowHistory(true)}
-                            className="h-7 px-2 rounded-[6px] border border-[#EEEEEE] text-[11px] font-bold text-[#181725] hover:bg-[#F5F5F5] flex items-center gap-1"
-                            title="View inventory history"
-                        >
-                            <History size={12} /> Log
-                        </button>
-                        <button
-                            type="button"
-                            disabled={saving || qty === 0}
-                            onClick={() => {
-                                setQty(0);
-                                scheduleAutoSave({ qtyAvailable: 0, lowStockThreshold: threshold });
-                                toast.message('Marked out of stock');
-                            }}
-                            className="h-7 px-2 rounded-[6px] border border-[#E74C3C]/30 text-[11px] font-bold text-[#E74C3C] hover:bg-red-50 disabled:opacity-40"
-                            title="Mark product out of stock (qty = 0)"
-                        >
-                            Mark OOS
-                        </button>
+                <div className="flex items-center justify-center">
+                    {qty === 0 ? (
+                        <span className="text-[11px] font-bold text-[#AEAEAE] whitespace-nowrap">
+                            Out of stock
+                        </span>
+                    ) : (
                         <button
                             type="button"
                             disabled={saving}
                             onClick={() => {
-                                const next = Math.max(qty, item.qtyReserved) + 20;
-                                setQty(next);
-                                scheduleAutoSave({ qtyAvailable: next, lowStockThreshold: threshold });
-                                toast.success(`Restocked to ${next}`);
+                                setQty(0);
+                                qtyDirtyRef.current = false;
+                                setQtyDirty(false);
+                                void persist({ qtyAvailable: 0, lowStockThreshold: threshold });
+                                toast.message('Marked out of stock');
                             }}
-                            className="h-7 px-2 rounded-[6px] border border-[#299E60]/40 text-[11px] font-bold text-[#299E60] hover:bg-[#EEF8F1]"
-                            title="Add stock (restock +20)"
+                            className="h-7 px-2.5 rounded-[6px] border border-[#E74C3C]/30 text-[11px] font-bold text-[#E74C3C] hover:bg-red-50 disabled:opacity-40 whitespace-nowrap"
+                            title="Mark product out of stock (qty = 0)"
                         >
-                            Restock
+                            Mark OOS
                         </button>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1 justify-center">
-                        {item.product.isActive ? (
-                            <button
-                                type="button"
-                                disabled={orderingBusy}
-                                onClick={async () => {
-                                    setOrderingBusy(true);
-                                    try {
-                                        const res = await fetch(`/api/v1/vendor/products/${item.productId}`, {
-                                            method: 'PATCH',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ isActive: false }),
-                                        });
-                                        const json = await res.json();
-                                        if (!json.success) throw new Error(json.error?.message || 'Failed');
-                                        onSaved({
-                                            id: item.id,
-                                            product: { ...item.product, isActive: false },
-                                        } as Partial<InventoryItem> & { id: string });
-                                        toast.success('Ordering disabled');
-                                    } catch (err) {
-                                        toast.error(err instanceof Error ? err.message : 'Failed');
-                                    } finally {
-                                        setOrderingBusy(false);
-                                    }
-                                }}
-                                className="h-7 px-2 rounded-[6px] border border-[#EEEEEE] text-[11px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5]"
-                            >
-                                Disable ordering
-                            </button>
-                        ) : (
-                            <button
-                                type="button"
-                                disabled={orderingBusy}
-                                onClick={async () => {
-                                    setOrderingBusy(true);
-                                    try {
-                                        const res = await fetch(`/api/v1/vendor/products/${item.productId}`, {
-                                            method: 'PATCH',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ isActive: true }),
-                                        });
-                                        const json = await res.json();
-                                        if (!json.success) throw new Error(json.error?.message || 'Failed');
-                                        onSaved({
-                                            id: item.id,
-                                            product: { ...item.product, isActive: true },
-                                        } as Partial<InventoryItem> & { id: string });
-                                        toast.success('Ordering enabled');
-                                    } catch (err) {
-                                        toast.error(err instanceof Error ? err.message : 'Failed');
-                                    } finally {
-                                        setOrderingBusy(false);
-                                    }
-                                }}
-                                className="h-7 px-2 rounded-[6px] border border-[#299E60]/40 text-[11px] font-bold text-[#299E60] hover:bg-[#EEF8F1]"
-                            >
-                                Enable ordering
-                            </button>
-                        )}
-                    </div>
+                    )}
                 </div>
-                {showHistory && (
-                    <InventoryHistoryPanel
-                        inventoryId={item.id}
-                        productName={item.product.name}
-                        onClose={() => setShowHistory(false)}
-                    />
-                )}
             </td>
         </tr>
     );
@@ -851,13 +679,13 @@ function InventoryMobileCard({
 }) {
     const [qty, setQty] = useState(item.qtyAvailable);
     const [saving, setSaving] = useState(false);
-    const [dirty, setDirty] = useState(false);
-    const dirtyRef = useRef(false);
+    const [qtyDirty, setQtyDirty] = useState(false);
+    const qtyDirtyRef = useRef(false);
     const saveGen = useRef(0);
     const abortRef = useRef<AbortController | null>(null);
 
     useEffect(() => {
-        if (dirtyRef.current) return;
+        if (qtyDirtyRef.current) return;
         setQty(item.qtyAvailable);
     }, [item.qtyAvailable]);
 
@@ -867,10 +695,13 @@ function InventoryMobileCard({
 
     const net = qty - item.qtyReserved;
 
-    const saveQty = async (newQty: number) => {
+    const markQtyDirty = (newQty: number) => {
         setQty(newQty);
-        dirtyRef.current = true;
-        setDirty(true);
+        qtyDirtyRef.current = true;
+        setQtyDirty(true);
+    };
+
+    const saveQty = async () => {
         const gen = ++saveGen.current;
         abortRef.current?.abort();
         const ac = new AbortController();
@@ -879,7 +710,7 @@ function InventoryMobileCard({
         try {
             const body: Record<string, unknown> = {
                 productId: item.productId,
-                qtyAvailable: newQty,
+                qtyAvailable: qty,
             };
             if (outletId) body.outletId = outletId;
             const res = await fetch('/api/v1/vendor/inventory', {
@@ -891,9 +722,9 @@ function InventoryMobileCard({
             const json = await res.json();
             if (gen !== saveGen.current) return;
             if (!json.success) throw new Error(json.error?.message || 'Save failed');
-            dirtyRef.current = false;
-            setDirty(false);
-            onSaved({ id: item.id, qtyAvailable: newQty, isLowStock: newQty - item.qtyReserved <= item.lowStockThreshold });
+            qtyDirtyRef.current = false;
+            setQtyDirty(false);
+            onSaved({ id: item.id, qtyAvailable: qty, isLowStock: qty - item.qtyReserved <= item.lowStockThreshold });
         } catch (err) {
             if (err instanceof DOMException && err.name === 'AbortError') return;
             if (gen !== saveGen.current) return;
@@ -930,11 +761,19 @@ function InventoryMobileCard({
             </div>
             <div className="flex items-center gap-2">
                 <span className="text-[11px] font-bold text-[#7C7C7C]">Available</span>
-                <button type="button" onClick={() => saveQty(Math.max(0, qty - 1))} className="w-7 h-7 rounded border border-[#EEEEEE]">−</button>
+                <button type="button" onClick={() => markQtyDirty(Math.max(0, qty - 1))} className="w-7 h-7 rounded border border-[#EEEEEE]">−</button>
                 <span className="text-[13px] font-bold w-8 text-center">{qty}</span>
-                <button type="button" onClick={() => saveQty(qty + 1)} className="w-7 h-7 rounded border border-[#EEEEEE]">+</button>
+                <button type="button" onClick={() => markQtyDirty(qty + 1)} className="w-7 h-7 rounded border border-[#EEEEEE]">+</button>
+                {qtyDirty && !saving && (
+                    <button
+                        type="button"
+                        onClick={() => void saveQty()}
+                        className="h-7 px-2 rounded-[6px] border border-[#299E60]/40 bg-[#EEF8F1] text-[11px] font-bold text-[#299E60]"
+                    >
+                        Save
+                    </button>
+                )}
                 {saving && <Loader2 size={12} className="animate-spin text-[#299E60]" />}
-                {dirty && !saving && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
             </div>
         </div>
     );
@@ -949,11 +788,12 @@ export default function VendorInventoryPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [brandFilter, setBrandFilter] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('');
-    const [tagFilter, setTagFilter] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
     const [showCsvModal, setShowCsvModal] = useState(false);
+    const [showExportMenu, setShowExportMenu] = useState(false);
     const [alertCollapsed, setAlertCollapsed] = useState(false);
     const fetchGen = useRef(0);
+    const exportMenuRef = useRef<HTMLDivElement>(null);
 
     // Drop stale rows when Online Store / default outlet changes.
     useEffect(() => {
@@ -1014,9 +854,6 @@ export default function VendorInventoryPage() {
                 .map((i) => [i.product.category!.id, i.product.category!.name]),
         ).entries(),
     ).sort((a, b) => a[1].localeCompare(b[1]));
-    const tagOptions = Array.from(
-        new Set(items.flatMap((i) => i.product.tags ?? []).filter(Boolean)),
-    ).sort((a, b) => a.localeCompare(b));
 
     const filtered = items.filter(item => {
         const q = searchQuery.toLowerCase();
@@ -1029,7 +866,6 @@ export default function VendorInventoryPage() {
         if (!matchSearch) return false;
         if (brandFilter && (item.product.brand ?? '') !== brandFilter) return false;
         if (categoryFilter && item.product.category?.id !== categoryFilter) return false;
-        if (tagFilter && !(item.product.tags ?? []).includes(tagFilter)) return false;
         if (activeFilter === 'low_stock') return item.isLowStock && item.qtyAvailable - item.qtyReserved > 0;
         if (activeFilter === 'out_of_stock') return item.qtyAvailable - item.qtyReserved <= 0;
         return true;
@@ -1040,9 +876,25 @@ export default function VendorInventoryPage() {
         { key: 'out_of_stock', label: 'Out of Stock', count: outOfStockItems.length },
     ];
 
+    useEffect(() => {
+        if (!showExportMenu) return;
+        const onDocClick = (e: MouseEvent) => {
+            if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+                setShowExportMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', onDocClick);
+        return () => document.removeEventListener('mousedown', onDocClick);
+    }, [showExportMenu]);
+
+    const openExport = (format: 'csv' | 'xlsx') => {
+        setShowExportMenu(false);
+        window.open(`/api/v1/vendor/inventory/export?format=${format}`, '_blank');
+    };
+
     return (
         <div className="space-y-5 pb-10">
-            {/* Header */}
+            {/* Header — Export + Bulk Upload only */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-[24px] font-bold text-[#181725]">Inventory</h1>
@@ -1051,59 +903,35 @@ export default function VendorInventoryPage() {
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEAEAE]" size={14} />
-                        <input
-                            type="text"
-                            placeholder="Search SKU / name / brand..."
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            className="h-[38px] w-[min(200px,100%)] max-w-full bg-white border border-[#EEEEEE] rounded-[10px] pl-9 pr-3 text-[12px] outline-none placeholder:text-[#AEAEAE] focus:border-[#299E60]/40 shadow-sm"
-                        />
+                    <div className="relative" ref={exportMenuRef}>
+                        <button
+                            type="button"
+                            onClick={() => setShowExportMenu((p) => !p)}
+                            className="h-[38px] px-4 rounded-[10px] border border-[#EEEEEE] bg-white text-[#181725] text-[12px] font-bold flex items-center gap-2 hover:bg-[#F9F9F9] transition-all"
+                        >
+                            <Download size={13} />
+                            Export
+                            <ChevronDown size={12} className="text-[#AEAEAE]" />
+                        </button>
+                        {showExportMenu && (
+                            <div className="absolute right-0 top-[calc(100%+4px)] z-20 min-w-[140px] rounded-[10px] border border-[#EEEEEE] bg-white shadow-lg overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => openExport('csv')}
+                                    className="w-full px-3 py-2.5 text-left text-[12px] font-bold text-[#181725] hover:bg-[#F5F5F5]"
+                                >
+                                    CSV
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => openExport('xlsx')}
+                                    className="w-full px-3 py-2.5 text-left text-[12px] font-bold text-[#181725] hover:bg-[#F5F5F5] border-t border-[#F5F5F5]"
+                                >
+                                    Excel
+                                </button>
+                            </div>
+                        )}
                     </div>
-                    <select
-                        aria-label="Filter by brand"
-                        value={brandFilter}
-                        onChange={(e) => setBrandFilter(e.target.value)}
-                        className="h-[38px] max-w-[140px] bg-white border border-[#EEEEEE] rounded-[10px] px-2 text-[12px] outline-none focus:border-[#299E60]/40 shadow-sm"
-                    >
-                        <option value="">All brands</option>
-                        {brandOptions.map((b) => (
-                            <option key={b} value={b}>{b}</option>
-                        ))}
-                    </select>
-                    <select
-                        aria-label="Filter by category"
-                        value={categoryFilter}
-                        onChange={(e) => setCategoryFilter(e.target.value)}
-                        className="h-[38px] max-w-[160px] bg-white border border-[#EEEEEE] rounded-[10px] px-2 text-[12px] outline-none focus:border-[#299E60]/40 shadow-sm"
-                    >
-                        <option value="">All categories</option>
-                        {categoryOptions.map(([id, name]) => (
-                            <option key={id} value={id}>{name}</option>
-                        ))}
-                    </select>
-                    <select
-                        aria-label="Filter by tag"
-                        value={tagFilter}
-                        onChange={(e) => setTagFilter(e.target.value)}
-                        className="h-[38px] max-w-[140px] bg-white border border-[#EEEEEE] rounded-[10px] px-2 text-[12px] outline-none focus:border-[#299E60]/40 shadow-sm"
-                    >
-                        <option value="">All tags</option>
-                        {tagOptions.map((t) => (
-                            <option key={t} value={t}>{t}</option>
-                        ))}
-                    </select>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            window.open('/api/v1/vendor/inventory/export?format=xlsx', '_blank');
-                        }}
-                        className="h-[38px] px-4 rounded-[10px] border border-[#EEEEEE] bg-white text-[#181725] text-[12px] font-bold flex items-center gap-2 hover:bg-[#F9F9F9] transition-all"
-                    >
-                        <Download size={13} />
-                        Export
-                    </button>
                     <button
                         type="button"
                         onClick={() => setShowCsvModal(true)}
@@ -1152,34 +980,66 @@ export default function VendorInventoryPage() {
                 </div>
             )}
 
-            {/* Filter tabs */}
-            <div className="flex items-center gap-2">
-                {FILTER_TABS.map(tab => (
-                    <button
-                        key={tab.key}
-                        onClick={() => setActiveFilter(tab.key)}
-                        className={cn(
-                            'h-[34px] px-4 rounded-[8px] text-[12px] font-bold transition-all flex items-center gap-1.5',
-                            activeFilter === tab.key
-                                ? 'bg-[#299E60] text-white shadow-sm'
-                                : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:border-[#299E60]/30'
-                        )}
+            {/* Filter tabs + search / brand / category */}
+            <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                    {FILTER_TABS.map(tab => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveFilter(tab.key)}
+                            className={cn(
+                                'h-[34px] px-4 rounded-[8px] text-[12px] font-bold transition-all flex items-center gap-1.5',
+                                activeFilter === tab.key
+                                    ? 'bg-[#299E60] text-white shadow-sm'
+                                    : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:border-[#299E60]/30'
+                            )}
+                        >
+                            {tab.label}
+                            {tab.count > 0 && (
+                                <span className={cn(
+                                    'text-[10px] font-[900] px-1.5 py-0.5 rounded-full',
+                                    activeFilter === tab.key ? 'bg-white/20' : 'bg-[#F5F5F5] text-[#7C7C7C]'
+                                )}>
+                                    {tab.count}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEAEAE]" size={14} />
+                        <input
+                            type="text"
+                            placeholder="Search SKU / name / brand..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="h-[34px] w-[min(200px,100%)] max-w-full bg-white border border-[#EEEEEE] rounded-[8px] pl-9 pr-3 text-[12px] outline-none placeholder:text-[#AEAEAE] focus:border-[#299E60]/40 shadow-sm"
+                        />
+                    </div>
+                    <select
+                        aria-label="Filter by brand"
+                        value={brandFilter}
+                        onChange={(e) => setBrandFilter(e.target.value)}
+                        className="h-[34px] max-w-[140px] bg-white border border-[#EEEEEE] rounded-[8px] px-2 text-[12px] outline-none focus:border-[#299E60]/40 shadow-sm"
                     >
-                        {tab.label}
-                        {tab.count > 0 && (
-                            <span className={cn(
-                                'text-[10px] font-[900] px-1.5 py-0.5 rounded-full',
-                                activeFilter === tab.key ? 'bg-white/20' : 'bg-[#F5F5F5] text-[#7C7C7C]'
-                            )}>
-                                {tab.count}
-                            </span>
-                        )}
-                    </button>
-                ))}
-                <span className="ml-auto text-[11px] text-[#AEAEAE] flex items-center gap-1">
-                    <FileText size={11} />
-                    Click threshold to edit · Changes auto-save
-                </span>
+                        <option value="">All brands</option>
+                        {brandOptions.map((b) => (
+                            <option key={b} value={b}>{b}</option>
+                        ))}
+                    </select>
+                    <select
+                        aria-label="Filter by category"
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        className="h-[34px] max-w-[160px] bg-white border border-[#EEEEEE] rounded-[8px] px-2 text-[12px] outline-none focus:border-[#299E60]/40 shadow-sm"
+                    >
+                        <option value="">All categories</option>
+                        {categoryOptions.map(([id, name]) => (
+                            <option key={id} value={id}>{name}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             {/* Table */}

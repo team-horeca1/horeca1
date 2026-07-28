@@ -27,9 +27,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       where: { vendorId: voc.vendorId, ...outletWhere },
       include: {
         product: {
-          select: { id: true, name: true, sku: true, vendorSku: true, unit: true },
+          select: { id: true, name: true, sku: true, vendorSku: true },
         },
-        outlet: { select: { name: true, pincode: true } },
       },
       orderBy: [{ outlet: { name: 'asc' } }, { product: { name: 'asc' } }],
     });
@@ -38,13 +37,12 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       sku: item.product.vendorSku || item.product.sku || item.product.id,
       productName: item.product.name,
       qtyAvailable: item.qtyAvailable,
+      qtyReserved: item.qtyReserved,
+      net: item.qtyAvailable - item.qtyReserved,
       qtyInTransit: item.qtyInTransit,
       qtyDamaged: item.qtyDamaged,
       qtyReturned: item.qtyReturned,
       lowStockThreshold: item.lowStockThreshold,
-      warehouse: consolidated ? item.outlet.name : undefined,
-      warehousePincode: consolidated ? item.outlet.pincode : undefined,
-      unit: item.product.unit,
     }));
 
     const date = new Date().toISOString().slice(0, 10);

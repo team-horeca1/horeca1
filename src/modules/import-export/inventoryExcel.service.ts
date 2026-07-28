@@ -4,26 +4,24 @@ export interface InventoryExportRow {
   sku: string;
   productName: string;
   qtyAvailable: number;
+  qtyReserved: number;
+  net: number;
   qtyInTransit: number;
   qtyDamaged: number;
   qtyReturned: number;
   lowStockThreshold: number;
-  warehouse?: string;
-  warehousePincode?: string | null;
-  unit?: string | null;
 }
 
 const EXPORT_HEADERS = [
   'SKU',
   'Product Name',
   'Qty Available',
+  'Qty Reserved',
+  'Net',
   'Qty In Transit',
   'Qty Damaged',
   'Qty Returned',
   'Low Stock Threshold',
-  'Warehouse',
-  'Warehouse Pincode',
-  'Unit',
 ] as const;
 
 const IMPORT_HEADERS = ['SKU', 'Qty Available', 'Low Stock Threshold', 'Warehouse Pincode'] as const;
@@ -40,13 +38,12 @@ function rowToExportRecord(row: InventoryExportRow): Record<string, string | num
     SKU: row.sku,
     'Product Name': row.productName,
     'Qty Available': row.qtyAvailable,
+    'Qty Reserved': row.qtyReserved,
+    Net: row.net,
     'Qty In Transit': row.qtyInTransit,
     'Qty Damaged': row.qtyDamaged,
     'Qty Returned': row.qtyReturned,
     'Low Stock Threshold': row.lowStockThreshold,
-    Warehouse: row.warehouse ?? '',
-    'Warehouse Pincode': row.warehousePincode ?? '',
-    Unit: row.unit ?? '',
   };
 }
 
