@@ -1,9 +1,14 @@
 # Local Next.js Turbopack in Linux (default via `npm run dev`).
 # Lower host RAM than Windows Webpack — only Docker + optional SSH tunnel on the host.
+# watchOptions.pollIntervalMs in next.config.ts helps Windows bind-mount HMR.
 #
 # Local Postgres + Redis (recommended):
 #   npm run dev:db
 #   npm run dev          → http://localhost:3000
+#
+# If HMR misses edits on Windows, use host Webpack instead:
+#   npm run dev:db
+#   npm run dev:webpack  → http://localhost:3000
 #
 # If the UI looks stuck on an old build after edits:
 #   npm run dev:fresh
@@ -29,7 +34,7 @@ services:
       AUTH_URL: http://localhost:3000
       HOSTNAME: "0.0.0.0"
       NODE_ENV: development
-      # Windows bind-mount file watching (Turbopack/HMR)
+      # Windows bind-mount helpers (Webpack path); Turbopack uses next.config watchOptions
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "1000"

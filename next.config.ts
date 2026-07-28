@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   reactStrictMode: true,
 
+  // Docker/Windows bind mounts often miss native FS events. Poll so Turbopack
+  // (and Webpack) pick up edits without restarting the container.
+  ...(isDev ? { watchOptions: { pollIntervalMs: 1000 } } : {}),
+
   // pdfkit ships .afm font metric files alongside its JS that webpack cannot bundle.
   // Marking it external means Next loads it from node_modules at runtime, so
   // PDFDocument can resolve `js/data/Helvetica.afm` and friends.
