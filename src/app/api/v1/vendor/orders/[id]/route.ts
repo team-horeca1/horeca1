@@ -128,7 +128,20 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       };
     });
 
-    return NextResponse.json({ success: true, data: { ...order, items: enrichedItems } });
+    const { computeAttentionReasons } = await import('@/lib/orderAttention');
+    const attentionReasons = computeAttentionReasons({
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      isPartial: order.isPartial,
+      createdAt: order.createdAt,
+      hasPendingCancelRequest: order.cancelRequest?.status === 'pending',
+      hasLowStock: enrichedItems.some((i) => i.isLowStock),
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: { ...order, items: enrichedItems, attentionReasons },
+    });
   } catch (error) {
     return errorResponse(error);
   }

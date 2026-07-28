@@ -132,6 +132,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         user: {
           select: { fullName: true, email: true, businessName: true },
         },
+        items: { select: { productId: true, quantity: true } },
+        cancelRequest: { select: { status: true } },
         _count: { select: { items: true } },
       },
     });
@@ -141,10 +143,40 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
     const nextCursor = hasMore ? orders[orders.length - 1].id : null;
 
+    // Attention flags (derived) — batch inventory for low_stock
+    const { computeAttentionReasons } = await import('@/lib/orderAttention');
+    const allProductIds = [...new Set(orders.flatMap((o) => o.items.map((i) => i.productId)))];
+    const inventories = allProductIds.length
+      ? await prisma.inventory.findMany({
+          where: { productId: { in: allProductIds }, vendorId },
+          select: { productId: true, qtyAvailable: true, qtyReserved: true },
+        })
+      : [];
+    const invByProduct = new Map(
+      inventories.map((i) => [i.productId, i.qtyAvailable - i.qtyReserved] as const),
+    );
+
+    const ordersWithAttention = orders.map((o) => {
+      const hasLowStock = o.items.some((item) => {
+        const avail = invByProduct.get(item.productId);
+        return avail !== undefined && avail < item.quantity;
+      });
+      const attentionReasons = computeAttentionReasons({
+        status: o.status,
+        paymentStatus: o.paymentStatus,
+        isPartial: o.isPartial,
+        createdAt: o.createdAt,
+        hasPendingCancelRequest: o.cancelRequest?.status === 'pending',
+        hasLowStock,
+      });
+      const { items: _items, cancelRequest: _cr, ...rest } = o;
+      return { ...rest, attentionReasons };
+    });
+
     return NextResponse.json({
       success: true,
       data: {
-        orders,
+        orders: ordersWithAttention,
         nextCursor,
         hasMore,
       },

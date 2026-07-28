@@ -27,7 +27,7 @@ async function sessionEmail(page: Page): Promise<string | null> {
  * Prefer this for prod E2E account switches.
  */
 export async function credentialsLogin(page: Page, email: string, password: string) {
-  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   let lastStatus = 0;
   let lastHint = '';
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -59,7 +59,7 @@ export async function credentialsLogin(page: Page, email: string, password: stri
     if (status.status === 429 || /error=CredentialsSignin/i.test(status.url)) {
       // Prod auth rate limiter / brief auth lockout
       await page.waitForTimeout(Math.min(20_000 * (attempt + 1), 60_000));
-      await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {});
       continue;
     }
     if (status.status >= 400) {
@@ -72,12 +72,12 @@ export async function credentialsLogin(page: Page, email: string, password: stri
           intervals: [100, 250, 500, 1000],
         })
         .toBe(true);
-      await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {});
       return;
     } catch {
       // Auth.js often returns 200 with an error URL when credentials are wrong / CSRF stale
       await page.waitForTimeout(1_000 * (attempt + 1));
-      await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {});
     }
   }
   throw new Error(
@@ -96,7 +96,7 @@ export async function passwordLogin(page: Page, email: string, password: string)
   }
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
     // Dismiss overlays that block the login form (location / empty address book)
     const closeLoc = page.getByRole('button', { name: /Close delivery location|Close/i }).filter({
       has: page.locator('svg'),

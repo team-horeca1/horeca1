@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CancelRequestBanner } from './CancelRequestBanner';
+import { ATTENTION_LABELS, type AttentionReasonCode } from '@/lib/orderAttention';
 import {
   formatWorkbenchDateTime,
   formatWorkbenchPrice,
@@ -29,10 +30,15 @@ import {
 export function OrderWorkbenchPanel({
   orderId,
   onChanged,
+  onOrderLoaded,
+  showEmbeddedActivity = false,
   compactEvents = 6,
 }: {
   orderId: string;
   onChanged?: () => void;
+  onOrderLoaded?: (order: WorkbenchOrder | null) => void;
+  /** When false (Workspace 3-zone), Activity lives in the right rail. */
+  showEmbeddedActivity?: boolean;
   compactEvents?: number;
 }) {
   const [order, setOrder] = useState<WorkbenchOrder | null>(null);
@@ -52,6 +58,7 @@ export function OrderWorkbenchPanel({
       if (!json.success) throw new Error(json.error?.message || 'Failed to load order');
       const data = json.data as WorkbenchOrder;
       setOrder(data);
+      onOrderLoaded?.(data);
       const init: Record<string, number> = {};
       for (const item of data.items) {
         init[item.id] = item.fulfilledQty ?? item.quantity;
@@ -61,10 +68,11 @@ export function OrderWorkbenchPanel({
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load');
       setOrder(null);
+      onOrderLoaded?.(null);
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, onOrderLoaded]);
 
   useEffect(() => {
     void fetchOrder();
@@ -337,6 +345,22 @@ export function OrderWorkbenchPanel({
         />
       )}
 
+      {(order.attentionReasons?.length ?? 0) > 0 && (
+        <div
+          className="rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3"
+          data-testid="workbench-attention"
+        >
+          <p className="text-[12px] font-bold text-amber-900">Needs attention</p>
+          <ul className="mt-1 list-inside list-disc text-[12px] text-amber-800">
+            {order.attentionReasons!.map((code) => (
+              <li key={code}>
+                {ATTENTION_LABELS[code as AttentionReasonCode] ?? code}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Customer + notes */}
       <div className="grid gap-3 sm:grid-cols-2" data-testid="workbench-customer">
         <div className="rounded-[14px] border border-[#EEEEEE] bg-white p-4">
@@ -374,7 +398,7 @@ export function OrderWorkbenchPanel({
 
       {/* Lines */}
       <div className="rounded-[14px] border border-[#EEEEEE] bg-white overflow-hidden" data-testid="workbench-lines">
-        <div className="flex items-center justify-between border-b border-[#EEEEEE] px-4 py-3">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#EEEEEE] bg-white px-4 py-3">
           <h3 className="text-[14px] font-bold text-[#181725]">Line items</h3>
           {(isPartialDirty || isAmendDirty) && (
             <button
@@ -515,42 +539,44 @@ export function OrderWorkbenchPanel({
         </div>
       )}
 
-      {/* Activity */}
-      <div className="rounded-[14px] border border-[#EEEEEE] bg-white overflow-hidden" data-testid="order-events-panel">
-        <div className="flex items-center justify-between border-b border-[#EEEEEE] px-4 py-3">
-          <h3 className="text-[14px] font-bold text-[#181725]">Activity</h3>
-          <button
-            type="button"
-            onClick={() => setActivityTab((v) => !v)}
-            className="text-[12px] font-bold text-[#299E60] hover:underline"
-          >
-            {activityTab ? 'Show less' : 'Activity Log'}
-          </button>
-        </div>
-        <div className="max-h-48 space-y-2 overflow-y-auto p-4">
-          {shownEvents.length === 0 ? (
-            <p className="py-2 text-center text-[12px] text-[#AEAEAE]">No events yet.</p>
-          ) : (
-            shownEvents.map((ev) => (
-              <div key={ev.id} className="flex gap-2 border-b border-[#F5F5F5] pb-2 last:border-0">
-                <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#299E60]" />
-                <div className="min-w-0">
-                  <p className="text-[12px] font-semibold text-[#181725]">
-                    {WORKBENCH_EVENT_LABELS[ev.action] ?? ev.action}
-                  </p>
-                  <p className="text-[11px] text-[#AEAEAE]">
-                    {formatWorkbenchDateTime(ev.createdAt)}
-                    {ev.actor?.fullName ? ` · ${ev.actor.fullName}` : ''}
-                  </p>
-                  {activityTab && typeof ev.payload?.reason === 'string' && (
-                    <p className="text-[11px] text-[#7C7C7C]">— {String(ev.payload.reason)}</p>
-                  )}
+      {/* Activity (embedded — full detail; Workspace uses right ActivityRail) */}
+      {showEmbeddedActivity && (
+        <div className="rounded-[14px] border border-[#EEEEEE] bg-white overflow-hidden" data-testid="order-events-panel">
+          <div className="flex items-center justify-between border-b border-[#EEEEEE] px-4 py-3">
+            <h3 className="text-[14px] font-bold text-[#181725]">Activity</h3>
+            <button
+              type="button"
+              onClick={() => setActivityTab((v) => !v)}
+              className="text-[12px] font-bold text-[#299E60] hover:underline"
+            >
+              {activityTab ? 'Show less' : 'Activity Log'}
+            </button>
+          </div>
+          <div className="max-h-48 space-y-2 overflow-y-auto p-4">
+            {shownEvents.length === 0 ? (
+              <p className="py-2 text-center text-[12px] text-[#AEAEAE]">No events yet.</p>
+            ) : (
+              shownEvents.map((ev) => (
+                <div key={ev.id} className="flex gap-2 border-b border-[#F5F5F5] pb-2 last:border-0">
+                  <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#299E60]" />
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-semibold text-[#181725]">
+                      {WORKBENCH_EVENT_LABELS[ev.action] ?? ev.action}
+                    </p>
+                    <p className="text-[11px] text-[#AEAEAE]">
+                      {formatWorkbenchDateTime(ev.createdAt)}
+                      {ev.actor?.fullName ? ` · ${ev.actor.fullName}` : ''}
+                    </p>
+                    {activityTab && typeof ev.payload?.reason === 'string' && (
+                      <p className="text-[11px] text-[#7C7C7C]">— {String(ev.payload.reason)}</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

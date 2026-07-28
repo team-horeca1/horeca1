@@ -2,7 +2,17 @@ import { test, expect } from '@playwright/test';
 import { passwordLogin } from './helpers/auth';
 import { ensureDailyFreshVendorContext } from './helpers/supplierPortal';
 
-test.describe.configure({ timeout: 240_000, mode: 'serial' });
+test.describe.configure({ timeout: 300_000, mode: 'serial' });
+
+test.beforeAll(async ({ browser }) => {
+  // Warm Turbopack compile so first login isn't killed by the default 45s nav timeout.
+  const page = await browser.newPage();
+  try {
+    await page.goto('http://localhost:3000/login', { waitUntil: 'domcontentloaded', timeout: 180_000 });
+  } finally {
+    await page.close();
+  }
+});
 
 async function enterStore(page: import('@playwright/test').Page) {
   await page.evaluate(() => {
@@ -197,7 +207,7 @@ test.describe('Section 7 — Order Management', () => {
     // UI smoke — warm route then assert brief labels (Turbopack can abort first nav).
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        await page.goto('/vendor/orders?view=list&status=pending', {
+        await page.goto('/vendor/orders?status=pending', {
           waitUntil: 'domcontentloaded',
           timeout: 60_000,
         });
@@ -408,7 +418,9 @@ test.describe('Section 7 — Order Management', () => {
     const cancelResp = await cancelRespPromise;
     const cancelJson = await cancelResp.json();
     expect(cancelJson.success, cancelJson.error?.message ?? 'cancel request failed').toBe(true);
-    await expect(customerPage.getByTestId('cancel-request-status')).toBeVisible({ timeout: 30_000 });
+    // Remount-safe: reload so cancel-request-status comes from GET, not only optimistic setState
+    await customerPage.reload({ waitUntil: 'domcontentloaded', timeout: 90_000 });
+    await expect(customerPage.getByTestId('cancel-request-status')).toBeVisible({ timeout: 60_000 });
     await expect(customerPage.getByTestId('cancel-request-status')).toContainText(/pending/i);
     await customerCtx.close();
 
@@ -445,7 +457,7 @@ test.describe('Section 7 — Order Management', () => {
 
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        await page.goto('/vendor/orders?view=list&status=pending', {
+        await page.goto('/vendor/orders?status=pending', {
           waitUntil: 'domcontentloaded',
           timeout: 60_000,
         });
@@ -480,7 +492,7 @@ test.describe('Section 7 — Order Management', () => {
     expect((bulk.json.data?.succeeded ?? []).length).toBe(2);
 
     // UI: select rows and show bulk bar when orders are on screen
-    await page.goto('/vendor/orders?view=list&status=accepted', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.goto('/vendor/orders?status=accepted', { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await expect(page.getByRole('heading', { name: /All orders|^Orders$/i })).toBeVisible({ timeout: 60_000 });
     const cbA = page.getByTestId(`select-order-${a.orderId}`);
     if (await cbA.isVisible({ timeout: 10_000 }).catch(() => false)) {
@@ -588,7 +600,7 @@ test.describe('Section 7 — Order Management', () => {
     }
   });
 
-  test('Order Workspace primary hub + IGST helper + list secondary', async ({ page, browser }) => {
+  test('Order Workspace optional hub + IGST helper + list primary', async ({ page, browser }) => {
     const { normalizeIndianState, resolveSupplyType, splitGstTax, formatLineTaxRate, stateFromGstin } =
       await import('../src/lib/gstPlaceOfSupply');
 
@@ -602,20 +614,28 @@ test.describe('Section 7 — Order Management', () => {
     expect(formatLineTaxRate(18, 'intra')).toBe('9+9+0+0');
 
     await enterStore(page);
+    // Default = All orders list
     await page.goto('/vendor/orders', { waitUntil: 'domcontentloaded', timeout: 60_000 });
-    await expect(page.getByTestId('order-workspace')).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByRole('heading', { name: /Order Workspace/i })).toBeVisible();
-    await expect(page.getByTestId('workspace-stage-pending')).toBeVisible();
-    await expect(page.getByTestId('workspace-queue-pending')).toBeVisible();
-    await expect(page.getByText(/Pending Approval/i)).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /All orders/i })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('order-workspace')).toHaveCount(0);
 
     // Place order so pending queue has a row to process
     const prep = await prepVendorProduct(page);
     test.skip(!prep.ok, 'No inventory/vendor');
     const placed = await placeCodOrder(browser, prep as Prep);
 
-    await page.goto('/vendor/orders?status=pending', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.goto('/vendor/orders?view=workspace&status=pending', {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
     await expect(page.getByTestId('order-workspace')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('workspace-zones')).toBeVisible();
+    await expect(page.getByTestId('workspace-filters')).toBeVisible();
+    await expect(page.getByTestId('workspace-search')).toBeVisible();
+    await expect(page.getByTestId('workspace-date-from')).toBeVisible();
+    await expect(page.getByTestId('workspace-payment-status')).toBeVisible();
+    await expect(page.getByTestId('workspace-payment-method')).toBeVisible();
+    await expect(page.getByTestId('workspace-activity-rail')).toBeVisible();
     await page.getByTestId('workspace-refresh').click();
     await expect(page.getByTestId(`workspace-row-${placed.orderId}`)).toBeVisible({ timeout: 60_000 });
     await page.getByTestId(`workspace-row-${placed.orderId}`).click();
@@ -624,34 +644,29 @@ test.describe('Section 7 — Order Management', () => {
     await expect(page.getByTestId('workbench-next-status')).toBeVisible();
     await expect(page.getByTestId('workbench-invoice')).toBeVisible();
     await expect(page.getByTestId('workbench-lines')).toBeVisible();
+    await expect(page.getByTestId('order-events-panel')).toBeVisible();
+    await expect(page.getByTestId('workspace-invoice-meta')).toBeVisible();
 
-    // Adjust qty in workbench and save
-    const qtyInput = page.getByTestId('order-workbench').locator('input[type="number"]').first();
-    if (await qtyInput.isVisible().catch(() => false)) {
-      const cur = Number(await qtyInput.inputValue());
-      if (cur > 0) {
-        await qtyInput.fill(String(Math.max(0, cur - 1)));
-        if (cur - 1 === 0) {
-          const reason = page.getByTestId(`reject-reason-desk-${placed.itemId}`);
-          if (await reason.isVisible().catch(() => false)) {
-            await reason.fill('Short stock from workspace');
-          }
-        }
-        const saveBtn = page.getByTestId('workbench-save-qty');
-        if (await saveBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-          await saveBtn.click();
-          await page.waitForTimeout(1500);
-        }
-      }
-    }
+    // Payment filter still shows COD unpaid order
+    await page.getByTestId('workspace-payment-status').selectOption('unpaid');
+    await page.waitForTimeout(800);
+    await expect(page.getByTestId(`workspace-row-${placed.orderId}`)).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId('workspace-payment-status').selectOption('');
+    await page.waitForTimeout(800);
+    // Re-select after filter refresh (queue reload can remount workbench)
+    await page.getByTestId(`workspace-row-${placed.orderId}`).click();
+    await expect(page.getByTestId('order-workbench')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('workbench-next-status')).toBeVisible({ timeout: 30_000 });
 
     await page.getByTestId('workbench-next-status').click();
     await expect(page.getByTestId('workbench-status')).toContainText(/Accepted|Packed/i, { timeout: 30_000 });
+    await expect(page.getByTestId('order-events-panel')).toContainText(/status|Accepted|Packed|changed/i, {
+      timeout: 15_000,
+    });
 
-    // All orders secondary list
+    // Back to primary All orders list
     await page.getByTestId('workspace-all-orders').click();
     await expect(page.getByRole('heading', { name: /All orders/i })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('orders-export')).toBeVisible();
-    await expect(page.getByTestId('orders-workspace-link')).toBeVisible();
   });
 });

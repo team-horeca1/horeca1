@@ -66,6 +66,7 @@ export interface WorkbenchOrder {
   items: WorkbenchItem[];
   events?: WorkbenchEvent[];
   cancelRequest?: WorkbenchCancelRequest | null;
+  attentionReasons?: string[];
 }
 
 export const WORKBENCH_STATUS_LABELS: Record<string, string> = {

@@ -116,9 +116,8 @@ export default function VendorOrdersPage() {
     const router = useRouter();
     const { outletQuery, scopeVersion, multiWarehouseEnabled } = useVendorOutletScope();
 
-    // Default = Order Workspace (primary ops). List via ?view=list
-    const isListView = searchParams.get('view') === 'list';
-    const isWorkspace = !isListView;
+    // Default = All orders list. Workspace via ?view=workspace
+    const isWorkspace = searchParams.get('view') === 'workspace';
     const initialStatus = searchParams.get('status') || 'all';
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -401,10 +400,6 @@ export default function VendorOrdersPage() {
                     <h1 className="text-[24px] font-bold text-[#181725]">All orders</h1>
                     <p className="text-[12px] text-[#AEAEAE]">
                       Filters, bulk actions, and export
-                      {' · '}
-                      <Link href="/vendor/orders" className="font-semibold text-[#299E60] hover:underline" data-testid="orders-workspace-link">
-                        Order Workspace
-                      </Link>
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
