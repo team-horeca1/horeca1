@@ -68,6 +68,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         promoPrice: p.promoPrice ? Number(p.promoPrice) : null,
         imageUrl: p.imageUrl,
         imageName: p.imageUrl ? p.imageUrl.split('/').pop() || '' : '',
+        description: p.description,
         stock: totalStockQty(p.inventories),
         approvalStatus: p.approvalStatus,
         barcode: p.barcode,

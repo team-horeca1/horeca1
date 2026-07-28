@@ -676,6 +676,7 @@ export interface ProductExportRow {
   promoPrice?: number | null; // taxable promo single unit
   imageUrl?: string | null;
   imageName?: string | null;
+  description?: string | null;
   stock?: number;
   approvalStatus?: string;
   barcode?: string | null;
