@@ -201,13 +201,13 @@ export class WarehouseService {
     return { ...updated, items: parsePicklistItems(updated.items) };
   }
 
-  /** Order graph: confirmed → processing → ready_for_dispatch (no skipping). */
+  /** Order graph: pending|confirmed → processing → ready_for_dispatch (no skipping). */
   private async syncOrderOnPicklistPicked(
     orderId: string,
     vendorId: string,
     orderStatus: string,
   ) {
-    if (orderStatus === 'confirmed') {
+    if (orderStatus === 'pending' || orderStatus === 'confirmed') {
       await this.orderService.updateStatus(orderId, vendorId, 'processing');
       await this.orderService.updateStatus(orderId, vendorId, 'ready_for_dispatch');
     } else if (orderStatus === 'processing') {

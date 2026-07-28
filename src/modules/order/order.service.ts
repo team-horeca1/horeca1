@@ -25,6 +25,11 @@ import {
   type CheckoutDraftItem,
   type CouponApplication,
 } from '@/modules/promotion/promotion.service';
+import {
+  ORDER_EVENT_ACTIONS,
+  recordOrderEvent,
+  recordOrderEvents,
+} from '@/modules/order/order-events';
 
 // Payment methods that draw on a CreditWallet. 'h1_wallet'/'wallet' uses the platform
 // (vendor-less) wallet; the rest use the order's vendor credit line.
@@ -60,6 +65,8 @@ type OrderLineCreate = OrderLineSnapshot & {
   productId: string;
   productName: string;
   quantity: number;
+  /** Accepted qty at place (auto-accept); defaults to ordered qty for live orders. */
+  fulfilledQty: number;
   unitPrice: number | Prisma.Decimal;
   totalPrice: number;
 };
@@ -329,6 +336,7 @@ export class OrderService {
               productName: product.name,
               ...snapshotFromProduct(product),
               quantity: item.quantity,
+              fulfilledQty: isDraft ? 0 : item.quantity,
               unitPrice: 0,
               totalPrice: 0,
             });
@@ -357,6 +365,7 @@ export class OrderService {
             productName: product.name,
             ...snapshotFromProduct(product),
             quantity: item.quantity,
+            fulfilledQty: isDraft ? 0 : item.quantity,
             unitPrice: grossUnitPrice,
             totalPrice,
           });
@@ -403,6 +412,7 @@ export class OrderService {
                   productName: freeProduct.name,
                   ...snapshotFromProduct(freeProduct),
                   quantity: bxgy.freeUnits,
+                  fulfilledQty: isDraft ? 0 : bxgy.freeUnits,
                   unitPrice: 0,
                   totalPrice: 0,
                 });
@@ -519,6 +529,8 @@ export class OrderService {
             fulfillmentOutletId: p.fulfillmentOutletId,
             deliveryAddressSnapshot,
             status: isDraft ? 'draft' : 'pending',
+            // Section 7 Platform Rule: live orders are auto-accepted at place.
+            acceptedAt: isDraft ? null : new Date(),
             subtotal: p.subtotal,
             promoDiscount: p.promoDiscount,
             promotionId: p.appliedPromoId,
@@ -535,6 +547,26 @@ export class OrderService {
           },
           include: { items: true },
         });
+
+        if (!isDraft) {
+          await recordOrderEvents(tx, [
+            {
+              orderId: order.id,
+              actorId: userId,
+              action: ORDER_EVENT_ACTIONS.CREATED,
+              toStatus: 'pending',
+              payload: { orderNumber, totalAmount },
+            },
+            {
+              orderId: order.id,
+              actorId: userId,
+              action: ORDER_EVENT_ACTIONS.AUTO_ACCEPTED,
+              fromStatus: 'pending',
+              toStatus: 'pending',
+              payload: { reason: 'platform_auto_accept' },
+            },
+          ]);
+        }
 
         // Reserve inventory (drafts reserve nothing until submitted)
         if (!isDraft) await this.inventoryService.reserveStock(p.stockItems, p.fulfillmentOutletId, tx);
@@ -834,14 +866,42 @@ export class OrderService {
         await creditWalletService.debitWallet(ctx.userId, creditVendorId, Number(order.totalAmount), order.id, tx);
       }
 
+      // Auto-accept: set acceptedAt + fulfilledQty = ordered qty on every line.
+      for (const item of order.items) {
+        await tx.orderItem.update({
+          where: { id: item.id },
+          data: { fulfilledQty: item.quantity },
+        });
+      }
+
       const updated = await tx.order.update({
         where: { id: orderId },
         data: {
           status: 'pending',
+          acceptedAt: new Date(),
           paymentMethod: effectivePaymentMethod,
           ...(creditPaid ? { paymentStatus: 'paid' } : {}),
         },
       });
+
+      await recordOrderEvents(tx, [
+        {
+          orderId: order.id,
+          actorId: ctx.userId,
+          action: ORDER_EVENT_ACTIONS.CREATED,
+          fromStatus: 'draft',
+          toStatus: 'pending',
+          payload: { orderNumber: order.orderNumber, via: 'submit_draft' },
+        },
+        {
+          orderId: order.id,
+          actorId: ctx.userId,
+          action: ORDER_EVENT_ACTIONS.AUTO_ACCEPTED,
+          fromStatus: 'pending',
+          toStatus: 'pending',
+          payload: { reason: 'platform_auto_accept' },
+        },
+      ]);
 
       // Promo Engine Phase 1 — drafts skip cashback at save time; evaluate it
       // now that the order is real. (Drafts can't carry coupons, but compute
@@ -957,6 +1017,7 @@ export class OrderService {
             categoryName: item.categoryName,
             taxPercent: item.taxPercent ?? new Prisma.Decimal(0),
             quantity: moveQty,
+            fulfilledQty: moveQty,
             unitPrice: item.unitPrice,
             totalPrice: childTotal,
           });
@@ -964,7 +1025,10 @@ export class OrderService {
         }
         if (keepQty > 0) {
           const parentTotal = Math.round(unit * keepQty * 100) / 100;
-          await tx.orderItem.update({ where: { id: item.id }, data: { quantity: keepQty, totalPrice: parentTotal } });
+          await tx.orderItem.update({
+            where: { id: item.id },
+            data: { quantity: keepQty, fulfilledQty: keepQty, totalPrice: parentTotal },
+          });
           parentSubtotal += parentTotal;
         } else {
           await tx.orderItem.delete({ where: { id: item.id } });
@@ -980,12 +1044,31 @@ export class OrderService {
           outletId: order.outletId,
           fulfillmentOutletId: order.fulfillmentOutletId,
           deliveryAddressSnapshot: order.deliveryAddressSnapshot as Prisma.InputJsonValue,
-          status: 'pending', subtotal: childSubtotal, totalAmount: childSubtotal,
+          status: 'pending',
+          acceptedAt: order.acceptedAt ?? new Date(),
+          subtotal: childSubtotal, totalAmount: childSubtotal,
           paymentMethod: order.paymentMethod, paymentStatus: order.paymentStatus,
           deliverySlotId: order.deliverySlotId, salespersonId: order.salespersonId,
           notes: order.notes, items: { create: childItems },
         },
       });
+      await recordOrderEvents(tx, [
+        {
+          orderId: child.id,
+          actorId: order.userId,
+          action: ORDER_EVENT_ACTIONS.CREATED,
+          toStatus: 'pending',
+          payload: { orderNumber, via: 'split', parentId: orderId },
+        },
+        {
+          orderId: child.id,
+          actorId: order.userId,
+          action: ORDER_EVENT_ACTIONS.AUTO_ACCEPTED,
+          fromStatus: 'pending',
+          toStatus: 'pending',
+          payload: { reason: 'platform_auto_accept', via: 'split' },
+        },
+      ]);
       await tx.order.update({
         where: { id: orderId },
         // Coupon discount + wallet redemption stay on the parent — the child
@@ -1229,12 +1312,151 @@ export class OrderService {
     });
   }
 
-  // Partial accept: vendor ships a subset of items/quantities.
-  // Unfulfilled qty is released back to inventory; order total is recalculated.
+  /**
+   * Apply a catalog substitute on a pending order line:
+   * - zero original fulfilledQty
+   * - create a new OrderItem for the substitute (snapshotted + priced)
+   * - rebalance reservation + totals
+   * - emit item.substituted OrderEvent
+   */
+  async applySubstitute(
+    orderId: string,
+    vendorId: string,
+    itemId: string,
+    substituteProductId: string,
+    actorId?: string | null,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { id: orderId, vendorId, status: 'pending' },
+        include: { items: true },
+      });
+      if (!order) throw Errors.notFound('Order or order is not pending');
+
+      const item = order.items.find((i) => i.id === itemId);
+      if (!item) throw Errors.badRequest('Item does not belong to this order');
+
+      const originalProduct = await tx.product.findFirst({
+        where: { id: item.productId, vendorId },
+        select: { id: true, substituteIds: true },
+      });
+      if (!originalProduct?.substituteIds?.includes(substituteProductId)) {
+        throw Errors.badRequest('Selected product is not a configured substitute for this line');
+      }
+
+      const subProduct = await tx.product.findFirst({
+        where: { id: substituteProductId, vendorId, isActive: true },
+        select: {
+          id: true,
+          name: true,
+          sku: true,
+          hsn: true,
+          brand: true,
+          packSize: true,
+          taxPercent: true,
+          categoryId: true,
+          category: { select: { name: true } },
+        },
+      });
+      if (!subProduct) throw Errors.notFound('Substitute product');
+
+      const qty = item.fulfilledQty > 0 ? item.fulfilledQty : item.quantity;
+      if (qty <= 0) throw Errors.badRequest('Nothing left to substitute on this line');
+
+      const vc = await tx.vendorCustomer.findUnique({
+        where: { vendorId_userId: { vendorId, userId: order.userId } },
+        select: { tags: true },
+      });
+      const customer = this.buildCustomerCtx(order, vc?.tags ?? []);
+      const resolved = await resolveUnitPrice(
+        { productId: substituteProductId, vendorId, quantity: qty, customer },
+        tx,
+      );
+      const taxPercent = Number(subProduct.taxPercent) || 0;
+      const grossUnit = Math.round(Number(resolved.unitPrice) * (1 + taxPercent / 100) * 100) / 100;
+      const totalPrice = Math.round(grossUnit * qty * 100) / 100;
+
+      const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
+      // Release original reserved qty, reserve substitute
+      await this.inventoryService.releaseStock(
+        [{ productId: item.productId, quantity: qty }],
+        fulfillOutlet,
+        tx,
+      );
+      await this.inventoryService.reserveStock(
+        [{ productId: substituteProductId, quantity: qty }],
+        fulfillOutlet,
+        tx,
+      );
+
+      await tx.orderItem.update({
+        where: { id: item.id },
+        data: { fulfilledQty: 0 },
+      });
+
+      const newItem = await tx.orderItem.create({
+        data: {
+          orderId,
+          productId: substituteProductId,
+          productName: subProduct.name,
+          ...snapshotFromProduct(subProduct),
+          quantity: qty,
+          fulfilledQty: qty,
+          unitPrice: grossUnit,
+          totalPrice,
+        },
+      });
+
+      const allItems = await tx.orderItem.findMany({ where: { orderId } });
+      let newSubtotal = 0;
+      for (const row of allItems) {
+        const f = row.fulfilledQty > 0 ? row.fulfilledQty : 0;
+        if (f <= 0) continue;
+        newSubtotal += Math.round(Number(row.totalPrice) * (f / row.quantity) * 100) / 100;
+      }
+
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          isPartial: true,
+          subtotal: newSubtotal,
+          totalAmount: Math.max(
+            0,
+            newSubtotal - Number(order.promoDiscount) - Number(order.couponDiscount) - Number(order.walletApplied),
+          ),
+        },
+        include: { items: true },
+      });
+
+      await recordOrderEvent(tx, {
+        orderId,
+        actorId,
+        action: ORDER_EVENT_ACTIONS.ITEM_SUBSTITUTED,
+        fromStatus: 'pending',
+        toStatus: 'pending',
+        payload: {
+          originalItemId: item.id,
+          originalProductId: item.productId,
+          originalProductName: item.productName,
+          substituteItemId: newItem.id,
+          substituteProductId,
+          substituteProductName: subProduct.name,
+          quantity: qty,
+        },
+      });
+
+      return updated;
+    });
+  }
+
+  // Partial fulfilment while still in the Rule 12 cancel window (`pending`).
+  // Does NOT advance status to confirmed — that is an explicit status transition.
+  // Unfulfilled qty is released; order total recalculated; OrderEvents appended.
   async partialAccept(
     orderId: string,
     vendorId: string,
-    itemLines: Array<{ itemId: string; fulfilledQty: number }>,
+    itemLines: Array<{ itemId: string; fulfilledQty: number; reason?: string }>,
+    actorId?: string | null,
   ) {
     return prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
@@ -1257,10 +1479,12 @@ export class OrderService {
         }
       }
 
-      // Build fulfilled map — items not in the list default to their full ordered qty
+      // Build fulfilled map — items not in the list default to their current fulfilled/ordered qty
       const fulfilledMap = new Map(itemLines.map(l => [l.itemId, l.fulfilledQty]));
       for (const item of order.items) {
-        if (!fulfilledMap.has(item.id)) fulfilledMap.set(item.id, item.quantity);
+        if (!fulfilledMap.has(item.id)) {
+          fulfilledMap.set(item.id, item.fulfilledQty > 0 ? item.fulfilledQty : item.quantity);
+        }
       }
 
       // Must fulfil at least one unit in total
@@ -1271,49 +1495,93 @@ export class OrderService {
 
       const isPartial = order.items.some(i => (fulfilledMap.get(i.id) ?? i.quantity) < i.quantity);
 
-      // Release inventory for unfulfilled quantities
-      const toRelease = order.items
-        .map(i => ({ productId: i.productId, quantity: i.quantity - (fulfilledMap.get(i.id) ?? i.quantity) }))
-        .filter(r => r.quantity > 0);
-      if (toRelease.length > 0) {
-        const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
-        await this.inventoryService.releaseStock(toRelease, fulfillOutlet, tx);
+      // Release inventory for qty reduced from previously reserved amount
+      const prevReserved = order.items.map((i) => ({
+        productId: i.productId,
+        quantity: i.fulfilledQty > 0 ? i.fulfilledQty : i.quantity,
+      }));
+      const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
+      await this.inventoryService.releaseStock(prevReserved, fulfillOutlet, tx);
+
+      const toReserve = order.items
+        .map((i) => ({ productId: i.productId, quantity: fulfilledMap.get(i.id) ?? i.quantity }))
+        .filter((r) => r.quantity > 0);
+      if (toReserve.length > 0) {
+        await this.inventoryService.reserveStock(toReserve, fulfillOutlet, tx);
       }
 
       // Recalculate order total proportionally & update each item's fulfilledQty
       let newSubtotal = 0;
+      const lineEvents: Array<{
+        orderId: string;
+        actorId?: string | null;
+        action: string;
+        fromStatus?: string | null;
+        toStatus?: string | null;
+        payload?: Record<string, unknown> | null;
+      }> = [];
+
       for (const item of order.items) {
+        const prevFulfilled = item.fulfilledQty > 0 ? item.fulfilledQty : item.quantity;
         const fulfilled = fulfilledMap.get(item.id) ?? item.quantity;
         const itemTotal = Math.round(Number(item.totalPrice) * (fulfilled / item.quantity) * 100) / 100;
         newSubtotal += itemTotal;
         await tx.orderItem.update({ where: { id: item.id }, data: { fulfilledQty: fulfilled } });
+
+        if (fulfilled !== prevFulfilled) {
+          const reason = itemLines.find((l) => l.itemId === item.id)?.reason;
+          lineEvents.push({
+            orderId,
+            actorId,
+            action: fulfilled === 0 ? ORDER_EVENT_ACTIONS.ITEM_REJECTED : ORDER_EVENT_ACTIONS.ITEM_QTY_ADJUSTED,
+            fromStatus: order.status,
+            toStatus: order.status,
+            payload: {
+              itemId: item.id,
+              productName: item.productName,
+              orderedQty: item.quantity,
+              fromQty: prevFulfilled,
+              toQty: fulfilled,
+              ...(reason ? { reason } : {}),
+            },
+          });
+        }
       }
 
       const updated = await tx.order.update({
         where: { id: orderId },
         data: {
-          status: 'confirmed',
+          // Stay pending — cancel window (R12) remains open until status advances.
+          status: 'pending',
           isPartial,
           subtotal: newSubtotal,
-          // Discounts (vendor promo + coupon + prepaid wallet) stay fixed as the
-          // order shrinks; payable is recomputed around them, clamped at 0. The
-          // delivered-time cashback recompute reads this final subtotal, so a
-          // partial accept also shrinks the cashback base correctly.
           totalAmount: Math.max(0, newSubtotal - Number(order.promoDiscount) - Number(order.couponDiscount) - Number(order.walletApplied)),
-          acceptedAt: new Date(),
+          acceptedAt: order.acceptedAt ?? new Date(),
         },
       });
 
-      emitEvent('OrderConfirmed', { orderId, userId: updated.userId, vendorId });
+      if (isPartial) {
+        lineEvents.unshift({
+          orderId,
+          actorId,
+          action: ORDER_EVENT_ACTIONS.PARTIAL_FULFILMENT,
+          fromStatus: 'pending',
+          toStatus: 'pending',
+          payload: { subtotal: newSubtotal, totalAmount: Number(updated.totalAmount) },
+        });
+      }
+      if (lineEvents.length > 0) await recordOrderEvents(tx, lineEvents);
+
       return updated;
     });
   }
 
-  /** Post-confirm quantity adjustments while order is confirmed or processing. */
+  /** Post-confirm quantity adjustments while order is confirmed or packing. */
   async amendOrderLines(
     orderId: string,
     vendorId: string,
-    itemLines: Array<{ itemId: string; fulfilledQty: number }>,
+    itemLines: Array<{ itemId: string; fulfilledQty: number; reason?: string }>,
+    actorId?: string | null,
   ) {
     return prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
@@ -1352,11 +1620,40 @@ export class OrderService {
       await this.inventoryService.reserveStock(toReserve, fulfillOutlet, tx);
 
       let newSubtotal = 0;
+      const lineEvents: Array<{
+        orderId: string;
+        actorId?: string | null;
+        action: string;
+        fromStatus?: string | null;
+        toStatus?: string | null;
+        payload?: Record<string, unknown> | null;
+      }> = [];
+
       for (const item of order.items) {
+        const prevFulfilled = order.isPartial ? (item.fulfilledQty ?? item.quantity) : item.quantity;
         const fulfilled = fulfilledMap.get(item.id) ?? item.quantity;
         const itemTotal = Math.round(Number(item.totalPrice) * (fulfilled / item.quantity) * 100) / 100;
         newSubtotal += itemTotal;
         await tx.orderItem.update({ where: { id: item.id }, data: { fulfilledQty: fulfilled } });
+
+        if (fulfilled !== prevFulfilled) {
+          const reason = itemLines.find((l) => l.itemId === item.id)?.reason;
+          lineEvents.push({
+            orderId,
+            actorId,
+            action: fulfilled === 0 ? ORDER_EVENT_ACTIONS.ITEM_REJECTED : ORDER_EVENT_ACTIONS.ITEM_QTY_ADJUSTED,
+            fromStatus: order.status,
+            toStatus: order.status,
+            payload: {
+              itemId: item.id,
+              productName: item.productName,
+              orderedQty: item.quantity,
+              fromQty: prevFulfilled,
+              toQty: fulfilled,
+              ...(reason ? { reason } : {}),
+            },
+          });
+        }
       }
 
       const isPartial = order.items.some((i) => (fulfilledMap.get(i.id) ?? i.quantity) < i.quantity);
@@ -1369,22 +1666,33 @@ export class OrderService {
         },
       });
 
+      if (lineEvents.length > 0) {
+        lineEvents.unshift({
+          orderId,
+          actorId,
+          action: ORDER_EVENT_ACTIONS.PARTIAL_FULFILMENT,
+          fromStatus: order.status,
+          toStatus: order.status,
+          payload: { subtotal: newSubtotal, mode: 'amend' },
+        });
+        await recordOrderEvents(tx, lineEvents);
+      }
+
       emitEvent('OrderConfirmed', { orderId, userId: updated.userId, vendorId });
       return updated;
     });
   }
 
-  // Valid status transitions
-  // V2.2 Phase 5 widened the graph with the richer client states. The old
-  // happy path (pending→confirmed→processing→shipped→delivered) still holds;
-  // ready_for_dispatch / partially_delivered / returned are optional stops.
-  // `draft` is handled by the submit endpoint (draft→pending), not here.
+  // Valid status transitions (Section 7):
+  // - Auto-accepted orders start as `pending` (cancel window / R12).
+  // - Cancel only from `pending` (vendor). Admin `force` may still jump.
+  // - `pending → processing` allowed so Packed can skip optional Accepted step.
   private static readonly VALID_TRANSITIONS: Readonly<Record<string, string[]>> = {
     draft:               ['pending', 'cancelled'],
-    pending:             ['confirmed', 'cancelled'],
-    confirmed:           ['processing', 'cancelled'],
-    processing:          ['ready_for_dispatch', 'shipped', 'cancelled'],
-    ready_for_dispatch:  ['shipped', 'cancelled'],
+    pending:             ['confirmed', 'processing', 'cancelled'],
+    confirmed:           ['processing'],
+    processing:          ['ready_for_dispatch', 'shipped'],
+    ready_for_dispatch:  ['shipped'],
     shipped:             ['delivered', 'partially_delivered'],
     partially_delivered: ['delivered', 'returned'],
     delivered:           ['returned'],
@@ -1402,6 +1710,7 @@ export class OrderService {
     // skipped, but the stock/credit side-effects below are idempotent + guarded
     // by the order's current state so a forced jump can't corrupt the ledgers.
     force = false,
+    actorId?: string | null,
   ) {
     return prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
@@ -1420,6 +1729,16 @@ export class OrderService {
         },
       });
       if (!order) throw Errors.notFound('Order');
+
+      // Rule 12 — Online Stores may cancel only while Pending (unless admin force).
+      if (status === 'cancelled' && !force && order.status !== 'pending') {
+        throw Errors.badRequest(
+          'Only Pending orders may be cancelled by the store. Processed orders should follow the Returns workflow.',
+        );
+      }
+      if (status === 'cancelled' && !reason?.trim()) {
+        throw Errors.badRequest('A cancellation / rejection reason is required.');
+      }
 
       const validNext = OrderService.VALID_TRANSITIONS[order.status as string] ?? [];
       if (!force && !validNext.includes(status)) {
@@ -1458,7 +1777,7 @@ export class OrderService {
       // Timestamp fields
       const now = new Date();
       const extraData: Record<string, unknown> = {};
-      if (status === 'confirmed') extraData.acceptedAt = now;
+      if (status === 'confirmed' && !order.acceptedAt) extraData.acceptedAt = now;
       if (status === 'cancelled') {
         extraData.rejectedAt = now;
         if (reason) extraData.rejectionReason = reason;
@@ -1483,9 +1802,23 @@ export class OrderService {
         }
       }
 
+      const fromStatus = order.status as string;
       const updated = await tx.order.update({
         where: { id: orderId },
         data: { status: status as never, ...extraData },
+      });
+
+      await recordOrderEvent(tx, {
+        orderId,
+        actorId,
+        action: status === 'cancelled' ? ORDER_EVENT_ACTIONS.CANCELLED : ORDER_EVENT_ACTIONS.STATUS_CHANGED,
+        fromStatus,
+        toStatus: status,
+        payload: {
+          ...(reason ? { reason } : {}),
+          ...(force ? { force: true } : {}),
+          ...(proof?.proofType ? { proofType: proof.proofType } : {}),
+        },
       });
 
       // Credit side-effect — the wallet was already debited at order create, so the

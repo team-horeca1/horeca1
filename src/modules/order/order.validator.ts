@@ -92,6 +92,7 @@ export const partialAcceptSchema = z.object({
   items: z.array(z.object({
     itemId: z.string().uuid(),
     fulfilledQty: z.number().int().min(0),
+    reason: z.string().min(1).max(500).optional(),
   })).min(1, 'At least one item line is required'),
 });
 
