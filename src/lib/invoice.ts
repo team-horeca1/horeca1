@@ -6,6 +6,12 @@
 import PDFDocument from 'pdfkit';
 import { prisma } from '@/lib/prisma';
 import { buildInvoiceLineItems, type InvoiceItem } from '@/lib/invoice-items';
+import {
+  formatLineTaxRate,
+  resolveState,
+  resolveSupplyType,
+  splitGstTax,
+} from '@/lib/gstPlaceOfSupply';
 
 // --------------------------------------------------------------------------
 // Main export
@@ -62,10 +68,17 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
   const totalTax = items.reduce((s, i) => s + i.taxAmount, 0);
   const grandTotal = totalTaxable + totalTax;
 
-  // Intra-state assumed → CGST + SGST split. (No vendor state field yet.)
-  const cgst = totalTax / 2;
-  const sgst = totalTax / 2;
-  const igst = 0;
+  // Place of supply: seller (vendor address / GSTIN) vs buyer (ship-to / GSTIN).
+  const sellerState = resolveState({
+    state: order.vendor.state,
+    gstin: order.vendor.gstNumber,
+  });
+  const buyerState = resolveState({
+    state: buyerAddr?.state,
+    gstin: order.user.gstNumber,
+  });
+  const supplyType = resolveSupplyType(sellerState, buyerState);
+  const { cgst, sgst, igst } = splitGstTax(totalTax, supplyType);
   const cess = 0;
 
   // ── 3. Build PDF ─────────────────────────────────────────────────────────
@@ -281,8 +294,7 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
         doc.text(fmtNum(item.preTax), COL.preTax.x, y + 4, { width: COL.preTax.w - 2, align: 'right' });
         doc.text(fmtNum(item.discount), COL.disc.x, y + 4, { width: COL.disc.w - 2, align: 'right' });
         doc.text(fmtNum(item.taxableAmount), COL.taxable.x, y + 4, { width: COL.taxable.w - 2, align: 'right' });
-        const halfRate = (item.taxPercent / 2).toFixed(1).replace(/\.0$/, '');
-        doc.text(`${halfRate}+${halfRate}+0+0`, COL.taxRate.x, y + 4, { width: COL.taxRate.w, align: 'center' });
+        doc.text(formatLineTaxRate(item.taxPercent, supplyType), COL.taxRate.x, y + 4, { width: COL.taxRate.w, align: 'center' });
         doc.text(fmtNum(item.taxAmount), COL.taxAmt.x, y + 4, { width: COL.taxAmt.w - 2, align: 'right' });
         doc.text(fmtNum(item.total), COL.total.x, y + 4, { width: COL.total.w - 2, align: 'right' });
 
