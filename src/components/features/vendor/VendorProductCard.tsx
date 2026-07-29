@@ -412,8 +412,8 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         No distributor
                     </span>
                 ) : isOutOfStock ? (
-                    <span className="bg-gray-800 text-white text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
-                        Out
+                    <span className="bg-gray-800 text-white text-[9px] sm:text-[10px] font-bold px-2 py-1 rounded-full tracking-wide leading-tight max-w-[110px] text-center">
+                        Out of stock
                     </span>
                 ) : (
                     <>
@@ -884,16 +884,8 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                 </span>
                             )}
                         </div>
-                    </div>
 
-                    {bulkTiers.length > 0 && (
-                        <div className="flex flex-col gap-1.5 mt-0.5 relative z-20">
-                            {bulkTiers.map((tier, i) => renderTier(tier, i))}
-                        </div>
-                    )}
-
-                    <div className="mt-auto pt-3 flex flex-col gap-3 relative z-20">
-                        <div className="flex items-baseline gap-1.5">
+                        <div className="flex items-baseline gap-1.5 mt-1">
                             <span className={cn(
                                 "text-[22px] md:text-[24px] font-extrabold tracking-tight leading-none",
                                 isOutOfStock ? "text-gray-300" : "text-[#181725]"
@@ -905,6 +897,15 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             )}
                             <span className="text-[12px] font-medium text-gray-500">/ unit</span>
                         </div>
+                    </div>
+
+                    {bulkTiers.length > 0 && (
+                        <div className="flex flex-col gap-1.5 mt-0.5 relative z-20">
+                            {bulkTiers.map((tier, i) => renderTier(tier, i))}
+                        </div>
+                    )}
+
+                    <div className="mt-auto pt-3 flex flex-col gap-3 relative z-20">
                         {renderPrimaryCTA(false)}
                     </div>
                 </div>

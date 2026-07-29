@@ -111,8 +111,12 @@ async function applyPriceRow(
     changes.push({ field: 'minOrderQty', oldValue: oldMoq, newValue: row.moq });
   }
 
+  // Always sync slabs from sheet — empty/zero tiers are omitted by the parser,
+  // so an empty array clears all bulk pricing on the product.
+  const oldSlabsSummary = summarizePriceSlabs(product.priceSlabs);
+  const newSlabsSummary = summarizePriceSlabs(row.slabs);
+  await prisma.priceSlab.deleteMany({ where: { productId: product.id, vendorId } });
   if (row.slabs.length > 0) {
-    await prisma.priceSlab.deleteMany({ where: { productId: product.id, vendorId } });
     await prisma.priceSlab.createMany({
       data: row.slabs.slice(0, 3).map((s, idx) => ({
         productId: product.id,
@@ -123,10 +127,12 @@ async function applyPriceRow(
         sortOrder: idx,
       })),
     });
+  }
+  if (oldSlabsSummary !== newSlabsSummary) {
     changes.push({
       field: 'priceSlabs',
-      oldValue: summarizePriceSlabs(product.priceSlabs),
-      newValue: summarizePriceSlabs(row.slabs),
+      oldValue: oldSlabsSummary,
+      newValue: newSlabsSummary,
     });
   }
 

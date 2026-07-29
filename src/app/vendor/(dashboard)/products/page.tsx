@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import {
     Search, Plus, Loader2, Package, Pencil, X,
     ChevronRight, ChevronLeft, Info, ImageIcon, Settings as SettingsIcon, Trash2,
-    BarChart3, BoxIcon, Tag, Percent, Star, Wand2,
+    BarChart3, BoxIcon, Tag, IndianRupee, Star, Wand2,
     ChevronDown, FileSpreadsheet, AlertCircle, Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -2158,7 +2158,7 @@ export default function VendorProductsPage() {
                         onClick={() => setShowPriceReplace(true)}
                         className="h-[40px] px-3.5 border border-[#EEEEEE] bg-white rounded-[10px] text-[12px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] transition-all flex items-center gap-1.5 shrink-0"
                     >
-                        <Percent size={13} className="text-[#299E60]" />
+                        <IndianRupee size={13} className="text-[#299E60]" />
                         Price Bulk Update
                     </button>
                     <button

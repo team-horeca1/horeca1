@@ -723,9 +723,6 @@ export class InventoryService {
       sku: string;
       qtyAvailable: number;
       lowStockThreshold?: number;
-      qtyInTransit?: number;
-      qtyDamaged?: number;
-      qtyReturned?: number;
       warehousePincode?: string;
     }>;
     changedBy?: string;
@@ -765,9 +762,6 @@ export class InventoryService {
       outletId: string;
       qtyAvailable: number;
       lowStockThreshold?: number;
-      qtyInTransit?: number;
-      qtyDamaged?: number;
-      qtyReturned?: number;
     }> = [];
 
     for (const item of items) {
@@ -793,9 +787,6 @@ export class InventoryService {
         outletId,
         qtyAvailable: item.qtyAvailable,
         ...(item.lowStockThreshold !== undefined && { lowStockThreshold: item.lowStockThreshold }),
-        ...(item.qtyInTransit !== undefined && { qtyInTransit: item.qtyInTransit }),
-        ...(item.qtyDamaged !== undefined && { qtyDamaged: item.qtyDamaged }),
-        ...(item.qtyReturned !== undefined && { qtyReturned: item.qtyReturned }),
       });
     }
 
@@ -816,9 +807,6 @@ export class InventoryService {
             id: true,
             qtyAvailable: true,
             qtyReserved: true,
-            qtyInTransit: true,
-            qtyDamaged: true,
-            qtyReturned: true,
             lowStockThreshold: true,
           },
         });
@@ -827,9 +815,6 @@ export class InventoryService {
           data: {
             qtyAvailable: u.qtyAvailable,
             ...(u.lowStockThreshold !== undefined && { lowStockThreshold: u.lowStockThreshold }),
-            ...(u.qtyInTransit !== undefined && { qtyInTransit: u.qtyInTransit }),
-            ...(u.qtyDamaged !== undefined && { qtyDamaged: u.qtyDamaged }),
-            ...(u.qtyReturned !== undefined && { qtyReturned: u.qtyReturned }),
           },
         });
         if (before) {
@@ -853,42 +838,6 @@ export class InventoryService {
               'lowStockThreshold',
               before.lowStockThreshold,
               u.lowStockThreshold,
-              'sku_import',
-              changedBy,
-              tx,
-            );
-          }
-          if (u.qtyInTransit !== undefined && u.qtyInTransit !== before.qtyInTransit) {
-            await logInventoryChange(
-              before.id,
-              vendorId,
-              'qtyInTransit',
-              before.qtyInTransit,
-              u.qtyInTransit,
-              'sku_import',
-              changedBy,
-              tx,
-            );
-          }
-          if (u.qtyDamaged !== undefined && u.qtyDamaged !== before.qtyDamaged) {
-            await logInventoryChange(
-              before.id,
-              vendorId,
-              'qtyDamaged',
-              before.qtyDamaged,
-              u.qtyDamaged,
-              'sku_import',
-              changedBy,
-              tx,
-            );
-          }
-          if (u.qtyReturned !== undefined && u.qtyReturned !== before.qtyReturned) {
-            await logInventoryChange(
-              before.id,
-              vendorId,
-              'qtyReturned',
-              before.qtyReturned,
-              u.qtyReturned,
               'sku_import',
               changedBy,
               tx,

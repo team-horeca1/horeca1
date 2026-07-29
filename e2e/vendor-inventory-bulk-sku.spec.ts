@@ -132,12 +132,12 @@ test.describe('Inventory bulk upload — SKU / product-id keys', () => {
 
     await page.getByRole('button', { name: /Bulk Upload/i }).click();
     await expect(page.getByText(/Bulk Stock Update/i)).toBeVisible();
-    await expect(page.getByText(/Qty In Transit, Qty Damaged, Qty Returned/i)).toBeVisible();
-    await expect(page.getByText(/Qty Reserved, Net/i)).toBeVisible();
+    await expect(page.getByText(/SKU, Qty Available, Low Stock Threshold/i)).toBeVisible();
+    await expect(page.getByText(/Status is auto/i)).toBeVisible();
     await page.getByRole('button', { name: /^Cancel$/i }).click();
   });
 
-  test('import updates available/threshold/damaged/transit/returned; reserved unchanged', async ({
+  test('import updates available + threshold only; reserved/transit/damaged/returned unchanged', async ({
     page,
   }) => {
     await openInventory(page);
@@ -166,10 +166,10 @@ test.describe('Inventory bulk upload — SKU / product-id keys', () => {
 
       const nextAvailable = Math.max(row.qtyAvailable, 1) + 3;
       const nextThreshold = Math.max(row.lowStockThreshold, 1) + 2;
-      const nextDamaged = (row.qtyDamaged ?? 0) + 5;
-      const nextTransit = (row.qtyInTransit ?? 0) + 1;
-      const nextReturned = (row.qtyReturned ?? 0) + 2;
       const reservedBefore = row.qtyReserved;
+      const transitBefore = row.qtyInTransit ?? 0;
+      const damagedBefore = row.qtyDamaged ?? 0;
+      const returnedBefore = row.qtyReturned ?? 0;
 
       const importRes = await fetch('/api/v1/vendor/inventory/import', {
         method: 'POST',
@@ -181,9 +181,10 @@ test.describe('Inventory bulk upload — SKU / product-id keys', () => {
               sku,
               qtyAvailable: nextAvailable,
               lowStockThreshold: nextThreshold,
-              qtyDamaged: nextDamaged,
-              qtyInTransit: nextTransit,
-              qtyReturned: nextReturned,
+              // Extra fields must be ignored by Zod/API (reference-only in export)
+              qtyDamaged: damagedBefore + 99,
+              qtyInTransit: transitBefore + 99,
+              qtyReturned: returnedBefore + 99,
             },
           ],
         }),
@@ -201,6 +202,9 @@ test.describe('Inventory bulk upload — SKU / product-id keys', () => {
         updated: importJson.updated as number | undefined,
         errors: importJson.errors,
         reservedBefore,
+        transitBefore,
+        damagedBefore,
+        returnedBefore,
         after: after
           ? {
               qtyAvailable: after.qtyAvailable,
@@ -214,9 +218,6 @@ test.describe('Inventory bulk upload — SKU / product-id keys', () => {
         expected: {
           qtyAvailable: nextAvailable,
           lowStockThreshold: nextThreshold,
-          qtyDamaged: nextDamaged,
-          qtyInTransit: nextTransit,
-          qtyReturned: nextReturned,
         },
       };
     });
@@ -228,9 +229,9 @@ test.describe('Inventory bulk upload — SKU / product-id keys', () => {
     if (result.ok && result.after) {
       expect(result.after.qtyAvailable).toBe(result.expected.qtyAvailable);
       expect(result.after.lowStockThreshold).toBe(result.expected.lowStockThreshold);
-      expect(result.after.qtyDamaged).toBe(result.expected.qtyDamaged);
-      expect(result.after.qtyInTransit).toBe(result.expected.qtyInTransit);
-      expect(result.after.qtyReturned).toBe(result.expected.qtyReturned);
+      expect(result.after.qtyDamaged).toBe(result.damagedBefore);
+      expect(result.after.qtyInTransit).toBe(result.transitBefore);
+      expect(result.after.qtyReturned).toBe(result.returnedBefore);
       expect(result.after.qtyReserved).toBe(result.reservedBefore);
     }
   });

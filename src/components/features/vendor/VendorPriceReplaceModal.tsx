@@ -227,7 +227,8 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
             <p className="text-[11px] text-[#7C7C7C] leading-relaxed">
               Edit <span className="font-semibold text-[#181725]">Main Price</span> (taxable) and{' '}
               <span className="font-semibold text-[#181725]">Tax %</span> only. Gross columns use Excel
-              formulas and are ignored on upload. Leave bulk slabs blank for a simple price update.
+              formulas and are ignored on upload. Clear a bulk slab (empty or 0) to remove that tier; clear
+              all three to remove bulk pricing.
             </p>
             <button
               type="button"

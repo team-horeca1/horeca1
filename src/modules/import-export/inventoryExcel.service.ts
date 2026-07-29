@@ -12,14 +12,11 @@ export interface InventoryExportRow {
   lowStockThreshold: number;
 }
 
-/** Parsed import row — Reserved / Net / Product Name are never imported. */
+/** Parsed import row — only Available + Threshold (+ optional Warehouse Pincode) are applied. */
 export interface InventoryImportParsedRow {
   sku: string;
   qtyAvailable: string;
   lowStockThreshold: string;
-  qtyInTransit: string;
-  qtyDamaged: string;
-  qtyReturned: string;
   warehousePincode: string;
 }
 
@@ -33,15 +30,13 @@ const EXPORT_HEADERS = [
   'Qty Damaged',
   'Qty Returned',
   'Low Stock Threshold',
+  'Status',
 ] as const;
 
 const IMPORT_HEADERS = [
   'SKU',
   'Qty Available',
   'Low Stock Threshold',
-  'Qty In Transit',
-  'Qty Damaged',
-  'Qty Returned',
   'Warehouse Pincode',
 ] as const;
 
@@ -49,11 +44,19 @@ const IMPORT_INSTRUCTIONS: Record<string, string> = {
   SKU: 'Required — product SKU, vendor SKU, or product ID from Export',
   'Qty Available': 'Required — whole number ≥ 0',
   'Low Stock Threshold': 'Optional — alert when stock falls below this',
-  'Qty In Transit': 'Optional — whole number ≥ 0 (from Export)',
-  'Qty Damaged': 'Optional — whole number ≥ 0 (from Export)',
-  'Qty Returned': 'Optional — whole number ≥ 0 (from Export)',
   'Warehouse Pincode': 'Optional — only when you have multiple warehouses; leave blank for active warehouse',
 };
+
+export function inventoryStockStatus(
+  qtyAvailable: number,
+  qtyReserved: number,
+  lowStockThreshold: number,
+): 'Out of Stock' | 'Low Stock' | 'In Stock' {
+  const sellable = Math.max(0, qtyAvailable - qtyReserved);
+  if (sellable <= 0) return 'Out of Stock';
+  if (sellable <= lowStockThreshold) return 'Low Stock';
+  return 'In Stock';
+}
 
 function rowToExportRecord(row: InventoryExportRow): Record<string, string | number> {
   return {
@@ -66,6 +69,7 @@ function rowToExportRecord(row: InventoryExportRow): Record<string, string | num
     'Qty Damaged': row.qtyDamaged,
     'Qty Returned': row.qtyReturned,
     'Low Stock Threshold': row.lowStockThreshold,
+    Status: inventoryStockStatus(row.qtyAvailable, row.qtyReserved, row.lowStockThreshold),
   };
 }
 
@@ -91,12 +95,16 @@ export function exportInventoryToXlsx(rows: InventoryExportRow[]): Buffer {
   const readme = XLSX.utils.aoa_to_sheet([
     ['Inventory bulk upload — column guide'],
     [],
-    ['Writable on Bulk Upload', 'SKU, Qty Available, Low Stock Threshold, Qty In Transit, Qty Damaged, Qty Returned'],
-    ['Ignored (do not edit for upload)', 'Product Name, Qty Reserved, Net'],
+    ['Writable on Bulk Upload', 'SKU, Qty Available, Low Stock Threshold'],
+    [
+      'Ignored (reference only)',
+      'Product Name, Qty Reserved, Net, Qty In Transit, Qty Damaged, Qty Returned, Status',
+    ],
+    ['Status', 'Auto: In Stock / Low Stock / Out of Stock from Available − Reserved vs Threshold'],
     ['Qty Reserved', 'System-managed from orders — never overwritten by import'],
     ['Net', 'Calculated as Qty Available − Qty Reserved — never stored'],
   ]);
-  readme['!cols'] = [{ wch: 36 }, { wch: 72 }];
+  readme['!cols'] = [{ wch: 36 }, { wch: 88 }];
   XLSX.utils.book_append_sheet(wb, readme, 'Readme');
 
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
@@ -114,9 +122,6 @@ export function generateInventoryImportTemplate(opts?: { multiWarehouse?: boolea
     if (h === 'SKU') sampleRow[h] = 'Z0001';
     else if (h === 'Qty Available') sampleRow[h] = 100;
     else if (h === 'Low Stock Threshold') sampleRow[h] = 10;
-    else if (h === 'Qty In Transit') sampleRow[h] = 0;
-    else if (h === 'Qty Damaged') sampleRow[h] = 0;
-    else if (h === 'Qty Returned') sampleRow[h] = 0;
     else if (h === 'Warehouse Pincode') sampleRow[h] = '400001';
     else sampleRow[h] = '';
   }
@@ -147,9 +152,6 @@ function mapImportRow(row: Record<string, string | number>): InventoryImportPars
     sku: String(row.SKU ?? row.sku ?? '').trim(),
     qtyAvailable: String(row['Qty Available'] ?? row.qtyAvailable ?? row.qty ?? '').trim(),
     lowStockThreshold: String(row['Low Stock Threshold'] ?? row.lowStockThreshold ?? '').trim(),
-    qtyInTransit: String(row['Qty In Transit'] ?? row.qtyInTransit ?? '').trim(),
-    qtyDamaged: String(row['Qty Damaged'] ?? row.qtyDamaged ?? '').trim(),
-    qtyReturned: String(row['Qty Returned'] ?? row.qtyReturned ?? '').trim(),
     warehousePincode: String(row['Warehouse Pincode'] ?? row.warehousePincode ?? '').trim(),
   };
 }
