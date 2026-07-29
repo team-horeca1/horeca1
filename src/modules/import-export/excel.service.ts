@@ -1042,6 +1042,7 @@ export function exportPriceUpdateSheet(products: PriceExportProduct[]): Buffer {
             MOQ: p.moq,
             'Main Price': p.basePrice,
             'Tax %': tax,
+            // Placeholder — overwritten with formulas below so Gross tracks Main Price × tax
             Gross: toGross(p.basePrice, tax),
             'Bulk Qty 1': s1?.minQty ?? '',
             'Taxable Rate 1': s1 ? Number(s1.price) : '',
@@ -1058,6 +1059,19 @@ export function exportPriceUpdateSheet(products: PriceExportProduct[]): Buffer {
 
   const ws = XLSX.utils.json_to_sheet(data, { header: [...PRICE_UPDATE_HEADERS] });
   ws['!cols'] = PRICE_UPDATE_HEADERS.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
+
+  // Columns: A Name, B SKU, C MOQ, D Main Price, E Tax %, F Gross,
+  // G Bulk Qty 1, H Taxable Rate 1, I Gross 1, J/K/L tier2, M/N/O tier3
+  const rowCount = products.length > 0 ? products.length : 0;
+  for (let i = 0; i < rowCount; i++) {
+    const r = i + 2; // header is row 1
+    ws[`F${r}`] = { t: 'n', f: `D${r}*(1+E${r}/100)` };
+    const p = products[i]!;
+    if (p.slabs[0]) ws[`I${r}`] = { t: 'n', f: `H${r}*(1+$E${r}/100)` };
+    if (p.slabs[1]) ws[`L${r}`] = { t: 'n', f: `K${r}*(1+$E${r}/100)` };
+    if (p.slabs[2]) ws[`O${r}`] = { t: 'n', f: `N${r}*(1+$E${r}/100)` };
+  }
+
   XLSX.utils.book_append_sheet(wb, ws, 'Prices');
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
 }
