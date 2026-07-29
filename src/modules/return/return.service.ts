@@ -50,6 +50,51 @@ export async function notifyReturnSubmitted(returnRequestId: string): Promise<vo
   });
 }
 
+export async function notifyReturnReviewed(returnRequestId: string): Promise<void> {
+  const req = await prisma.returnRequest.findUnique({
+    where: { id: returnRequestId },
+    include: {
+      order: { select: { orderNumber: true, userId: true } },
+    },
+  });
+  if (!req) return;
+
+  const note = req.adminNote?.trim();
+  let title = 'Return update';
+  let body = `Your return request for ${req.order.orderNumber} was updated.`;
+
+  if (req.status === 'rejected') {
+    title = 'Return rejected';
+    body = note
+      ? `Your return request for ${req.order.orderNumber} was rejected. Store note: ${note}`
+      : `Your return request for ${req.order.orderNumber} was rejected.`;
+  } else if (req.status === 'approved') {
+    title = 'Return approved';
+    body = note
+      ? `Your return for ${req.order.orderNumber} was approved. Refund will be processed by HoReCa1. Store note: ${note}`
+      : `Your return for ${req.order.orderNumber} was approved. Refund will be processed by HoReCa1.`;
+  } else if (req.status === 'resolved') {
+    const kind = req.resolutionType === 'credit_note' ? 'credit note' : 'replacement';
+    title = 'Return resolved';
+    body = note
+      ? `Your return for ${req.order.orderNumber} was resolved via ${kind}. Store note: ${note}`
+      : `Your return for ${req.order.orderNumber} was resolved via ${kind}.`;
+  }
+
+  await prisma.notification.create({
+    data: {
+      userId: req.order.userId,
+      type: `return_${req.status}`,
+      channel: 'in_app',
+      status: 'sent',
+      title,
+      body,
+      referenceId: returnRequestId,
+      referenceType: 'return_request',
+    },
+  }).catch(() => undefined);
+}
+
 export async function vendorReviewReturn(
   returnId: string,
   vendorId: string,
@@ -65,13 +110,18 @@ export async function vendorReviewReturn(
     where: { id: returnId, order: { vendorId } },
     include: {
       order: {
-        select: { id: true, status: true, userId: true, paymentMethod: true },
+        select: { id: true, status: true, userId: true, paymentMethod: true, orderNumber: true },
       },
     },
   });
   if (!returnReq) throw Errors.notFound('Return request');
   if (returnReq.status !== 'pending') {
     throw Errors.badRequest(`Return is already ${returnReq.status}`);
+  }
+
+  const noteTrimmed = input.vendorNote?.trim() ?? '';
+  if (input.status === 'rejected' && noteTrimmed.length < 10) {
+    throw Errors.badRequest('A note to the customer (at least 10 characters) is required when rejecting.');
   }
 
   const resolutionType = input.resolutionType ?? 'refund';
@@ -96,7 +146,7 @@ export async function vendorReviewReturn(
     where: { id: returnId },
     data: {
       status: nextStatus,
-      adminNote: input.vendorNote,
+      adminNote: noteTrimmed || null,
       ...resolutionData,
     },
   });
@@ -139,6 +189,8 @@ export async function vendorReviewReturn(
       }
     }
   }
+
+  void notifyReturnReviewed(returnId);
 
   return updated;
 }
@@ -278,6 +330,7 @@ export async function adminProcessReturnRefund(
 
 export const returnService = {
   notifyReturnSubmitted,
+  notifyReturnReviewed,
   vendorReviewReturn,
   adminProcessReturnRefund,
 };

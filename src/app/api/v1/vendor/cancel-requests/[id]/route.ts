@@ -8,10 +8,20 @@ import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { cancelRequestService } from '@/modules/order/cancel-request.service';
 
-const schema = z.object({
-  status: z.enum(['approved', 'rejected']),
-  vendorNote: z.string().max(500).optional(),
-});
+const schema = z
+  .object({
+    status: z.enum(['approved', 'rejected']),
+    vendorNote: z.string().max(500).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.status === 'rejected' && (val.vendorNote?.trim().length ?? 0) < 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['vendorNote'],
+        message: 'A note to the customer (at least 10 characters) is required when declining.',
+      });
+    }
+  });
 
 function extractId(req: NextRequest): string {
   const segments = new URL(req.url).pathname.split('/');

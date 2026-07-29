@@ -12,8 +12,11 @@ export async function createCancelRequest(orderId: string, customerId: string, r
       select: { id: true, status: true, vendorId: true, orderNumber: true, userId: true },
     });
     if (!order) throw Errors.notFound('Order');
-    if (order.status !== 'pending') {
-      throw Errors.badRequest('Cancellation can only be requested while the order is Pending.');
+    // Online payment moves pending → confirmed; cancel still allowed until Packed.
+    if (!OrderService.isCancellableStatus(order.status)) {
+      throw Errors.badRequest(
+        'Cancellation can only be requested while the order is Pending or Confirmed (before packing).',
+      );
     }
 
     const existing = await prisma.cancelRequest.findUnique({ where: { orderId } });
@@ -39,8 +42,8 @@ export async function createCancelRequest(orderId: string, customerId: string, r
         orderId,
         actorId: customerId,
         action: ORDER_EVENT_ACTIONS.CANCEL_REQUESTED,
-        fromStatus: 'pending',
-        toStatus: 'pending',
+        fromStatus: order.status,
+        toStatus: order.status,
         payload: { reason: reason.trim(), cancelRequestId: row.id },
       });
       return row;
@@ -117,12 +120,17 @@ export async function reviewCancelRequest(
   }
 
   if (input.status === 'rejected') {
+    const rejectNote = input.vendorNote?.trim() ?? '';
+    if (rejectNote.length < 10) {
+      throw Errors.badRequest('A note to the customer (at least 10 characters) is required when declining.');
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       const row = await tx.cancelRequest.update({
         where: { id: requestId },
         data: {
           status: 'rejected',
-          vendorNote: input.vendorNote?.trim() || null,
+          vendorNote: rejectNote,
         },
       });
       await recordOrderEvent(tx, {
@@ -133,7 +141,7 @@ export async function reviewCancelRequest(
         toStatus: req.order.status,
         payload: {
           cancelRequestId: requestId,
-          vendorNote: input.vendorNote?.trim() || null,
+          vendorNote: rejectNote,
         },
       });
       return row;
@@ -146,7 +154,7 @@ export async function reviewCancelRequest(
         channel: 'in_app',
         status: 'sent',
         title: 'Cancellation declined',
-        body: `Your cancellation request for ${req.order.orderNumber} was declined.`,
+        body: `Your cancellation request for ${req.order.orderNumber} was declined. Store note: ${rejectNote}`,
         referenceId: requestId,
         referenceType: 'cancel_request',
       },
@@ -155,9 +163,9 @@ export async function reviewCancelRequest(
     return updated;
   }
 
-  // Approve → cancel order (R12: must still be pending)
-  if (req.order.status !== 'pending') {
-    throw Errors.badRequest('Order is no longer Pending; cancellation cannot be approved.');
+  // Approve → cancel order (must still be before packing)
+  if (!OrderService.isCancellableStatus(req.order.status)) {
+    throw Errors.badRequest('Order is already being packed or beyond; cancellation cannot be approved.');
   }
 
   const reason = `Customer cancel request approved${input.vendorNote?.trim() ? `: ${input.vendorNote.trim()}` : ''}`;
@@ -183,7 +191,7 @@ export async function reviewCancelRequest(
       orderId: req.orderId,
       actorId,
       action: ORDER_EVENT_ACTIONS.CANCEL_APPROVED,
-      fromStatus: 'pending',
+      fromStatus: req.order.status,
       toStatus: 'cancelled',
       payload: {
         cancelRequestId: requestId,

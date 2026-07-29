@@ -35,7 +35,7 @@ function ReviewModal({
 }: {
     request: ReturnRequest;
     onClose: () => void;
-    onDone: (id: string, status: 'approved' | 'rejected') => void;
+    onDone: (updated: ReturnRequest) => void;
 }) {
     const [note, setNote] = useState('');
     const [refundAmount, setRefundAmount] = useState(String(Number(request.order.totalAmount)));
@@ -45,19 +45,30 @@ function ReviewModal({
     const [action, setAction] = useState<'approved' | 'rejected' | null>(null);
     const [saving, setSaving] = useState(false);
 
+    const noteTrimmed = note.trim();
+    const canReject = noteTrimmed.length >= 10;
+
     const handleSubmit = async () => {
         if (!action) return;
+        if (action === 'rejected' && !canReject) {
+            toast.error('Add a note to the customer (at least 10 characters) before rejecting.');
+            return;
+        }
         setSaving(true);
         try {
-            const body: Record<string, unknown> = { status: action, adminNote: note.trim() || undefined };
+            let adminNote = noteTrimmed || undefined;
+            if (action === 'approved' && resolutionType === 'replacement' && replacementNotes.trim()) {
+                adminNote = noteTrimmed
+                    ? `${noteTrimmed}\n\nReplacement: ${replacementNotes.trim()}`
+                    : `Replacement: ${replacementNotes.trim()}`;
+            }
+            const body: Record<string, unknown> = { status: action, adminNote };
             if (action === 'approved') {
                 body.resolutionType = resolutionType;
                 if (resolutionType === 'refund') {
                     body.refundAmount = parseFloat(refundAmount) || 0;
                 } else if (resolutionType === 'credit_note') {
                     body.creditNoteAmount = parseFloat(creditNoteAmount) || 0;
-                } else if (resolutionType === 'replacement' && replacementNotes.trim()) {
-                    body.adminNote = replacementNotes.trim();
                 }
             }
             const res = await fetch(`/api/v1/vendor/returns/${request.id}`, {
@@ -67,8 +78,22 @@ function ReviewModal({
             });
             const json = await res.json();
             if (!json.success) throw new Error(json.error?.message || 'Failed');
-            toast.success(`Return ${action}`);
-            onDone(request.id, action);
+            const updated = json.data as ReturnRequest;
+            toast.success(
+                updated.status === 'resolved'
+                    ? `Return resolved (${resolutionType === 'credit_note' ? 'credit note' : 'replacement'})`
+                    : `Return ${updated.status}`,
+            );
+            onDone({
+                ...request,
+                ...updated,
+                status: updated.status,
+                adminNote: updated.adminNote ?? adminNote ?? null,
+                resolutionType: updated.resolutionType ?? (action === 'approved' ? resolutionType : request.resolutionType),
+                refundAmount: updated.refundAmount != null ? String(updated.refundAmount) : request.refundAmount,
+                creditNoteNumber: updated.creditNoteNumber ?? request.creditNoteNumber,
+                creditNoteAmount: updated.creditNoteAmount != null ? String(updated.creditNoteAmount) : request.creditNoteAmount,
+            });
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Failed');
         } finally {
@@ -181,23 +206,28 @@ function ReviewModal({
                         </>
                     )}
 
-                    {/* Note */}
+                    {/* Note — required on reject */}
                     <div>
-                        <label className="text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wide">Note to customer (optional)</label>
+                        <label className="text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wide">
+                            Note to customer {action === 'rejected' ? '(required)' : '(optional)'}
+                        </label>
                         <textarea
                             value={note}
                             onChange={e => setNote(e.target.value)}
                             rows={2}
-                            placeholder="Explain your decision..."
+                            placeholder={action === 'rejected' ? 'Explain why you are rejecting (at least 10 characters)...' : 'Explain your decision...'}
                             className="mt-1.5 w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[13px] outline-none focus:border-[#299E60]/50 resize-none"
                         />
+                        {action === 'rejected' && !canReject && (
+                            <p className="text-[11px] text-[#AEAEAE] mt-1">At least 10 characters required to reject.</p>
+                        )}
                     </div>
 
                     <div className="flex gap-3 pt-1">
                         <button onClick={onClose} className="flex-1 h-[42px] rounded-[10px] border border-[#EEEEEE] text-[13px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] transition-all">Cancel</button>
                         <button
                             onClick={handleSubmit}
-                            disabled={!action || saving}
+                            disabled={!action || saving || (action === 'rejected' && !canReject)}
                             className={cn(
                                 'flex-1 h-[42px] rounded-[10px] text-[13px] font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50',
                                 action === 'rejected' ? 'bg-[#E74C3C] hover:bg-[#d44234] text-white' : 'bg-[#299E60] hover:bg-[#238a54] text-white'
@@ -251,9 +281,11 @@ export default function VendorReturnsPage() {
         try {
             const res = await fetch('/api/v1/vendor/returns');
             const json = await res.json();
-            if (json.success) setReturns(json.data);
+            if (!json.success) throw new Error(json.error?.message || 'Failed to load returns');
+            setReturns(json.data);
         } catch (err) {
             console.error(err);
+            toast.error(err instanceof Error ? err.message : 'Failed to load returns');
         } finally {
             setLoading(false);
         }
@@ -261,8 +293,8 @@ export default function VendorReturnsPage() {
 
     useEffect(() => { fetchReturns(); }, [fetchReturns]);
 
-    const handleDone = (id: string, status: 'approved' | 'rejected') => {
-        setReturns(prev => prev.map(r => r.id !== id ? r : { ...r, status }));
+    const handleDone = (updated: ReturnRequest) => {
+        setReturns(prev => prev.map(r => (r.id !== updated.id ? r : { ...r, ...updated })));
         setReviewing(null);
     };
 
@@ -370,7 +402,7 @@ export default function VendorReturnsPage() {
                                             {new Date(req.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                                         </td>
                                         <td className="px-5 py-4 text-center">
-                                            {req.status === 'approved' && req.resolutionType ? (
+                                            {(req.status === 'approved' || req.status === 'resolved') && req.resolutionType ? (
                                                 <div className="flex flex-col items-center gap-1">
                                                     <span className={cn(
                                                         'text-[10px] font-bold px-2 py-0.5 rounded-[5px] uppercase tracking-wide',

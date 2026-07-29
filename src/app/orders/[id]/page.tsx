@@ -23,6 +23,8 @@ interface ApiOrderItem {
     productId: string;
     productName: string;
     quantity: number;
+    fulfilledQty?: number;
+    cancelledQty?: number;
     unitPrice: string | number;
     totalPrice: string | number;
     product?: { imageUrl: string | null; images: string[] } | null;
@@ -63,7 +65,8 @@ const STATUS_CONFIG: Record<string, { label: string; textColor: string; bgColor:
     processing: { label: 'Being Processed',       textColor: 'text-purple-700', bgColor: 'bg-purple-50',  borderColor: 'border-purple-200',icon: <Loader2 size={14} /> },
     shipped:    { label: 'Out for Delivery',      textColor: 'text-indigo-700', bgColor: 'bg-indigo-50',  borderColor: 'border-indigo-200',icon: <Truck size={14} /> },
     out_for_delivery: { label: 'Out for Delivery', textColor: 'text-indigo-700', bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200', icon: <Truck size={14} /> },
-    delivered:  { label: 'Delivered',             textColor: 'text-green-700',  bgColor: 'bg-green-50',   borderColor: 'border-green-200', icon: <CheckCircle2 size={14} /> },
+    partially_delivered: { label: 'Partially Fulfilled', textColor: 'text-amber-700', bgColor: 'bg-amber-50', borderColor: 'border-amber-200', icon: <Package size={14} /> },
+    delivered:  { label: 'Completed',             textColor: 'text-green-700',  bgColor: 'bg-green-50',   borderColor: 'border-green-200', icon: <CheckCircle2 size={14} /> },
     returned:   { label: 'Returned',              textColor: 'text-orange-700', bgColor: 'bg-orange-50',  borderColor: 'border-orange-200', icon: <RotateCcw size={14} /> },
     cancelled:  { label: 'Cancelled',             textColor: 'text-red-700',    bgColor: 'bg-red-50',     borderColor: 'border-red-200',   icon: <XCircle size={14} /> },
 };
@@ -119,7 +122,11 @@ export default function OrderDetailPage() {
     const [showReturnForm, setShowReturnForm] = React.useState(false);
     const [returnReason, setReturnReason] = React.useState('');
     const [isSubmittingReturn, setIsSubmittingReturn] = React.useState(false);
-    const [returnRequest, setReturnRequest] = React.useState<{ status: string } | null>(null);
+    const [returnRequest, setReturnRequest] = React.useState<{
+        status: string;
+        reason?: string;
+        adminNote?: string | null;
+    } | null>(null);
 
     // Cancel request state (Section 7 Flow 18)
     const [showCancelForm, setShowCancelForm] = React.useState(false);
@@ -182,7 +189,7 @@ export default function OrderDetailPage() {
     };
 
     React.useEffect(() => {
-        if (!order || order.status !== 'delivered') return;
+        if (!order || (order.status !== 'delivered' && order.status !== 'returned')) return;
         fetch(`/api/v1/orders/${orderId}/return`)
             .then(r => r.json())
             .then(json => { if (json.success && json.data) setReturnRequest(json.data); })
@@ -190,7 +197,12 @@ export default function OrderDetailPage() {
     }, [order, orderId]);
 
     React.useEffect(() => {
-        if (!order || (order.status !== 'pending' && order.status !== 'cancelled')) return;
+        if (!order) return;
+        const canHaveCancel =
+            order.status === 'pending' ||
+            order.status === 'confirmed' ||
+            order.status === 'cancelled';
+        if (!canHaveCancel) return;
         fetch(`/api/v1/orders/${orderId}/cancel-request`)
             .then((r) => r.json())
             .then((json) => { if (json.success && json.data) setCancelRequest(json.data); })
@@ -366,7 +378,28 @@ export default function OrderDetailPage() {
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-[14px] font-bold text-[#181725] leading-snug">{item.productName}</p>
                                                 <p className="text-[12px] text-gray-400 mt-0.5">
-                                                    {item.quantity} × {fmt(item.unitPrice)}
+                                                    Ordered {item.quantity} × {fmt(item.unitPrice)}
+                                                    {typeof item.fulfilledQty === 'number' &&
+                                                        (item.fulfilledQty > 0 ||
+                                                            (item.cancelledQty ?? 0) > 0 ||
+                                                            order.status === 'partially_delivered') && (
+                                                        <>
+                                                            {' · '}Fulfilled {item.fulfilledQty}
+                                                            {(() => {
+                                                                const bal = Math.max(
+                                                                    0,
+                                                                    item.quantity -
+                                                                        (item.fulfilledQty ?? 0) -
+                                                                        (item.cancelledQty ?? 0),
+                                                                );
+                                                                return bal > 0 ? (
+                                                                    <span className="text-amber-700 font-semibold">
+                                                                        {' · '}Balance {bal}
+                                                                    </span>
+                                                                ) : null;
+                                                            })()}
+                                                        </>
+                                                    )}
                                                 </p>
                                             </div>
                                             <p className="text-[15px] font-black text-[#181725] shrink-0">{fmt(item.totalPrice)}</p>
@@ -561,7 +594,7 @@ export default function OrderDetailPage() {
                                     Rate This Order
                                 </button>
                             )}
-                            {order.status === 'pending' && !cancelRequest && !showCancelForm && (
+                            {(order.status === 'pending' || order.status === 'confirmed') && !cancelRequest && !showCancelForm && (
                                 <button
                                     onClick={() => setShowCancelForm(true)}
                                     data-testid="request-cancel-btn"
@@ -618,8 +651,16 @@ export default function OrderDetailPage() {
                                 </button>
                             )}
                             {returnRequest && (
-                                <div className="space-y-3 p-4 border-2 border-amber-100 bg-amber-50/40 rounded-2xl">
-                                    <p className="text-[13px] font-bold text-[#181725]">Return request</p>
+                                <div className="space-y-3 p-4 border-2 border-amber-100 bg-amber-50/40 rounded-2xl" data-testid="return-request-status">
+                                    <p className="text-[13px] font-bold text-[#181725]">
+                                        Return request: <span className="capitalize">{returnRequest.status.replace(/_/g, ' ')}</span>
+                                    </p>
+                                    {returnRequest.reason && (
+                                        <p className="text-[12px] text-gray-600">{returnRequest.reason}</p>
+                                    )}
+                                    {returnRequest.adminNote && (
+                                        <p className="text-[12px] text-gray-500">Store note: {returnRequest.adminNote}</p>
+                                    )}
                                     <StatusTimeline
                                         steps={returnTimelineStepsForStatus(returnRequest.status)}
                                         currentKey={returnTimelineCurrentKey(returnRequest.status)}

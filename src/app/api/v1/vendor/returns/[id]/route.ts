@@ -18,13 +18,23 @@ function extractId(req: NextRequest) {
   return new URL(req.url).pathname.split('/').at(-1) ?? '';
 }
 
-const reviewSchema = z.object({
-  status: z.enum(['approved', 'rejected']),
-  adminNote: z.string().max(1000).optional(),
-  refundAmount: z.number().min(0).optional(),
-  resolutionType: z.enum(['refund', 'credit_note', 'replacement']).optional().default('refund'),
-  creditNoteAmount: z.number().positive().optional(),
-});
+const reviewSchema = z
+  .object({
+    status: z.enum(['approved', 'rejected']),
+    adminNote: z.string().max(1000).optional(),
+    refundAmount: z.number().min(0).optional(),
+    resolutionType: z.enum(['refund', 'credit_note', 'replacement']).optional().default('refund'),
+    creditNoteAmount: z.number().positive().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.status === 'rejected' && (val.adminNote?.trim().length ?? 0) < 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['adminNote'],
+        message: 'A note to the customer (at least 10 characters) is required when rejecting.',
+      });
+    }
+  });
 
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
   try {

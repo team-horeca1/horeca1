@@ -14,13 +14,23 @@ export function CancelRequestBanner({
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const noteTrimmed = note.trim();
+  const canDecline = noteTrimmed.length >= 10;
+
   const review = async (status: 'approved' | 'rejected') => {
+    if (status === 'rejected' && !canDecline) {
+      toast.error('Add a note to the customer (at least 10 characters) before declining.');
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch(`/api/v1/vendor/cancel-requests/${request.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, vendorNote: note.trim() || undefined }),
+        body: JSON.stringify({
+          status,
+          vendorNote: noteTrimmed || undefined,
+        }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error?.message || 'Review failed');
@@ -42,14 +52,24 @@ export function CancelRequestBanner({
         <p className="text-[14px] font-bold text-[#181725]">Customer cancellation request</p>
         <p className="mt-1 text-[13px] text-[#7C7C7C]">{request.reason}</p>
       </div>
-      <textarea
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        rows={2}
-        placeholder="Optional note to customer..."
-        data-testid="vendor-cancel-note"
-        className="w-full resize-none rounded-[10px] border border-[#EEEEEE] bg-white px-3 py-2 text-[13px] outline-none focus:border-[#299E60]/40"
-      />
+      <div>
+        <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-[#7C7C7C]">
+          Note to customer (required to decline)
+        </label>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={2}
+          placeholder="Explain why you are declining, or optional note if approving..."
+          data-testid="vendor-cancel-note"
+          className="w-full resize-none rounded-[10px] border border-[#EEEEEE] bg-white px-3 py-2 text-[13px] outline-none focus:border-[#299E60]/40"
+        />
+        {!canDecline && (
+          <p className="mt-1 text-[11px] text-[#AEAEAE]">
+            Decline needs at least 10 characters. Approve can skip the note.
+          </p>
+        )}
+      </div>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -62,7 +82,7 @@ export function CancelRequestBanner({
         </button>
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || !canDecline}
           data-testid="reject-cancel-request"
           onClick={() => void review('rejected')}
           className="h-10 rounded-[10px] border border-[#EEEEEE] px-4 text-[13px] font-bold text-[#7C7C7C] hover:bg-white disabled:opacity-50"

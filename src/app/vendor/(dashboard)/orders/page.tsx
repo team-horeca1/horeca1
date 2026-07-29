@@ -73,8 +73,8 @@ const STATUS_LABELS: Record<string, string> = {
     ready_for_dispatch: 'Ready for Dispatch',
     dispatched: 'Dispatched',
     shipped: 'Dispatched',
-    partially_delivered: 'Partially Delivered',
-    delivered: 'Delivered',
+    partially_delivered: 'Partially Fulfilled',
+    delivered: 'Completed',
     completed: 'Completed',
     returned: 'Returned',
     cancelled: 'Cancelled',
@@ -134,6 +134,9 @@ export default function VendorOrdersPage() {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [bulkBusy, setBulkBusy] = useState(false);
     const [bulkStatus, setBulkStatus] = useState('confirmed');
+    const [cancelModal, setCancelModal] = useState<{ orderId: string; orderNumber: string } | null>(null);
+    const [cancelReason, setCancelReason] = useState('');
+    const [cancelBusy, setCancelBusy] = useState(false);
 
     // Cursors stack for "back" pagination
     const [cursorStack, setCursorStack] = useState<string[]>([]);
@@ -266,8 +269,17 @@ export default function VendorOrdersPage() {
     };
 
     const updateOrderStatus = async (orderId: string, newStatus: string) => {
-        const prev = orders.find(o => o.id === orderId)?.status;
+        const order = orders.find(o => o.id === orderId);
+        const prev = order?.status;
         if (!prev || prev === newStatus) return;
+
+        // Cancelled requires a reason — open modal instead of silent PATCH failure
+        if (newStatus === 'cancelled') {
+            setCancelReason('');
+            setCancelModal({ orderId, orderNumber: order.orderNumber });
+            return;
+        }
+
         setBusyId(orderId);
         setOrders(os => os.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
         try {
@@ -283,6 +295,38 @@ export default function VendorOrdersPage() {
             setOrders(os => os.map(o => o.id === orderId ? { ...o, status: prev } : o));
             toast.error(err instanceof Error ? err.message : 'Failed to update status');
         } finally {
+            setBusyId(null);
+        }
+    };
+
+    const confirmCancelOrder = async () => {
+        if (!cancelModal) return;
+        const reason = cancelReason.trim();
+        if (reason.length < 3) {
+            toast.error('Enter a cancellation reason (at least 3 characters).');
+            return;
+        }
+        const { orderId } = cancelModal;
+        const prev = orders.find(o => o.id === orderId)?.status;
+        if (!prev) return;
+        setCancelBusy(true);
+        setBusyId(orderId);
+        try {
+            const res = await fetch(`/api/v1/vendor/orders/${orderId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'cancelled', reason }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.error?.message || json.message || 'Failed to cancel');
+            setOrders(os => os.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o));
+            setCancelModal(null);
+            setCancelReason('');
+            toast.success('Order cancelled. Inventory released.');
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Failed to cancel');
+        } finally {
+            setCancelBusy(false);
             setBusyId(null);
         }
     };
@@ -744,6 +788,54 @@ export default function VendorOrdersPage() {
                     </div>
                 )}
             </div>
+
+            {cancelModal && (
+                <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                    <div
+                        className="bg-white rounded-[16px] shadow-2xl w-full max-w-[420px]"
+                        data-testid="vendor-cancel-order-modal"
+                    >
+                        <div className="px-6 py-4 border-b border-[#F5F5F5]">
+                            <p className="text-[15px] font-bold text-[#181725]">Cancel order</p>
+                            <p className="text-[12px] text-[#AEAEAE]">{cancelModal.orderNumber}</p>
+                        </div>
+                        <div className="p-6 space-y-3">
+                            <p className="text-[13px] text-[#7C7C7C]">
+                                A reason is required. The customer will see this if they check the order.
+                            </p>
+                            <textarea
+                                value={cancelReason}
+                                onChange={(e) => setCancelReason(e.target.value)}
+                                rows={3}
+                                autoFocus
+                                placeholder="e.g. Out of stock, delivery area not serviceable..."
+                                data-testid="vendor-cancel-order-reason"
+                                className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[13px] outline-none focus:border-[#E74C3C]/40 resize-none"
+                            />
+                            <div className="flex gap-3 pt-1">
+                                <button
+                                    type="button"
+                                    disabled={cancelBusy}
+                                    onClick={() => { setCancelModal(null); setCancelReason(''); }}
+                                    className="flex-1 h-[42px] rounded-[10px] border border-[#EEEEEE] text-[13px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5]"
+                                >
+                                    Back
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={cancelBusy || cancelReason.trim().length < 3}
+                                    onClick={() => void confirmCancelOrder()}
+                                    data-testid="confirm-vendor-cancel-order"
+                                    className="flex-1 h-[42px] rounded-[10px] bg-[#E74C3C] text-white text-[13px] font-bold hover:bg-[#d44234] disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {cancelBusy ? <Loader2 size={14} className="animate-spin" /> : null}
+                                    Cancel order
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
