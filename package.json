@@ -7,6 +7,7 @@
     "dev:fresh": "node scripts/dev-fresh.mjs",
     "dev:db": "docker compose -f docker/docker-compose.yml up -d",
     "dev:tunnel": "docker compose -f docker/docker-compose.dev.yml -f docker/docker-compose.dev.tunnel.yml up",
+    "dev:turbo": "node scripts/dev-host-turbo.mjs",
     "dev:webpack": "node scripts/dev-host-webpack.mjs",
     "build": "next build",
     "start": "next start",

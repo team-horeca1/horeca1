@@ -6,8 +6,11 @@
 #   npm run dev:db
 #   npm run dev          → http://localhost:3000
 #
-# If HMR misses edits on Windows, use host Webpack instead:
+# For reliable HMR on Windows (Turbopack on host, DB/Redis in Docker):
 #   npm run dev:db
+#   npm run dev:turbo    → http://localhost:3000
+#
+# Host Webpack fallback (if Turbopack misbehaves):
 #   npm run dev:webpack  → http://localhost:3000
 #
 # If the UI looks stuck on an old build after edits:
