@@ -33,6 +33,9 @@ function toGross(taxable: number, taxPercent: number): number {
   return Math.round(taxable * (1 + (taxPercent || 0) / 100) * 100) / 100;
 }
 
+const PRODUCT_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function findProductBySkuOrId(
   vendorId: string,
   key: string
@@ -40,15 +43,21 @@ async function findProductBySkuOrId(
   const sku = key.trim();
   if (!sku) return null;
 
+  // Only query by id when the key looks like a UUID — Prisma throws on invalid UUID
+  // values against a uuid column (surfaced as "Something went wrong" on preview).
+  const or: Array<Record<string, unknown>> = [
+    { sku: { equals: sku, mode: 'insensitive' as const } },
+    { vendorSku: { equals: sku, mode: 'insensitive' as const } },
+  ];
+  if (PRODUCT_ID_RE.test(sku)) {
+    or.unshift({ id: sku });
+  }
+
   return prisma.product.findFirst({
     where: {
       vendorId,
       slug: { not: { startsWith: '_deleted_' } },
-      OR: [
-        { id: sku },
-        { sku: { equals: sku, mode: 'insensitive' as const } },
-        { vendorSku: { equals: sku, mode: 'insensitive' as const } },
-      ],
+      OR: or,
     },
     select: {
       id: true,
