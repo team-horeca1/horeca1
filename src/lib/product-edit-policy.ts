@@ -1,9 +1,16 @@
 /**
  * Product edit policy — material vs non-material field classification.
  * Material changes on approved listings queue as pending_edit; non-material apply live.
+ *
+ * Approval gate (vendor edits on live listings):
+ * - New products → pending (handled at create, not here)
+ * - Image changes → pending_edit (wrong media / adult content risk)
+ * - Everything else (veg/nonveg, name, brand, HSN, pack, unit, category, …) → live
  */
 
-export const MATERIAL_PRODUCT_FIELDS = [
+export const MATERIAL_PRODUCT_FIELDS = ['imageUrl', 'images'] as const;
+
+export const NON_MATERIAL_PRODUCT_FIELDS = [
   'brand',
   'name',
   'hsn',
@@ -11,16 +18,11 @@ export const MATERIAL_PRODUCT_FIELDS = [
   'unit',
   'vegNonVeg',
   'masterProductId',
-] as const;
-
-export const NON_MATERIAL_PRODUCT_FIELDS = [
   'basePrice',
   'originalPrice',
   'taxPercent',
   'description',
   'aliasNames',
-  'imageUrl',
-  'images',
   'minOrderQty',
   'promoPrice',
   'promoStartTime',
@@ -38,7 +40,7 @@ export const NON_MATERIAL_PRODUCT_FIELDS = [
 export type MaterialProductField = (typeof MATERIAL_PRODUCT_FIELDS)[number];
 export type NonMaterialProductField = (typeof NON_MATERIAL_PRODUCT_FIELDS)[number];
 
-/** Levenshtein distance — used for name typo escape hatch. */
+/** Levenshtein distance — kept for callers / historical typo tooling. */
 export function levenshteinDistance(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
@@ -64,6 +66,10 @@ export function isMinorNameChange(oldName: string, newName: string): boolean {
   return dist <= Math.ceil(old.length * 0.3);
 }
 
+/**
+ * Queued pending-edit shape. Image fields are the only ones newly queued;
+ * other keys remain for applying older pending_edit payloads still in the DB.
+ */
 export interface PendingEditPayload {
   name?: string;
   brand?: string | null;
@@ -75,6 +81,7 @@ export interface PendingEditPayload {
   categoryIds?: string[];
   imageUrl?: string | null;
   images?: string[];
+  taxPercent?: number;
   submittedAt: string;
   submittedBy: string;
 }
@@ -90,6 +97,7 @@ export function serializeFieldValue(value: unknown): string | null {
 export interface MaterialChangeResult {
   materialPayload: Partial<PendingEditPayload>;
   hasMaterialChanges: boolean;
+  /** Always false — name edits apply live; kept for call-site compatibility. */
   nameIsMinorOnly: boolean;
 }
 
@@ -107,42 +115,33 @@ type ProductSnapshot = {
 };
 
 /**
- * Compare incoming update against current product + category set.
- * Returns material fields that should be queued (not applied live).
+ * Compare incoming update against current product.
+ * Only image fields are material (queued as pending_edit).
  */
 export function detectMaterialChanges(
   current: ProductSnapshot,
-  currentCategoryIds: string[],
+  _currentCategoryIds: string[],
   incoming: Record<string, unknown>,
-  incomingCategoryIds?: string[],
+  _incomingCategoryIds?: string[],
 ): MaterialChangeResult {
   const materialPayload: Partial<PendingEditPayload> = {};
   let hasMaterialChanges = false;
 
-  const compare = <K extends keyof ProductSnapshot>(field: K, incomingKey: string) => {
-    if (incoming[incomingKey] === undefined) return;
-    const next = incoming[incomingKey];
-    const old = current[field];
-    const oldStr = old === null || old === undefined ? '' : String(old);
-    const nextStr = next === null || next === undefined ? '' : String(next);
+  if (incoming.imageUrl !== undefined) {
+    const oldStr = current.imageUrl ?? '';
+    const nextStr =
+      incoming.imageUrl === null || incoming.imageUrl === undefined
+        ? ''
+        : String(incoming.imageUrl);
     if (oldStr !== nextStr) {
-      (materialPayload as Record<string, unknown>)[incomingKey] = next;
+      materialPayload.imageUrl = incoming.imageUrl as string | null;
       hasMaterialChanges = true;
     }
-  };
-
-  compare('brand', 'brand');
-  compare('name', 'name');
-  compare('hsn', 'hsn');
-  compare('packSize', 'packSize');
-  compare('unit', 'unit');
-  compare('vegNonVeg', 'vegNonVeg');
-  compare('masterProductId', 'masterProductId');
-  compare('imageUrl', 'imageUrl');
+  }
 
   if (incoming.images !== undefined) {
     const oldImages = current.images || [];
-    const newImages = incoming.images as string[] || [];
+    const newImages = (incoming.images as string[]) || [];
     const oldStr = [...oldImages].sort().join(',');
     const newStr = [...newImages].sort().join(',');
     if (oldStr !== newStr) {
@@ -151,38 +150,16 @@ export function detectMaterialChanges(
     }
   }
 
-  if (incomingCategoryIds !== undefined) {
-    const oldPrimary = current.categoryId;
-    const newPrimary = incomingCategoryIds[0] ?? null;
-    if (oldPrimary !== newPrimary) {
-      materialPayload.categoryIds = incomingCategoryIds;
-      hasMaterialChanges = true;
-    }
-  }
-
-  const nameChanged = incoming.name !== undefined && String(incoming.name) !== current.name;
-  const otherMaterial =
-    hasMaterialChanges &&
-    !(nameChanged && Object.keys(materialPayload).length === 1 && materialPayload.name !== undefined);
-
-  const nameIsMinorOnly =
-    nameChanged &&
-    !otherMaterial &&
-    isMinorNameChange(current.name, String(incoming.name));
-
-  if (nameIsMinorOnly) {
-    delete materialPayload.name;
-    hasMaterialChanges = Object.keys(materialPayload).length > 0;
-  }
-
-  return { materialPayload, hasMaterialChanges, nameIsMinorOnly };
+  return { materialPayload, hasMaterialChanges, nameIsMinorOnly: false };
 }
 
-/** taxPercent is non-material unless HSN also changed in the same request. */
+/**
+ * taxPercent is never material now (HSN / identity fields apply live).
+ * Kept for call-site compatibility.
+ */
 export function isTaxPercentMaterial(
-  incoming: Record<string, unknown>,
-  materialPayload: Partial<PendingEditPayload>,
+  _incoming: Record<string, unknown>,
+  _materialPayload: Partial<PendingEditPayload>,
 ): boolean {
-  if (incoming.taxPercent === undefined) return false;
-  return materialPayload.hsn !== undefined;
+  return false;
 }

@@ -20,7 +20,6 @@ import {
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import {
   detectMaterialChanges,
-  isTaxPercentMaterial,
   NON_MATERIAL_PRODUCT_FIELDS,
   type PendingEditPayload,
 } from '@/lib/product-edit-policy';
@@ -549,8 +548,12 @@ async function assertVendorSkuUnique(
 }
 
 /** Compose `{vendorCode}-{posSku}` for vendor listings (import + admin approval). */
-export async function composeVendorListingSku(vendorId: string, posSku: string): Promise<string> {
-  return composeVendorProductSku(vendorId, posSku);
+export async function composeVendorListingSku(
+  vendorId: string,
+  posSku: string,
+  excludeProductId?: string,
+): Promise<string> {
+  return composeVendorProductSku(vendorId, posSku, excludeProductId);
 }
 
 /** Lookup an approved master catalog row by admin-entered catalog SKU. */
@@ -1553,7 +1556,7 @@ export class CatalogService {
     let pendingPayload: PendingEditPayload | null = null;
 
     if (isApprovedLive || isPendingEdit) {
-      const { materialPayload, hasMaterialChanges, nameIsMinorOnly } = detectMaterialChanges(
+      const { materialPayload, hasMaterialChanges } = detectMaterialChanges(
         {
           name: product.name,
           brand: product.brand,
@@ -1571,10 +1574,6 @@ export class CatalogService {
         categoryIds,
       );
 
-      if (isTaxPercentMaterial(data, materialPayload)) {
-        (materialPayload as Record<string, unknown>).taxPercent = data.taxPercent;
-      }
-
       if (hasMaterialChanges) {
         const existingPending = (product.pendingEditPayload ?? {}) as unknown as PendingEditPayload;
         pendingPayload = {
@@ -1585,25 +1584,11 @@ export class CatalogService {
         };
         data.approvalStatus = 'pending_edit';
 
-        // Strip material fields from live update — queue only
-        for (const key of [
-          'brand',
-          'name',
-          'hsn',
-          'packSize',
-          'unit',
-          'vegNonVeg',
-          'masterProductId',
-          'taxPercent',
-          'imageUrl',
-          'images',
-        ] as const) {
-          if (materialPayload[key as keyof typeof materialPayload] !== undefined) {
+        // Strip material image fields from live update — queue only
+        for (const key of ['imageUrl', 'images'] as const) {
+          if (materialPayload[key] !== undefined) {
             delete data[key];
           }
-        }
-        if (materialPayload.categoryIds !== undefined) {
-          delete data.categoryId;
         }
         data.pendingEditPayload = pendingPayload as unknown as Prisma.InputJsonValue;
 
@@ -1612,8 +1597,6 @@ export class CatalogService {
           vendorId,
           productName: product.name,
         });
-      } else if (nameIsMinorOnly && data.name !== undefined) {
-        // Minor name typo — apply live, audit only
       }
 
       // Non-material fields apply immediately with audit
@@ -1634,14 +1617,9 @@ export class CatalogService {
           nonMaterialAfter,
           [...NON_MATERIAL_PRODUCT_FIELDS],
         );
-        if (nameIsMinorOnly && data.name !== undefined) {
-          await logProductFieldChanges(productId, actorUserId, 'vendor_edit', [
-            { field: 'name', oldValue: product.name, newValue: data.name },
-          ]);
-        }
       }
 
-      if (categoryIds !== undefined && !materialPayload.categoryIds) {
+      if (categoryIds !== undefined) {
         await syncProductCategories(productId, categoryIds);
         delete data.categoryId;
       }

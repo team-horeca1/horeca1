@@ -715,7 +715,8 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
           // Invariant: an approved product needs an approved brand AND category.
           if (brandPending || categoryPending) approvalStatus = 'pending';
         } else if (vendorSku) {
-          composedSku = await composeVendorListingSku(vendorId, vendorSku);
+          // Exclude self — uniqueness check would otherwise fail against this listing.
+          composedSku = await composeVendorListingSku(vendorId, vendorSku, existing.id);
         }
 
         prepared.push({ rowNum, r, existing, categoryId, categoryIds, masterProductId, approvalStatus, composedSku, vendorSku });

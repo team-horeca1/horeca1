@@ -651,7 +651,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           let vendorSku: string | undefined;
           if (vendorId && r.sku) {
             vendorSku = r.sku.trim();
-            composedSku = await composeVendorListingSku(vendorId, vendorSku);
+            composedSku = await composeVendorListingSku(vendorId, vendorSku, existing.id);
           }
 
           const updatedProduct = await tx.product.update({
