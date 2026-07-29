@@ -739,10 +739,12 @@ export class InventoryService {
       select: { id: true, sku: true, vendorSku: true },
     });
 
+    // Match vendorSku, platform sku, AND product.id — export falls back to id when both SKUs are empty.
     const skuToProduct = new Map<string, { id: string }>();
     for (const p of products) {
       if (p.sku) skuToProduct.set(p.sku.toLowerCase(), { id: p.id });
       if (p.vendorSku) skuToProduct.set(p.vendorSku.toLowerCase(), { id: p.id });
+      skuToProduct.set(p.id.toLowerCase(), { id: p.id });
     }
 
     const outlets = await prisma.outlet.findMany({
@@ -763,7 +765,7 @@ export class InventoryService {
     }> = [];
 
     for (const item of items) {
-      const product = skuToProduct.get(item.sku.toLowerCase());
+      const product = skuToProduct.get(item.sku.toLowerCase().trim());
       if (!product) {
         errors.push({ sku: item.sku, error: 'SKU not found for your catalog' });
         continue;

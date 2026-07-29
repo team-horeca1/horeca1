@@ -27,7 +27,7 @@ const EXPORT_HEADERS = [
 const IMPORT_HEADERS = ['SKU', 'Qty Available', 'Low Stock Threshold', 'Warehouse Pincode'] as const;
 
 const IMPORT_INSTRUCTIONS: Record<string, string> = {
-  SKU: 'Required — product SKU or vendor SKU',
+  SKU: 'Required — product SKU, vendor SKU, or product ID from Export',
   'Qty Available': 'Required — whole number ≥ 0',
   'Low Stock Threshold': 'Optional — alert when stock falls below this',
   'Warehouse Pincode': 'Optional — only when you have multiple warehouses; leave blank for active warehouse',
