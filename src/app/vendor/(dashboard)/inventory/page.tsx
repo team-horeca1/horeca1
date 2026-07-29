@@ -47,8 +47,17 @@ interface ImportRow {
     productName?: string;
     qtyAvailable: number;
     lowStockThreshold?: number;
+    qtyInTransit?: number;
+    qtyDamaged?: number;
+    qtyReturned?: number;
     warehousePincode?: string;
     error?: string;
+}
+
+function parseOptionalInt(raw: string | undefined): number | undefined {
+    if (raw === undefined || raw === '') return undefined;
+    const n = parseInt(raw, 10);
+    return Number.isNaN(n) ? undefined : n;
 }
 
 function parseImportFile(text: string): ImportRow[] {
@@ -59,6 +68,9 @@ function parseImportFile(text: string): ImportRow[] {
     const skuIdx = header.findIndex((h) => h === 'sku');
     const qtyIdx = header.findIndex((h) => h.includes('qty') && h.includes('available'));
     const thresholdIdx = header.findIndex((h) => h.includes('low') || h.includes('threshold'));
+    const transitIdx = header.findIndex((h) => h.includes('transit'));
+    const damagedIdx = header.findIndex((h) => h.includes('damaged'));
+    const returnedIdx = header.findIndex((h) => h.includes('returned'));
     const pincodeIdx = header.findIndex((h) => h.includes('pincode') || h.includes('warehouse'));
 
     const rows: ImportRow[] = [];
@@ -68,12 +80,17 @@ function parseImportFile(text: string): ImportRow[] {
         if (!sku || sku.toLowerCase() === 'sku' || sku.toLowerCase().includes('required')) continue;
         const qtyRaw = qtyIdx >= 0 ? cols[qtyIdx] : cols[1];
         const qty = parseInt(qtyRaw ?? '', 10);
-        const thresholdRaw = thresholdIdx >= 0 ? cols[thresholdIdx] : '';
-        const threshold = thresholdRaw ? parseInt(thresholdRaw, 10) : undefined;
+        const threshold = parseOptionalInt(thresholdIdx >= 0 ? cols[thresholdIdx] : undefined);
+        const qtyInTransit = parseOptionalInt(transitIdx >= 0 ? cols[transitIdx] : undefined);
+        const qtyDamaged = parseOptionalInt(damagedIdx >= 0 ? cols[damagedIdx] : undefined);
+        const qtyReturned = parseOptionalInt(returnedIdx >= 0 ? cols[returnedIdx] : undefined);
         rows.push({
             sku,
             qtyAvailable: isNaN(qty) ? 0 : qty,
-            lowStockThreshold: threshold !== undefined && !isNaN(threshold) ? threshold : undefined,
+            lowStockThreshold: threshold,
+            qtyInTransit,
+            qtyDamaged,
+            qtyReturned,
             warehousePincode: pincodeIdx >= 0 ? cols[pincodeIdx] || undefined : undefined,
             error: isNaN(qty) ? 'Invalid quantity' : undefined,
         });
@@ -85,7 +102,12 @@ async function parseXlsxFile(file: File): Promise<ImportRow[]> {
     const XLSX = await import('xlsx');
     const buffer = await file.arrayBuffer();
     const wb = XLSX.read(buffer, { type: 'array' });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
+    // Prefer Inventory sheet; skip Readme if present
+    const sheetName =
+        wb.SheetNames.find((n) => n.toLowerCase() === 'inventory') ??
+        wb.SheetNames.find((n) => n.toLowerCase() !== 'readme') ??
+        wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName!];
     const raw = XLSX.utils.sheet_to_json<Record<string, string | number>>(sheet, { defval: '' });
     return raw
         .filter((row) => {
@@ -101,10 +123,25 @@ async function parseXlsxFile(file: File): Promise<ImportRow[]> {
             const qty = parseInt(String(qtyRaw), 10);
             const thresholdRaw = row['Low Stock Threshold'] ?? row.lowStockThreshold ?? '';
             const threshold = thresholdRaw !== '' ? parseInt(String(thresholdRaw), 10) : undefined;
+            const transitRaw = row['Qty In Transit'] ?? row.qtyInTransit ?? '';
+            const damagedRaw = row['Qty Damaged'] ?? row.qtyDamaged ?? '';
+            const returnedRaw = row['Qty Returned'] ?? row.qtyReturned ?? '';
             return {
                 sku,
                 qtyAvailable: isNaN(qty) ? 0 : qty,
                 lowStockThreshold: threshold !== undefined && !isNaN(threshold) ? threshold : undefined,
+                qtyInTransit:
+                    transitRaw !== '' && !isNaN(parseInt(String(transitRaw), 10))
+                        ? parseInt(String(transitRaw), 10)
+                        : undefined,
+                qtyDamaged:
+                    damagedRaw !== '' && !isNaN(parseInt(String(damagedRaw), 10))
+                        ? parseInt(String(damagedRaw), 10)
+                        : undefined,
+                qtyReturned:
+                    returnedRaw !== '' && !isNaN(parseInt(String(returnedRaw), 10))
+                        ? parseInt(String(returnedRaw), 10)
+                        : undefined,
                 warehousePincode: String(row['Warehouse Pincode'] ?? row.warehousePincode ?? '').trim() || undefined,
                 error: isNaN(qty) ? 'Invalid quantity' : undefined,
             };
@@ -171,6 +208,9 @@ function BulkUploadModal({
                         sku: r.sku,
                         qtyAvailable: r.qtyAvailable,
                         ...(r.lowStockThreshold !== undefined && { lowStockThreshold: r.lowStockThreshold }),
+                        ...(r.qtyInTransit !== undefined && { qtyInTransit: r.qtyInTransit }),
+                        ...(r.qtyDamaged !== undefined && { qtyDamaged: r.qtyDamaged }),
+                        ...(r.qtyReturned !== undefined && { qtyReturned: r.qtyReturned }),
                         ...(r.warehousePincode && { warehousePincode: r.warehousePincode }),
                     })),
                 }),
@@ -238,9 +278,17 @@ function BulkUploadModal({
                         <Upload size={24} className="text-[#AEAEAE] mx-auto mb-2" />
                         <p className="text-[13px] font-bold text-[#181725]">Drop CSV/XLSX here or click to browse</p>
                         <p className="text-[11px] text-[#AEAEAE] mt-1">
-                            Use page <span className="font-semibold text-[#181725]">Export</span> for current stock, then re-upload with{' '}
-                            <span className="font-mono">SKU, Qty Available</span>
-                            {multiWarehouse && <>, <span className="font-mono">Warehouse Pincode</span></>}
+                            Use page <span className="font-semibold text-[#181725]">Export</span>, edit, then re-upload.
+                            Writable:{' '}
+                            <span className="font-mono">
+                              SKU, Qty Available, Low Stock Threshold, Qty In Transit, Qty Damaged, Qty Returned
+                            </span>
+                            {multiWarehouse && (
+                              <>
+                                , <span className="font-mono">Warehouse Pincode</span>
+                              </>
+                            )}
+                            . Ignored: <span className="font-mono">Product Name, Qty Reserved, Net</span>.
                         </p>
                         <input
                             ref={fileRef}

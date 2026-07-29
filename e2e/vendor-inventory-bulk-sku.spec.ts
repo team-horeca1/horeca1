@@ -132,6 +132,106 @@ test.describe('Inventory bulk upload — SKU / product-id keys', () => {
 
     await page.getByRole('button', { name: /Bulk Upload/i }).click();
     await expect(page.getByText(/Bulk Stock Update/i)).toBeVisible();
+    await expect(page.getByText(/Qty In Transit, Qty Damaged, Qty Returned/i)).toBeVisible();
+    await expect(page.getByText(/Qty Reserved, Net/i)).toBeVisible();
     await page.getByRole('button', { name: /^Cancel$/i }).click();
+  });
+
+  test('import updates available/threshold/damaged/transit/returned; reserved unchanged', async ({
+    page,
+  }) => {
+    await openInventory(page);
+
+    const result = await page.evaluate(async () => {
+      const invJson = await (await fetch('/api/v1/vendor/inventory', { credentials: 'include' })).json();
+      const items = (invJson.data ?? []) as Array<{
+        productId: string;
+        outletId: string;
+        qtyAvailable: number;
+        qtyReserved: number;
+        qtyInTransit: number;
+        qtyDamaged: number;
+        qtyReturned: number;
+        lowStockThreshold: number;
+        product: { sku?: string | null };
+      }>;
+      const row = items[0];
+      if (!row) return { ok: false as const, reason: 'no inventory' };
+
+      const pr = await (
+        await fetch(`/api/v1/vendor/products/${row.productId}`, { credentials: 'include' })
+      ).json();
+      const d = pr.data as { sku?: string | null; vendorSku?: string | null } | undefined;
+      const sku = d?.vendorSku || d?.sku || row.productId;
+
+      const nextAvailable = Math.max(row.qtyAvailable, 1) + 3;
+      const nextThreshold = Math.max(row.lowStockThreshold, 1) + 2;
+      const nextDamaged = (row.qtyDamaged ?? 0) + 5;
+      const nextTransit = (row.qtyInTransit ?? 0) + 1;
+      const nextReturned = (row.qtyReturned ?? 0) + 2;
+      const reservedBefore = row.qtyReserved;
+
+      const importRes = await fetch('/api/v1/vendor/inventory/import', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [
+            {
+              sku,
+              qtyAvailable: nextAvailable,
+              lowStockThreshold: nextThreshold,
+              qtyDamaged: nextDamaged,
+              qtyInTransit: nextTransit,
+              qtyReturned: nextReturned,
+            },
+          ],
+        }),
+      });
+      const importJson = await importRes.json();
+
+      const afterJson = await (await fetch('/api/v1/vendor/inventory', { credentials: 'include' })).json();
+      const after = ((afterJson.data ?? []) as typeof items).find(
+        (i) => i.productId === row.productId && i.outletId === row.outletId,
+      );
+
+      return {
+        ok: true as const,
+        success: importJson.success as boolean | undefined,
+        updated: importJson.updated as number | undefined,
+        errors: importJson.errors,
+        reservedBefore,
+        after: after
+          ? {
+              qtyAvailable: after.qtyAvailable,
+              qtyReserved: after.qtyReserved,
+              qtyDamaged: after.qtyDamaged,
+              qtyInTransit: after.qtyInTransit,
+              qtyReturned: after.qtyReturned,
+              lowStockThreshold: after.lowStockThreshold,
+            }
+          : null,
+        expected: {
+          qtyAvailable: nextAvailable,
+          lowStockThreshold: nextThreshold,
+          qtyDamaged: nextDamaged,
+          qtyInTransit: nextTransit,
+          qtyReturned: nextReturned,
+        },
+      };
+    });
+
+    test.skip(!result.ok, result.ok === false ? result.reason : 'skip');
+    expect(result.ok && result.success, JSON.stringify(result.ok ? result.errors : [])).toBe(true);
+    expect(result.ok && result.updated).toBe(1);
+    expect(result.ok && result.after).toBeTruthy();
+    if (result.ok && result.after) {
+      expect(result.after.qtyAvailable).toBe(result.expected.qtyAvailable);
+      expect(result.after.lowStockThreshold).toBe(result.expected.lowStockThreshold);
+      expect(result.after.qtyDamaged).toBe(result.expected.qtyDamaged);
+      expect(result.after.qtyInTransit).toBe(result.expected.qtyInTransit);
+      expect(result.after.qtyReturned).toBe(result.expected.qtyReturned);
+      expect(result.after.qtyReserved).toBe(result.reservedBefore);
+    }
   });
 });

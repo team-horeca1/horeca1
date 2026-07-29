@@ -12,6 +12,9 @@ const skuImportItemSchema = z.object({
   sku: z.string().min(1).max(100),
   qtyAvailable: z.number().int().min(0),
   lowStockThreshold: z.number().int().min(0).optional(),
+  qtyInTransit: z.number().int().min(0).optional(),
+  qtyDamaged: z.number().int().min(0).optional(),
+  qtyReturned: z.number().int().min(0).optional(),
   warehousePincode: z.string().max(10).optional(),
 });
 
