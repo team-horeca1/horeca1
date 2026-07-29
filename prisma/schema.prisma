@@ -121,6 +121,7 @@ model User {
   productAuditLogs       ProductAuditLog[] @relation("ProductAuditActor")
   priceHistoryChanges    PriceHistory[]    @relation("PriceHistoryActor")
   orderEvents            OrderEvent[]      @relation("OrderEventActor")
+  orderShipments         OrderShipment[]   @relation("OrderShipmentActor")
   masterProductRevisions MasterProductRevision[] @relation("MasterRevisionActor")
   stockTransfersCreated  StockTransfer[]         @relation("StockTransferCreator")
 
@@ -879,6 +880,7 @@ model Order {
   dispatches         Dispatch[]
   events             OrderEvent[]
   cancelRequest      CancelRequest?
+  shipments          OrderShipment[]
 
   @@index([userId])
   @@index([vendorId])
@@ -963,14 +965,49 @@ model OrderItem {
   taxPercent   Decimal? @map("tax_percent") @db.Decimal(5, 2)
   quantity     Int
   fulfilledQty Int     @default(0) @map("fulfilled_qty")
+  // Backorder — qty that will never ship. balance = quantity - fulfilledQty - cancelledQty
+  cancelledQty Int     @default(0) @map("cancelled_qty")
   unitPrice    Decimal @map("unit_price") @db.Decimal(10, 2)
   totalPrice   Decimal @map("total_price") @db.Decimal(12, 2)
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
+  shipmentItems OrderShipmentItem[]
 
   @@index([orderId])
   @@map("order_items")
+}
+
+/** Partial-fulfillment shipment audit trail (Shipment 1, Shipment 2, …). */
+model OrderShipment {
+  id          String   @id @default(uuid()) @db.Uuid
+  orderId     String   @map("order_id") @db.Uuid
+  shipmentNo  Int      @map("shipment_no")
+  actorId     String?  @map("actor_id") @db.Uuid
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actor User? @relation("OrderShipmentActor", fields: [actorId], references: [id], onDelete: SetNull)
+  items OrderShipmentItem[]
+
+  @@unique([orderId, shipmentNo])
+  @@index([orderId, createdAt(sort: Desc)])
+  @@map("order_shipments")
+}
+
+model OrderShipmentItem {
+  id         String @id @default(uuid()) @db.Uuid
+  shipmentId String @map("shipment_id") @db.Uuid
+  orderItemId String @map("order_item_id") @db.Uuid
+  qty        Int
+
+  shipment  OrderShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  orderItem OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId])
+  @@index([orderItemId])
+  @@map("order_shipment_items")
 }
 
 // ═══ REVIEWS ═════════════════════════════════════════
