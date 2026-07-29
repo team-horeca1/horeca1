@@ -10,6 +10,8 @@ export const ORDER_EVENT_ACTIONS = {
   ITEM_REJECTED: 'item.rejected',
   ITEM_SUBSTITUTED: 'item.substituted',
   PARTIAL_FULFILMENT: 'order.partial_fulfilment',
+  SHIPPED_LINES: 'order.shipped_lines',
+  BALANCE_CANCELLED: 'order.balance_cancelled',
   CANCELLED: 'order.cancelled',
   CANCEL_REQUESTED: 'cancel.requested',
   CANCEL_APPROVED: 'cancel.approved',

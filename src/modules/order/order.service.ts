@@ -336,7 +336,7 @@ export class OrderService {
               productName: product.name,
               ...snapshotFromProduct(product),
               quantity: item.quantity,
-              fulfilledQty: isDraft ? 0 : item.quantity,
+              fulfilledQty: 0,
               unitPrice: 0,
               totalPrice: 0,
             });
@@ -365,7 +365,7 @@ export class OrderService {
             productName: product.name,
             ...snapshotFromProduct(product),
             quantity: item.quantity,
-            fulfilledQty: isDraft ? 0 : item.quantity,
+            fulfilledQty: 0,
             unitPrice: grossUnitPrice,
             totalPrice,
           });
@@ -412,7 +412,7 @@ export class OrderService {
                   productName: freeProduct.name,
                   ...snapshotFromProduct(freeProduct),
                   quantity: bxgy.freeUnits,
-                  fulfilledQty: isDraft ? 0 : bxgy.freeUnits,
+                  fulfilledQty: 0,
                   unitPrice: 0,
                   totalPrice: 0,
                 });
@@ -866,14 +866,7 @@ export class OrderService {
         await creditWalletService.debitWallet(ctx.userId, creditVendorId, Number(order.totalAmount), order.id, tx);
       }
 
-      // Auto-accept: set acceptedAt + fulfilledQty = ordered qty on every line.
-      for (const item of order.items) {
-        await tx.orderItem.update({
-          where: { id: item.id },
-          data: { fulfilledQty: item.quantity },
-        });
-      }
-
+      // Auto-accept timestamp only — fulfilledQty stays 0 until ship (backorder-safe).
       const updated = await tx.order.update({
         where: { id: orderId },
         data: {
@@ -1452,253 +1445,339 @@ export class OrderService {
   // Partial fulfilment while still in the Rule 12 cancel window (`pending`).
   // Does NOT advance status to confirmed — that is an explicit status transition.
   // Unfulfilled qty is released; order total recalculated; OrderEvents appended.
+  /** balance = ordered − fulfilled − cancelled */
+  private static lineBalance(item: { quantity: number; fulfilledQty: number; cancelledQty?: number | null }) {
+    return Math.max(0, item.quantity - (item.fulfilledQty ?? 0) - (item.cancelledQty ?? 0));
+  }
+
+  private static lineStatus(item: { quantity: number; fulfilledQty: number; cancelledQty?: number | null }) {
+    const cancelled = item.cancelledQty ?? 0;
+    const fulfilled = item.fulfilledQty ?? 0;
+    const balance = OrderService.lineBalance(item);
+    if (cancelled >= item.quantity) return 'CANCELLED' as const;
+    if (balance === 0 && fulfilled > 0) return 'FULFILLED' as const;
+    if (fulfilled > 0 || cancelled > 0) return 'PARTIALLY_FULFILLED' as const;
+    return 'OPEN' as const;
+  }
+
+  /**
+   * Legacy bridge: map fulfilledQty targets → ship (+ optional cancel of remainder when 0).
+   * Does NOT reprice — ordered qty and order totals stay intact (backorder billing).
+   */
   async partialAccept(
     orderId: string,
     vendorId: string,
     itemLines: Array<{ itemId: string; fulfilledQty: number; reason?: string }>,
     actorId?: string | null,
   ) {
-    return prisma.$transaction(async (tx) => {
-      const order = await tx.order.findFirst({
-        where: { id: orderId, vendorId, status: 'pending' },
-        include: { items: true },
-      });
-      if (!order) throw Errors.notFound('Order or order is not pending');
-
-      const orderItemMap = new Map(order.items.map(i => [i.id, i]));
-
-      // Validate each supplied line
-      for (const line of itemLines) {
-        const item = orderItemMap.get(line.itemId);
-        if (!item) throw Errors.badRequest(`Item ${line.itemId} does not belong to this order`);
-        if (line.fulfilledQty < 0) throw Errors.badRequest('Fulfilled qty cannot be negative');
-        if (line.fulfilledQty > item.quantity) {
-          throw Errors.badRequest(
-            `Fulfilled qty ${line.fulfilledQty} exceeds ordered qty ${item.quantity} for "${item.productName}"`,
-          );
-        }
-      }
-
-      // Build fulfilled map — items not in the list default to their current fulfilled/ordered qty
-      const fulfilledMap = new Map(itemLines.map(l => [l.itemId, l.fulfilledQty]));
-      for (const item of order.items) {
-        if (!fulfilledMap.has(item.id)) {
-          fulfilledMap.set(item.id, item.fulfilledQty > 0 ? item.fulfilledQty : item.quantity);
-        }
-      }
-
-      // Must fulfil at least one unit in total
-      const totalFulfilled = Array.from(fulfilledMap.values()).reduce((s, q) => s + q, 0);
-      if (totalFulfilled === 0) {
-        throw Errors.badRequest('At least one item must be fulfilled. Use Reject to cancel entirely.');
-      }
-
-      const isPartial = order.items.some(i => (fulfilledMap.get(i.id) ?? i.quantity) < i.quantity);
-
-      // Release inventory for qty reduced from previously reserved amount
-      const prevReserved = order.items.map((i) => ({
-        productId: i.productId,
-        quantity: i.fulfilledQty > 0 ? i.fulfilledQty : i.quantity,
-      }));
-      const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
-      await this.inventoryService.releaseStock(prevReserved, fulfillOutlet, tx);
-
-      const toReserve = order.items
-        .map((i) => ({ productId: i.productId, quantity: fulfilledMap.get(i.id) ?? i.quantity }))
-        .filter((r) => r.quantity > 0);
-      if (toReserve.length > 0) {
-        await this.inventoryService.reserveStock(toReserve, fulfillOutlet, tx);
-      }
-
-      // Recalculate order total proportionally & update each item's fulfilledQty
-      let newSubtotal = 0;
-      const lineEvents: Array<{
-        orderId: string;
-        actorId?: string | null;
-        action: string;
-        fromStatus?: string | null;
-        toStatus?: string | null;
-        payload?: Record<string, unknown> | null;
-      }> = [];
-
-      for (const item of order.items) {
-        const prevFulfilled = item.fulfilledQty > 0 ? item.fulfilledQty : item.quantity;
-        const fulfilled = fulfilledMap.get(item.id) ?? item.quantity;
-        const itemTotal = Math.round(Number(item.totalPrice) * (fulfilled / item.quantity) * 100) / 100;
-        newSubtotal += itemTotal;
-        await tx.orderItem.update({ where: { id: item.id }, data: { fulfilledQty: fulfilled } });
-
-        if (fulfilled !== prevFulfilled) {
-          const reason = itemLines.find((l) => l.itemId === item.id)?.reason;
-          lineEvents.push({
-            orderId,
-            actorId,
-            action: fulfilled === 0 ? ORDER_EVENT_ACTIONS.ITEM_REJECTED : ORDER_EVENT_ACTIONS.ITEM_QTY_ADJUSTED,
-            fromStatus: order.status,
-            toStatus: order.status,
-            payload: {
-              itemId: item.id,
-              productName: item.productName,
-              orderedQty: item.quantity,
-              fromQty: prevFulfilled,
-              toQty: fulfilled,
-              ...(reason ? { reason } : {}),
-            },
-          });
-        }
-      }
-
-      const updated = await tx.order.update({
-        where: { id: orderId },
-        data: {
-          // Stay pending — cancel window (R12) remains open until status advances.
-          status: 'pending',
-          isPartial,
-          subtotal: newSubtotal,
-          totalAmount: Math.max(0, newSubtotal - Number(order.promoDiscount) - Number(order.couponDiscount) - Number(order.walletApplied)),
-          acceptedAt: order.acceptedAt ?? new Date(),
-        },
-      });
-
-      if (isPartial) {
-        lineEvents.unshift({
-          orderId,
-          actorId,
-          action: ORDER_EVENT_ACTIONS.PARTIAL_FULFILMENT,
-          fromStatus: 'pending',
-          toStatus: 'pending',
-          payload: { subtotal: newSubtotal, totalAmount: Number(updated.totalAmount) },
-        });
-      }
-      if (lineEvents.length > 0) await recordOrderEvents(tx, lineEvents);
-
-      return updated;
+    // Load once to convert absolute "accept N" into ship delta + leave balance (not cancel).
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, vendorId },
+      include: { items: true },
     });
+    if (!order) throw Errors.notFound('Order');
+
+    const ships: Array<{ itemId: string; shipQty: number }> = [];
+    for (const line of itemLines) {
+      const item = order.items.find((i) => i.id === line.itemId);
+      if (!item) throw Errors.badRequest(`Item ${line.itemId} does not belong to this order`);
+      const already = item.fulfilledQty ?? 0;
+      const target = line.fulfilledQty;
+      if (target < already) {
+        throw Errors.badRequest(
+          `Cannot reduce fulfilled qty for "${item.productName}" (already shipped ${already}). Cancel balance instead.`,
+        );
+      }
+      const delta = target - already;
+      if (delta > 0) ships.push({ itemId: line.itemId, shipQty: delta });
+    }
+
+    // FulfilledQty 0 on a line → cancel entire remaining balance (Option 1 cancel items)
+    const cancels: Array<{ itemId: string; cancelQty: number; reason?: string }> = [];
+    for (const line of itemLines) {
+      if (line.fulfilledQty !== 0) continue;
+      const item = order.items.find((i) => i.id === line.itemId)!;
+      const bal = OrderService.lineBalance(item);
+      if (bal > 0) {
+        cancels.push({ itemId: line.itemId, cancelQty: bal, reason: line.reason });
+      }
+    }
+
+    let updated = order;
+    if (ships.length > 0) {
+      updated = await this.shipLines(orderId, vendorId, ships, actorId);
+    }
+    if (cancels.length > 0) {
+      updated = await this.cancelLineBalance(orderId, vendorId, cancels, actorId);
+    }
+    if (ships.length === 0 && cancels.length === 0) {
+      throw Errors.badRequest('No quantity changes to apply');
+    }
+    return updated;
   }
 
-  /** Post-confirm quantity adjustments while order is confirmed or packing. */
+  /** Post-confirm amend → ship deltas only (no reprice / no cut). */
   async amendOrderLines(
     orderId: string,
     vendorId: string,
     itemLines: Array<{ itemId: string; fulfilledQty: number; reason?: string }>,
     actorId?: string | null,
   ) {
+    return this.partialAccept(orderId, vendorId, itemLines, actorId);
+  }
+
+  /**
+   * Ship line quantities (backorder-safe). Creates OrderShipment, increments fulfilledQty,
+   * finalizes inventory for shipped qty, keeps order totals. Status → partially_delivered | delivered.
+   */
+  async shipLines(
+    orderId: string,
+    vendorId: string,
+    items: Array<{ itemId: string; shipQty: number }>,
+    actorId?: string | null,
+    notes?: string,
+  ) {
     return prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
-        where: { id: orderId, vendorId, status: { in: ['confirmed', 'processing', 'ready_for_dispatch'] } },
+        where: {
+          id: orderId,
+          vendorId,
+          status: {
+            in: ['pending', 'confirmed', 'processing', 'ready_for_dispatch', 'shipped', 'partially_delivered'],
+          },
+        },
         include: { items: true },
       });
-      if (!order) throw Errors.badRequest('Order cannot be amended in its current status');
+      if (!order) throw Errors.badRequest('Order cannot be shipped in its current status');
 
       const orderItemMap = new Map(order.items.map((i) => [i.id, i]));
-      for (const line of itemLines) {
+      const shipRows: Array<{ item: (typeof order.items)[0]; shipQty: number }> = [];
+
+      for (const line of items) {
         const item = orderItemMap.get(line.itemId);
         if (!item) throw Errors.badRequest(`Item ${line.itemId} does not belong to this order`);
-        if (line.fulfilledQty < 0 || line.fulfilledQty > item.quantity) {
-          throw Errors.badRequest(`Invalid quantity for "${item.productName}"`);
+        if (line.shipQty < 1) throw Errors.badRequest('Ship qty must be ≥ 1');
+        const balance = OrderService.lineBalance(item);
+        if (line.shipQty > balance) {
+          throw Errors.badRequest(
+            `Cannot ship ${line.shipQty} of "${item.productName}" — balance is ${balance}`,
+          );
         }
+        shipRows.push({ item, shipQty: line.shipQty });
       }
+      if (shipRows.length === 0) throw Errors.badRequest('At least one line to ship');
 
-      const fulfilledMap = new Map(itemLines.map((l) => [l.itemId, l.fulfilledQty]));
-      for (const item of order.items) {
-        if (!fulfilledMap.has(item.id)) fulfilledMap.set(item.id, item.fulfilledQty ?? item.quantity);
-      }
-
-      const totalFulfilled = Array.from(fulfilledMap.values()).reduce((s, q) => s + q, 0);
-      if (totalFulfilled === 0) throw Errors.badRequest('At least one item must remain on the order');
-
-      const prevReserved = order.items.map((i) => ({
-        productId: i.productId,
-        quantity: order.isPartial ? (i.fulfilledQty ?? i.quantity) : i.quantity,
-      }));
       const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
-      await this.inventoryService.releaseStock(prevReserved, fulfillOutlet, tx);
+      await this.inventoryService.finalizeStock(
+        shipRows.map((r) => ({ productId: r.item.productId, quantity: r.shipQty })),
+        fulfillOutlet,
+        tx,
+        actorId ?? undefined,
+      );
 
-      const toReserve = order.items
-        .map((i) => ({ productId: i.productId, quantity: fulfilledMap.get(i.id) ?? i.quantity }))
-        .filter((l) => l.quantity > 0);
-      await this.inventoryService.reserveStock(toReserve, fulfillOutlet, tx);
-
-      let newSubtotal = 0;
-      const lineEvents: Array<{
-        orderId: string;
-        actorId?: string | null;
-        action: string;
-        fromStatus?: string | null;
-        toStatus?: string | null;
-        payload?: Record<string, unknown> | null;
-      }> = [];
-
-      for (const item of order.items) {
-        const prevFulfilled = order.isPartial ? (item.fulfilledQty ?? item.quantity) : item.quantity;
-        const fulfilled = fulfilledMap.get(item.id) ?? item.quantity;
-        const itemTotal = Math.round(Number(item.totalPrice) * (fulfilled / item.quantity) * 100) / 100;
-        newSubtotal += itemTotal;
-        await tx.orderItem.update({ where: { id: item.id }, data: { fulfilledQty: fulfilled } });
-
-        if (fulfilled !== prevFulfilled) {
-          const reason = itemLines.find((l) => l.itemId === item.id)?.reason;
-          lineEvents.push({
-            orderId,
-            actorId,
-            action: fulfilled === 0 ? ORDER_EVENT_ACTIONS.ITEM_REJECTED : ORDER_EVENT_ACTIONS.ITEM_QTY_ADJUSTED,
-            fromStatus: order.status,
-            toStatus: order.status,
-            payload: {
-              itemId: item.id,
-              productName: item.productName,
-              orderedQty: item.quantity,
-              fromQty: prevFulfilled,
-              toQty: fulfilled,
-              ...(reason ? { reason } : {}),
-            },
-          });
-        }
+      for (const { item, shipQty } of shipRows) {
+        await tx.orderItem.update({
+          where: { id: item.id },
+          data: { fulfilledQty: item.fulfilledQty + shipQty },
+        });
       }
 
-      const isPartial = order.items.some((i) => (fulfilledMap.get(i.id) ?? i.quantity) < i.quantity);
-      const updated = await tx.order.update({
-        where: { id: orderId },
+      const lastShipment = await tx.orderShipment.findFirst({
+        where: { orderId },
+        orderBy: { shipmentNo: 'desc' },
+        select: { shipmentNo: true },
+      });
+      const shipmentNo = (lastShipment?.shipmentNo ?? 0) + 1;
+      const shipmentId = randomUUID();
+      await tx.orderShipment.create({
         data: {
-          isPartial,
-          subtotal: newSubtotal,
-          totalAmount: Math.max(0, newSubtotal - Number(order.promoDiscount) - Number(order.couponDiscount) - Number(order.walletApplied)),
+          id: shipmentId,
+          orderId,
+          shipmentNo,
+          actorId: actorId ?? null,
+          notes: notes ?? null,
+          items: {
+            create: shipRows.map((r) => ({
+              id: randomUUID(),
+              orderItemId: r.item.id,
+              qty: r.shipQty,
+            })),
+          },
         },
       });
 
-      if (lineEvents.length > 0) {
-        lineEvents.unshift({
+      const refreshed = await tx.orderItem.findMany({ where: { orderId } });
+      const anyBalance = refreshed.some((i) => OrderService.lineBalance(i) > 0);
+      const anyFulfilled = refreshed.some((i) => i.fulfilledQty > 0);
+      const fromStatus = order.status;
+      let toStatus: OrderStatus = order.status;
+      if (anyFulfilled && anyBalance) toStatus = 'partially_delivered';
+      else if (anyFulfilled && !anyBalance) toStatus = 'delivered';
+
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: toStatus,
+          isPartial: anyBalance && anyFulfilled,
+          acceptedAt: order.acceptedAt ?? new Date(),
+          ...(toStatus === 'delivered' ? { deliveredAt: new Date() } : {}),
+        },
+        include: {
+          items: true,
+          shipments: { include: { items: true }, orderBy: { shipmentNo: 'asc' } },
+        },
+      });
+
+      await recordOrderEvent(tx, {
+        orderId,
+        actorId,
+        action: ORDER_EVENT_ACTIONS.SHIPPED_LINES,
+        fromStatus,
+        toStatus,
+        payload: {
+          shipmentNo,
+          lines: shipRows.map((r) => ({
+            itemId: r.item.id,
+            productName: r.item.productName,
+            shipQty: r.shipQty,
+            orderedQty: r.item.quantity,
+          })),
+        },
+      });
+      if (anyBalance) {
+        await recordOrderEvent(tx, {
           orderId,
           actorId,
           action: ORDER_EVENT_ACTIONS.PARTIAL_FULFILMENT,
-          fromStatus: order.status,
-          toStatus: order.status,
-          payload: { subtotal: newSubtotal, mode: 'amend' },
+          fromStatus,
+          toStatus,
+          payload: { shipmentNo },
         });
-        await recordOrderEvents(tx, lineEvents);
       }
 
-      emitEvent('OrderConfirmed', { orderId, userId: updated.userId, vendorId });
+      return updated;
+    });
+  }
+
+  /** Cancel remaining balance on lines (never ship). Order totals unchanged. */
+  async cancelLineBalance(
+    orderId: string,
+    vendorId: string,
+    items: Array<{ itemId: string; cancelQty: number; reason?: string }>,
+    actorId?: string | null,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: {
+          id: orderId,
+          vendorId,
+          status: {
+            in: ['pending', 'confirmed', 'processing', 'ready_for_dispatch', 'partially_delivered'],
+          },
+        },
+        include: { items: true },
+      });
+      if (!order) throw Errors.badRequest('Order balance cannot be cancelled in its current status');
+
+      const orderItemMap = new Map(order.items.map((i) => [i.id, i]));
+      const cancelRows: Array<{ item: (typeof order.items)[0]; cancelQty: number; reason?: string }> = [];
+
+      for (const line of items) {
+        const item = orderItemMap.get(line.itemId);
+        if (!item) throw Errors.badRequest(`Item ${line.itemId} does not belong to this order`);
+        const balance = OrderService.lineBalance(item);
+        if (line.cancelQty < 1 || line.cancelQty > balance) {
+          throw Errors.badRequest(
+            `Cannot cancel ${line.cancelQty} of "${item.productName}" — balance is ${balance}`,
+          );
+        }
+        cancelRows.push({ item, cancelQty: line.cancelQty, reason: line.reason });
+      }
+
+      const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
+      await this.inventoryService.releaseStock(
+        cancelRows.map((r) => ({ productId: r.item.productId, quantity: r.cancelQty })),
+        fulfillOutlet,
+        tx,
+        actorId ?? undefined,
+      );
+
+      for (const { item, cancelQty } of cancelRows) {
+        await tx.orderItem.update({
+          where: { id: item.id },
+          data: { cancelledQty: (item.cancelledQty ?? 0) + cancelQty },
+        });
+      }
+
+      const refreshed = await tx.orderItem.findMany({ where: { orderId } });
+      const anyBalance = refreshed.some((i) => OrderService.lineBalance(i) > 0);
+      const anyFulfilled = refreshed.some((i) => i.fulfilledQty > 0);
+      const allCancelled = refreshed.every((i) => (i.cancelledQty ?? 0) >= i.quantity);
+      const fromStatus = order.status;
+      let toStatus: OrderStatus = order.status;
+      if (allCancelled) toStatus = 'cancelled';
+      else if (anyFulfilled && !anyBalance) toStatus = 'delivered';
+      else if (anyFulfilled && anyBalance) toStatus = 'partially_delivered';
+
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: toStatus,
+          isPartial: anyFulfilled && anyBalance,
+          ...(toStatus === 'cancelled'
+            ? { rejectedAt: new Date(), rejectionReason: cancelRows[0]?.reason ?? 'Line balance cancelled' }
+            : {}),
+          ...(toStatus === 'delivered' ? { deliveredAt: new Date() } : {}),
+        },
+        include: {
+          items: true,
+          shipments: { include: { items: true }, orderBy: { shipmentNo: 'asc' } },
+        },
+      });
+
+      await recordOrderEvents(
+        tx,
+        cancelRows.map((r) => ({
+          orderId,
+          actorId,
+          action: ORDER_EVENT_ACTIONS.BALANCE_CANCELLED,
+          fromStatus,
+          toStatus,
+          payload: {
+            itemId: r.item.id,
+            productName: r.item.productName,
+            cancelQty: r.cancelQty,
+            orderedQty: r.item.quantity,
+            ...(r.reason ? { reason: r.reason } : {}),
+          },
+        })),
+      );
+
       return updated;
     });
   }
 
   // Valid status transitions (Section 7):
-  // - Auto-accepted orders start as `pending` (cancel window / R12).
-  // - Cancel only from `pending` (vendor). Admin `force` may still jump.
+  // - Live orders start as `pending`; online payment often advances to `confirmed`.
+  // - Cancel window (R12 / customer cancel-request): pending + confirmed (before Packed).
   // - `pending → processing` allowed so Packed can skip optional Accepted step.
   private static readonly VALID_TRANSITIONS: Readonly<Record<string, string[]>> = {
     draft:               ['pending', 'cancelled'],
-    pending:             ['confirmed', 'processing', 'cancelled'],
-    confirmed:           ['processing'],
-    processing:          ['ready_for_dispatch', 'shipped'],
-    ready_for_dispatch:  ['shipped'],
+    pending:             ['confirmed', 'processing', 'partially_delivered', 'cancelled'],
+    confirmed:           ['processing', 'partially_delivered', 'delivered', 'shipped', 'cancelled'],
+    processing:          ['ready_for_dispatch', 'shipped', 'partially_delivered', 'delivered'],
+    ready_for_dispatch:  ['shipped', 'partially_delivered', 'delivered'],
     shipped:             ['delivered', 'partially_delivered'],
-    partially_delivered: ['delivered', 'returned'],
+    partially_delivered: ['delivered', 'returned', 'cancelled'],
     delivered:           ['returned'],
     returned:            [],
     cancelled:           [],
   };
+
+  /** Store / customer-cancel may cancel before packing starts. */
+  static isCancellableStatus(status: string): boolean {
+    return status === 'pending' || status === 'confirmed';
+  }
 
   async updateStatus(
     orderId: string,
@@ -1718,9 +1797,11 @@ export class OrderService {
         include: {
           items: {
             select: {
+              id: true,
               productId: true,
               quantity: true,
               fulfilledQty: true,
+              cancelledQty: true,
               // categoryId needed to resolve category-scoped commission rules
               // at delivery time. Tiny extra row; cheap to include.
               product: { select: { categoryId: true, brand: true } },
@@ -1730,10 +1811,10 @@ export class OrderService {
       });
       if (!order) throw Errors.notFound('Order');
 
-      // Rule 12 — Online Stores may cancel only while Pending (unless admin force).
-      if (status === 'cancelled' && !force && order.status !== 'pending') {
+      // Rule 12 — cancel only before packing (pending/confirmed). After Packed → Returns.
+      if (status === 'cancelled' && !force && !OrderService.isCancellableStatus(order.status)) {
         throw Errors.badRequest(
-          'Only Pending orders may be cancelled by the store. Processed orders should follow the Returns workflow.',
+          'Only Pending or Confirmed orders may be cancelled. Once packed, use the Returns workflow.',
         );
       }
       if (status === 'cancelled' && !reason?.trim()) {
@@ -1752,26 +1833,46 @@ export class OrderService {
         return order;
       }
 
-      // For a partially-accepted order, only the fulfilled quantity stayed
-      // reserved (the rest was released at accept time), so release/finalize
-      // must act on the fulfilled qty — not the original ordered qty — or
-      // inventory over-corrects. Non-partial orders use the ordered qty.
-      const effectiveLines = order.items.map(i => ({
-        productId: i.productId,
-        quantity: order.isPartial ? i.fulfilledQty : i.quantity,
-      })).filter(l => l.quantity > 0);
+      // Backorder: reserved remaining = ordered − fulfilled − cancelled.
+      // Fulfilled qty is already finalized incrementally via shipLines.
+      const remainingReserved = order.items
+        .map((i) => ({
+          productId: i.productId,
+          quantity: Math.max(0, i.quantity - (i.fulfilledQty ?? 0) - (i.cancelledQty ?? 0)),
+        }))
+        .filter((l) => l.quantity > 0);
 
-      // Inventory side-effects. Stock is only held in `qtyReserved` while the
-      // order is in one of these states; only then is it safe to release/finalize
-      // it (guards forced admin jumps from double-decrementing).
       const RESERVED_STATES = ['pending', 'confirmed', 'processing', 'ready_for_dispatch', 'shipped', 'partially_delivered'];
       const stockReserved = RESERVED_STATES.includes(order.status as string);
       const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
       if (status === 'cancelled' && stockReserved) {
-        await this.inventoryService.releaseStock(effectiveLines, fulfillOutlet, tx);
+        await this.inventoryService.releaseStock(remainingReserved, fulfillOutlet, tx);
       }
       if (status === 'delivered' && stockReserved) {
-        await this.inventoryService.finalizeStock(effectiveLines, fulfillOutlet, tx);
+        const shipmentCount = await tx.orderShipment.count({ where: { orderId } });
+        if (shipmentCount === 0) {
+          // Classic path — no incremental shipments; finalize remaining reserved / ordered.
+          const toFinalize = order.items
+            .map((i) => ({
+              productId: i.productId,
+              quantity: Math.max(0, i.quantity - (i.cancelledQty ?? 0)),
+            }))
+            .filter((l) => l.quantity > 0);
+          await this.inventoryService.finalizeStock(toFinalize, fulfillOutlet, tx);
+          for (const i of order.items) {
+            const target = Math.max(0, i.quantity - (i.cancelledQty ?? 0));
+            if (i.fulfilledQty !== target) {
+              await tx.orderItem.update({
+                where: { id: i.id },
+                data: { fulfilledQty: target },
+              });
+            }
+          }
+        }
+        // else: shipLines already finalized fulfilled qty; release any leftover reserved balance
+        else if (remainingReserved.length > 0) {
+          await this.inventoryService.releaseStock(remainingReserved, fulfillOutlet, tx);
+        }
       }
 
       // Timestamp fields

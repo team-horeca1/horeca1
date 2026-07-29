@@ -9,7 +9,14 @@ import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { OrderService } from '@/modules/order/order.service';
-import { updateStatusSchema, partialAcceptSchema, ewayBillSchema, updateDeliverySchema } from '@/modules/order/order.validator';
+import {
+  updateStatusSchema,
+  partialAcceptSchema,
+  shipLinesSchema,
+  cancelBalanceSchema,
+  ewayBillSchema,
+  updateDeliverySchema,
+} from '@/modules/order/order.validator';
 import { resolveVendorId, resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 
@@ -57,6 +64,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
             productName: true,
             quantity: true,
             fulfilledQty: true,
+            cancelledQty: true,
             unitPrice: true,
             totalPrice: true,
             product: {
@@ -98,6 +106,13 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
           },
         },
         cancelRequest: true,
+        shipments: {
+          orderBy: { shipmentNo: 'asc' },
+          include: {
+            items: { select: { orderItemId: true, qty: true } },
+            actor: { select: { id: true, fullName: true } },
+          },
+        },
       },
     });
 
@@ -120,8 +135,21 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       const substitutes = (prod?.substituteIds ?? [])
         .map((sid) => substituteProducts.find((s) => s.id === sid))
         .filter(Boolean);
+      const cancelledQty = item.cancelledQty ?? 0;
+      const balanceQty = Math.max(0, item.quantity - item.fulfilledQty - cancelledQty);
+      const lineStatus =
+        cancelledQty >= item.quantity
+          ? 'CANCELLED'
+          : balanceQty === 0 && item.fulfilledQty > 0
+            ? 'FULFILLED'
+            : item.fulfilledQty > 0 || cancelledQty > 0
+              ? 'PARTIALLY_FULFILLED'
+              : 'OPEN';
       return {
         ...item,
+        cancelledQty,
+        balanceQty,
+        lineStatus,
         stockAvailable,
         isLowStock: stockAvailable < item.quantity,
         substitutes,
@@ -177,7 +205,21 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
       return NextResponse.json({ success: true, data: updated });
     }
 
-    // Partial accept (pending) or post-confirm amend
+    // Ship lines (partial fulfillment / backorder)
+    if (body.action === 'ship') {
+      const { items, notes } = shipLinesSchema.parse(body);
+      const updated = await orderService.shipLines(orderId, vendorId, items, ctx.userId, notes);
+      return NextResponse.json({ success: true, data: updated });
+    }
+
+    // Cancel remaining balance on lines
+    if (body.action === 'cancel_balance') {
+      const { items } = cancelBalanceSchema.parse(body);
+      const updated = await orderService.cancelLineBalance(orderId, vendorId, items, ctx.userId);
+      return NextResponse.json({ success: true, data: updated });
+    }
+
+    // Legacy partial accept / amend → ship deltas (no reprice)
     if (Array.isArray(body.items)) {
       const { items } = partialAcceptSchema.parse(body);
       if (body.mode === 'amend') {

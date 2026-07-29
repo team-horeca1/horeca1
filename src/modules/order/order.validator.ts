@@ -96,6 +96,26 @@ export const partialAcceptSchema = z.object({
   })).min(1, 'At least one item line is required'),
 });
 
+/** Ship qty on this action (increments fulfilledQty; creates a shipment). */
+export const shipLinesSchema = z.object({
+  action: z.literal('ship'),
+  items: z.array(z.object({
+    itemId: z.string().uuid(),
+    shipQty: z.number().int().positive(),
+  })).min(1, 'At least one line to ship'),
+  notes: z.string().max(500).optional(),
+});
+
+/** Cancel remaining balance (will never ship). Full-order billing totals stay. */
+export const cancelBalanceSchema = z.object({
+  action: z.literal('cancel_balance'),
+  items: z.array(z.object({
+    itemId: z.string().uuid(),
+    cancelQty: z.number().int().positive(),
+    reason: z.string().min(1).max(500).optional(),
+  })).min(1, 'At least one line to cancel'),
+});
+
 export const saveAsListSchema = z.object({
   listName: z.string().min(1),
 });
