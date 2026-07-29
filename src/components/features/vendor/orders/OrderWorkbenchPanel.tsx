@@ -23,6 +23,7 @@ import {
   formatWorkbenchPrice,
   nextWorkbenchStatus,
   WORKBENCH_EVENT_LABELS,
+  WORKBENCH_LINE_STATUS_LABELS,
   WORKBENCH_STATUS_LABELS,
   type WorkbenchOrder,
 } from './types';
@@ -44,10 +45,19 @@ export function OrderWorkbenchPanel({
   const [order, setOrder] = useState<WorkbenchOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [fulfilledQtys, setFulfilledQtys] = useState<Record<string, number>>({});
-  const [rejectReasons, setRejectReasons] = useState<Record<string, string>>({});
+  /** This-shipment qty per line (not cumulative). */
+  const [shipQtys, setShipQtys] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [activityTab, setActivityTab] = useState(false);
+
+  const lineBalance = (item: {
+    quantity: number;
+    fulfilledQty: number;
+    cancelledQty?: number;
+    balanceQty?: number;
+  }) =>
+    item.balanceQty ??
+    Math.max(0, item.quantity - (item.fulfilledQty ?? 0) - (item.cancelledQty ?? 0));
 
   const fetchOrder = useCallback(async () => {
     setLoading(true);
@@ -61,10 +71,10 @@ export function OrderWorkbenchPanel({
       onOrderLoaded?.(data);
       const init: Record<string, number> = {};
       for (const item of data.items) {
-        init[item.id] = item.fulfilledQty ?? item.quantity;
+        const bal = lineBalance(item);
+        init[item.id] = bal > 0 ? bal : 0;
       }
-      setFulfilledQtys(init);
-      setRejectReasons({});
+      setShipQtys(init);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load');
       setOrder(null);
@@ -82,70 +92,88 @@ export function OrderWorkbenchPanel({
     onChanged?.();
   };
 
-  const isPartialDirty =
+  const canShip =
     !!order &&
-    order.status === 'pending' &&
+    ['pending', 'confirmed', 'processing', 'ready_for_dispatch', 'shipped', 'partially_delivered'].includes(
+      order.status,
+    ) &&
+    order.items.some((i) => lineBalance(i) > 0);
+
+  const shipDirty =
+    !!order &&
     order.items.some((item) => {
-      const current = item.fulfilledQty > 0 ? item.fulfilledQty : item.quantity;
-      return (fulfilledQtys[item.id] ?? current) !== current;
+      const bal = lineBalance(item);
+      const q = shipQtys[item.id] ?? 0;
+      return q > 0 && q <= bal;
     });
 
-  const isAmendDirty =
-    !!order &&
-    ['confirmed', 'processing', 'ready_for_dispatch'].includes(order.status) &&
-    order.items.some(
-      (item) =>
-        (fulfilledQtys[item.id] ?? item.fulfilledQty ?? item.quantity) !==
-        (item.fulfilledQty ?? item.quantity),
-    );
-
-  const canEditQty =
-    !!order && ['pending', 'confirmed', 'processing', 'ready_for_dispatch'].includes(order.status);
-
-  const setQty = (itemId: string, next: number, max: number) => {
-    setFulfilledQtys((prev) => ({
+  const setShipQty = (itemId: string, next: number, max: number) => {
+    setShipQtys((prev) => ({
       ...prev,
       [itemId]: Math.max(0, Math.min(max, next)),
     }));
   };
 
-  const saveAdjustments = async () => {
+  const shipSelected = async () => {
     if (!order) return;
-    const zeroWithoutReason = order.items.filter((item) => {
-      const q = fulfilledQtys[item.id] ?? item.quantity;
-      return q === 0 && !(rejectReasons[item.id]?.trim());
-    });
-    if (zeroWithoutReason.length > 0) {
-      toast.error('Enter a rejection reason for each line set to quantity 0.');
+    const items = order.items
+      .map((item) => ({
+        itemId: item.id,
+        shipQty: shipQtys[item.id] ?? 0,
+        bal: lineBalance(item),
+      }))
+      .filter((r) => r.shipQty > 0 && r.shipQty <= r.bal)
+      .map(({ itemId, shipQty }) => ({ itemId, shipQty }));
+    if (items.length === 0) {
+      toast.error('Enter a fulfillment qty greater than 0 on at least one line.');
       return;
     }
     setBusy(true);
     try {
-      const items = order.items.map((item) => ({
-        itemId: item.id,
-        fulfilledQty: fulfilledQtys[item.id] ?? item.quantity,
-        ...(fulfilledQtys[item.id] === 0 && rejectReasons[item.id]
-          ? { reason: rejectReasons[item.id].trim() }
-          : {}),
-      }));
-      const isAmend = order.status !== 'pending';
       const res = await fetch(`/api/v1/vendor/orders/${orderId}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items, ...(isAmend ? { mode: 'amend' } : {}) }),
+        body: JSON.stringify({ action: 'ship', items }),
       });
       const json = await res.json();
-      if (!json.success) throw new Error(json.error?.message || 'Save failed');
-      toast.success(
-        isAmend
-          ? 'Order quantities updated.'
-          : 'Quantity adjustments saved. Order remains Pending until you advance status.',
-      );
+      if (!json.success) throw new Error(json.error?.message || 'Ship failed');
+      toast.success('Shipment saved. Remaining qty stays as balance to fulfill.');
       await fetchOrder();
       notifyChanged();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Save failed');
+      toast.error(err instanceof Error ? err.message : 'Ship failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancelLineBalance = async (itemId: string) => {
+    if (!order) return;
+    const item = order.items.find((i) => i.id === itemId);
+    if (!item) return;
+    const bal = lineBalance(item);
+    if (bal <= 0) return;
+    const reason = window.prompt(`Cancel remaining ${bal} unit(s) of "${item.productName}"? Enter reason:`);
+    if (!reason || reason.trim().length < 2) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/v1/vendor/orders/${orderId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'cancel_balance',
+          items: [{ itemId, cancelQty: bal, reason: reason.trim() }],
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'Cancel failed');
+      toast.success('Balance cancelled for this line.');
+      await fetchOrder();
+      notifyChanged();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Cancel failed');
     } finally {
       setBusy(false);
     }
@@ -396,44 +424,69 @@ export function OrderWorkbenchPanel({
         </div>
       </div>
 
-      {/* Lines */}
+      {/* Lines — backorder fulfillment */}
       <div className="rounded-[14px] border border-[#EEEEEE] bg-white overflow-hidden" data-testid="workbench-lines">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#EEEEEE] bg-white px-4 py-3">
-          <h3 className="text-[14px] font-bold text-[#181725]">Line items</h3>
-          {(isPartialDirty || isAmendDirty) && (
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#EEEEEE] bg-white px-4 py-3 gap-2">
+          <div>
+            <h3 className="text-[14px] font-bold text-[#181725]">Line items</h3>
+            <p className="text-[11px] text-[#AEAEAE]">
+              Ordered qty is fixed. Ship what you have now — balance stays open for later.
+            </p>
+          </div>
+          {canShip && shipDirty && (
             <button
               type="button"
               disabled={busy}
-              data-testid="workbench-save-qty"
-              onClick={() => void saveAdjustments()}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-[#299E60] px-3 text-[12px] font-bold text-white disabled:opacity-50"
+              data-testid="workbench-ship-qty"
+              onClick={() => void shipSelected()}
+              className="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-[#299E60] px-3 text-[12px] font-bold text-white disabled:opacity-50 shrink-0"
             >
-              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              Save Quantity Adjustments
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              Ship fulfillment qty
             </button>
           )}
         </div>
         <ul className="divide-y divide-[#F5F5F5]">
           {order.items.map((item) => {
-            const fulfilled = canEditQty
-              ? (fulfilledQtys[item.id] ?? item.fulfilledQty ?? item.quantity)
-              : item.fulfilledQty;
-            const showReject = canEditQty && fulfilled === 0;
+            const bal = lineBalance(item);
+            const shipQty = shipQtys[item.id] ?? 0;
+            const remainingAfter = Math.max(0, bal - shipQty);
+            const lineStatus = item.lineStatus ?? (bal === 0 && item.fulfilledQty > 0 ? 'FULFILLED' : bal < item.quantity ? 'PARTIALLY_FULFILLED' : 'OPEN');
             return (
               <li key={item.id} className="px-4 py-3" data-testid={`workbench-line-${item.id}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-bold text-[#181725]">{item.productName}</p>
-                    <p className="text-[11px] text-[#AEAEAE]">
-                      Ordered {item.quantity}
-                      {item.product?.unit ? ` ${item.product.unit}` : ''}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[13px] font-bold text-[#181725]">{item.productName}</p>
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-[10px] font-bold',
+                          lineStatus === 'FULFILLED' && 'bg-green-50 text-green-700',
+                          lineStatus === 'PARTIALLY_FULFILLED' && 'bg-amber-50 text-amber-800',
+                          lineStatus === 'CANCELLED' && 'bg-red-50 text-red-600',
+                          lineStatus === 'OPEN' && 'bg-gray-50 text-gray-600',
+                        )}
+                      >
+                        {WORKBENCH_LINE_STATUS_LABELS[lineStatus] ?? lineStatus}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-[#7C7C7C]">
+                      Ordered <span className="font-semibold text-[#181725]">{item.quantity}</span>
+                      {' · '}Fulfilled <span className="font-semibold text-[#181725]">{item.fulfilledQty}</span>
+                      {' · '}Balance <span className="font-semibold text-amber-700">{bal}</span>
+                      {(item.cancelledQty ?? 0) > 0 && (
+                        <>
+                          {' · '}Cancelled{' '}
+                          <span className="font-semibold text-red-600">{item.cancelledQty}</span>
+                        </>
+                      )}
                       {typeof item.stockAvailable === 'number' && (
                         <span className={item.isLowStock ? ' text-amber-700 font-semibold' : ''}>
-                          {' '}· Stock {item.stockAvailable}
+                          {' '}· Available {item.stockAvailable}
                         </span>
                       )}
                     </p>
-                    {canEditQty && item.isLowStock && (
+                    {canShip && bal > 0 && item.isLowStock && (
                       <div className="mt-2 rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
                         <p className="font-semibold">Low stock — only {item.stockAvailable} available</p>
                         <div className="mt-1.5 flex flex-wrap gap-2">
@@ -441,14 +494,14 @@ export function OrderWorkbenchPanel({
                             type="button"
                             className="rounded-lg bg-white px-2 py-1 text-[11px] font-bold border border-amber-200"
                             onClick={() =>
-                              setQty(
+                              setShipQty(
                                 item.id,
-                                Math.min(item.stockAvailable ?? 0, item.quantity),
-                                item.quantity,
+                                Math.min(item.stockAvailable ?? 0, bal),
+                                bal,
                               )
                             }
                           >
-                            Accept {Math.min(item.stockAvailable ?? 0, item.quantity)} only
+                            Ship {Math.min(item.stockAvailable ?? 0, bal)} now
                           </button>
                           {(item.substitutes ?? []).map((s) => (
                             <button
@@ -465,56 +518,60 @@ export function OrderWorkbenchPanel({
                         </div>
                       </div>
                     )}
-                    {showReject && (
-                      <input
-                        type="text"
-                        value={rejectReasons[item.id] ?? ''}
-                        onChange={(e) =>
-                          setRejectReasons((prev) => ({ ...prev, [item.id]: e.target.value }))
-                        }
-                        placeholder="Rejection reason (required)"
-                        data-testid={`reject-reason-desk-${item.id}`}
-                        className="mt-2 w-full max-w-md rounded-[8px] border border-red-200 px-2.5 py-1.5 text-[12px] outline-none focus:border-red-400"
-                      />
+                    {canShip && bal > 0 && (
+                      <p className="mt-1 text-[11px] text-[#AEAEAE]">
+                        Remaining after this shipment: <span className="font-semibold text-[#181725]">{remainingAfter}</span>
+                      </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    {canEditQty ? (
-                      <div className="flex items-center gap-1 rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] p-0.5">
+                  <div className="flex flex-col items-end gap-2">
+                    {canShip && bal > 0 ? (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-semibold text-[#7C7C7C]">Fulfill</span>
+                          <div className="flex items-center gap-1 rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] p-0.5">
+                            <button
+                              type="button"
+                              aria-label="Decrease ship qty"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white"
+                              onClick={() => setShipQty(item.id, shipQty - 1, bal)}
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                            </button>
+                            <input
+                              type="number"
+                              min={0}
+                              max={bal}
+                              value={shipQty}
+                              onChange={(e) => setShipQty(item.id, Number(e.target.value) || 0, bal)}
+                              className="w-12 border-0 bg-transparent text-center text-[13px] font-bold outline-none"
+                            />
+                            <button
+                              type="button"
+                              aria-label="Increase ship qty"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white"
+                              onClick={() => setShipQty(item.id, shipQty + 1, bal)}
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
                         <button
                           type="button"
-                          aria-label="Decrease qty"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white"
-                          onClick={() => setQty(item.id, fulfilled - 1, item.quantity)}
+                          disabled={busy}
+                          onClick={() => void cancelLineBalance(item.id)}
+                          className="text-[11px] font-bold text-red-600 hover:underline disabled:opacity-50"
                         >
-                          <Minus className="h-3.5 w-3.5" />
+                          Cancel remaining {bal}
                         </button>
-                        <input
-                          type="number"
-                          min={0}
-                          max={item.quantity}
-                          value={fulfilled}
-                          onChange={(e) =>
-                            setQty(item.id, Number(e.target.value) || 0, item.quantity)
-                          }
-                          className="w-12 border-0 bg-transparent text-center text-[13px] font-bold outline-none"
-                        />
-                        <button
-                          type="button"
-                          aria-label="Increase qty"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-white"
-                          onClick={() => setQty(item.id, fulfilled + 1, item.quantity)}
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                      </>
                     ) : (
                       <span className="text-[13px] font-bold tabular-nums text-[#181725]">
-                        {fulfilled}/{item.quantity}
+                        {item.fulfilledQty}/{item.quantity}
                       </span>
                     )}
-                    <span className="min-w-[4.5rem] text-right text-[13px] font-semibold tabular-nums text-[#181725]">
-                      {formatWorkbenchPrice(Number(item.unitPrice) * fulfilled)}
+                    <span className="min-w-[4.5rem] text-right text-[12px] font-semibold tabular-nums text-[#7C7C7C]">
+                      {formatWorkbenchPrice(Number(item.totalPrice))}
                     </span>
                   </div>
                 </div>
@@ -523,6 +580,32 @@ export function OrderWorkbenchPanel({
           })}
         </ul>
       </div>
+
+      {/* Shipment history */}
+      {(order.shipments?.length ?? 0) > 0 && (
+        <div className="rounded-[14px] border border-[#EEEEEE] bg-white p-4" data-testid="shipment-history">
+          <h3 className="text-[14px] font-bold text-[#181725]">Shipment history</h3>
+          <ul className="mt-3 space-y-3">
+            {order.shipments!.map((s) => (
+              <li key={s.id} className="rounded-[10px] border border-[#F0F0F0] bg-[#FAFAFA] px-3 py-2">
+                <p className="text-[13px] font-bold text-[#181725]">
+                  Shipment {s.shipmentNo}
+                  <span className="ml-2 text-[11px] font-medium text-[#AEAEAE]">
+                    {formatWorkbenchDateTime(s.createdAt)}
+                    {s.actor?.fullName ? ` · ${s.actor.fullName}` : ''}
+                  </span>
+                </p>
+                <p className="mt-1 text-[12px] text-[#7C7C7C]">
+                  {s.items.map((li) => {
+                    const name = order.items.find((i) => i.id === li.orderItemId)?.productName ?? 'Item';
+                    return `${name}: ${li.qty}`;
+                  }).join(' · ')}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Actions row */}
       {order.status === 'pending' && (

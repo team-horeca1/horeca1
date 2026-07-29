@@ -20,6 +20,9 @@ export interface WorkbenchItem {
   productName: string;
   quantity: number;
   fulfilledQty: number;
+  cancelledQty?: number;
+  balanceQty?: number;
+  lineStatus?: 'OPEN' | 'PARTIALLY_FULFILLED' | 'FULFILLED' | 'CANCELLED';
   unitPrice: number;
   totalPrice: number;
   stockAvailable?: number;
@@ -31,6 +34,15 @@ export interface WorkbenchItem {
     unit: string | null;
     packSize: string | null;
   } | null;
+}
+
+export interface WorkbenchShipment {
+  id: string;
+  shipmentNo: number;
+  createdAt: string;
+  notes?: string | null;
+  actor?: { id: string; fullName: string } | null;
+  items: Array<{ orderItemId: string; qty: number }>;
 }
 
 export interface WorkbenchEvent {
@@ -64,6 +76,7 @@ export interface WorkbenchOrder {
   deliveryAddressSnapshot: Record<string, unknown> | null;
   user: WorkbenchUser;
   items: WorkbenchItem[];
+  shipments?: WorkbenchShipment[];
   events?: WorkbenchEvent[];
   cancelRequest?: WorkbenchCancelRequest | null;
   attentionReasons?: string[];
@@ -76,10 +89,17 @@ export const WORKBENCH_STATUS_LABELS: Record<string, string> = {
   processing: 'Packed',
   ready_for_dispatch: 'Ready for Dispatch',
   shipped: 'Dispatched',
-  partially_delivered: 'Partially Delivered',
-  delivered: 'Delivered',
+  partially_delivered: 'Partially Fulfilled',
+  delivered: 'Completed',
   returned: 'Returned',
   cancelled: 'Cancelled',
+};
+
+export const WORKBENCH_LINE_STATUS_LABELS: Record<string, string> = {
+  OPEN: 'Open',
+  PARTIALLY_FULFILLED: 'Partially Fulfilled',
+  FULFILLED: 'Fulfilled',
+  CANCELLED: 'Cancelled',
 };
 
 export const WORKBENCH_EVENT_LABELS: Record<string, string> = {
@@ -90,6 +110,8 @@ export const WORKBENCH_EVENT_LABELS: Record<string, string> = {
   'item.rejected': 'Item rejected',
   'item.substituted': 'Item substituted',
   'order.partial_fulfilment': 'Partial fulfilment',
+  'order.shipped_lines': 'Shipment created',
+  'order.balance_cancelled': 'Balance cancelled',
   'order.cancelled': 'Order cancelled',
   'cancel.requested': 'Cancellation requested',
   'cancel.approved': 'Cancellation approved',
@@ -129,6 +151,8 @@ export function nextWorkbenchStatus(status: string): { status: string; label: st
       return { status: 'shipped', label: 'Mark as Dispatched' };
     case 'shipped':
       return { status: 'delivered', label: 'Confirm Delivered' };
+    case 'partially_delivered':
+      return { status: 'delivered', label: 'Mark Completed' };
     default:
       return null;
   }

@@ -36,6 +36,8 @@ interface OrderItem {
     productName: string;
     quantity: number;
     fulfilledQty: number;
+    cancelledQty?: number;
+    balanceQty?: number;
     unitPrice: number;
     totalPrice: number;
     stockAvailable?: number;
@@ -49,6 +51,11 @@ interface OrderItem {
         packSize: string | null;
         taxPercent: number;
     };
+}
+
+function itemBalance(item: OrderItem): number {
+    if (typeof item.balanceQty === 'number') return item.balanceQty;
+    return Math.max(0, item.quantity - (item.fulfilledQty ?? 0) - (item.cancelledQty ?? 0));
 }
 
 interface OrderPayment {
@@ -128,8 +135,8 @@ const STATUS_LABELS: Record<string, string> = {
     processing: 'Packed',
     ready_for_dispatch: 'Ready for Dispatch',
     shipped: 'Dispatched',
-    partially_delivered: 'Partially Delivered',
-    delivered: 'Delivered',
+    partially_delivered: 'Partially Fulfilled',
+    delivered: 'Completed',
     returned: 'Returned',
     cancelled: 'Cancelled',
 };
@@ -392,13 +399,13 @@ function StatusTimeline({
 
 // ─── ActionPanel ──────────────────────────────────────────────────────────────
 
-function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onAction, onAccept }: {
+function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShip }: {
     order: OrderData;
-    fulfilledQtys: Record<string, number>;
-    adjustedTotal: number;
-    isPartialAccept: boolean;
+    shipQtys: Record<string, number>;
+    shipDirty: boolean;
+    totalBalance: number;
     onAction: (status: string, reason?: string, proof?: { proofType?: string; proofUrl?: string; notes?: string }) => Promise<void>;
-    onAccept: (qtys: Record<string, number>) => Promise<void>;
+    onShip: (qtys: Record<string, number>) => Promise<void>;
 }) {
     const [rejecting, setRejecting] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
@@ -414,9 +421,9 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
         try { await onAction(status, reason, proof); }
         finally { setBusy(false); }
     };
-    const runAccept = async () => {
+    const runShip = async () => {
         setBusy(true);
-        try { await onAccept(fulfilledQtys); }
+        try { await onShip(shipQtys); }
         finally { setBusy(false); }
     };
 
@@ -424,18 +431,13 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
 
     if (order.status === 'delivered' || order.status === 'cancelled') return null;
 
+    const shipTotal = order.items.reduce((s, i) => s + (shipQtys[i.id] ?? 0), 0);
     const hint =
-        order.status === 'pending'
-            ? (isPartialAccept
-                ? 'Save quantity adjustments (order stays Pending until you advance status). Cancel is still allowed.'
-                : 'Auto-accepted on place. Adjust quantities, then Mark as Accepted or Packed. Cancel only while Pending.')
-            : order.status === 'confirmed' || order.status === 'processing'
-                ? 'Adjust quantities if needed, then advance fulfilment.'
-                : order.status === 'shipped'
-                    ? 'Confirm full or partial delivery with optional proof.'
-                    : order.status === 'partially_delivered'
-                        ? 'Complete remaining delivery when balance arrives.'
-                        : 'Confirm delivery once the customer has received the goods.';
+        order.status === 'partially_delivered'
+            ? totalBalance > 0
+                ? `Balance left: ${totalBalance}. Enter Ship qty below and click “Ship this qty now” when stock arrives. Bill stays for full ordered qty.`
+                : 'All lines fulfilled — mark Completed when customer has received goods.'
+            : 'Enter how many you can send now (Ship qty), then Ship. Remaining stays as Balance for later. Invoice stays for full order.';
 
     return (
         <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
@@ -445,15 +447,25 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
             </div>
             <div className="p-6">
 
-                {/* Partial accept summary banner */}
-                {order.status === 'pending' && isPartialAccept && (
+                {shipDirty && (
+                    <div className="mb-4 p-3 rounded-[10px] bg-[#EEF8F1] border border-[#299E60]/30 flex items-start gap-2.5">
+                        <Info size={16} className="text-[#299E60] shrink-0 mt-0.5" />
+                        <div className="text-[12px]">
+                            <p className="font-bold text-[#181725]">Ship {shipTotal} unit(s) now</p>
+                            <p className="text-[#7C7C7C]">
+                                Remaining qty stays on the order as Balance (backorder). Grand total stays{' '}
+                                <span className="font-bold text-[#181725]">{formatPrice(Number(order.totalAmount))}</span>.
+                            </p>
+                        </div>
+                    </div>
+                )}
+                {order.status === 'partially_delivered' && totalBalance > 0 && !shipDirty && (
                     <div className="mb-4 p-3 rounded-[10px] bg-[#FFF4E5] border border-[#F59E0B]/30 flex items-start gap-2.5">
                         <Info size={16} className="text-[#F59E0B] shrink-0 mt-0.5" />
                         <div className="text-[12px]">
-                            <p className="font-bold text-[#976538]">Partial Fulfilment</p>
+                            <p className="font-bold text-[#976538]">Partially Fulfilled — {totalBalance} still to send</p>
                             <p className="text-[#7C7C7C]">
-                                You&apos;ve reduced quantities on some items. The customer will be notified.
-                                Adjusted order value: <span className="font-bold text-[#181725]">{formatPrice(adjustedTotal)}</span>
+                                Set Ship qty in the product table, then click “Ship this qty now”. Do not use Complete until balance is 0.
                             </p>
                         </div>
                     </div>
@@ -496,15 +508,15 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
                     </div>
                 ) : (
                     <div className="flex flex-wrap gap-3">
-                        {/* Pending: save qty adjustments (no approval gate) */}
-                        {order.status === 'pending' && isPartialAccept && (
+                        {shipDirty && (
                             <button
-                                onClick={runAccept}
+                                onClick={() => void runShip()}
                                 disabled={busy}
+                                data-testid="ship-qty-now"
                                 className="h-[48px] px-8 rounded-[12px] bg-[#299E60] text-white text-[15px] font-bold hover:bg-[#238a54] transition-all shadow-sm flex items-center gap-2 disabled:opacity-60"
                             >
-                                {busy ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-                                Save Quantity Adjustments
+                                {busy ? <Loader2 size={18} className="animate-spin" /> : <Truck size={18} />}
+                                Ship this qty now
                             </button>
                         )}
                         {order.status === 'pending' && (
@@ -517,7 +529,6 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
                                 Mark as Accepted
                             </button>
                         )}
-                        {/* Mark as Packed from pending or accepted */}
                         {(order.status === 'pending' || order.status === 'confirmed') && (
                             <button
                                 onClick={() => run('processing')}
@@ -528,7 +539,6 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
                                 Mark as Packed
                             </button>
                         )}
-                        {/* Ready for Dispatch */}
                         {order.status === 'processing' && (
                             <button
                                 onClick={() => run('ready_for_dispatch')}
@@ -538,7 +548,6 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
                                 Ready for Dispatch
                             </button>
                         )}
-                        {/* Mark as Dispatched */}
                         {(order.status === 'processing' || order.status === 'ready_for_dispatch') && (
                             <button
                                 onClick={() => run('shipped')}
@@ -549,107 +558,88 @@ function ActionPanel({ order, fulfilledQtys, adjustedTotal, isPartialAccept, onA
                                 Mark as Dispatched
                             </button>
                         )}
-                        {/* Confirm Delivery (shipped) — opens proof modal */}
                         {order.status === 'shipped' && (
-                            <>
-                                <button
-                                    onClick={() => setShowProofModal(true)}
-                                    disabled={busy}
-                                    className="h-[48px] px-8 rounded-[12px] bg-[#299E60] text-white text-[15px] font-bold hover:bg-[#238a54] transition-all shadow-sm flex items-center gap-2 disabled:opacity-60"
-                                >
-                                    {busy ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-                                    Confirm Delivery
-                                </button>
-                                <button
-                                    onClick={() => run('partially_delivered')}
-                                    disabled={busy}
-                                    className="h-[48px] px-6 rounded-[12px] border border-[#F59E0B] text-[#976538] text-[14px] font-bold hover:bg-[#FFF4E5] flex items-center gap-2 disabled:opacity-60"
-                                >
-                                    Partial Delivery
-                                </button>
-                                {showProofModal && (
-                                    <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                                        <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-[420px]">
-                                            <div className="px-6 py-4 border-b border-[#F5F5F5]">
-                                                <p className="text-[15px] font-bold text-[#181725]">Delivery Proof</p>
-                                                <p className="text-[12px] text-[#AEAEAE]">Optional — record how delivery was confirmed</p>
-                                            </div>
-                                            <div className="p-6 space-y-4">
-                                                <div>
-                                                    <p className="text-[11px] font-bold text-[#7C7C7C] uppercase mb-2">Proof Type</p>
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        {(['none', 'otp', 'photo', 'notes'] as const).map(t => (
-                                                            <button key={t} onClick={() => setProofType(t)}
-                                                                className={cn('py-2.5 rounded-[10px] border text-[12px] font-semibold transition-colors',
-                                                                    proofType === t ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]' : 'border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5]')}>
-                                                                {t === 'none' ? 'No Proof' : t === 'otp' ? 'OTP Verified' : t === 'photo' ? 'Photo Taken' : 'Notes Only'}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                                {(proofType === 'notes' || proofType === 'otp') && (
-                                                    <div>
-                                                        <label className="block text-[11px] font-bold text-[#7C7C7C] uppercase mb-1">
-                                                            {proofType === 'otp' ? 'OTP Code / Reference' : 'Delivery Notes'}
-                                                        </label>
-                                                        <input type="text" value={proofNotes} onChange={e => setProofNotes(e.target.value)}
-                                                            placeholder={proofType === 'otp' ? 'Enter OTP used' : 'e.g. Left at reception'}
-                                                            className="w-full h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/50" />
-                                                    </div>
-                                                )}
-                                                {proofType === 'photo' && (
-                                                    <div>
-                                                        <label className="block text-[11px] font-bold text-[#7C7C7C] uppercase mb-1">Photo URL (ImageKit)</label>
-                                                        <input type="url" value={proofUrl} onChange={e => setProofUrl(e.target.value)}
-                                                            placeholder="https://..."
-                                                            className="w-full h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/50" />
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="px-6 py-4 border-t border-[#F5F5F5] flex gap-3 justify-end">
-                                                <button onClick={() => setShowProofModal(false)}
-                                                    className="h-[38px] px-4 rounded-[10px] border border-[#EEEEEE] text-[13px] text-[#7C7C7C] hover:bg-[#F5F5F5]">
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setShowProofModal(false);
-                                                        run('delivered', undefined, {
-                                                            proofType: proofType !== 'none' ? proofType : undefined,
-                                                            proofUrl: proofUrl.trim() || undefined,
-                                                            notes: proofNotes.trim() || undefined,
-                                                        });
-                                                    }}
-                                                    disabled={busy}
-                                                    className="h-[38px] px-5 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] disabled:opacity-50 flex items-center gap-2">
-                                                    {busy && <Loader2 size={12} className="animate-spin" />}
-                                                    Confirm Delivery
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </>
+                            <button
+                                onClick={() => setShowProofModal(true)}
+                                disabled={busy}
+                                className="h-[48px] px-8 rounded-[12px] bg-[#299E60] text-white text-[15px] font-bold hover:bg-[#238a54] transition-all shadow-sm flex items-center gap-2 disabled:opacity-60"
+                            >
+                                {busy ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                                Confirm Delivery
+                            </button>
                         )}
-                        {order.status === 'partially_delivered' && (
+                        {/* Only complete when no balance left */}
+                        {order.status === 'partially_delivered' && totalBalance === 0 && (
                             <button
                                 onClick={() => setShowProofModal(true)}
                                 disabled={busy}
                                 className="h-[48px] px-8 rounded-[12px] bg-[#299E60] text-white text-[15px] font-bold hover:bg-[#238a54] flex items-center gap-2 disabled:opacity-60"
                             >
-                                Complete Delivery
+                                Mark Completed
                             </button>
                         )}
-                        {['confirmed', 'processing', 'ready_for_dispatch'].includes(order.status) && (
-                            <button
-                                onClick={runAccept}
-                                disabled={busy}
-                                className="h-[48px] px-6 rounded-[12px] border border-[#4F46E5] text-[#4F46E5] text-[14px] font-bold hover:bg-indigo-50 flex items-center gap-2 disabled:opacity-60"
-                            >
-                                Save Quantity Changes
-                            </button>
+                        {showProofModal && (
+                            <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                                <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-[420px]">
+                                    <div className="px-6 py-4 border-b border-[#F5F5F5]">
+                                        <p className="text-[15px] font-bold text-[#181725]">Delivery Proof</p>
+                                        <p className="text-[12px] text-[#AEAEAE]">Optional — record how delivery was confirmed</p>
+                                    </div>
+                                    <div className="p-6 space-y-4">
+                                        <div>
+                                            <p className="text-[11px] font-bold text-[#7C7C7C] uppercase mb-2">Proof Type</p>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {(['none', 'otp', 'photo', 'notes'] as const).map(t => (
+                                                    <button key={t} onClick={() => setProofType(t)}
+                                                        className={cn('py-2.5 rounded-[10px] border text-[12px] font-semibold transition-colors',
+                                                            proofType === t ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]' : 'border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5]')}>
+                                                        {t === 'none' ? 'No Proof' : t === 'otp' ? 'OTP Verified' : t === 'photo' ? 'Photo Taken' : 'Notes Only'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        {(proofType === 'notes' || proofType === 'otp') && (
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-[#7C7C7C] uppercase mb-1">
+                                                    {proofType === 'otp' ? 'OTP Code / Reference' : 'Delivery Notes'}
+                                                </label>
+                                                <input type="text" value={proofNotes} onChange={e => setProofNotes(e.target.value)}
+                                                    placeholder={proofType === 'otp' ? 'Enter OTP used' : 'e.g. Left at reception'}
+                                                    className="w-full h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/50" />
+                                            </div>
+                                        )}
+                                        {proofType === 'photo' && (
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-[#7C7C7C] uppercase mb-1">Photo URL (ImageKit)</label>
+                                                <input type="url" value={proofUrl} onChange={e => setProofUrl(e.target.value)}
+                                                    placeholder="https://..."
+                                                    className="w-full h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/50" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="px-6 py-4 border-t border-[#F5F5F5] flex gap-3 justify-end">
+                                        <button onClick={() => setShowProofModal(false)}
+                                            className="h-[38px] px-4 rounded-[10px] border border-[#EEEEEE] text-[13px] text-[#7C7C7C] hover:bg-[#F5F5F5]">
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setShowProofModal(false);
+                                                run('delivered', undefined, {
+                                                    proofType: proofType !== 'none' ? proofType : undefined,
+                                                    proofUrl: proofUrl.trim() || undefined,
+                                                    notes: proofNotes.trim() || undefined,
+                                                });
+                                            }}
+                                            disabled={busy}
+                                            className="h-[38px] px-5 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] disabled:opacity-50 flex items-center gap-2">
+                                            {busy && <Loader2 size={12} className="animate-spin" />}
+                                            Confirm
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         )}
-                        {/* Reject / Cancel — Rule 12: pending only */}
                         {order.status === 'pending' && (
                             <button
                                 onClick={() => setRejecting(true)}
@@ -789,7 +779,6 @@ export default function VendorOrderDetailPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [fulfilledQtys, setFulfilledQtys] = useState<Record<string, number>>({});
-    const [rejectReasons, setRejectReasons] = useState<Record<string, string>>({});
     const [ewayBill, setEwayBill] = useState('');
     const [ewaySaving, setEwaySaving] = useState(false);
     const [showClaimModal, setShowClaimModal] = useState(false);
@@ -864,7 +853,10 @@ export default function VendorOrderDetailPage() {
             setEwayBill(json.data.ewayBillNo ?? '');
             const init: Record<string, number> = {};
             for (const item of json.data.items as OrderItem[]) {
-                init[item.id] = item.fulfilledQty ?? item.quantity;
+                const bal = itemBalance(item);
+                // Default ship qty = what you can send now (stock or full balance)
+                const avail = typeof item.stockAvailable === 'number' ? item.stockAvailable : bal;
+                init[item.id] = bal > 0 ? Math.min(Math.max(0, avail), bal) : 0;
             }
             setFulfilledQtys(init);
         } catch (err: unknown) {
@@ -876,21 +868,14 @@ export default function VendorOrderDetailPage() {
 
     useEffect(() => { fetchOrder(); }, [fetchOrder]);
 
-    // Derived state for partial-fulfilment indicators
-    const isPartialAccept = !!order && order.status === 'pending' && order.items.some(
-        (item) => {
-            const current = item.fulfilledQty > 0 ? item.fulfilledQty : item.quantity;
-            return (fulfilledQtys[item.id] ?? current) !== current;
-        },
-    );
-    const isAmendDirty = order && ['confirmed', 'processing', 'ready_for_dispatch'].includes(order.status) && order.items.some(
-        item => (fulfilledQtys[item.id] ?? item.fulfilledQty ?? item.quantity) !== (item.fulfilledQty ?? item.quantity)
-    );
-    const adjustedTotal = order?.items.reduce((sum, item) => {
-        const fulfilled = fulfilledQtys[item.id] ?? item.quantity;
-        const proportion = item.quantity > 0 ? fulfilled / item.quantity : 0;
-        return sum + Number(item.totalPrice) * proportion;
-    }, 0) ?? 0;
+    const shipDirty =
+        !!order &&
+        order.items.some((item) => {
+            const bal = itemBalance(item);
+            const q = fulfilledQtys[item.id] ?? 0;
+            return q > 0 && q <= bal;
+        });
+    const totalBalance = order?.items.reduce((s, i) => s + itemBalance(i), 0) ?? 0;
 
     const handleAction = useCallback(async (
         status: string,
@@ -922,42 +907,36 @@ export default function VendorOrderDetailPage() {
         await handleAction(status);
     }, [handleAction]);
 
-    const handleAccept = useCallback(async (qtys: Record<string, number>) => {
+    const handleShip = useCallback(async (qtys: Record<string, number>) => {
         if (!order) return;
         try {
-            const zeroWithoutReason = order.items.filter((item) => {
-                const q = qtys[item.id] ?? item.quantity;
-                return q === 0 && !(rejectReasons[item.id]?.trim());
-            });
-            if (zeroWithoutReason.length > 0) {
-                throw new Error('Enter a rejection reason for each line set to quantity 0.');
+            const items = order.items
+                .map((item) => {
+                    const bal = itemBalance(item);
+                    const shipQty = Math.min(qtys[item.id] ?? 0, bal);
+                    return { itemId: item.id, shipQty };
+                })
+                .filter((r) => r.shipQty > 0);
+            if (items.length === 0) {
+                throw new Error('Enter a Ship qty greater than 0. Remaining stays as Balance for later.');
             }
-            const items = order.items.map(item => ({
-                itemId: item.id,
-                fulfilledQty: qtys[item.id] ?? item.quantity,
-                ...(qtys[item.id] === 0 && rejectReasons[item.id]
-                    ? { reason: rejectReasons[item.id].trim() }
-                    : {}),
-            }));
-            const isAmend = order.status !== 'pending';
             const res = await fetch(`/api/v1/vendor/orders/${orderId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ items, ...(isAmend ? { mode: 'amend' } : {}) }),
+                body: JSON.stringify({ action: 'ship', items }),
             });
             const json = await res.json();
-            if (!json.success) throw new Error(json.error?.message || 'Accept failed');
+            if (!json.success) throw new Error(json.error?.message || 'Ship failed');
             await fetchOrder();
+            const shipped = items.reduce((s, i) => s + i.shipQty, 0);
             toast.success(
-                isAmend
-                    ? 'Order quantities updated.'
-                    : 'Quantity adjustments saved. Order remains Pending until you advance status.',
+                `Shipped ${shipped} unit(s). Remaining balance stays on this order — ship again when stock arrives. Bill unchanged.`,
             );
         } catch (err: unknown) {
-            toast.error(err instanceof Error ? err.message : 'Accept failed');
+            toast.error(err instanceof Error ? err.message : 'Ship failed');
             throw err;
         }
-    }, [order, orderId, fetchOrder, rejectReasons]);
+    }, [order, orderId, fetchOrder]);
 
     const applySubstitute = async (itemId: string, substituteProductId: string) => {
         try {
@@ -1021,8 +1000,13 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
     }
 
     const isPending = order.status === 'pending';
-    const isAmendable = ['confirmed', 'processing', 'ready_for_dispatch'].includes(order.status);
-    const canEditQty = isPending || isAmendable;
+    const canEditQty = [
+        'pending',
+        'confirmed',
+        'processing',
+        'ready_for_dispatch',
+        'partially_delivered',
+    ].includes(order.status);
     const canFileClaim = ['delivered', 'partially_delivered'].includes(order.status);
     const canCreatePicklist = ['confirmed', 'processing', 'ready_for_dispatch', 'shipped'].includes(order.status);
 
@@ -1116,7 +1100,8 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
 
             <OrderEventsPanel events={order.events ?? []} />
 
-            {order.cancelRequest?.status === 'pending' && order.status === 'pending' && (
+            {order.cancelRequest?.status === 'pending' &&
+                (order.status === 'pending' || order.status === 'confirmed') && (
                 <CancelRequestBanner
                     request={order.cancelRequest}
                     onReviewed={() => fetchOrder()}
@@ -1159,11 +1144,11 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
             <div className="lg:hidden print:hidden">
                 <ActionPanel
                     order={order}
-                    fulfilledQtys={fulfilledQtys}
-                    adjustedTotal={adjustedTotal}
-                    isPartialAccept={!!isPartialAccept}
+                    shipQtys={fulfilledQtys}
+                    shipDirty={!!shipDirty}
+                    totalBalance={totalBalance}
                     onAction={handleAction}
-                    onAccept={handleAccept}
+                    onShip={handleShip}
                 />
             </div>
 
@@ -1294,9 +1279,9 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                 <Package size={16} className="text-[#299E60]" />
                                 Products Sub-items List ({order.items.length})
                             </h3>
-                            {isPending && (
+                            {canEditQty && (
                                 <span className="text-[11px] text-[#AEAEAE]">
-                                    Adjust &quot;Fulfil&quot; qty to ship less than ordered
+                                    Ship qty = send now · Balance = still owed later · Bill stays full
                                 </span>
                             )}
                         </div>
@@ -1304,61 +1289,38 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                         {/* Mobile card list */}
                         <div className={cn('md:hidden divide-y divide-[#F3F4F6]', !itemsExpanded && 'hidden')}>
                             {order.items.map((item) => {
-                                const fulfilled = canEditQty ? (fulfilledQtys[item.id] ?? item.fulfilledQty ?? item.quantity) : item.fulfilledQty;
-                                const isReduced = canEditQty && fulfilled < item.quantity;
+                                const bal = itemBalance(item);
+                                const shipQty = canEditQty ? (fulfilledQtys[item.id] ?? 0) : 0;
                                 return (
                                     <div key={item.id} className="p-4 space-y-2">
                                         <div className="flex justify-between gap-2">
                                             <p className="text-[13px] font-bold text-[#111827]">{item.productName}</p>
                                             <p className="text-[13px] font-bold text-[#111827] shrink-0">{formatPrice(item.totalPrice)}</p>
                                         </div>
-                                        <p className="text-[11px] text-[#7C7C7C]">Qty {item.quantity} · {formatPrice(item.unitPrice)} each</p>
-                                        {isPending && item.isLowStock && (
+                                        <p className="text-[11px] text-[#7C7C7C]">
+                                            Ordered {item.quantity} · Fulfilled {item.fulfilledQty} ·{' '}
+                                            <span className="font-bold text-amber-700">Balance {bal}</span>
+                                        </p>
+                                        {canEditQty && item.isLowStock && (
                                             <div className="bg-amber-50 border border-amber-200 rounded-[8px] px-3 py-2 text-[11px] text-amber-900">
                                                 <p className="font-bold flex items-center gap-1"><AlertTriangle size={12} /> Only {item.stockAvailable ?? 0} in stock</p>
-                                                {(item.substitutes?.length ?? 0) > 0 && (
-                                                    <div className="mt-1 space-y-1">
-                                                        <p>Suggest: {item.substitutes!.map((s) => s.name).join(', ')}</p>
-                                                        {order.status === 'pending' && item.substitutes!.map((s) => (
-                                                            <button
-                                                                key={s.id}
-                                                                type="button"
-                                                                data-testid={`apply-sub-${item.id}-${s.id}`}
-                                                                onClick={() => applySubstitute(item.id, s.id)}
-                                                                className="block text-[#299E60] font-bold underline"
-                                                            >
-                                                                Apply {s.name}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
                                                 <button
                                                     type="button"
-                                                    onClick={() => setFulfilledQty(item.id, Math.min(item.stockAvailable ?? 0, item.quantity), item.quantity)}
+                                                    onClick={() => setFulfilledQty(item.id, Math.min(item.stockAvailable ?? 0, bal), bal)}
                                                     className="mt-1.5 text-[#299E60] font-bold"
                                                 >
-                                                    Accept {Math.min(item.stockAvailable ?? 0, item.quantity)} only
+                                                    Ship {Math.min(item.stockAvailable ?? 0, bal)} now
                                                 </button>
                                             </div>
                                         )}
-                                        {canEditQty && (
+                                        {canEditQty && bal > 0 && (
                                             <div className="flex items-center gap-2">
-                                                <span className="text-[11px] font-bold text-[#7C7C7C]">Fulfil:</span>
-                                                <button type="button" onClick={() => setFulfilledQty(item.id, fulfilled - 1, item.quantity)} className="w-7 h-7 rounded border border-[#EEEEEE] flex items-center justify-center"><Minus size={12} /></button>
-                                                <span className="text-[13px] font-bold w-8 text-center">{fulfilled}</span>
-                                                <button type="button" onClick={() => setFulfilledQty(item.id, fulfilled + 1, item.quantity)} className="w-7 h-7 rounded border border-[#EEEEEE] flex items-center justify-center"><Plus size={12} /></button>
-                                                {isReduced && <span className="text-[10px] text-amber-700 font-bold">partial</span>}
+                                                <span className="text-[11px] font-bold text-[#7C7C7C]">Ship now:</span>
+                                                <button type="button" onClick={() => setFulfilledQty(item.id, shipQty - 1, bal)} className="w-7 h-7 rounded border border-[#EEEEEE] flex items-center justify-center"><Minus size={12} /></button>
+                                                <span className="text-[13px] font-bold w-8 text-center">{shipQty}</span>
+                                                <button type="button" onClick={() => setFulfilledQty(item.id, shipQty + 1, bal)} className="w-7 h-7 rounded border border-[#EEEEEE] flex items-center justify-center"><Plus size={12} /></button>
+                                                <span className="text-[10px] text-amber-700 font-bold">→ bal {Math.max(0, bal - shipQty)}</span>
                                             </div>
-                                        )}
-                                        {canEditQty && fulfilled === 0 && (
-                                            <input
-                                                type="text"
-                                                data-testid={`reject-reason-${item.id}`}
-                                                placeholder="Rejection reason (required)"
-                                                value={rejectReasons[item.id] ?? ''}
-                                                onChange={(e) => setRejectReasons((p) => ({ ...p, [item.id]: e.target.value }))}
-                                                className="w-full mt-1 h-[34px] px-2 rounded-[8px] border border-red-200 text-[12px] outline-none"
-                                            />
                                         )}
                                     </div>
                                 );
@@ -1373,8 +1335,10 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                         <th className="px-5 py-3 font-bold text-center">SKU / HSN</th>
                                         <th className="px-5 py-3 font-bold text-right">Unit Price</th>
                                         <th className="px-5 py-3 font-bold text-center">Ordered</th>
+                                        <th className="px-5 py-3 font-bold text-center">Fulfilled</th>
+                                        <th className="px-5 py-3 font-bold text-center text-amber-700">Balance</th>
                                         {canEditQty && (
-                                            <th className="px-5 py-3 font-bold text-center text-[#976538]">Fulfil</th>
+                                            <th className="px-5 py-3 font-bold text-center text-[#299E60]">Ship now</th>
                                         )}
                                         <th className="px-5 py-3 font-bold text-center print:hidden">GST</th>
                                         <th className="px-5 py-3 font-bold text-right">Total Price</th>
@@ -1386,15 +1350,11 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                         const itemGST = taxPct > 0
                                             ? Number(item.totalPrice) - (Number(item.totalPrice) / (1 + taxPct / 100))
                                             : 0;
-                                        const fulfilled = canEditQty ? (fulfilledQtys[item.id] ?? item.fulfilledQty ?? item.quantity) : item.fulfilledQty;
-                                        const isReduced = canEditQty && fulfilled < item.quantity;
-                                        const isSkipped = canEditQty && fulfilled === 0;
+                                        const bal = itemBalance(item);
+                                        const shipQty = canEditQty ? (fulfilledQtys[item.id] ?? 0) : 0;
 
                                         return (
-                                            <tr key={item.id} className={cn(
-                                                'hover:bg-[#F9FAFB]/30 transition-colors',
-                                                isSkipped && canEditQty ? 'opacity-40' : ''
-                                            )}>
+                                            <tr key={item.id} className="hover:bg-[#F9FAFB]/30 transition-colors">
                                                 <td className="px-5 py-4">
                                                     <div className="flex items-center gap-3">
                                                         {item.product?.imageUrl ? (
@@ -1413,34 +1373,18 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                                     {item.product.packSize}{item.product.unit ? ` · ${item.product.unit}` : ''}
                                                                 </p>
                                                             )}
-                                                            {isPending && item.isLowStock && (
+                                                            {canEditQty && item.isLowStock && bal > 0 && (
                                                                 <div className="mt-2 bg-amber-50 border border-amber-200 rounded-[8px] px-2.5 py-1.5 text-[11px] text-amber-900 max-w-[280px]">
                                                                     <p className="font-bold flex items-center gap-1">
                                                                         <AlertTriangle size={11} />
                                                                         Only {item.stockAvailable ?? 0} available
                                                                     </p>
-                                                                    {(item.substitutes?.length ?? 0) > 0 && (
-                                                                        <div className="mt-0.5 space-y-1">
-                                                                            <p>Suggest: {item.substitutes!.map((s) => s.name).join(', ')}</p>
-                                                                            {order.status === 'pending' && item.substitutes!.map((s) => (
-                                                                                <button
-                                                                                    key={s.id}
-                                                                                    type="button"
-                                                                                    data-testid={`apply-sub-desk-${item.id}-${s.id}`}
-                                                                                    onClick={() => applySubstitute(item.id, s.id)}
-                                                                                    className="block text-[#299E60] font-bold underline text-[11px]"
-                                                                                >
-                                                                                    Apply {s.name}
-                                                                                </button>
-                                                                            ))}
-                                                                        </div>
-                                                                    )}
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => setFulfilledQty(item.id, Math.min(item.stockAvailable ?? 0, item.quantity), item.quantity)}
+                                                                        onClick={() => setFulfilledQty(item.id, Math.min(item.stockAvailable ?? 0, bal), bal)}
                                                                         className="mt-1 text-[#299E60] font-bold hover:underline"
                                                                     >
-                                                                        Accept {Math.min(item.stockAvailable ?? 0, item.quantity)} only
+                                                                        Ship {Math.min(item.stockAvailable ?? 0, bal)} now
                                                                     </button>
                                                                 </div>
                                                             )}
@@ -1460,52 +1404,44 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                 <td className="px-5 py-4 text-center font-extrabold text-[#111827]">
                                                     {item.quantity}
                                                 </td>
-                                                
-                                                {/* Fulfil qty editor — only visible on pending orders */}
+                                                <td className="px-5 py-4 text-center font-bold text-[#299E60]">
+                                                    {item.fulfilledQty}
+                                                </td>
+                                                <td className="px-5 py-4 text-center font-extrabold text-amber-700">
+                                                    {bal}
+                                                </td>
                                                 {canEditQty && (
                                                     <td className="px-5 py-4 text-center">
-                                                        <div className="inline-flex items-center gap-1">
-                                                            <button
-                                                                onClick={() => setFulfilledQty(item.id, (fulfilledQtys[item.id] ?? item.quantity) - 1, item.quantity)}
-                                                                className="w-7 h-7 rounded-[6px] border border-[#EEEEEE] flex items-center justify-center hover:bg-[#F5F5F5] text-[#7C7C7C] transition-colors active:scale-95"
-                                                            >
-                                                                <Minus size={12} />
-                                                            </button>
-                                                            <input
-                                                                type="number"
-                                                                min={0}
-                                                                max={item.quantity}
-                                                                value={fulfilledQtys[item.id] ?? item.quantity}
-                                                                onChange={(e) => setFulfilledQty(item.id, parseInt(e.target.value) || 0, item.quantity)}
-                                                                className={cn(
-                                                                    'w-12 h-7 text-center text-[13px] font-bold rounded-[6px] border outline-none',
-                                                                    isSkipped ? 'border-[#E74C3C] text-[#E74C3C] bg-[#FFF0F0]' :
-                                                                        isReduced ? 'border-[#F59E0B] text-[#976538] bg-[#FFF4E5]' :
-                                                                            'border-[#299E60] text-[#299E60] bg-[#F0FBF5]'
-                                                                )}
-                                                            />
-                                                            <button
-                                                                onClick={() => setFulfilledQty(item.id, (fulfilledQtys[item.id] ?? item.quantity) + 1, item.quantity)}
-                                                                className="w-7 h-7 rounded-[6px] border border-[#EEEEEE] flex items-center justify-center hover:bg-[#F5F5F5] text-[#7C7C7C] transition-colors active:scale-95"
-                                                            >
-                                                                <Plus size={12} />
-                                                            </button>
-                                                        </div>
-                                                        {isReduced && !isSkipped && (
-                                                            <p className="text-[10px] text-[#976538] mt-0.5 font-bold">of {item.quantity}</p>
-                                                        )}
-                                                        {isSkipped && (
-                                                            <p className="text-[10px] text-[#E74C3C] mt-0.5 font-bold">skipped</p>
-                                                        )}
-                                                        {isSkipped && (
-                                                            <input
-                                                                type="text"
-                                                                data-testid={`reject-reason-desk-${item.id}`}
-                                                                placeholder="Rejection reason"
-                                                                value={rejectReasons[item.id] ?? ''}
-                                                                onChange={(e) => setRejectReasons((p) => ({ ...p, [item.id]: e.target.value }))}
-                                                                className="mt-1 w-full max-w-[140px] mx-auto h-[28px] px-1.5 rounded border border-red-200 text-[10px] outline-none"
-                                                            />
+                                                        {bal > 0 ? (
+                                                            <>
+                                                                <div className="inline-flex items-center gap-1">
+                                                                    <button
+                                                                        onClick={() => setFulfilledQty(item.id, shipQty - 1, bal)}
+                                                                        className="w-7 h-7 rounded-[6px] border border-[#EEEEEE] flex items-center justify-center hover:bg-[#F5F5F5] text-[#7C7C7C] transition-colors active:scale-95"
+                                                                    >
+                                                                        <Minus size={12} />
+                                                                    </button>
+                                                                    <input
+                                                                        type="number"
+                                                                        min={0}
+                                                                        max={bal}
+                                                                        value={shipQty}
+                                                                        onChange={(e) => setFulfilledQty(item.id, parseInt(e.target.value) || 0, bal)}
+                                                                        className="w-12 h-7 text-center text-[13px] font-bold rounded-[6px] border border-[#299E60] text-[#299E60] bg-[#F0FBF5] outline-none"
+                                                                    />
+                                                                    <button
+                                                                        onClick={() => setFulfilledQty(item.id, shipQty + 1, bal)}
+                                                                        className="w-7 h-7 rounded-[6px] border border-[#EEEEEE] flex items-center justify-center hover:bg-[#F5F5F5] text-[#7C7C7C] transition-colors active:scale-95"
+                                                                    >
+                                                                        <Plus size={12} />
+                                                                    </button>
+                                                                </div>
+                                                                <p className="text-[10px] text-amber-700 mt-0.5 font-bold">
+                                                                    then bal {Math.max(0, bal - shipQty)}
+                                                                </p>
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-[11px] font-bold text-[#299E60]">Done</span>
                                                         )}
                                                     </td>
                                                 )}
@@ -1516,13 +1452,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                     ) : <span className="text-[#DDDDDD]">—</span>}
                                                 </td>
                                                 <td className="px-5 py-4 text-right font-bold text-[#111827]">
-                                                    {isPending && isReduced
-                                                        ? <div>
-                                                            <p className="text-[#976538]">{formatPrice(Number(item.totalPrice) * (fulfilled / item.quantity))}</p>
-                                                            <p className="text-[11px] text-[#AEAEAE] line-through font-normal">{formatPrice(item.totalPrice)}</p>
-                                                        </div>
-                                                        : formatPrice(item.totalPrice)
-                                                    }
+                                                    {formatPrice(item.totalPrice)}
                                                 </td>
                                             </tr>
                                         );
@@ -1539,11 +1469,11 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                     <div className="print:hidden hidden lg:block">
                         <ActionPanel
                             order={order}
-                            fulfilledQtys={fulfilledQtys}
-                            adjustedTotal={adjustedTotal}
-                            isPartialAccept={!!isPartialAccept}
+                            shipQtys={fulfilledQtys}
+                            shipDirty={!!shipDirty}
+                            totalBalance={totalBalance}
                             onAction={handleAction}
-                            onAccept={handleAccept}
+                            onShip={handleShip}
                         />
                     </div>
 
@@ -1554,6 +1484,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                 <Landmark size={15} className="text-[#4B5563]" />
                                 Billing Invoice Summary
                             </h4>
+                            <p className="text-[11px] text-[#AEAEAE] mt-1">Full order billing — partial ship does not reduce total</p>
                         </div>
                         
                         <div className="space-y-3.5 text-[13px] font-medium text-[#4B5563]">
@@ -1577,10 +1508,10 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                 <span className="text-[14px] font-black text-[#111827]">Grand Total</span>
                                 <span className="text-[20px] font-black text-[#299E60]">{formatPrice(order.totalAmount)}</span>
                             </div>
-                            {isPartialAccept && (
-                                <div className="flex justify-between text-[#976538] pt-1 border-t border-dashed border-[#D1D5DB]">
-                                    <span>Adjusted Total</span>
-                                    <span className="font-bold">{formatPrice(adjustedTotal)}</span>
+                            {totalBalance > 0 && (
+                                <div className="flex justify-between text-amber-700 pt-1 border-t border-dashed border-[#D1D5DB]">
+                                    <span>Still to fulfill</span>
+                                    <span className="font-bold">{totalBalance} units</span>
                                 </div>
                             )}
                         </div>
