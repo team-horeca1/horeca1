@@ -24,6 +24,18 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     include: {
       user: true,
       vendor: { include: { user: true } },
+      outlet: { select: { id: true, name: true, addressLine: true, city: true, state: true, pincode: true } },
+      businessAccount: {
+        select: {
+          gstin: true,
+          billingAddressLine: true,
+          billingCity: true,
+          billingState: true,
+          billingPincode: true,
+          displayName: true,
+          legalName: true,
+        },
+      },
       items: {
         include: {
           product: {
@@ -36,15 +48,57 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     },
   });
 
-  // Buyer ship-to: pull user's default saved address separately (avoids nested
-  // select/include quirks on the User relation).
-  const buyerAddr = await prisma.savedAddress.findFirst({
+  // Buyer ship-to fallback only — primary source is order.deliveryAddressSnapshot.
+  const buyerSavedAddr = await prisma.savedAddress.findFirst({
     where: { userId: order.userId, isDefault: true },
   }) ?? await prisma.savedAddress.findFirst({
     where: { userId: order.userId },
     orderBy: { createdAt: 'desc' },
   });
-  const buyerStateForSupply = buyerAddr?.state ?? '—';
+
+  type SnapshotAddr = {
+    name?: string | null;
+    addressLine?: string | null;
+    flatInfo?: string | null;
+    landmark?: string | null;
+    city?: string | null;
+    state?: string | null;
+    pincode?: string | null;
+  };
+  const snap = (order.deliveryAddressSnapshot ?? null) as SnapshotAddr | null;
+
+  const composeParts = (...parts: Array<string | null | undefined>) =>
+    parts.map((p) => (typeof p === 'string' ? p.trim() : '')).filter(Boolean);
+
+  const snapStreet = composeParts(snap?.addressLine, snap?.flatInfo, snap?.landmark).join(', ');
+  const snapCityLine = composeParts(
+    snap?.city,
+    snap?.state ? `${snap.state}${snap.pincode ? `-${snap.pincode}` : ''}` : snap?.pincode,
+  ).join(', ');
+  const snapAddressText = composeParts(snapStreet, snapCityLine).join(', ');
+
+  const buyerOutletName =
+    snap?.name?.trim() ||
+    order.outlet?.name ||
+    order.businessAccount?.displayName ||
+    order.businessAccount?.legalName ||
+    order.user.businessName ||
+    order.user.fullName;
+
+  const buyerAddressText =
+    snapAddressText ||
+    buyerSavedAddr?.fullAddress?.trim() ||
+    '— (buyer: add address in profile)';
+  const buyerPincode = snap?.pincode?.trim() || buyerSavedAddr?.pincode || '—';
+  const buyerStateForSupply =
+    snap?.state?.trim() ||
+    order.businessAccount?.billingState ||
+    buyerSavedAddr?.state ||
+    '—';
+  const buyerGstin =
+    order.businessAccount?.gstin ||
+    order.user.gstNumber ||
+    '—';
 
   // ── 2. Build line-item data ──────────────────────────────────────────────
   // Partial fulfilment: when a vendor accepts only part of an order, the order
@@ -68,14 +122,39 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
   const totalTax = items.reduce((s, i) => s + i.taxAmount, 0);
   const grandTotal = totalTaxable + totalTax;
 
+  // Seller: registered office first, then warehouse/pickup.
+  const vendorRegisteredParts = composeParts(
+    order.vendor.addressLine,
+    order.vendor.city,
+    order.vendor.state
+      ? `${order.vendor.state}${order.vendor.addressPincode ? `-${order.vendor.addressPincode}` : ''}`
+      : order.vendor.addressPincode,
+  );
+  const vendorPickupParts = composeParts(
+    order.vendor.pickupAddressLine,
+    order.vendor.pickupCity,
+    order.vendor.pickupState
+      ? `${order.vendor.pickupState}${order.vendor.pickupPincode ? `-${order.vendor.pickupPincode}` : ''}`
+      : order.vendor.pickupPincode,
+  );
+  const vendorAddrText =
+    vendorRegisteredParts.length > 0
+      ? vendorRegisteredParts.join(', ')
+      : vendorPickupParts.length > 0
+        ? vendorPickupParts.join(', ')
+        : '— Address not on file (vendor: set it in Settings)';
+  const vendorGstin = order.vendor.gstNumber || order.vendor.user?.gstNumber || '—';
+  const sellerStateValue =
+    order.vendor.state || order.vendor.pickupState || null;
+
   // Place of supply: seller (vendor address / GSTIN) vs buyer (ship-to / GSTIN).
   const sellerState = resolveState({
-    state: order.vendor.state,
+    state: sellerStateValue,
     gstin: order.vendor.gstNumber,
   });
   const buyerState = resolveState({
-    state: buyerAddr?.state,
-    gstin: order.user.gstNumber,
+    state: buyerStateForSupply === '—' ? undefined : buyerStateForSupply,
+    gstin: buyerGstin === '—' ? undefined : buyerGstin,
   });
   const supplyType = resolveSupplyType(sellerState, buyerState);
   const { cgst, sgst, igst } = splitGstTax(totalTax, supplyType);
@@ -156,16 +235,6 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     y += cellH + 4;
 
     // ── Bill From / Shipped From boxes ──────────────────────────────────────
-    // Compose vendor address from the registered fields. Empty parts dropped so the
-    // line collapses cleanly when only some fields are filled.
-    const vendorAddrParts = [
-      order.vendor.addressLine,
-      order.vendor.city,
-      order.vendor.state ? `${order.vendor.state}${order.vendor.addressPincode ? '-' + order.vendor.addressPincode : ''}` : (order.vendor.addressPincode || null),
-    ].filter(Boolean) as string[];
-    const vendorAddrText = vendorAddrParts.length > 0 ? vendorAddrParts.join(', ') : '— Address not on file (vendor: set it in Settings)';
-    const vendorGstin = order.vendor.gstNumber || order.vendor.user?.gstNumber || '—';
-
     const partyH = 64;
     const drawParty = (yStart: number, label: string) => {
       doc.lineWidth(0.6).strokeColor('#000').rect(LEFT, yStart, PAGE_W, partyH).stroke();
@@ -207,12 +276,11 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
 
       doc.font('Helvetica-Bold').fontSize(9).text(`${label} :`, lx, by);
       by += 14;
-      const noAddrHint = '— (buyer: add address in profile)';
-      line('Outlet :',          order.user.businessName ?? order.user.fullName);
-      line('Address :',         buyerAddr?.fullAddress ?? noAddrHint);
-      line('Pincode :',         buyerAddr?.pincode ?? '—');
+      line('Outlet :', buyerOutletName);
+      line('Address :', buyerAddressText);
+      line('Pincode :', buyerPincode);
       line('Place of Supply :', buyerStateForSupply);
-      line('GSTIN :',           order.user.gstNumber ?? '—');
+      line('GSTIN :', buyerGstin);
     };
 
     drawBuyer(LEFT, 'Bill To');
@@ -220,23 +288,24 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     y += buyerH + 6;
 
     // ── Items table ─────────────────────────────────────────────────────────
-    // Columns: Sl | Description | HSN | Qty.Del. | Unit Price | UoM | Pre Tax | Disc | Taxable | Tax Rate | Tax Amt | Total
+    // Keep headers to 1–2 short lines so they never spill into the next column.
+    // PAGE_W ≈ 535; widths must sum exactly to PAGE_W.
     const COL = {
-      sl:      { x: LEFT,                     w: 22 },
-      desc:    { x: LEFT + 22,                w: 110 },
-      hsn:     { x: LEFT + 132,                w: 38 },
-      qty:     { x: LEFT + 170,                w: 26 },
-      unit:    { x: LEFT + 196,                w: 38 },
-      uom:     { x: LEFT + 234,                w: 28 },
-      preTax:  { x: LEFT + 262,                w: 38 },
-      disc:    { x: LEFT + 300,                w: 35 },
-      taxable: { x: LEFT + 335,                w: 42 },
-      taxRate: { x: LEFT + 377,                w: 50 },
-      taxAmt:  { x: LEFT + 427,                w: 38 },
-      total:   { x: LEFT + 465,                w: PAGE_W - 465 },
+      sl:      { x: LEFT,       w: 18 },
+      desc:    { x: LEFT + 18,  w: 108 },
+      hsn:     { x: LEFT + 126, w: 36 },
+      qty:     { x: LEFT + 162, w: 28 },
+      unit:    { x: LEFT + 190, w: 42 },
+      uom:     { x: LEFT + 232, w: 30 },
+      preTax:  { x: LEFT + 262, w: 42 },
+      disc:    { x: LEFT + 304, w: 36 },
+      taxable: { x: LEFT + 340, w: 44 },
+      taxRate: { x: LEFT + 384, w: 36 },
+      taxAmt:  { x: LEFT + 420, w: 44 },
+      total:   { x: LEFT + 464, w: PAGE_W - 464 },
     };
 
-    const headerH = 36;
+    const headerH = 28;
 
     // Header
     doc.lineWidth(0.6).strokeColor('#000');
@@ -245,22 +314,28 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
       if (idx > 0) doc.moveTo(c.x, y).lineTo(c.x, y + headerH).stroke();
     });
 
-    doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#000');
+    doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#000');
     const drawHeader = (label: string, c: { x: number; w: number }) => {
-      doc.text(label, c.x + 1, y + 4, { width: c.w - 2, align: 'center' });
+      doc.text(label, c.x + 1, y + 3, {
+        width: c.w - 2,
+        align: 'center',
+        lineGap: 0,
+        height: headerH - 4,
+        ellipsis: true,
+      });
     };
-    drawHeader('Sl\nNo.',                  COL.sl);
-    drawHeader('Description of Goods',     COL.desc);
-    drawHeader('HSN',                       COL.hsn);
-    drawHeader('Qty.\nDel.',               COL.qty);
-    drawHeader('Unit Price',               COL.unit);
-    drawHeader('UoM',                       COL.uom);
-    drawHeader('Pre Tax',                  COL.preTax);
-    drawHeader('Total\nDiscount\nValue',   COL.disc);
-    drawHeader('Taxable\nAmount',          COL.taxable);
-    drawHeader('Tax Rate\n(CGST+SGST+IGST+\nCESS)%', COL.taxRate);
-    drawHeader('Total Tax\nAmount',        COL.taxAmt);
-    drawHeader('Total',                     COL.total);
+    drawHeader('Sl\nNo.', COL.sl);
+    drawHeader('Description of Goods', COL.desc);
+    drawHeader('HSN', COL.hsn);
+    drawHeader('Qty\nDel.', COL.qty);
+    drawHeader('Unit\nPrice', COL.unit);
+    drawHeader('UoM', COL.uom);
+    drawHeader('Pre Tax', COL.preTax);
+    drawHeader('Disc.', COL.disc);
+    drawHeader('Taxable\nAmt', COL.taxable);
+    drawHeader('Tax %', COL.taxRate);
+    drawHeader('Tax\nAmt', COL.taxAmt);
+    drawHeader('Total', COL.total);
     y += headerH;
 
     // Body — group by category
@@ -336,22 +411,31 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     y += summaryH;
 
     // ── Tax breakdown row: Total Taxable | IGST | CESS | CGST | SGST | Total
+    // Short labels + taller cells so the value never sits on top of the label.
     const breakdownColW = PAGE_W / 6;
-    const bdH = 32;
+    const bdH = 38;
     const drawBdCell = (i: number, label: string, value: string) => {
       const x = LEFT + i * breakdownColW;
       doc.lineWidth(0.6).strokeColor('#000').rect(x, y, breakdownColW, bdH).stroke();
-      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#000');
-      doc.text(label, x + 2, y + 4, { width: breakdownColW - 4, align: 'center' });
+      doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#000');
+      doc.text(label, x + 2, y + 3, {
+        width: breakdownColW - 4,
+        align: 'center',
+        lineGap: 0,
+        height: 16,
+      });
       doc.font('Helvetica-Bold').fontSize(9);
-      doc.text(value, x + 2, y + 17, { width: breakdownColW - 4, align: 'center' });
+      doc.text(value, x + 2, y + bdH - 14, {
+        width: breakdownColW - 4,
+        align: 'center',
+      });
     };
-    drawBdCell(0, 'Total Taxable Amount(in Rs)', fmtNum(totalTaxable));
-    drawBdCell(1, 'IGST Amount',                fmtNum(igst));
-    drawBdCell(2, 'CESS Amount',                fmtNum(cess));
-    drawBdCell(3, 'CGST Amount',                fmtNum(cgst));
-    drawBdCell(4, 'SGST Amount',                fmtNum(sgst));
-    drawBdCell(5, 'Total Tax Amount',           fmtNum(totalTax));
+    drawBdCell(0, 'Taxable Amt\n(Rs)', fmtNum(totalTaxable));
+    drawBdCell(1, 'IGST', fmtNum(igst));
+    drawBdCell(2, 'CESS', fmtNum(cess));
+    drawBdCell(3, 'CGST', fmtNum(cgst));
+    drawBdCell(4, 'SGST', fmtNum(sgst));
+    drawBdCell(5, 'Total Tax', fmtNum(totalTax));
     y += bdH + 4;
 
     // ── IRN row ─────────────────────────────────────────────────────────────
