@@ -33,6 +33,10 @@ export interface VendorSettings {
   state: string | null;
   addressPincode: string | null;
   gstNumber: string | null;
+  pickupAddressLine?: string | null;
+  pickupCity?: string | null;
+  pickupState?: string | null;
+  pickupPincode?: string | null;
   serviceAreas: ServiceArea[];
   deliverySlots: DeliverySlot[];
   user: { email: string; phone: string | null; fullName: string };

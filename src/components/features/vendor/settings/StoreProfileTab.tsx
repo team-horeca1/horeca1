@@ -37,7 +37,7 @@ export interface StoreProfileTabProps {
   saving: boolean;
   saved: boolean;
   onSave: () => void;
-  /** Admin View: settings are read-only so admins don't accidentally mutate vendor config */
+  /** When true, fields are disabled (unused for Admin View — admins may edit). */
   readOnly?: boolean;
 }
 

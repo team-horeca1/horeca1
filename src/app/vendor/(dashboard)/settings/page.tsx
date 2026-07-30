@@ -13,7 +13,6 @@ import { PoliciesTab } from '@/components/features/vendor/settings/PoliciesTab';
 import { DocumentsTab } from '@/components/features/vendor/settings/DocumentsTab';
 import type { DeliverySlot, ServiceArea, SettingsTabId, VendorDocument, VendorSettings } from '@/components/features/vendor/settings/types';
 import { normalizeTimeInput, SETTINGS_TABS } from '@/components/features/vendor/settings/types';
-import { isAdminVendorImpersonationActive } from '@/lib/clearImpersonation';
 
 function parseTab(raw: string | null): SettingsTabId {
   if (raw && SETTINGS_TABS.some((t) => t.id === raw)) return raw as SettingsTabId;
@@ -72,11 +71,6 @@ function VendorSettingsContent() {
   const [docFile, setDocFile] = useState<File | null>(null);
   const docFileRef = useRef<HTMLInputElement>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
-  const [adminViewReadOnly, setAdminViewReadOnly] = useState(false);
-
-  useEffect(() => {
-    Promise.resolve().then(() => setAdminViewReadOnly(isAdminVendorImpersonationActive()));
-  }, []);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -97,10 +91,21 @@ function VendorSettingsContent() {
         setBannerUrl(data.bannerUrl || '');
         setMinOrderValue(String(data.minOrderValue));
         setCreditEnabled(data.creditEnabled);
-        setAddressLine(data.addressLine || '');
-        setCity(data.city || '');
-        setStateName(data.state || '');
-        setAddressPincode(data.addressPincode || '');
+        // Prefill registered office from pickup when registered fields were never set
+        // (common for seed / legacy creates). User still must Save to persist.
+        const hasRegistered = Boolean(data.addressLine?.trim() || data.city?.trim());
+        setAddressLine(
+          data.addressLine ||
+            (!hasRegistered ? (data.pickupAddressLine || '') : '') ||
+            '',
+        );
+        setCity(data.city || (!hasRegistered ? (data.pickupCity || '') : '') || '');
+        setStateName(data.state || (!hasRegistered ? (data.pickupState || '') : '') || '');
+        setAddressPincode(
+          data.addressPincode ||
+            (!hasRegistered ? (data.pickupPincode || '') : '') ||
+            '',
+        );
         setGstNumber(data.gstNumber || '');
         setDefaultMOQ(data.defaultMOQ != null ? String(data.defaultMOQ) : '');
         setDeliveryFeeVal(data.deliveryFee != null ? String(data.deliveryFee) : '');
@@ -432,7 +437,6 @@ function VendorSettingsContent() {
             stateName={stateName} setStateName={setStateName}
             addressPincode={addressPincode} setAddressPincode={setAddressPincode}
             gstNumber={gstNumber} setGstNumber={setGstNumber}
-            readOnly={adminViewReadOnly}
             {...saveProps}
           />
         )}
