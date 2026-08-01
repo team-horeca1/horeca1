@@ -171,6 +171,7 @@ export function Navbar() {
     const isBrandPortal = pathname?.startsWith('/brand/portal');
     const isAccountPage = pathname?.startsWith('/account');
     const isDeliveryBoyLink = pathname?.startsWith('/d/');
+    const isReturnPickupLink = pathname?.startsWith('/r/');
 
     const availableAccounts = (session?.user as {
         availableAccounts?: Array<{ isVendor?: boolean; isBrand?: boolean }>;
@@ -213,7 +214,8 @@ export function Navbar() {
         isBrandPortal ||
         isShipmentPage ||
         isAccountPage ||
-        isDeliveryBoyLink
+        isDeliveryBoyLink ||
+        isReturnPickupLink
     ) {
         return null;
     }

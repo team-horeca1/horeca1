@@ -42,7 +42,9 @@ export function OutletCompletionBanner() {
     pathname?.startsWith('/account') ||
     pathname?.startsWith('/admin') ||
     pathname?.startsWith('/vendor') ||
-    pathname?.startsWith('/brand/portal')
+    pathname?.startsWith('/brand/portal') ||
+    pathname?.startsWith('/d/') ||
+    pathname?.startsWith('/r/')
   ) {
     return null;
   }

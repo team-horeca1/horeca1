@@ -82,11 +82,13 @@ export function VendorApplicationBanner() {
 
   if (dismissed || !appStatus?.hasApplication) return null;
 
-  // Don't show on vendor portal or admin/account pages
+  // Don't show on vendor portal, admin/account, or public boy magic-link pages
   if (
     isVendorPortalPath(pathname) ||
     pathname?.startsWith('/admin') ||
-    pathname?.startsWith('/account')
+    pathname?.startsWith('/account') ||
+    pathname?.startsWith('/d/') ||
+    pathname?.startsWith('/r/')
   ) {
     return null;
   }

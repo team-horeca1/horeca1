@@ -29,7 +29,7 @@ import {
 import { isAdminCustomerImpersonationActive } from '@/lib/clearImpersonation';
 
 // Auth screens + non-customer portals never get the gate.
-const EXCLUDED_PREFIXES = ['/login', '/register', '/admin', '/vendor', '/brand', '/d'];
+const EXCLUDED_PREFIXES = ['/login', '/register', '/admin', '/vendor', '/brand', '/d', '/r'];
 
 export function MandatoryAddressGate() {
   const { data: session, status, update } = useSession();
