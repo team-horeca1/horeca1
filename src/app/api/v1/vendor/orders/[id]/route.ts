@@ -113,10 +113,18 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
             actor: { select: { id: true, fullName: true } },
           },
         },
+        // Linked Workspaces (S8/S9) — read-only summaries for Orders UI deep-links
+        fulfilment: { select: { id: true, status: true } },
+        returnRequests: {
+          select: { id: true, status: true },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
 
     if (!order) throw Errors.notFound('Order');
+
+    const { fulfilment, returnRequests, ...orderRest } = order;
 
     const productIds = order.items.map((i) => i.productId);
     const [inventories, productsWithSubs] = await Promise.all([
@@ -168,7 +176,13 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
     return NextResponse.json({
       success: true,
-      data: { ...order, items: enrichedItems, attentionReasons },
+      data: {
+        ...orderRest,
+        items: enrichedItems,
+        attentionReasons,
+        fulfilment: fulfilment ? { id: fulfilment.id, status: fulfilment.status } : null,
+        returns: returnRequests.map((r) => ({ id: r.id, status: r.status })),
+      },
     });
   } catch (error) {
     return errorResponse(error);

@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CancelRequestBanner } from './CancelRequestBanner';
+import { LinkedWorkspacesCard } from './LinkedWorkspacesCard';
 import { ATTENTION_LABELS, type AttentionReasonCode } from '@/lib/orderAttention';
 import {
   formatWorkbenchDateTime,
@@ -49,6 +50,8 @@ export function OrderWorkbenchPanel({
   const [shipQtys, setShipQtys] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [activityTab, setActivityTab] = useState(false);
+  const [showDeliverProof, setShowDeliverProof] = useState(false);
+  const [deliverOtp, setDeliverOtp] = useState('');
 
   const lineBalance = (item: {
     quantity: number;
@@ -179,18 +182,23 @@ export function OrderWorkbenchPanel({
     }
   };
 
-  const advanceStatus = async (status: string) => {
+  const advanceStatus = async (
+    status: string,
+    proof?: { proofType?: string; notes?: string; otp?: string },
+  ) => {
     setBusy(true);
     try {
       const res = await fetch(`/api/v1/vendor/orders/${orderId}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...(proof ? { proof } : {}) }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error?.message || 'Update failed');
       toast.success(`Order marked as ${WORKBENCH_STATUS_LABELS[status] ?? status}.`);
+      setShowDeliverProof(false);
+      setDeliverOtp('');
       await fetchOrder();
       notifyChanged();
     } catch (err: unknown) {
@@ -198,6 +206,22 @@ export function OrderWorkbenchPanel({
     } finally {
       setBusy(false);
     }
+  };
+
+  const confirmDeliveredWithOtp = async () => {
+    const otp = deliverOtp.trim();
+    if (!/^\d{4}$/.test(otp)) {
+      toast.error('Enter the 4-digit customer OTP');
+      return;
+    }
+    await advanceStatus('delivered', { proofType: 'otp', otp });
+  };
+
+  const confirmDeliveredWithoutOtp = async () => {
+    await advanceStatus('delivered', {
+      proofType: 'none',
+      notes: 'Delivered without OTP',
+    });
   };
 
   const cancelOrder = async () => {
@@ -348,7 +372,7 @@ export function OrderWorkbenchPanel({
             Full detail
             <ExternalLink className="h-3.5 w-3.5" />
           </Link>
-          {next && (
+          {next && next.status !== 'delivered' && (
             <button
               type="button"
               disabled={busy}
@@ -360,8 +384,77 @@ export function OrderWorkbenchPanel({
               {next.label}
             </button>
           )}
+          {next?.status === 'delivered' && !showDeliverProof && (
+            <button
+              type="button"
+              disabled={busy}
+              data-testid="workbench-next-status"
+              onClick={() => setShowDeliverProof(true)}
+              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#299E60] px-4 text-[13px] font-bold text-white hover:bg-[#248a54] disabled:opacity-50"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              {next.label}
+            </button>
+          )}
         </div>
       </div>
+
+      {showDeliverProof && next?.status === 'delivered' && (
+        <div
+          className="rounded-[12px] border border-[#EEEEEE] bg-white p-4 space-y-3"
+          data-testid="workbench-deliver-proof"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-[13px] font-bold text-[#181725]">Confirm delivery</p>
+              <p className="text-[12px] text-[#7C7C7C]">
+                Enter the customer OTP, or deliver without OTP
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowDeliverProof(false);
+                setDeliverOtp('');
+              }}
+              className="text-[12px] font-semibold text-[#7C7C7C] hover:text-[#181725]"
+            >
+              Cancel
+            </button>
+          </div>
+          <input
+            value={deliverOtp}
+            onChange={(e) => setDeliverOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            placeholder="4-digit OTP"
+            maxLength={4}
+            inputMode="numeric"
+            data-testid="workbench-deliver-otp"
+            className="w-full h-10 px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] tracking-widest outline-none focus:border-[#299E60]/50"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy || deliverOtp.trim().length < 4}
+              data-testid="workbench-deliver-with-otp"
+              onClick={() => void confirmDeliveredWithOtp()}
+              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-[#299E60] px-4 text-[12px] font-bold text-[#299E60] hover:bg-[#EEF8F1] disabled:opacity-50"
+            >
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              Confirm with OTP
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              data-testid="workbench-deliver-without-otp"
+              onClick={() => void confirmDeliveredWithoutOtp()}
+              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#299E60] px-4 text-[12px] font-bold text-white hover:bg-[#248a54] disabled:opacity-50"
+            >
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              Deliver without OTP
+            </button>
+          </div>
+        </div>
+      )}
 
       {order.cancelRequest?.status === 'pending' && (
         <CancelRequestBanner
@@ -423,6 +516,11 @@ export function OrderWorkbenchPanel({
           </p>
         </div>
       </div>
+
+      <LinkedWorkspacesCard
+        fulfilment={order.fulfilment}
+        returns={order.returns}
+      />
 
       {/* Lines — backorder fulfillment */}
       <div className="rounded-[14px] border border-[#EEEEEE] bg-white overflow-hidden" data-testid="workbench-lines">

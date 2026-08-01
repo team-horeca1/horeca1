@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { FileClaimModal } from '@/components/features/vendor/FileClaimModal';
 import { CancelRequestBanner } from '@/components/features/vendor/orders/CancelRequestBanner';
+import { LinkedWorkspacesCard } from '@/components/features/vendor/orders/LinkedWorkspacesCard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,6 +123,9 @@ interface OrderData {
         vendorNote: string | null;
         createdAt: string;
     } | null;
+    /** Linked Workspaces (S8/S9) — read-only. */
+    fulfilment?: { id: string; status: string } | null;
+    returns?: Array<{ id: string; status: string }>;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -404,7 +408,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
     shipQtys: Record<string, number>;
     shipDirty: boolean;
     totalBalance: number;
-    onAction: (status: string, reason?: string, proof?: { proofType?: string; proofUrl?: string; notes?: string }) => Promise<void>;
+    onAction: (status: string, reason?: string, proof?: { proofType?: string; proofUrl?: string; notes?: string; otp?: string }) => Promise<void>;
     onShip: (qtys: Record<string, number>) => Promise<void>;
 }) {
     const [rejecting, setRejecting] = useState(false);
@@ -416,7 +420,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
     const [busy, setBusy] = useState(false);
     const reasonRef = useRef<HTMLTextAreaElement>(null);
 
-    const run = async (status: string, reason?: string, proof?: { proofType?: string; proofUrl?: string; notes?: string }) => {
+    const run = async (status: string, reason?: string, proof?: { proofType?: string; proofUrl?: string; notes?: string; otp?: string }) => {
         setBusy(true);
         try { await onAction(status, reason, proof); }
         finally { setBusy(false); }
@@ -580,32 +584,60 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
                         )}
                         {showProofModal && (
                             <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                                <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-[420px]">
+                                <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-[420px]" data-testid="delivery-proof-modal">
                                     <div className="px-6 py-4 border-b border-[#F5F5F5]">
                                         <p className="text-[15px] font-bold text-[#181725]">Delivery Proof</p>
-                                        <p className="text-[12px] text-[#AEAEAE]">Optional — record how delivery was confirmed</p>
+                                        <p className="text-[12px] text-[#AEAEAE]">
+                                            Enter the customer OTP, or deliver without OTP
+                                        </p>
                                     </div>
                                     <div className="p-6 space-y-4">
                                         <div>
                                             <p className="text-[11px] font-bold text-[#7C7C7C] uppercase mb-2">Proof Type</p>
                                             <div className="grid grid-cols-2 gap-2">
-                                                {(['none', 'otp', 'photo', 'notes'] as const).map(t => (
-                                                    <button key={t} onClick={() => setProofType(t)}
-                                                        className={cn('py-2.5 rounded-[10px] border text-[12px] font-semibold transition-colors',
-                                                            proofType === t ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]' : 'border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5]')}>
-                                                        {t === 'none' ? 'No Proof' : t === 'otp' ? 'OTP Verified' : t === 'photo' ? 'Photo Taken' : 'Notes Only'}
+                                                {([
+                                                    ['none', 'Deliver without OTP'],
+                                                    ['otp', 'OTP Verified'],
+                                                    ['photo', 'Photo Taken'],
+                                                    ['notes', 'Notes Only'],
+                                                ] as const).map(([t, label]) => (
+                                                    <button
+                                                        key={t}
+                                                        type="button"
+                                                        data-testid={`proof-type-${t}`}
+                                                        onClick={() => setProofType(t)}
+                                                        className={cn(
+                                                            'py-2.5 rounded-[10px] border text-[12px] font-semibold transition-colors',
+                                                            proofType === t
+                                                                ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]'
+                                                                : 'border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5]',
+                                                        )}
+                                                    >
+                                                        {label}
                                                     </button>
                                                 ))}
                                             </div>
+                                            {proofType === 'none' && (
+                                                <p className="mt-2 text-[12px] text-[#7C7C7C]">
+                                                    Marks delivery complete without capturing the customer code.
+                                                </p>
+                                            )}
                                         </div>
                                         {(proofType === 'notes' || proofType === 'otp') && (
                                             <div>
                                                 <label className="block text-[11px] font-bold text-[#7C7C7C] uppercase mb-1">
-                                                    {proofType === 'otp' ? 'OTP Code / Reference' : 'Delivery Notes'}
+                                                    {proofType === 'otp' ? 'Customer OTP' : 'Delivery Notes'}
                                                 </label>
-                                                <input type="text" value={proofNotes} onChange={e => setProofNotes(e.target.value)}
-                                                    placeholder={proofType === 'otp' ? 'Enter OTP used' : 'e.g. Left at reception'}
-                                                    className="w-full h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/50" />
+                                                <input
+                                                    type="text"
+                                                    value={proofNotes}
+                                                    onChange={(e) => setProofNotes(e.target.value)}
+                                                    maxLength={proofType === 'otp' ? 4 : undefined}
+                                                    inputMode={proofType === 'otp' ? 'numeric' : undefined}
+                                                    placeholder={proofType === 'otp' ? '4-digit code' : 'e.g. Left at reception'}
+                                                    className="w-full h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/50 tracking-widest"
+                                                    data-testid={proofType === 'otp' ? 'proof-otp-input' : 'proof-notes-input'}
+                                                />
                                             </div>
                                         )}
                                         {proofType === 'photo' && (
@@ -618,23 +650,40 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
                                         )}
                                     </div>
                                     <div className="px-6 py-4 border-t border-[#F5F5F5] flex gap-3 justify-end">
-                                        <button onClick={() => setShowProofModal(false)}
-                                            className="h-[38px] px-4 rounded-[10px] border border-[#EEEEEE] text-[13px] text-[#7C7C7C] hover:bg-[#F5F5F5]">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowProofModal(false)}
+                                            className="h-[38px] px-4 rounded-[10px] border border-[#EEEEEE] text-[13px] text-[#7C7C7C] hover:bg-[#F5F5F5]"
+                                        >
                                             Cancel
                                         </button>
                                         <button
+                                            type="button"
+                                            data-testid="confirm-delivery-proof"
                                             onClick={() => {
+                                                const otp = proofType === 'otp' ? proofNotes.trim() : undefined;
+                                                if (proofType === 'otp' && (!otp || !/^\d{4}$/.test(otp))) {
+                                                    toast.error('Enter the 4-digit customer OTP');
+                                                    return;
+                                                }
                                                 setShowProofModal(false);
-                                                run('delivered', undefined, {
-                                                    proofType: proofType !== 'none' ? proofType : undefined,
-                                                    proofUrl: proofUrl.trim() || undefined,
-                                                    notes: proofNotes.trim() || undefined,
+                                                void run('delivered', undefined, {
+                                                    proofType,
+                                                    proofUrl: proofType === 'photo' ? (proofUrl.trim() || undefined) : undefined,
+                                                    notes:
+                                                        proofType === 'none'
+                                                            ? 'Delivered without OTP'
+                                                            : proofType === 'notes'
+                                                              ? (proofNotes.trim() || undefined)
+                                                              : undefined,
+                                                    ...(otp ? { otp } : {}),
                                                 });
                                             }}
-                                            disabled={busy}
-                                            className="h-[38px] px-5 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] disabled:opacity-50 flex items-center gap-2">
+                                            disabled={busy || (proofType === 'otp' && proofNotes.trim().length < 4)}
+                                            className="h-[38px] px-5 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] disabled:opacity-50 flex items-center gap-2"
+                                        >
                                             {busy && <Loader2 size={12} className="animate-spin" />}
-                                            Confirm
+                                            {proofType === 'none' ? 'Deliver without OTP' : 'Confirm'}
                                         </button>
                                     </div>
                                 </div>
@@ -880,7 +929,7 @@ export default function VendorOrderDetailPage() {
     const handleAction = useCallback(async (
         status: string,
         reason?: string,
-        proof?: { proofType?: string; proofUrl?: string; notes?: string }
+        proof?: { proofType?: string; proofUrl?: string; notes?: string; otp?: string }
     ) => {
         if (!order) return;
         try {
@@ -904,6 +953,13 @@ export default function VendorOrderDetailPage() {
     }, [order, orderId, fetchOrder]);
 
     const handleTimelineStatusChange = useCallback(async (status: string) => {
+        if (status === 'delivered') {
+            await handleAction(status, undefined, {
+                proofType: 'none',
+                notes: 'Delivered without OTP',
+            });
+            return;
+        }
         await handleAction(status);
     }, [handleAction]);
 
@@ -1100,6 +1156,13 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
 
             <OrderEventsPanel events={order.events ?? []} />
 
+            <div className="print:hidden">
+                <LinkedWorkspacesCard
+                    fulfilment={order.fulfilment}
+                    returns={order.returns}
+                />
+            </div>
+
             {order.cancelRequest?.status === 'pending' &&
                 (order.status === 'pending' || order.status === 'confirmed') && (
                 <CancelRequestBanner
@@ -1120,9 +1183,16 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                             </p>
                         )}
                         {order.deliveryProofType && (
-                            <p className="text-[12px] text-[#7C7C7C]">Proof: <span className="font-semibold capitalize">{order.deliveryProofType.replace('_', ' ')}</span></p>
+                            <p className="text-[12px] text-[#7C7C7C]">
+                                Proof:{' '}
+                                <span className="font-semibold capitalize">
+                                    {order.deliveryProofType === 'none'
+                                        ? 'Delivered without OTP'
+                                        : order.deliveryProofType.replace('_', ' ')}
+                                </span>
+                            </p>
                         )}
-                        {order.deliveryNotes && (
+                        {order.deliveryNotes && order.deliveryProofType !== 'none' && (
                             <p className="text-[12px] text-[#7C7C7C]">{order.deliveryNotes}</p>
                         )}
                     </div>

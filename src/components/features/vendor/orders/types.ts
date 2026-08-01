@@ -63,6 +63,18 @@ export interface WorkbenchCancelRequest {
   createdAt: string;
 }
 
+/** Linked Delivery workspace summary — read-only deep-link into `/vendor/delivery`. */
+export interface WorkbenchFulfilmentLink {
+  id: string;
+  status: string;
+}
+
+/** Linked Return Workspace summary (S9) — read-only. */
+export interface WorkbenchReturnLink {
+  id: string;
+  status: string;
+}
+
 export interface WorkbenchOrder {
   id: string;
   orderNumber: string;
@@ -80,6 +92,8 @@ export interface WorkbenchOrder {
   events?: WorkbenchEvent[];
   cancelRequest?: WorkbenchCancelRequest | null;
   attentionReasons?: string[];
+  fulfilment?: WorkbenchFulfilmentLink | null;
+  returns?: WorkbenchReturnLink[];
 }
 
 export const WORKBENCH_STATUS_LABELS: Record<string, string> = {

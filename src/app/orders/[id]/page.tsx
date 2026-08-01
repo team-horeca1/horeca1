@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Home, Package, Store, Clock, CheckCircle2, XCircle, Truck, CreditCard, Star, Loader2, X, ShoppingCart, FileDown, ClipboardList, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, Package, Store, Clock, CheckCircle2, XCircle, Truck, CreditCard, Star, Loader2, X, ShoppingCart, FileDown, ClipboardList, RotateCcw, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useCart } from '@/context/CartContext';
@@ -53,6 +53,9 @@ interface ApiOrder {
     notes?: string | null;
     createdAt: string;
     updatedAt?: string;
+    deliveryOtp?: string | null;
+    deliveryOtpExpiresAt?: string | null;
+    deliveryOtpVerifiedAt?: string | null;
     vendor: ApiOrderVendor;
     items: ApiOrderItem[];
     review?: { rating: number; comment?: string } | null;
@@ -288,6 +291,15 @@ export default function OrderDetailPage() {
     const couponDiscount = Number(order.couponDiscount) || 0;
     const walletApplied = Number(order.walletApplied) || 0;
 
+    const showDeliveryOtp =
+        (order.status === 'shipped' ||
+            order.status === 'out_for_delivery' ||
+            order.status === 'partially_delivered') &&
+        !!order.deliveryOtp &&
+        !order.deliveryOtpVerifiedAt;
+
+    const deliveryConfirmed = !!order.deliveryOtpVerifiedAt;
+
     return (
         <div className="min-h-screen bg-[#F2F3F2]">
             {/* Header */}
@@ -346,6 +358,49 @@ export default function OrderDetailPage() {
                                 <p className="text-[12px] text-gray-400 mt-0.5">{fmtDate(order.createdAt)} · {fmtTime(order.createdAt)}</p>
                             </div>
                         </div>
+
+                        {/* Delivery OTP — share with agent while out for delivery */}
+                        {showDeliveryOtp && (
+                            <div
+                                className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 shadow-sm"
+                                data-testid="delivery-otp-card"
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
+                                        <KeyRound size={18} className="text-indigo-700" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[11px] text-indigo-600 font-bold uppercase tracking-wide mb-1">
+                                            Delivery code
+                                        </p>
+                                        <p className="text-[14px] font-bold text-indigo-950 mb-3">
+                                            Share this code with the delivery agent
+                                        </p>
+                                        <p
+                                            className="text-[clamp(1.75rem,6vw,2.25rem)] font-black tracking-[0.35em] text-indigo-900 tabular-nums font-mono select-all"
+                                            data-testid="delivery-otp-code"
+                                        >
+                                            {order.deliveryOtp}
+                                        </p>
+                                        {order.deliveryOtpExpiresAt && (
+                                            <p className="text-[12px] text-indigo-600/80 font-medium mt-2">
+                                                Valid until {fmtDate(order.deliveryOtpExpiresAt)} · {fmtTime(order.deliveryOtpExpiresAt)}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {deliveryConfirmed && (
+                            <div
+                                className="bg-green-50 border border-green-200 rounded-2xl px-4 py-3 flex items-center gap-2.5"
+                                data-testid="delivery-otp-confirmed"
+                            >
+                                <CheckCircle2 size={16} className="text-green-700 shrink-0" />
+                                <p className="text-[13px] font-bold text-green-800">Delivery confirmed</p>
+                            </div>
+                        )}
 
                         {/* Order progress */}
                         {order.status !== 'cancelled' && (

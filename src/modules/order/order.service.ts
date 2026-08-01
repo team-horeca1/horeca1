@@ -50,6 +50,15 @@ function normalizeVendorPaymentMode(method: string): string {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Dynamic import — breaks OrderService ↔ FulfilmentService module cycle. */
+async function ensureFulfilmentForOrder(
+  orderId: string,
+  opts?: { actorId?: string | null; tx?: Prisma.TransactionClient },
+) {
+  const { fulfilmentService } = await import('@/modules/fulfillment/fulfillment.service');
+  return fulfilmentService.ensureForOrder(orderId, opts);
+}
+
 /** Catalog identity fields snapshotted onto each OrderItem at write time.
  *  Keep in sync with ORDER_ITEM_SNAPSHOT_FIELDS in order-snapshots.ts */
 type OrderLineSnapshot = {
@@ -566,6 +575,8 @@ export class OrderService {
               payload: { reason: 'platform_auto_accept' },
             },
           ]);
+          // S8 — create Fulfilment aggregate on accept (idempotent).
+          await ensureFulfilmentForOrder(order.id, { actorId: userId, tx });
         }
 
         // Reserve inventory (drafts reserve nothing until submitted)
@@ -895,6 +906,8 @@ export class OrderService {
           payload: { reason: 'platform_auto_accept' },
         },
       ]);
+      // S8 — create Fulfilment aggregate on accept (idempotent).
+      await ensureFulfilmentForOrder(order.id, { actorId: ctx.userId, tx });
 
       // Promo Engine Phase 1 — drafts skip cashback at save time; evaluate it
       // now that the order is real. (Drafts can't carry coupons, but compute
@@ -1062,6 +1075,8 @@ export class OrderService {
           payload: { reason: 'platform_auto_accept', via: 'split' },
         },
       ]);
+      // S8 — child order is auto-accepted; ensure its own Fulfilment row.
+      await ensureFulfilmentForOrder(child.id, { actorId: order.userId, tx });
       await tx.order.update({
         where: { id: orderId },
         // Coupon discount + wallet redemption stay on the parent — the child
@@ -1201,15 +1216,16 @@ export class OrderService {
   }
 
   /**
-   * Generate + dispatch a delivery OTP (Phase 5). The vendor/delivery operator
-   * calls this when the order is heading out; the customer receives a 4-digit
-   * code over SMS/email/in-app and reads it to the agent, who enters it on the
-   * delivered transition (proofType='otp') to confirm handover.
+   * Generate + dispatch a delivery OTP (Phase 5). Auto-called (idempotently)
+   * when an order first becomes `shipped` via `ensureDeliveryOtpIfNeeded`;
+   * vendors can also regenerate via `generateDeliveryOtp` / POST delivery-otp.
+   * The customer receives a 4-digit code over SMS (same MSG91 OTP API as login)
+   * and reads it to the agent on the magic-link / delivered transition.
    *
    * Scoped to the order's vendor. Allowed while the order is open
    * (pending through shipped) — never for delivered/cancelled/returned.
-   * The OTP is NOT returned to the caller when emitEvent is true; only the
-   * customer receives it via the OrderDeliveryOtp listener.
+   * SMS is sent directly (login OTP path) so local/dev works without
+   * REGISTER_EVENT_LISTENERS. Event still fans out email/in_app when listeners are on.
    */
   async issueDeliveryOtp(
     orderId: string,
@@ -1220,7 +1236,13 @@ export class OrderService {
 
     const order = await prisma.order.findFirst({
       where: { id: orderId, vendorId },
-      select: { id: true, userId: true, orderNumber: true, status: true },
+      select: {
+        id: true,
+        userId: true,
+        orderNumber: true,
+        status: true,
+        user: { select: { phone: true } },
+      },
     });
     if (!order) throw Errors.notFound('Order');
 
@@ -1238,6 +1260,25 @@ export class OrderService {
     });
 
     if (shouldEmit) {
+      // Same MSG91 Verify OTP path as login — not the notification flow template.
+      if (order.user.phone) {
+        try {
+          const { sendPhoneOtp } = await import('@/lib/providers/otpSms');
+          await sendPhoneOtp(order.user.phone, otp);
+        } catch (err) {
+          console.error('[Order] Delivery OTP SMS failed:', err);
+          throw Errors.badRequest(
+            err instanceof Error
+              ? err.message
+              : 'Failed to send delivery OTP SMS. Try again.',
+          );
+        }
+      } else {
+        console.warn(
+          `[Order] Delivery OTP for ${order.orderNumber}: customer has no phone — code stored only`,
+        );
+      }
+
       emitEvent('OrderDeliveryOtp', {
         orderId: order.id,
         orderNumber: order.orderNumber,
@@ -1265,6 +1306,27 @@ export class OrderService {
 
     const result = await this.issueDeliveryOtp(orderId, vendorId, { emitEvent: true });
     return { sent: true, expiresAt: result.expiresAt };
+  }
+
+  /**
+   * Ensure an active delivery OTP exists (idempotent).
+   * Skips when a non-expired OTP is already on the order so mid-delivery
+   * re-calls (and Fulfilment dispatch retries) do not rotate the code.
+   */
+  async ensureDeliveryOtpIfNeeded(orderId: string, vendorId: string): Promise<void> {
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, vendorId },
+      select: { deliveryOtp: true, deliveryOtpExpiresAt: true },
+    });
+    if (!order) return;
+
+    const now = Date.now();
+    const hasActive =
+      !!order.deliveryOtp &&
+      (!order.deliveryOtpExpiresAt || order.deliveryOtpExpiresAt.getTime() > now);
+    if (hasActive) return;
+
+    await this.issueDeliveryOtp(orderId, vendorId, { emitEvent: true });
   }
 
   /**
@@ -1791,7 +1853,12 @@ export class OrderService {
     force = false,
     actorId?: string | null,
   ) {
-    return prisma.$transaction(async (tx) => {
+    // Set inside the tx when we actually transition → shipped (not a no-op).
+    // Auto-issue OTP runs after commit so Fulfilment dispatch / classic ship
+    // share one hook via syncOrderGate → updateStatus.
+    let becameShipped = false;
+
+    const updated = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
         where: { id: orderId, vendorId },
         include: {
@@ -1831,6 +1898,10 @@ export class OrderService {
       if (order.status === status) {
         // No-op: nothing to change (avoids a spurious side-effect re-run).
         return order;
+      }
+
+      if (status === 'shipped') {
+        becameShipped = true;
       }
 
       // Backorder: reserved remaining = ordered − fulfilled − cancelled.
@@ -1921,6 +1992,12 @@ export class OrderService {
           ...(proof?.proofType ? { proofType: proof.proofType } : {}),
         },
       });
+
+      // S8 — ensure Fulfilment exists when order becomes confirmed (or acceptedAt set).
+      // Idempotent; covers legacy accepted orders that predate the Fulfilment table.
+      if (status === 'confirmed' || extraData.acceptedAt) {
+        await ensureFulfilmentForOrder(orderId, { actorId: actorId ?? null, tx });
+      }
 
       // Credit side-effect — the wallet was already debited at order create, so the
       // only ledger move on a status change is RELEASING that debit when the order
@@ -2045,6 +2122,211 @@ export class OrderService {
 
       return updated;
     });
+
+    // Auto-issue delivery OTP on first transition to Out for Delivery.
+    // Idempotent when an active OTP already exists (OrderCreated / prior issue).
+    if (becameShipped) {
+      try {
+        await this.ensureDeliveryOtpIfNeeded(orderId, vendorId);
+      } catch (err) {
+        // Status is already committed — don't fail the ship if notify/issue fails.
+        console.error('[Order] Auto-issue delivery OTP on shipped failed:', err);
+      }
+    }
+
+    return updated;
+  }
+
+  /**
+   * S9 — create a NEW replacement PO linked to a return.
+   * Does not mutate the original order's line items/prices.
+   * Reserves stock and ensures Fulfilment (auto-accepted).
+   */
+  async createReplacementOrder(input: {
+    returnId: string;
+    vendorId: string;
+    actorId?: string | null;
+    notes?: string;
+    items: Array<{ returnItemId: string; quantity: number }>;
+  }) {
+    if (!input.items.length) {
+      throw Errors.badRequest('Specify at least one return line for replacement');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const ret = await tx.returnRequest.findFirst({
+        where: { id: input.returnId, order: { vendorId: input.vendorId } },
+        include: {
+          items: {
+            include: {
+              orderItem: {
+                select: {
+                  id: true,
+                  productId: true,
+                  productName: true,
+                  productSku: true,
+                  hsn: true,
+                  brand: true,
+                  packSize: true,
+                  categoryName: true,
+                  taxPercent: true,
+                  unitPrice: true,
+                  quantity: true,
+                },
+              },
+            },
+          },
+          order: true,
+        },
+      });
+      if (!ret) throw Errors.notFound('Return request');
+      if (ret.replacementOrderId) {
+        throw Errors.badRequest('Replacement order already exists for this return');
+      }
+
+      const itemMap = new Map(ret.items.map((i) => [i.id, i]));
+      const childItems: OrderLineCreate[] = [];
+      let subtotal = 0;
+
+      for (const line of input.items) {
+        const ri = itemMap.get(line.returnItemId);
+        if (!ri) throw Errors.badRequest(`Return item ${line.returnItemId} not found`);
+        if (ri.decision !== 'approved' && ri.decision !== 'partial') {
+          throw Errors.badRequest(
+            `Cannot replace ${ri.decision} line "${ri.orderItem.productName}"`,
+          );
+        }
+        const maxQty = ri.approvedQty ?? ri.requestedQty;
+        if (line.quantity <= 0 || line.quantity > maxQty) {
+          throw Errors.badRequest(
+            `Invalid replacement qty for "${ri.orderItem.productName}" (max ${maxQty})`,
+          );
+        }
+        const unit = Number(ri.orderItem.unitPrice);
+        const totalPrice = Math.round(unit * line.quantity * 100) / 100;
+        childItems.push({
+          productId: ri.orderItem.productId,
+          productName: ri.orderItem.productName,
+          productSku: ri.orderItem.productSku,
+          hsn: ri.orderItem.hsn,
+          brand: ri.orderItem.brand,
+          packSize: ri.orderItem.packSize,
+          categoryName: ri.orderItem.categoryName,
+          taxPercent: ri.orderItem.taxPercent ?? new Prisma.Decimal(0),
+          quantity: line.quantity,
+          fulfilledQty: line.quantity,
+          unitPrice: ri.orderItem.unitPrice,
+          totalPrice,
+        });
+        subtotal += totalPrice;
+      }
+
+      if (!childItems.length) throw Errors.badRequest('Nothing to replace');
+
+      const fulfillmentOutletId =
+        ret.order.fulfillmentOutletId ??
+        (await this.orderFulfillmentOutletId(
+          { fulfillmentOutletId: ret.order.fulfillmentOutletId, vendorId: input.vendorId },
+          tx,
+        ));
+
+      const stockItems = childItems.map((i) => ({
+        productId: i.productId,
+        quantity: i.quantity,
+      }));
+      const stockCheck = await this.inventoryService.bulkCheck(stockItems, fulfillmentOutletId, tx);
+      const outOfStock = stockCheck.find((s) => !s.available);
+      if (outOfStock) {
+        throw Errors.outOfStock(outOfStock.productName, outOfStock.qtyAvailable);
+      }
+
+      const orderNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}R`;
+      const noteParts = [
+        `Replacement for return ${input.returnId.slice(0, 8)} (invoice ${ret.invoiceNumber ?? ret.order.orderNumber})`,
+        input.notes?.trim(),
+      ].filter(Boolean);
+
+      const child = await tx.order.create({
+        data: {
+          orderNumber,
+          userId: ret.order.userId,
+          vendorId: input.vendorId,
+          businessAccountId: ret.order.businessAccountId,
+          outletId: ret.order.outletId,
+          fulfillmentOutletId,
+          deliveryAddressSnapshot: ret.order.deliveryAddressSnapshot as Prisma.InputJsonValue,
+          status: 'pending',
+          acceptedAt: new Date(),
+          subtotal,
+          totalAmount: subtotal,
+          paymentMethod: 'replacement',
+          paymentStatus: 'paid',
+          salespersonId: ret.order.salespersonId,
+          notes: noteParts.join(' — '),
+          items: { create: childItems },
+        },
+        include: { items: true },
+      });
+
+      await recordOrderEvents(tx, [
+        {
+          orderId: child.id,
+          actorId: input.actorId ?? ret.order.userId,
+          action: ORDER_EVENT_ACTIONS.CREATED,
+          toStatus: 'pending',
+          payload: {
+            orderNumber,
+            via: 'replacement',
+            returnId: input.returnId,
+            originalOrderId: ret.orderId,
+          },
+        },
+        {
+          orderId: child.id,
+          actorId: input.actorId ?? ret.order.userId,
+          action: ORDER_EVENT_ACTIONS.AUTO_ACCEPTED,
+          fromStatus: 'pending',
+          toStatus: 'pending',
+          payload: { reason: 'replacement_auto_accept', returnId: input.returnId },
+        },
+      ]);
+
+      await this.inventoryService.reserveStock(stockItems, fulfillmentOutletId, tx);
+      await ensureFulfilmentForOrder(child.id, {
+        actorId: input.actorId ?? null,
+        tx,
+      });
+
+      await tx.returnRequest.update({
+        where: { id: input.returnId },
+        data: {
+          replacementOrderId: child.id,
+          resolutionType: 'replacement',
+        },
+      });
+
+      return {
+        id: child.id,
+        orderNumber: child.orderNumber,
+        userId: child.userId,
+        vendorId: child.vendorId,
+        totalAmount: subtotal,
+        items: stockItems,
+      };
+    }, { isolationLevel: 'Serializable' });
+
+    setImmediate(() => {
+      emitEvent('OrderCreated', {
+        orderId: result.id,
+        orderNumber: result.orderNumber,
+        userId: result.userId,
+        vendorId: result.vendorId,
+        totalAmount: result.totalAmount,
+        items: result.items,
+      });
+    });
+
+    return { id: result.id, orderNumber: result.orderNumber };
   }
 }
 

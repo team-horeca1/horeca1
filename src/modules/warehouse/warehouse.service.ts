@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
-import { OrderService } from '@/modules/order/order.service';
+import type { OrderService } from '@/modules/order/order.service';
 import type { PicklistItem, GrnItem } from './warehouse.validator';
 import type { PicklistStatus, DispatchStatus, GoodsReceiptStatus, Prisma } from '@prisma/client';
 
@@ -15,8 +15,9 @@ const PICKLIST_TRANSITIONS: Record<PicklistStatus, PicklistStatus[]> = {
 
 const DISPATCH_TRANSITIONS: Record<DispatchStatus, DispatchStatus[]> = {
   pending: ['out_for_delivery', 'cancelled'],
-  out_for_delivery: ['delivered', 'cancelled'],
+  out_for_delivery: ['delivered', 'failed_delivery', 'cancelled'],
   delivered: [],
+  failed_delivery: ['out_for_delivery', 'cancelled'],
   cancelled: [],
 };
 
@@ -43,7 +44,14 @@ function parseGrnItems(items: Prisma.JsonValue): GrnItem[] {
 }
 
 export class WarehouseService {
-  private orderService = new OrderService();
+  private _orderService: OrderService | null = null;
+  private async getOrderService(): Promise<OrderService> {
+    if (!this._orderService) {
+      const mod = await import('@/modules/order/order.service');
+      this._orderService = new mod.OrderService();
+    }
+    return this._orderService;
+  }
 
   async lookupOrders(vendorId: string, outletId: string | undefined, q: string, limit = 8) {
     return prisma.order.findMany({
@@ -207,11 +215,12 @@ export class WarehouseService {
     vendorId: string,
     orderStatus: string,
   ) {
+    const orderService = await this.getOrderService();
     if (orderStatus === 'pending' || orderStatus === 'confirmed') {
-      await this.orderService.updateStatus(orderId, vendorId, 'processing');
-      await this.orderService.updateStatus(orderId, vendorId, 'ready_for_dispatch');
+      await orderService.updateStatus(orderId, vendorId, 'processing');
+      await orderService.updateStatus(orderId, vendorId, 'ready_for_dispatch');
     } else if (orderStatus === 'processing') {
-      await this.orderService.updateStatus(orderId, vendorId, 'ready_for_dispatch');
+      await orderService.updateStatus(orderId, vendorId, 'ready_for_dispatch');
     }
   }
 
@@ -311,7 +320,7 @@ export class WarehouseService {
           select: { status: true },
         });
         if (order && ['ready_for_dispatch', 'processing'].includes(order.status)) {
-          await this.orderService.updateStatus(orderId, vendorId, 'shipped');
+          await (await this.getOrderService()).updateStatus(orderId, vendorId, 'shipped');
         }
       }
 
@@ -358,7 +367,7 @@ export class WarehouseService {
             notes?.trim() ||
             dispatch.notes?.trim() ||
             'Confirmed via warehouse dispatch';
-          await this.orderService.updateStatus(
+          await (await this.getOrderService()).updateStatus(
             dispatch.orderId,
             vendorId,
             'delivered',
