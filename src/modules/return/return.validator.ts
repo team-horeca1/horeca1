@@ -1,10 +1,17 @@
 import { z } from 'zod';
 import {
+  BLOCKED_RETURN_ACTION_MESSAGES,
+  BLOCKED_RETURN_ACTIONS,
+  CREATE_RETURN_TYPES,
   RETURN_DISPOSITIONS,
   RETURN_ITEM_DECISIONS,
   RETURN_ITEM_REASONS,
+  RETURN_PICKUP_FAIL_REASONS,
   RETURN_STATUSES,
   RETURN_TYPES,
+  RETURN_UI_STATUSES,
+  type BlockedReturnAction,
+  type ReturnActionBody,
 } from '@/modules/return/return.types';
 
 const lineDecisionSchema = z.object({
@@ -26,7 +33,9 @@ const dispositionItemSchema = z.object({
 });
 
 export const listReturnsQuerySchema = z.object({
-  status: z.enum(RETURN_STATUSES).optional(),
+  /** Vendor UI chip (`review`, `pickup`, …) or raw DB status — service expands to `in`. */
+  status: z.union([z.enum(RETURN_UI_STATUSES), z.enum(RETURN_STATUSES)]).optional(),
+  /** Includes legacy `replacement` for filters; new creates use CREATE_RETURN_TYPES. */
   type: z.enum(RETURN_TYPES).optional(),
   outletId: z.string().uuid().optional(),
   customerId: z.string().uuid().optional(),
@@ -37,9 +46,15 @@ export const listReturnsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional().default(20),
 });
 
+/** Shared filters for CSV export + summary (no pagination). */
+export const reportReturnsQuerySchema = listReturnsQuerySchema.omit({
+  cursor: true,
+  limit: true,
+});
+
 export const customerCreateReturnSchema = z.object({
   reason: z.string().min(10, 'Please provide more detail (at least 10 characters)').max(2000),
-  type: z.enum(RETURN_TYPES).optional().default('return'),
+  type: z.enum(CREATE_RETURN_TYPES).optional().default('return'),
   items: z
     .array(
       z.object({
@@ -53,7 +68,7 @@ export const customerCreateReturnSchema = z.object({
     .optional(),
 });
 
-export const returnActionSchema = z.discriminatedUnion('action', [
+const activeReturnActionSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('approve'),
     items: z.array(lineDecisionSchema).optional(),
@@ -85,9 +100,19 @@ export const returnActionSchema = z.discriminatedUnion('action', [
     pickupAt: z.string().datetime(),
     pickupAddress: z.string().max(1000).optional(),
     notes: z.string().max(1000).optional(),
+    deliveryBoyName: z.string().trim().max(150).optional(),
+    deliveryBoyPhone: z.string().trim().max(20).optional(),
+  }),
+  z.object({
+    action: z.literal('skip_pickup'),
+    reason: z.string().trim().min(10).max(1000),
+  }),
+  z.object({
+    action: z.literal('resend_pickup_otp'),
   }),
   z.object({
     action: z.literal('mark_goods_received'),
+    otp: z.string().trim().regex(/^\d{4}$/, 'OTP must be a 4-digit code'),
     receivedAt: z.string().datetime().optional(),
     notes: z.string().max(1000).optional(),
   }),
@@ -107,24 +132,7 @@ export const returnActionSchema = z.discriminatedUnion('action', [
     items: z.array(dispositionItemSchema).min(1),
   }),
   z.object({
-    action: z.literal('generate_replacement'),
-    items: z
-      .array(
-        z.object({
-          returnItemId: z.string().uuid(),
-          quantity: z.number().int().positive(),
-        }),
-      )
-      .optional(),
-    notes: z.string().max(1000).optional(),
-  }),
-  z.object({
     action: z.literal('generate_credit_note'),
-    amount: z.number().positive().optional(),
-    notes: z.string().max(1000).optional(),
-  }),
-  z.object({
-    action: z.literal('process_refund'),
     amount: z.number().positive().optional(),
     notes: z.string().max(1000).optional(),
   }),
@@ -133,3 +141,61 @@ export const returnActionSchema = z.discriminatedUnion('action', [
     notes: z.string().max(1000).optional(),
   }),
 ]);
+
+function isBlockedReturnAction(action: unknown): action is BlockedReturnAction {
+  return (
+    typeof action === 'string' &&
+    (BLOCKED_RETURN_ACTIONS as readonly string[]).includes(action)
+  );
+}
+
+/**
+ * Vendor return actions. Blocked actions (`generate_replacement`, `process_refund`)
+ * fail with a clear message before the active union is evaluated.
+ */
+export const returnActionSchema: z.ZodType<ReturnActionBody> = z.preprocess(
+  (raw) => {
+    if (raw && typeof raw === 'object' && 'action' in raw) {
+      const action = (raw as { action: unknown }).action;
+      if (isBlockedReturnAction(action)) {
+        throw new z.ZodError([
+          {
+            code: z.ZodIssueCode.custom,
+            message: BLOCKED_RETURN_ACTION_MESSAGES[action],
+            path: ['action'],
+          },
+        ]);
+      }
+    }
+    return raw;
+  },
+  activeReturnActionSchema,
+) as z.ZodType<ReturnActionBody>;
+
+// ─── Public /r/[token] ───────────────────────────────────────────────────────
+
+export const returnPickupLinkTokenParamSchema = z
+  .string()
+  .trim()
+  .min(16)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/, 'Invalid return pickup link token');
+
+export const returnPickupLinkCompleteSchema = z.object({
+  otp: z.string().trim().regex(/^\d{4}$/, 'OTP must be a 4-digit code'),
+});
+
+export const returnPickupLinkFailSchema = z
+  .object({
+    failedReason: z.enum(RETURN_PICKUP_FAIL_REASONS),
+    failedReasonOther: z.string().trim().max(1000).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.failedReason === 'other' && !val.failedReasonOther?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Please describe the reason when selecting Other',
+        path: ['failedReasonOther'],
+      });
+    }
+  });

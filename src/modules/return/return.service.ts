@@ -14,9 +14,19 @@ import { promotionService } from '@/modules/promotion/promotion.service';
 import { orderService } from '@/modules/order/order.service';
 import type { OrderService } from '@/modules/order/order.service';
 import {
+  issueReturnPickupOtp,
+  returnPickupLinkAbsoluteUrl,
+  returnPickupLinkPath,
+  returnPickupLinkService,
+} from '@/modules/return/return-pickup-link.service';
+import {
   RETURN_DISPOSITIONS,
   RETURN_EVENT_ACTIONS,
+  dbStatusesForReturnUi,
+  isReturnUiStatus,
   mapLegacyReturnStatus,
+  toReturnUiStatus,
+  type CreateReturnType,
   type ReturnActionBody,
   type ReturnDisposition,
   type ReturnStatus,
@@ -25,11 +35,13 @@ import {
 
 const CREDIT_METHODS = ['credit', 'vendor_credit'];
 const WALLET_METHODS = ['h1_wallet', 'wallet'];
+const RETURN_CN_WALLET_REF = 'return_credit_note';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
 type ListFilters = {
-  status?: ReturnStatus;
+  /** UI chip or DB status — expanded via {@link dbStatusesForReturnUi}. */
+  status?: string;
   type?: ReturnRequestType;
   outletId?: string;
   customerId?: string;
@@ -40,9 +52,66 @@ type ListFilters = {
   limit?: number;
 };
 
+/** Filters shared by list / CSV export / summary (no cursor/limit). */
+type ReportFilters = Omit<ListFilters, 'cursor' | 'limit'>;
+
+const EXPORT_MAX_ROWS = 5000;
+
+function csvEscape(v: string | number | null | undefined): string {
+  const s = v == null ? '' : String(v);
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function buildReturnListWhere(vendorId: string, filters: ReportFilters): Prisma.ReturnRequestWhereInput {
+  const createdAtFilter: { gte?: Date; lte?: Date } = {};
+  if (filters.dateFrom) createdAtFilter.gte = new Date(filters.dateFrom);
+  if (filters.dateTo) createdAtFilter.lte = new Date(`${filters.dateTo}T23:59:59Z`);
+
+  const search = filters.search?.trim();
+  const orderWhere: Prisma.OrderWhereInput = { vendorId };
+  if (filters.outletId) orderWhere.outletId = filters.outletId;
+
+  const statusFilter = filters.status
+    ? {
+        status: {
+          in: dbStatusesForReturnUi(
+            isReturnUiStatus(filters.status)
+              ? filters.status
+              : toReturnUiStatus(filters.status),
+          ),
+        },
+      }
+    : {};
+
+  const where: Prisma.ReturnRequestWhereInput = {
+    order: orderWhere,
+    ...statusFilter,
+    ...(filters.type ? { type: filters.type } : {}),
+    ...(filters.customerId ? { customerId: filters.customerId } : {}),
+    ...(Object.keys(createdAtFilter).length > 0 ? { createdAt: createdAtFilter } : {}),
+  };
+
+  if (search) {
+    where.AND = [
+      {
+        OR: [
+          { invoiceNumber: { contains: search, mode: 'insensitive' } },
+          { creditNoteNumber: { contains: search, mode: 'insensitive' } },
+          { order: { orderNumber: { contains: search, mode: 'insensitive' } } },
+          { customer: { fullName: { contains: search, mode: 'insensitive' } } },
+          { customer: { businessName: { contains: search, mode: 'insensitive' } } },
+          { customer: { phone: { contains: search } } },
+        ],
+      },
+    ];
+  }
+
+  return where;
+}
+
 type CustomerCreateInput = {
   reason: string;
-  type?: ReturnRequestType;
+  type?: CreateReturnType;
   items?: Array<{
     orderItemId: string;
     quantity: number;
@@ -212,6 +281,138 @@ function computeApprovedGoodsValue(
   return Math.round(total * 100) / 100;
 }
 
+/** Qty already claimed by non-rejected returns for an order item (pending + approved). */
+function qtyClaimedOnReturnLine(item: {
+  decision: string;
+  requestedQty: number;
+  approvedQty: number | null;
+}): number {
+  if (item.decision === 'rejected') return 0;
+  if (item.decision === 'approved' || item.decision === 'partial') {
+    return item.approvedQty ?? item.requestedQty;
+  }
+  return item.requestedQty;
+}
+
+/**
+ * Remaining returnable qty per order item =
+ * ordered − cancelled − sum(approved/requested on non-rejected returns).
+ */
+export async function remainingReturnableByOrderItem(
+  orderId: string,
+  orderItems: Array<{ id: string; quantity: number; cancelledQty: number | null }>,
+): Promise<Map<string, number>> {
+  const existing = await prisma.returnItem.findMany({
+    where: {
+      orderItemId: { in: orderItems.map((i) => i.id) },
+      returnRequest: { orderId, status: { not: 'rejected' } },
+    },
+    select: {
+      orderItemId: true,
+      decision: true,
+      requestedQty: true,
+      approvedQty: true,
+    },
+  });
+
+  const claimed = new Map<string, number>();
+  for (const row of existing) {
+    claimed.set(row.orderItemId, (claimed.get(row.orderItemId) ?? 0) + qtyClaimedOnReturnLine(row));
+  }
+
+  const remaining = new Map<string, number>();
+  for (const oi of orderItems) {
+    const maxQty = Math.max(0, oi.quantity - (oi.cancelledQty ?? 0));
+    remaining.set(oi.id, Math.max(0, maxQty - (claimed.get(oi.id) ?? 0)));
+  }
+  return remaining;
+}
+
+/** Strip pickup OTP secrets; attach active magic-link metadata for vendor UI. */
+async function toVendorReturnDetail<T extends Record<string, unknown>>(row: T) {
+  const {
+    pickupOtp: _otp,
+    ...rest
+  } = row as T & { pickupOtp?: string | null };
+  void _otp;
+
+  const id = typeof rest.id === 'string' ? rest.id : null;
+  const activeToken = id ? await returnPickupLinkService.getActiveTokenForReturn(id) : null;
+
+  return {
+    ...rest,
+    status: mapLegacyReturnStatus(String(rest.status ?? 'new')),
+    hasPickupOtp: Boolean((row as { pickupOtp?: string | null }).pickupOtp),
+    pickupLink: activeToken
+      ? {
+          path: returnPickupLinkPath(activeToken.token),
+          url: returnPickupLinkAbsoluteUrl(activeToken.token),
+          expiresAt: activeToken.expiresAt.toISOString(),
+          usedAt: activeToken.usedAt?.toISOString() ?? null,
+          deliveryBoyName: activeToken.deliveryBoyName,
+          deliveryBoyPhone: activeToken.deliveryBoyPhone,
+        }
+      : null,
+  };
+}
+
+/**
+ * Credit H1 prepaid Wallet for a CN (Rule 1C). Idempotent on returnId.
+ * DiSCCO repayment is applied separately when outstanding exists.
+ */
+async function creditPrepaidWalletForCreditNote(
+  db: Db,
+  input: {
+    userId: string;
+    returnId: string;
+    amount: number;
+    creditNoteNumber: string;
+  },
+) {
+  const existing = await db.walletTransaction.findFirst({
+    where: {
+      referenceId: input.returnId,
+      referenceType: RETURN_CN_WALLET_REF,
+      type: 'credit',
+    },
+  });
+  if (existing) return;
+
+  const wallet = await db.wallet.upsert({
+    where: { userId: input.userId },
+    create: { userId: input.userId, balance: input.amount },
+    update: { balance: { increment: input.amount } },
+  });
+
+  await db.walletTransaction.create({
+    data: {
+      id: randomUUID(),
+      walletId: wallet.id,
+      type: 'credit',
+      amount: input.amount,
+      referenceId: input.returnId,
+      referenceType: RETURN_CN_WALLET_REF,
+      notes: `Credit note ${input.creditNoteNumber}`,
+    },
+  });
+}
+
+function approvedLinesNeedDisposition(
+  items: Array<{
+    decision: string;
+    approvedQty: number | null;
+    requestedQty: number;
+    disposition: string | null;
+  }>,
+): boolean {
+  return items.some((item) => {
+    if (item.decision !== 'approved' && item.decision !== 'partial') return false;
+    const qty = item.approvedQty ?? item.requestedQty;
+    if (qty <= 0) return false;
+    return !item.disposition;
+  });
+}
+
 export async function notifyReturnSubmitted(returnRequestId: string): Promise<void> {
   const req = await prisma.returnRequest.findUnique({
     where: { id: returnRequestId },
@@ -266,10 +467,10 @@ export async function notifyReturnReviewed(returnRequestId: string): Promise<voi
   } else if (status === 'approved' || req.status === 'approved') {
     title = 'Return approved';
     body = note
-      ? `Your return for ${req.order.orderNumber} was approved. Refund will be processed by HoReCa1. Store note: ${note}`
-      : `Your return for ${req.order.orderNumber} was approved. Refund will be processed by HoReCa1.`;
+      ? `Your return for ${req.order.orderNumber} was approved. The store will issue a credit note or schedule a pickup. Store note: ${note}`
+      : `Your return for ${req.order.orderNumber} was approved. The store will issue a credit note or schedule a pickup.`;
   } else if (req.status === 'resolved' || status === 'closed') {
-    const kind = req.resolutionType === 'credit_note' ? 'credit note' : 'replacement';
+    const kind = req.resolutionType === 'credit_note' ? 'credit note' : 'resolution';
     title = 'Return resolved';
     body = note
       ? `Your return for ${req.order.orderNumber} was resolved via ${kind}. Store note: ${note}`
@@ -604,14 +805,7 @@ export class ReturnService {
       throw Errors.badRequest('Returns can only be requested for delivered orders');
     }
 
-    const open = await prisma.returnRequest.findFirst({
-      where: {
-        orderId,
-        status: { notIn: ['rejected', 'closed'] },
-      },
-    });
-    if (open) throw Errors.badRequest('A return request already exists for this order');
-
+    const remaining = await remainingReturnableByOrderItem(orderId, order.items);
     const type = input.type ?? 'return';
     let lineCreates: Array<{
       id: string;
@@ -626,10 +820,13 @@ export class ReturnService {
       for (const line of input.items) {
         const oi = itemMap.get(line.orderItemId);
         if (!oi) throw Errors.badRequest(`Order item ${line.orderItemId} not on this order`);
-        const maxQty = Math.max(0, oi.quantity - (oi.cancelledQty ?? 0));
+        const maxQty = remaining.get(line.orderItemId) ?? 0;
+        if (maxQty <= 0) {
+          throw Errors.badRequest(`No remaining returnable qty for "${oi.productName}"`);
+        }
         if (line.quantity > maxQty) {
           throw Errors.badRequest(
-            `Requested qty ${line.quantity} exceeds available ${maxQty} for "${oi.productName}"`,
+            `Requested qty ${line.quantity} exceeds remaining returnable ${maxQty} for "${oi.productName}"`,
           );
         }
         lineCreates.push({
@@ -641,10 +838,10 @@ export class ReturnService {
         });
       }
     } else {
-      // Whole-order fallback: one line per accepted order item.
+      // Whole-order fallback: one line per item with remaining returnable qty.
       lineCreates = order.items
         .map((oi) => {
-          const qty = Math.max(0, oi.quantity - (oi.cancelledQty ?? 0));
+          const qty = remaining.get(oi.id) ?? 0;
           if (qty <= 0) return null;
           return {
             id: randomUUID(),
@@ -658,7 +855,7 @@ export class ReturnService {
     }
 
     if (lineCreates.length === 0) {
-      throw Errors.badRequest('No returnable items on this order');
+      throw Errors.badRequest('No returnable items remaining on this order');
     }
 
     const created = await prisma.returnRequest.create({
@@ -689,41 +886,12 @@ export class ReturnService {
     });
 
     void notifyReturnSubmitted(created.id);
-    return created;
+    return toVendorReturnDetail(created);
   }
 
   async list(vendorId: string, filters: ListFilters = {}) {
     const limit = filters.limit ?? 20;
-    const createdAtFilter: { gte?: Date; lte?: Date } = {};
-    if (filters.dateFrom) createdAtFilter.gte = new Date(filters.dateFrom);
-    if (filters.dateTo) createdAtFilter.lte = new Date(`${filters.dateTo}T23:59:59Z`);
-
-    const search = filters.search?.trim();
-    const orderWhere: Prisma.OrderWhereInput = { vendorId };
-    if (filters.outletId) orderWhere.outletId = filters.outletId;
-
-    const where: Prisma.ReturnRequestWhereInput = {
-      order: orderWhere,
-      ...(filters.status ? { status: filters.status } : {}),
-      ...(filters.type ? { type: filters.type } : {}),
-      ...(filters.customerId ? { customerId: filters.customerId } : {}),
-      ...(Object.keys(createdAtFilter).length > 0 ? { createdAt: createdAtFilter } : {}),
-    };
-
-    if (search) {
-      where.AND = [
-        {
-          OR: [
-            { invoiceNumber: { contains: search, mode: 'insensitive' } },
-            { creditNoteNumber: { contains: search, mode: 'insensitive' } },
-            { order: { orderNumber: { contains: search, mode: 'insensitive' } } },
-            { customer: { fullName: { contains: search, mode: 'insensitive' } } },
-            { customer: { businessName: { contains: search, mode: 'insensitive' } } },
-            { customer: { phone: { contains: search } } },
-          ],
-        },
-      ];
-    }
+    const where = buildReturnListWhere(vendorId, filters);
 
     const rows = await prisma.returnRequest.findMany({
       where,
@@ -737,13 +905,308 @@ export class ReturnService {
     const data = hasMore ? rows.slice(0, limit) : rows;
     const nextCursor = hasMore ? data[data.length - 1]?.id ?? null : null;
 
+    // Batch-attach active pickup magic links (Fulfilment table parity).
+    const pickupIds = data
+      .filter((r) => mapLegacyReturnStatus(r.status) === 'pickup_scheduled')
+      .map((r) => r.id);
+    const tokenByReturn = new Map<
+      string,
+      {
+        token: string;
+        expiresAt: Date;
+        usedAt: Date | null;
+        deliveryBoyName: string | null;
+        deliveryBoyPhone: string | null;
+      }
+    >();
+    if (pickupIds.length > 0) {
+      const tokens = await prisma.returnPickupAccessToken.findMany({
+        where: {
+          returnRequestId: { in: pickupIds },
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          returnRequestId: true,
+          token: true,
+          expiresAt: true,
+          usedAt: true,
+          deliveryBoyName: true,
+          deliveryBoyPhone: true,
+        },
+      });
+      for (const t of tokens) {
+        if (!tokenByReturn.has(t.returnRequestId)) {
+          tokenByReturn.set(t.returnRequestId, t);
+        }
+      }
+    }
+
     return {
-      data: data.map((r) => ({
-        ...r,
-        status: mapLegacyReturnStatus(r.status),
-      })),
+      data: data.map((r) => {
+        const { pickupOtp: _otp, ...rest } = r;
+        void _otp;
+        const token = tokenByReturn.get(r.id);
+        return {
+          ...rest,
+          status: mapLegacyReturnStatus(r.status),
+          hasPickupOtp: Boolean(r.pickupOtp),
+          pickupLink: token
+            ? {
+                path: returnPickupLinkPath(token.token),
+                url: returnPickupLinkAbsoluteUrl(token.token),
+                expiresAt: token.expiresAt.toISOString(),
+                usedAt: token.usedAt?.toISOString() ?? null,
+                deliveryBoyName: token.deliveryBoyName,
+                deliveryBoyPhone: token.deliveryBoyPhone,
+              }
+            : null,
+        };
+      }),
       nextCursor,
       hasMore,
+    };
+  }
+
+  /**
+   * Full CSV of filtered returns (period + status + other workspace filters).
+   * No replacement report — type filter may still include legacy rows.
+   */
+  async exportCsv(vendorId: string, filters: ReportFilters = {}): Promise<string> {
+    const where = buildReturnListWhere(vendorId, filters);
+    const rows = await prisma.returnRequest.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: EXPORT_MAX_ROWS,
+      select: {
+        id: true,
+        status: true,
+        type: true,
+        reason: true,
+        invoiceNumber: true,
+        creditNoteNumber: true,
+        creditNoteAmount: true,
+        refundAmount: true,
+        resolutionType: true,
+        pickupAt: true,
+        goodsReceivedAt: true,
+        pickupSkippedAt: true,
+        createdAt: true,
+        customer: {
+          select: {
+            fullName: true,
+            businessName: true,
+            phone: true,
+            email: true,
+          },
+        },
+        order: {
+          select: {
+            orderNumber: true,
+            outlet: { select: { name: true } },
+          },
+        },
+        items: {
+          select: {
+            requestedQty: true,
+            approvedQty: true,
+            reason: true,
+            decision: true,
+            orderItem: { select: { productName: true, productSku: true } },
+          },
+        },
+      },
+    });
+
+    const header = [
+      'Return ID',
+      'Status',
+      'Type',
+      'Order / Invoice',
+      'Customer',
+      'Business',
+      'Phone',
+      'Email',
+      'Outlet',
+      'Header Reason',
+      'Line Reasons',
+      'Items',
+      'Requested Qty',
+      'Approved Qty',
+      'Credit Note #',
+      'Credit Note Amount',
+      'Refund Amount',
+      'Resolution',
+      'Pickup At',
+      'Goods Received At',
+      'Pickup Skipped',
+      'Created At',
+    ];
+
+    const body = rows.map((r) => {
+      const uiStatus = toReturnUiStatus(r.status);
+      const requestedQty = r.items.reduce((s, i) => s + i.requestedQty, 0);
+      const approvedQty = r.items.reduce((s, i) => s + (i.approvedQty ?? 0), 0);
+      const lineReasons = [...new Set(r.items.map((i) => i.reason))].join('; ');
+      return [
+        r.id,
+        uiStatus,
+        r.type,
+        r.invoiceNumber ?? r.order.orderNumber,
+        r.customer.fullName,
+        r.customer.businessName ?? '',
+        r.customer.phone ?? '',
+        r.customer.email ?? '',
+        r.order.outlet?.name ?? '',
+        r.reason,
+        lineReasons,
+        r.items.length,
+        requestedQty,
+        approvedQty,
+        r.creditNoteNumber ?? '',
+        r.creditNoteAmount != null ? Number(r.creditNoteAmount).toFixed(2) : '',
+        r.refundAmount != null ? Number(r.refundAmount).toFixed(2) : '',
+        r.resolutionType ?? '',
+        r.pickupAt?.toISOString() ?? '',
+        r.goodsReceivedAt?.toISOString() ?? '',
+        r.pickupSkippedAt ? 'yes' : 'no',
+        r.createdAt.toISOString(),
+      ];
+    });
+
+    return [header, ...body].map((row) => row.map(csvEscape).join(',')).join('\n');
+  }
+
+  /**
+   * Lightweight summary for flows 27–29: counts by status, reason, customer, product.
+   * Explicitly omits any replacement report (Rule 9).
+   */
+  async summarize(vendorId: string, filters: ReportFilters = {}) {
+    const base = buildReturnListWhere(vendorId, {
+      ...filters,
+      // Never scope summary to replacement type (Rule 9 — no Replacement report).
+      type: filters.type === 'replacement' ? undefined : filters.type,
+    });
+    const summaryWhere: Prisma.ReturnRequestWhereInput = {
+      AND: [base, { type: { not: 'replacement' } }],
+    };
+
+    const returns = await prisma.returnRequest.findMany({
+      where: summaryWhere,
+      select: {
+        id: true,
+        status: true,
+        customerId: true,
+        creditNoteAmount: true,
+        refundAmount: true,
+        customer: {
+          select: { id: true, fullName: true, businessName: true },
+        },
+        items: {
+          select: {
+            reason: true,
+            requestedQty: true,
+            approvedQty: true,
+            orderItem: {
+              select: {
+                productId: true,
+                productName: true,
+                productSku: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const byStatusMap = new Map<string, number>();
+    const byReasonMap = new Map<string, { count: number; qty: number }>();
+    const byCustomerMap = new Map<
+      string,
+      { customerId: string; name: string; count: number; creditNoteTotal: number }
+    >();
+    const byProductMap = new Map<
+      string,
+      {
+        productId: string;
+        productName: string;
+        productSku: string | null;
+        returnCount: number;
+        requestedQty: number;
+        approvedQty: number;
+      }
+    >();
+
+    for (const r of returns) {
+      const ui = toReturnUiStatus(r.status);
+      byStatusMap.set(ui, (byStatusMap.get(ui) ?? 0) + 1);
+
+      const custName =
+        r.customer.businessName?.trim() || r.customer.fullName || '—';
+      const cust = byCustomerMap.get(r.customerId) ?? {
+        customerId: r.customerId,
+        name: custName,
+        count: 0,
+        creditNoteTotal: 0,
+      };
+      cust.count += 1;
+      cust.creditNoteTotal += Number(r.creditNoteAmount ?? 0);
+      byCustomerMap.set(r.customerId, cust);
+
+      const seenProducts = new Set<string>();
+      for (const item of r.items) {
+        const reasonKey = item.reason;
+        const reasonRow = byReasonMap.get(reasonKey) ?? { count: 0, qty: 0 };
+        reasonRow.count += 1;
+        reasonRow.qty += item.requestedQty;
+        byReasonMap.set(reasonKey, reasonRow);
+
+        const pid = item.orderItem.productId;
+        const prod = byProductMap.get(pid) ?? {
+          productId: pid,
+          productName: item.orderItem.productName,
+          productSku: item.orderItem.productSku,
+          returnCount: 0,
+          requestedQty: 0,
+          approvedQty: 0,
+        };
+        if (!seenProducts.has(pid)) {
+          prod.returnCount += 1;
+          seenProducts.add(pid);
+        }
+        prod.requestedQty += item.requestedQty;
+        prod.approvedQty += item.approvedQty ?? 0;
+        byProductMap.set(pid, prod);
+      }
+    }
+
+    const byStatus = [...byStatusMap.entries()]
+      .map(([status, count]) => ({ status, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const byReason = [...byReasonMap.entries()]
+      .map(([reason, v]) => ({ reason, count: v.count, qty: v.qty }))
+      .sort((a, b) => b.count - a.count);
+
+    const byCustomer = [...byCustomerMap.values()]
+      .map((c) => ({
+        ...c,
+        creditNoteTotal: Math.round(c.creditNoteTotal * 100) / 100,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 50);
+
+    const byProduct = [...byProductMap.values()]
+      .sort((a, b) => b.requestedQty - a.requestedQty)
+      .slice(0, 50);
+
+    return {
+      total: returns.length,
+      byStatus,
+      byReason,
+      byCustomer,
+      byProduct,
     };
   }
 
@@ -753,7 +1216,34 @@ export class ReturnService {
       include: DETAIL_INCLUDE,
     });
     if (!row) throw Errors.notFound('Return request');
-    return { ...row, status: mapLegacyReturnStatus(row.status) };
+    return toVendorReturnDetail(row);
+  }
+
+  /**
+   * First vendor touch: new → under_review (event), then the decision proceeds.
+   */
+  private async ensureUnderReview(
+    tx: Prisma.TransactionClient,
+    ret: { id: string; status: string },
+    actorId?: string | null,
+  ): Promise<string> {
+    const normalized = mapLegacyReturnStatus(ret.status);
+    if (normalized !== 'new' && ret.status !== 'pending') {
+      return ret.status;
+    }
+    await tx.returnRequest.update({
+      where: { id: ret.id },
+      data: { status: 'under_review' },
+    });
+    await appendReturnEvent(tx, {
+      returnRequestId: ret.id,
+      actorId,
+      action: RETURN_EVENT_ACTIONS.STATUS_CHANGED,
+      fromStatus: ret.status,
+      toStatus: 'under_review',
+      payload: { via: 'vendor_review' },
+    });
+    return 'under_review';
   }
 
   async dispatchAction(
@@ -771,6 +1261,10 @@ export class ReturnService {
         return this.reject(vendorId, returnId, body, actorId);
       case 'schedule_pickup':
         return this.schedulePickup(vendorId, returnId, body, actorId);
+      case 'skip_pickup':
+        return this.skipPickup(vendorId, returnId, body, actorId);
+      case 'resend_pickup_otp':
+        return this.resendPickupOtp(vendorId, returnId, body, actorId);
       case 'mark_goods_received':
         return this.markGoodsReceived(vendorId, returnId, body, actorId);
       case 'complete_inspection':
@@ -779,12 +1273,8 @@ export class ReturnService {
         return this.rejectGoods(vendorId, returnId, body, actorId);
       case 'set_disposition':
         return this.setDisposition(vendorId, returnId, body, actorId);
-      case 'generate_replacement':
-        return this.generateReplacement(vendorId, returnId, body, actorId);
       case 'generate_credit_note':
         return this.generateCreditNote(vendorId, returnId, body, actorId);
-      case 'process_refund':
-        return this.processRefund(vendorId, returnId, body, actorId);
       case 'close':
         return this.close(vendorId, returnId, body, actorId);
       default: {
@@ -830,6 +1320,7 @@ export class ReturnService {
             businessAccountId: true,
             deliveryAddressSnapshot: true,
             salespersonId: true,
+            user: { select: { phone: true } },
           },
         },
       },
@@ -895,6 +1386,8 @@ export class ReturnService {
     assertStatus(ret.status, ['new', 'under_review'], 'approve');
 
     await prisma.$transaction(async (tx) => {
+      const fromStatus = await this.ensureUnderReview(tx, ret, actorId);
+
       if (body.items?.length) {
         await this.applyLineDecisions(tx, returnId, ret.items, body.items);
       } else if (ret.items.length > 0) {
@@ -911,7 +1404,8 @@ export class ReturnService {
         data: {
           status: 'approved',
           adminNote: body.adminNote?.trim() || ret.adminNote,
-          resolutionType: ret.resolutionType ?? (ret.type === 'replacement' ? 'replacement' : 'refund'),
+          // Resolution is set on generate_credit_note (vendor two-path model).
+          resolutionType: null,
         },
       });
 
@@ -919,7 +1413,7 @@ export class ReturnService {
         returnRequestId: returnId,
         actorId,
         action: RETURN_EVENT_ACTIONS.APPROVED,
-        fromStatus: ret.status,
+        fromStatus,
         toStatus: 'approved',
         payload: { adminNote: body.adminNote ?? null },
       });
@@ -942,6 +1436,7 @@ export class ReturnService {
     }
 
     await prisma.$transaction(async (tx) => {
+      const fromStatus = await this.ensureUnderReview(tx, ret, actorId);
       await this.applyLineDecisions(tx, returnId, ret.items, body.items);
 
       await tx.returnRequest.update({
@@ -949,7 +1444,7 @@ export class ReturnService {
         data: {
           status: 'approved',
           adminNote: body.adminNote?.trim() || ret.adminNote,
-          resolutionType: ret.resolutionType ?? 'refund',
+          resolutionType: null,
         },
       });
 
@@ -957,7 +1452,7 @@ export class ReturnService {
         returnRequestId: returnId,
         actorId,
         action: RETURN_EVENT_ACTIONS.PARTIAL_APPROVED,
-        fromStatus: ret.status,
+        fromStatus,
         toStatus: 'approved',
         payload: { decisions: body.items },
       });
@@ -978,6 +1473,7 @@ export class ReturnService {
     const note = (body.adminNote ?? body.reason).trim();
 
     await prisma.$transaction(async (tx) => {
+      const fromStatus = await this.ensureUnderReview(tx, ret, actorId);
       for (const item of ret.items) {
         await tx.returnItem.update({
           where: { id: item.id },
@@ -992,7 +1488,7 @@ export class ReturnService {
         returnRequestId: returnId,
         actorId,
         action: RETURN_EVENT_ACTIONS.REJECTED,
-        fromStatus: ret.status,
+        fromStatus,
         toStatus: 'rejected',
         payload: { reason: body.reason },
       });
@@ -1013,7 +1509,7 @@ export class ReturnService {
     const pickupAt = new Date(body.pickupAt);
     if (Number.isNaN(pickupAt.getTime())) throw Errors.badRequest('Invalid pickupAt');
 
-    await prisma.$transaction(async (tx) => {
+    const link = await prisma.$transaction(async (tx) => {
       await tx.returnRequest.update({
         where: { id: returnId },
         data: {
@@ -1021,8 +1517,18 @@ export class ReturnService {
           pickupAt,
           pickupAddress: body.pickupAddress?.trim() || ret.pickupAddress,
           pickupNotes: body.notes?.trim() || ret.pickupNotes,
+          // Starting physical pickup clears any prior skip-pickup audit.
+          pickupSkippedAt: null,
+          pickupSkipReason: null,
         },
       });
+
+      const tokenRow = await returnPickupLinkService.createToken(tx, {
+        returnRequestId: returnId,
+        deliveryBoyName: body.deliveryBoyName,
+        deliveryBoyPhone: body.deliveryBoyPhone,
+      });
+
       await appendReturnEvent(tx, {
         returnRequestId: returnId,
         actorId,
@@ -1033,10 +1539,83 @@ export class ReturnService {
           pickupAt: pickupAt.toISOString(),
           pickupAddress: body.pickupAddress ?? null,
           notes: body.notes ?? null,
+          deliveryBoyName: body.deliveryBoyName ?? null,
+          deliveryBoyPhone: body.deliveryBoyPhone ?? null,
+          pickupLinkPath: tokenRow.path,
         },
+      });
+
+      return {
+        path: tokenRow.path,
+        url: tokenRow.url,
+        expiresAt: tokenRow.expiresAt,
+        token: tokenRow.token,
+      };
+    });
+
+    // Do not SMS OTP here — delivery-parity: OTP is sent only when the boy
+    // taps Complete on /r (request-otp), or when vendor explicitly resends.
+
+    const detail = await this.getById(vendorId, returnId);
+    return {
+      ...detail,
+      pickupLink: {
+        path: link.path,
+        url: link.url,
+        expiresAt: link.expiresAt.toISOString(),
+        usedAt: null,
+        deliveryBoyName: body.deliveryBoyName ?? null,
+        deliveryBoyPhone: body.deliveryBoyPhone ?? null,
+      },
+    };
+  }
+
+  private async skipPickup(
+    vendorId: string,
+    returnId: string,
+    body: Extract<ReturnActionBody, { action: 'skip_pickup' }>,
+    actorId?: string | null,
+  ) {
+    const ret = await this.loadForVendor(vendorId, returnId);
+    assertStatus(ret.status, ['approved'], 'skip_pickup');
+    const reason = body.reason.trim();
+    if (reason.length < 10) {
+      throw Errors.badRequest('Skip pickup requires a reason (at least 10 characters)');
+    }
+
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.returnRequest.update({
+        where: { id: returnId },
+        data: {
+          pickupSkippedAt: now,
+          pickupSkipReason: reason,
+        },
+      });
+      await appendReturnEvent(tx, {
+        returnRequestId: returnId,
+        actorId,
+        action: RETURN_EVENT_ACTIONS.PICKUP_SKIPPED,
+        fromStatus: ret.status,
+        toStatus: ret.status,
+        payload: { reason, skippedAt: now.toISOString() },
       });
     });
 
+    return this.getById(vendorId, returnId);
+  }
+
+  private async resendPickupOtp(
+    vendorId: string,
+    returnId: string,
+    body: Extract<ReturnActionBody, { action: 'resend_pickup_otp' }>,
+    actorId?: string | null,
+  ) {
+    void body;
+    const ret = await this.loadForVendor(vendorId, returnId);
+    assertStatus(ret.status, ['pickup_scheduled'], 'resend_pickup_otp');
+
+    await issueReturnPickupOtp(returnId, { sendSms: true, actorId });
     return this.getById(vendorId, returnId);
   }
 
@@ -1047,8 +1626,25 @@ export class ReturnService {
     actorId?: string | null,
   ) {
     const ret = await this.loadForVendor(vendorId, returnId);
-    assertStatus(ret.status, ['pickup_scheduled', 'approved'], 'mark_goods_received');
-    const receivedAt = body.receivedAt ? new Date(body.receivedAt) : new Date();
+    assertStatus(ret.status, ['pickup_scheduled'], 'mark_goods_received');
+
+    const now = new Date();
+    const code = body.otp.trim();
+    if (!ret.pickupOtp) {
+      throw Errors.badRequest(
+        'No pickup OTP on this return. Resend OTP to the customer, then retry.',
+      );
+    }
+    if (code !== ret.pickupOtp) {
+      throw Errors.badRequest(
+        'Pickup OTP does not match. Ask the customer for the code sent to their phone.',
+      );
+    }
+    if (ret.pickupOtpExpiresAt && ret.pickupOtpExpiresAt < now) {
+      throw Errors.badRequest('Pickup OTP has expired. Resend OTP and retry.');
+    }
+
+    const receivedAt = body.receivedAt ? new Date(body.receivedAt) : now;
     if (Number.isNaN(receivedAt.getTime())) throw Errors.badRequest('Invalid receivedAt');
 
     await prisma.$transaction(async (tx) => {
@@ -1057,16 +1653,28 @@ export class ReturnService {
         data: {
           status: 'goods_received',
           goodsReceivedAt: receivedAt,
+          pickupOtpVerifiedAt: now,
           pickupNotes: body.notes?.trim() || ret.pickupNotes,
         },
       });
+
+      // Mark active magic-link tokens used so boy page flips to complete.
+      await tx.returnPickupAccessToken.updateMany({
+        where: { returnRequestId: returnId, revokedAt: null, usedAt: null },
+        data: { usedAt: now },
+      });
+
       await appendReturnEvent(tx, {
         returnRequestId: returnId,
         actorId,
         action: RETURN_EVENT_ACTIONS.GOODS_RECEIVED,
         fromStatus: ret.status,
         toStatus: 'goods_received',
-        payload: { receivedAt: receivedAt.toISOString(), notes: body.notes ?? null },
+        payload: {
+          receivedAt: receivedAt.toISOString(),
+          notes: body.notes ?? null,
+          via: 'vendor_override',
+        },
       });
     });
 
@@ -1306,66 +1914,6 @@ export class ReturnService {
     }
   }
 
-  private async generateReplacement(
-    vendorId: string,
-    returnId: string,
-    body: Extract<ReturnActionBody, { action: 'generate_replacement' }>,
-    actorId?: string | null,
-  ) {
-    const ret = await this.loadForVendor(vendorId, returnId);
-    assertStatus(
-      ret.status,
-      ['approved', 'pickup_scheduled', 'goods_received', 'inspection_completed'],
-      'generate_replacement',
-    );
-    if (ret.replacementOrderId) {
-      throw Errors.badRequest('Replacement order already generated for this return');
-    }
-
-    const lines =
-      body.items ??
-      ret.items
-        .filter((i) => i.decision === 'approved' || i.decision === 'partial')
-        .map((i) => ({
-          returnItemId: i.id,
-          quantity: i.approvedQty ?? i.requestedQty,
-        }))
-        .filter((l) => l.quantity > 0);
-
-    if (!lines.length) {
-      throw Errors.badRequest('No approved lines to generate a replacement for');
-    }
-
-    const orderServiceInstance = await this.getOrderService();
-    const replacement = await orderServiceInstance.createReplacementOrder({
-      returnId,
-      vendorId,
-      actorId: actorId ?? null,
-      notes: body.notes,
-      items: lines,
-    });
-
-    await appendReturnEvent(prisma, {
-      returnRequestId: returnId,
-      actorId,
-      action: RETURN_EVENT_ACTIONS.REPLACEMENT_GENERATED,
-      fromStatus: ret.status,
-      toStatus: ret.status,
-      payload: {
-        replacementOrderId: replacement.id,
-        orderNumber: replacement.orderNumber,
-        notes: body.notes ?? null,
-      },
-    });
-
-    await prisma.returnRequest.update({
-      where: { id: returnId },
-      data: { resolutionType: 'replacement' },
-    });
-
-    return this.getById(vendorId, returnId);
-  }
-
   private async generateCreditNote(
     vendorId: string,
     returnId: string,
@@ -1373,13 +1921,19 @@ export class ReturnService {
     actorId?: string | null,
   ) {
     const ret = await this.loadForVendor(vendorId, returnId);
-    assertStatus(
-      ret.status,
-      ['approved', 'pickup_scheduled', 'goods_received', 'inspection_completed'],
-      'generate_credit_note',
-    );
+    // Two-path model: CN from approved (direct / after skip), or after pickup
+    // path completes disposition. Never mid-pickup (pickup_scheduled / goods_received).
+    assertStatus(ret.status, ['approved', 'inspection_completed'], 'generate_credit_note');
     if (ret.creditNoteNumber) {
       throw Errors.badRequest('Credit note already generated');
+    }
+
+    if (mapLegacyReturnStatus(ret.status) === 'inspection_completed') {
+      if (approvedLinesNeedDisposition(ret.items)) {
+        throw Errors.badRequest(
+          'Set disposition on all approved lines before generating a credit note',
+        );
+      }
     }
 
     const goodsValue = computeApprovedGoodsValue(ret.items);
@@ -1389,6 +1943,7 @@ export class ReturnService {
     if (!(amount > 0)) throw Errors.badRequest('Credit note amount must be greater than zero');
 
     const creditNoteNumber = `CN-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+    const skipped = !!ret.pickupSkippedAt;
 
     await prisma.$transaction(async (tx) => {
       await tx.returnRequest.update({
@@ -1401,107 +1956,43 @@ export class ReturnService {
         },
       });
 
+      await creditPrepaidWalletForCreditNote(tx, {
+        userId: ret.order.userId,
+        returnId,
+        amount,
+        creditNoteNumber,
+      });
+
       await appendReturnEvent(tx, {
         returnRequestId: returnId,
         actorId,
         action: RETURN_EVENT_ACTIONS.CREDIT_NOTE_GENERATED,
         fromStatus: ret.status,
         toStatus: ret.status,
-        payload: { creditNoteNumber, amount, notes: body.notes ?? null },
+        payload: {
+          creditNoteNumber,
+          amount,
+          notes: body.notes ?? null,
+          walletCredited: true,
+          pickupSkipped: skipped,
+        },
       });
     });
 
+    // DiSCCO outstanding reduction (Rule 1C) — after prepaid wallet credit.
     const wallet = await prisma.creditWallet.findFirst({
       where: { userId: ret.order.userId, vendorId },
     });
     if (wallet && Number(wallet.outstandingAmount) > 0) {
       const applyAmt = Math.min(amount, Number(wallet.outstandingAmount));
-      await creditWalletService.applyRepayment(
-        wallet.id,
-        applyAmt,
-        'CREDIT_NOTE',
-        undefined,
-        undefined,
-        `Credit note ${creditNoteNumber} on return ${returnId}`,
-      );
-    }
-
-    return this.getById(vendorId, returnId);
-  }
-
-  /**
-   * Vendor-side refund intent. Razorpay gateway refunds stay on admin path.
-   * Credit/wallet methods apply reversal immediately; online flags amount for admin.
-   */
-  private async processRefund(
-    vendorId: string,
-    returnId: string,
-    body: Extract<ReturnActionBody, { action: 'process_refund' }>,
-    actorId?: string | null,
-  ) {
-    const ret = await this.loadForVendor(vendorId, returnId);
-    assertStatus(
-      ret.status,
-      ['approved', 'pickup_scheduled', 'goods_received', 'inspection_completed'],
-      'process_refund',
-    );
-    if (ret.resolutionType && ret.resolutionType !== 'refund') {
-      throw Errors.badRequest(
-        `Cannot process refund when resolution is "${ret.resolutionType}"`,
-      );
-    }
-
-    const goodsValue = computeApprovedGoodsValue(ret.items);
-    const amount =
-      body.amount ??
-      (Number(ret.refundAmount ?? 0) > 0
-        ? Number(ret.refundAmount)
-        : goodsValue > 0
-          ? goodsValue
-          : Number(ret.order.totalAmount));
-    if (!(amount > 0)) throw Errors.badRequest('Refund amount must be greater than zero');
-
-    const method = ret.order.paymentMethod;
-
-    await prisma.$transaction(async (tx) => {
-      await tx.returnRequest.update({
-        where: { id: returnId },
-        data: {
-          resolutionType: 'refund',
-          refundAmount: amount,
-          adminNote: body.notes?.trim() || ret.adminNote,
-        },
-      });
-
-      await appendReturnEvent(tx, {
-        returnRequestId: returnId,
-        actorId,
-        action: RETURN_EVENT_ACTIONS.REFUND_PROCESSED,
-        fromStatus: ret.status,
-        toStatus: ret.status,
-        payload: {
-          amount,
-          notes: body.notes ?? null,
-          gateway: method && !CREDIT_METHODS.includes(method) && !WALLET_METHODS.includes(method)
-            ? 'pending_admin'
-            : 'vendor_applied',
-        },
-      });
-    });
-
-    if (method && CREDIT_METHODS.includes(method)) {
-      const wallet = await prisma.creditWallet.findFirst({
-        where: { userId: ret.order.userId, vendorId },
-      });
-      if (wallet && Number(wallet.outstandingAmount) > 0) {
-        const refund = Math.min(amount, Number(wallet.outstandingAmount));
+      if (applyAmt > 0) {
         await creditWalletService.applyRepayment(
           wallet.id,
-          refund,
-          'REVERSAL',
+          applyAmt,
+          'CREDIT_NOTE',
           undefined,
           undefined,
-          `Return ${returnId} — credit reversal ₹${refund.toFixed(2)}`,
+          `Credit note ${creditNoteNumber} on return ${returnId}`,
         );
       }
     }
@@ -1524,8 +2015,14 @@ export class ReturnService {
       'inspection_completed',
     ];
     assertStatus(ret.status, closable, 'close');
-    if (ret.status === 'rejected') {
-      // Already terminal commercially — allow explicit close for workspace hygiene.
+
+    const normalized = mapLegacyReturnStatus(ret.status);
+    if (normalized !== 'rejected') {
+      if (!ret.creditNoteNumber || ret.resolutionType !== 'credit_note') {
+        throw Errors.badRequest(
+          'Generate a credit note before closing this return (vendor close gate)',
+        );
+      }
     }
 
     await prisma.$transaction(async (tx) => {
@@ -1548,13 +2045,8 @@ export class ReturnService {
 
     if (
       ret.order.status !== 'returned' &&
-      ret.status !== 'rejected' &&
-      (ret.resolutionType === 'refund' ||
-        ret.resolutionType === 'credit_note' ||
-        ret.resolutionType === 'replacement' ||
-        ret.creditNoteNumber ||
-        ret.replacementOrderId ||
-        ret.refundAmount != null)
+      normalized !== 'rejected' &&
+      (ret.resolutionType === 'credit_note' || ret.creditNoteNumber)
     ) {
       await (await this.getOrderService()).updateStatus(
         ret.order.id,
@@ -1577,10 +2069,15 @@ export const returnService = {
   notifyReturnReviewed,
   vendorReviewReturn,
   adminProcessReturnRefund,
+  remainingReturnableByOrderItem,
   createForOrder: (orderId: string, customerId: string, input: CustomerCreateInput) =>
     returnWorkspaceService.createForOrder(orderId, customerId, input),
   list: (vendorId: string, filters?: ListFilters) =>
     returnWorkspaceService.list(vendorId, filters),
+  exportCsv: (vendorId: string, filters?: ReportFilters) =>
+    returnWorkspaceService.exportCsv(vendorId, filters),
+  summarize: (vendorId: string, filters?: ReportFilters) =>
+    returnWorkspaceService.summarize(vendorId, filters),
   getById: (vendorId: string, returnId: string) =>
     returnWorkspaceService.getById(vendorId, returnId),
   dispatchAction: (
