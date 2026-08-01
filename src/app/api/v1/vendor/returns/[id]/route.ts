@@ -1,9 +1,5 @@
-// PATCH /api/v1/vendor/returns/:id — Vendor approves or rejects a return request
-// WHY: Vendor has operational ownership of their orders — they decide the resolution.
-//      Admin can override, but vendor does first review.
-//      On approval with a refundAmount: if the original order was paid via credit,
-//      we write a credit transaction to reduce the customer's outstanding balance.
-// PROTECTED: Vendor only
+// GET   /api/v1/vendor/returns/:id — Return detail (items, events, inspection)
+// PATCH /api/v1/vendor/returns/:id — Legacy approve/reject (kept for existing UI)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -36,6 +32,18 @@ const reviewSchema = z
     }
   });
 
+export const GET = vendorOnly(async (req: NextRequest, ctx) => {
+  try {
+    const { vendorId } = await resolveVendorContext(ctx, req);
+    requirePermission(ctx, 'returns.view');
+
+    const data = await returnService.getById(vendorId, extractId(req));
+    return NextResponse.json({ success: true, data });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
+
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
@@ -44,7 +52,6 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     const returnId = extractId(req);
     const body = reviewSchema.parse(await req.json());
 
-    // Verify the return belongs to one of this vendor's orders
     const returnReq = await prisma.returnRequest.findFirst({
       where: { id: returnId, order: { vendorId } },
     });

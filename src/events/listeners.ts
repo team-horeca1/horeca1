@@ -270,22 +270,13 @@ export function registerEventListeners(): void {
     }
   });
 
+  // SMS is sent directly via sendPhoneOtp (same MSG91 login OTP API) in
+  // OrderService.issueDeliveryOtp — do not send a second SMS via flow templates.
   eventBus.on('OrderDeliveryOtp', async (payload) => {
     try {
       const notifications = await getNotifications();
       const body = `Your delivery code for order ${payload.orderNumber} is ${payload.otp}. Share it with the delivery agent only when you receive your order.`;
       await Promise.all([
-        notifications.send({
-          userId: payload.userId,
-          type: 'order',
-          channel: 'sms',
-          title: 'Delivery code',
-          body,
-          smsTemplateId: SMS_TEMPLATES.orderConfirmCustomer,
-          smsVariables: { var1: payload.orderNumber, var2: payload.otp },
-          referenceId: payload.orderId,
-          referenceType: 'order',
-        }),
         notifications.send({
           userId: payload.userId,
           type: 'order',

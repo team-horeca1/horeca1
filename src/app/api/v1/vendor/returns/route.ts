@@ -1,39 +1,29 @@
-// GET /api/v1/vendor/returns — List return requests for orders belonging to this vendor
-// WHY: Vendors need visibility into what customers are requesting to return so they
-//      can decide whether to approve, request replacement, or reject.
-// PROTECTED: Vendor only
+// GET  /api/v1/vendor/returns — List returns (workspace filters + cursor)
+// PATCH kept on [id]/route for legacy approve/reject
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
-import { resolveVendorId } from '@/lib/resolveVendorId';
+import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
+import { returnService } from '@/modules/return/return.service';
+import { listReturnsQuerySchema } from '@/modules/return/return.validator';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
-  requirePermission(ctx, 'returns.view');
   try {
-    const vendorId = await resolveVendorId(ctx, req);
-    const { searchParams } = new URL(req.url);
-    const status = searchParams.get('status') ?? undefined;
+    const { vendorId } = await resolveVendorContext(ctx, req);
+    requirePermission(ctx, 'returns.view');
 
-    const returns = await prisma.returnRequest.findMany({
-      where: {
-        order: { vendorId },
-        ...(status ? { status } : {}),
-      },
-      include: {
-        order: {
-          select: { id: true, orderNumber: true, totalAmount: true, vendorId: true },
-        },
-        customer: {
-          select: { id: true, fullName: true, email: true, businessName: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
+    const raw = Object.fromEntries(req.nextUrl.searchParams.entries());
+    const filters = listReturnsQuerySchema.parse(raw);
+
+    const result = await returnService.list(vendorId, filters);
+    return NextResponse.json({
+      success: true,
+      data: result.data,
+      nextCursor: result.nextCursor,
+      hasMore: result.hasMore,
     });
-
-    return NextResponse.json({ success: true, data: returns });
   } catch (error) {
     return errorResponse(error);
   }
