@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { personFirstCustomerLabel } from '@/lib/customerLabel';
 import { CancelRequestBanner } from './CancelRequestBanner';
 import { LinkedWorkspacesCard } from './LinkedWorkspacesCard';
 import { ATTENTION_LABELS, type AttentionReasonCode } from '@/lib/orderAttention';
@@ -315,7 +316,10 @@ export function OrderWorkbenchPanel({
   const next = nextWorkbenchStatus(order.status);
   const events = order.events ?? [];
   const shownEvents = activityTab ? events : events.slice(0, compactEvents);
-  const customerName = order.user.businessName || order.user.fullName;
+  const customerName = personFirstCustomerLabel({
+    fullName: order.user.fullName,
+    businessName: order.user.businessName,
+  });
   const addr = order.deliveryAddressSnapshot;
 
   return (

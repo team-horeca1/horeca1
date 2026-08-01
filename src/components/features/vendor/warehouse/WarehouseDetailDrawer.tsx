@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { X, Loader2, Truck, CheckCircle2, XCircle, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { personFirstCustomerLabel } from '@/lib/customerLabel';
 import { toast } from 'sonner';
 import { WAREHOUSE_STATUS_STYLE, type WarehouseTab, type PicklistItem } from './warehouseConstants';
 import { PicklistPrintButton } from './PicklistPrintButton';
@@ -241,7 +242,11 @@ export function WarehouseDetailDrawer({
                   <p className="text-[#7C7C7C]">
                     Customer:{' '}
                     <span className="font-semibold text-[#181725]">
-                      {picklist.order.user?.businessName ?? picklist.order.user?.fullName}
+                      {personFirstCustomerLabel({
+                        fullName: picklist.order.user?.fullName,
+                        businessName: picklist.order.user?.businessName,
+                        fallback: '—',
+                      })}
                     </span>
                   </p>
                   <Link href={`/vendor/orders/${picklist.order.id}`} className="text-[#299E60] font-bold text-[12px] hover:underline">

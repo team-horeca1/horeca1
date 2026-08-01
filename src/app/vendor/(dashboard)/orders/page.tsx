@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Search, Loader2, Eye, CheckCircle2, ChevronRight, ChevronLeft, AlertTriangle, Download, X, ChevronDown, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { personFirstCustomerLabel } from '@/lib/customerLabel';
 import { toast } from 'sonner';
 import { useVendorOutletScope } from '@/hooks/useVendorOutletScope';
 import OrderWorkspace from '@/components/features/vendor/OrderWorkspace';
@@ -608,14 +609,21 @@ export default function VendorOrdersPage() {
                             >
                                 <div className="flex justify-between items-start gap-2">
                                     <p className="text-[14px] font-bold text-[#181725]">{order.orderNumber}</p>
-                                    {orderFulfillmentChip(order)}
                                     <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-[6px] uppercase', STATUS_STYLE[order.status] || 'bg-gray-100')}>
                                         {order.isPartial && order.status !== 'cancelled'
                                             ? 'Partially Accepted'
                                             : (STATUS_LABELS[order.status] ?? order.status)}
                                     </span>
                                 </div>
-                                <p className="text-[12px] text-[#7C7C7C]">{order.user.fullName}</p>
+                                <div>
+                                    <p className="text-[12px] font-semibold text-[#181725]">
+                                        {personFirstCustomerLabel({
+                                            fullName: order.user.fullName,
+                                            businessName: order.user.businessName,
+                                        })}
+                                    </p>
+                                    {orderFulfillmentChip(order)}
+                                </div>
                                 <div className="flex justify-between text-[13px] font-bold">
                                     <span className="text-[#AEAEAE]">{new Date(order.createdAt).toLocaleDateString('en-IN')}</span>
                                     <span>{formatINR(Number(order.totalAmount))}</span>
@@ -684,16 +692,18 @@ export default function VendorOrdersPage() {
                                                         {order.orderNumber}
                                                     </Link>
                                                 </div>
-                                                {orderFulfillmentChip(order)}
                                                 {overSLA && (
                                                     <p className="text-[10px] text-[#E74C3C] font-bold mt-0.5">Overdue — needs action</p>
                                                 )}
                                             </td>
                                             <td className="px-5 py-4">
-                                                <p className="text-[13px] font-bold text-[#181725]">{order.user.fullName}</p>
-                                                {order.user.businessName && (
-                                                    <p className="text-[11px] text-[#AEAEAE]">{order.user.businessName}</p>
-                                                )}
+                                                <p className="text-[13px] font-bold text-[#181725]">
+                                                    {personFirstCustomerLabel({
+                                                        fullName: order.user.fullName,
+                                                        businessName: order.user.businessName,
+                                                    })}
+                                                </p>
+                                                {orderFulfillmentChip(order)}
                                             </td>
                                             <td className="px-5 py-4 text-center text-[12px] text-[#AEAEAE] font-medium">
                                                 {order._count?.items ?? '—'}

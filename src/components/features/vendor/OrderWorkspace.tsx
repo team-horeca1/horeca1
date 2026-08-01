@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { personFirstCustomerLabel } from '@/lib/customerLabel';
 import { useVendorOutletScope } from '@/hooks/useVendorOutletScope';
 import { ATTENTION_LABELS, type AttentionReasonCode } from '@/lib/orderAttention';
 import { OrderWorkbenchPanel } from '@/components/features/vendor/orders/OrderWorkbenchPanel';
@@ -95,7 +96,10 @@ const STAGES: {
 ];
 
 function customerLabel(o: QueueOrder) {
-  return o.user?.businessName || o.user?.fullName || 'Customer';
+  return personFirstCustomerLabel({
+    fullName: o.user?.fullName,
+    businessName: o.user?.businessName,
+  });
 }
 
 export default function OrderWorkspace() {

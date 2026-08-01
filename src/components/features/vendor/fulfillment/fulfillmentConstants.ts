@@ -9,6 +9,7 @@ import {
   type DeliveryUiStatus,
 } from '@/modules/fulfillment/delivery.scope';
 import { FULFILMENT_ACCENT, type FulfilmentStatus } from '@/modules/fulfillment/fulfillment.types';
+import { personFirstCustomerLabel } from '@/lib/customerLabel';
 
 export {
   DELIVERY_UI_STATUS_LABELS,
@@ -177,7 +178,12 @@ export function customerLabel(row: {
   user?: { businessName: string | null; fullName: string } | null;
   outlet?: { name: string } | null;
 }): string {
-  return row.user?.fullName || row.user?.businessName || row.outlet?.name || '—';
+  return personFirstCustomerLabel({
+    fullName: row.user?.fullName,
+    businessName: row.user?.businessName,
+    outletName: row.outlet?.name,
+    fallback: '—',
+  });
 }
 
 /** Customer delivery outlet (order stamp), not the warehouse fulfilment outlet. */

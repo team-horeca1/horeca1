@@ -3,6 +3,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { personFirstCustomerLabel } from '@/lib/customerLabel';
 import { Errors } from '@/middleware/errorHandler';
 import {
   cascadeBusinessTeamToStore,
@@ -1125,11 +1126,11 @@ export async function listSupplierOrders(
       businessName:
         o.vendor.businessAccount.displayName
         ?? o.vendor.businessAccount.legalName,
-      customerName:
-        o.user.businessName?.trim()
-        || o.user.fullName
-        || o.user.email
-        || 'Customer',
+      customerName: personFirstCustomerLabel({
+        fullName: o.user.fullName,
+        businessName: o.user.businessName,
+        fallback: o.user.email || 'Customer',
+      }),
       itemCount: o._count.items,
     })),
     nextCursor,
