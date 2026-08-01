@@ -2,21 +2,29 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Pencil, X, Loader2 } from 'lucide-react';
+import { AddressAutocomplete, type AddressPickPayload } from '@/components/ui/AddressAutocomplete';
+
+export interface EditProfileFormData {
+    fullName: string;
+    phone: string;
+    businessName: string;
+    address: string;
+    address2: string;
+    pincode: string;
+    city: string;
+    image?: string;
+    shortAddress?: string;
+    state?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+    placeId?: string;
+}
 
 interface EditProfileOverlayProps {
     isOpen: boolean;
     onClose: () => void;
-    userData: {
-        fullName: string;
-        phone: string;
-        businessName: string;
-        address: string;
-        address2: string;
-        pincode: string;
-        city: string;
-        image?: string;
-    };
-    onSave: (data: EditProfileOverlayProps['userData']) => void | Promise<void>;
+    userData: EditProfileFormData;
+    onSave: (data: EditProfileFormData) => void | Promise<void>;
 }
 
 // Reduce any stored phone (e.g. "+919999900000") to the editable 10-digit local part.
@@ -30,6 +38,11 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
     const [address2, setAddress2] = useState(userData.address2);
     const [pincode, setPincode] = useState(userData.pincode);
     const [city, setCity] = useState(userData.city);
+    const [shortAddress, setShortAddress] = useState(userData.shortAddress || '');
+    const [state, setState] = useState(userData.state || '');
+    const [latitude, setLatitude] = useState<number | null>(userData.latitude ?? null);
+    const [longitude, setLongitude] = useState<number | null>(userData.longitude ?? null);
+    const [placeId, setPlaceId] = useState(userData.placeId || '');
     const [image, setImage] = useState(userData.image || '');
     const [uploading, setUploading] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
@@ -44,13 +57,46 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
         setAddress2(userData.address2);
         setPincode(userData.pincode);
         setCity(userData.city);
+        setShortAddress(userData.shortAddress || '');
+        setState(userData.state || '');
+        setLatitude(userData.latitude ?? null);
+        setLongitude(userData.longitude ?? null);
+        setPlaceId(userData.placeId || '');
         setImage(userData.image || '');
     }, [isOpen, userData]);
 
     if (!isOpen) return null;
 
+    const handlePick = (place: AddressPickPayload) => {
+        setAddress(place.fullAddress);
+        setShortAddress(place.shortAddress);
+        setPincode(place.pincode);
+        setCity(place.city);
+        setState(place.state);
+        setLatitude(place.latitude);
+        setLongitude(place.longitude);
+        setPlaceId(place.placeId);
+        if (place.businessName) {
+            setBusinessName(place.businessName);
+        }
+    };
+
     const handleSave = async () => {
-        await onSave({ fullName, phone, businessName, address, address2, pincode, city, image });
+        await onSave({
+            fullName,
+            phone,
+            businessName,
+            address,
+            address2,
+            pincode,
+            city,
+            image,
+            shortAddress: shortAddress || address.split(',').slice(0, 2).join(', '),
+            state,
+            latitude,
+            longitude,
+            placeId: placeId || undefined,
+        });
         onClose();
     };
 
@@ -181,14 +227,16 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                             </div>
                         </div>
                         <div>
-                            <label className="text-[12px] md:text-[13px] font-semibold text-[#181725] ml-0.5 mb-1.5 block">Address line 1</label>
-                            <input
-                                type="text"
-                                value={address}
-                                onChange={(e) => setAddress(e.target.value)}
-                                placeholder="House / building / street"
-                                className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-white border border-gray-200 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium text-gray-700 placeholder:text-gray-400 outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 transition-all mb-3"
+                            <AddressAutocomplete
+                                label="Search delivery address"
+                                placeholder="Search area, street, or business name…"
+                                businessMode
+                                hint="Pick a place from search — this sets pincode, city and map pin."
+                                initialValue={address}
+                                onPick={handlePick}
                             />
+                        </div>
+                        <div>
                             <label className="text-[12px] md:text-[13px] font-semibold text-[#181725] ml-0.5 mb-1.5 block">Address line 2 <span className="text-gray-400 font-normal">(optional)</span></label>
                             <input
                                 type="text"

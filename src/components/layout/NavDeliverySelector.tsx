@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MapPin, ChevronDown, Check, Loader2, AlertCircle } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
+import { useAddress } from '@/context/AddressContext';
 
 interface Props {
   fallbackLabel: string;
@@ -51,6 +52,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
     accessibleOutletIds,
     customerImpersonating,
   } = useBusinessAccountSwitcher();
+  const { savedAddresses, setSelectedAddress, updateAddress } = useAddress();
   const [outletOpen, setOutletOpen] = useState(false);
   const [pickingId, setPickingId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -116,6 +118,21 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
   const handleSwitchOutlet = async (id: string) => {
     setPickingId(id);
     await switchOutlet(id);
+    // Keep h1_addr / selectedAddress in sync with the chosen outlet so
+    // checkout stamps the deliver-to store, not a stale primary address.
+    // No match → clear cookie so resolveStorefrontContext falls through to JWT.
+    const match = savedAddresses.find((a) => a.outletId === id);
+    if (match) {
+      setSelectedAddress(match);
+      // Linked SavedAddress → promote as primary (isDefault + primaryOutletId).
+      try {
+        await updateAddress(match.id, { isDefault: true });
+      } catch {
+        /* toast already shown by updateAddress on API failure */
+      }
+    } else {
+      setSelectedAddress(null);
+    }
     setPickingId(null);
     setOutletOpen(false);
   };

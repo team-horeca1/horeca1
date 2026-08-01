@@ -30,6 +30,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
         savedAddresses,
         isLoadingAddresses,
         setSelectedAddress,
+        updateAddress,
         addAddress,
         removeAddress,
         detectCurrentLocation,
@@ -57,6 +58,17 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
     // ─── Sync selected address with active session outlet ────────────────
     const handleSelectAddressAndSyncOutlet = async (addr: Address) => {
         setSelectedAddress(addr);
+
+        // Selecting an address also makes it primary (isDefault + primaryOutletId via PATCH).
+        // Only real SavedAddress UUIDs — skip guest/local ids (addr_…, current_…).
+        const isDbId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(addr.id);
+        if (isDbId) {
+            try {
+                await updateAddress(addr.id, { isDefault: true });
+            } catch (err) {
+                console.error('Error setting default address:', err);
+            }
+        }
 
         if (status === 'authenticated') {
             try {

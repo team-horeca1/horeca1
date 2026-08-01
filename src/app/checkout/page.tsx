@@ -202,6 +202,7 @@ function DeliveringToRow() {
         switchOutlet,
         switching,
     } = useBusinessAccountSwitcher();
+    const { savedAddresses, setSelectedAddress } = useAddress();
     const [outletDetails, setOutletDetails] = useState<OutletDetail[]>([]);
     const [open, setOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -309,6 +310,12 @@ function DeliveringToRow() {
                                     disabled={switching || o.id === activeOutletId}
                                     onClick={async () => {
                                         await switchOutlet(o.id);
+                                        // Keep h1_addr in sync with the chosen outlet so
+                                        // place-order stamps the deliver-to store, not a stale primary.
+                                        // No match → clear cookie so resolveStorefrontContext falls through to JWT.
+                                        const match = savedAddresses.find((a) => a.outletId === o.id);
+                                        if (match) setSelectedAddress(match);
+                                        else setSelectedAddress(null);
                                         setOpen(false);
                                     }}
                                     className="w-full flex items-start gap-2 px-3 py-2.5 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-left transition-colors"

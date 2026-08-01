@@ -35,8 +35,10 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { useAddress, type Address } from '@/context/AddressContext';
 import { EditProfileOverlay } from './EditProfileOverlay';
 import { SavedAddressesOverlay } from './SavedAddressesOverlay';
+import { EditAddressOverlay } from '@/components/layout/EditAddressOverlay';
 import { PaymentManagementOverlay } from './PaymentManagementOverlay';
 import { NotificationOverlay } from './NotificationOverlay';
 import { GeneralInformationOverlay } from './GeneralInformationOverlay';
@@ -75,6 +77,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const searchParams = useSearchParams();
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [isSavedAddressesOpen, setIsSavedAddressesOpen] = useState(false);
+    const [editingAddress, setEditingAddress] = useState<Address | null>(null);
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isGeneralInfoOpen, setIsGeneralInfoOpen] = useState(false);
@@ -96,6 +99,13 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
 
     const { data: session, update: updateSession } = useSession();
     const { has, hasAny } = usePermissions();
+    const {
+        savedAddresses,
+        selectedAddress,
+        setSelectedAddress,
+        updateAddress,
+        addAddress,
+    } = useAddress();
     const {
         activeBusinessAccountId: switcherAccountId,
         customerImpersonating,
@@ -138,7 +148,13 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         pincode: '',
         city: '',
         image: '',
+        shortAddress: '',
+        state: '',
+        latitude: null as number | null,
+        longitude: null as number | null,
+        placeId: '',
     });
+    const [primaryAddressId, setPrimaryAddressId] = useState<string | null>(null);
     const [profileReady, setProfileReady] = useState(false);
 
     const sessionUserId = session?.user?.id;
@@ -205,7 +221,8 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                 }
                 const p = profileJson?.success ? profileJson.data : null;
                 const addresses = addrJson?.success ? addrJson.data : [];
-                const defaultAddr = addresses?.[0];
+                const defaultAddr = addresses?.find((a: { isDefault?: boolean }) => a.isDefault) ?? addresses?.[0];
+                setPrimaryAddressId(defaultAddr?.id ?? null);
                 setUserData(prev => ({
                     ...prev,
                     fullName: p?.fullName || prev.fullName || sessionName || '',
@@ -214,9 +231,14 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                     email: p?.email || prev.email || sessionEmail || '',
                     pincode: p?.pincode || defaultAddr?.pincode || '',
                     image: p?.image || '',
-                    address: defaultAddr?.shortAddress || defaultAddr?.fullAddress || '',
+                    address: defaultAddr?.fullAddress || defaultAddr?.shortAddress || '',
                     address2: defaultAddr?.flatInfo || defaultAddr?.landmark || '',
                     city: defaultAddr?.city || '',
+                    shortAddress: defaultAddr?.shortAddress || '',
+                    state: defaultAddr?.state || '',
+                    latitude: typeof defaultAddr?.latitude === 'number' ? defaultAddr.latitude : null,
+                    longitude: typeof defaultAddr?.longitude === 'number' ? defaultAddr.longitude : null,
+                    placeId: defaultAddr?.placeId || '',
                 }));
                 setProfileReady(true);
             })
@@ -394,10 +416,59 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     ];
 
     const isProfileComplete = !!(userData.fullName && userData.businessName && userData.pincode);
-    const defaultLocation = [userData.city, userData.pincode].filter(Boolean).join(' · ');
+    // Deliver-to comes from AddressContext (selected / primary SavedAddress), not User profile fields.
+    const deliverToAddress =
+        selectedAddress
+        ?? savedAddresses.find((a) => a.isDefault)
+        ?? savedAddresses[0]
+        ?? null;
+    const deliverToLabel = deliverToAddress
+        ? (deliverToAddress.businessName || deliverToAddress.label || deliverToAddress.shortAddress || '').trim()
+        : '';
+    const deliverToLine = deliverToAddress
+        ? (deliverToAddress.fullAddress || deliverToAddress.shortAddress || '').trim()
+        : '';
+    const deliverToSub = deliverToAddress
+        ? [deliverToAddress.city, deliverToAddress.pincode].filter(Boolean).join(' · ')
+        : '';
+    // Fallback only when no SavedAddress exists yet (legacy profile fields).
+    const defaultLocation = deliverToSub || [userData.city, userData.pincode].filter(Boolean).join(' · ');
+    const defaultDeliveryLine = deliverToLine || userData.address || '';
+    // Account details Edit → same SavedAddress as navbar Deliver To.
+    const openDeliverToEdit = () => {
+        if (deliverToAddress) {
+            setEditingAddress(deliverToAddress);
+            return;
+        }
+        setIsSavedAddressesOpen(true);
+    };
     // Show the "Become a vendor" CTA only for customers who haven't yet applied.
     // Admins, brands, and existing vendors (pending or approved) all skip it.
     const showBecomeVendorCta = hasVendorApplication === false && sessionRole !== 'admin' && sessionRole !== 'brand' && sessionRole !== 'vendor';
+
+    // Edit Profile delivery fields seed from deliver-to (not stale User profile address).
+    const editProfileUserData = deliverToAddress
+        ? {
+            ...userData,
+            businessName:
+                deliverToAddress.businessName
+                || deliverToAddress.label
+                || userData.businessName,
+            address: deliverToAddress.fullAddress || userData.address,
+            address2: deliverToAddress.flatInfo || userData.address2,
+            pincode: deliverToAddress.pincode || userData.pincode,
+            city: deliverToAddress.city || userData.city,
+            state: deliverToAddress.state || userData.state,
+            shortAddress: deliverToAddress.shortAddress || userData.shortAddress,
+            latitude: Number.isFinite(deliverToAddress.latitude)
+                ? deliverToAddress.latitude
+                : userData.latitude,
+            longitude: Number.isFinite(deliverToAddress.longitude)
+                ? deliverToAddress.longitude
+                : userData.longitude,
+            placeId: deliverToAddress.placeId || userData.placeId,
+        }
+        : userData;
 
     return (
         <>
@@ -456,9 +527,9 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                         {isProfileComplete && <BadgeCheck size={15} className="text-[#53B175] shrink-0" />}
                                     </div>
                                     <p className="text-[12px] text-gray-400 font-medium truncate">{userData.email}</p>
-                                    {userData.businessName && (
+                                    {deliverToLabel && (
                                         <span className="inline-flex items-center mt-1 text-[10px] font-bold text-[#53B175] bg-[#53B175]/10 border border-[#53B175]/15 px-2 py-0.5 rounded-full max-w-full truncate">
-                                            {userData.businessName}
+                                            {deliverToLabel}
                                         </span>
                                     )}
                                 </div>
@@ -532,7 +603,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                             </div>
 
                             {/* Account details snapshot */}
-                            {(userData.phone || userData.businessName || userData.address || defaultLocation) && (
+                            {(userData.phone || deliverToLabel || userData.businessName || defaultDeliveryLine || defaultLocation) && (
                                 <div className="mb-6">
                                     <h4 className="text-[12px] font-[800] text-gray-400 uppercase tracking-wider mb-2 px-1">Account details</h4>
                                     <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm divide-y divide-gray-50">
@@ -548,17 +619,17 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                 <span className="text-[13px] font-[600] text-[#181725] truncate">{userData.email}</span>
                                             </div>
                                         )}
-                                        {userData.businessName && (
+                                        {(deliverToLabel || userData.businessName) && (
                                             <div className="flex items-center gap-3 px-4 py-3">
                                                 <Building2 size={15} className="text-gray-400 shrink-0" />
-                                                <span className="text-[13px] font-[600] text-[#181725] truncate">{userData.businessName}</span>
+                                                <span className="text-[13px] font-[600] text-[#181725] truncate">{deliverToLabel || userData.businessName}</span>
                                             </div>
                                         )}
-                                        {(userData.address || defaultLocation) && (
+                                        {(defaultDeliveryLine || defaultLocation) && (
                                             <div className="flex items-start gap-3 px-4 py-3">
                                                 <MapPin size={15} className="text-gray-400 shrink-0 mt-0.5" />
                                                 <div className="text-[13px] font-[600] text-[#181725]">
-                                                    {userData.address && <p className="truncate">{userData.address}</p>}
+                                                    {defaultDeliveryLine && <p className="truncate">{defaultDeliveryLine}</p>}
                                                     {defaultLocation && <p className="text-[11px] text-gray-400 font-medium">{defaultLocation}</p>}
                                                 </div>
                                             </div>
@@ -686,9 +757,9 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                             {isProfileComplete && <BadgeCheck size={14} className="text-[#53B175] shrink-0" />}
                                         </div>
                                         <p className="text-[11.5px] text-gray-400 font-medium mt-0.5 truncate max-w-full">{userData.email}</p>
-                                        {userData.businessName && (
+                                        {deliverToLabel && (
                                             <span className="mt-2 inline-flex items-center text-[10.5px] font-bold text-[#53B175] bg-[#53B175]/10 border border-[#53B175]/15 px-2.5 py-0.5 rounded-full max-w-full truncate">
-                                                {userData.businessName}
+                                                {deliverToLabel}
                                             </span>
                                         )}
                                     </div>
@@ -1039,20 +1110,25 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 <section>
                                     <div className="flex items-baseline justify-between mb-3 px-1">
                                         <h3 className="text-[15px] font-[700] text-[#181725]">Account details</h3>
-                                        <button onClick={() => setIsEditProfileOpen(true)} className="text-[12px] font-bold text-[#53B175] hover:text-[#469E66] transition-colors cursor-pointer">
+                                        <button onClick={openDeliverToEdit} className="text-[12px] font-bold text-[#53B175] hover:text-[#469E66] transition-colors cursor-pointer">
                                             Edit
                                         </button>
                                     </div>
                                     <div className="bg-white border border-gray-100 rounded-2xl shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)] divide-y divide-gray-50">
                                         <DetailRow icon={Mail} label="Email" value={userData.email || '—'} />
                                         <DetailRow icon={Phone} label="Phone" value={userData.phone || 'Not added'} muted={!userData.phone} />
-                                        <DetailRow icon={Building2} label="Business" value={userData.businessName || 'Not added'} muted={!userData.businessName} />
+                                        <DetailRow
+                                            icon={Building2}
+                                            label="Business"
+                                            value={deliverToLabel || userData.businessName || 'Not added'}
+                                            muted={!deliverToLabel && !userData.businessName}
+                                        />
                                         <DetailRow
                                             icon={MapPin}
                                             label="Default delivery"
-                                            value={userData.address || 'No address saved'}
+                                            value={defaultDeliveryLine || 'No address saved'}
                                             sub={defaultLocation || undefined}
-                                            muted={!userData.address}
+                                            muted={!defaultDeliveryLine}
                                         />
                                     </div>
                                 </section>
@@ -1068,7 +1144,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
             <EditProfileOverlay
                 isOpen={isEditProfileOpen}
                 onClose={() => setIsEditProfileOpen(false)}
-                userData={userData}
+                userData={editProfileUserData}
                 onSave={async (data) => {
                     setUserData(prev => ({ ...prev, ...data }));
                     try {
@@ -1088,8 +1164,57 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                         if (data.fullName && data.businessName && /^\d{6}$/.test(data.pincode)) {
                             await fetch('/api/v1/me/profile', { method: 'POST', credentials: 'include' });
                         }
+
+                        // Persist delivery address to primary SavedAddress (same source as navbar Deliver To).
+                        const fullAddress = data.address?.trim();
+                        if (fullAddress) {
+                            const shortAddress = (data.shortAddress || fullAddress.split(',').slice(0, 2).join(', ')).trim();
+                            const addressPatch = {
+                                businessName: data.businessName?.trim() || undefined,
+                                fullAddress,
+                                shortAddress,
+                                flatInfo: data.address2?.trim() || undefined,
+                                pincode: data.pincode?.trim() || undefined,
+                                city: data.city?.trim() || undefined,
+                                state: data.state?.trim() || undefined,
+                                ...(typeof data.latitude === 'number' && typeof data.longitude === 'number'
+                                    ? { latitude: data.latitude, longitude: data.longitude }
+                                    : {}),
+                                ...(data.placeId ? { placeId: data.placeId } : {}),
+                            };
+                            const existingId = deliverToAddress?.id
+                                ?? primaryAddressId
+                                ?? savedAddresses.find((a) => a.isDefault)?.id
+                                ?? savedAddresses[0]?.id
+                                ?? selectedAddress?.id
+                                ?? null;
+                            if (existingId) {
+                                await updateAddress(existingId, addressPatch);
+                            } else if (
+                                typeof data.latitude === 'number'
+                                && typeof data.longitude === 'number'
+                            ) {
+                                const created = await addAddress({
+                                    label: 'Home',
+                                    isDefault: true,
+                                    ...addressPatch,
+                                    latitude: data.latitude,
+                                    longitude: data.longitude,
+                                });
+                                if (created) {
+                                    setPrimaryAddressId(created.id);
+                                    setSelectedAddress(created);
+                                }
+                            }
+                        }
                     } catch { /* silent — local state already updated */ }
                 }}
+            />
+
+            {/* Edit current deliver-to address (Account details Edit) */}
+            <EditAddressOverlay
+                address={editingAddress}
+                onClose={() => setEditingAddress(null)}
             />
 
             {/* Delivery Addresses Overlay */}

@@ -160,12 +160,13 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                 if (defaultAddr) {
                     setSelectedAddressState(prev => {
                         // Drop orphan selections that aren't in the fetched list.
-                        const prevStillValid = prev && addresses.some((a) => a.id === prev.id);
-                        if (!prev || !prevStillValid) {
-                            try { localStorage.setItem(addressSelectedKey(userId), JSON.stringify(defaultAddr)); } catch { /* ignore */ }
-                            return defaultAddr;
-                        }
-                        return prev;
+                        // When id still matches, use the fresh DB row (not a stale localStorage blob).
+                        const freshMatch = prev
+                            ? addresses.find((a) => a.id === prev.id) ?? null
+                            : null;
+                        const next = freshMatch ?? defaultAddr;
+                        try { localStorage.setItem(addressSelectedKey(userId), JSON.stringify(next)); } catch { /* ignore */ }
+                        return next;
                     });
                 }
             });
@@ -198,14 +199,21 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
         if (status !== 'authenticated') return;
         const addresses = await fetchAddressesFromDB();
         setSavedAddresses(addresses);
-        if (impersonatingRef.current) {
-            const defaultAddr = pickDefaultAddress(addresses);
-            setSelectedAddressState((prev) => {
-                if (prev && addresses.some((a) => a.id === prev.id)) return prev;
-                return defaultAddr;
-            });
-        }
-    }, [status, fetchAddressesFromDB]);
+        const defaultAddr = pickDefaultAddress(addresses);
+        setSelectedAddressState((prev) => {
+            const freshMatch = prev
+                ? addresses.find((a) => a.id === prev.id) ?? null
+                : null;
+            if (impersonatingRef.current) {
+                return freshMatch ?? defaultAddr;
+            }
+            const next = freshMatch ?? defaultAddr;
+            if (next) {
+                try { localStorage.setItem(addressSelectedKey(userId), JSON.stringify(next)); } catch { /* ignore */ }
+            }
+            return next;
+        });
+    }, [status, fetchAddressesFromDB, userId]);
 
     // ─── setSelectedAddress ──────────────────────────────────────────────
 
@@ -306,21 +314,32 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             }
         }
         setSavedAddresses(prev => {
-            const updated = prev.filter(a => a.id !== id);
+            let remaining = prev.filter(a => a.id !== id);
+            // Mirror server DELETE promotion: keep exactly one local default.
+            if (remaining.length > 0 && !remaining.some(a => a.isDefault)) {
+                remaining = remaining.map((a, i) => ({ ...a, isDefault: i === 0 }));
+            }
             if (status !== 'authenticated') {
-                try { localStorage.setItem(addressSavedKey(null), JSON.stringify(updated)); } catch { /* ignore */ }
+                try { localStorage.setItem(addressSavedKey(null), JSON.stringify(remaining)); } catch { /* ignore */ }
             }
-            return updated;
-        });
-        // If the removed address was selected, clear it
-        setSelectedAddressState(prev => {
-            if (prev?.id === id) {
-                if (!impersonatingRef.current) {
-                    try { localStorage.removeItem(addressSelectedKey(userId)); } catch { /* ignore */ }
-                }
-                return null;
-            }
-            return prev;
+            // If the removed address was selected, fall back to remaining default / first.
+            Promise.resolve().then(() => {
+                setSelectedAddressState(sel => {
+                    if (sel?.id !== id) return sel;
+                    const fallback = pickDefaultAddress(remaining);
+                    if (!impersonatingRef.current) {
+                        try {
+                            if (fallback) {
+                                localStorage.setItem(addressSelectedKey(userId), JSON.stringify(fallback));
+                            } else {
+                                localStorage.removeItem(addressSelectedKey(userId));
+                            }
+                        } catch { /* ignore */ }
+                    }
+                    return fallback;
+                });
+            });
+            return remaining;
         });
         notifyAccountsRefresh();
     }, [status, userId]);
@@ -341,14 +360,27 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             }
         }
         setSavedAddresses(prev => {
-            const updated = prev.map(a => a.id === id ? { ...a, ...updates } : a);
+            // Mirror addAddress / server PATCH: only one local default at a time.
+            const cleared = updates.isDefault === true
+                ? prev.map((a) => (a.id === id ? a : { ...a, isDefault: false }))
+                : prev;
+            const updated = cleared.map((a) => (a.id === id ? { ...a, ...updates } : a));
             if (status !== 'authenticated') {
                 try { localStorage.setItem(addressSavedKey(null), JSON.stringify(updated)); } catch { /* ignore */ }
             }
             return updated;
         });
+        // Keep navbar "Deliver to" in sync when the selected address was edited.
+        setSelectedAddressState(prev => {
+            if (!prev || prev.id !== id) return prev;
+            const merged = { ...prev, ...updates };
+            if (!impersonatingRef.current) {
+                try { localStorage.setItem(addressSelectedKey(userId), JSON.stringify(merged)); } catch { /* ignore */ }
+            }
+            return merged;
+        });
         notifyAccountsRefresh();
-    }, [status]);
+    }, [status, userId]);
 
     // ─── Reverse Geocode ─────────────────────────────────────────────────
 

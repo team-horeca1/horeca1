@@ -159,6 +159,8 @@ async function findOrCreateOutletForAddress(
 
 /**
  * Resolve storefront scope from session + saved delivery address.
+ * Delivery cookie (h1_addr) / SavedAddress is preferred over JWT activeOutletId
+ * so checkout stamps the outlet the buyer actually selected for delivery.
  * Throws if no delivery location can be determined.
  */
 export async function resolveStorefrontContext(ctx: AuthContext): Promise<StorefrontContext> {
@@ -166,33 +168,25 @@ export async function resolveStorefrontContext(ctx: AuthContext): Promise<Storef
   const { role } = ctx;
 
   let businessAccountId = effectiveCustomerBusinessAccountId(ctx);
-  let outletId = ctx.impersonatedCustomer ? null : ctx.activeOutletId;
-
-  if (businessAccountId && outletId) {
-    const ok = await prisma.outlet.findFirst({
-      where: { id: outletId, businessAccountId },
-      select: { id: true },
-    });
-    if (ok) return { userId, businessAccountId, outletId };
-  }
-
   if (!businessAccountId) {
     businessAccountId = await ensureBusinessAccountId(userId, role);
   }
 
-  if (outletId) {
-    const ok = await prisma.outlet.findFirst({
-      where: { id: outletId, businessAccountId },
-      select: { id: true },
-    });
-    if (ok) return { userId, businessAccountId, outletId };
-    outletId = null;
-  }
-
+  // Prefer h1_addr SavedAddress over JWT — cookie and JWT can disagree after
+  // address-only or outlet-only switches.
   const savedAddr = await getSelectedSavedAddress(userId);
   if (savedAddr) {
-    outletId = await findOrCreateOutletForAddress(businessAccountId, savedAddr);
+    const outletId = await findOrCreateOutletForAddress(businessAccountId, savedAddr);
     return { userId, businessAccountId, outletId };
+  }
+
+  const jwtOutletId = ctx.impersonatedCustomer ? null : ctx.activeOutletId;
+  if (jwtOutletId) {
+    const ok = await prisma.outlet.findFirst({
+      where: { id: jwtOutletId, businessAccountId },
+      select: { id: true },
+    });
+    if (ok) return { userId, businessAccountId, outletId: jwtOutletId };
   }
 
   const account = await prisma.businessAccount.findUnique({
@@ -202,7 +196,7 @@ export async function resolveStorefrontContext(ctx: AuthContext): Promise<Storef
       outlets: { select: { id: true }, orderBy: { createdAt: 'asc' }, take: 1 },
     },
   });
-  outletId = account?.primaryOutletId ?? account?.outlets[0]?.id ?? null;
+  const outletId = account?.primaryOutletId ?? account?.outlets[0]?.id ?? null;
 
   if (!outletId) {
     throw Errors.badRequest('Select a delivery address before placing orders.');

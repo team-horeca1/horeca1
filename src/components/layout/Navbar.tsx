@@ -170,6 +170,7 @@ export function Navbar() {
     const isVendorDashboard = isVendorPortalPath(pathname);
     const isBrandPortal = pathname?.startsWith('/brand/portal');
     const isAccountPage = pathname?.startsWith('/account');
+    const isDeliveryBoyLink = pathname?.startsWith('/d/');
 
     const availableAccounts = (session?.user as {
         availableAccounts?: Array<{ isVendor?: boolean; isBrand?: boolean }>;
@@ -206,7 +207,16 @@ export function Navbar() {
         ];
     }, [sessionReady, isLoggedIn, hasVendorAccount, hasBrandAccount, vendorAppApproved, userRole, isAdminImpersonating, isCustomerImpersonating]);
 
-    if (isAdminPage || isVendorDashboard || isBrandPortal || isShipmentPage || isAccountPage) return null;
+    if (
+        isAdminPage ||
+        isVendorDashboard ||
+        isBrandPortal ||
+        isShipmentPage ||
+        isAccountPage ||
+        isDeliveryBoyLink
+    ) {
+        return null;
+    }
 
     return (
         <>

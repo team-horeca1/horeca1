@@ -52,7 +52,8 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
         setLatitude(place.latitude);
         setLongitude(place.longitude);
         setPlaceId(place.placeId);
-        if (!businessName.trim() && place.businessName) {
+        // Overwrite business name when Places returns one; keep existing if street-only pick.
+        if (place.businessName) {
             setBusinessName(place.businessName);
         }
     };

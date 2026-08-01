@@ -6,12 +6,27 @@ import { z } from 'zod';
 import { withRole } from '@/middleware/rbac';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
-import { assertCanMutateAccount } from '@/lib/accountAccess';
+import { assertAccountMember, isAdminActingAsBusinessAccount } from '@/lib/accountAccess';
 import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 import {
   effectiveCustomerBusinessAccountId,
   effectiveCustomerUserId,
 } from '@/lib/resolveCustomerImpersonation';
+import type { AuthContext } from '@/middleware/auth';
+
+/**
+ * Storefront /addresses may receive an Outlet id (GET maps outlets when the
+ * user has no SavedAddress row). Delivery-location edits only need BA membership
+ * — not the account-admin `outlets.edit` / `outlets.delete` keys.
+ */
+async function assertCanEditDeliveryLocation(
+  ctx: AuthContext,
+  userId: string,
+  businessAccountId: string,
+): Promise<void> {
+  if (await isAdminActingAsBusinessAccount(ctx, businessAccountId)) return;
+  await assertAccountMember(userId, businessAccountId);
+}
 
 const updateSchema = z.object({
   label: z.string().min(1).max(50).optional(),
@@ -34,6 +49,75 @@ const ALL_ROLES = ['customer', 'vendor', 'brand', 'admin'] as const;
 function extractId(req: NextRequest): string {
   const segments = new URL(req.url).pathname.split('/');
   return segments[segments.length - 1];
+}
+
+type AddressTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * After removing a primary outlet / default SavedAddress, promote the oldest
+ * remaining active outlet (and its linked SavedAddress) so primaryOutletId and
+ * isDefault never point at a deleted row.
+ */
+async function promoteNextPrimary(
+  tx: AddressTx,
+  opts: {
+    userId: string;
+    businessAccountId: string | null;
+    deletedOutletId: string | null;
+    deletedWasDefault: boolean;
+  },
+): Promise<void> {
+  const { userId, businessAccountId, deletedOutletId, deletedWasDefault } = opts;
+
+  if (businessAccountId && deletedOutletId) {
+    const ba = await tx.businessAccount.findUnique({
+      where: { id: businessAccountId },
+      select: { primaryOutletId: true },
+    });
+    const wasPrimary = ba?.primaryOutletId === deletedOutletId;
+    if (!wasPrimary && !deletedWasDefault) return;
+
+    // Deleted outlet is already isActive: false, so this picks the next survivor.
+    const nextOutlet = await tx.outlet.findFirst({
+      where: { businessAccountId, isActive: true },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (!nextOutlet) return;
+
+    await tx.businessAccount.update({
+      where: { id: businessAccountId },
+      data: { primaryOutletId: nextOutlet.id },
+    });
+    await tx.savedAddress.updateMany({
+      where: { userId, isDefault: true },
+      data: { isDefault: false },
+    });
+    await tx.savedAddress.updateMany({
+      where: { userId, outletId: nextOutlet.id },
+      data: { isDefault: true },
+    });
+    return;
+  }
+
+  if (!deletedWasDefault) return;
+
+  // Legacy SavedAddress with no outlet — promote oldest remaining row.
+  const next = await tx.savedAddress.findFirst({
+    where: { userId },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+  if (!next) return;
+
+  await tx.savedAddress.updateMany({
+    where: { userId, isDefault: true, id: { not: next.id } },
+    data: { isDefault: false },
+  });
+  await tx.savedAddress.update({
+    where: { id: next.id },
+    data: { isDefault: true },
+  });
 }
 
 export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
@@ -113,9 +197,9 @@ export const PATCH = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => {
       return NextResponse.json({ success: true, data: updated });
     }
 
-    // Client may hold an Outlet id (legacy GET mapped outlets directly).
+    // Client may hold an Outlet id (GET maps outlets when no SavedAddress exists).
     if (!businessAccountId) throw Errors.notFound('Address');
-    await assertCanMutateAccount(ctx, businessAccountId, 'outlets.edit', ctx.activeOutletId);
+    await assertCanEditDeliveryLocation(ctx, userId, businessAccountId);
 
     const outlet = await prisma.outlet.findFirst({
       where: { id, businessAccountId, isActive: true },
@@ -221,7 +305,7 @@ export const DELETE = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => 
 
     const existing = await prisma.savedAddress.findFirst({
       where: { id, userId },
-      select: { id: true, outletId: true },
+      select: { id: true, outletId: true, isDefault: true },
     });
 
     if (existing) {
@@ -242,12 +326,18 @@ export const DELETE = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => 
           });
         }
         await tx.savedAddress.delete({ where: { id } });
+        await promoteNextPrimary(tx, {
+          userId,
+          businessAccountId,
+          deletedOutletId: existing.outletId,
+          deletedWasDefault: existing.isDefault,
+        });
       });
       return NextResponse.json({ success: true });
     }
 
     if (!businessAccountId) throw Errors.notFound('Address');
-    await assertCanMutateAccount(ctx, businessAccountId, 'outlets.delete', ctx.activeOutletId);
+    await assertCanEditDeliveryLocation(ctx, userId, businessAccountId);
 
     const outlet = await prisma.outlet.findFirst({
       where: { id, businessAccountId, isActive: true },
@@ -263,8 +353,24 @@ export const DELETE = withRole([...ALL_ROLES], async (req: NextRequest, ctx) => 
     }
 
     await prisma.$transaction(async (tx) => {
+      const ba = await tx.businessAccount.findUnique({
+        where: { id: businessAccountId },
+        select: { primaryOutletId: true },
+      });
+      const linkedDefault = await tx.savedAddress.findFirst({
+        where: { outletId: outlet.id, userId, isDefault: true },
+        select: { id: true },
+      });
+
       await tx.outlet.update({ where: { id: outlet.id }, data: { isActive: false } });
       await tx.savedAddress.deleteMany({ where: { outletId: outlet.id, userId } });
+      await promoteNextPrimary(tx, {
+        userId,
+        businessAccountId,
+        deletedOutletId: outlet.id,
+        // wasPrimary is re-checked inside promoteNextPrimary via primaryOutletId
+        deletedWasDefault: Boolean(linkedDefault) || ba?.primaryOutletId === outlet.id,
+      });
     });
 
     return NextResponse.json({ success: true });
