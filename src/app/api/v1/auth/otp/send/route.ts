@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/providers/email';
+import { sendPhoneOtp } from '@/lib/providers/otpSms';
 import { withRateLimit } from '@/middleware/withRateLimit';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 import { lookupEmailForRegistration, type EmailCheckIntent } from '@/lib/auth/checkEmailLookup';
@@ -25,31 +26,6 @@ function emailExistsMessage(intent: EmailCheckIntent): string {
 
 function generateOTP(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
-}
-
-async function dispatchPhoneOTP(phone: string, otp: string): Promise<void> {
-  const authKey = process.env.MSG91_AUTH_KEY;
-  const templateId = process.env.MSG91_OTP_TEMPLATE_ID ?? process.env.MSG91_TEMPLATE_ID;
-  const sender = process.env.MSG91_SENDER_ID ?? 'HCXGBL';
-
-  if (!authKey || !templateId) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[OTP:dev] +91${phone} → ${otp}`);
-    }
-    return;
-  }
-
-  const mobile = `91${phone}`;
-  const url = new URL('https://control.msg91.com/api/v5/otp');
-  url.searchParams.set('authkey', authKey);
-  url.searchParams.set('template_id', templateId);
-  url.searchParams.set('mobile', mobile);
-  url.searchParams.set('otp', otp);
-  url.searchParams.set('otp_expiry', '10');
-  url.searchParams.set('sender', sender);
-
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`MSG91 error: ${await res.text()}`);
 }
 
 async function dispatchEmailOTP(email: string, otp: string): Promise<void> {
@@ -170,7 +146,7 @@ async function postHandler(req: NextRequest) {
       throw err;
     }
 
-    if (usePhone) await dispatchPhoneOTP(phone, otp);
+    if (usePhone) await sendPhoneOtp(phone, otp);
     else await dispatchEmailOTP(email, otp);
 
     return NextResponse.json({ success: true });
