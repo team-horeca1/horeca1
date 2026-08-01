@@ -302,13 +302,15 @@ async function seedReturns(adminId: string) {
     vendorEmail: 'fresh@dailyfreshfoods.com',
     paymentMethod: 'cod',
   });
-  if (!(await prisma.returnRequest.findUnique({ where: { orderId: r1Order.id } }))) {
+  if (!(await prisma.returnRequest.findFirst({ where: { orderId: r1Order.id } }))) {
     await prisma.returnRequest.create({
       data: {
         orderId: r1Order.id,
         customerId: taj.userId,
         reason: 'Damaged packaging — demo pending return',
-        status: 'pending',
+        status: 'new',
+        invoiceNumber: r1Order.orderNumber,
+        type: 'return',
       },
     });
     console.log('  ✓ Return pending (SEED-FIN-R1)');
@@ -320,18 +322,20 @@ async function seedReturns(adminId: string) {
     vendorEmail: 'fresh@dailyfreshfoods.com',
     paymentMethod: 'cod',
   });
-  let r2 = await prisma.returnRequest.findUnique({ where: { orderId: r2Order.id } });
+  let r2 = await prisma.returnRequest.findFirst({ where: { orderId: r2Order.id } });
   if (!r2) {
     r2 = await prisma.returnRequest.create({
       data: {
         orderId: r2Order.id,
         customerId: r2Order.userId,
         reason: 'Wrong quantity — vendor-approved, awaiting admin refund',
-        status: 'pending',
+        status: 'new',
+        invoiceNumber: r2Order.orderNumber,
+        type: 'return',
       },
     });
   }
-  if (r2.status === 'pending') {
+  if (r2.status === 'new' || r2.status === 'pending') {
     await vendorReviewReturn(r2.id, dailyFresh.id, {
       status: 'approved',
       vendorNote: 'Approved — partial refund',
@@ -347,19 +351,21 @@ async function seedReturns(adminId: string) {
     vendorEmail: 'fresh@dailyfreshfoods.com',
     paymentMethod: 'cod',
   });
-  let r3 = await prisma.returnRequest.findUnique({ where: { orderId: r3Order.id } });
+  let r3 = await prisma.returnRequest.findFirst({ where: { orderId: r3Order.id } });
   if (!r3) {
     r3 = await prisma.returnRequest.create({
       data: {
         orderId: r3Order.id,
         customerId: taj.userId,
         reason: 'Quality issue — full refund demo',
-        status: 'pending',
+        status: 'new',
+        invoiceNumber: r3Order.orderNumber,
+        type: 'return',
       },
     });
   }
-  if (r3.status !== 'refunded') {
-    if (r3.status === 'pending') {
+  if (r3.status !== 'refunded' && r3.status !== 'closed') {
+    if (r3.status === 'new' || r3.status === 'pending') {
       await vendorReviewReturn(r3.id, dailyFresh.id, {
         status: 'approved',
         resolutionType: 'refund',

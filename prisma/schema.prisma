@@ -122,6 +122,10 @@ model User {
   priceHistoryChanges    PriceHistory[]    @relation("PriceHistoryActor")
   orderEvents            OrderEvent[]      @relation("OrderEventActor")
   orderShipments         OrderShipment[]   @relation("OrderShipmentActor")
+  fulfilmentEvents       FulfilmentEvent[] @relation("FulfilmentEventActor")
+  deliveryEvents         DeliveryEvent[]   @relation("DeliveryEventActor")
+  returnEvents           ReturnEvent[]     @relation("ReturnEventActor")
+  returnInspections      ReturnInspection[] @relation("ReturnInspectionVerifier")
   masterProductRevisions MasterProductRevision[] @relation("MasterRevisionActor")
   stockTransfersCreated  StockTransfer[]         @relation("StockTransferCreator")
 
@@ -257,6 +261,8 @@ model Vendor {
   dispatches          Dispatch[]
   goodsReceipts       GoodsReceipt[]
   stockTransfers      StockTransfer[]
+  fulfilments         Fulfilment[]
+  deliveryResources   DeliveryResource[]
   storeScopedRoles    UserRole[]          @relation("UserRoleOnlineStore")
 
   // Ordering defaults applied to new products and checkout
@@ -873,7 +879,8 @@ model Order {
   payments       Payment[]
   creditTxns     CreditTransaction[]
   review         Review?
-  returnRequest  ReturnRequest?
+  returnRequests ReturnRequest[]
+  replacementReturns ReturnRequest[] @relation("ReturnReplacementOrder")
   commissionAccruals CommissionAccrual[]
   vendorClaims       VendorClaim[]
   picklists          Picklist[]
@@ -881,6 +888,8 @@ model Order {
   events             OrderEvent[]
   cancelRequest      CancelRequest?
   shipments          OrderShipment[]
+  fulfilment         Fulfilment?
+  deliveryAccessTokens DeliveryAccessToken[]
 
   @@index([userId])
   @@index([vendorId])
@@ -973,6 +982,8 @@ model OrderItem {
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
   shipmentItems OrderShipmentItem[]
+  fulfilmentItems FulfilmentItem[]
+  returnItems     ReturnItem[]
 
   @@index([orderId])
   @@map("order_items")
@@ -1742,26 +1753,131 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// S9 Returns Workspace — multiple returns per order; statuses independent of Order/Fulfilment.
 model ReturnRequest {
-  id           String   @id @default(uuid()) @db.Uuid
-  orderId      String   @map("order_id") @db.Uuid
-  customerId   String   @map("customer_id") @db.Uuid
-  reason            String   @db.Text
-  status            String   @default("pending") @db.VarChar(20)
-  adminNote         String?  @map("admin_note") @db.Text
-  refundAmount      Decimal? @map("refund_amount") @db.Decimal(12, 2)
-  resolutionType    String?  @map("resolution_type") @db.VarChar(20)
-  creditNoteNumber  String?  @map("credit_note_number") @db.VarChar(50)
-  creditNoteAmount  Decimal? @map("credit_note_amount") @db.Decimal(12, 2)
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id                 String    @id @default(uuid()) @db.Uuid
+  orderId            String    @map("order_id") @db.Uuid
+  customerId         String    @map("customer_id") @db.Uuid
+  // Snapshotted commercial invoice ref (= order.orderNumber); no Invoice entity.
+  invoiceNumber      String?   @map("invoice_number") @db.VarChar(50)
+  // return | replacement | refund | claim (see RETURN_TYPES) — String avoids reserved `return` enum.
+  type               String    @default("return") @db.VarChar(20)
+  reason             String    @db.Text
+  // S9 lifecycle string (see RETURN_STATUSES); legacy values migrated in SQL.
+  status             String    @default("new") @db.VarChar(40)
+  adminNote          String?   @map("admin_note") @db.Text
+  refundAmount       Decimal?  @map("refund_amount") @db.Decimal(12, 2)
+  resolutionType     String?   @map("resolution_type") @db.VarChar(20)
+  creditNoteNumber   String?   @map("credit_note_number") @db.VarChar(50)
+  creditNoteAmount   Decimal?  @map("credit_note_amount") @db.Decimal(12, 2)
+  pickupAt           DateTime? @map("pickup_at") @db.Timestamptz
+  pickupAddress      String?   @map("pickup_address") @db.Text
+  pickupNotes        String?   @map("pickup_notes") @db.Text
+  goodsReceivedAt    DateTime? @map("goods_received_at") @db.Timestamptz
+  replacementOrderId String?   @map("replacement_order_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  order    Order @relation(fields: [orderId], references: [id])
-  customer User  @relation("CustomerReturnRequests", fields: [customerId], references: [id])
+  order            Order              @relation(fields: [orderId], references: [id])
+  customer         User               @relation("CustomerReturnRequests", fields: [customerId], references: [id])
+  replacementOrder Order?             @relation("ReturnReplacementOrder", fields: [replacementOrderId], references: [id], onDelete: SetNull)
+  items            ReturnItem[]
+  events           ReturnEvent[]
+  inspection       ReturnInspection?
 
-  @@unique([orderId])
+  @@index([orderId])
+  @@index([customerId])
   @@index([status])
+  @@index([type])
+  @@index([replacementOrderId])
+  @@index([createdAt(sort: Desc)])
   @@map("return_requests")
+}
+
+enum ReturnItemReason {
+  damaged
+  expired
+  wrong_item
+  short_supplied
+  quality_issue
+  not_as_described
+  other
+
+  @@map("return_item_reason")
+}
+
+enum ReturnItemDecision {
+  pending
+  approved
+  partial
+  rejected
+
+  @@map("return_item_decision")
+}
+
+enum ReturnDisposition {
+  saleable
+  return_to_brand
+  damaged
+  expired
+  scrap
+  qa_hold
+
+  @@map("return_disposition")
+}
+
+model ReturnItem {
+  id              String              @id @default(uuid()) @db.Uuid
+  returnRequestId String              @map("return_request_id") @db.Uuid
+  orderItemId     String              @map("order_item_id") @db.Uuid
+  requestedQty    Int                 @map("requested_qty")
+  approvedQty     Int?                @map("approved_qty")
+  reason          ReturnItemReason
+  decision        ReturnItemDecision  @default(pending)
+  disposition     ReturnDisposition?
+  note            String?             @db.Text
+
+  returnRequest ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  orderItem     OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@unique([returnRequestId, orderItemId])
+  @@index([returnRequestId])
+  @@index([orderItemId])
+  @@map("return_items")
+}
+
+model ReturnEvent {
+  id              String   @id @default(uuid()) @db.Uuid
+  returnRequestId String   @map("return_request_id") @db.Uuid
+  actorId         String?  @map("actor_id") @db.Uuid
+  action          String   @db.VarChar(64)
+  fromStatus      String?  @map("from_status") @db.VarChar(40)
+  toStatus        String?  @map("to_status") @db.VarChar(40)
+  payload         Json?
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  returnRequest ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  actor         User?         @relation("ReturnEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([returnRequestId, createdAt(sort: Desc)])
+  @@index([actorId])
+  @@map("return_events")
+}
+
+model ReturnInspection {
+  id              String   @id @default(uuid()) @db.Uuid
+  returnRequestId String   @unique @map("return_request_id") @db.Uuid
+  passed          Boolean
+  notes           String?  @db.Text
+  verifiedBy      String?  @map("verified_by") @db.Uuid
+  verifiedAt      DateTime @map("verified_at") @db.Timestamptz
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  returnRequest ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  verifier      User?         @relation("ReturnInspectionVerifier", fields: [verifiedBy], references: [id], onDelete: SetNull)
+
+  @@index([verifiedBy])
+  @@map("return_inspections")
 }
 
 model PushSubscription {
@@ -1986,6 +2102,7 @@ model Outlet {
   stockTransfersFrom   StockTransfer[]       @relation("StockTransferFrom")
   stockTransfersTo     StockTransfer[]       @relation("StockTransferTo")
   defaultForVendor     Vendor?               @relation("VendorDefaultOutlet")
+  fulfilments          Fulfilment[]
 
   @@index([businessAccountId])
   @@index([pincode])
@@ -2522,9 +2639,31 @@ enum DispatchStatus {
   pending
   out_for_delivery
   delivered
+  failed_delivery
   cancelled
 
   @@map("dispatch_status")
+}
+
+enum FulfilmentStatus {
+  awaiting_picking
+  picking
+  awaiting_packing
+  packed
+  ready_for_dispatch
+  out_for_delivery
+  delivered
+  failed_delivery
+
+  @@map("fulfilment_status")
+}
+
+enum DeliveryResourceType {
+  executive
+  vehicle
+  logistics_partner
+
+  @@map("delivery_resource_type")
 }
 
 enum GoodsReceiptStatus {
@@ -2536,49 +2675,191 @@ enum GoodsReceiptStatus {
 }
 
 model Picklist {
-  id        String         @id @default(uuid()) @db.Uuid
-  vendorId  String         @map("vendor_id") @db.Uuid
-  outletId  String?        @map("outlet_id") @db.Uuid
-  orderId   String?        @map("order_id") @db.Uuid
-  status    PicklistStatus @default(draft)
-  notes     String?        @db.Text
-  items     Json           @default("[]")
-  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id           String         @id @default(uuid()) @db.Uuid
+  vendorId     String         @map("vendor_id") @db.Uuid
+  outletId     String?        @map("outlet_id") @db.Uuid
+  orderId      String?        @map("order_id") @db.Uuid
+  fulfilmentId String?        @map("fulfilment_id") @db.Uuid
+  status       PicklistStatus @default(draft)
+  notes        String?        @db.Text
+  items        Json           @default("[]")
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  vendor Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  outlet Outlet? @relation(fields: [outletId], references: [id], onDelete: SetNull)
-  order  Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  vendor     Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  outlet     Outlet?     @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  order      Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  fulfilment Fulfilment? @relation(fields: [fulfilmentId], references: [id], onDelete: SetNull)
 
   @@index([vendorId])
   @@index([outletId])
   @@index([orderId])
+  @@index([fulfilmentId])
   @@map("picklists")
 }
 
 model Dispatch {
-  id              String         @id @default(uuid()) @db.Uuid
-  vendorId        String         @map("vendor_id") @db.Uuid
-  outletId        String?        @map("outlet_id") @db.Uuid
-  orderId         String?        @map("order_id") @db.Uuid
-  picklistId      String?        @map("picklist_id") @db.Uuid
-  status          DispatchStatus @default(pending)
-  driverName      String?        @map("driver_name") @db.VarChar(100)
-  vehicleNumber   String?        @map("vehicle_number") @db.VarChar(30)
-  dispatchedAt    DateTime?      @map("dispatched_at") @db.Timestamptz
-  deliveredAt     DateTime?      @map("delivered_at") @db.Timestamptz
-  notes           String?        @db.Text
-  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id                 String         @id @default(uuid()) @db.Uuid
+  vendorId           String         @map("vendor_id") @db.Uuid
+  outletId           String?        @map("outlet_id") @db.Uuid
+  orderId            String?        @map("order_id") @db.Uuid
+  picklistId         String?        @map("picklist_id") @db.Uuid
+  fulfilmentId       String?        @map("fulfilment_id") @db.Uuid
+  deliveryResourceId String?        @map("delivery_resource_id") @db.Uuid
+  status             DispatchStatus @default(pending)
+  driverName         String?        @map("driver_name") @db.VarChar(100)
+  vehicleNumber      String?        @map("vehicle_number") @db.VarChar(30)
+  dispatchedAt       DateTime?      @map("dispatched_at") @db.Timestamptz
+  deliveredAt        DateTime?      @map("delivered_at") @db.Timestamptz
+  notes              String?        @db.Text
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  vendor Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  outlet Outlet? @relation(fields: [outletId], references: [id], onDelete: SetNull)
-  order  Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  vendor           Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  outlet           Outlet?           @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  order            Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  fulfilment       Fulfilment?       @relation(fields: [fulfilmentId], references: [id], onDelete: SetNull)
+  deliveryResource DeliveryResource? @relation(fields: [deliveryResourceId], references: [id], onDelete: SetNull)
 
   @@index([vendorId])
   @@index([outletId])
   @@index([orderId])
+  @@index([fulfilmentId])
+  @@index([deliveryResourceId])
   @@map("dispatches")
+}
+
+// ═══ FULFILMENT WORKSPACE (S8) ═══════════════════════
+
+model DeliveryResource {
+  id        String               @id @default(uuid()) @db.Uuid
+  vendorId  String               @map("vendor_id") @db.Uuid
+  type      DeliveryResourceType
+  name      String               @db.VarChar(150)
+  phone     String?              @db.VarChar(20)
+  isActive  Boolean              @default(true) @map("is_active")
+  createdAt DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  vendor      Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  fulfilments Fulfilment[]
+  dispatches  Dispatch[]
+
+  @@index([vendorId])
+  @@index([vendorId, isActive])
+  @@map("delivery_resources")
+}
+
+/// Operational fulfilment aggregate — 1:1 with Order once accepted.
+/// Commercial OrderItem qty/price are never mutated by fulfilment actions.
+model Fulfilment {
+  id                 String           @id @default(uuid()) @db.Uuid
+  fulfilmentNumber   String           @unique @map("fulfilment_number") @db.VarChar(50)
+  orderId            String           @unique @map("order_id") @db.Uuid
+  vendorId           String           @map("vendor_id") @db.Uuid
+  outletId           String?          @map("outlet_id") @db.Uuid
+  status             FulfilmentStatus @default(awaiting_picking)
+  deliveryResourceId String?          @map("delivery_resource_id") @db.Uuid
+  eta                DateTime?        @db.Timestamptz
+  failedReason       String?          @map("failed_reason") @db.Text
+  redeliveryAt       DateTime?        @map("redelivery_at") @db.Timestamptz
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor           Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  outlet           Outlet?           @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  deliveryResource DeliveryResource? @relation(fields: [deliveryResourceId], references: [id], onDelete: SetNull)
+  items            FulfilmentItem[]
+  events           FulfilmentEvent[]
+  deliveryEvents   DeliveryEvent[]
+  picklists        Picklist[]
+  dispatches       Dispatch[]
+  deliveryAccessTokens DeliveryAccessToken[]
+
+  @@index([vendorId])
+  @@index([outletId])
+  @@index([status])
+  @@index([deliveryResourceId])
+  @@index([createdAt(sort: Desc)])
+  @@map("fulfilments")
+}
+
+model FulfilmentItem {
+  id            String  @id @default(uuid()) @db.Uuid
+  fulfilmentId  String  @map("fulfilment_id") @db.Uuid
+  orderItemId   String  @map("order_item_id") @db.Uuid
+  acceptedQty   Int     @map("accepted_qty")
+  pickedQty     Int     @default(0) @map("picked_qty")
+  packedQty     Int     @default(0) @map("packed_qty")
+  exceptionNote String? @map("exception_note") @db.Text
+
+  fulfilment Fulfilment @relation(fields: [fulfilmentId], references: [id], onDelete: Cascade)
+  orderItem  OrderItem  @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@unique([fulfilmentId, orderItemId])
+  @@index([fulfilmentId])
+  @@index([orderItemId])
+  @@map("fulfilment_items")
+}
+
+model FulfilmentEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  fulfilmentId String   @map("fulfilment_id") @db.Uuid
+  actorId      String?  @map("actor_id") @db.Uuid
+  action       String   @db.VarChar(64)
+  fromStatus   String?  @map("from_status") @db.VarChar(40)
+  toStatus     String?  @map("to_status") @db.VarChar(40)
+  payload      Json?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  fulfilment Fulfilment @relation(fields: [fulfilmentId], references: [id], onDelete: Cascade)
+  actor      User?      @relation("FulfilmentEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([fulfilmentId, createdAt(sort: Desc)])
+  @@index([actorId])
+  @@map("fulfilment_events")
+}
+
+model DeliveryEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  fulfilmentId String   @map("fulfilment_id") @db.Uuid
+  actorId      String?  @map("actor_id") @db.Uuid
+  kind         String   @db.VarChar(40)
+  payload      Json?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  fulfilment Fulfilment @relation(fields: [fulfilmentId], references: [id], onDelete: Cascade)
+  actor      User?      @relation("DeliveryEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([fulfilmentId, createdAt(sort: Desc)])
+  @@index([actorId])
+  @@map("delivery_events")
+}
+
+/// Opaque public magic-link for delivery boy POD (no login).
+/// Path: /d/[token]. Revoked on reschedule; new token on re-dispatch.
+model DeliveryAccessToken {
+  id               String    @id @default(uuid()) @db.Uuid
+  token            String    @unique @db.VarChar(64)
+  orderId          String    @map("order_id") @db.Uuid
+  fulfilmentId     String    @map("fulfilment_id") @db.Uuid
+  deliveryBoyName  String    @map("delivery_boy_name") @db.VarChar(150)
+  deliveryBoyPhone String    @map("delivery_boy_phone") @db.VarChar(20)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
+  usedAt           DateTime? @map("used_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  order      Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fulfilment Fulfilment @relation(fields: [fulfilmentId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([fulfilmentId])
+  @@index([fulfilmentId, revokedAt])
+  @@index([expiresAt])
+  @@map("delivery_access_tokens")
 }
 
 model GoodsReceipt {
