@@ -57,7 +57,7 @@ export function StatusTimeline({ steps, currentKey, className }: StatusTimelineP
 }
 
 export function returnTimelineCurrentKey(status: string): string {
-  if (status === 'refunded') return 'refunded';
+  if (status === 'refunded' || status === 'closed') return 'refunded';
   if (status === 'resolved') return 'resolved';
   if (status === 'refund_processing') return 'refund_processing';
   if (status === 'approved') return 'approved';

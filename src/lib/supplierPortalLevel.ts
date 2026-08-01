@@ -12,6 +12,7 @@ export const PORTAL_ENTERED_STORE_KEY = 'horeca_supplier_entered_store';
 export const STORE_OPS_PREFIXES = [
   '/vendor/dashboard',
   '/vendor/orders',
+  '/vendor/delivery',
   '/vendor/products',
   '/vendor/inventory',
   '/vendor/warehouse',

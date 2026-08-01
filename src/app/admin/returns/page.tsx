@@ -19,11 +19,14 @@ interface ReturnRequest {
 
 const STATUS_STYLE: Record<string, string> = {
     pending:  'bg-amber-50 text-amber-700',
+    new: 'bg-amber-50 text-amber-700',
+    under_review: 'bg-amber-50 text-amber-700',
     approved: 'bg-green-50 text-green-700',
     rejected: 'bg-red-50 text-red-700',
     refund_processing: 'bg-blue-50 text-blue-700',
     refunded: 'bg-blue-50 text-blue-700',
     resolved: 'bg-indigo-50 text-indigo-700',
+    closed: 'bg-indigo-50 text-indigo-700',
 };
 
 function fmt(v: string | number | null): string {
@@ -167,7 +170,7 @@ export default function AdminReturnsPage() {
                         </div>
 
                         <div className="space-y-3 border-t border-[#F5F5F5] pt-4">
-                            {selected.status === 'pending' && (
+                            {(selected.status === 'pending' || selected.status === 'new' || selected.status === 'under_review') && (
                                 <p className="text-[12px] text-amber-700 bg-amber-50 rounded-[8px] px-3 py-2">
                                     Waiting for vendor approval before you can process a refund.
                                 </p>
