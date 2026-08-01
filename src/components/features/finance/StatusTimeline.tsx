@@ -56,40 +56,75 @@ export function StatusTimeline({ steps, currentKey, className }: StatusTimelineP
   );
 }
 
-export function returnTimelineCurrentKey(status: string): string {
-  if (status === 'refunded' || status === 'closed') return 'refunded';
-  if (status === 'resolved') return 'resolved';
-  if (status === 'refund_processing') return 'refund_processing';
-  if (status === 'approved') return 'approved';
-  if (status === 'rejected') return 'rejected';
-  return 'submitted';
-}
-
-/** Default refund path (pending → approved → processing → refunded). */
+/**
+ * Customer return timeline — S9 Delivery-tab style (not legacy refund_processing).
+ * Keys match {@link toReturnUiStatus} / RETURN_PROGRESS_STAGES.
+ */
 export const RETURN_TIMELINE_STEPS: TimelineStep[] = [
-  { key: 'submitted', label: 'Submitted', description: 'Your return request was received' },
-  { key: 'approved', label: 'Vendor review', description: 'Vendor approves or rejects' },
-  { key: 'refund_processing', label: 'Refund processing', description: 'Platform processes your refund' },
-  { key: 'refunded', label: 'Refund complete', description: 'Money returned to you' },
+  { key: 'new', label: 'Submitted', description: 'Your return request was received' },
+  { key: 'review', label: 'Under review', description: 'Store is reviewing your request' },
+  { key: 'approved', label: 'Approved', description: 'Store approved the return' },
+  { key: 'pickup', label: 'Pickup', description: 'Goods pickup scheduled' },
+  { key: 'received', label: 'Received', description: 'Store received the goods' },
+  { key: 'closed', label: 'Closed', description: 'Return completed with credit note' },
+];
+
+/** Skip-pickup path: Approved → Closed (no physical accept). */
+export const RETURN_SKIP_TIMELINE_STEPS: TimelineStep[] = [
+  { key: 'new', label: 'Submitted', description: 'Your return request was received' },
+  { key: 'review', label: 'Under review', description: 'Store is reviewing your request' },
+  { key: 'approved', label: 'Approved', description: 'Store approved the return' },
+  { key: 'closed', label: 'Closed', description: 'Return completed with credit note' },
 ];
 
 /** Rejected returns — short path ending at Rejected. */
 export const RETURN_REJECTED_TIMELINE_STEPS: TimelineStep[] = [
-  { key: 'submitted', label: 'Submitted', description: 'Your return request was received' },
-  { key: 'rejected', label: 'Rejected', description: 'Vendor declined this return request' },
+  { key: 'new', label: 'Submitted', description: 'Your return request was received' },
+  { key: 'review', label: 'Under review', description: 'Store reviewed your request' },
+  { key: 'rejected', label: 'Rejected', description: 'Store declined this return request' },
 ];
 
-/** Credit note / replacement — closed without a money refund. */
-export const RETURN_RESOLVED_TIMELINE_STEPS: TimelineStep[] = [
-  { key: 'submitted', label: 'Submitted', description: 'Your return request was received' },
-  { key: 'approved', label: 'Vendor review', description: 'Vendor approved the request' },
-  { key: 'resolved', label: 'Resolved', description: 'Closed with credit note or replacement' },
-];
+/** @deprecated Prefer RETURN_TIMELINE_STEPS (S9). Kept for any stale imports. */
+export const RETURN_RESOLVED_TIMELINE_STEPS: TimelineStep[] = RETURN_SKIP_TIMELINE_STEPS;
 
-/** Pick the timeline steps that match the return's current status. */
-export function returnTimelineStepsForStatus(status: string): TimelineStep[] {
-  if (status === 'rejected') return RETURN_REJECTED_TIMELINE_STEPS;
-  if (status === 'resolved') return RETURN_RESOLVED_TIMELINE_STEPS;
+function toCustomerReturnTimelineKey(status: string): string {
+  switch (status) {
+    case 'pending':
+    case 'new':
+      return 'new';
+    case 'under_review':
+      return 'review';
+    case 'approved':
+    case 'refund_processing':
+      return 'approved';
+    case 'pickup_scheduled':
+      return 'pickup';
+    case 'goods_received':
+    case 'inspection_completed':
+      return 'received';
+    case 'closed':
+    case 'refunded':
+    case 'resolved':
+      return 'closed';
+    case 'rejected':
+      return 'rejected';
+    default:
+      return 'new';
+  }
+}
+
+export function returnTimelineCurrentKey(status: string): string {
+  return toCustomerReturnTimelineKey(status);
+}
+
+/** Pick S9 timeline steps for the return's current status / skip-pickup path. */
+export function returnTimelineStepsForStatus(
+  status: string,
+  opts?: { pickupSkipped?: boolean },
+): TimelineStep[] {
+  const key = toCustomerReturnTimelineKey(status);
+  if (key === 'rejected') return RETURN_REJECTED_TIMELINE_STEPS;
+  if (opts?.pickupSkipped) return RETURN_SKIP_TIMELINE_STEPS;
   return RETURN_TIMELINE_STEPS;
 }
 

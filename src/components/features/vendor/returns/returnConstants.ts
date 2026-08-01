@@ -1,47 +1,75 @@
 import {
   RETURN_DISPOSITIONS,
   RETURN_PROGRESS_STAGES,
-  RETURN_STATUSES,
+  RETURN_SKIP_PROGRESS_STAGES,
   RETURN_TYPES,
+  RETURN_UI_STATUSES,
+  dbStatusesForReturnUi,
+  returnProgressStageIndex,
+  toReturnUiStatus,
   type ReturnDisposition,
+  type ReturnProgressStage,
   type ReturnStatus,
   type ReturnType,
+  type ReturnUiStatus,
 } from '@/modules/return/return.types';
+import { personFirstCustomerLabel } from '@/lib/customerLabel';
 
-export const RETURN_STATUS_LABELS: Record<ReturnStatus, string> = {
+export const RETURN_UI_STATUS_LABELS: Record<ReturnUiStatus, string> = {
   new: 'New',
-  under_review: 'Under Review',
+  review: 'Review',
   approved: 'Approved',
   rejected: 'Rejected',
-  pickup_scheduled: 'Pickup Scheduled',
-  goods_received: 'Goods Received',
-  inspection_completed: 'Inspection Done',
+  pickup: 'Pickup',
+  received: 'Received',
   closed: 'Closed',
 };
 
-export const RETURN_STATUS_STYLE: Record<ReturnStatus, string> = {
+export const RETURN_UI_STATUS_STYLE: Record<ReturnUiStatus, string> = {
   new: 'bg-amber-50 text-amber-800 border-amber-200',
-  under_review: 'bg-orange-50 text-orange-800 border-orange-200',
+  review: 'bg-orange-50 text-orange-800 border-orange-200',
   approved: 'bg-emerald-50 text-emerald-800 border-emerald-200',
   rejected: 'bg-rose-50 text-rose-800 border-rose-200',
-  pickup_scheduled: 'bg-sky-50 text-sky-800 border-sky-200',
-  goods_received: 'bg-indigo-50 text-indigo-800 border-indigo-200',
-  inspection_completed: 'bg-violet-50 text-violet-800 border-violet-200',
+  pickup: 'bg-sky-50 text-sky-800 border-sky-200',
+  received: 'bg-indigo-50 text-indigo-800 border-indigo-200',
   closed: 'bg-slate-100 text-slate-700 border-slate-200',
 };
 
-export const RETURN_STATUS_CHIPS: Array<{ key: 'all' | ReturnStatus; label: string }> = [
+/** @deprecated Prefer RETURN_UI_STATUS_LABELS via toReturnUiStatus */
+export const RETURN_STATUS_LABELS: Record<ReturnStatus, string> = {
+  new: RETURN_UI_STATUS_LABELS.new,
+  under_review: RETURN_UI_STATUS_LABELS.review,
+  approved: RETURN_UI_STATUS_LABELS.approved,
+  rejected: RETURN_UI_STATUS_LABELS.rejected,
+  pickup_scheduled: RETURN_UI_STATUS_LABELS.pickup,
+  goods_received: RETURN_UI_STATUS_LABELS.received,
+  inspection_completed: RETURN_UI_STATUS_LABELS.received,
+  closed: RETURN_UI_STATUS_LABELS.closed,
+};
+
+/** @deprecated Prefer RETURN_UI_STATUS_STYLE via toReturnUiStatus */
+export const RETURN_STATUS_STYLE: Record<ReturnStatus, string> = {
+  new: RETURN_UI_STATUS_STYLE.new,
+  under_review: RETURN_UI_STATUS_STYLE.review,
+  approved: RETURN_UI_STATUS_STYLE.approved,
+  rejected: RETURN_UI_STATUS_STYLE.rejected,
+  pickup_scheduled: RETURN_UI_STATUS_STYLE.pickup,
+  goods_received: RETURN_UI_STATUS_STYLE.received,
+  inspection_completed: RETURN_UI_STATUS_STYLE.received,
+  closed: RETURN_UI_STATUS_STYLE.closed,
+};
+
+export const RETURN_STATUS_CHIPS: Array<{ key: 'all' | ReturnUiStatus; label: string }> = [
   { key: 'all', label: 'All' },
-  ...RETURN_STATUSES.map((s) => ({ key: s, label: RETURN_STATUS_LABELS[s] })),
+  ...RETURN_UI_STATUSES.map((s) => ({ key: s, label: RETURN_UI_STATUS_LABELS[s] })),
 ];
 
-export const RETURN_PROGRESS_LABELS: Record<(typeof RETURN_PROGRESS_STAGES)[number], string> = {
+export const RETURN_PROGRESS_LABELS: Record<ReturnProgressStage, string> = {
   new: 'New',
-  under_review: 'Review',
+  review: 'Review',
   approved: 'Approved',
-  pickup_scheduled: 'Pickup',
-  goods_received: 'Received',
-  inspection_completed: 'Inspect',
+  pickup: 'Pickup',
+  received: 'Received',
   closed: 'Closed',
 };
 
@@ -54,12 +82,15 @@ export const RETURN_TYPE_LABELS: Record<ReturnType, string> = {
 
 export const RETURN_TYPE_OPTIONS: Array<{ value: '' | ReturnType; label: string }> = [
   { value: '', label: 'All types' },
-  ...RETURN_TYPES.map((t) => ({ value: t, label: RETURN_TYPE_LABELS[t] })),
+  ...RETURN_TYPES.filter((t) => t !== 'replacement').map((t) => ({
+    value: t,
+    label: RETURN_TYPE_LABELS[t],
+  })),
 ];
 
 export const RETURN_DISPOSITION_LABELS: Record<ReturnDisposition, string> = {
   saleable: 'Saleable',
-  return_to_brand: 'Return to brand',
+  return_to_brand: 'Return to Online Store/Brand',
   damaged: 'Damaged',
   expired: 'Expired',
   scrap: 'Scrap',
@@ -76,12 +107,23 @@ export const RETURN_ITEM_REASON_LABELS: Record<string, string> = {
   expired: 'Expired',
   wrong_item: 'Wrong item',
   short_supplied: 'Short supplied',
+  excess_supplied: 'Excess supplied',
+  customer_rejected: 'Customer rejected',
   quality_issue: 'Quality issue',
   not_as_described: 'Not as described',
   other: 'Other',
 };
 
 export type OutletOption = { id: string; name: string };
+
+export type ReturnPickupLink = {
+  path: string;
+  url: string;
+  expiresAt: string;
+  usedAt: string | null;
+  deliveryBoyName: string | null;
+  deliveryBoyPhone: string | null;
+};
 
 export type ReturnListRow = {
   id: string;
@@ -96,7 +138,9 @@ export type ReturnListRow = {
   creditNoteAmount: string | number | null;
   pickupAt: string | null;
   goodsReceivedAt: string | null;
+  pickupSkippedAt?: string | null;
   replacementOrderId: string | null;
+  pickupLink?: ReturnPickupLink | null;
   createdAt: string;
   customer: {
     id: string;
@@ -171,6 +215,10 @@ export type ReturnInspectionRow = {
 export type ReturnDetail = Omit<ReturnListRow, 'items'> & {
   pickupAddress: string | null;
   pickupNotes: string | null;
+  pickupSkippedAt?: string | null;
+  pickupSkipReason?: string | null;
+  hasPickupOtp?: boolean;
+  pickupLink?: ReturnPickupLink | null;
   items: ReturnItemRow[];
   events: ReturnEventRow[];
   inspection: ReturnInspectionRow;
@@ -203,14 +251,12 @@ export function customerLabel(row: {
     outlet?: { name: string } | null;
   } | null;
 }): string {
-  return (
-    row.customer?.businessName ||
-    row.customer?.fullName ||
-    row.order?.user?.businessName ||
-    row.order?.user?.fullName ||
-    row.order?.outlet?.name ||
-    '—'
-  );
+  return personFirstCustomerLabel({
+    fullName: row.customer?.fullName || row.order?.user?.fullName,
+    businessName: row.customer?.businessName || row.order?.user?.businessName,
+    outletName: row.order?.outlet?.name,
+    fallback: '—',
+  });
 }
 
 export function shortReturnId(id: string): string {
@@ -244,21 +290,51 @@ export function formatDateTime(value: string | null | undefined): string {
   }
 }
 
-export function progressStageIndex(status: ReturnStatus): number {
-  if (status === 'rejected') {
-    return RETURN_PROGRESS_STAGES.indexOf('under_review');
-  }
-  const idx = RETURN_PROGRESS_STAGES.indexOf(
-    status as (typeof RETURN_PROGRESS_STAGES)[number],
-  );
-  return idx >= 0 ? idx : 0;
+export function progressStageIndex(
+  status: ReturnStatus | string,
+  opts?: { pickupSkipped?: boolean },
+): number {
+  return returnProgressStageIndex(status, opts);
 }
 
-export function isAwaitingReview(status: ReturnStatus): boolean {
-  return status === 'new' || status === 'under_review';
+export function returnStatusLabel(dbStatus: string): string {
+  return RETURN_UI_STATUS_LABELS[toReturnUiStatus(dbStatus)];
+}
+
+export function returnStatusStyle(dbStatus: string): string {
+  return RETURN_UI_STATUS_STYLE[toReturnUiStatus(dbStatus)];
+}
+
+export function isAwaitingReview(status: ReturnStatus | string): boolean {
+  const ui = toReturnUiStatus(status);
+  return ui === 'new' || ui === 'review';
 }
 
 export function money(value: string | number | null | undefined): string {
   if (value == null || value === '') return '—';
   return `₹${Number(value).toLocaleString('en-IN')}`;
 }
+
+/** Absolute URL for a magic-link path (client-safe). */
+export function pickupLinkAbsoluteUrl(path: string): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}${path}`;
+  }
+  return path;
+}
+
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export {
+  RETURN_PROGRESS_STAGES,
+  RETURN_SKIP_PROGRESS_STAGES,
+  dbStatusesForReturnUi,
+  toReturnUiStatus,
+};

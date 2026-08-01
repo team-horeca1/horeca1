@@ -15,13 +15,13 @@ import { ReturnActions } from './ReturnActions';
 import {
   RETURN_ITEM_REASON_LABELS,
   RETURN_DISPOSITION_LABELS,
-  RETURN_STATUS_LABELS,
-  RETURN_STATUS_STYLE,
   RETURN_TYPE_LABELS,
   customerLabel,
   formatDateTime,
   shortReturnId,
   money,
+  returnStatusLabel,
+  returnStatusStyle,
   type ReturnDetail,
 } from './returnConstants';
 
@@ -104,10 +104,10 @@ export function ReturnDetailDrawer({ open, returnId, onClose, onUpdated }: Props
                 <span
                   className={cn(
                     'inline-flex px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border',
-                    RETURN_STATUS_STYLE[detail.status],
+                    returnStatusStyle(detail.status),
                   )}
                 >
-                  {RETURN_STATUS_LABELS[detail.status]}
+                  {returnStatusLabel(detail.status)}
                 </span>
                 {typeLabel && (
                   <span className="text-[11px] font-bold text-[#7C7C7C]">{typeLabel}</span>
@@ -127,7 +127,10 @@ export function ReturnDetailDrawer({ open, returnId, onClose, onUpdated }: Props
             </div>
           ) : (
             <>
-              <ReturnProgress status={detail.status} />
+              <ReturnProgress
+                status={detail.status}
+                pickupSkipped={!!detail.pickupSkippedAt}
+              />
 
               <div className="text-[13px] space-y-1.5 bg-[#FAFAFA] rounded-[10px] p-3 border border-[#EEEEEE]">
                 <p>
@@ -243,9 +246,7 @@ export function ReturnDetailDrawer({ open, returnId, onClose, onUpdated }: Props
                 </div>
               )}
 
-              {(detail.creditNoteNumber ||
-                detail.refundAmount != null ||
-                detail.replacementOrder) && (
+              {(detail.creditNoteNumber || detail.refundAmount != null) && (
                 <div className="rounded-[10px] border border-[#EEEEEE] p-3 text-[13px] space-y-1">
                   <p className="text-[11px] font-bold text-[#7C7C7C] uppercase mb-1">
                     Commercial refs
@@ -261,17 +262,6 @@ export function ReturnDetailDrawer({ open, returnId, onClose, onUpdated }: Props
                   {detail.refundAmount != null && (
                     <p>
                       Refund <strong>{money(detail.refundAmount)}</strong>
-                    </p>
-                  )}
-                  {detail.replacementOrder && (
-                    <p>
-                      Replacement{' '}
-                      <Link
-                        href={`/vendor/orders/${detail.replacementOrder.id}`}
-                        className="font-bold text-[#B45309] hover:underline"
-                      >
-                        {detail.replacementOrder.orderNumber}
-                      </Link>
                     </p>
                   )}
                 </div>
@@ -321,6 +311,10 @@ function actionSuccessMessage(action: ReturnActionBody['action']): string {
       return 'Return rejected';
     case 'schedule_pickup':
       return 'Pickup scheduled';
+    case 'skip_pickup':
+      return 'Pickup skipped';
+    case 'resend_pickup_otp':
+      return 'Pickup OTP resent';
     case 'mark_goods_received':
       return 'Goods received';
     case 'complete_inspection':
@@ -329,12 +323,8 @@ function actionSuccessMessage(action: ReturnActionBody['action']): string {
       return 'Goods rejected';
     case 'set_disposition':
       return 'Disposition applied';
-    case 'generate_replacement':
-      return 'Replacement order created';
     case 'generate_credit_note':
       return 'Credit note generated';
-    case 'process_refund':
-      return 'Refund processed';
     case 'close':
       return 'Return closed';
     default:

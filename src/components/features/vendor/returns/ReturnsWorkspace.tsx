@@ -2,30 +2,53 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
   RETURNS_ACCENT_STYLE,
-  RETURN_STATUSES,
   RETURN_TYPES,
-  type ReturnStatus,
+  isReturnUiStatus,
+  toReturnUiStatus,
   type ReturnType,
+  type ReturnUiStatus,
 } from '@/modules/return/return.types';
 import { ReturnsTable } from './ReturnsTable';
 import { ReturnDetailDrawer } from './ReturnDetailDrawer';
 import {
+  RETURN_ITEM_REASON_LABELS,
   RETURN_STATUS_CHIPS,
   RETURN_TYPE_OPTIONS,
+  RETURN_UI_STATUS_LABELS,
   type OutletOption,
   type ReturnListRow,
 } from './returnConstants';
 
-function parseStatusParam(raw: string | null): 'all' | ReturnStatus {
-  if (raw && (RETURN_STATUSES as readonly string[]).includes(raw)) {
-    return raw as ReturnStatus;
-  }
-  return 'all';
+type ReturnsSummary = {
+  total: number;
+  byStatus: Array<{ status: string; count: number }>;
+  byReason: Array<{ reason: string; count: number; qty: number }>;
+  byCustomer: Array<{
+    customerId: string;
+    name: string;
+    count: number;
+    creditNoteTotal: number;
+  }>;
+  byProduct: Array<{
+    productId: string;
+    productName: string;
+    productSku: string | null;
+    returnCount: number;
+    requestedQty: number;
+    approvedQty: number;
+  }>;
+};
+
+function parseStatusParam(raw: string | null): 'all' | ReturnUiStatus {
+  if (!raw) return 'all';
+  if (isReturnUiStatus(raw)) return raw;
+  // Legacy DB status in URL → UI chip
+  return toReturnUiStatus(raw);
 }
 
 function parseTypeParam(raw: string | null): '' | ReturnType {
@@ -45,7 +68,7 @@ export function ReturnsWorkspace() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
 
-  const [status, setStatus] = useState<'all' | ReturnStatus>(() =>
+  const [status, setStatus] = useState<'all' | ReturnUiStatus>(() =>
     parseStatusParam(searchParams.get('status')),
   );
   const [type, setType] = useState<'' | ReturnType>(() => parseTypeParam(searchParams.get('type')));
@@ -56,6 +79,9 @@ export function ReturnsWorkspace() {
   const [outletId, setOutletId] = useState(searchParams.get('outlet') ?? '');
   const [outlets, setOutlets] = useState<OutletOption[]>([]);
   const [drawerId, setDrawerId] = useState<string | null>(searchParams.get('id'));
+  const [summary, setSummary] = useState<ReturnsSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -79,21 +105,63 @@ export function ReturnsWorkspace() {
     }
   }, []);
 
+  const buildFilterParams = useCallback(() => {
+    const params = new URLSearchParams();
+    if (status !== 'all') params.set('status', status);
+    if (type) params.set('type', type);
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    if (outletId) params.set('outletId', outletId);
+    return params;
+  }, [status, type, debouncedSearch, dateFrom, dateTo, outletId]);
+
   const buildQuery = useCallback(
     (cursor?: string | null) => {
-      const params = new URLSearchParams();
+      const params = buildFilterParams();
       params.set('limit', '20');
-      if (status !== 'all') params.set('status', status);
-      if (type) params.set('type', type);
-      if (debouncedSearch) params.set('search', debouncedSearch);
-      if (dateFrom) params.set('dateFrom', dateFrom);
-      if (dateTo) params.set('dateTo', dateTo);
-      if (outletId) params.set('outletId', outletId);
       if (cursor) params.set('cursor', cursor);
       return params.toString();
     },
-    [status, type, debouncedSearch, dateFrom, dateTo, outletId],
+    [buildFilterParams],
   );
+
+  const loadSummary = useCallback(async () => {
+    setSummaryLoading(true);
+    try {
+      const qs = buildFilterParams().toString();
+      const res = await fetch(`/api/v1/vendor/returns/summary${qs ? `?${qs}` : ''}`);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'Failed to load summary');
+      setSummary(json.data as ReturnsSummary);
+    } catch {
+      setSummary(null);
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, [buildFilterParams]);
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const qs = buildFilterParams().toString();
+      const res = await fetch(`/api/v1/vendor/returns/export${qs ? `?${qs}` : ''}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `returns-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast.success('Export downloaded');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -134,6 +202,10 @@ export function ReturnsWorkspace() {
   }, [load]);
 
   useEffect(() => {
+    void loadSummary();
+  }, [loadSummary]);
+
+  useEffect(() => {
     void loadOutlets();
   }, [loadOutlets]);
 
@@ -164,7 +236,7 @@ export function ReturnsWorkspace() {
     syncUrl(null);
   };
 
-  const setStatusChip = (key: 'all' | ReturnStatus) => {
+  const setStatusChip = (key: 'all' | ReturnUiStatus) => {
     setStatus(key);
     syncUrl(drawerId, key);
   };
@@ -181,12 +253,21 @@ export function ReturnsWorkspace() {
           </div>
           <h1 className="text-[24px] font-bold text-[#181725]">Returns</h1>
           <p className="text-[12px] text-[#AEAEAE]">
-            Review, inspect, disposition, and resolve customer returns — separate from order status
+            Review → credit note or pickup — same flow as Delivery
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => void exportCsv()}
+          disabled={exporting}
+          title="Export filtered returns as CSV"
+          className="h-[40px] px-3 rounded-[10px] bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5] flex items-center gap-1.5 text-[12px] font-semibold shadow-sm shrink-0 disabled:opacity-60"
+        >
+          {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          Export CSV
+        </button>
       </div>
 
-      {/* Status chips */}
       <div className="flex flex-wrap gap-2">
         {RETURN_STATUS_CHIPS.map((chip) => (
           <button
@@ -205,7 +286,6 @@ export function ReturnsWorkspace() {
         ))}
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col lg:flex-row gap-2 lg:items-center">
         <div className="relative flex-1 min-w-0">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEAEAE]" />
@@ -261,6 +341,50 @@ export function ReturnsWorkspace() {
         )}
       </div>
 
+      {(summaryLoading || summary) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <SummaryCard
+            title="By status"
+            loading={summaryLoading}
+            total={summary?.total}
+            rows={(summary?.byStatus ?? []).slice(0, 6).map((r) => ({
+              key: r.status,
+              label:
+                RETURN_UI_STATUS_LABELS[r.status as ReturnUiStatus] ??
+                r.status.replace(/_/g, ' '),
+              value: String(r.count),
+            }))}
+          />
+          <SummaryCard
+            title="By reason"
+            loading={summaryLoading}
+            rows={(summary?.byReason ?? []).slice(0, 6).map((r) => ({
+              key: r.reason,
+              label: RETURN_ITEM_REASON_LABELS[r.reason] ?? r.reason.replace(/_/g, ' '),
+              value: `${r.count} · qty ${r.qty}`,
+            }))}
+          />
+          <SummaryCard
+            title="By customer"
+            loading={summaryLoading}
+            rows={(summary?.byCustomer ?? []).slice(0, 6).map((r) => ({
+              key: r.customerId,
+              label: r.name,
+              value: String(r.count),
+            }))}
+          />
+          <SummaryCard
+            title="By product"
+            loading={summaryLoading}
+            rows={(summary?.byProduct ?? []).slice(0, 6).map((r) => ({
+              key: r.productId,
+              label: r.productSku ? `${r.productName} (${r.productSku})` : r.productName,
+              value: `qty ${r.requestedQty}`,
+            }))}
+          />
+        </div>
+      )}
+
       <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
         <ReturnsTable
           rows={rows}
@@ -294,5 +418,48 @@ export function ReturnsWorkspacePage() {
     >
       <ReturnsWorkspace />
     </React.Suspense>
+  );
+}
+
+function SummaryCard({
+  title,
+  loading,
+  total,
+  rows,
+}: {
+  title: string;
+  loading: boolean;
+  total?: number;
+  rows: Array<{ key: string; label: string; value: string }>;
+}) {
+  return (
+    <div className="bg-white rounded-[12px] border border-[#EEEEEE] shadow-sm p-3.5 min-h-[140px]">
+      <div className="flex items-baseline justify-between gap-2 mb-2.5">
+        <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-[#AEAEAE]">
+          {title}
+        </h2>
+        {typeof total === 'number' && (
+          <span className="text-[12px] font-bold text-[#181725]">{total} total</span>
+        )}
+      </div>
+      {loading && !rows.length ? (
+        <div className="flex justify-center py-6">
+          <Loader2 size={16} className="animate-spin text-[#B45309]" />
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="text-[12px] text-[#AEAEAE] py-4">No data for filters</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {rows.map((row) => (
+            <li key={row.key} className="flex items-start justify-between gap-2 text-[12px]">
+              <span className="text-[#181725] truncate min-w-0" title={row.label}>
+                {row.label}
+              </span>
+              <span className="font-bold text-[#7C7C7C] shrink-0 tabular-nums">{row.value}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

@@ -1,14 +1,18 @@
 'use client';
 
-import { ChevronRight, Loader2, RotateCcw } from 'lucide-react';
+import type { MouseEvent } from 'react';
+import { ChevronRight, Copy, ExternalLink, Link2, Loader2, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ReturnType } from '@/modules/return/return.types';
 import {
-  RETURN_STATUS_LABELS,
-  RETURN_STATUS_STYLE,
   RETURN_TYPE_LABELS,
+  copyText,
   customerLabel,
   formatDate,
+  pickupLinkAbsoluteUrl,
+  returnStatusLabel,
+  returnStatusStyle,
   shortReturnId,
   type ReturnListRow,
 } from './returnConstants';
@@ -39,6 +43,18 @@ export function ReturnsTable({
   onLoadMore,
   loadingMore,
 }: Props) {
+  const visitLink = (path: string, e: MouseEvent) => {
+    e.stopPropagation();
+    window.open(pickupLinkAbsoluteUrl(path), '_blank', 'noopener,noreferrer');
+  };
+
+  const copyLink = async (path: string, e: MouseEvent) => {
+    e.stopPropagation();
+    const ok = await copyText(pickupLinkAbsoluteUrl(path));
+    if (ok) toast.success('Pickup link copied');
+    else toast.error('Could not copy link');
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-16">
@@ -85,10 +101,10 @@ export function ReturnsTable({
               <span
                 className={cn(
                   'inline-flex px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border shrink-0',
-                  RETURN_STATUS_STYLE[row.status],
+                  returnStatusStyle(row.status),
                 )}
               >
-                {RETURN_STATUS_LABELS[row.status]}
+                {returnStatusLabel(row.status)}
               </span>
             </div>
             <p className="text-[13px] font-semibold text-[#181725]">{customerLabel(row)}</p>
@@ -96,6 +112,28 @@ export function ReturnsTable({
               <span>{typeLabel(row.type)}</span>
               <span>{formatDate(row.createdAt)}</span>
             </div>
+            {row.pickupLink?.path && (
+              <div
+                className="flex items-center gap-3 pt-1"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={(e) => visitLink(row.pickupLink!.path, e)}
+                  className="inline-flex items-center gap-1 text-[12px] font-bold text-[#B45309]"
+                >
+                  <ExternalLink size={13} /> Visit
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => void copyLink(row.pickupLink!.path, e)}
+                  className="inline-flex items-center gap-1 text-[12px] font-bold text-[#B45309]"
+                >
+                  <Link2 size={13} /> Copy
+                </button>
+              </div>
+            )}
           </button>
         ))}
       </div>
@@ -115,10 +153,10 @@ export function ReturnsTable({
                 Customer / Outlet
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wide">
-                Type
+                Status
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wide">
-                Status
+                Pickup link
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wide">
                 Requested On
@@ -157,16 +195,41 @@ export function ReturnsTable({
                     <p className="text-[11px] text-[#AEAEAE]">{row.order.outlet.name}</p>
                   )}
                 </td>
-                <td className="px-4 py-3.5 text-[#7C7C7C]">{typeLabel(row.type)}</td>
                 <td className="px-4 py-3.5">
                   <span
                     className={cn(
                       'inline-flex px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border',
-                      RETURN_STATUS_STYLE[row.status],
+                      returnStatusStyle(row.status),
                     )}
                   >
-                    {RETURN_STATUS_LABELS[row.status]}
+                    {returnStatusLabel(row.status)}
                   </span>
+                </td>
+                <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                  {row.pickupLink?.path ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => visitLink(row.pickupLink!.path, e)}
+                        className="inline-flex items-center gap-1 text-[12px] font-bold text-[#B45309] hover:underline"
+                        title="Open magic link"
+                      >
+                        <ExternalLink size={13} />
+                        Visit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => void copyLink(row.pickupLink!.path, e)}
+                        className="inline-flex items-center gap-1 text-[12px] font-bold text-[#B45309] hover:underline"
+                        title="Copy magic link"
+                      >
+                        <Copy size={13} />
+                        Copy
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[#AEAEAE]">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3.5 text-[#7C7C7C]">{formatDate(row.createdAt)}</td>
                 <td className="px-4 py-3.5 text-right">

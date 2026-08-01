@@ -14,9 +14,8 @@ import {
     StatusTimeline,
     ORDER_STATUS_STEPS,
     orderTimelineCurrentKey,
-    returnTimelineCurrentKey,
-    returnTimelineStepsForStatus,
 } from '@/components/features/finance/StatusTimeline';
+import CustomerReturnSection from '@/components/features/return/CustomerReturnSection';
 
 interface ApiOrderItem {
     id: string;
@@ -121,16 +120,6 @@ export default function OrderDetailPage() {
     const [ratingComment, setRatingComment] = React.useState('');
     const [isSubmittingRating, setIsSubmittingRating] = React.useState(false);
 
-    // Return request state
-    const [showReturnForm, setShowReturnForm] = React.useState(false);
-    const [returnReason, setReturnReason] = React.useState('');
-    const [isSubmittingReturn, setIsSubmittingReturn] = React.useState(false);
-    const [returnRequest, setReturnRequest] = React.useState<{
-        status: string;
-        reason?: string;
-        adminNote?: string | null;
-    } | null>(null);
-
     // Cancel request state (Section 7 Flow 18)
     const [showCancelForm, setShowCancelForm] = React.useState(false);
     const [cancelReason, setCancelReason] = React.useState('');
@@ -192,14 +181,6 @@ export default function OrderDetailPage() {
     };
 
     React.useEffect(() => {
-        if (!order || (order.status !== 'delivered' && order.status !== 'returned')) return;
-        fetch(`/api/v1/orders/${orderId}/return`)
-            .then(r => r.json())
-            .then(json => { if (json.success && json.data) setReturnRequest(json.data); })
-            .catch(() => {});
-    }, [order, orderId]);
-
-    React.useEffect(() => {
         if (!order) return;
         const canHaveCancel =
             order.status === 'pending' ||
@@ -230,27 +211,6 @@ export default function OrderDetailPage() {
             toast.error(err instanceof Error ? err.message : 'Failed to submit');
         } finally {
             setIsSubmittingCancel(false);
-        }
-    };
-
-    const handleSubmitReturn = async () => {
-        if (!order || !returnReason.trim()) return;
-        setIsSubmittingReturn(true);
-        try {
-            const res = await fetch(`/api/v1/orders/${orderId}/return`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason: returnReason }),
-            });
-            const json = await res.json();
-            if (!json.success) throw new Error(json.error?.message || 'Failed to submit');
-            setReturnRequest(json.data);
-            setShowReturnForm(false);
-            toast.success('Return request submitted');
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Failed to submit return');
-        } finally {
-            setIsSubmittingReturn(false);
         }
     };
 
@@ -699,51 +659,11 @@ export default function OrderDetailPage() {
                                     </div>
                                 </div>
                             )}
-                            {order.status === 'delivered' && !returnRequest && !showReturnForm && (
-                                <button onClick={() => setShowReturnForm(true)}
-                                    className="w-full py-3.5 border-2 border-gray-200 text-[14px] font-black text-gray-600 rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
-                                    Request Return
-                                </button>
-                            )}
-                            {returnRequest && (
-                                <div className="space-y-3 p-4 border-2 border-amber-100 bg-amber-50/40 rounded-2xl" data-testid="return-request-status">
-                                    <p className="text-[13px] font-bold text-[#181725]">
-                                        Return request: <span className="capitalize">{returnRequest.status.replace(/_/g, ' ')}</span>
-                                    </p>
-                                    {returnRequest.reason && (
-                                        <p className="text-[12px] text-gray-600">{returnRequest.reason}</p>
-                                    )}
-                                    {returnRequest.adminNote && (
-                                        <p className="text-[12px] text-gray-500">Store note: {returnRequest.adminNote}</p>
-                                    )}
-                                    <StatusTimeline
-                                        steps={returnTimelineStepsForStatus(returnRequest.status)}
-                                        currentKey={returnTimelineCurrentKey(returnRequest.status)}
-                                    />
-                                </div>
-                            )}
-                            {showReturnForm && (
-                                <div className="space-y-3 p-4 border-2 border-gray-200 rounded-2xl">
-                                    <p className="text-[13px] font-bold text-[#181725]">Reason for return</p>
-                                    <textarea
-                                        value={returnReason}
-                                        onChange={e => setReturnReason(e.target.value)}
-                                        rows={3}
-                                        placeholder="Describe the issue (damaged, wrong item, etc.)..."
-                                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-[#299e60]/40 resize-none"
-                                    />
-                                    <div className="flex gap-2">
-                                        <button onClick={handleSubmitReturn} disabled={isSubmittingReturn || returnReason.trim().length < 10}
-                                            className="flex-1 py-2.5 bg-[#299e60] text-white text-[13px] font-black rounded-xl disabled:opacity-50">
-                                            {isSubmittingReturn ? 'Submitting...' : 'Submit Request'}
-                                        </button>
-                                        <button onClick={() => setShowReturnForm(false)}
-                                            className="px-4 py-2.5 border border-gray-200 text-[13px] font-bold rounded-xl">
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            <CustomerReturnSection
+                                orderId={orderId}
+                                orderStatus={order.status}
+                                items={order.items}
+                            />
                             <Link href="/orders"
                                 className="w-full py-3 flex items-center justify-center gap-1 text-[13px] font-bold text-gray-400 hover:text-gray-600 transition-colors">
                                 <ChevronLeft size={14} />
