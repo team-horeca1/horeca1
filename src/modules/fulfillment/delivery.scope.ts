@@ -92,7 +92,7 @@ export const DELIVERY_PROGRESS_LABELS: Record<DeliveryProgressStage, string> = {
  * Leave `/vendor/returns` and return APIs as already built. No Returns UX/API
  * changes in the Delivery pass.
  */
-export const DELIVERY_SCOPE_RETURNS: 'out' = 'out';
+export const DELIVERY_SCOPE_RETURNS = 'out' as const;
 
 /**
  * 2) Magic-link auth — public opaque token, no login.
@@ -100,15 +100,14 @@ export const DELIVERY_SCOPE_RETURNS: 'out' = 'out';
  * Token can be revoked/rotated on reschedule; link stays viewable after fail
  * but complete is disabled until vendor redispatches.
  */
-export const DELIVERY_SCOPE_MAGIC_LINK_AUTH: 'public_token' = 'public_token';
+export const DELIVERY_SCOPE_MAGIC_LINK_AUTH = 'public_token' as const;
 
 /**
  * 3) Packed gate — hard gate before dispatch.
  * Flow: Accepted → mark Packed → assign boy + dispatch (creates magic link).
  * `assign_and_dispatch` must reject (or no-op with clear error) if not Packed.
  */
-export const DELIVERY_SCOPE_PACKED_GATE: 'required_before_dispatch' =
-  'required_before_dispatch';
+export const DELIVERY_SCOPE_PACKED_GATE = 'required_before_dispatch' as const;
 
 /**
  * 4) Override location — vendor Delivery workspace only.
@@ -116,8 +115,7 @@ export const DELIVERY_SCOPE_PACKED_GATE: 'required_before_dispatch' =
  * Vendor drawer: Reschedule + Override mark delivered (no OTP, audit note).
  * Order workbench ship/POD left as-is; not the primary override surface.
  */
-export const DELIVERY_SCOPE_OVERRIDE_LOCATION: 'vendor_delivery_ui_only' =
-  'vendor_delivery_ui_only';
+export const DELIVERY_SCOPE_OVERRIDE_LOCATION = 'vendor_delivery_ui_only' as const;
 
 /** Fixed fail reasons on magic-link Fail + vendor record_failed_delivery. */
 export const DELIVERY_FAIL_REASONS = [
