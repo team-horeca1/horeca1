@@ -1,11 +1,13 @@
 import {
+  DELIVERY_FILTER_KEYS,
+  DELIVERY_FILTER_LABELS,
   DELIVERY_PROGRESS_LABELS,
   DELIVERY_PROGRESS_STAGES,
-  DELIVERY_UI_STATUSES,
   DELIVERY_UI_STATUS_LABELS,
   DELIVERY_UI_STATUS_STYLE,
   deliveryProgressStageIndex,
   toDeliveryUiStatus,
+  type DeliveryFilterKey,
   type DeliveryUiStatus,
 } from '@/modules/fulfillment/delivery.scope';
 import { FULFILMENT_ACCENT, type FulfilmentStatus } from '@/modules/fulfillment/fulfillment.types';
@@ -15,6 +17,7 @@ export {
   DELIVERY_UI_STATUS_LABELS,
   DELIVERY_UI_STATUS_STYLE,
   toDeliveryUiStatus,
+  type DeliveryFilterKey,
   type DeliveryUiStatus,
 };
 
@@ -43,13 +46,13 @@ export const FULFILMENT_STATUS_STYLE: Record<FulfilmentStatus, string> = {
 };
 
 export const FULFILMENT_STATUS_CHIPS: Array<{
-  key: 'all' | DeliveryUiStatus;
+  key: 'all' | DeliveryFilterKey;
   label: string;
 }> = [
   { key: 'all', label: 'All' },
-  ...DELIVERY_UI_STATUSES.map((s) => ({
+  ...DELIVERY_FILTER_KEYS.map((s) => ({
     key: s,
-    label: DELIVERY_UI_STATUS_LABELS[s],
+    label: DELIVERY_FILTER_LABELS[s],
   })),
 ];
 
@@ -82,6 +85,12 @@ export type MagicLinkSummary = {
   createdAt?: string | Date;
 };
 
+export type BoyPortalSummary = {
+  token: string;
+  path: string;
+  expiresAt: string | Date;
+};
+
 export type FulfilmentListRow = {
   id: string;
   fulfilmentNumber: string;
@@ -93,6 +102,7 @@ export type FulfilmentListRow = {
   deliveryResource: { id: string; type: string; name: string; phone: string | null } | null;
   outlet: { id: string; name: string } | null;
   magicLink: MagicLinkSummary | null;
+  boyPortal?: BoyPortalSummary | null;
   order: {
     id: string;
     orderNumber: string;

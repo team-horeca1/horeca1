@@ -36,18 +36,18 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     if (dateTo) createdAtFilter.lte = new Date(dateTo + 'T23:59:59Z');
 
     // Brief filter → Prisma where fragment
-    const NEW_WINDOW_MS = 2 * 60 * 60 * 1000;
     let statusWhere: Record<string, unknown> = { status: { not: 'draft' } };
     if (statusParam && statusParam !== 'all' && statusParam !== 'draft') {
       switch (statusParam) {
         case 'new':
-          statusWhere = {
-            status: 'pending',
-            createdAt: { gte: new Date(Date.now() - NEW_WINDOW_MS) },
-          };
+          // Accepted-only inbox — leave when status moves past confirmed
+          statusWhere = { status: 'confirmed' };
           break;
-        case 'pending':
-          statusWhere = { status: 'pending' };
+        case 'processing':
+          // Middle phases between Accepted and Delivered
+          statusWhere = {
+            status: { in: ['processing', 'ready_for_dispatch', 'shipped', 'partially_delivered'] },
+          };
           break;
         case 'accepted':
           statusWhere = { status: 'confirmed' };
@@ -62,10 +62,11 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
           statusWhere = { status: 'shipped' };
           break;
         case 'completed':
+          // Legacy bookmark alias → same as delivered
           statusWhere = { status: 'delivered' };
           break;
         default:
-          // Native enum values: confirmed, processing, ready_for_dispatch, shipped, …
+          // Native enum values: confirmed, ready_for_dispatch, shipped, delivered, …
           statusWhere = { status: statusParam };
           break;
       }

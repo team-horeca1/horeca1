@@ -140,7 +140,7 @@ const STATUS_LABELS: Record<string, string> = {
     ready_for_dispatch: 'Ready for Dispatch',
     shipped: 'Dispatched',
     partially_delivered: 'Partially Fulfilled',
-    delivered: 'Completed',
+    delivered: 'Delivered',
     returned: 'Returned',
     cancelled: 'Cancelled',
 };
@@ -440,7 +440,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
         order.status === 'partially_delivered'
             ? totalBalance > 0
                 ? `Balance left: ${totalBalance}. Enter Ship qty below and click “Ship this qty now” when stock arrives. Bill stays for full ordered qty.`
-                : 'All lines fulfilled — mark Completed when customer has received goods.'
+                : 'All lines fulfilled — mark Delivered when customer has received goods.'
             : 'Enter how many you can send now (Ship qty), then Ship. Remaining stays as Balance for later. Invoice stays for full order.';
 
     return (
@@ -579,7 +579,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
                                 disabled={busy}
                                 className="h-[48px] px-8 rounded-[12px] bg-[#299E60] text-white text-[15px] font-bold hover:bg-[#238a54] flex items-center gap-2 disabled:opacity-60"
                             >
-                                Mark Completed
+                                Mark Delivered
                             </button>
                         )}
                         {showProofModal && (

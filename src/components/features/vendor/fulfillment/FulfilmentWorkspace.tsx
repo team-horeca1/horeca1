@@ -6,12 +6,13 @@ import { Search, Loader2, Truck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
-  DELIVERY_UI_STATUSES,
-  type DeliveryUiStatus,
+  DELIVERY_FILTER_KEYS,
+  type DeliveryFilterKey,
 } from '@/modules/fulfillment/delivery.scope';
 import { FULFILMENT_ACCENT_STYLE } from '@/modules/fulfillment/fulfillment.types';
 import { FulfilmentTable } from './FulfilmentTable';
 import { FulfilmentDetailDrawer } from './FulfilmentDetailDrawer';
+import { DeliveryBoysPanel } from './DeliveryBoysPanel';
 import {
   canBulkAssign,
   FULFILMENT_STATUS_CHIPS,
@@ -19,16 +20,25 @@ import {
   type FulfilmentListRow,
 } from './fulfillmentConstants';
 
-function parseStatusParam(raw: string | null): 'all' | DeliveryUiStatus {
-  if (raw && (DELIVERY_UI_STATUSES as readonly string[]).includes(raw)) {
-    return raw as DeliveryUiStatus;
+function parseStatusParam(raw: string | null): 'all' | DeliveryFilterKey {
+  if (raw && (DELIVERY_FILTER_KEYS as readonly string[]).includes(raw)) {
+    return raw as DeliveryFilterKey;
   }
   return 'all';
+}
+
+type WorkspaceTab = 'delivery' | 'boys';
+
+function parseTab(raw: string | null): WorkspaceTab {
+  return raw === 'boys' ? 'boys' : 'delivery';
 }
 
 export function FulfilmentWorkspace() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const [tab, setTab] = useState<WorkspaceTab>(() => parseTab(searchParams.get('tab')));
+  const [boyId, setBoyId] = useState<string | null>(searchParams.get('boyId'));
 
   const [rows, setRows] = useState<FulfilmentListRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +46,7 @@ export function FulfilmentWorkspace() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
 
-  const [status, setStatus] = useState<'all' | DeliveryUiStatus>(() =>
+  const [status, setStatus] = useState<'all' | DeliveryFilterKey>(() =>
     parseStatusParam(searchParams.get('status')),
   );
   const [search, setSearch] = useState(searchParams.get('q') ?? '');
@@ -52,7 +62,6 @@ export function FulfilmentWorkspace() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [boyName, setBoyName] = useState('');
   const [boyPhone, setBoyPhone] = useState('');
-  const [bulkEta, setBulkEta] = useState('');
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -110,34 +119,62 @@ export function FulfilmentWorkspace() {
   };
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (tab === 'delivery') void load();
+  }, [load, tab]);
 
-  const syncUrl = (id: string | null, nextStatus: typeof status = status) => {
+  const syncUrl = (opts?: {
+    id?: string | null;
+    nextStatus?: typeof status;
+    nextTab?: WorkspaceTab;
+    nextBoyId?: string | null;
+  }) => {
+    const nextTab = opts?.nextTab ?? tab;
+    const id = opts?.id === undefined ? drawerId : opts.id;
+    const nextStatus = opts?.nextStatus ?? status;
+    const nextBoyId = opts?.nextBoyId === undefined ? boyId : opts.nextBoyId;
     const params = new URLSearchParams();
-    if (id) params.set('id', id);
-    if (nextStatus !== 'all') params.set('status', nextStatus);
-    if (debouncedSearch) params.set('q', debouncedSearch);
-    if (dateFrom) params.set('from', dateFrom);
-    if (dateTo) params.set('to', dateTo);
-    if (paymentMethod) params.set('pay', paymentMethod);
+    if (nextTab !== 'delivery') params.set('tab', nextTab);
+    if (nextTab === 'boys' && nextBoyId) params.set('boyId', nextBoyId);
+    if (nextTab === 'delivery') {
+      if (id) params.set('id', id);
+      if (nextStatus !== 'all') params.set('status', nextStatus);
+      if (debouncedSearch) params.set('q', debouncedSearch);
+      if (dateFrom) params.set('from', dateFrom);
+      if (dateTo) params.set('to', dateTo);
+      if (paymentMethod) params.set('pay', paymentMethod);
+    }
     const qs = params.toString();
     router.replace(qs ? `/vendor/delivery?${qs}` : '/vendor/delivery');
   };
 
   const openDrawer = (id: string) => {
     setDrawerId(id);
-    syncUrl(id);
+    syncUrl({ id });
   };
 
   const closeDrawer = () => {
     setDrawerId(null);
-    syncUrl(null);
+    syncUrl({ id: null });
   };
 
-  const setStatusChip = (key: 'all' | DeliveryUiStatus) => {
+  const setStatusChip = (key: 'all' | DeliveryFilterKey) => {
     setStatus(key);
-    syncUrl(drawerId, key);
+    syncUrl({ nextStatus: key });
+  };
+
+  const setWorkspaceTab = (next: WorkspaceTab) => {
+    setTab(next);
+    if (next === 'boys') {
+      setDrawerId(null);
+      syncUrl({ nextTab: next, id: null });
+    } else {
+      syncUrl({ nextTab: next, nextBoyId: null });
+    }
+  };
+
+  const selectBoy = (id: string | null) => {
+    setBoyId(id);
+    syncUrl({ nextTab: 'boys', nextBoyId: id });
   };
 
   const toggleSelect = (id: string) => {
@@ -182,7 +219,6 @@ export function FulfilmentWorkspace() {
           fulfilmentIds: ids,
           deliveryBoyName: boyName.trim(),
           deliveryBoyPhone: boyPhone.trim(),
-          eta: bulkEta ? new Date(bulkEta).toISOString() : undefined,
         }),
       });
       const json = await res.json();
@@ -204,7 +240,6 @@ export function FulfilmentWorkspace() {
       setBulkOpen(false);
       setBoyName('');
       setBoyPhone('');
-      setBulkEta('');
       setSelectedIds(new Set());
       await load();
     } catch (e) {
@@ -228,11 +263,40 @@ export function FulfilmentWorkspace() {
           </div>
           <h1 className="text-[24px] font-bold text-[#181725]">Delivery</h1>
           <p className="text-[12px] text-[#AEAEAE]">
-            Accepted → Packed → Dispatched → Delivered (or failed attempt)
+            {tab === 'delivery'
+              ? 'Accepted → Packed → Dispatched → Delivered (or failed attempt)'
+              : 'Roster, portal links, and each boy’s assigned orders'}
           </p>
         </div>
       </div>
 
+      <div className="flex gap-1 rounded-[12px] border border-[#EEEEEE] bg-white p-1 w-fit">
+        {(
+          [
+            { key: 'delivery' as const, label: 'Delivery' },
+            { key: 'boys' as const, label: 'Delivery Boy' },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setWorkspaceTab(t.key)}
+            className={cn(
+              'h-[36px] px-4 rounded-[10px] text-[13px] font-bold transition-colors',
+              tab === t.key
+                ? 'bg-[#0F766E] text-white'
+                : 'text-[#7C7C7C] hover:text-[#0F766E]',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'boys' ? (
+        <DeliveryBoysPanel boyId={boyId} onSelectBoy={selectBoy} />
+      ) : (
+        <>
       <div className="flex flex-wrap gap-2">
         {FULFILMENT_STATUS_CHIPS.map((chip) => (
           <button
@@ -315,7 +379,7 @@ export function FulfilmentWorkspace() {
           </div>
 
           {bulkOpen && (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               <input
                 value={boyName}
                 onChange={(e) => setBoyName(e.target.value)}
@@ -327,13 +391,6 @@ export function FulfilmentWorkspace() {
                 onChange={(e) => setBoyPhone(e.target.value)}
                 placeholder="Phone number"
                 className="h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#0F766E]/40"
-              />
-              <input
-                type="datetime-local"
-                value={bulkEta}
-                onChange={(e) => setBulkEta(e.target.value)}
-                className="h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#0F766E]/40"
-                aria-label="ETA"
               />
               <button
                 type="button"
@@ -370,6 +427,8 @@ export function FulfilmentWorkspace() {
         onClose={closeDrawer}
         onUpdated={() => void load()}
       />
+        </>
+      )}
     </div>
   );
 }

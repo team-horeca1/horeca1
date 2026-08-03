@@ -13,7 +13,6 @@ import {
   customerLabel,
   deliveryStatusLabel,
   deliveryStatusStyle,
-  formatEta,
   fulfilmentOutletLabels,
   magicLinkAbsoluteUrl,
   type FulfilmentDetail,
@@ -207,9 +206,6 @@ function FulfilmentDetailBody({
                 : 'Unassigned'}
           </strong>
         </p>
-        <p>
-          <span className="text-[#7C7C7C]">ETA:</span> <strong>{formatEta(detail.eta)}</strong>
-        </p>
         {detail.failedReason && (
           <p>
             <span className="text-[#7C7C7C]">Fail reason:</span>{' '}
@@ -218,31 +214,37 @@ function FulfilmentDetailBody({
         )}
       </div>
 
-      {detail.magicLink && (
+      {(detail.boyPortal || detail.magicLink) && (
         <div className="rounded-[10px] border border-[#0F766E]/25 bg-[#0F766E]/[0.04] p-3 space-y-2">
           <p className="text-[11px] font-bold text-[#0F766E] uppercase tracking-wide flex items-center gap-1">
-            <Link2 size={12} /> Delivery boy magic link
+            <Link2 size={12} />{' '}
+            {detail.boyPortal ? 'Delivery boy portal link' : 'Delivery boy magic link'}
           </p>
           <p className="text-[12px] text-[#7C7C7C] break-all font-mono bg-white border border-[#EEEEEE] rounded-lg px-2 py-1.5">
-            {magicLinkAbsoluteUrl(detail.magicLink.path)}
+            {magicLinkAbsoluteUrl((detail.boyPortal ?? detail.magicLink)!.path)}
           </p>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => onVisitMagicLink(detail.magicLink!.path)}
+              onClick={() => onVisitMagicLink((detail.boyPortal ?? detail.magicLink)!.path)}
               className="h-[36px] rounded-[10px] border border-[#0F766E]/30 bg-white text-[#0F766E] text-[12px] font-bold hover:bg-[#0F766E]/5 flex items-center justify-center gap-1.5"
             >
               <ExternalLink size={13} /> Visit link
             </button>
             <button
               type="button"
-              onClick={() => void onCopyMagicLink(detail.magicLink!.path)}
+              onClick={() => void onCopyMagicLink((detail.boyPortal ?? detail.magicLink)!.path)}
               className="h-[36px] rounded-[10px] bg-[#0F766E] text-white text-[12px] font-bold hover:bg-[#0D9488] flex items-center justify-center gap-1.5"
             >
               <Copy size={13} /> Copy link
             </button>
           </div>
-          {detail.magicLink.usedAt && (
+          {detail.boyPortal && (
+            <p className="text-[11px] text-[#7C7C7C]">
+              Opens the boy’s full open-order list (then tap an order for OTP).
+            </p>
+          )}
+          {!detail.boyPortal && detail.magicLink?.usedAt && (
             <p className="text-[11px] text-emerald-700 font-semibold">
               Link used (delivery completed via OTP)
             </p>

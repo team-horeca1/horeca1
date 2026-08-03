@@ -31,12 +31,10 @@ export function FulfilmentActions({ detail, busy, onAction }: Props) {
   const ui = toDeliveryUiStatus(detail.status);
   const [boyName, setBoyName] = useState(detail.deliveryResource?.name ?? '');
   const [boyPhone, setBoyPhone] = useState(detail.deliveryResource?.phone ?? '');
-  const [eta, setEta] = useState('');
   const [otp, setOtp] = useState('');
   const [failReason, setFailReason] = useState<DeliveryFailReason>('customer_not_available');
   const [failOther, setFailOther] = useState('');
   const [overrideNote, setOverrideNote] = useState('');
-  const [rescheduleEta, setRescheduleEta] = useState('');
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -82,12 +80,6 @@ export function FulfilmentActions({ detail, busy, onAction }: Props) {
             placeholder="Phone number"
             className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#0F766E]/40"
           />
-          <input
-            type="datetime-local"
-            value={eta}
-            onChange={(e) => setEta(e.target.value)}
-            className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#0F766E]/40"
-          />
           <button
             type="button"
             disabled={busy || !boyName.trim() || boyPhone.trim().length < 8}
@@ -97,7 +89,6 @@ export function FulfilmentActions({ detail, busy, onAction }: Props) {
                 action: 'assign_and_dispatch',
                 deliveryBoyName: boyName.trim(),
                 deliveryBoyPhone: boyPhone.trim(),
-                eta: eta ? new Date(eta).toISOString() : undefined,
               })
             }
           >
@@ -224,24 +215,11 @@ export function FulfilmentActions({ detail, busy, onAction }: Props) {
                 {detail.failedReason}
               </p>
             )}
-            <input
-              type="datetime-local"
-              value={rescheduleEta}
-              onChange={(e) => setRescheduleEta(e.target.value)}
-              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none"
-            />
             <button
               type="button"
               disabled={busy}
               className={primary}
-              onClick={() =>
-                onAction({
-                  action: 'reschedule_dispatch',
-                  eta: rescheduleEta
-                    ? new Date(rescheduleEta).toISOString()
-                    : undefined,
-                })
-              }
+              onClick={() => onAction({ action: 'reschedule_dispatch' })}
             >
               {busy ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
               Reschedule (back to Packed)

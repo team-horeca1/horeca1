@@ -62,9 +62,9 @@ const PAYMENT_STYLE: Record<string, string> = {
     refunded: 'bg-[#F3F4F6] text-[#6B7280]',
 };
 
+/** Row / dropdown labels for native order statuses (+ legacy aliases). */
 const STATUS_LABELS: Record<string, string> = {
     draft: 'Draft',
-    new: 'New',
     pending: 'Pending',
     accepted: 'Accepted',
     confirmed: 'Accepted',
@@ -75,9 +75,21 @@ const STATUS_LABELS: Record<string, string> = {
     dispatched: 'Dispatched',
     shipped: 'Dispatched',
     partially_delivered: 'Partially Fulfilled',
-    delivered: 'Completed',
-    completed: 'Completed',
+    delivered: 'Delivered',
     returned: 'Returned',
+    cancelled: 'Cancelled',
+};
+
+/** Tab chip labels — separate so Processing bucket ≠ DB processing → Packed. */
+const TAB_LABELS: Record<string, string> = {
+    all: 'All',
+    new: 'New',
+    processing: 'Processing',
+    partially_accepted: 'Partially Accepted',
+    packed: 'Packed',
+    ready_for_dispatch: 'Ready for Dispatch',
+    dispatched: 'Dispatched',
+    delivered: 'Delivered',
     cancelled: 'Cancelled',
 };
 
@@ -86,18 +98,16 @@ const STATUS_OPTIONS = [
     'shipped', 'partially_delivered', 'delivered', 'returned', 'cancelled',
 ];
 
-/** Brief Section 7 filter tabs (API aliases + native statuses). */
+/** Filter tabs: New = Accepted; Processing = middle phases; single Delivered end-state. */
 const STATUS_TABS = [
     'all',
     'new',
-    'pending',
-    'accepted',
+    'processing',
     'partially_accepted',
     'packed',
     'ready_for_dispatch',
     'dispatched',
     'delivered',
-    'completed',
     'cancelled',
 ] as const;
 const PAGE_SIZE = 20;
@@ -484,7 +494,7 @@ export default function VendorOrdersPage() {
                                 : 'bg-white text-[#7C7C7C] border border-[#EEEEEE] hover:border-[#299E60]/30'
                         )}
                     >
-                        {STATUS_LABELS[tab] || tab.replace(/_/g, ' ')}
+                        {TAB_LABELS[tab] || tab.replace(/_/g, ' ')}
                     </button>
                 ))}
             </div>

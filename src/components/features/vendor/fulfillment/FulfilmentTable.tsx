@@ -10,7 +10,6 @@ import {
   customerLabel,
   deliveryStatusLabel,
   deliveryStatusStyle,
-  formatEta,
   fulfilmentOutletLabels,
   magicLinkAbsoluteUrl,
   type FulfilmentListRow,
@@ -100,12 +99,16 @@ export function FulfilmentTable({
     window.open(magicLinkAbsoluteUrl(path), '_blank', 'noopener,noreferrer');
   };
 
+  const linkPath = (row: FulfilmentListRow) =>
+    row.boyPortal?.path ?? row.magicLink?.path ?? null;
+
   return (
     <>
       {/* Mobile cards */}
       <div className="md:hidden p-3 space-y-3">
         {rows.map((row) => {
           const assignable = canBulkAssign(row.status);
+          const path = linkPath(row);
           return (
             <div
               key={row.id}
@@ -149,24 +152,23 @@ export function FulfilmentTable({
                   <div className="text-[13px]">
                     <CustomerCell row={row} />
                   </div>
-                  <div className="flex justify-between text-[11px] text-[#7C7C7C]">
+                  <div className="text-[11px] text-[#7C7C7C]">
                     <span>{row.deliveryResource?.name ?? 'Unassigned'}</span>
-                    <span>ETA {formatEta(row.eta)}</span>
                   </div>
                 </button>
               </div>
-              {row.magicLink && (
+              {path && (
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={(e) => visitLink(row.magicLink!.path, e)}
+                    onClick={(e) => visitLink(path, e)}
                     className="h-[36px] rounded-[10px] border border-[#0F766E]/25 bg-white text-[12px] font-bold text-[#0F766E] flex items-center justify-center gap-1.5"
                   >
                     <ExternalLink size={13} /> Visit
                   </button>
                   <button
                     type="button"
-                    onClick={(e) => void copyLink(row.magicLink!.path, e)}
+                    onClick={(e) => void copyLink(path, e)}
                     className="h-[36px] rounded-[10px] border border-[#0F766E]/25 bg-white text-[12px] font-bold text-[#0F766E] flex items-center justify-center gap-1.5"
                   >
                     <Copy size={13} /> Copy
@@ -209,9 +211,6 @@ export function FulfilmentTable({
               <th className="px-4 py-3 text-left text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wide">
                 Link
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wide">
-                ETA
-              </th>
               <th className="px-4 py-3 text-right text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wide">
                 Actions
               </th>
@@ -220,6 +219,7 @@ export function FulfilmentTable({
           <tbody>
             {rows.map((row) => {
               const assignable = canBulkAssign(row.status);
+              const path = linkPath(row);
               return (
                 <tr
                   key={row.id}
@@ -266,22 +266,22 @@ export function FulfilmentTable({
                     {row.deliveryResource?.name ?? row.magicLink?.deliveryBoyName ?? '—'}
                   </td>
                   <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                    {row.magicLink ? (
+                    {path ? (
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={(e) => visitLink(row.magicLink!.path, e)}
+                          onClick={(e) => visitLink(path, e)}
                           className="inline-flex items-center gap-1 text-[12px] font-bold text-[#0F766E] hover:underline"
-                          title="Open magic link"
+                          title="Open delivery boy order list"
                         >
                           <ExternalLink size={13} />
                           Visit
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => void copyLink(row.magicLink!.path, e)}
+                          onClick={(e) => void copyLink(path, e)}
                           className="inline-flex items-center gap-1 text-[12px] font-bold text-[#0F766E] hover:underline"
-                          title="Copy magic link"
+                          title="Copy delivery boy portal link"
                         >
                           <Link2 size={13} />
                           Copy
@@ -291,7 +291,6 @@ export function FulfilmentTable({
                       <span className="text-[#AEAEAE]">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3.5 text-[#7C7C7C]">{formatEta(row.eta)}</td>
                   <td className="px-4 py-3.5 text-right">
                     <ChevronRight size={16} className="inline text-[#AEAEAE]" />
                   </td>

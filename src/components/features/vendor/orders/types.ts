@@ -104,7 +104,7 @@ export const WORKBENCH_STATUS_LABELS: Record<string, string> = {
   ready_for_dispatch: 'Ready for Dispatch',
   shipped: 'Dispatched',
   partially_delivered: 'Partially Fulfilled',
-  delivered: 'Completed',
+  delivered: 'Delivered',
   returned: 'Returned',
   cancelled: 'Cancelled',
 };
@@ -166,7 +166,7 @@ export function nextWorkbenchStatus(status: string): { status: string; label: st
     case 'shipped':
       return { status: 'delivered', label: 'Confirm Delivered' };
     case 'partially_delivered':
-      return { status: 'delivered', label: 'Mark Completed' };
+      return { status: 'delivered', label: 'Mark Delivered' };
     default:
       return null;
   }

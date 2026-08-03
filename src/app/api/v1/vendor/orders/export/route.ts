@@ -32,12 +32,16 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     if (dateFrom) createdAtFilter.gte = new Date(dateFrom);
     if (dateTo) createdAtFilter.lte = new Date(dateTo + 'T23:59:59Z');
 
-    const NEW_WINDOW_MS = 2 * 60 * 60 * 1000;
     let statusWhere: Record<string, unknown> = { status: { not: 'draft' } };
     if (statusParam && statusParam !== 'all' && statusParam !== 'draft') {
       switch (statusParam) {
         case 'new':
-          statusWhere = { status: 'pending', createdAt: { gte: new Date(Date.now() - NEW_WINDOW_MS) } };
+          statusWhere = { status: 'confirmed' };
+          break;
+        case 'processing':
+          statusWhere = {
+            status: { in: ['processing', 'ready_for_dispatch', 'shipped', 'partially_delivered'] },
+          };
           break;
         case 'accepted':
           statusWhere = { status: 'confirmed' };

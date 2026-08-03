@@ -1094,7 +1094,7 @@ export class DeliveryLinkService {
     failedReason: DeliveryFailReason,
     failedReasonOther?: string,
   ) {
-    const { boy: _boy, fulfilment } = await this.loadBoyFulfilmentContext(token, fulfilmentId);
+    const { fulfilment } = await this.loadBoyFulfilmentContext(token, fulfilmentId);
     this.assertBoyFulfilmentActionable(fulfilment.status, { requireActionable: true });
 
     const reasonText = formatDeliveryFailReason(failedReason, failedReasonOther);
