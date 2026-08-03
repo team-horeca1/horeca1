@@ -7,11 +7,12 @@ import type { OrderService } from '@/modules/order/order.service';
 import {
   DELIVERY_ACCEPTED_DB_STATUSES,
   DELIVERY_PACKED_DB_STATUSES,
-  dbStatusesForDeliveryUi,
+  dbStatusesForDeliveryFilter,
   formatDeliveryFailReason,
-  type DeliveryUiStatus,
+  type DeliveryFilterKey,
 } from '@/modules/fulfillment/delivery.scope';
 import {
+  deliveryBoyLinkPath,
   deliveryLinkPath,
   DeliveryLinkService,
 } from '@/modules/fulfillment/delivery-link.service';
@@ -27,7 +28,7 @@ import {
 type Db = Prisma.TransactionClient | typeof prisma;
 
 type ListFilters = {
-  status?: DeliveryUiStatus;
+  status?: DeliveryFilterKey;
   outletId?: string;
   deliveryResourceId?: string;
   paymentMethod?: string;
@@ -322,7 +323,7 @@ export class FulfilmentService {
       ...(filters.status
         ? {
             status: {
-              in: dbStatusesForDeliveryUi(filters.status) as PrismaFulfilmentStatus[],
+              in: dbStatusesForDeliveryFilter(filters.status) as PrismaFulfilmentStatus[],
             },
           }
         : {}),
@@ -361,11 +362,68 @@ export class FulfilmentService {
     const sliced = hasMore ? rows.slice(0, limit) : rows;
     const nextCursor = hasMore ? sliced[sliced.length - 1]?.id ?? null : null;
 
+    const resourceIds = [
+      ...new Set(
+        sliced
+          .map((r) => r.deliveryResourceId)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0),
+      ),
+    ];
+
+    const boyPortalByResource = new Map<
+      string,
+      { token: string; path: string; expiresAt: Date }
+    >();
+    if (resourceIds.length > 0) {
+      const now = new Date();
+      const boyTokens = await prisma.deliveryBoyAccessToken.findMany({
+        where: {
+          deliveryResourceId: { in: resourceIds },
+          revokedAt: null,
+          expiresAt: { gt: now },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          token: true,
+          expiresAt: true,
+          deliveryResourceId: true,
+          vendorId: true,
+        },
+      });
+      for (const tok of boyTokens) {
+        if (boyPortalByResource.has(tok.deliveryResourceId)) continue;
+        boyPortalByResource.set(tok.deliveryResourceId, {
+          token: tok.token,
+          path: deliveryBoyLinkPath(tok.token),
+          expiresAt: tok.expiresAt,
+        });
+      }
+      // Ensure portal for assigned boys missing an active token (pre-feature dispatches)
+      for (const resourceId of resourceIds) {
+        if (boyPortalByResource.has(resourceId)) continue;
+        const row = sliced.find((r) => r.deliveryResourceId === resourceId);
+        if (!row) continue;
+        const ensured = await this.deliveryLinks.ensureBoyToken(prisma, {
+          vendorId: row.vendorId,
+          deliveryResourceId: resourceId,
+        });
+        boyPortalByResource.set(resourceId, {
+          token: ensured.token,
+          path: ensured.path,
+          expiresAt: ensured.expiresAt,
+        });
+      }
+    }
+
     const data = sliced.map((row) => {
       const { deliveryAccessTokens, ...rest } = row;
+      const boyPortal = row.deliveryResourceId
+        ? boyPortalByResource.get(row.deliveryResourceId) ?? null
+        : null;
       return {
         ...rest,
         magicLink: mapMagicLink(deliveryAccessTokens),
+        boyPortal,
       };
     });
 
@@ -379,9 +437,27 @@ export class FulfilmentService {
     });
     if (!row) throw Errors.notFound('Fulfilment');
     const { deliveryAccessTokens, ...rest } = row;
+    let boyPortal: {
+      token: string;
+      path: string;
+      expiresAt: Date;
+    } | null = null;
+    if (row.deliveryResourceId) {
+      const boyTok = await this.deliveryLinks.getActiveBoyTokenForResource(
+        row.deliveryResourceId,
+      );
+      if (boyTok) {
+        boyPortal = {
+          token: boyTok.token,
+          path: deliveryBoyLinkPath(boyTok.token),
+          expiresAt: boyTok.expiresAt,
+        };
+      }
+    }
     return {
       ...rest,
       magicLink: mapMagicLink(deliveryAccessTokens),
+      boyPortal,
     };
   }
 
@@ -789,6 +865,10 @@ export class FulfilmentService {
         deliveryBoyName: resource.name,
         deliveryBoyPhone: resource.phone ?? body.deliveryBoyPhone,
       });
+      const boyPortal = await this.deliveryLinks.ensureBoyToken(tx, {
+        vendorId,
+        deliveryResourceId: resource.id,
+      });
 
       await this.appendEvent(tx, {
         fulfilmentId: f.id,
@@ -815,6 +895,7 @@ export class FulfilmentService {
           phone: resource.phone,
           magicLinkPath: magicLink.path,
           magicLinkToken: magicLink.token,
+          boyPortalPath: boyPortal.path,
         },
       });
       if (fromStatus !== toStatus) {
@@ -844,6 +925,7 @@ export class FulfilmentService {
           dispatchId: dispatch.id,
           driverName: resource.name,
           magicLinkPath: magicLink.path,
+          boyPortalPath: boyPortal.path,
         },
       });
 
@@ -1203,7 +1285,7 @@ export class FulfilmentService {
   }
 
   async listDeliveryResources(vendorId: string, opts?: { activeOnly?: boolean }) {
-    return prisma.deliveryResource.findMany({
+    const rows = await prisma.deliveryResource.findMany({
       where: {
         vendorId,
         ...(opts?.activeOnly === false ? {} : { isActive: true }),
@@ -1216,7 +1298,52 @@ export class FulfilmentService {
         phone: true,
         isActive: true,
         createdAt: true,
+        _count: {
+          select: {
+            fulfilments: {
+              where: { status: { in: ['out_for_delivery', 'failed_delivery'] } },
+            },
+          },
+        },
+        boyAccessTokens: {
+          where: { revokedAt: null, expiresAt: { gt: new Date() } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { token: true, expiresAt: true },
+        },
       },
+    });
+
+    return rows.map((r) => {
+      const activeTok = r.boyAccessTokens[0] ?? null;
+      return {
+        id: r.id,
+        type: r.type,
+        name: r.name,
+        phone: r.phone,
+        isActive: r.isActive,
+        createdAt: r.createdAt,
+        openOrderCount: r._count.fulfilments,
+        boyPortal: activeTok
+          ? {
+              token: activeTok.token,
+              path: deliveryBoyLinkPath(activeTok.token),
+              expiresAt: activeTok.expiresAt,
+            }
+          : null,
+      };
+    });
+  }
+
+  async ensureBoyPortalForResource(vendorId: string, deliveryResourceId: string) {
+    const resource = await prisma.deliveryResource.findFirst({
+      where: { id: deliveryResourceId, vendorId },
+      select: { id: true },
+    });
+    if (!resource) throw Errors.notFound('Delivery boy');
+    return this.deliveryLinks.ensureBoyToken(prisma, {
+      vendorId,
+      deliveryResourceId,
     });
   }
 
@@ -1224,7 +1351,7 @@ export class FulfilmentService {
     vendorId: string,
     input: { type: 'executive' | 'vehicle' | 'logistics_partner'; name: string; phone?: string },
   ) {
-    return prisma.deliveryResource.create({
+    const created = await prisma.deliveryResource.create({
       data: {
         vendorId,
         type: input.type,
@@ -1240,6 +1367,19 @@ export class FulfilmentService {
         createdAt: true,
       },
     });
+    const boyPortal = await this.deliveryLinks.ensureBoyToken(prisma, {
+      vendorId,
+      deliveryResourceId: created.id,
+    });
+    return {
+      ...created,
+      openOrderCount: 0,
+      boyPortal: {
+        token: boyPortal.token,
+        path: boyPortal.path,
+        expiresAt: boyPortal.expiresAt,
+      },
+    };
   }
 }
 

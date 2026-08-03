@@ -4,6 +4,7 @@ import {
   DELIVERY_TO_ORDER_STATUS,
   DELIVERY_UI_TO_DB_STATUSES,
   DELIVERY_VENDOR_ACTIONS,
+  dbStatusesForDeliveryFilter,
   dbStatusesForDeliveryUi,
   formatDeliveryFailReason,
   toDeliveryUiStatus,
@@ -34,6 +35,17 @@ describe('delivery.scope — UI ↔ DB status mapping', () => {
       ...DELIVERY_UI_TO_DB_STATUSES.accepted,
     ]);
     expect(dbStatusesForDeliveryUi('dispatched')).toEqual(['out_for_delivery']);
+  });
+
+  it('expands New / Processing bucket filters', () => {
+    expect(dbStatusesForDeliveryFilter('new')).toEqual([
+      ...DELIVERY_UI_TO_DB_STATUSES.accepted,
+    ]);
+    expect(dbStatusesForDeliveryFilter('processing')).toEqual([
+      ...DELIVERY_UI_TO_DB_STATUSES.packed,
+      ...DELIVERY_UI_TO_DB_STATUSES.dispatched,
+      ...DELIVERY_UI_TO_DB_STATUSES.delivery_attempt_failed,
+    ]);
   });
 
   it('keeps failed attempts as shipped on Order (never complete)', () => {

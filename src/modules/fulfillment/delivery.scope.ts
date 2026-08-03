@@ -18,6 +18,18 @@ export const DELIVERY_UI_STATUSES = [
 export type DeliveryUiStatus = (typeof DELIVERY_UI_STATUSES)[number];
 
 /**
+ * List filter chips — includes bucket aliases (New / Processing) plus stage chips.
+ * New = Accepted only; Processing = after Accepted until Delivered.
+ */
+export const DELIVERY_FILTER_KEYS = [
+  'new',
+  'processing',
+  ...DELIVERY_UI_STATUSES,
+] as const;
+
+export type DeliveryFilterKey = (typeof DELIVERY_FILTER_KEYS)[number];
+
+/**
  * Linear progress stages (failed is a branch off Dispatched, not a step).
  * Accepted → Packed → Dispatched → Delivered
  */
@@ -58,6 +70,25 @@ export function dbStatusesForDeliveryUi(uiStatus: DeliveryUiStatus): string[] {
   return [...DELIVERY_UI_TO_DB_STATUSES[uiStatus]];
 }
 
+/**
+ * Expand list filter (including New / Processing buckets) → DB statuses.
+ * New = Accepted; Processing = Packed + Dispatched + failed attempt (before Delivered).
+ */
+export function dbStatusesForDeliveryFilter(filter: DeliveryFilterKey): string[] {
+  switch (filter) {
+    case 'new':
+      return dbStatusesForDeliveryUi('accepted');
+    case 'processing':
+      return [
+        ...DELIVERY_UI_TO_DB_STATUSES.packed,
+        ...DELIVERY_UI_TO_DB_STATUSES.dispatched,
+        ...DELIVERY_UI_TO_DB_STATUSES.delivery_attempt_failed,
+      ];
+    default:
+      return dbStatusesForDeliveryUi(filter);
+  }
+}
+
 /** DB statuses allowed for mark_packed (Accepted bucket). */
 export const DELIVERY_ACCEPTED_DB_STATUSES = DELIVERY_UI_TO_DB_STATUSES.accepted;
 
@@ -70,6 +101,12 @@ export const DELIVERY_UI_STATUS_LABELS: Record<DeliveryUiStatus, string> = {
   dispatched: 'Dispatched',
   delivery_attempt_failed: 'Delivery attempt failed',
   delivered: 'Delivered',
+};
+
+export const DELIVERY_FILTER_LABELS: Record<DeliveryFilterKey, string> = {
+  new: 'New',
+  processing: 'Processing',
+  ...DELIVERY_UI_STATUS_LABELS,
 };
 
 export const DELIVERY_UI_STATUS_STYLE: Record<DeliveryUiStatus, string> = {

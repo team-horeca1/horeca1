@@ -36,10 +36,25 @@ export function deliveryLinkPath(token: string): string {
   return `/d/${token}`;
 }
 
+export function deliveryBoyLinkPath(token: string): string {
+  return `/d/b/${token}`;
+}
+
+export function deliveryBoyOrderPath(token: string, fulfilmentId: string): string {
+  return `/d/b/${token}/${fulfilmentId}`;
+}
+
 export function deliveryLinkAbsoluteUrl(token: string): string {
   const base = (process.env.AUTH_URL || 'http://localhost:3000').replace(/\/$/, '');
   return `${base}${deliveryLinkPath(token)}`;
 }
+
+export function deliveryBoyLinkAbsoluteUrl(token: string): string {
+  const base = (process.env.AUTH_URL || 'http://localhost:3000').replace(/\/$/, '');
+  return `${base}${deliveryBoyLinkPath(token)}`;
+}
+
+const BOY_OPEN_STATUSES = ['out_for_delivery', 'failed_delivery'] as const;
 
 function formatAddress(snapshot: unknown): {
   lines: string[];
@@ -573,6 +588,584 @@ export class DeliveryLinkService {
     });
 
     return this.getPublicView(token);
+  }
+
+  // ─── Boy portal (shared link per DeliveryResource) ─────────────────────────
+
+  /** Ensure one active portal token for the boy; reuse if still valid. */
+  async ensureBoyToken(
+    db: Db,
+    input: {
+      vendorId: string;
+      deliveryResourceId: string;
+      expiresAt?: Date;
+    },
+  ): Promise<{ id: string; token: string; path: string; url: string; expiresAt: Date }> {
+    const now = new Date();
+    const existing = await db.deliveryBoyAccessToken.findFirst({
+      where: {
+        deliveryResourceId: input.deliveryResourceId,
+        revokedAt: null,
+        expiresAt: { gt: now },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, token: true, expiresAt: true },
+    });
+    if (existing) {
+      return {
+        id: existing.id,
+        token: existing.token,
+        path: deliveryBoyLinkPath(existing.token),
+        url: deliveryBoyLinkAbsoluteUrl(existing.token),
+        expiresAt: existing.expiresAt,
+      };
+    }
+
+    const token = generateOpaqueToken();
+    const expiresAt = input.expiresAt ?? new Date(now.getTime() + TOKEN_TTL_MS);
+    const row = await db.deliveryBoyAccessToken.create({
+      data: {
+        id: randomUUID(),
+        token,
+        vendorId: input.vendorId,
+        deliveryResourceId: input.deliveryResourceId,
+        expiresAt,
+      },
+      select: { id: true, token: true, expiresAt: true },
+    });
+    return {
+      id: row.id,
+      token: row.token,
+      path: deliveryBoyLinkPath(row.token),
+      url: deliveryBoyLinkAbsoluteUrl(row.token),
+      expiresAt: row.expiresAt,
+    };
+  }
+
+  async getActiveBoyTokenForResource(deliveryResourceId: string) {
+    return prisma.deliveryBoyAccessToken.findFirst({
+      where: {
+        deliveryResourceId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        token: true,
+        expiresAt: true,
+        deliveryResourceId: true,
+        vendorId: true,
+      },
+    });
+  }
+
+  /** Resolve legacy per-order token → boy portal **list** when possible. */
+  async resolveLegacyToBoyPortal(token: string): Promise<{
+    boyPath: string;
+    fulfilmentId: string;
+  } | null> {
+    const row = await prisma.deliveryAccessToken.findUnique({
+      where: { token },
+      select: {
+        fulfilmentId: true,
+        fulfilment: { select: { deliveryResourceId: true, vendorId: true } },
+      },
+    });
+    if (!row?.fulfilment.deliveryResourceId) return null;
+    const boy = await this.ensureBoyToken(prisma, {
+      vendorId: row.fulfilment.vendorId,
+      deliveryResourceId: row.fulfilment.deliveryResourceId,
+    });
+    return {
+      boyPath: deliveryBoyLinkPath(boy.token),
+      fulfilmentId: row.fulfilmentId,
+    };
+  }
+
+  private async loadBoyToken(token: string) {
+    const row = await prisma.deliveryBoyAccessToken.findUnique({
+      where: { token },
+      include: {
+        deliveryResource: {
+          select: { id: true, name: true, phone: true, isActive: true },
+        },
+        vendor: {
+          select: {
+            id: true,
+            businessName: true,
+            displayName: true,
+            logoUrl: true,
+          },
+        },
+      },
+    });
+    if (!row) throw Errors.notFound('Delivery boy link');
+    const now = new Date();
+    if (row.revokedAt) {
+      throw Errors.badRequest(
+        'This delivery boy link was revoked. Ask the vendor for a new link.',
+      );
+    }
+    if (row.expiresAt < now) {
+      throw Errors.badRequest('This delivery boy link has expired. Ask the vendor for a new link.');
+    }
+    if (!row.deliveryResource.isActive) {
+      throw Errors.badRequest('This delivery boy is inactive. Ask the vendor for help.');
+    }
+    return row;
+  }
+
+  /** Page 1 — open orders for this boy. */
+  async getBoyPortalList(token: string) {
+    const boy = await this.loadBoyToken(token);
+    const fulfilments = await prisma.fulfilment.findMany({
+      where: {
+        deliveryResourceId: boy.deliveryResourceId,
+        status: { in: [...BOY_OPEN_STATUSES] },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        status: true,
+        failedReason: true,
+        order: {
+          select: {
+            id: true,
+            orderNumber: true,
+            paymentMethod: true,
+            deliveryAddressSnapshot: true,
+            user: {
+              select: { fullName: true, businessName: true, phone: true },
+            },
+            outlet: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    return {
+      token: boy.token,
+      path: deliveryBoyLinkPath(boy.token),
+      expiresAt: boy.expiresAt.toISOString(),
+      deliveryBoyName: boy.deliveryResource.name,
+      deliveryBoyPhone: boy.deliveryResource.phone,
+      vendor: {
+        name: boy.vendor.displayName || boy.vendor.businessName,
+        logoUrl: boy.vendor.logoUrl,
+      },
+      orders: fulfilments.map((f) => {
+        const address = formatAddress(f.order.deliveryAddressSnapshot);
+        const customerName =
+          f.order.user.fullName ||
+          f.order.user.businessName ||
+          address.label ||
+          f.order.outlet?.name ||
+          'Customer';
+        return {
+          fulfilmentId: f.id,
+          orderId: f.order.id,
+          orderNumber: f.order.orderNumber,
+          status: toDeliveryUiStatus(f.status),
+          fulfilmentStatus: f.status,
+          failedReason: f.failedReason,
+          paymentMethod: f.order.paymentMethod,
+          customerName,
+          customerPhone: f.order.user.phone,
+          addressSummary: [...address.lines, address.pincode].filter(Boolean).join(', ') || null,
+          path: deliveryBoyOrderPath(boy.token, f.id),
+        };
+      }),
+    };
+  }
+
+  private async loadBoyFulfilmentContext(token: string, fulfilmentId: string) {
+    const boy = await this.loadBoyToken(token);
+    const fulfilment = await prisma.fulfilment.findFirst({
+      where: {
+        id: fulfilmentId,
+        deliveryResourceId: boy.deliveryResourceId,
+        vendorId: boy.vendorId,
+      },
+      include: {
+        items: {
+          include: {
+            orderItem: {
+              select: {
+                id: true,
+                productName: true,
+                quantity: true,
+                product: { select: { sku: true, unit: true, imageUrl: true } },
+              },
+            },
+          },
+        },
+        dispatches: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            driverName: true,
+            dispatchedAt: true,
+            deliveredAt: true,
+          },
+        },
+        order: {
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            deliveryDate: true,
+            deliveryAddressSnapshot: true,
+            deliveryOtp: true,
+            deliveryOtpExpiresAt: true,
+            deliveryOtpVerifiedAt: true,
+            deliveredAt: true,
+            totalAmount: true,
+            paymentMethod: true,
+            user: {
+              select: {
+                fullName: true,
+                businessName: true,
+                phone: true,
+                email: true,
+              },
+            },
+            outlet: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+    if (!fulfilment) throw Errors.notFound('Delivery order');
+    return { boy, fulfilment };
+  }
+
+  private assertBoyFulfilmentActionable(status: string, opts: { requireActionable?: boolean }) {
+    if (!opts.requireActionable) return;
+    if (status !== 'out_for_delivery') {
+      if (status === 'failed_delivery') {
+        throw Errors.badRequest(
+          'Delivery attempt already failed. Wait for the vendor to reschedule.',
+        );
+      }
+      if (status === 'delivered') {
+        throw Errors.badRequest('This order is already delivered.');
+      }
+      throw Errors.badRequest(`Cannot act on this delivery while status is "${status}".`);
+    }
+  }
+
+  /** Page 2 — single order POD view (same shape as legacy getPublicView). */
+  async getBoyPortalOrderView(token: string, fulfilmentId: string) {
+    const { boy, fulfilment } = await this.loadBoyFulfilmentContext(token, fulfilmentId);
+    const uiStatus = toDeliveryUiStatus(fulfilment.status);
+    const actionable = fulfilment.status === 'out_for_delivery';
+    const address = formatAddress(fulfilment.order.deliveryAddressSnapshot);
+    const customerName =
+      fulfilment.order.user.fullName ||
+      fulfilment.order.user.businessName ||
+      address.label ||
+      fulfilment.order.outlet?.name ||
+      'Customer';
+
+    return {
+      token: boy.token,
+      path: deliveryBoyOrderPath(boy.token, fulfilment.id),
+      listPath: deliveryBoyLinkPath(boy.token),
+      expiresAt: boy.expiresAt.toISOString(),
+      revokedAt: null as string | null,
+      usedAt: fulfilment.status === 'delivered' ? fulfilment.order.deliveredAt?.toISOString() ?? null : null,
+      deliveryBoyName: boy.deliveryResource.name,
+      deliveryBoyPhone: boy.deliveryResource.phone ?? '',
+      status: uiStatus,
+      fulfilmentStatus: fulfilment.status,
+      fulfilmentId: fulfilment.id,
+      failedReason: fulfilment.failedReason,
+      canRequestOtp: actionable,
+      canComplete: actionable,
+      canFail: actionable,
+      vendor: {
+        name: boy.vendor.displayName || boy.vendor.businessName,
+        logoUrl: boy.vendor.logoUrl,
+      },
+      order: {
+        id: fulfilment.order.id,
+        orderNumber: fulfilment.order.orderNumber,
+        status: fulfilment.order.status,
+        deliveryDate: fulfilment.order.deliveryDate?.toISOString() ?? null,
+        paymentMethod: fulfilment.order.paymentMethod,
+        totalAmount: fulfilment.order.totalAmount.toString(),
+        deliveredAt: fulfilment.order.deliveredAt?.toISOString() ?? null,
+        customer: {
+          name: customerName,
+          phone: fulfilment.order.user.phone,
+          email: fulfilment.order.user.email,
+        },
+        address: {
+          label: address.label,
+          lines: address.lines,
+          pincode: address.pincode,
+          full: [...address.lines, address.pincode].filter(Boolean).join(', '),
+        },
+        items: fulfilment.items.map((item) => ({
+          id: item.id,
+          productName: item.orderItem.productName,
+          qty: item.acceptedQty || item.orderItem.quantity,
+          packedQty: item.packedQty,
+          sku: item.orderItem.product?.sku ?? null,
+          unit: item.orderItem.product?.unit ?? null,
+          imageUrl: item.orderItem.product?.imageUrl ?? null,
+        })),
+      },
+      dispatch: fulfilment.dispatches[0]
+        ? {
+            id: fulfilment.dispatches[0].id,
+            status: fulfilment.dispatches[0].status,
+            driverName: fulfilment.dispatches[0].driverName,
+            dispatchedAt: fulfilment.dispatches[0].dispatchedAt?.toISOString() ?? null,
+            deliveredAt: fulfilment.dispatches[0].deliveredAt?.toISOString() ?? null,
+          }
+        : null,
+    };
+  }
+
+  async requestOtpViaBoy(token: string, fulfilmentId: string) {
+    const { boy, fulfilment } = await this.loadBoyFulfilmentContext(token, fulfilmentId);
+    this.assertBoyFulfilmentActionable(fulfilment.status, { requireActionable: true });
+
+    const orderService = await this.getOrderService();
+    const result = await orderService.issueDeliveryOtp(fulfilment.orderId, boy.vendorId, {
+      emitEvent: true,
+    });
+
+    return {
+      sent: true,
+      expiresAt: result.expiresAt.toISOString(),
+      customerPhoneMasked: maskPhone(fulfilment.order.user.phone),
+    };
+  }
+
+  async completeViaBoy(token: string, fulfilmentId: string, otp: string) {
+    const { boy, fulfilment } = await this.loadBoyFulfilmentContext(token, fulfilmentId);
+    this.assertBoyFulfilmentActionable(fulfilment.status, { requireActionable: true });
+
+    const now = new Date();
+    const code = otp.trim();
+    const order = fulfilment.order;
+
+    if (!order.deliveryOtp) {
+      throw Errors.badRequest(
+        'No delivery OTP yet. Tap Complete Delivery to send an OTP to the customer first.',
+      );
+    }
+    if (code !== order.deliveryOtp) {
+      throw Errors.badRequest(
+        'Delivery OTP does not match. Ask the customer for the code sent to their phone.',
+      );
+    }
+    if (order.deliveryOtpExpiresAt && order.deliveryOtpExpiresAt < now) {
+      throw Errors.badRequest('Delivery OTP has expired. Request a new OTP and retry.');
+    }
+
+    const proofNotes = 'Confirmed via delivery boy portal (OTP verified)';
+    const fromStatus = fulfilment.status;
+    const toStatus: FulfilmentStatus = 'delivered';
+    const vendorId = boy.vendorId;
+    const orderId = fulfilment.orderId;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          deliveryOtpVerifiedAt: now,
+          deliveryProofType: 'otp',
+          deliveryNotes: proofNotes,
+        },
+      });
+
+      await tx.fulfilment.update({
+        where: { id: fulfilment.id },
+        data: { status: toStatus, failedReason: null },
+      });
+
+      const activeDispatch = fulfilment.dispatches[0];
+      if (activeDispatch) {
+        await tx.dispatch.update({
+          where: { id: activeDispatch.id },
+          data: { status: 'delivered', deliveredAt: now },
+        });
+      }
+
+      await tx.deliveryAccessToken.updateMany({
+        where: { fulfilmentId: fulfilment.id, revokedAt: null, usedAt: null },
+        data: { usedAt: now },
+      });
+
+      await tx.fulfilmentEvent.create({
+        data: {
+          id: randomUUID(),
+          fulfilmentId: fulfilment.id,
+          actorId: null,
+          action: FULFILMENT_EVENT_ACTIONS.POD_CAPTURED,
+          fromStatus,
+          toStatus: fromStatus,
+          payload: { proofType: 'otp', via: 'boy_portal' },
+        },
+      });
+      await tx.fulfilmentEvent.create({
+        data: {
+          id: randomUUID(),
+          fulfilmentId: fulfilment.id,
+          actorId: null,
+          action: FULFILMENT_EVENT_ACTIONS.DELIVERED,
+          fromStatus,
+          toStatus,
+          payload: { via: 'boy_portal' },
+        },
+      });
+      await tx.fulfilmentEvent.create({
+        data: {
+          id: randomUUID(),
+          fulfilmentId: fulfilment.id,
+          actorId: null,
+          action: FULFILMENT_EVENT_ACTIONS.STATUS_CHANGED,
+          fromStatus,
+          toStatus,
+        },
+      });
+      await tx.deliveryEvent.create({
+        data: {
+          id: randomUUID(),
+          fulfilmentId: fulfilment.id,
+          actorId: null,
+          kind: 'pod',
+          payload: { proofType: 'otp', via: 'boy_portal' },
+        },
+      });
+      await tx.deliveryEvent.create({
+        data: {
+          id: randomUUID(),
+          fulfilmentId: fulfilment.id,
+          actorId: null,
+          kind: 'arrived',
+          payload: { delivered: true, via: 'boy_portal' },
+        },
+      });
+    });
+
+    const orderService = await this.getOrderService();
+    try {
+      await orderService.updateStatus(
+        orderId,
+        vendorId,
+        'delivered',
+        undefined,
+        {
+          proofType: 'notes',
+          proofUrl: null,
+          notes: proofNotes,
+        },
+        false,
+        null,
+      );
+
+      await prisma.$transaction(async (tx) => {
+        await recordOrderEvent(tx, {
+          orderId,
+          actorId: null,
+          action: FULFILMENT_EVENT_ACTIONS.DELIVERED,
+          fromStatus: 'shipped',
+          toStatus: 'delivered',
+          payload: { fulfilmentId: fulfilment.id, via: 'boy_portal' },
+        });
+      });
+    } catch (err) {
+      console.error('[DeliveryBoyLink] post-complete order sync failed:', err);
+    }
+
+    return this.getBoyPortalOrderView(token, fulfilmentId);
+  }
+
+  async failViaBoy(
+    token: string,
+    fulfilmentId: string,
+    failedReason: DeliveryFailReason,
+    failedReasonOther?: string,
+  ) {
+    const { boy: _boy, fulfilment } = await this.loadBoyFulfilmentContext(token, fulfilmentId);
+    this.assertBoyFulfilmentActionable(fulfilment.status, { requireActionable: true });
+
+    const reasonText = formatDeliveryFailReason(failedReason, failedReasonOther);
+    const fromStatus = fulfilment.status;
+    const toStatus: FulfilmentStatus = 'failed_delivery';
+
+    await prisma.$transaction(async (tx) => {
+      await tx.fulfilment.update({
+        where: { id: fulfilment.id },
+        data: { status: toStatus, failedReason: reasonText },
+      });
+
+      const activeDispatch = fulfilment.dispatches[0];
+      if (activeDispatch) {
+        await tx.dispatch.update({
+          where: { id: activeDispatch.id },
+          data: { status: 'failed_delivery', notes: reasonText },
+        });
+      }
+
+      await tx.fulfilmentEvent.create({
+        data: {
+          id: randomUUID(),
+          fulfilmentId: fulfilment.id,
+          actorId: null,
+          action: FULFILMENT_EVENT_ACTIONS.FAILED_DELIVERY,
+          fromStatus,
+          toStatus,
+          payload: {
+            failedReason,
+            failedReasonOther: failedReasonOther ?? null,
+            reasonText,
+            via: 'boy_portal',
+          },
+        },
+      });
+      await tx.fulfilmentEvent.create({
+        data: {
+          id: randomUUID(),
+          fulfilmentId: fulfilment.id,
+          actorId: null,
+          action: FULFILMENT_EVENT_ACTIONS.STATUS_CHANGED,
+          fromStatus,
+          toStatus,
+        },
+      });
+      await tx.deliveryEvent.create({
+        data: {
+          id: randomUUID(),
+          fulfilmentId: fulfilment.id,
+          actorId: null,
+          kind: 'failed',
+          payload: { failedReason: reasonText, via: 'boy_portal' },
+        },
+      });
+
+      await recordOrderEvent(tx, {
+        orderId: fulfilment.orderId,
+        actorId: null,
+        action: FULFILMENT_EVENT_ACTIONS.FAILED_DELIVERY,
+        fromStatus: 'shipped',
+        toStatus: 'shipped',
+        payload: {
+          fulfilmentId: fulfilment.id,
+          failedReason: reasonText,
+          via: 'boy_portal',
+        },
+      });
+    });
+
+    return this.getBoyPortalOrderView(token, fulfilmentId);
   }
 }
 

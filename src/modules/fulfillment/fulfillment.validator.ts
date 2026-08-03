@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import {
   DELIVERY_FAIL_REASONS,
-  DELIVERY_UI_STATUSES,
+  DELIVERY_FILTER_KEYS,
 } from '@/modules/fulfillment/delivery.scope';
 import { DELIVERY_RESOURCE_TYPES } from '@/modules/fulfillment/fulfillment.types';
 
@@ -13,8 +13,8 @@ const phoneSchema = z
   .regex(/^[+\d][\d\s\-()]{7,19}$/, 'Enter a valid phone number');
 
 export const listFulfilmentsQuerySchema = z.object({
-  /** Delivery UI status chip — expands to DB FulfilmentStatus[] in the service. */
-  status: z.enum(DELIVERY_UI_STATUSES).optional(),
+  /** Delivery filter chip (New / Processing / stage) — expands to DB statuses in the service. */
+  status: z.enum(DELIVERY_FILTER_KEYS).optional(),
   outletId: z.string().uuid().optional(),
   deliveryResourceId: z.string().uuid().optional(),
   paymentMethod: z.string().max(30).optional(),
