@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   AlertTriangle,
+  ArrowLeft,
   CheckCircle2,
   Loader2,
   MapPin,
@@ -27,6 +29,7 @@ import { cn } from '@/lib/utils';
 type PublicDeliveryView = {
   token: string;
   path: string;
+  listPath?: string;
   expiresAt: string;
   revokedAt: string | null;
   usedAt: string | null;
@@ -92,7 +95,17 @@ function apiErrorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
-export default function DeliveryLinkClient({ token }: { token: string }) {
+type DeliveryLinkClientProps = {
+  token: string;
+  /** When set, uses boy-portal APIs (/delivery-boy-link/:token/:fulfilmentId). */
+  fulfilmentId?: string;
+};
+
+export default function DeliveryLinkClient({ token, fulfilmentId }: DeliveryLinkClientProps) {
+  const apiBase = fulfilmentId
+    ? `/api/v1/delivery-boy-link/${encodeURIComponent(token)}/${encodeURIComponent(fulfilmentId)}`
+    : `/api/v1/delivery-link/${encodeURIComponent(token)}`;
+
   const [data, setData] = useState<PublicDeliveryView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,7 +125,7 @@ export default function DeliveryLinkClient({ token }: { token: string }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/v1/delivery-link/${encodeURIComponent(token)}`);
+      const res = await fetch(apiBase);
       const json = (await res.json()) as { success?: boolean; data?: PublicDeliveryView; error?: unknown };
       if (!res.ok || !json.success || !json.data) {
         throw new Error(apiErrorMessage(json, 'Delivery link not found'));
@@ -124,12 +137,12 @@ export default function DeliveryLinkClient({ token }: { token: string }) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [apiBase]);
 
   /** Sync view from server without full-page spinner. */
   const refreshQuiet = useCallback(async () => {
     try {
-      const res = await fetch(`/api/v1/delivery-link/${encodeURIComponent(token)}`);
+      const res = await fetch(apiBase);
       const json = (await res.json()) as { success?: boolean; data?: PublicDeliveryView; error?: unknown };
       if (!res.ok || !json.success || !json.data) return;
       setData(json.data);
@@ -139,7 +152,7 @@ export default function DeliveryLinkClient({ token }: { token: string }) {
     } catch {
       /* keep current UI */
     }
-  }, [token]);
+  }, [apiBase]);
 
   useEffect(() => {
     void load();
@@ -185,10 +198,7 @@ export default function DeliveryLinkClient({ token }: { token: string }) {
     setBusy(true);
     setActionError(null);
     try {
-      const res = await fetch(
-        `/api/v1/delivery-link/${encodeURIComponent(token)}/request-otp`,
-        { method: 'POST' },
-      );
+      const res = await fetch(`${apiBase}/request-otp`, { method: 'POST' });
       const json = (await res.json()) as {
         success?: boolean;
         data?: { customerPhoneMasked?: string | null };
@@ -215,14 +225,11 @@ export default function DeliveryLinkClient({ token }: { token: string }) {
     setBusy(true);
     setActionError(null);
     try {
-      const res = await fetch(
-        `/api/v1/delivery-link/${encodeURIComponent(token)}/complete`,
-        {
+      const res = await fetch(`${apiBase}/complete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ otp: otpCode }),
-        },
-      );
+        });
       const json = (await res.json()) as {
         success?: boolean;
         data?: PublicDeliveryView;
@@ -253,17 +260,14 @@ export default function DeliveryLinkClient({ token }: { token: string }) {
     setBusy(true);
     setActionError(null);
     try {
-      const res = await fetch(
-        `/api/v1/delivery-link/${encodeURIComponent(token)}/fail`,
-        {
+      const res = await fetch(`${apiBase}/fail`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             failedReason: failReason,
             ...(failReason === 'other' ? { failedReasonOther: failOther.trim() } : {}),
           }),
-        },
-      );
+        });
       const json = (await res.json()) as {
         success?: boolean;
         data?: PublicDeliveryView;
@@ -329,28 +333,39 @@ export default function DeliveryLinkClient({ token }: { token: string }) {
   return (
     <div className="min-h-screen bg-[#F4F7F6] text-[#181725]" data-testid="delivery-link-page">
       <header className="border-b border-[#E5EBE9] bg-white">
-        <div className="mx-auto flex max-w-lg items-center justify-between gap-3 px-[clamp(1rem,4vw,1.5rem)] py-4">
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-[#0F766E]">
-              Delivery
-            </p>
-            <h1 className="truncate text-[clamp(1.1rem,4vw,1.35rem)] font-black">
-              {data.vendor.name}
-            </h1>
-            <p className="text-[12px] text-[#7C7C7C]">
-              For {data.deliveryBoyName}
-              {data.deliveryBoyPhone ? ` · ${data.deliveryBoyPhone}` : ''}
-            </p>
+        <div className="mx-auto max-w-lg px-[clamp(1rem,4vw,1.5rem)] py-4">
+          {data.listPath && (
+            <Link
+              href={data.listPath}
+              className="mb-2 inline-flex items-center gap-1 text-[12px] font-bold text-[#0F766E]"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              All orders
+            </Link>
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[#0F766E]">
+                Delivery
+              </p>
+              <h1 className="truncate text-[clamp(1.1rem,4vw,1.35rem)] font-black">
+                {data.vendor.name}
+              </h1>
+              <p className="text-[12px] text-[#7C7C7C]">
+                For {data.deliveryBoyName}
+                {data.deliveryBoyPhone ? ` · ${data.deliveryBoyPhone}` : ''}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={printPicklist}
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[10px] border border-[#D5E5E1] bg-white px-3 text-[12px] font-bold text-[#0F766E]"
+              data-testid="delivery-link-print"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              Picklist
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={printPicklist}
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[10px] border border-[#D5E5E1] bg-white px-3 text-[12px] font-bold text-[#0F766E]"
-            data-testid="delivery-link-print"
-          >
-            <Printer className="h-3.5 w-3.5" />
-            Picklist
-          </button>
         </div>
       </header>
 
