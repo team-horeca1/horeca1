@@ -35,10 +35,9 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { useAddress, type Address } from '@/context/AddressContext';
+import { useAddress } from '@/context/AddressContext';
 import { EditProfileOverlay } from './EditProfileOverlay';
 import { SavedAddressesOverlay } from './SavedAddressesOverlay';
-import { EditAddressOverlay } from '@/components/layout/EditAddressOverlay';
 import { PaymentManagementOverlay } from './PaymentManagementOverlay';
 import { NotificationOverlay } from './NotificationOverlay';
 import { GeneralInformationOverlay } from './GeneralInformationOverlay';
@@ -77,7 +76,6 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const searchParams = useSearchParams();
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [isSavedAddressesOpen, setIsSavedAddressesOpen] = useState(false);
-    const [editingAddress, setEditingAddress] = useState<Address | null>(null);
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
     const [isNotificationOpen, setIsNotificationOpen] = useState(false);
     const [isGeneralInfoOpen, setIsGeneralInfoOpen] = useState(false);
@@ -434,14 +432,6 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     // Fallback only when no SavedAddress exists yet (legacy profile fields).
     const defaultLocation = deliverToSub || [userData.city, userData.pincode].filter(Boolean).join(' · ');
     const defaultDeliveryLine = deliverToLine || userData.address || '';
-    // Account details Edit → same SavedAddress as navbar Deliver To.
-    const openDeliverToEdit = () => {
-        if (deliverToAddress) {
-            setEditingAddress(deliverToAddress);
-            return;
-        }
-        setIsSavedAddressesOpen(true);
-    };
     // Show the "Become a vendor" CTA only for customers who haven't yet applied.
     // Admins, brands, and existing vendors (pending or approved) all skip it.
     const showBecomeVendorCta = hasVendorApplication === false && sessionRole !== 'admin' && sessionRole !== 'brand' && sessionRole !== 'vendor';
@@ -1110,7 +1100,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 <section>
                                     <div className="flex items-baseline justify-between mb-3 px-1">
                                         <h3 className="text-[15px] font-[700] text-[#181725]">Account details</h3>
-                                        <button onClick={openDeliverToEdit} className="text-[12px] font-bold text-[#53B175] hover:text-[#469E66] transition-colors cursor-pointer">
+                                        <button onClick={() => setIsEditProfileOpen(true)} className="text-[12px] font-bold text-[#53B175] hover:text-[#469E66] transition-colors cursor-pointer">
                                             Edit
                                         </button>
                                     </div>
@@ -1146,75 +1136,78 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                 onClose={() => setIsEditProfileOpen(false)}
                 userData={editProfileUserData}
                 onSave={async (data) => {
-                    setUserData(prev => ({ ...prev, ...data }));
-                    try {
-                        const patch: Record<string, string> = {};
-                        if (data.fullName) patch.fullName = data.fullName;
-                        if (data.businessName) patch.businessName = data.businessName;
-                        if (/^\d{6}$/.test(data.pincode)) patch.pincode = data.pincode;
-                        // Phone is editable now (10-digit local part; the API normalizes to +91…).
-                        if (/^[6-9]\d{9}$/.test(data.phone)) patch.phone = data.phone;
-                        await fetch('/api/v1/auth/me', {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify(patch),
-                        });
-                        // Mark profile complete when core fields are filled
-                        if (data.fullName && data.businessName && /^\d{6}$/.test(data.pincode)) {
-                            await fetch('/api/v1/me/profile', { method: 'POST', credentials: 'include' });
-                        }
+                    const patch: Record<string, string> = {};
+                    if (data.fullName) patch.fullName = data.fullName;
+                    if (data.businessName) patch.businessName = data.businessName;
+                    if (/^\d{6}$/.test(data.pincode)) patch.pincode = data.pincode;
+                    // Phone is editable now (10-digit local part; the API normalizes to +91…).
+                    if (/^[6-9]\d{9}$/.test(data.phone)) patch.phone = data.phone;
 
-                        // Persist delivery address to primary SavedAddress (same source as navbar Deliver To).
-                        const fullAddress = data.address?.trim();
-                        if (fullAddress) {
-                            const shortAddress = (data.shortAddress || fullAddress.split(',').slice(0, 2).join(', ')).trim();
-                            const addressPatch = {
-                                businessName: data.businessName?.trim() || undefined,
-                                fullAddress,
-                                shortAddress,
-                                flatInfo: data.address2?.trim() || undefined,
-                                pincode: data.pincode?.trim() || undefined,
-                                city: data.city?.trim() || undefined,
-                                state: data.state?.trim() || undefined,
-                                ...(typeof data.latitude === 'number' && typeof data.longitude === 'number'
-                                    ? { latitude: data.latitude, longitude: data.longitude }
-                                    : {}),
-                                ...(data.placeId ? { placeId: data.placeId } : {}),
-                            };
-                            const existingId = deliverToAddress?.id
-                                ?? primaryAddressId
-                                ?? savedAddresses.find((a) => a.isDefault)?.id
-                                ?? savedAddresses[0]?.id
-                                ?? selectedAddress?.id
-                                ?? null;
-                            if (existingId) {
-                                await updateAddress(existingId, addressPatch);
-                            } else if (
-                                typeof data.latitude === 'number'
-                                && typeof data.longitude === 'number'
-                            ) {
-                                const created = await addAddress({
-                                    label: 'Home',
-                                    isDefault: true,
-                                    ...addressPatch,
-                                    latitude: data.latitude,
-                                    longitude: data.longitude,
-                                });
-                                if (created) {
-                                    setPrimaryAddressId(created.id);
-                                    setSelectedAddress(created);
-                                }
+                    const res = await fetch('/api/v1/auth/me', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(patch),
+                    });
+                    if (!res.ok) {
+                        const json = await res.json().catch(() => null) as
+                            | { error?: { message?: string } }
+                            | null;
+                        throw new Error(
+                            json?.error?.message ?? 'Failed to save profile. Please try again.',
+                        );
+                    }
+
+                    setUserData(prev => ({ ...prev, ...data }));
+
+                    // Mark profile complete when core fields are filled
+                    if (data.fullName && data.businessName && /^\d{6}$/.test(data.pincode)) {
+                        await fetch('/api/v1/me/profile', { method: 'POST', credentials: 'include' });
+                    }
+
+                    // Persist delivery address to primary SavedAddress (same source as navbar Deliver To).
+                    const fullAddress = data.address?.trim();
+                    if (fullAddress) {
+                        const shortAddress = (data.shortAddress || fullAddress.split(',').slice(0, 2).join(', ')).trim();
+                        const addressPatch = {
+                            businessName: data.businessName?.trim() || undefined,
+                            fullAddress,
+                            shortAddress,
+                            flatInfo: data.address2?.trim() || undefined,
+                            pincode: data.pincode?.trim() || undefined,
+                            city: data.city?.trim() || undefined,
+                            state: data.state?.trim() || undefined,
+                            ...(typeof data.latitude === 'number' && typeof data.longitude === 'number'
+                                ? { latitude: data.latitude, longitude: data.longitude }
+                                : {}),
+                            ...(data.placeId ? { placeId: data.placeId } : {}),
+                        };
+                        const existingId = deliverToAddress?.id
+                            ?? primaryAddressId
+                            ?? savedAddresses.find((a) => a.isDefault)?.id
+                            ?? savedAddresses[0]?.id
+                            ?? selectedAddress?.id
+                            ?? null;
+                        if (existingId) {
+                            await updateAddress(existingId, addressPatch);
+                        } else if (
+                            typeof data.latitude === 'number'
+                            && typeof data.longitude === 'number'
+                        ) {
+                            const created = await addAddress({
+                                label: 'Home',
+                                isDefault: true,
+                                ...addressPatch,
+                                latitude: data.latitude,
+                                longitude: data.longitude,
+                            });
+                            if (created) {
+                                setPrimaryAddressId(created.id);
+                                setSelectedAddress(created);
                             }
                         }
-                    } catch { /* silent — local state already updated */ }
+                    }
                 }}
-            />
-
-            {/* Edit current deliver-to address (Account details Edit) */}
-            <EditAddressOverlay
-                address={editingAddress}
-                onClose={() => setEditingAddress(null)}
             />
 
             {/* Delivery Addresses Overlay */}

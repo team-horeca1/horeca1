@@ -155,6 +155,45 @@ export class AuthService {
     if (data.phone !== undefined) {
       const phone = normalizePhone(data.phone);
       if (!phone) throw Errors.badRequest('Invalid phone number');
+
+      const current = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { phone: true },
+      });
+      if (!current) throw Errors.notFound('User');
+
+      // Treat legacy "+91…" / "91…" rows as the same number as bare 10-digit.
+      const phoneChanged = !phoneLookupVariants(current.phone).includes(phone);
+
+      if (phoneChanged) {
+        const taken = await prisma.user.findFirst({
+          where: {
+            id: { not: userId },
+            phone: { in: phoneLookupVariants(phone) },
+          },
+          select: { id: true },
+        });
+        if (taken) {
+          throw Errors.fieldError('phone', 'Phone already exists', 409);
+        }
+
+        // Same trust window as vendor/brand onboarding: a used OTP within 30 min.
+        const verifiedOtp = await prisma.otpCode.findFirst({
+          where: {
+            phone,
+            used: true,
+            createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        });
+        if (!verifiedOtp) {
+          throw Errors.badRequest(
+            'Phone number is not verified. Please verify your number first.',
+          );
+        }
+      }
+
       data = { ...data, phone };
     }
     return prisma.user.update({
