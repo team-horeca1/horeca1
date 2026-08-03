@@ -263,6 +263,7 @@ model Vendor {
   stockTransfers      StockTransfer[]
   fulfilments         Fulfilment[]
   deliveryResources   DeliveryResource[]
+  deliveryBoyAccessTokens DeliveryBoyAccessToken[]
   storeScopedRoles    UserRole[]          @relation("UserRoleOnlineStore")
 
   // Ordering defaults applied to new products and checkout
@@ -2776,6 +2777,7 @@ model DeliveryResource {
   vendor      Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   fulfilments Fulfilment[]
   dispatches  Dispatch[]
+  boyAccessTokens DeliveryBoyAccessToken[]
 
   @@index([vendorId])
   @@index([vendorId, isActive])
@@ -2892,6 +2894,28 @@ model DeliveryAccessToken {
   @@index([fulfilmentId, revokedAt])
   @@index([expiresAt])
   @@map("delivery_access_tokens")
+}
+
+/// Shared public portal for a delivery boy — path /d/b/[token].
+/// Lists all open assigned fulfilments; order POD is /d/b/[token]/[fulfilmentId].
+model DeliveryBoyAccessToken {
+  id                 String    @id @default(uuid()) @db.Uuid
+  token              String    @unique @db.VarChar(64)
+  vendorId           String    @map("vendor_id") @db.Uuid
+  deliveryResourceId String    @map("delivery_resource_id") @db.Uuid
+  expiresAt          DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt          DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  vendor           Vendor           @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  deliveryResource DeliveryResource @relation(fields: [deliveryResourceId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+  @@index([deliveryResourceId])
+  @@index([deliveryResourceId, revokedAt])
+  @@index([expiresAt])
+  @@map("delivery_boy_access_tokens")
 }
 
 model GoodsReceipt {
