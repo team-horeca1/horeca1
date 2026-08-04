@@ -1,4 +1,5 @@
 // GET /api/v1/delivery-boy-link/:token — boy portal order list (public)
+// Filters closed Order.status so delivered desync rows never appear as open.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { errorResponse } from '@/middleware/errorHandler';

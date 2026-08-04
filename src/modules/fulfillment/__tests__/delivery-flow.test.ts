@@ -75,6 +75,25 @@ describe('delivery.scope — UI ↔ DB status mapping', () => {
 });
 
 describe('delivery validators — accept→pack→assign→OTP/fail/override shapes', () => {
+  it('accepts assign_and_dispatch with deliveryResourceId', () => {
+    const assign = fulfilmentActionSchema.parse({
+      action: 'assign_and_dispatch',
+      deliveryResourceId: '11111111-1111-4111-8111-111111111111',
+    });
+    expect(assign.action).toBe('assign_and_dispatch');
+    expect(
+      'deliveryResourceId' in assign ? assign.deliveryResourceId : undefined,
+    ).toBe('11111111-1111-4111-8111-111111111111');
+  });
+
+  it('rejects assign_and_dispatch without boy or name/phone', () => {
+    expect(() =>
+      fulfilmentActionSchema.parse({
+        action: 'assign_and_dispatch',
+      }),
+    ).toThrow();
+  });
+
   it('accepts mark_packed then assign_and_dispatch payload', () => {
     expect(fulfilmentActionSchema.parse({ action: 'mark_packed' })).toEqual({
       action: 'mark_packed',

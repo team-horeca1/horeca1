@@ -97,8 +97,11 @@ export type FulfilmentActionBody =
   | { action: 'mark_packed' }
   | {
       action: 'assign_and_dispatch';
-      deliveryBoyName: string;
-      deliveryBoyPhone: string;
+      /** Prefer selecting an existing roster boy. */
+      deliveryResourceId?: string;
+      /** Required when creating a new boy (no deliveryResourceId). */
+      deliveryBoyName?: string;
+      deliveryBoyPhone?: string;
       eta?: string;
     }
   | {
@@ -129,8 +132,9 @@ export type FulfilmentAction = FulfilmentActionBody['action'];
 export type FulfilmentBulkActionBody = {
   action: 'assign_and_dispatch';
   fulfilmentIds: string[];
-  deliveryBoyName: string;
-  deliveryBoyPhone: string;
+  deliveryResourceId?: string;
+  deliveryBoyName?: string;
+  deliveryBoyPhone?: string;
   eta?: string;
 };
 

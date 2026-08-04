@@ -25,16 +25,55 @@ export const listFulfilmentsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional().default(20),
 });
 
+const assignBoyFields = {
+  deliveryResourceId: z.string().uuid().optional(),
+  deliveryBoyName: z.string().trim().min(1).max(150).optional(),
+  deliveryBoyPhone: phoneSchema.optional(),
+  eta: z.string().datetime().optional(),
+};
+
+function refineAssignBoy(
+  val: {
+    deliveryResourceId?: string;
+    deliveryBoyName?: string;
+    deliveryBoyPhone?: string;
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (val.deliveryResourceId) return;
+  if (!val.deliveryBoyName?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Select a delivery boy or enter a name',
+      path: ['deliveryBoyName'],
+    });
+  }
+  if (!val.deliveryBoyPhone?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Phone is required for a new delivery boy',
+      path: ['deliveryBoyPhone'],
+    });
+  } else {
+    const phoneCheck = phoneSchema.safeParse(val.deliveryBoyPhone);
+    if (!phoneCheck.success) {
+      for (const issue of phoneCheck.error.issues) {
+        ctx.addIssue({ ...issue, path: ['deliveryBoyPhone'] });
+      }
+    }
+  }
+}
+
 export const fulfilmentActionSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('mark_packed'),
   }),
-  z.object({
-    action: z.literal('assign_and_dispatch'),
-    deliveryBoyName: z.string().trim().min(1).max(150),
-    deliveryBoyPhone: phoneSchema,
-    eta: z.string().datetime().optional(),
-  }),
+  z
+    .object({
+      action: z.literal('assign_and_dispatch'),
+      ...assignBoyFields,
+    })
+    .superRefine(refineAssignBoy),
   z
     .object({
       action: z.literal('record_failed_delivery'),
@@ -65,13 +104,13 @@ export const fulfilmentActionSchema = z.discriminatedUnion('action', [
   }),
 ]);
 
-export const fulfilmentBulkActionSchema = z.object({
-  action: z.literal('assign_and_dispatch'),
-  fulfilmentIds: z.array(z.string().uuid()).min(1).max(50),
-  deliveryBoyName: z.string().trim().min(1).max(150),
-  deliveryBoyPhone: phoneSchema,
-  eta: z.string().datetime().optional(),
-});
+export const fulfilmentBulkActionSchema = z
+  .object({
+    action: z.literal('assign_and_dispatch'),
+    fulfilmentIds: z.array(z.string().uuid()).min(1).max(50),
+    ...assignBoyFields,
+  })
+  .superRefine(refineAssignBoy);
 
 export const createDeliveryResourceSchema = z.object({
   type: z.enum(DELIVERY_RESOURCE_TYPES),

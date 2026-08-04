@@ -1599,7 +1599,7 @@ export class OrderService {
     actorId?: string | null,
     notes?: string,
   ) {
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
         where: {
           id: orderId,
@@ -1719,6 +1719,15 @@ export class OrderService {
 
       return updated;
     });
+
+    if (result.status === 'delivered') {
+      try {
+        await this.syncOpenFulfilmentToDelivered(orderId);
+      } catch (err) {
+        console.error('[Order] Sync fulfilment after shipLines delivered failed:', err);
+      }
+    }
+    return result;
   }
 
   /** Cancel remaining balance on lines (never ship). Order totals unchanged. */
@@ -1728,7 +1737,7 @@ export class OrderService {
     items: Array<{ itemId: string; cancelQty: number; reason?: string }>,
     actorId?: string | null,
   ) {
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
         where: {
           id: orderId,
@@ -1817,6 +1826,15 @@ export class OrderService {
 
       return updated;
     });
+
+    if (result.status === 'delivered') {
+      try {
+        await this.syncOpenFulfilmentToDelivered(orderId);
+      } catch (err) {
+        console.error('[Order] Sync fulfilment after cancelLineBalance delivered failed:', err);
+      }
+    }
+    return result;
   }
 
   // Valid status transitions (Section 7):
@@ -1857,6 +1875,7 @@ export class OrderService {
     // Auto-issue OTP runs after commit so Fulfilment dispatch / classic ship
     // share one hook via syncOrderGate → updateStatus.
     let becameShipped = false;
+    let becameDelivered = false;
 
     const updated = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
@@ -1902,6 +1921,9 @@ export class OrderService {
 
       if (status === 'shipped') {
         becameShipped = true;
+      }
+      if (status === 'delivered') {
+        becameDelivered = true;
       }
 
       // Backorder: reserved remaining = ordered − fulfilled − cancelled.
@@ -2134,7 +2156,57 @@ export class OrderService {
       }
     }
 
+    // Keep Fulfilment in sync when Order is marked delivered outside the
+    // delivery workspace (vendor Orders PATCH / shipLines / etc.).
+    if (becameDelivered) {
+      try {
+        await this.syncOpenFulfilmentToDelivered(orderId);
+      } catch (err) {
+        console.error('[Order] Sync fulfilment on delivered failed:', err);
+      }
+    }
+
     return updated;
+  }
+
+  /**
+   * Best-effort: if Fulfilment is still out_for_delivery/failed after Order
+   * became delivered, close it so boy portal stops listing the run.
+   */
+  private async syncOpenFulfilmentToDelivered(orderId: string): Promise<void> {
+    const open = await prisma.fulfilment.findFirst({
+      where: {
+        orderId,
+        status: { in: ['out_for_delivery', 'failed_delivery'] },
+      },
+      select: {
+        id: true,
+        dispatches: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { id: true },
+        },
+      },
+    });
+    if (!open) return;
+
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.fulfilment.update({
+        where: { id: open.id },
+        data: { status: 'delivered', failedReason: null },
+      });
+      if (open.dispatches[0]) {
+        await tx.dispatch.update({
+          where: { id: open.dispatches[0].id },
+          data: { status: 'delivered', deliveredAt: now },
+        });
+      }
+      await tx.deliveryAccessToken.updateMany({
+        where: { fulfilmentId: open.id, revokedAt: null, usedAt: null },
+        data: { usedAt: now },
+      });
+    });
   }
 
   /**

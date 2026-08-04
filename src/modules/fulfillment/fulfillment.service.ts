@@ -501,6 +501,7 @@ export class FulfilmentService {
           id,
           {
             action: 'assign_and_dispatch',
+            deliveryResourceId: body.deliveryResourceId,
             deliveryBoyName: body.deliveryBoyName,
             deliveryBoyPhone: body.deliveryBoyPhone,
             eta: body.eta,
@@ -700,15 +701,33 @@ export class FulfilmentService {
     });
   }
 
-  /** Find-or-create an executive DeliveryResource by name + phone. */
+  /** Load an owned active DeliveryResource, or find-or-create by name + phone. */
   private async resolveDeliveryBoy(
     tx: Prisma.TransactionClient,
     vendorId: string,
-    name: string,
-    phone: string,
+    input: {
+      deliveryResourceId?: string;
+      deliveryBoyName?: string;
+      deliveryBoyPhone?: string;
+    },
   ) {
-    const trimmedName = name.trim();
-    const trimmedPhone = phone.trim();
+    if (input.deliveryResourceId) {
+      const existing = await tx.deliveryResource.findFirst({
+        where: {
+          id: input.deliveryResourceId,
+          vendorId,
+          isActive: true,
+        },
+      });
+      if (!existing) throw Errors.notFound('Delivery boy');
+      return existing;
+    }
+
+    const trimmedName = (input.deliveryBoyName ?? '').trim();
+    const trimmedPhone = (input.deliveryBoyPhone ?? '').trim();
+    if (!trimmedName || trimmedPhone.length < 8) {
+      throw Errors.badRequest('Delivery boy name and phone are required');
+    }
 
     const byPhone = await tx.deliveryResource.findFirst({
       where: { vendorId, phone: trimmedPhone, isActive: true },
@@ -804,12 +823,7 @@ export class FulfilmentService {
       const f = await this.loadOwned(vendorId, fulfilmentId, tx);
       assertStatus(f.status, DELIVERY_PACKED_DB_STATUSES, 'assign_and_dispatch');
 
-      const resource = await this.resolveDeliveryBoy(
-        tx,
-        vendorId,
-        body.deliveryBoyName,
-        body.deliveryBoyPhone,
-      );
+      const resource = await this.resolveDeliveryBoy(tx, vendorId, body);
 
       const now = new Date();
       const eta = body.eta ? new Date(body.eta) : undefined;
@@ -863,7 +877,7 @@ export class FulfilmentService {
         orderId: f.orderId,
         fulfilmentId: f.id,
         deliveryBoyName: resource.name,
-        deliveryBoyPhone: resource.phone ?? body.deliveryBoyPhone,
+        deliveryBoyPhone: resource.phone ?? body.deliveryBoyPhone ?? '',
       });
       const boyPortal = await this.deliveryLinks.ensureBoyToken(tx, {
         vendorId,
@@ -1301,7 +1315,13 @@ export class FulfilmentService {
         _count: {
           select: {
             fulfilments: {
-              where: { status: { in: ['out_for_delivery', 'failed_delivery'] } },
+              where: {
+                status: { in: ['out_for_delivery', 'failed_delivery'] },
+                order: { status: { notIn: ['delivered', 'cancelled', 'returned'] } },
+              },
+            },
+            returnRequests: {
+              where: { status: 'pickup_scheduled' },
             },
           },
         },
@@ -1323,7 +1343,9 @@ export class FulfilmentService {
         phone: r.phone,
         isActive: r.isActive,
         createdAt: r.createdAt,
-        openOrderCount: r._count.fulfilments,
+        openOrderCount: r._count.fulfilments + r._count.returnRequests,
+        openDeliveryCount: r._count.fulfilments,
+        openPickupCount: r._count.returnRequests,
         boyPortal: activeTok
           ? {
               token: activeTok.token,
@@ -1374,6 +1396,8 @@ export class FulfilmentService {
     return {
       ...created,
       openOrderCount: 0,
+      openDeliveryCount: 0,
+      openPickupCount: 0,
       boyPortal: {
         token: boyPortal.token,
         path: boyPortal.path,

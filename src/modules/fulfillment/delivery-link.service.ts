@@ -13,6 +13,9 @@ import {
 } from '@/modules/fulfillment/fulfillment.types';
 import type { OrderService } from '@/modules/order/order.service';
 import { recordOrderEvent } from '@/modules/order/order-events';
+import {
+  returnPickupLinkPath,
+} from '@/modules/return/return-pickup-link.service';
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -55,6 +58,12 @@ export function deliveryBoyLinkAbsoluteUrl(token: string): string {
 }
 
 const BOY_OPEN_STATUSES = ['out_for_delivery', 'failed_delivery'] as const;
+/** Order statuses that must not appear as open delivery tasks. */
+const CLOSED_ORDER_STATUSES = ['delivered', 'cancelled', 'returned'] as const;
+
+function isClosedOrderStatus(status: string): boolean {
+  return (CLOSED_ORDER_STATUSES as readonly string[]).includes(status);
+}
 
 function formatAddress(snapshot: unknown): {
   lines: string[];
@@ -250,32 +259,113 @@ export class DeliveryLinkService {
       if (row.usedAt) {
         throw Errors.badRequest('This delivery is already completed.');
       }
-      if (row.fulfilment.status !== 'out_for_delivery') {
-        if (row.fulfilment.status === 'failed_delivery') {
-          throw Errors.badRequest(
-            'Delivery attempt already failed. Wait for the vendor to reschedule.',
-          );
-        }
-        if (row.fulfilment.status === 'delivered') {
-          throw Errors.badRequest('This order is already delivered.');
-        }
+      this.assertDeliveryActionable(row.fulfilment.status, row.order.status);
+    }
+  }
+
+  /** Reject OTP/complete/fail when fulfilment or commercial order is closed. */
+  private assertDeliveryActionable(fulfilmentStatus: string, orderStatus: string) {
+    if (isClosedOrderStatus(orderStatus)) {
+      throw Errors.badRequest(
+        orderStatus === 'delivered'
+          ? 'This order is already delivered.'
+          : `This order is closed (status: ${orderStatus}).`,
+      );
+    }
+    if (fulfilmentStatus !== 'out_for_delivery') {
+      if (fulfilmentStatus === 'failed_delivery') {
         throw Errors.badRequest(
-          `Cannot act on this delivery while status is "${row.fulfilment.status}".`,
+          'Delivery attempt already failed. Wait for the vendor to reschedule.',
         );
+      }
+      if (fulfilmentStatus === 'delivered') {
+        throw Errors.badRequest('This order is already delivered.');
+      }
+      throw Errors.badRequest(
+        `Cannot act on this delivery while status is "${fulfilmentStatus}".`,
+      );
+    }
+  }
+
+  /**
+   * When Order is already delivered but Fulfilment stayed open, close the
+   * fulfilment (+ active dispatch) so boy portal / counts stay consistent.
+   */
+  async healFulfilmentIfOrderDelivered(fulfilmentId: string): Promise<boolean> {
+    const row = await prisma.fulfilment.findFirst({
+      where: {
+        id: fulfilmentId,
+        status: { in: [...BOY_OPEN_STATUSES] },
+        order: { status: 'delivered' },
+      },
+      select: {
+        id: true,
+        dispatches: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { id: true },
+        },
+      },
+    });
+    if (!row) return false;
+
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.fulfilment.update({
+        where: { id: row.id },
+        data: { status: 'delivered', failedReason: null },
+      });
+      if (row.dispatches[0]) {
+        await tx.dispatch.update({
+          where: { id: row.dispatches[0].id },
+          data: { status: 'delivered', deliveredAt: now },
+        });
+      }
+      await tx.deliveryAccessToken.updateMany({
+        where: { fulfilmentId: row.id, revokedAt: null, usedAt: null },
+        data: { usedAt: now },
+      });
+    });
+    return true;
+  }
+
+  /** Heal all open fulfilments for this boy whose orders are already delivered. */
+  private async healBoyDesyncedDeliveries(deliveryResourceId: string): Promise<void> {
+    const desynced = await prisma.fulfilment.findMany({
+      where: {
+        deliveryResourceId,
+        status: { in: [...BOY_OPEN_STATUSES] },
+        order: { status: 'delivered' },
+      },
+      select: { id: true },
+      take: 50,
+    });
+    for (const f of desynced) {
+      try {
+        await this.healFulfilmentIfOrderDelivered(f.id);
+      } catch (err) {
+        console.error('[DeliveryLink] heal desynced fulfilment failed:', f.id, err);
       }
     }
   }
 
   /** Public view payload — never includes the customer OTP code. */
   async getPublicView(token: string) {
+    const loaded = await this.loadByToken(token);
+    await this.healFulfilmentIfOrderDelivered(loaded.fulfilmentId);
     const row = await this.loadByToken(token);
     const now = new Date();
-    const uiStatus = toDeliveryUiStatus(row.fulfilment.status);
+    const orderClosed = isClosedOrderStatus(row.order.status);
+    const uiStatus =
+      orderClosed && row.order.status === 'delivered'
+        ? toDeliveryUiStatus('delivered')
+        : toDeliveryUiStatus(row.fulfilment.status);
     const actionable =
       !row.revokedAt &&
       row.expiresAt > now &&
       !row.usedAt &&
-      row.fulfilment.status === 'out_for_delivery';
+      row.fulfilment.status === 'out_for_delivery' &&
+      !orderClosed;
 
     const address = formatAddress(row.order.deliveryAddressSnapshot);
     const customerName =
@@ -716,34 +806,72 @@ export class DeliveryLinkService {
     return row;
   }
 
-  /** Page 1 — open orders for this boy. */
+  /** Page 1 — open deliveries + return pickups for this boy. */
   async getBoyPortalList(token: string) {
     const boy = await this.loadBoyToken(token);
-    const fulfilments = await prisma.fulfilment.findMany({
-      where: {
-        deliveryResourceId: boy.deliveryResourceId,
-        status: { in: [...BOY_OPEN_STATUSES] },
-      },
-      orderBy: { updatedAt: 'desc' },
-      take: 100,
-      select: {
-        id: true,
-        status: true,
-        failedReason: true,
-        order: {
-          select: {
-            id: true,
-            orderNumber: true,
-            paymentMethod: true,
-            deliveryAddressSnapshot: true,
-            user: {
-              select: { fullName: true, businessName: true, phone: true },
+    await this.healBoyDesyncedDeliveries(boy.deliveryResourceId);
+
+    const [fulfilments, pickups] = await Promise.all([
+      prisma.fulfilment.findMany({
+        where: {
+          deliveryResourceId: boy.deliveryResourceId,
+          status: { in: [...BOY_OPEN_STATUSES] },
+          order: { status: { notIn: [...CLOSED_ORDER_STATUSES] } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 100,
+        select: {
+          id: true,
+          status: true,
+          failedReason: true,
+          order: {
+            select: {
+              id: true,
+              orderNumber: true,
+              paymentMethod: true,
+              deliveryAddressSnapshot: true,
+              user: {
+                select: { fullName: true, businessName: true, phone: true },
+              },
+              outlet: { select: { name: true } },
             },
-            outlet: { select: { name: true } },
           },
         },
-      },
-    });
+      }),
+      prisma.returnRequest.findMany({
+        where: {
+          deliveryResourceId: boy.deliveryResourceId,
+          status: 'pickup_scheduled',
+          order: { vendorId: boy.vendorId },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 100,
+        select: {
+          id: true,
+          status: true,
+          order: {
+            select: {
+              id: true,
+              orderNumber: true,
+              deliveryAddressSnapshot: true,
+              user: {
+                select: { fullName: true, businessName: true, phone: true },
+              },
+              outlet: { select: { name: true } },
+            },
+          },
+          pickupAccessTokens: {
+            where: {
+              revokedAt: null,
+              expiresAt: { gt: new Date() },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { token: true },
+          },
+        },
+      }),
+    ]);
 
     return {
       token: boy.token,
@@ -777,6 +905,29 @@ export class DeliveryLinkService {
           path: deliveryBoyOrderPath(boy.token, f.id),
         };
       }),
+      pickups: pickups
+        .map((r) => {
+          const pickupToken = r.pickupAccessTokens[0]?.token;
+          if (!pickupToken) return null;
+          const address = formatAddress(r.order.deliveryAddressSnapshot);
+          const customerName =
+            r.order.user.fullName ||
+            r.order.user.businessName ||
+            address.label ||
+            r.order.outlet?.name ||
+            'Customer';
+          return {
+            returnRequestId: r.id,
+            orderId: r.order.id,
+            orderNumber: r.order.orderNumber,
+            status: r.status,
+            customerName,
+            customerPhone: r.order.user.phone,
+            addressSummary: [...address.lines, address.pincode].filter(Boolean).join(', ') || null,
+            path: returnPickupLinkPath(pickupToken),
+          };
+        })
+        .filter((p): p is NonNullable<typeof p> => p !== null),
     };
   }
 
@@ -842,26 +993,25 @@ export class DeliveryLinkService {
     return { boy, fulfilment };
   }
 
-  private assertBoyFulfilmentActionable(status: string, opts: { requireActionable?: boolean }) {
+  private assertBoyFulfilmentActionable(
+    fulfilmentStatus: string,
+    orderStatus: string,
+    opts: { requireActionable?: boolean },
+  ) {
     if (!opts.requireActionable) return;
-    if (status !== 'out_for_delivery') {
-      if (status === 'failed_delivery') {
-        throw Errors.badRequest(
-          'Delivery attempt already failed. Wait for the vendor to reschedule.',
-        );
-      }
-      if (status === 'delivered') {
-        throw Errors.badRequest('This order is already delivered.');
-      }
-      throw Errors.badRequest(`Cannot act on this delivery while status is "${status}".`);
-    }
+    this.assertDeliveryActionable(fulfilmentStatus, orderStatus);
   }
 
   /** Page 2 — single order POD view (same shape as legacy getPublicView). */
   async getBoyPortalOrderView(token: string, fulfilmentId: string) {
+    await this.healFulfilmentIfOrderDelivered(fulfilmentId);
     const { boy, fulfilment } = await this.loadBoyFulfilmentContext(token, fulfilmentId);
-    const uiStatus = toDeliveryUiStatus(fulfilment.status);
-    const actionable = fulfilment.status === 'out_for_delivery';
+    const orderClosed = isClosedOrderStatus(fulfilment.order.status);
+    const uiStatus =
+      orderClosed && fulfilment.order.status === 'delivered'
+        ? toDeliveryUiStatus('delivered')
+        : toDeliveryUiStatus(fulfilment.status);
+    const actionable = fulfilment.status === 'out_for_delivery' && !orderClosed;
     const address = formatAddress(fulfilment.order.deliveryAddressSnapshot);
     const customerName =
       fulfilment.order.user.fullName ||
@@ -876,7 +1026,10 @@ export class DeliveryLinkService {
       listPath: deliveryBoyLinkPath(boy.token),
       expiresAt: boy.expiresAt.toISOString(),
       revokedAt: null as string | null,
-      usedAt: fulfilment.status === 'delivered' ? fulfilment.order.deliveredAt?.toISOString() ?? null : null,
+      usedAt:
+        fulfilment.status === 'delivered' || fulfilment.order.status === 'delivered'
+          ? fulfilment.order.deliveredAt?.toISOString() ?? null
+          : null,
       deliveryBoyName: boy.deliveryResource.name,
       deliveryBoyPhone: boy.deliveryResource.phone ?? '',
       status: uiStatus,
@@ -933,7 +1086,9 @@ export class DeliveryLinkService {
 
   async requestOtpViaBoy(token: string, fulfilmentId: string) {
     const { boy, fulfilment } = await this.loadBoyFulfilmentContext(token, fulfilmentId);
-    this.assertBoyFulfilmentActionable(fulfilment.status, { requireActionable: true });
+    this.assertBoyFulfilmentActionable(fulfilment.status, fulfilment.order.status, {
+      requireActionable: true,
+    });
 
     const orderService = await this.getOrderService();
     const result = await orderService.issueDeliveryOtp(fulfilment.orderId, boy.vendorId, {
@@ -949,7 +1104,9 @@ export class DeliveryLinkService {
 
   async completeViaBoy(token: string, fulfilmentId: string, otp: string) {
     const { boy, fulfilment } = await this.loadBoyFulfilmentContext(token, fulfilmentId);
-    this.assertBoyFulfilmentActionable(fulfilment.status, { requireActionable: true });
+    this.assertBoyFulfilmentActionable(fulfilment.status, fulfilment.order.status, {
+      requireActionable: true,
+    });
 
     const now = new Date();
     const code = otp.trim();
@@ -1095,7 +1252,9 @@ export class DeliveryLinkService {
     failedReasonOther?: string,
   ) {
     const { fulfilment } = await this.loadBoyFulfilmentContext(token, fulfilmentId);
-    this.assertBoyFulfilmentActionable(fulfilment.status, { requireActionable: true });
+    this.assertBoyFulfilmentActionable(fulfilment.status, fulfilment.order.status, {
+      requireActionable: true,
+    });
 
     const reasonText = formatDeliveryFailReason(failedReason, failedReasonOther);
     const fromStatus = fulfilment.status;
