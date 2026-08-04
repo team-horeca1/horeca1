@@ -342,9 +342,6 @@ export default function ReturnPickupLinkClient({ token }: { token: string }) {
           </p>
           <p className="mt-3 text-[12px] text-[#7C7C7C]">
             Status: <strong className="text-[#181725]">{statusLabel}</strong>
-            {data.returnRequest.pickupAt
-              ? ` · Pickup ${new Date(data.returnRequest.pickupAt).toLocaleString('en-IN')}`
-              : ''}
           </p>
         </section>
 

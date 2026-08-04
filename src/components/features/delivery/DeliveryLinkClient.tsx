@@ -401,7 +401,7 @@ export default function DeliveryLinkClient({ token, fulfilmentId }: DeliveryLink
           </p>
         </section>
 
-        {(data.status === 'delivered' || data.usedAt) && (
+        {(data.status === 'delivered' || data.usedAt || data.order.status === 'delivered') && (
           <div
             className="flex items-center gap-2 rounded-[12px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] font-bold text-emerald-800"
             data-testid="delivery-link-delivered"
@@ -411,6 +411,20 @@ export default function DeliveryLinkClient({ token, fulfilmentId }: DeliveryLink
             {data.order.deliveredAt
               ? ` · ${new Date(data.order.deliveredAt).toLocaleString('en-IN')}`
               : ''}
+          </div>
+        )}
+
+        {(data.order.status === 'cancelled' || data.order.status === 'returned') &&
+          data.status !== 'delivered' &&
+          !data.usedAt && (
+          <div
+            className="rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900"
+            data-testid="delivery-link-order-closed"
+          >
+            <p className="font-bold">This order is closed</p>
+            <p className="mt-1 text-[12px]">
+              Status: {data.order.status}. Complete and fail are disabled.
+            </p>
           </div>
         )}
 

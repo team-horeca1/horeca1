@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   CheckCircle2,
   Loader2,
@@ -20,6 +20,12 @@ import {
 } from '@/modules/fulfillment/delivery.scope';
 import type { FulfilmentActionBody } from '@/modules/fulfillment/fulfillment.types';
 import type { FulfilmentDetail } from './fulfillmentConstants';
+import {
+  DeliveryBoySelect,
+  deliveryBoyAssignFields,
+  isDeliveryBoySelectionReady,
+  type DeliveryBoySelection,
+} from './DeliveryBoySelect';
 
 interface Props {
   detail: FulfilmentDetail;
@@ -29,19 +35,15 @@ interface Props {
 
 export function FulfilmentActions({ detail, busy, onAction }: Props) {
   const ui = toDeliveryUiStatus(detail.status);
-  const [boyName, setBoyName] = useState(detail.deliveryResource?.name ?? '');
-  const [boyPhone, setBoyPhone] = useState(detail.deliveryResource?.phone ?? '');
+  const [boySelection, setBoySelection] = useState<DeliveryBoySelection>({ mode: 'none' });
   const [otp, setOtp] = useState('');
   const [failReason, setFailReason] = useState<DeliveryFailReason>('customer_not_available');
   const [failOther, setFailOther] = useState('');
   const [overrideNote, setOverrideNote] = useState('');
 
-  useEffect(() => {
-    Promise.resolve().then(() => {
-      setBoyName(detail.deliveryResource?.name ?? '');
-      setBoyPhone(detail.deliveryResource?.phone ?? '');
-    });
-  }, [detail]);
+  const onBoyChange = useCallback((selection: DeliveryBoySelection) => {
+    setBoySelection(selection);
+  }, []);
 
   const btn =
     'h-[40px] px-4 rounded-[10px] text-[13px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-50';
@@ -68,27 +70,19 @@ export function FulfilmentActions({ detail, busy, onAction }: Props) {
           <p className="text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wide flex items-center gap-1">
             <UserPlus size={12} /> Assign delivery boy &amp; dispatch
           </p>
-          <input
-            value={boyName}
-            onChange={(e) => setBoyName(e.target.value)}
-            placeholder="Delivery boy name"
-            className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#0F766E]/40"
-          />
-          <input
-            value={boyPhone}
-            onChange={(e) => setBoyPhone(e.target.value)}
-            placeholder="Phone number"
-            className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#0F766E]/40"
+          <DeliveryBoySelect
+            initialResourceId={detail.deliveryResource?.id}
+            disabled={busy}
+            onChange={onBoyChange}
           />
           <button
             type="button"
-            disabled={busy || !boyName.trim() || boyPhone.trim().length < 8}
+            disabled={busy || !isDeliveryBoySelectionReady(boySelection)}
             className={primary}
             onClick={() =>
               onAction({
                 action: 'assign_and_dispatch',
-                deliveryBoyName: boyName.trim(),
-                deliveryBoyPhone: boyPhone.trim(),
+                ...deliveryBoyAssignFields(boySelection),
               })
             }
           >

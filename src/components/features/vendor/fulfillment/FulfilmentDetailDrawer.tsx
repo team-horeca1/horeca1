@@ -93,10 +93,10 @@ export function FulfilmentDetailDrawer({
   if (!open || !fulfilmentId) return null;
 
   return (
-    <div className="fixed inset-0 z-[10002] flex justify-end">
+    <div className="fixed inset-0 z-[10002] flex justify-start">
       <button type="button" className="absolute inset-0 bg-black/40" onClick={onClose} aria-label="Close" />
-      <div className="relative w-full max-w-[480px] h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#EEEEEE]">
+      <div className="relative w-full h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-left duration-200">
+        <div className="flex items-center justify-between px-[clamp(1.25rem,3vw,2rem)] py-4 border-b border-[#EEEEEE]">
           <div className="min-w-0">
             <p className="text-[15px] font-bold text-[#181725] truncate">
               {detail?.order.orderNumber ?? detail?.fulfilmentNumber ?? 'Delivery'}
@@ -119,7 +119,8 @@ export function FulfilmentDetailDrawer({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto px-[clamp(1.25rem,3vw,2rem)] py-5">
+          <div className="mx-auto w-full max-w-3xl space-y-5">
           {loading || !detail ? (
             <div className="flex justify-center py-16">
               <Loader2 className="animate-spin text-[#0F766E]" size={28} />
@@ -134,6 +135,7 @@ export function FulfilmentDetailDrawer({
               onDownloadPicklist={downloadPicklist}
             />
           )}
+          </div>
         </div>
       </div>
     </div>

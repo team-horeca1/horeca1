@@ -27,6 +27,8 @@ type BoyRow = {
   phone: string | null;
   isActive: boolean;
   openOrderCount: number;
+  openDeliveryCount?: number;
+  openPickupCount?: number;
   boyPortal: { token: string; path: string; expiresAt: string | Date } | null;
 };
 
@@ -177,7 +179,19 @@ export function DeliveryBoysPanel({ boyId, onSelectBoy }: Props) {
               </p>
               <p className="mt-1 text-[12px] text-[#AEAEAE]">
                 {selected.openOrderCount} open{' '}
-                {selected.openOrderCount === 1 ? 'delivery' : 'deliveries'}
+                {selected.openOrderCount === 1 ? 'task' : 'tasks'}
+                {(selected.openDeliveryCount != null || selected.openPickupCount != null) && (
+                  <>
+                    {' '}
+                    (
+                    {selected.openDeliveryCount ?? 0} deliver
+                    {(selected.openDeliveryCount ?? 0) === 1 ? 'y' : 'ies'}
+                    {(selected.openPickupCount ?? 0) > 0
+                      ? `, ${selected.openPickupCount} pickup${(selected.openPickupCount ?? 0) === 1 ? '' : 's'}`
+                      : ''}
+                    )
+                  </>
+                )}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

@@ -86,15 +86,15 @@ export function ReturnDetailDrawer({ open, returnId, onClose, onUpdated }: Props
       : detail?.type;
 
   return (
-    <div className="fixed inset-0 z-[10002] flex justify-end">
+    <div className="fixed inset-0 z-[10002] flex justify-start">
       <button
         type="button"
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
         aria-label="Close"
       />
-      <div className="relative w-full max-w-[480px] h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#EEEEEE]">
+      <div className="relative w-full h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-left duration-200">
+        <div className="flex items-center justify-between px-[clamp(1.25rem,3vw,2rem)] py-4 border-b border-[#EEEEEE]">
           <div className="min-w-0">
             <p className="text-[15px] font-bold text-[#181725] truncate font-mono">
               {detail ? shortReturnId(detail.id) : 'Return'}
@@ -120,7 +120,8 @@ export function ReturnDetailDrawer({ open, returnId, onClose, onUpdated }: Props
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto px-[clamp(1.25rem,3vw,2rem)] py-5">
+          <div className="mx-auto w-full max-w-3xl space-y-5">
           {loading || !detail ? (
             <div className="flex justify-center py-16">
               <Loader2 className="animate-spin text-[#B45309]" size={28} />
@@ -162,7 +163,7 @@ export function ReturnDetailDrawer({ open, returnId, onClose, onUpdated }: Props
                 </p>
                 {detail.pickupAt && (
                   <p>
-                    <span className="text-[#7C7C7C]">Pickup:</span>{' '}
+                    <span className="text-[#7C7C7C]">Assigned:</span>{' '}
                     <strong>{formatDateTime(detail.pickupAt)}</strong>
                   </p>
                 )}
@@ -296,6 +297,7 @@ export function ReturnDetailDrawer({ open, returnId, onClose, onUpdated }: Props
               </div>
             </>
           )}
+          </div>
         </div>
       </div>
     </div>
@@ -310,7 +312,7 @@ function actionSuccessMessage(action: ReturnActionBody['action']): string {
     case 'reject':
       return 'Return rejected';
     case 'schedule_pickup':
-      return 'Pickup scheduled';
+      return 'Pickup assigned — magic link ready';
     case 'skip_pickup':
       return 'Pickup skipped';
     case 'resend_pickup_otp':

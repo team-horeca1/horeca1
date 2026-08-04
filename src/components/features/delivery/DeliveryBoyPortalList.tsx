@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ChevronRight, Loader2, MapPin, Package, Phone } from 'lucide-react';
+import {
+  AlertTriangle,
+  ChevronRight,
+  Loader2,
+  MapPin,
+  Package,
+  Phone,
+  RotateCcw,
+} from 'lucide-react';
 import {
   DELIVERY_UI_STATUS_LABELS,
   DELIVERY_UI_STATUS_STYLE,
@@ -24,6 +32,17 @@ type PortalOrder = {
   path: string;
 };
 
+type PortalPickup = {
+  returnRequestId: string;
+  orderId: string;
+  orderNumber: string;
+  status: string;
+  customerName: string;
+  customerPhone: string | null;
+  addressSummary: string | null;
+  path: string;
+};
+
 type PortalList = {
   token: string;
   path: string;
@@ -31,6 +50,7 @@ type PortalList = {
   deliveryBoyPhone: string | null;
   vendor: { name: string; logoUrl: string | null };
   orders: PortalOrder[];
+  pickups: PortalPickup[];
 };
 
 function apiErrorMessage(payload: unknown, fallback: string): string {
@@ -62,7 +82,10 @@ export default function DeliveryBoyPortalList({ token }: { token: string }) {
       if (!res.ok || !json.success || !json.data) {
         throw new Error(apiErrorMessage(json, 'Delivery boy link not found'));
       }
-      setData(json.data);
+      setData({
+        ...json.data,
+        pickups: json.data.pickups ?? [],
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load deliveries');
       setData(null);
@@ -95,6 +118,8 @@ export default function DeliveryBoyPortalList({ token }: { token: string }) {
     );
   }
 
+  const openCount = data.orders.length + data.pickups.length;
+
   return (
     <div className="min-h-screen bg-[#F4F7F6] text-[#181725]" data-testid="delivery-boy-portal-list">
       <header className="border-b border-[#E5EBE9] bg-white">
@@ -115,7 +140,10 @@ export default function DeliveryBoyPortalList({ token }: { token: string }) {
       <main className="mx-auto max-w-lg space-y-3 px-[clamp(1rem,4vw,1.5rem)] py-5">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[13px] font-bold text-[#181725]">
-            {data.orders.length} open {data.orders.length === 1 ? 'order' : 'orders'}
+            {openCount} open {openCount === 1 ? 'task' : 'tasks'}
+            {data.pickups.length > 0
+              ? ` · ${data.orders.length} ${data.orders.length === 1 ? 'delivery' : 'deliveries'} · ${data.pickups.length} pickup${data.pickups.length === 1 ? '' : 's'}`
+              : ''}
           </p>
           <button
             type="button"
@@ -126,58 +154,109 @@ export default function DeliveryBoyPortalList({ token }: { token: string }) {
           </button>
         </div>
 
-        {data.orders.length === 0 ? (
+        {openCount === 0 ? (
           <div className="rounded-[12px] border border-[#E5EBE9] bg-white p-8 text-center">
             <Package className="mx-auto h-8 w-8 text-[#AEAEAE]" />
-            <p className="mt-3 text-[14px] font-bold text-[#181725]">No open deliveries</p>
+            <p className="mt-3 text-[14px] font-bold text-[#181725]">No open tasks</p>
             <p className="mt-1 text-[12px] text-[#7C7C7C]">
-              New assignments from the vendor will show up here.
+              New deliveries or return pickups from the vendor will show up here.
             </p>
           </div>
         ) : (
-          data.orders.map((order) => (
-            <Link
-              key={order.fulfilmentId}
-              href={order.path}
-              className="flex items-start gap-3 rounded-[12px] border border-[#E5EBE9] bg-white p-4 transition-colors hover:border-[#0F766E]/40"
-              data-testid="delivery-boy-order-row"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-mono text-[14px] font-black tracking-wide">
-                    {order.orderNumber}
-                  </p>
-                  <span
-                    className={cn(
-                      'rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase',
-                      DELIVERY_UI_STATUS_STYLE[order.status],
-                    )}
+          <>
+            {data.orders.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-[#7C7C7C]">
+                  Deliveries
+                </p>
+                {data.orders.map((order) => (
+                  <Link
+                    key={order.fulfilmentId}
+                    href={order.path}
+                    className="flex items-start gap-3 rounded-[12px] border border-[#E5EBE9] bg-white p-4 transition-colors hover:border-[#0F766E]/40"
+                    data-testid="delivery-boy-order-row"
                   >
-                    {DELIVERY_UI_STATUS_LABELS[order.status]}
-                  </span>
-                </div>
-                <p className="mt-1 text-[14px] font-bold">{order.customerName}</p>
-                {order.customerPhone && (
-                  <p className="mt-0.5 flex items-center gap-1 text-[12px] text-[#3D3D3D]">
-                    <Phone className="h-3 w-3 text-[#0F766E]" />
-                    {order.customerPhone}
-                  </p>
-                )}
-                {order.addressSummary && (
-                  <p className="mt-1 flex items-start gap-1 text-[12px] leading-snug text-[#7C7C7C]">
-                    <MapPin className="mt-0.5 h-3 w-3 shrink-0 text-[#0F766E]" />
-                    <span className="line-clamp-2">{order.addressSummary}</span>
-                  </p>
-                )}
-                {order.failedReason && (
-                  <p className="mt-1 text-[11px] font-semibold text-rose-700">
-                    {order.failedReason}
-                  </p>
-                )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-mono text-[14px] font-black tracking-wide">
+                          {order.orderNumber}
+                        </p>
+                        <span
+                          className={cn(
+                            'rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase',
+                            DELIVERY_UI_STATUS_STYLE[order.status],
+                          )}
+                        >
+                          {DELIVERY_UI_STATUS_LABELS[order.status]}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[14px] font-bold">{order.customerName}</p>
+                      {order.customerPhone && (
+                        <p className="mt-0.5 flex items-center gap-1 text-[12px] text-[#3D3D3D]">
+                          <Phone className="h-3 w-3 text-[#0F766E]" />
+                          {order.customerPhone}
+                        </p>
+                      )}
+                      {order.addressSummary && (
+                        <p className="mt-1 flex items-start gap-1 text-[12px] leading-snug text-[#7C7C7C]">
+                          <MapPin className="mt-0.5 h-3 w-3 shrink-0 text-[#0F766E]" />
+                          <span className="line-clamp-2">{order.addressSummary}</span>
+                        </p>
+                      )}
+                      {order.failedReason && (
+                        <p className="mt-1 text-[11px] font-semibold text-rose-700">
+                          {order.failedReason}
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-[#AEAEAE]" />
+                  </Link>
+                ))}
               </div>
-              <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-[#AEAEAE]" />
-            </Link>
-          ))
+            )}
+
+            {data.pickups.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-[#7C7C7C]">
+                  Return pickups
+                </p>
+                {data.pickups.map((pickup) => (
+                  <Link
+                    key={pickup.returnRequestId}
+                    href={pickup.path}
+                    className="flex items-start gap-3 rounded-[12px] border border-[#E5EBE9] bg-white p-4 transition-colors hover:border-[#B45309]/40"
+                    data-testid="delivery-boy-pickup-row"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-mono text-[14px] font-black tracking-wide">
+                          {pickup.orderNumber}
+                        </p>
+                        <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+                          <RotateCcw className="h-3 w-3" />
+                          Pickup
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[14px] font-bold">{pickup.customerName}</p>
+                      {pickup.customerPhone && (
+                        <p className="mt-0.5 flex items-center gap-1 text-[12px] text-[#3D3D3D]">
+                          <Phone className="h-3 w-3 text-[#B45309]" />
+                          {pickup.customerPhone}
+                        </p>
+                      )}
+                      {pickup.addressSummary && (
+                        <p className="mt-1 flex items-start gap-1 text-[12px] leading-snug text-[#7C7C7C]">
+                          <MapPin className="mt-0.5 h-3 w-3 shrink-0 text-[#B45309]" />
+                          <span className="line-clamp-2">{pickup.addressSummary}</span>
+                        </p>
+                      )}
+                    </div>
+                    <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-[#AEAEAE]" />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>

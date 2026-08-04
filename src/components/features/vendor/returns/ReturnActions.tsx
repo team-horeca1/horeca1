@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Archive,
   CheckCircle2,
@@ -16,6 +16,12 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toReturnUiStatus, type ReturnActionBody, type ReturnDisposition } from '@/modules/return/return.types';
+import {
+  DeliveryBoySelect,
+  deliveryBoyAssignFields,
+  isDeliveryBoySelectionReady,
+  type DeliveryBoySelection,
+} from '@/components/features/vendor/fulfillment/DeliveryBoySelect';
 import {
   RETURN_DISPOSITION_OPTIONS,
   copyText,
@@ -85,10 +91,7 @@ export function ReturnActions({ detail, busy, onAction }: Props) {
   const [decisionDraft, setDecisionDraft] = useState<DecisionDraft>(() =>
     buildDecisionDraft(detail.items),
   );
-  const [pickupAt, setPickupAt] = useState('');
-  const [pickupAddress, setPickupAddress] = useState(detail.pickupAddress ?? '');
-  const [deliveryBoyName, setDeliveryBoyName] = useState('');
-  const [deliveryBoyPhone, setDeliveryBoyPhone] = useState('');
+  const [boySelection, setBoySelection] = useState<DeliveryBoySelection>({ mode: 'none' });
   const [skipReason, setSkipReason] = useState('');
   const [linkCopied, setLinkCopied] = useState(false);
   const [showReceiveOverride, setShowReceiveOverride] = useState(false);
@@ -98,6 +101,10 @@ export function ReturnActions({ detail, busy, onAction }: Props) {
   const [dispositionDraft, setDispositionDraft] = useState<DispositionDraft>(() =>
     buildDispositionDraft(detail.items),
   );
+
+  const onBoyChange = useCallback((selection: DeliveryBoySelection) => {
+    setBoySelection(selection);
+  }, []);
   const [resolutionAmount, setResolutionAmount] = useState('');
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [approvedPath, setApprovedPath] = useState<ApprovedPath>(() =>
@@ -108,7 +115,6 @@ export function ReturnActions({ detail, busy, onAction }: Props) {
     Promise.resolve().then(() => {
       setDecisionDraft(buildDecisionDraft(detail.items));
       setDispositionDraft(buildDispositionDraft(detail.items));
-      setPickupAddress(detail.pickupAddress ?? '');
       setApprovedPath(detail.pickupSkippedAt ? 'credit_note' : 'choose');
       setShowReceiveOverride(false);
     });
@@ -148,9 +154,10 @@ export function ReturnActions({ detail, busy, onAction }: Props) {
         ui === 'received'));
 
   const copyPickupLink = async () => {
-    const path = detail.pickupLink?.path;
+    const portal = detail.boyPortal;
+    const path = portal?.path ?? detail.pickupLink?.path;
     if (!path) return;
-    const url = detail.pickupLink?.url || pickupLinkAbsoluteUrl(path);
+    const url = portal?.url || detail.pickupLink?.url || pickupLinkAbsoluteUrl(path);
     const ok = await copyText(url);
     if (ok) {
       setLinkCopied(true);
@@ -442,54 +449,30 @@ export function ReturnActions({ detail, busy, onAction }: Props) {
           </button>
           <div className="space-y-2 rounded-[10px] border border-[#EEEEEE] p-3">
             <p className="text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wide flex items-center gap-1">
-              <Truck size={12} /> Schedule pickup
+              <Truck size={12} /> Assign pickup
             </p>
-            <input
-              type="datetime-local"
-              value={pickupAt}
-              onChange={(e) => setPickupAt(e.target.value)}
-              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#B45309]/40"
+            <DeliveryBoySelect
+              disabled={busy}
+              accentClassName="focus:border-[#B45309]/40"
+              onChange={onBoyChange}
             />
-            <input
-              value={pickupAddress}
-              onChange={(e) => setPickupAddress(e.target.value)}
-              placeholder="Pickup address (optional)"
-              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none"
-            />
-            <div className="grid gap-2 sm:grid-cols-2">
-              <input
-                value={deliveryBoyName}
-                onChange={(e) => setDeliveryBoyName(e.target.value)}
-                placeholder="Delivery boy name (optional)"
-                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none"
-              />
-              <input
-                value={deliveryBoyPhone}
-                onChange={(e) => setDeliveryBoyPhone(e.target.value)}
-                placeholder="Boy phone (optional)"
-                inputMode="tel"
-                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none"
-              />
-            </div>
             <button
               type="button"
-              disabled={busy || !pickupAt}
+              disabled={busy || !isDeliveryBoySelectionReady(boySelection)}
               className={primary}
               onClick={() =>
                 onAction({
                   action: 'schedule_pickup',
-                  pickupAt: new Date(pickupAt).toISOString(),
-                  pickupAddress: pickupAddress.trim() || undefined,
-                  deliveryBoyName: deliveryBoyName.trim() || undefined,
-                  deliveryBoyPhone: deliveryBoyPhone.trim() || undefined,
+                  ...deliveryBoyAssignFields(boySelection),
                 })
               }
             >
               {busy ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
-              Schedule &amp; get magic link
+              Assign &amp; get magic link
             </button>
             <p className="text-[11px] text-[#AEAEAE]">
-              OTP is sent only when the boy taps Complete pickup on the link — not now.
+              Pickup appears on the boy&apos;s shared portal link. OTP is sent only when they
+              tap Complete pickup — not now.
             </p>
           </div>
         </div>
@@ -531,11 +514,12 @@ export function ReturnActions({ detail, busy, onAction }: Props) {
         </div>
       )}
 
-      {/* Pickup scheduled: magic link + resend; override tucked away */}
+      {/* Pickup scheduled: shared boy portal (+ per-pickup deep link) */}
       {showPickupLink && detail.pickupLink && (
         <div className="rounded-[10px] border border-[#B45309]/25 bg-[#B45309]/[0.04] p-3 space-y-2">
           <p className="text-[11px] font-bold text-[#B45309] uppercase tracking-wide flex items-center gap-1">
-            <Link2 size={12} /> Pickup magic link
+            <Link2 size={12} />{' '}
+            {detail.boyPortal ? 'Delivery boy portal' : 'Pickup magic link'}
           </p>
           {(detail.pickupLink.deliveryBoyName || detail.pickupLink.deliveryBoyPhone) && (
             <p className="text-[12px] text-[#7C7C7C]">
@@ -546,11 +530,17 @@ export function ReturnActions({ detail, busy, onAction }: Props) {
             </p>
           )}
           <p className="text-[12px] text-[#7C7C7C] break-all font-mono bg-white border border-[#EEEEEE] rounded-lg px-2 py-1.5">
-            {pickupLinkAbsoluteUrl(detail.pickupLink.path)}
+            {pickupLinkAbsoluteUrl(
+              (detail.boyPortal ?? detail.pickupLink).path,
+            )}
           </p>
           <div className="grid grid-cols-2 gap-2">
             <a
-              href={detail.pickupLink.url || pickupLinkAbsoluteUrl(detail.pickupLink.path)}
+              href={
+                detail.boyPortal?.url ||
+                detail.pickupLink.url ||
+                pickupLinkAbsoluteUrl((detail.boyPortal ?? detail.pickupLink).path)
+              }
               target="_blank"
               rel="noreferrer"
               className="h-[36px] rounded-[10px] border border-[#B45309]/30 bg-white text-[#B45309] text-[12px] font-bold hover:bg-[#B45309]/5 flex items-center justify-center gap-1.5 no-underline"
@@ -566,7 +556,9 @@ export function ReturnActions({ detail, busy, onAction }: Props) {
             </button>
           </div>
           <p className="text-[11px] text-[#AEAEAE]">
-            Boy opens the link and taps Complete pickup — that sends the customer OTP.
+            {detail.boyPortal
+              ? 'Boy opens the portal to see deliveries and this pickup together. Completing pickup sends the customer OTP.'
+              : 'Boy opens the link and taps Complete pickup — that sends the customer OTP.'}
           </p>
           {detail.pickupLink.usedAt && (
             <p className="text-[11px] text-emerald-700 font-semibold">

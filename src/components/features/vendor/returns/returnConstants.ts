@@ -125,6 +125,13 @@ export type ReturnPickupLink = {
   deliveryBoyPhone: string | null;
 };
 
+export type ReturnBoyPortal = {
+  path: string;
+  url: string;
+  expiresAt: string;
+  token: string;
+};
+
 export type ReturnListRow = {
   id: string;
   status: ReturnStatus;
@@ -219,6 +226,7 @@ export type ReturnDetail = Omit<ReturnListRow, 'items'> & {
   pickupSkipReason?: string | null;
   hasPickupOtp?: boolean;
   pickupLink?: ReturnPickupLink | null;
+  boyPortal?: ReturnBoyPortal | null;
   items: ReturnItemRow[];
   events: ReturnEventRow[];
   inspection: ReturnInspectionRow;

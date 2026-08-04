@@ -14,6 +14,12 @@ import { FulfilmentTable } from './FulfilmentTable';
 import { FulfilmentDetailDrawer } from './FulfilmentDetailDrawer';
 import { DeliveryBoysPanel } from './DeliveryBoysPanel';
 import {
+  DeliveryBoySelect,
+  deliveryBoyAssignFields,
+  isDeliveryBoySelectionReady,
+  type DeliveryBoySelection,
+} from './DeliveryBoySelect';
+import {
   canBulkAssign,
   FULFILMENT_STATUS_CHIPS,
   PAYMENT_METHOD_OPTIONS,
@@ -60,8 +66,11 @@ export function FulfilmentWorkspace() {
 
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [boyName, setBoyName] = useState('');
-  const [boyPhone, setBoyPhone] = useState('');
+  const [boySelection, setBoySelection] = useState<DeliveryBoySelection>({ mode: 'none' });
+
+  const onBoyChange = useCallback((selection: DeliveryBoySelection) => {
+    setBoySelection(selection);
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -205,8 +214,8 @@ export function FulfilmentWorkspace() {
   const runBulkAssign = async () => {
     const ids = [...selectedIds];
     if (ids.length === 0) return;
-    if (!boyName.trim() || boyPhone.trim().length < 8) {
-      toast.error('Enter delivery boy name and phone');
+    if (!isDeliveryBoySelectionReady(boySelection)) {
+      toast.error('Select a delivery boy');
       return;
     }
     setBulkBusy(true);
@@ -217,8 +226,7 @@ export function FulfilmentWorkspace() {
         body: JSON.stringify({
           action: 'assign_and_dispatch',
           fulfilmentIds: ids,
-          deliveryBoyName: boyName.trim(),
-          deliveryBoyPhone: boyPhone.trim(),
+          ...deliveryBoyAssignFields(boySelection),
         }),
       });
       const json = await res.json();
@@ -238,8 +246,7 @@ export function FulfilmentWorkspace() {
         toast.warning(`${okCount} dispatched, ${failCount} failed`);
       }
       setBulkOpen(false);
-      setBoyName('');
-      setBoyPhone('');
+      setBoySelection({ mode: 'none' });
       setSelectedIds(new Set());
       await load();
     } catch (e) {
@@ -379,22 +386,11 @@ export function FulfilmentWorkspace() {
           </div>
 
           {bulkOpen && (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              <input
-                value={boyName}
-                onChange={(e) => setBoyName(e.target.value)}
-                placeholder="Delivery boy name"
-                className="h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#0F766E]/40"
-              />
-              <input
-                value={boyPhone}
-                onChange={(e) => setBoyPhone(e.target.value)}
-                placeholder="Phone number"
-                className="h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#0F766E]/40"
-              />
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-[minmax(0,1fr)_auto]">
+              <DeliveryBoySelect disabled={bulkBusy} onChange={onBoyChange} />
               <button
                 type="button"
-                disabled={bulkBusy || !boyName.trim() || boyPhone.trim().length < 8}
+                disabled={bulkBusy || !isDeliveryBoySelectionReady(boySelection)}
                 onClick={() => void runBulkAssign()}
                 className="h-[40px] px-4 rounded-[10px] bg-[#0F766E] text-white text-[13px] font-bold hover:bg-[#0D9488] disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
