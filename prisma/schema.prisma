@@ -1774,6 +1774,8 @@ model ReturnRequest {
   pickupAt           DateTime? @map("pickup_at") @db.Timestamptz
   pickupAddress      String?   @map("pickup_address") @db.Text
   pickupNotes        String?   @map("pickup_notes") @db.Text
+  // Assigned delivery boy for return pickup (same roster as fulfilment dispatch).
+  deliveryResourceId String?   @map("delivery_resource_id") @db.Uuid
   // Return pickup OTP — same pattern as Order.deliveryOtp (SMS to customer, boy verifies via /r/).
   pickupOtp           String?   @map("pickup_otp") @db.VarChar(6)
   pickupOtpExpiresAt  DateTime? @map("pickup_otp_expires_at") @db.Timestamptz
@@ -1789,6 +1791,7 @@ model ReturnRequest {
   order            Order              @relation(fields: [orderId], references: [id])
   customer         User               @relation("CustomerReturnRequests", fields: [customerId], references: [id])
   replacementOrder Order?             @relation("ReturnReplacementOrder", fields: [replacementOrderId], references: [id], onDelete: SetNull)
+  deliveryResource DeliveryResource?  @relation(fields: [deliveryResourceId], references: [id], onDelete: SetNull)
   items            ReturnItem[]
   events           ReturnEvent[]
   inspection       ReturnInspection?
@@ -1799,6 +1802,7 @@ model ReturnRequest {
   @@index([status])
   @@index([type])
   @@index([replacementOrderId])
+  @@index([deliveryResourceId])
   @@index([createdAt(sort: Desc)])
   @@map("return_requests")
 }
@@ -2777,6 +2781,7 @@ model DeliveryResource {
   vendor      Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   fulfilments Fulfilment[]
   dispatches  Dispatch[]
+  returnRequests ReturnRequest[]
   boyAccessTokens DeliveryBoyAccessToken[]
 
   @@index([vendorId])
