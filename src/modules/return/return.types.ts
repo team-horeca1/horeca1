@@ -321,11 +321,12 @@ export type ReturnActionBody =
     }
   | {
       action: 'schedule_pickup';
-      pickupAt: string;
-      pickupAddress?: string;
-      notes?: string;
+      /** Prefer selecting an existing roster boy. */
+      deliveryResourceId?: string;
+      /** Required when creating a new boy (no deliveryResourceId). */
       deliveryBoyName?: string;
       deliveryBoyPhone?: string;
+      notes?: string;
     }
   | {
       action: 'skip_pickup';

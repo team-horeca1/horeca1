@@ -20,6 +20,11 @@ import {
   returnPickupLinkService,
 } from '@/modules/return/return-pickup-link.service';
 import {
+  deliveryBoyLinkAbsoluteUrl,
+  deliveryBoyLinkPath,
+  deliveryLinkService,
+} from '@/modules/fulfillment/delivery-link.service';
+import {
   RETURN_DISPOSITIONS,
   RETURN_EVENT_ACTIONS,
   dbStatusesForReturnUi,
@@ -338,6 +343,26 @@ async function toVendorReturnDetail<T extends Record<string, unknown>>(row: T) {
 
   const id = typeof rest.id === 'string' ? rest.id : null;
   const activeToken = id ? await returnPickupLinkService.getActiveTokenForReturn(id) : null;
+  const deliveryResourceId =
+    typeof rest.deliveryResourceId === 'string' ? rest.deliveryResourceId : null;
+
+  let boyPortal: {
+    path: string;
+    url: string;
+    expiresAt: string;
+    token: string;
+  } | null = null;
+  if (deliveryResourceId) {
+    const activeBoy = await deliveryLinkService.getActiveBoyTokenForResource(deliveryResourceId);
+    if (activeBoy) {
+      boyPortal = {
+        path: deliveryBoyLinkPath(activeBoy.token),
+        url: deliveryBoyLinkAbsoluteUrl(activeBoy.token),
+        expiresAt: activeBoy.expiresAt.toISOString(),
+        token: activeBoy.token,
+      };
+    }
+  }
 
   return {
     ...rest,
@@ -353,12 +378,13 @@ async function toVendorReturnDetail<T extends Record<string, unknown>>(row: T) {
           deliveryBoyPhone: activeToken.deliveryBoyPhone,
         }
       : null,
+    boyPortal,
   };
 }
 
 /**
- * Credit H1 prepaid Wallet for a CN (Rule 1C). Idempotent on returnId.
- * DiSCCO repayment is applied separately when outstanding exists.
+ * Credit H1 prepaid Wallet for a CN. Idempotent on returnId.
+ * Simple wallet only — DiSCCO pay-later is not touched here.
  */
 async function creditPrepaidWalletForCreditNote(
   db: Db,
@@ -572,17 +598,33 @@ export async function vendorReviewReturn(
   });
 
   if (input.status === 'approved') {
-    const wallet = await prisma.creditWallet.findFirst({
-      where: { userId: returnReq.order.userId, vendorId },
-    });
-    if (wallet && Number(wallet.outstandingAmount) > 0) {
-      if (
-        resolutionType === 'refund' &&
-        input.refundAmount &&
-        input.refundAmount > 0 &&
-        returnReq.order.paymentMethod &&
-        CREDIT_METHODS.includes(returnReq.order.paymentMethod)
-      ) {
+    if (
+      resolutionType === 'credit_note' &&
+      input.creditNoteAmount &&
+      input.creditNoteAmount > 0
+    ) {
+      const cnNumber =
+        typeof resolutionData.creditNoteNumber === 'string'
+          ? resolutionData.creditNoteNumber
+          : `CN-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+      await creditPrepaidWalletForCreditNote(prisma, {
+        userId: returnReq.order.userId,
+        returnId,
+        amount: input.creditNoteAmount,
+        creditNoteNumber: cnNumber,
+      });
+    } else if (
+      resolutionType === 'refund' &&
+      input.refundAmount &&
+      input.refundAmount > 0 &&
+      returnReq.order.paymentMethod &&
+      CREDIT_METHODS.includes(returnReq.order.paymentMethod)
+    ) {
+      // Legacy refund on DiSCCO credit orders only — CN path uses H1 wallet above.
+      const wallet = await prisma.creditWallet.findFirst({
+        where: { userId: returnReq.order.userId, vendorId },
+      });
+      if (wallet && Number(wallet.outstandingAmount) > 0) {
         const refund = Math.min(input.refundAmount, Number(wallet.outstandingAmount));
         await creditWalletService.applyRepayment(
           wallet.id,
@@ -591,20 +633,6 @@ export async function vendorReviewReturn(
           undefined,
           undefined,
           `Return approved — credit reversal ₹${refund.toFixed(2)}`,
-        );
-      } else if (
-        resolutionType === 'credit_note' &&
-        input.creditNoteAmount &&
-        input.creditNoteAmount > 0
-      ) {
-        const cnAmount = Math.min(input.creditNoteAmount, Number(wallet.outstandingAmount));
-        await creditWalletService.applyRepayment(
-          wallet.id,
-          cnAmount,
-          'CREDIT_NOTE',
-          undefined,
-          undefined,
-          `Credit note on return ${returnId}`,
         );
       }
     }
@@ -1506,16 +1534,17 @@ export class ReturnService {
   ) {
     const ret = await this.loadForVendor(vendorId, returnId);
     assertStatus(ret.status, ['approved'], 'schedule_pickup');
-    const pickupAt = new Date(body.pickupAt);
-    if (Number.isNaN(pickupAt.getTime())) throw Errors.badRequest('Invalid pickupAt');
 
     const link = await prisma.$transaction(async (tx) => {
+      const resource = await this.resolveReturnDeliveryBoy(tx, vendorId, body);
+      const pickupAt = new Date();
+
       await tx.returnRequest.update({
         where: { id: returnId },
         data: {
           status: 'pickup_scheduled',
           pickupAt,
-          pickupAddress: body.pickupAddress?.trim() || ret.pickupAddress,
+          deliveryResourceId: resource.id,
           pickupNotes: body.notes?.trim() || ret.pickupNotes,
           // Starting physical pickup clears any prior skip-pickup audit.
           pickupSkippedAt: null,
@@ -1525,8 +1554,13 @@ export class ReturnService {
 
       const tokenRow = await returnPickupLinkService.createToken(tx, {
         returnRequestId: returnId,
-        deliveryBoyName: body.deliveryBoyName,
-        deliveryBoyPhone: body.deliveryBoyPhone,
+        deliveryBoyName: resource.name,
+        deliveryBoyPhone: resource.phone,
+      });
+
+      const boyPortal = await deliveryLinkService.ensureBoyToken(tx, {
+        vendorId,
+        deliveryResourceId: resource.id,
       });
 
       await appendReturnEvent(tx, {
@@ -1537,11 +1571,12 @@ export class ReturnService {
         toStatus: 'pickup_scheduled',
         payload: {
           pickupAt: pickupAt.toISOString(),
-          pickupAddress: body.pickupAddress ?? null,
           notes: body.notes ?? null,
-          deliveryBoyName: body.deliveryBoyName ?? null,
-          deliveryBoyPhone: body.deliveryBoyPhone ?? null,
+          deliveryResourceId: resource.id,
+          deliveryBoyName: resource.name,
+          deliveryBoyPhone: resource.phone,
           pickupLinkPath: tokenRow.path,
+          boyPortalPath: boyPortal.path,
         },
       });
 
@@ -1550,6 +1585,14 @@ export class ReturnService {
         url: tokenRow.url,
         expiresAt: tokenRow.expiresAt,
         token: tokenRow.token,
+        deliveryBoyName: resource.name,
+        deliveryBoyPhone: resource.phone,
+        boyPortal: {
+          path: boyPortal.path,
+          url: boyPortal.url,
+          expiresAt: boyPortal.expiresAt,
+          token: boyPortal.token,
+        },
       };
     });
 
@@ -1564,10 +1607,69 @@ export class ReturnService {
         url: link.url,
         expiresAt: link.expiresAt.toISOString(),
         usedAt: null,
-        deliveryBoyName: body.deliveryBoyName ?? null,
-        deliveryBoyPhone: body.deliveryBoyPhone ?? null,
+        deliveryBoyName: link.deliveryBoyName,
+        deliveryBoyPhone: link.deliveryBoyPhone,
+      },
+      boyPortal: {
+        path: link.boyPortal.path,
+        url: link.boyPortal.url,
+        expiresAt: link.boyPortal.expiresAt.toISOString(),
+        token: link.boyPortal.token,
       },
     };
+  }
+
+  /** Load owned active DeliveryResource, or find-or-create by name + phone. */
+  private async resolveReturnDeliveryBoy(
+    tx: Prisma.TransactionClient,
+    vendorId: string,
+    input: {
+      deliveryResourceId?: string;
+      deliveryBoyName?: string;
+      deliveryBoyPhone?: string;
+    },
+  ) {
+    if (input.deliveryResourceId) {
+      const existing = await tx.deliveryResource.findFirst({
+        where: {
+          id: input.deliveryResourceId,
+          vendorId,
+          isActive: true,
+        },
+      });
+      if (!existing) throw Errors.notFound('Delivery boy');
+      return existing;
+    }
+
+    const trimmedName = (input.deliveryBoyName ?? '').trim();
+    const trimmedPhone = (input.deliveryBoyPhone ?? '').trim();
+    if (!trimmedName || trimmedPhone.length < 8) {
+      throw Errors.badRequest('Delivery boy name and phone are required');
+    }
+
+    const byPhone = await tx.deliveryResource.findFirst({
+      where: { vendorId, phone: trimmedPhone, isActive: true },
+    });
+    if (byPhone) {
+      if (byPhone.name !== trimmedName) {
+        return tx.deliveryResource.update({
+          where: { id: byPhone.id },
+          data: { name: trimmedName },
+        });
+      }
+      return byPhone;
+    }
+
+    return tx.deliveryResource.create({
+      data: {
+        id: randomUUID(),
+        vendorId,
+        type: 'executive',
+        name: trimmedName,
+        phone: trimmedPhone,
+        isActive: true,
+      },
+    });
   }
 
   private async skipPickup(
@@ -1974,28 +2076,11 @@ export class ReturnService {
           amount,
           notes: body.notes ?? null,
           walletCredited: true,
+          h1WalletCredited: true,
           pickupSkipped: skipped,
         },
       });
     });
-
-    // DiSCCO outstanding reduction (Rule 1C) — after prepaid wallet credit.
-    const wallet = await prisma.creditWallet.findFirst({
-      where: { userId: ret.order.userId, vendorId },
-    });
-    if (wallet && Number(wallet.outstandingAmount) > 0) {
-      const applyAmt = Math.min(amount, Number(wallet.outstandingAmount));
-      if (applyAmt > 0) {
-        await creditWalletService.applyRepayment(
-          wallet.id,
-          applyAmt,
-          'CREDIT_NOTE',
-          undefined,
-          undefined,
-          `Credit note ${creditNoteNumber} on return ${returnId}`,
-        );
-      }
-    }
 
     return this.getById(vendorId, returnId);
   }

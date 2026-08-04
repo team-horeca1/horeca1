@@ -95,14 +95,37 @@ const activeReturnActionSchema = z.discriminatedUnion('action', [
         });
       }
     }),
-  z.object({
-    action: z.literal('schedule_pickup'),
-    pickupAt: z.string().datetime(),
-    pickupAddress: z.string().max(1000).optional(),
-    notes: z.string().max(1000).optional(),
-    deliveryBoyName: z.string().trim().max(150).optional(),
-    deliveryBoyPhone: z.string().trim().max(20).optional(),
-  }),
+  z
+    .object({
+      action: z.literal('schedule_pickup'),
+      deliveryResourceId: z.string().uuid().optional(),
+      deliveryBoyName: z.string().trim().min(1).max(150).optional(),
+      deliveryBoyPhone: z
+        .string()
+        .trim()
+        .min(8)
+        .max(20)
+        .regex(/^[+\d][\d\s\-()]{7,19}$/, 'Enter a valid phone number')
+        .optional(),
+      notes: z.string().max(1000).optional(),
+    })
+    .superRefine((val, ctx) => {
+      if (val.deliveryResourceId) return;
+      if (!val.deliveryBoyName?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Select a delivery boy or enter a name',
+          path: ['deliveryBoyName'],
+        });
+      }
+      if (!val.deliveryBoyPhone?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Phone is required for a new delivery boy',
+          path: ['deliveryBoyPhone'],
+        });
+      }
+    }),
   z.object({
     action: z.literal('skip_pickup'),
     reason: z.string().trim().min(10).max(1000),
