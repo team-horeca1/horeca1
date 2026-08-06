@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { FileClaimModal } from '@/components/features/vendor/FileClaimModal';
 import { CancelRequestBanner } from '@/components/features/vendor/orders/CancelRequestBanner';
 import { LinkedWorkspacesCard } from '@/components/features/vendor/orders/LinkedWorkspacesCard';
 
@@ -830,7 +829,6 @@ export default function VendorOrderDetailPage() {
     const [fulfilledQtys, setFulfilledQtys] = useState<Record<string, number>>({});
     const [ewayBill, setEwayBill] = useState('');
     const [ewaySaving, setEwaySaving] = useState(false);
-    const [showClaimModal, setShowClaimModal] = useState(false);
     const [itemsExpanded, setItemsExpanded] = useState(true);
     const [creatingPicklist, setCreatingPicklist] = useState(false);
     const [printingPicklist, setPrintingPicklist] = useState(false);
@@ -1063,7 +1061,6 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
         'ready_for_dispatch',
         'partially_delivered',
     ].includes(order.status);
-    const canFileClaim = ['delivered', 'partially_delivered'].includes(order.status);
     const canCreatePicklist = ['confirmed', 'processing', 'ready_for_dispatch', 'shipped'].includes(order.status);
 
     return (
@@ -1117,26 +1114,8 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                             Print Picklist
                         </button>
                     )}
-                    {canFileClaim && (
-                        <button
-                            type="button"
-                            onClick={() => setShowClaimModal(true)}
-                            className="h-[34px] px-4 rounded-[10px] bg-[#181725] text-white text-[13px] font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-                        >
-                            <FileText size={15} />
-                            File claim
-                        </button>
-                    )}
                 </div>
             </div>
-
-            <FileClaimModal
-                open={showClaimModal}
-                onClose={() => setShowClaimModal(false)}
-                orderId={order.id}
-                orderNumber={order.orderNumber}
-                onCreated={() => router.push('/vendor/claims')}
-            />
 
             {/* Print picklist — only rendered in DOM for confirmed/processing/shipped so
                 the @media print style tag is present when the user prints */}

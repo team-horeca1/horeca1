@@ -18,13 +18,11 @@ import {
   RotateCcw,
   CreditCard,
   Gift,
-  FileWarning,
   Warehouse,
   GitMerge,
   Bell,
   Building2,
   UserCircle,
-  ShieldAlert,
   ScrollText,
   Truck,
 } from 'lucide-react';
@@ -53,7 +51,6 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
       { name: 'Dashboard', icon: LayoutDashboard, href: '/admin/dashboard', feature: 'dashboard', requiredPerm: 'dashboard.view' },
       { name: 'Orders', icon: ShoppingBag, href: '/admin/orders', feature: 'orders', requiredPerm: 'orders.view' },
       { name: 'Returns', icon: RotateCcw, href: '/admin/returns', feature: 'orders', requiredPerm: 'orders.view' },
-      { name: 'Claims', icon: FileWarning, href: '/admin/claims', feature: 'orders', requiredPerm: 'orders.view' },
       { name: 'Approvals', icon: CheckSquare, href: '/admin/approvals', feature: 'vendors', requiredPerm: ['vendors.approve', 'brands.approve', 'products.approve'] },
     ],
   },
@@ -125,7 +122,6 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
       // Hidden for now — Delivery workspace is the primary outbound UX
       // { name: 'Warehouse', icon: Container, href: '/vendor/warehouse', feature: 'grn', requiredPerm: 'inventory.view' },
       { name: 'Returns', icon: RotateCcw, href: '/vendor/returns', feature: 'returns', requiredPerm: 'returns.view' },
-      { name: 'Claims', icon: ShieldAlert, href: '/vendor/claims', feature: 'claims', requiredPerm: 'claims.view' },
     ],
   },
   {

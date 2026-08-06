@@ -17,7 +17,6 @@ export const STORE_OPS_PREFIXES = [
   '/vendor/inventory',
   '/vendor/warehouse',
   '/vendor/returns',
-  '/vendor/claims',
   '/vendor/brand-mappings',
   '/vendor/price-lists',
   '/vendor/promotions',

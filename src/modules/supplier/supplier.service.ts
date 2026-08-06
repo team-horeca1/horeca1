@@ -726,7 +726,6 @@ async function purgeOnlineStoreInTx(
   await tx.commissionRule.deleteMany({ where: { vendorId } });
   await tx.commissionAccrual.deleteMany({ where: { vendorId } });
   await tx.priceList.deleteMany({ where: { vendorId } });
-  await tx.vendorClaim.deleteMany({ where: { vendorId } });
   await tx.picklist.deleteMany({ where: { vendorId } });
   await tx.dispatch.deleteMany({ where: { vendorId } });
   await tx.goodsReceipt.deleteMany({ where: { vendorId } });

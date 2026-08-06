@@ -18,7 +18,6 @@ export const MODULES = {
   brandStore:     ['view', 'edit'],
   orders:         ['view', 'create', 'edit', 'delete', 'approve'],
   returns:        ['view', 'create', 'edit', 'delete', 'approve'],
-  claims:         ['view', 'create', 'edit', 'approve'],
   repeatOrders:   ['view', 'create', 'edit'],
   inventory:      ['view', 'create', 'edit', 'delete'],
   grn:            ['view', 'create', 'edit'],

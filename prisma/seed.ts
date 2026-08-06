@@ -12,7 +12,7 @@ const prisma = new PrismaClient({ adapter });
 type PermissionsJson = Record<string, Record<string, boolean>>;
 
 const ACCOUNT_MODULES = ['dashboard', 'orders', 'repeatOrders', 'payments', 'creditLine', 'users', 'outlets', 'settings', 'storefront'] as const;
-const VENDOR_MODULES = ['dashboard', 'products', 'brandMappings', 'priceLists', 'orders', 'returns', 'claims', 'inventory', 'grn', 'dispatch', 'deliveries', 'wallet', 'ledger', 'creditLine', 'customers', 'users', 'outlets', 'analytics', 'promotions', 'salespersons', 'commissions', 'notifications', 'settings'] as const;
+const VENDOR_MODULES = ['dashboard', 'products', 'brandMappings', 'priceLists', 'orders', 'returns', 'inventory', 'grn', 'dispatch', 'deliveries', 'wallet', 'ledger', 'creditLine', 'customers', 'users', 'outlets', 'analytics', 'promotions', 'salespersons', 'commissions', 'notifications', 'settings'] as const;
 const BRAND_MODULES = ['dashboard', 'products', 'vendors', 'analytics', 'users', 'settings'] as const;
 const ADMIN_MODULES = ['dashboard', 'orders', 'customers', 'vendors', 'brands', 'products', 'payments', 'promotions', 'analytics', 'users', 'auditLogs', 'settings'] as const;
 
@@ -20,7 +20,7 @@ const MODULE_ACTIONS: Record<string, readonly string[]> = {
   dashboard: ['view'], products: ['view', 'create', 'edit', 'delete', 'approve'],
   brandMappings: ['view', 'create', 'edit', 'delete'], priceLists: ['view', 'create', 'edit', 'delete'],
   orders: ['view', 'create', 'edit', 'delete', 'approve'], returns: ['view', 'create', 'edit', 'delete', 'approve'],
-  claims: ['view', 'create', 'edit', 'approve'], repeatOrders: ['view', 'create', 'edit'],
+  repeatOrders: ['view', 'create', 'edit'],
   inventory: ['view', 'create', 'edit', 'delete'], grn: ['view', 'create', 'edit'],
   dispatch: ['view', 'create', 'edit'], deliveries: ['view', 'edit', 'approve'],
   payments: ['view', 'create', 'approve'], wallet: ['view', 'create', 'approve'], ledger: ['view'],
@@ -63,7 +63,7 @@ const SEED_TEMPLATES: Array<{ name: string; scope: 'account' | 'vendor' | 'brand
   { name: 'Viewer', scope: 'account', description: 'Read-only across account modules', permissions: viewOnly(ACCOUNT_MODULES) },
   { name: 'Vendor Admin', scope: 'vendor', description: 'Full vendor portal access', permissions: allScopePermissions(VENDOR_MODULES) },
   { name: 'Sales Rep', scope: 'vendor', description: 'Customer-facing sales', permissions: perms({ dashboard: ['view'], orders: ['view','create','edit'], customers: ['view','create','edit'], products: ['view'], inventory: ['view'], promotions: ['view','create','edit'], salespersons: ['view'], commissions: ['view'] }) },
-  { name: 'Order Manager', scope: 'vendor', description: 'Order processing + dispatch', permissions: perms({ dashboard: ['view'], orders: ['view','edit','approve'], returns: ['view','edit','approve'], claims: ['view','create','edit'], dispatch: ['view','create','edit'], deliveries: ['view','edit'], grn: ['view'], inventory: ['view'] }) },
+  { name: 'Order Manager', scope: 'vendor', description: 'Order processing + dispatch', permissions: perms({ dashboard: ['view'], orders: ['view','edit','approve'], returns: ['view','edit','approve'], dispatch: ['view','create','edit'], deliveries: ['view','edit'], grn: ['view'], inventory: ['view'] }) },
   { name: 'Warehouse Manager', scope: 'vendor', description: 'Inventory + GRN', permissions: perms({ inventory: ['view','create','edit','delete'], grn: ['view','create','edit'], dispatch: ['view','create'], products: ['view'] }) },
   { name: 'Finance Executive', scope: 'vendor', description: 'Payments + ledgers', permissions: perms({ dashboard: ['view'], wallet: ['view','create','approve'], ledger: ['view'], creditLine: ['view','approve'], orders: ['view'], analytics: ['view'] }) },
   { name: 'Brand Admin', scope: 'brand', description: 'Full brand portal access', permissions: allScopePermissions(BRAND_MODULES) },

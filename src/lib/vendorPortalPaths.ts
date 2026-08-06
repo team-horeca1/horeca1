@@ -19,7 +19,7 @@ const VENDOR_PORTAL_SEGMENTS = new Set([
   'credit',
   'collections',
   'returns',
-  'claims',
+  'delivery',
   'customers',
   'customer-groups',
   'price-lists',

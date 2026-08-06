@@ -256,7 +256,6 @@ model Vendor {
   customerGroups     CustomerGroup[]
   combos             ProductCombo[]
   brandAuthorizations BrandAuthorizedDistributor[]
-  vendorClaims        VendorClaim[]
   picklists           Picklist[]
   dispatches          Dispatch[]
   goodsReceipts       GoodsReceipt[]
@@ -883,7 +882,6 @@ model Order {
   returnRequests ReturnRequest[]
   replacementReturns ReturnRequest[] @relation("ReturnReplacementOrder")
   commissionAccruals CommissionAccrual[]
-  vendorClaims       VendorClaim[]
   picklists          Picklist[]
   dispatches         Dispatch[]
   events             OrderEvent[]
@@ -2623,44 +2621,6 @@ model InventoryLog {
   @@index([inventoryId])
   @@index([vendorId])
   @@map("inventory_logs")
-}
-
-enum VendorClaimType {
-  shortage
-  damage
-  quality
-  expiry
-
-  @@map("vendor_claim_type")
-}
-
-enum VendorClaimStatus {
-  pending
-  approved
-  rejected
-  resolved
-
-  @@map("vendor_claim_status")
-}
-
-model VendorClaim {
-  id          String            @id @default(uuid()) @db.Uuid
-  vendorId    String            @map("vendor_id") @db.Uuid
-  orderId     String            @map("order_id") @db.Uuid
-  type        VendorClaimType
-  status      VendorClaimStatus @default(pending)
-  amount      Decimal?          @db.Decimal(12, 2)
-  notes       String?           @db.Text
-  createdBy   String?           @map("created_by") @db.Uuid
-  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([vendorId])
-  @@index([orderId])
-  @@map("vendor_claims")
 }
 
 enum PicklistStatus {

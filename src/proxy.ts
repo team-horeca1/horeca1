@@ -11,7 +11,7 @@ const CUSTOMER_PROTECTED_PREFIXES = [
 ];
 
 const VENDOR_PORTAL_SEGMENTS = new Set([
-  'dashboard', 'orders', 'products', 'inventory', 'warehouse', 'returns', 'claims',
+  'dashboard', 'orders', 'products', 'inventory', 'warehouse', 'returns', 'delivery',
   'brand-mappings', 'price-lists', 'promotions', 'customers', 'sales-team', 'credit',
   'wallet', 'ledger', 'reports', 'notifications', 'account', 'team', 'outlets', 'settings',
   'collections', 'customer-groups', 'setup', 'businesses', 'overview', 'all-orders',

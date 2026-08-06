@@ -384,53 +384,6 @@ async function seedReturns(adminId: string) {
   }
 }
 
-async function seedClaims() {
-  const beverage = await getVendorByEmail('sales@beverageco.in');
-  const taj = await getCustomerContext('chef@tajpalace.com');
-
-  const c1Order = await ensureDeliveredOrder({
-    orderNumber: 'SEED-FIN-C1',
-    customerEmail: 'chef@tajpalace.com',
-    vendorEmail: 'sales@beverageco.in',
-    paymentMethod: 'cod',
-  });
-  if (!(await prisma.vendorClaim.findFirst({ where: { orderId: c1Order.id, status: 'pending' } }))) {
-    await prisma.vendorClaim.create({
-      data: {
-        vendorId: beverage.id,
-        orderId: c1Order.id,
-        type: 'damage',
-        status: 'pending',
-        amount: 350,
-        notes: 'Demo pending delivery dispute',
-        createdBy: taj.userId,
-      },
-    });
-    console.log('  ✓ Vendor claim pending (SEED-FIN-C1)');
-  }
-
-  const c2Order = await ensureDeliveredOrder({
-    orderNumber: 'SEED-FIN-C2',
-    customerEmail: 'owner@greenleafcafe.com',
-    vendorEmail: 'sales@beverageco.in',
-    paymentMethod: 'cod',
-  });
-  if (!(await prisma.vendorClaim.findFirst({ where: { orderId: c2Order.id, status: 'approved' } }))) {
-    await prisma.vendorClaim.create({
-      data: {
-        vendorId: beverage.id,
-        orderId: c2Order.id,
-        type: 'shortage',
-        status: 'approved',
-        amount: 480,
-        notes: 'Demo approved claim',
-        createdBy: c2Order.userId,
-      },
-    });
-    console.log('  ✓ Vendor claim approved (SEED-FIN-C2)');
-  }
-}
-
 async function seedPendingPayment() {
   const existing = await prisma.order.findUnique({ where: { orderNumber: 'SEED-FIN-PAY-PEND' } });
   if (existing) {
@@ -510,9 +463,8 @@ async function main() {
     paymentMethod: 'cod',
   });
 
-  console.log('\nReturns & claims:');
+  console.log('\nReturns:');
   await seedReturns(admin.id);
-  await seedClaims();
 
   console.log('\nPayments & settlements:');
   await seedPendingPayment();

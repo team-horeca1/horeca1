@@ -22,7 +22,7 @@ export type RoleScope = 'account' | 'vendor' | 'brand' | 'admin' | 'delivery';
 
 export type Module =
   | 'dashboard' | 'products' | 'brandMappings' | 'priceLists' | 'brandStore'
-  | 'orders' | 'returns' | 'claims' | 'repeatOrders'
+  | 'orders' | 'returns' | 'repeatOrders'
   | 'inventory' | 'grn' | 'dispatch' | 'deliveries'
   | 'payments' | 'wallet' | 'ledger' | 'creditLine'
   | 'customers' | 'vendors' | 'brands' | 'users' | 'outlets' | 'analytics'
@@ -38,7 +38,6 @@ const MODULE_ACTIONS: Record<Module, readonly string[]> = {
   brandStore:    ['view', 'edit'],
   orders:        ['view', 'create', 'edit', 'delete', 'approve'],
   returns:       ['view', 'create', 'edit', 'delete', 'approve'],
-  claims:        ['view', 'create', 'edit', 'approve'],
   repeatOrders:  ['view', 'create', 'edit'],
   inventory:     ['view', 'create', 'edit', 'delete'],
   grn:           ['view', 'create', 'edit'],
@@ -110,7 +109,6 @@ const VENDOR_FEATURES: PortalFeatureMap = {
   priceLists:    { label: 'Price Lists', actions: MODULE_ACTIONS.priceLists, routes: ['/vendor/price-lists'] },
   orders:        { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/vendor/orders', '/vendor/all-orders'] },
   returns:       { label: 'Returns', actions: MODULE_ACTIONS.returns, routes: ['/vendor/returns'] },
-  claims:        { label: 'Claims', actions: MODULE_ACTIONS.claims, routes: ['/vendor/claims'] },
   inventory:     { label: 'Inventory', actions: MODULE_ACTIONS.inventory, routes: ['/vendor/inventory'] },
   grn:           { label: 'Warehouse', actions: MODULE_ACTIONS.grn, routes: ['/vendor/warehouse'] },
   dispatch:      { label: 'Dispatch', actions: MODULE_ACTIONS.dispatch, routes: ['/vendor/warehouse'] },
@@ -144,7 +142,7 @@ const BRAND_FEATURES: PortalFeatureMap = {
 
 const ADMIN_FEATURES: PortalFeatureMap = {
   dashboard:  { label: 'Dashboard', actions: MODULE_ACTIONS.dashboard, routes: ['/admin/dashboard'] },
-  orders:     { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/admin/orders', '/admin/returns', '/admin/claims'] },
+  orders:     { label: 'Orders', actions: MODULE_ACTIONS.orders, routes: ['/admin/orders', '/admin/returns'] },
   customers:  { label: 'Customers', actions: MODULE_ACTIONS.customers, routes: ['/admin/customers'] },
   vendors:    { label: 'Suppliers', actions: MODULE_ACTIONS.vendors, routes: ['/admin/vendors', '/admin/approvals'] },
   brands:     { label: 'Brands', actions: MODULE_ACTIONS.brands, routes: ['/admin/brands', '/admin/approvals'] },
