@@ -29,6 +29,14 @@ pull_image() {
   if docker pull "$tag"; then
     return 0
   fi
+  # The images are public. When an expired CI token is still cached in
+  # ~/.docker/config.json, GHCR answers "denied" instead of serving them
+  # anonymously — so drop the stale login and try again before falling back.
+  echo "WARN: pull failed for $tag — clearing stale GHCR credentials and retrying"
+  docker logout ghcr.io >/dev/null 2>&1 || true
+  if docker pull "$tag"; then
+    return 0
+  fi
   echo "WARN: could not pull $tag — falling back to $fallback"
   docker pull "$fallback"
   docker tag "$fallback" "$tag"
