@@ -134,10 +134,14 @@ npx tsx prisma/scripts/seed-finance-demo.ts   # Finance demo orders/settlements 
 ```
 
 **Deploy (prod):**
+Normal path is automatic — pushing to `master` runs `.github/workflows/ci-deploy.yml`, which gates on type-check/lint plus a migration-drift rebuild, builds the images on GitHub, pushes them to GHCR, then SSHes into the droplet and runs `deploy.sh`. Only `team-horeca1/horeca1` deploys; the `AneeVerse` mirror skips build/deploy so two runs can't race the same droplet.
+
+When Actions cannot schedule runners (GitHub outages), deploy the already-built image yourself:
 ```bash
-ssh root@64.227.187.210 "bash /opt/horeca1/deploy.sh"
+npm run deploy:prod                    # newest pushed image (:latest)
+npm run deploy:prod -- --sha=<commit>  # pin an exact commit
 ```
-The script: pulls master, rebuilds Docker image, runs `prisma migrate deploy`, restarts app + nginx, runs health check. Takes ~5 min.
+`deploy.sh` pulls the SHA-pinned GHCR images, reconciles known migration drift, runs `prisma migrate deploy`, recreates app + worker, restarts nginx, and health-checks. Takes ~2 min. Images are public, so a pull needs no token — if an expired CI login is cached on the droplet the script clears it and retries.
 
 ## ENVIRONMENT VARIABLES
 Defined in `.env.example` (dev) and `.env.production` (on the droplet). Required:
