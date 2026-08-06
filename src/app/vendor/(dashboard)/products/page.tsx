@@ -3166,6 +3166,13 @@ export default function VendorProductsPage() {
                                                 onChange={(tags) => updateField('tags', tags)}
                                             />
                                         </div>
+                                        <div>
+                                            <FieldLabel>Alias / search keywords</FieldLabel>
+                                            <TagInput
+                                                tags={form.aliasNames}
+                                                onChange={(aliasNames) => updateField('aliasNames', aliasNames)}
+                                            />
+                                        </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
                                                 <FieldLabel>FSSAI Reference</FieldLabel>
