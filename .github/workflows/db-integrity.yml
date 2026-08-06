@@ -1,23 +1,24 @@
 name: DB integrity
 
-# Safety net against the schema drift that broke a fresh `prisma migrate deploy`
-# in June 2026: several tables/columns existed only because the schema had been
-# `prisma db push`-ed onto prod, with no migration. This job rebuilds a database
-# from migrations alone and fails if schema.prisma has drifted from them.
-#
-# RULE GOING FORWARD: never `prisma db push` against prod. Every schema change
-# goes through `prisma migrate dev` -> reviewed migration -> deploy.
+# Standalone safety net (manual / weekly). On every push/PR the same checks now
+# run inside CI / Deploy → "Type check & lint" so we do not compete for two
+# hosted runners at push time (that contention amplified GitHub acquisition
+# failures on 2026-08-06).
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
+  workflow_dispatch:
+  schedule:
+    # Weekly redundancy — Monday 03:17 UTC (odd minute avoids top-of-hour rush).
+    - cron: '17 3 * * 1'
 
 jobs:
   migrations:
     name: Migrations rebuild a fresh DB with no drift
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: db-integrity-standalone
+      cancel-in-progress: true
     services:
       postgres:
         image: postgres:17-alpine

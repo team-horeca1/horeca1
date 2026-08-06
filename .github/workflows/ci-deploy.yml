@@ -1,9 +1,14 @@
 name: CI / Deploy
 
-# One pipeline: type-check + lint (gate) -> build image on GitHub (cached) ->
-# push to GHCR -> SSH to the droplet and pull the SHA-pinned image + migrate +
-# restart. Builds off the droplet so deploys are ~40s, never starve the droplet
-# CPU, and can't run stale code. Reuses the existing DO_SSH_PRIVATE_KEY secret.
+# One pipeline: type-check + lint + DB integrity (gate) -> build image on GitHub
+# (cached) -> push to GHCR -> SSH to the droplet and pull the SHA-pinned image +
+# migrate + restart. Builds off the droplet so deploys are ~40s, never starve the
+# droplet CPU, and can't run stale code. Reuses the existing DO_SSH_PRIVATE_KEY secret.
+#
+# Resilience notes (2026-08):
+# - Pin ubuntu-24.04 (not ubuntu-latest) to avoid alias/capacity churn.
+# - Job-level concurrency: CI can cancel stale runs; deploy stays serial.
+# - DB integrity runs inside `ci` so master pushes don't fight for two runners at t=0.
 
 on:
   push:
@@ -11,17 +16,33 @@ on:
   pull_request:
     branches: [master]
 
-concurrency:
-  group: deploy-master
-  cancel-in-progress: false
-
 env:
   IMAGE: ghcr.io/team-horeca1/horeca1
 
 jobs:
   ci:
     name: Type check & lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    concurrency:
+      group: ci-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: horeca1
+          POSTGRES_PASSWORD: horeca1_dev
+          POSTGRES_DB: horeca1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U horeca1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://horeca1:horeca1_dev@localhost:5432/horeca1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,12 +61,36 @@ jobs:
         run: node scripts/audit-api-permissions.mjs --strict
       - name: Verify RBAC matrix (static)
         run: node scripts/verify-rbac-matrix.mjs
+      - name: Migrations apply cleanly to a fresh database
+        run: npx prisma migrate deploy
+      - name: schema.prisma has not drifted from the migrations
+        run: |
+          npx prisma migrate diff \
+            --from-config-datasource prisma.config.ts \
+            --to-schema prisma/schema.prisma \
+            --script > drift.sql 2>/dev/null || true
+          # The only DDL Prisma does not model is the trigram GIN search indexes,
+          # which the baseline creates as raw SQL. Allow exactly those; fail on anything else.
+          REAL=$(grep -vE '^[[:space:]]*(--.*)?$' drift.sql | grep -viE 'products_(name|brand)_trgm' || true)
+          if [ -n "$REAL" ]; then
+            echo "::error::Schema drift detected — schema.prisma differs from the migrations."
+            echo "Fix it by generating a migration:  npx prisma migrate dev --name <describe-change>"
+            echo "----- unexpected diff -----"
+            echo "$REAL"
+            exit 1
+          fi
+          echo "✓ No drift — migrations reproduce schema.prisma exactly."
 
   build:
     name: Build & push image
     needs: ci
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # Serialise image publishes / deploys only — do not block the CI gate.
+    concurrency:
+      group: deploy-master
+      cancel-in-progress: false
     permissions:
       contents: read
       packages: write
@@ -85,7 +130,11 @@ jobs:
   deploy:
     name: Deploy to production
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: deploy-master
+      cancel-in-progress: false
     permissions:
       packages: read
     steps:

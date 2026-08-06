@@ -1,0 +1,64 @@
+name: Auto-rerun runner acquisition failures
+
+# GitHub sometimes fails to assign a hosted runner ("not acquired by Runner of
+# type hosted" / Internal server error) with zero job steps. Re-run failed jobs
+# once automatically when that happens.
+
+on:
+  workflow_run:
+    workflows: ['CI / Deploy', 'DB integrity']
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  rerun:
+    name: Re-run if runner was never acquired
+    if: >
+      github.event.workflow_run.conclusion == 'failure' ||
+      github.event.workflow_run.conclusion == 'cancelled'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Detect acquisition failure and re-run once
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            if (!run || run.run_attempt >= 2) {
+              core.info(`Skip: attempt=${run?.run_attempt ?? 'n/a'} (only auto-retry once)`);
+              return;
+            }
+
+            const { data } = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.id,
+              per_page: 100,
+            });
+
+            const acquisitionFail = (data.jobs || []).some((job) => {
+              const bad =
+                job.conclusion === 'failure' ||
+                job.conclusion === 'cancelled';
+              const neverStarted = !job.steps || job.steps.length === 0;
+              const noRunner = !job.runner_name || job.runner_id === 0;
+              return bad && neverStarted && noRunner;
+            });
+
+            if (!acquisitionFail) {
+              core.info('Skip: failure looks like real job/step errors, not runner acquisition');
+              return;
+            }
+
+            core.warning(
+              `Hosted-runner acquisition failure on ${run.name} #${run.run_number}; re-running failed jobs`,
+            );
+            await github.rest.actions.reRunWorkflowFailedJobs({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.id,
+            });
+            core.info('Re-run requested');
