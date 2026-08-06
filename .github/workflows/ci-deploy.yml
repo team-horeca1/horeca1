@@ -117,7 +117,10 @@ jobs:
 
   build:
     name: Build & push image
-    needs: [checks, db]
+    # Deliberately NOT gated on checks/db — the image build runs alongside them so
+    # the pipeline is ~7 min instead of ~12. Nothing unvetted reaches production:
+    # `deploy` still requires both gates, and a type error fails `next build` here
+    # anyway, so a pushed image is always type-safe.
     if: >
       github.repository == 'team-horeca1/horeca1' &&
       github.ref == 'refs/heads/master' &&
@@ -162,7 +165,7 @@ jobs:
 
   deploy:
     name: Deploy to production
-    needs: build
+    needs: [checks, db, build]
     if: github.repository == 'team-horeca1/horeca1'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
