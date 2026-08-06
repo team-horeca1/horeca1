@@ -561,6 +561,14 @@ export default function BrandRegisterPage() {
                   });
                 }}
                 requireLocationFields={isAuthMode}
+                contactMode={!isAuthMode && EMAIL_REGISTER_ALLOWED ? 'relaxed' : 'strict'}
+                verifiedContact={
+                  !isAuthMode && phoneVerified
+                    ? { channel: 'phone', value: phone.replace(/\D/g, '').slice(-10) }
+                    : !isAuthMode && emailVerified
+                      ? { channel: 'email', value: registerEmail.trim().toLowerCase() }
+                      : null
+                }
                 visibleSections={{
                   contact: true,
                   identity: true,

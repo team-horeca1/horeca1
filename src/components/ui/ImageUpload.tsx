@@ -4,10 +4,12 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Upload, X, Loader2, ImageIcon, Plus, Link2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+import type { ImageFolder } from '@/lib/imagekit';
+
 interface ImageUploadProps {
     value: string; // current image URL
     onChange: (url: string) => void;
-    folder?: 'products' | 'categories' | 'vendors' | 'banners' | 'misc';
+    folder?: ImageFolder;
     label?: string;
     className?: string;
     size?: 'sm' | 'md' | 'lg';
@@ -17,7 +19,7 @@ interface ImageUploadProps {
 interface MultiImageUploadProps {
     values: string[];
     onChange: (urls: string[]) => void;
-    folder?: 'products' | 'categories' | 'vendors' | 'banners' | 'misc';
+    folder?: ImageFolder;
     label?: string;
     max?: number;
     disabled?: boolean;

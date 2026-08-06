@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import {
-    Users, Plus, Loader2, Search, X, MapPin, Building2, UserPlus, Trash2,
+    Users, Plus, Loader2, Search, MapPin, Building2, UserPlus, Trash2, Check, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -35,6 +35,23 @@ interface SearchVendor {
     logoUrl: string | null;
     city: string | null;
     _count: { products: number };
+}
+
+function VendorAvatar({ logoUrl }: { logoUrl: string | null }) {
+    return (
+        <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
+            {logoUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={logoUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+                <Building2 size={16} className="text-gray-300" />
+            )}
+        </div>
+    );
+}
+
+function mappedLabel(count: number) {
+    return `${count} of your SKU${count === 1 ? '' : 's'} mapped`;
 }
 
 export default function BrandDistributorsPage() {
@@ -85,16 +102,21 @@ export default function BrandDistributorsPage() {
         return () => clearTimeout(t);
     }, [runSearch]);
 
+    const postAction = async (vendorId: string, action: 'add' | 'approve' | 'reject' | 'unapprove') => {
+        const r = await fetch('/api/v1/brand/authorized-distributors', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ vendorId, action }),
+        });
+        const j = await r.json();
+        if (!j.success) throw new Error(j.error?.message || 'Action failed');
+        return j;
+    };
+
     const addDistributor = async (vendorId: string) => {
         setActingId(vendorId);
         try {
-            const r = await fetch('/api/v1/brand/authorized-distributors', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ vendorId, action: 'add' }),
-            });
-            const j = await r.json();
-            if (!j.success) throw new Error(j.error?.message || 'Failed to add distributor');
+            await postAction(vendorId, 'add');
             toast.success('Distributor added');
             setSearchResults((prev) => prev.filter((v) => v.id !== vendorId));
             fetchDistributors();
@@ -105,18 +127,37 @@ export default function BrandDistributorsPage() {
         }
     };
 
-    const removeDistributor = async (vendorId: string, name: string) => {
-        if (!window.confirm(`Remove ${name} from your distributor network?`)) return;
+    const approveRequest = async (vendorId: string, name: string) => {
         setActingId(vendorId);
         try {
-            const r = await fetch('/api/v1/brand/authorized-distributors', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ vendorId, action: 'reject' }),
-            });
-            const j = await r.json();
-            if (!j.success) throw new Error(j.error?.message || 'Failed to remove');
-            toast.success('Distributor removed');
+            await postAction(vendorId, 'approve');
+            toast.success(`${name} approved as distributor`);
+            fetchDistributors();
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : 'Failed to approve');
+        } finally {
+            setActingId(null);
+        }
+    };
+
+    const unlinkRequest = async (vendorId: string) => {
+        setActingId(vendorId);
+        try {
+            await postAction(vendorId, 'reject');
+            toast.success('Distributor unlinked');
+            fetchDistributors();
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : 'Failed to unlink');
+        } finally {
+            setActingId(null);
+        }
+    };
+
+    const removeDistributor = async (vendorId: string) => {
+        setActingId(vendorId);
+        try {
+            await postAction(vendorId, 'unapprove');
+            toast.success('Moved to Requests');
             fetchDistributors();
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : 'Failed to remove');
@@ -126,9 +167,10 @@ export default function BrandDistributorsPage() {
     };
 
     const approved = distributors.filter((d) => d.status === 'approved');
+    const pending = distributors.filter((d) => d.status === 'pending');
 
     return (
-        <div className="max-w-[1000px] mx-auto space-y-6 animate-in fade-in duration-500">
+        <div className="max-w-[1100px] mx-auto space-y-6 animate-in fade-in duration-500">
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="text-[26px] font-[900] text-[#181725] tracking-tight flex items-center gap-2">
@@ -136,7 +178,7 @@ export default function BrandDistributorsPage() {
                     </h1>
                     <p className="text-[#7C7C7C] font-medium mt-0.5 text-[14px] max-w-2xl">
                         Search marketplace vendors and add them as your distributors, or onboard a new one.
-                        Authorized distributors map your products in their vendor portal.
+                        Approved distributors appear in your public brand store; pending requests come from vendors who mapped your SKUs.
                     </p>
                 </div>
                 <button
@@ -179,14 +221,7 @@ export default function BrandDistributorsPage() {
                         {searchResults.map((v) => (
                             <div key={v.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
                                 <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
-                                        {v.logoUrl ? (
-                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img src={v.logoUrl} alt="" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <Building2 size={16} className="text-gray-300" />
-                                        )}
-                                    </div>
+                                    <VendorAvatar logoUrl={v.logoUrl} />
                                     <div className="min-w-0">
                                         <p className="text-[13px] font-bold text-[#181725] truncate">{v.businessName}</p>
                                         <p className="text-[11px] text-gray-500 flex items-center gap-1">
@@ -211,48 +246,130 @@ export default function BrandDistributorsPage() {
                 ) : null}
             </div>
 
-            {/* Linked distributors */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
-                <h2 className="text-[15px] font-bold text-[#181725]">
-                    Your distributors ({approved.length})
-                </h2>
-                {loading ? (
-                    <div className="flex justify-center py-8"><Loader2 size={22} className="animate-spin text-[#53B175]" /></div>
-                ) : approved.length === 0 ? (
-                    <p className="text-[13px] text-gray-400 py-4">No distributors yet. Search above or create one.</p>
-                ) : (
-                    <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
-                        {approved.map((d) => (
-                            <div key={d.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-10 h-10 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
-                                        {d.vendor.logoUrl ? (
-                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img src={d.vendor.logoUrl} alt="" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <Building2 size={16} className="text-gray-300" />
-                                        )}
+            {/* Approved (left) + Pending requests (right) */}
+            {loading ? (
+                <div className="flex justify-center py-12"><Loader2 size={22} className="animate-spin text-[#53B175]" /></div>
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    {/* Left — approved distributors (public brand store) */}
+                    <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4 min-h-[240px]">
+                        <div className="flex items-center justify-between gap-2">
+                            <h2 className="text-[15px] font-bold text-[#181725]">
+                                Your distributors
+                            </h2>
+                            <span className="text-[12px] font-bold text-[#53B175] bg-[#53B175]/10 px-2.5 py-0.5 rounded-full">
+                                {approved.length}
+                            </span>
+                        </div>
+                        <p className="text-[12px] text-gray-400 -mt-2">
+                            Shown in your public brand store.
+                        </p>
+                        {approved.length === 0 ? (
+                            <p className="text-[13px] text-gray-400 py-6 text-center">
+                                No distributors yet. Search above, create one, or approve a request.
+                            </p>
+                        ) : (
+                            <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
+                                {approved.map((d) => (
+                                    <div key={d.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <VendorAvatar logoUrl={d.vendor.logoUrl} />
+                                            <div className="min-w-0">
+                                                <p className="text-[13px] font-bold text-[#181725] truncate">{d.vendor.businessName}</p>
+                                                <p className="text-[11px] text-gray-500 flex items-center gap-1 flex-wrap">
+                                                    {d.vendor.city && (
+                                                        <span className="inline-flex items-center gap-0.5">
+                                                            <MapPin size={10} /> {d.vendor.city}
+                                                        </span>
+                                                    )}
+                                                    {d.vendor.city && <span>·</span>}
+                                                    <span>{mappedLabel(d.vendor._count?.products ?? 0)}</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => removeDistributor(d.vendorId)}
+                                            disabled={actingId === d.vendorId}
+                                            className="h-[32px] px-3 bg-gray-50 text-gray-600 rounded-lg text-[12px] font-bold hover:bg-red-50 hover:text-red-600 disabled:opacity-50 flex items-center gap-1"
+                                        >
+                                            {actingId === d.vendorId ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                                            Remove
+                                        </button>
                                     </div>
-                                    <div className="min-w-0">
-                                        <p className="text-[13px] font-bold text-[#181725] truncate">{d.vendor.businessName}</p>
-                                        <p className="text-[11px] text-gray-500">
-                                            {d.vendor.city ?? '—'} · {d.vendor._count?.products ?? 0} mapped products
-                                        </p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => removeDistributor(d.vendorId, d.vendor.businessName)}
-                                    disabled={actingId === d.vendorId}
-                                    className="h-[32px] px-3 bg-gray-50 text-gray-600 rounded-lg text-[12px] font-bold hover:bg-red-50 hover:text-red-600 disabled:opacity-50 flex items-center gap-1"
-                                >
-                                    {actingId === d.vendorId ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                                    Remove
-                                </button>
+                                ))}
                             </div>
-                        ))}
+                        )}
                     </div>
-                )}
-            </div>
+
+                    {/* Right — pending requests from vendor mapping activity */}
+                    <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4 min-h-[240px]">
+                        <div className="flex items-center justify-between gap-2">
+                            <h2 className="text-[15px] font-bold text-[#181725]">
+                                Requests
+                            </h2>
+                            <span className={`text-[12px] font-bold px-2.5 py-0.5 rounded-full ${
+                                pending.length > 0
+                                    ? 'text-amber-700 bg-amber-50'
+                                    : 'text-gray-500 bg-gray-50'
+                            }`}>
+                                {pending.length}
+                            </span>
+                        </div>
+                        <p className="text-[12px] text-gray-400 -mt-2">
+                            Vendors who mapped your SKUs and are waiting for approval.
+                        </p>
+                        {pending.length === 0 ? (
+                            <p className="text-[13px] text-gray-400 py-6 text-center">
+                                No pending requests.
+                            </p>
+                        ) : (
+                            <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
+                                {pending.map((d) => {
+                                    const mapped = d.vendor._count?.products ?? 0;
+                                    const busy = actingId === d.vendorId;
+                                    return (
+                                        <div key={d.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <VendorAvatar logoUrl={d.vendor.logoUrl} />
+                                                <div className="min-w-0">
+                                                    <p className="text-[13px] font-bold text-[#181725] truncate">{d.vendor.businessName}</p>
+                                                    <p className="text-[11px] text-gray-500 flex items-center gap-1 flex-wrap">
+                                                        {d.vendor.city && (
+                                                            <span className="inline-flex items-center gap-0.5">
+                                                                <MapPin size={10} /> {d.vendor.city}
+                                                            </span>
+                                                        )}
+                                                        {d.vendor.city && <span>·</span>}
+                                                        <span>{mappedLabel(mapped)}</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <button
+                                                    onClick={() => approveRequest(d.vendorId, d.vendor.businessName)}
+                                                    disabled={busy}
+                                                    className="h-[32px] px-3 bg-[#53B175] text-white rounded-lg text-[12px] font-bold hover:bg-[#3d9e5f] disabled:opacity-50 flex items-center gap-1"
+                                                >
+                                                    {busy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    onClick={() => unlinkRequest(d.vendorId)}
+                                                    disabled={busy}
+                                                    className="h-[32px] px-3 bg-gray-50 text-gray-600 rounded-lg text-[12px] font-bold hover:bg-red-50 hover:text-red-600 disabled:opacity-50 flex items-center gap-1"
+                                                >
+                                                    <X size={12} />
+                                                    Unlink
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {showCreate && (
                 <AddVendorWizard

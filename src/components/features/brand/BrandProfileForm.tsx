@@ -62,6 +62,14 @@ export interface BrandProfileFormProps {
   layout?: 'default' | 'wide';
   /** When true, outlet/address/pincode show required markers (add-business flow). */
   requireLocationFields?: boolean;
+  /**
+   * Contact channel labels / required markers.
+   * `relaxed` = public register with email-OR-phone (matches validateBrandProfile publicRegister).
+   * Admin / add-business stay `strict` (mobile still required).
+   */
+  contactMode?: 'strict' | 'relaxed';
+  /** Lock the OTP-verified channel so the user cannot swap to an unverified contact. */
+  verifiedContact?: { channel: 'phone' | 'email'; value: string } | null;
 }
 
 function SectionHeader({
@@ -144,6 +152,8 @@ export function BrandProfileForm({
   className,
   layout = 'default',
   requireLocationFields = false,
+  contactMode = 'strict',
+  verifiedContact = null,
 }: BrandProfileFormProps) {
   const set = (patch: Partial<BrandProfileValues>) => onChange(patch);
   const blur = (field: string, v: string) => onFieldBlur?.(field, v);
@@ -152,6 +162,9 @@ export function BrandProfileForm({
     ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3'
     : 'grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4';
   const SPAN_FULL = isWide ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2';
+  const relaxedContact = contactMode === 'relaxed';
+  const phoneLocked = verifiedContact?.channel === 'phone';
+  const emailLocked = verifiedContact?.channel === 'email';
 
   const handleBrandTypeChange = (brandType: string) => {
     set({ brandType, subType: '', productCategories: [] });
@@ -362,7 +375,7 @@ export function BrandProfileForm({
           <>
             <SectionHeader icon={User} spanClass={SPAN_FULL}>Primary Contact</SectionHeader>
             <FormField label="Contact Name" className={SPAN_FULL} dataField="firstName">
-              <div className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
+              <div className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
                 <FormSelect value={value.salutation ?? ''} onChange={v => set({ salutation: v })}>
                   <option value="">Salutation</option>
                   <option value="Mr.">Mr.</option>
@@ -375,32 +388,42 @@ export function BrandProfileForm({
                   onBlur={() => blur('firstName', value.firstName ?? '')} />
                 <FormInput value={value.lastName ?? ''} onChange={v => set({ lastName: v })}
                   placeholder="Last Name" />
-                {isWide && (
-                  <FormInput value={value.designation ?? ''} onChange={v => set({ designation: v })}
-                    placeholder="Designation (optional)" />
-                )}
               </div>
               {errors.firstName && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.firstName}</p>}
             </FormField>
-            {!isWide && (
-              <TextField label="Designation (optional)" value={value.designation ?? ''}
-                onChange={v => set({ designation: v })} placeholder="e.g. Brand Manager" />
-            )}
-            <FormField label="Mobile" required error={errors.phone} dataField="phone">
+            <FormField
+              label={relaxedContact ? 'Mobile (optional if email provided)' : 'Mobile'}
+              required={!relaxedContact}
+              error={errors.phone}
+              dataField="phone"
+              hint={phoneLocked ? 'Verified' : undefined}
+            >
               <PhoneInput
                 value={value.phone ?? value.mobilePhone ?? ''}
-                onChange={v => set({ phone: v, mobilePhone: v })}
+                onChange={v => {
+                  if (phoneLocked) return;
+                  set({ phone: v, mobilePhone: v });
+                }}
                 hasError={!!errors.phone}
                 onBlur={() => blur('phone', value.phone ?? value.mobilePhone ?? '')}
+                disabled={phoneLocked}
               />
             </FormField>
             {visibleSections.contactEmail !== false && (
-              <TextField label="Email" value={value.email ?? ''}
+              <TextField
+                label={relaxedContact ? 'Email (optional if mobile provided)' : 'Email'}
+                value={value.email ?? ''}
                 dataField="email"
                 error={errors.email}
-                onChange={v => set({ email: v })}
+                hint={emailLocked ? 'Verified' : undefined}
+                onChange={v => {
+                  if (emailLocked) return;
+                  set({ email: v });
+                }}
                 onBlur={() => blur('email', value.email ?? '')}
-                placeholder="brand@company.com" />
+                placeholder="brand@company.com"
+                disabled={emailLocked}
+              />
             )}
           </>
         )}
