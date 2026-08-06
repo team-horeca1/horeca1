@@ -25,15 +25,19 @@ function authLimitForPath(pathname: string): { max: number; windowMs: number } |
 
 function withRateLimit(handler: (req: NextRequest) => Promise<Response>) {
   return async (req: NextRequest) => {
-    const limit = authLimitForPath(req.nextUrl.pathname);
-    if (limit) {
-      const ip = getClientIp(req);
-      const { allowed } = await checkRateLimit(`auth:${ip}`, limit.max, limit.windowMs);
-      if (!allowed) {
-        return NextResponse.json(
-          { error: 'Too many requests. Try again later.' },
-          { status: 429, headers: { 'Retry-After': '60' } }
-        );
+    // Skip in development — session polling + HMR easily trip the bucket,
+    // and Redis may be shared with prod via tunnel.
+    if (process.env.NODE_ENV !== 'development') {
+      const limit = authLimitForPath(req.nextUrl.pathname);
+      if (limit) {
+        const ip = getClientIp(req);
+        const { allowed } = await checkRateLimit(`auth:${ip}`, limit.max, limit.windowMs);
+        if (!allowed) {
+          return NextResponse.json(
+            { error: 'Too many requests. Try again later.' },
+            { status: 429, headers: { 'Retry-After': '60' } }
+          );
+        }
       }
     }
     return handler(req);

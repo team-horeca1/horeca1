@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
 
 interface GoogleMapsContextType {
@@ -69,8 +69,13 @@ export function GoogleMapsProvider({ children }: { children: React.ReactNode }) 
     // Once loaded, the global `google` namespace is available
     const googleInstance = isLoaded ? (typeof window !== 'undefined' ? window.google : null) : null;
 
+    const value = useMemo(
+        () => ({ isLoaded, loadError, google: googleInstance }),
+        [isLoaded, loadError, googleInstance],
+    );
+
     return (
-        <GoogleMapsContext.Provider value={{ isLoaded, loadError, google: googleInstance }}>
+        <GoogleMapsContext.Provider value={value}>
             {children}
         </GoogleMapsContext.Provider>
     );

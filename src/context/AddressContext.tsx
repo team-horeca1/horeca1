@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 import { toast } from 'sonner';
@@ -540,23 +540,36 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
         }
     }, [reverseGeocode, setSelectedAddress]);
 
+    const value = useMemo(() => ({
+        selectedAddress,
+        savedAddresses,
+        isLoadingAddresses,
+        setSelectedAddress,
+        addAddress,
+        removeAddress,
+        updateAddress,
+        detectCurrentLocation,
+        isDetectingLocation,
+        reverseGeocode,
+        geocodePincode,
+        refreshAddresses,
+    }), [
+        selectedAddress,
+        savedAddresses,
+        isLoadingAddresses,
+        setSelectedAddress,
+        addAddress,
+        removeAddress,
+        updateAddress,
+        detectCurrentLocation,
+        isDetectingLocation,
+        reverseGeocode,
+        geocodePincode,
+        refreshAddresses,
+    ]);
+
     return (
-        <AddressContext.Provider
-            value={{
-                selectedAddress,
-                savedAddresses,
-                isLoadingAddresses,
-                setSelectedAddress,
-                addAddress,
-                removeAddress,
-                updateAddress,
-                detectCurrentLocation,
-                isDetectingLocation,
-                reverseGeocode,
-                geocodePincode,
-                refreshAddresses,
-            }}
-        >
+        <AddressContext.Provider value={value}>
             {children}
         </AddressContext.Provider>
     );

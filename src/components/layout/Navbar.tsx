@@ -51,6 +51,67 @@ const DESKTOP_NAV = [
     { name: 'Lists', href: '/order-lists', Icon: ClipboardList },
 ];
 
+type NavStyledCategory = Category & { image: string; bgColor: string };
+
+/** Module-level cache so remounting Navbar does not flash an empty category sheet. */
+let navCategoriesCache: NavStyledCategory[] | null = null;
+
+const NAV_CATEGORIES_SS_KEY = 'h1_nav_categories';
+
+function readCachedNavCategories(): NavStyledCategory[] {
+    if (navCategoriesCache) return navCategoriesCache;
+    if (typeof window === 'undefined') return [];
+    try {
+        const raw = sessionStorage.getItem(NAV_CATEGORIES_SS_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw) as NavStyledCategory[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+            navCategoriesCache = parsed;
+            return parsed;
+        }
+    } catch {
+        /* ignore corrupt cache */
+    }
+    return [];
+}
+
+function writeCachedNavCategories(cats: NavStyledCategory[]) {
+    navCategoriesCache = cats;
+    if (typeof window === 'undefined') return;
+    try {
+        sessionStorage.setItem(NAV_CATEGORIES_SS_KEY, JSON.stringify(cats));
+    } catch {
+        /* quota / private mode */
+    }
+}
+
+function styleCategories(cats: Category[]): NavStyledCategory[] {
+    return cats.map((c) => ({
+        ...c,
+        image: c.image || CATEGORY_STYLE[c.slug]?.image || DEFAULT_STYLE.image,
+        bgColor: CATEGORY_STYLE[c.slug]?.bgColor || DEFAULT_STYLE.bgColor,
+    }));
+}
+
+/** Invisible placeholder matching a desktop icon+label nav item — reserves layout while session settles. */
+function DesktopNavSlotPlaceholder({
+    label,
+    Icon = LayoutDashboard,
+}: {
+    label: string;
+    Icon?: typeof LayoutDashboard;
+}) {
+    return (
+        <div
+            className="flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl shrink-0 invisible pointer-events-none"
+            aria-hidden
+        >
+            <Icon size={21} strokeWidth={1.5} />
+            <span className="text-[10px] font-medium leading-none">{label}</span>
+        </div>
+    );
+}
+
 interface NavbarSearchBarProps {
     value: string;
     onChange: (value: string) => void;
@@ -114,10 +175,15 @@ export function Navbar() {
     const [searchTab, setSearchTab] = React.useState<'items' | 'stores'>('stores');
     const [isNavSearchFocused, setIsNavSearchFocused] = React.useState(false);
     const [navSearchQuery, setNavSearchQuery] = React.useState('');
-    const { totalItems } = useCart();
+    const { totalItems, isCartLoading } = useCart();
+    const [lastKnownTotalItems, setLastKnownTotalItems] = React.useState(totalItems);
+    if (!isCartLoading && lastKnownTotalItems !== totalItems) {
+        setLastKnownTotalItems(totalItems);
+    }
+    const badgeCount = isCartLoading ? lastKnownTotalItems : totalItems;
     const { selectedAddress, setSelectedAddress } = useAddress();
 
-    const [apiCategories, setApiCategories] = React.useState<(Category & { image: string; bgColor: string })[]>([]);
+    const [apiCategories, setApiCategories] = React.useState<NavStyledCategory[]>(readCachedNavCategories);
     const [isAdminImpersonating, setIsAdminImpersonating] = React.useState(false);
     const [isCustomerImpersonating, setIsCustomerImpersonating] = React.useState(false);
     const [vendorAppApproved, setVendorAppApproved] = React.useState(false);
@@ -146,12 +212,14 @@ export function Navbar() {
     }, [sessionStatus, pathname]);
 
     React.useEffect(() => {
+        // Seed from cache; still refresh in background so style/slug changes land.
+        const cached = readCachedNavCategories();
+        if (cached.length > 0) setApiCategories(cached);
+
         dal.categories.list().then((cats) => {
-            setApiCategories(cats.map(c => ({
-                ...c,
-                image: c.image || CATEGORY_STYLE[c.slug]?.image || DEFAULT_STYLE.image,
-                bgColor: CATEGORY_STYLE[c.slug]?.bgColor || DEFAULT_STYLE.bgColor,
-            })));
+            const styled = styleCategories(cats);
+            writeCachedNavCategories(styled);
+            setApiCategories(styled);
         }).catch((err) => console.error('[Navbar] Failed to load categories:', err));
     }, []);
 
@@ -185,28 +253,26 @@ export function Navbar() {
         || userRole === 'brand'
         || (availableAccounts?.some((a) => a.isBrand === true) ?? false);
 
-    // Simple portal links: Admin → Admin Dashboard, vendor/brand membership → their portal.
-    // Only hide Admin Dashboard while actively viewing-as-customer.
-    const desktopNavItems = React.useMemo(() => {
-        if (!sessionReady) return DESKTOP_NAV;
-
-        const portalLinks: typeof DESKTOP_NAV = [];
-        if (isLoggedIn) {
-            if (userRole === 'admin' && !isCustomerImpersonating) {
-                portalLinks.push({ name: 'Dashboard', href: '/admin/dashboard', Icon: LayoutDashboard });
-            } else if (!isAdminImpersonating && hasVendorAccount && vendorAppApproved) {
-                portalLinks.push({ name: 'Dashboard', href: '/vendor/dashboard', Icon: LayoutDashboard });
-            } else if (!isAdminImpersonating && hasBrandAccount) {
-                portalLinks.push({ name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard });
-            }
+    // Portal + Rewards may appear after sessionReady; compute them separately so we can
+    // reserve matching slots while status === 'loading' and avoid a layout jump.
+    const portalNavItem = React.useMemo(() => {
+        if (!sessionReady || !isLoggedIn) return null;
+        if (userRole === 'admin' && !isCustomerImpersonating) {
+            return { name: 'Dashboard', href: '/admin/dashboard', Icon: LayoutDashboard };
         }
-
-        return [
-            ...portalLinks,
-            ...DESKTOP_NAV,
-            ...(isLoggedIn ? [{ name: 'Rewards', href: '/rewards', Icon: Gift }] : []),
-        ];
+        if (!isAdminImpersonating && hasVendorAccount && vendorAppApproved) {
+            return { name: 'Dashboard', href: '/vendor/dashboard', Icon: LayoutDashboard };
+        }
+        if (!isAdminImpersonating && hasBrandAccount) {
+            return { name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard };
+        }
+        return null;
     }, [sessionReady, isLoggedIn, hasVendorAccount, hasBrandAccount, vendorAppApproved, userRole, isAdminImpersonating, isCustomerImpersonating]);
+
+    const showRewardsLink = sessionReady && isLoggedIn;
+    const reservePortalSlot = !sessionReady;
+    const reserveRewardsSlot = !sessionReady;
+    const PortalIcon = portalNavItem?.Icon;
 
     if (
         isAdminPage ||
@@ -266,9 +332,11 @@ export function Navbar() {
                             <PushBell />
                             <Link href="/cart" className="relative p-1 cursor-pointer">
                                 <ShoppingCart size={20} className="text-[#181725]" />
-                                <span className="absolute -top-1 -right-1 bg-[#53B175] text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full font-bold border border-white">
-                                    {totalItems}
-                                </span>
+                                {badgeCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 bg-[#53B175] text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full font-bold border border-white">
+                                        {badgeCount}
+                                    </span>
+                                )}
                             </Link>
                         </div>
                     </div>
@@ -340,9 +408,24 @@ export function Navbar() {
                             {/* Divider */}
                             <div className="h-9 w-px bg-gray-200 shrink-0" />
 
-                            {/* Iconized nav — shrink-0 so Dashboard never clips; search yields space */}
+                            {/* Iconized nav — shrink-0 so Dashboard never clips; search yields space.
+                                Reserve portal + Rewards slots while session is settling to avoid layout jump. */}
                             <div className="flex items-center gap-1 shrink-0">
-                                {desktopNavItems.map(({ name, href, Icon }) => {
+                                {reservePortalSlot ? (
+                                    <DesktopNavSlotPlaceholder label="Brand Portal" />
+                                ) : portalNavItem && PortalIcon ? (
+                                    <Link
+                                        href={portalNavItem.href}
+                                        className={cn(
+                                            "flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl transition-colors shrink-0",
+                                            pathname === portalNavItem.href ? "text-primary bg-primary/5" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                                        )}
+                                    >
+                                        <PortalIcon size={21} strokeWidth={pathname === portalNavItem.href ? 2 : 1.5} />
+                                        <span className="text-[10px] font-medium leading-none">{portalNavItem.name}</span>
+                                    </Link>
+                                ) : null}
+                                {DESKTOP_NAV.map(({ name, href, Icon }) => {
                                     const isActive = pathname === href;
                                     return (
                                         <Link
@@ -358,6 +441,20 @@ export function Navbar() {
                                         </Link>
                                     );
                                 })}
+                                {reserveRewardsSlot ? (
+                                    <DesktopNavSlotPlaceholder label="Rewards" Icon={Gift} />
+                                ) : showRewardsLink ? (
+                                    <Link
+                                        href="/rewards"
+                                        className={cn(
+                                            "flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl transition-colors shrink-0",
+                                            pathname === '/rewards' ? "text-primary bg-primary/5" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                                        )}
+                                    >
+                                        <Gift size={21} strokeWidth={pathname === '/rewards' ? 2 : 1.5} />
+                                        <span className="text-[10px] font-medium leading-none">Rewards</span>
+                                    </Link>
+                                ) : null}
                             </div>
 
                             {/* Divider */}
@@ -368,9 +465,11 @@ export function Navbar() {
                                 {isLoggedIn && <NotificationBell accentColor="#53B175" />}
                                 <Link href="/cart" className="p-2.5 hover:bg-gray-50 rounded-full transition-all relative group cursor-pointer">
                                     <ShoppingCart size={22} strokeWidth={1.5} className="text-text group-hover:text-primary transition-colors" />
-                                    <span className="absolute top-0.5 right-0.5 bg-primary text-white text-[10px] w-[18px] h-[18px] flex items-center justify-center rounded-full font-bold border-2 border-white">
-                                        {totalItems}
-                                    </span>
+                                    {badgeCount > 0 && (
+                                        <span className="absolute top-0.5 right-0.5 bg-primary text-white text-[10px] w-[18px] h-[18px] flex items-center justify-center rounded-full font-bold border-2 border-white">
+                                            {badgeCount}
+                                        </span>
+                                    )}
                                 </Link>
                                 <button
                                     onClick={() => {

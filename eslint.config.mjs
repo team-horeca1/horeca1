@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local tunnel helpers (not app source)
+    "tmp-tun*.js",
   ]),
   {
     rules: {

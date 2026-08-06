@@ -78,8 +78,6 @@ export default function VendorLayout({
     const [adminVendorName, setAdminVendorName] = useState<string | null>(null);
     const [isApplicationPending, setIsApplicationPending] = useState(false);
     const [checkingApplication, setCheckingApplication] = useState(true);
-    // null = brands fetch in flight — do not hide Brand Mappings (avoids false redirect to dashboard/setup)
-    const [hasBrandMappings, setHasBrandMappings] = useState<boolean | null>(null);
     const [enteredStore, setEnteredStoreState] = useState(false);
 
     const sessionUser = session?.user;
@@ -88,7 +86,6 @@ export default function VendorLayout({
     const isActiveVendor = activeAccountType?.isVendor === true;
     const isActiveBrand = activeAccountType?.isBrand === true;
     const isAdmin = userRole === 'admin';
-    const canUseVendorPortal = isAdmin || isActiveVendor || userRole === 'vendor';
     const {
       currentAccount,
       availableStores: switcherStores,
@@ -114,28 +111,6 @@ export default function VendorLayout({
     // Supplier's personal name (User.fullName) — shown as the root crumb instead of the account name
     const supplierPersonName = sessionUser?.name?.trim() || null;
     const onBusinessesList = pathname === '/vendor/businesses';
-
-    const fetchBrandMappingAccess = React.useCallback(() => {
-        if (status !== 'authenticated' || !canUseVendorPortal) return;
-        fetch('/api/v1/vendor/brand-mappings/brands')
-            .then((res) => res.json())
-            .then((res) => {
-                if (res.success) setHasBrandMappings(res.data?.hasAuthorizedBrands === true);
-                else setHasBrandMappings(false);
-            })
-            .catch(() => setHasBrandMappings(false));
-    }, [status, canUseVendorPortal]);
-
-    React.useEffect(() => {
-        fetchBrandMappingAccess();
-    }, [fetchBrandMappingAccess, pathname]);
-
-    React.useEffect(() => {
-        if (status !== 'authenticated' || !canUseVendorPortal) return;
-        const onFocus = () => fetchBrandMappingAccess();
-        window.addEventListener('focus', onFocus);
-        return () => window.removeEventListener('focus', onFocus);
-    }, [status, canUseVendorPortal, fetchBrandMappingAccess]);
 
     // Sync enter-store flag from sessionStorage (and clear when on supplier/business panels)
     React.useEffect(() => {
@@ -163,17 +138,15 @@ export default function VendorLayout({
     const visibleGroups = navSource.map((g) => ({
       ...g,
       links: filterNavLinks(g.links, can, 'vendor', (link) =>
-        // Hide only after we know there are no authorized brands (null = still loading)
-        (link.href === '/vendor/brand-mappings' && hasBrandMappings === false)
         // Store-scoped picker: Businesses only (no team / supplier overview)
-        || (allowStorePicker && !showStoreNav && (
+        allowStorePicker && !showStoreNav && (
           link.href === '/vendor/overview'
           || link.href === '/vendor/team'
           || link.href === '/vendor/account'
           || link.href === '/vendor/all-orders'
           || link.href === '/vendor/reports'
           || link.href === '/vendor/ledger'
-        )),
+        ),
       ),
     })).filter((g) => g.links.length > 0);
 
@@ -206,8 +179,6 @@ export default function VendorLayout({
         if (!isAdmin && !isActiveVendor) return;
         if (visibleGroups.length === 0) return;
         if (!firstAllowedRoute) return;
-        // Wait until brand-mapping access is known so we don't bounce /brand-mappings → dashboard → setup
-        if (hasBrandMappings === null && pathname.startsWith('/vendor/brand-mappings')) return;
         // Allow businesses list + detail under supplier nav (avoid store-nav race → dashboard)
         if (pathname === '/vendor/businesses' || pathname.startsWith('/vendor/businesses/')) return;
         if (pathname === '/vendor/setup') return;
@@ -215,7 +186,7 @@ export default function VendorLayout({
         if (!allHrefs.some((h) => pathname === h || pathname.startsWith(`${h}/`))) {
             router.replace(firstAllowedRoute);
         }
-    }, [status, isApplicationPending, isAdmin, isActiveVendor, visibleGroups, firstAllowedRoute, pathname, router, hasBrandMappings]);
+    }, [status, isApplicationPending, isAdmin, isActiveVendor, visibleGroups, firstAllowedRoute, pathname, router]);
 
     // Only treat the impersonation cookie as authoritative when the current
     // session is actually an admin. A vendor logging in fresh would otherwise

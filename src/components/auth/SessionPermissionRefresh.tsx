@@ -6,8 +6,10 @@
  * account was deleted / deactivated / revoked.
  *
  * Team panels promise "within 60 seconds — no re-login". We poll under that
- * ceiling and always call session.update() so Auth.js re-runs the jwt callback
- * (which reloads role permissions from DB via markSessionStale → updatedAt).
+ * ceiling via a 45s interval that always calls session.update() so Auth.js
+ * re-runs the jwt callback (role permissions via markSessionStale → updatedAt).
+ * Tab focus only probes /session-stale and calls update() when stale/invalid,
+ * so routine focus events do not flip useSession status to loading.
  */
 import { useEffect, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
@@ -22,12 +24,12 @@ export function SessionPermissionRefresh() {
   const { status, data: session, update } = useSession();
   const lastRefresh = useRef(0);
   const inFlight = useRef(false);
+  const userId = session?.user?.id;
 
   useEffect(() => {
     if (status !== 'authenticated') return;
 
     const forceSignOut = async () => {
-      const userId = (session?.user as { id?: string } | undefined)?.id;
       clearForcePickerCookie();
       clearDismissFlag();
       clearUserClientStores(userId);
@@ -38,22 +40,31 @@ export function SessionPermissionRefresh() {
       }
     };
 
-    const refreshSession = async () => {
+    /**
+     * @param forceUpdate — interval/mount: always update() so Redis-down
+     * User.updatedAt fallback still applies. Focus: probe only; update when
+     * stale or invalid.
+     */
+    const refreshSession = async (forceUpdate: boolean) => {
       const now = Date.now();
       if (inFlight.current || now - lastRefresh.current < MIN_GAP_MS) return;
       inFlight.current = true;
       try {
         const res = await fetch('/api/v1/auth/session-stale');
         const json = await res.json().catch(() => null);
-        if (res.status === 401 || json?.data?.valid === false) {
+        const data = json?.data as { stale?: boolean; valid?: boolean } | undefined;
+        if (res.status === 401 || data?.valid === false) {
           lastRefresh.current = Date.now();
           await forceSignOut();
           return;
         }
-        // Always update() so jwt reloads permissions when User.updatedAt moved
-        // (role/permission changes). Redis stale is an extra fast-path signal.
-        lastRefresh.current = Date.now();
-        await update({ permissionRefresh: lastRefresh.current });
+        if (forceUpdate || data?.stale === true) {
+          lastRefresh.current = Date.now();
+          await update({ permissionRefresh: lastRefresh.current });
+        } else {
+          // Clean probe (focus): throttle without flipping session status
+          lastRefresh.current = Date.now();
+        }
       } catch {
         // Ignore — permission refresh is best-effort
       } finally {
@@ -61,14 +72,19 @@ export function SessionPermissionRefresh() {
       }
     };
 
-    void refreshSession();
-    window.addEventListener('focus', refreshSession);
-    const intervalId = setInterval(refreshSession, REFRESH_INTERVAL_MS);
+    void refreshSession(true);
+    const onFocus = () => {
+      void refreshSession(false);
+    };
+    window.addEventListener('focus', onFocus);
+    const intervalId = setInterval(() => {
+      void refreshSession(true);
+    }, REFRESH_INTERVAL_MS);
     return () => {
-      window.removeEventListener('focus', refreshSession);
+      window.removeEventListener('focus', onFocus);
       clearInterval(intervalId);
     };
-  }, [status, update, session?.user]);
+  }, [status, update, userId]);
 
   return null;
 }

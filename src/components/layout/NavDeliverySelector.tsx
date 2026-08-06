@@ -12,6 +12,12 @@ interface Props {
   variant: 'desktop' | 'mobile';
 }
 
+type StickyDeliverTo = {
+  mode: 'outlet' | 'fallback';
+  label: string;
+  needsAddress?: boolean;
+};
+
 function DeliverToSkeleton({ variant }: { variant: 'desktop' | 'mobile' }) {
   if (variant === 'mobile') {
     return (
@@ -41,6 +47,50 @@ function DeliverToSkeleton({ variant }: { variant: 'desktop' | 'mobile' }) {
   );
 }
 
+/** Static last-known Deliver to chip — used while session/account is re-settling. */
+function StickyDeliverToChip({
+  sticky,
+  variant,
+}: {
+  sticky: StickyDeliverTo;
+  variant: 'desktop' | 'mobile';
+}) {
+  if (variant === 'mobile') {
+    return (
+      <div
+        className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-100 rounded-full bg-[#F7F7F7] shadow-sm w-full justify-center"
+        aria-busy
+      >
+        {sticky.needsAddress
+          ? <AlertCircle size={13} className="text-amber-500 shrink-0" />
+          : <MapPin size={13} className="text-[#53B175] shrink-0" />}
+        <span className="text-[12px] font-bold text-gray-600 truncate max-w-[140px]">
+          {sticky.label}
+        </span>
+        <ChevronDown size={13} className="text-gray-400 shrink-0" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center gap-2.5 px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 shrink-0 w-[195px]"
+      aria-busy
+    >
+      {sticky.needsAddress
+        ? <AlertCircle size={15} className="text-amber-500 shrink-0" />
+        : <MapPin size={15} className="text-[#53B175] shrink-0" />}
+      <div className="flex flex-col items-start min-w-0 flex-1">
+        <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider leading-none">Deliver to</span>
+        <span className={`text-[12px] font-bold truncate leading-tight mt-0.5 w-full text-left ${sticky.needsAddress ? 'text-amber-600' : 'text-gray-800'}`}>
+          {sticky.label}
+        </span>
+      </div>
+      <ChevronDown size={12} className="text-gray-400 shrink-0" />
+    </div>
+  );
+}
+
 export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }: Props) {
   const { status } = useSession();
   const {
@@ -56,6 +106,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
   const [outletOpen, setOutletOpen] = useState(false);
   const [pickingId, setPickingId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const [lastGood, setLastGood] = useState<StickyDeliverTo | null>(null);
 
   const visibleOutlets = (currentAccount?.outlets ?? []).filter(
     (o) => accessibleOutletIds.length === 0 || accessibleOutletIds.includes(o.id),
@@ -75,7 +126,35 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
   // so Deliver to does not jump between fallback and real values.
   const settling = status === 'loading' || (status === 'authenticated' && loading);
 
+  // Remember the last resolved label so session blips keep showing it instead of a skeleton.
+  if (!settling) {
+    const nextGood: StickyDeliverTo =
+      status === 'authenticated' && currentAccount && currentOutlet
+        ? {
+            mode: 'outlet',
+            label: currentOutlet.requiresAddressUpdate
+              ? 'Add address'
+              : (currentOutlet.pincode ?? currentOutlet.name),
+            needsAddress: currentOutlet.requiresAddressUpdate,
+          }
+        : {
+            mode: 'fallback',
+            label: fallbackLabel,
+          };
+    if (
+      !lastGood ||
+      lastGood.mode !== nextGood.mode ||
+      lastGood.label !== nextGood.label ||
+      lastGood.needsAddress !== nextGood.needsAddress
+    ) {
+      setLastGood(nextGood);
+    }
+  }
+
   if (settling) {
+    if (lastGood) {
+      return <StickyDeliverToChip sticky={lastGood} variant={variant} />;
+    }
     return <DeliverToSkeleton variant={variant} />;
   }
 
