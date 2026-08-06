@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { Errors } from '@/middleware/errorHandler';
 import {
   resolveUnitPrice,
@@ -289,6 +290,7 @@ export class CartService {
                 unit: true, creditEligible: true,
                 priceSlabs: { orderBy: { minQty: 'asc' as const }, select: { minQty: true, maxQty: true, price: true } },
                 inventories: { select: { outletId: true, qtyAvailable: true, qtyReserved: true } },
+                brandMappings: productBrandMappingsInclude,
               },
             },
             vendor: { select: { id: true, businessName: true, slug: true, minOrderValue: true, logoUrl: true } },
@@ -359,6 +361,7 @@ export class CartService {
             unit: true, creditEligible: true,
             priceSlabs: { orderBy: { minQty: 'asc' as const }, select: { minQty: true, maxQty: true, price: true } },
             inventories: { select: { outletId: true, qtyAvailable: true, qtyReserved: true } },
+            brandMappings: productBrandMappingsInclude,
           },
         },
         vendor: { select: { id: true, businessName: true, slug: true, minOrderValue: true, logoUrl: true } },

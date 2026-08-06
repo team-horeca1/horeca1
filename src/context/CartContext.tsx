@@ -34,6 +34,8 @@ interface CartContextType {
     totalGST: number;       // GST portion = subtotal - totalTaxable
     totalAmount: number;
     vendorCount: number;
+    /** True during a full context-switch load (cart may be empty). False during silent revalidate. */
+    isCartLoading: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -169,13 +171,44 @@ function parseApiCart(apiData: { vendorGroups: unknown[]; total: number }): {
                 ? Math.round(originalTaxableRate * (1 + taxPercent / 100) * 100) / 100
                 : 0;
 
+            // Brand mapping → cart/checkout display overrides. `name` stays the raw
+            // supplier name so orders and invoices keep GST traceability.
+            const rawName = (product.name as string) || '';
+            const brandMappings = (product.brandMappings as Array<Record<string, unknown>>) || [];
+            const masterProduct = brandMappings[0]?.brandMasterProduct as Record<string, unknown> | undefined;
+            const masterBrand = masterProduct?.brand as Record<string, unknown> | undefined;
+            const brandName = (masterBrand?.name as string) || undefined;
+            const brandSlug = (masterBrand?.slug as string) || undefined;
+            const overrideFields: string[] = [];
+
+            const masterName = typeof masterProduct?.name === 'string' ? masterProduct.name.trim() : '';
+            if (masterName) overrideFields.push('name');
+
+            const supplierImages = product.imageUrl ? [product.imageUrl as string] : [];
+            const masterImageList = Array.isArray(masterProduct?.images)
+                ? (masterProduct.images as string[]).filter((u): u is string => typeof u === 'string' && u.length > 0)
+                : [];
+            const masterImageUrl = typeof masterProduct?.imageUrl === 'string' ? masterProduct.imageUrl.trim() : '';
+            const brandImages = masterImageList.length > 0
+                ? masterImageList
+                : masterImageUrl
+                    ? [masterImageUrl]
+                    : [];
+            if (brandImages.length > 0) overrideFields.push('images');
+
             const vp: VendorProduct = {
                 id: product.id as string,
-                name: (product.name as string) || '',
+                name: rawName,
+                displayName: masterName || rawName,
+                brandName,
+                brandSlug,
+                brandOverride: brandName && overrideFields.length > 0
+                    ? { brandName, fields: overrideFields }
+                    : undefined,
                 description: '',
                 price: grossPrice,                 // gross price shown to customer
                 originalPrice: grossMRP || grossPrice,
-                images: product.imageUrl ? [product.imageUrl as string] : [],
+                images: brandImages.length > 0 ? brandImages : supplierImages,
                 category: '',
                 packSize: (product.packSize as string) || '1 unit',
                 unit: (product.unit as string) || 'unit',
@@ -259,6 +292,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const [apiGroupMeta, setApiGroupMeta] = useState<Record<string, ApiGroupMeta>>({});
     const [isInitialized, setIsInitialized] = useState(false);
     const [customerImpersonating, setCustomerImpersonating] = useState(false);
+    // Last identity we finished loading for — session blips reuse this for silent revalidate.
+    const lastContextKeyRef = useRef<string | null>(null);
 
     // Storefront cart APIs are customer-only (AUD-011) — skip for vendor/brand/admin unless impersonating
     const shouldUseServerCart =
@@ -293,26 +328,38 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // On mount or context switch: load cart (API if logged in, localStorage if guest).
     // On guest→login transition: merge localStorage items into the server cart
     // first, then load — otherwise items added while logged-out vanish.
+    // Session refresh blips (same user/BA/outlet) do a silent background revalidate
+    // without setCart([]) so the badge and line items never flash to zero.
     useEffect(() => {
         if (sessionStatus === 'loading') return;
-        // Block the localStorage-mirror effect below until THIS context finishes
-        // loading/merging. Critical on the guest→login transition: signIn briefly
-        // flips status to "authenticated" on the login page (before the redirect
-        // navigates away), which runs this effect and setCart([]). Without this
-        // guard the mirror would persist that empty array over the guest cart in
-        // localStorage, and the navigation aborts the merge before it can restore
-        // it — so the guest cart (and the items the user came to buy) vanish.
-        setIsInitialized(false);
-        setCart([]); // Clear immediately on account/outlet/session change so UI doesn't flicker old data
+
+        let alive = true;
+        const contextKey = `${userId ?? ''}|${activeBAId ?? ''}|${activeOutletId ?? ''}|${customerImpersonating}`;
+        const silent = lastContextKeyRef.current === contextKey;
+
+        if (!silent) {
+            // Block the localStorage-mirror effect below until THIS context finishes
+            // loading/merging. Critical on the guest→login transition: signIn briefly
+            // flips status to "authenticated" on the login page (before the redirect
+            // navigates away), which runs this effect and setCart([]). Without this
+            // guard the mirror would persist that empty array over the guest cart in
+            // localStorage, and the navigation aborts the merge before it can restore
+            // it — so the guest cart (and the items the user came to buy) vanish.
+            setIsInitialized(false);
+            setCart([]); // Clear only on real account/outlet/login change
+        }
+
         if (isLoggedIn && !shouldUseServerCart) {
             // Vendor/brand/admin portals must not poll /api/v1/cart
             setApiGroupMeta({});
+            lastContextKeyRef.current = contextKey;
             setIsInitialized(true);
             return;
         }
         if (isLoggedIn) {
             // Never merge guest/admin local lines into an impersonated customer cart.
-            const guestItems = customerImpersonating ? [] : loadLocalCart(null);
+            // Skip merge on silent revalidate — already done on the initial login load.
+            const guestItems = (silent || customerImpersonating) ? [] : loadLocalCart(null);
             const mergePayload = guestItems
                 .map(it => ({
                     productId: it.productId,
@@ -332,11 +379,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 : Promise.resolve();
 
             mergeFirst
-                .then(() => dal.cart.get())
+                .then(() => {
+                    if (!alive) return undefined;
+                    return dal.cart.get();
+                })
                 .then(apiData => {
+                    if (!alive || apiData == null) return;
                     applyApiCart(apiData as { vendorGroups: unknown[]; total: number });
                 })
                 .catch((err: unknown) => {
+                    if (!alive) return;
+                    // Silent revalidate must keep items already on screen — never clear.
+                    if (silent) return;
                     const msg = err instanceof Error ? err.message : '';
                     const noDelivery =
                         isLoggedIn &&
@@ -349,11 +403,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                     }
                     setCart(loadLocalCart(userId, activeBAId, activeOutletId));
                 })
-                .finally(() => setIsInitialized(true));
+                .finally(() => {
+                    if (!alive) return;
+                    lastContextKeyRef.current = contextKey;
+                    setIsInitialized(true);
+                });
         } else {
-            setCart(loadLocalCart(null));
+            if (!silent) {
+                setCart(loadLocalCart(null));
+            }
+            lastContextKeyRef.current = contextKey;
             setIsInitialized(true);
         }
+
+        return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionStatus, userId, activeBAId, activeOutletId, customerImpersonating, shouldUseServerCart]);
 
@@ -593,6 +656,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     const totalAmount = subtotal;
     const vendorCount = groups.length;
+    const isCartLoading = !isInitialized;
 
     const value = useMemo(() => ({
         cart,
@@ -608,7 +672,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         totalGST,
         totalAmount,
         vendorCount,
-    }), [cart, groups, addToCart, removeFromCart, updateQuantity, adjustQuantity, clearCart, totalItems, subtotal, totalTaxable, totalGST, totalAmount, vendorCount]);
+        isCartLoading,
+    }), [cart, groups, addToCart, removeFromCart, updateQuantity, adjustQuantity, clearCart, totalItems, subtotal, totalTaxable, totalGST, totalAmount, vendorCount, isCartLoading]);
 
     return (
         <CartContext.Provider value={value}>

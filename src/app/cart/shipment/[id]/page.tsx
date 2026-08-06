@@ -21,7 +21,7 @@ export default function ShipmentDetailPage() {
                     .map(item => ({
                         id: String(item.productId || (item.product && item.product.id)),
                         vendorId: g.vendorId,
-                        name: item.product.name,
+                        name: item.product.displayName ?? item.product.name,
                         size: item.product.packSize || '1 pc',
                         pcs: item.quantity,
                         price: item.product.price || 0,
@@ -45,7 +45,7 @@ export default function ShipmentDetailPage() {
                 items: targetGroup.items.map(item => ({
                     id: String(item.productId),
                     vendorId: targetGroup.vendorId,
-                    name: item.product.name,
+                    name: item.product.displayName ?? item.product.name,
                     size: item.product.packSize || '1 pc',
                     pcs: item.quantity,
                     price: item.product.price || 0,

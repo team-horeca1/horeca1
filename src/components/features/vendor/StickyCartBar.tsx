@@ -1,16 +1,28 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { ShoppingCart, X, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/context/CartContext';
 
 export function StickyCartBar() {
-    const { totalItems, totalAmount, vendorCount } = useCart();
+    const { totalItems, totalAmount, vendorCount, isCartLoading } = useCart();
     const [hidden, setHidden] = useState(false);
 
-    if (totalItems === 0) return null;
+    // Hold last known totals while a context-switch load clears the cart briefly.
+    const [lastKnown, setLastKnown] = useState({ totalItems, totalAmount, vendorCount });
+    if (
+        !isCartLoading &&
+        (lastKnown.totalItems !== totalItems ||
+            lastKnown.totalAmount !== totalAmount ||
+            lastKnown.vendorCount !== vendorCount)
+    ) {
+        setLastKnown({ totalItems, totalAmount, vendorCount });
+    }
+    const display = isCartLoading ? lastKnown : { totalItems, totalAmount, vendorCount };
+
+    if (display.totalItems === 0) return null;
 
     if (hidden) {
         return (
@@ -22,7 +34,7 @@ export function StickyCartBar() {
             >
                 <ShoppingCart size={18} />
                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-white text-[#299e60] text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#299e60]">
-                    {totalItems}
+                    {display.totalItems}
                 </span>
             </button>
         );
@@ -50,17 +62,17 @@ export function StickyCartBar() {
                     <div className="relative shrink-0">
                         <ShoppingCart size={20} className="text-white" strokeWidth={2.5} />
                         <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-white text-[#299e60] text-[10px] font-black rounded-full flex items-center justify-center">
-                            {totalItems}
+                            {display.totalItems}
                         </span>
                     </div>
 
                     <div className="flex-1 min-w-0 leading-tight">
                         <p className="text-white text-[13px] font-bold truncate">
-                            {totalItems} item{totalItems > 1 ? 's' : ''}
-                            {vendorCount > 1 ? ` · ${vendorCount} stores` : ''}
+                            {display.totalItems} item{display.totalItems > 1 ? 's' : ''}
+                            {display.vendorCount > 1 ? ` · ${display.vendorCount} stores` : ''}
                         </p>
                         <p className="text-green-100 text-[11px] font-semibold">
-                            ₹{totalAmount.toLocaleString('en-IN')}
+                            ₹{display.totalAmount.toLocaleString('en-IN')}
                         </p>
                     </div>
 

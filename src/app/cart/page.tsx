@@ -79,7 +79,7 @@ import type { VendorPromoSummary } from '@/types';
 
 export default function CartPage() {
     const [screen, setScreen] = useState<'cart' | 'payment' | 'success'>('cart');
-    const { cart, groups, removeFromCart, updateQuantity, adjustQuantity, totalItems, subtotal, totalGST, totalTaxable, clearCart } = useCart();
+    const { cart, groups, removeFromCart, updateQuantity, adjustQuantity, totalItems, subtotal, totalGST, totalTaxable, clearCart, isCartLoading } = useCart();
     const router = useRouter();
     const searchParams = useSearchParams();
     const initialVendorParam = searchParams?.get('vendor') ?? null;
@@ -159,7 +159,7 @@ export default function CartPage() {
                     .find((t) => item.quantity >= t.minQty);
                 return {
                     id: String(item.productId),
-                    name: item.product.name,
+                    name: item.product.displayName ?? item.product.name,
                     size: item.product.packSize || '1 pc',
                     pcs: item.quantity,
                     price: item.product.price,
@@ -238,14 +238,26 @@ export default function CartPage() {
         [selectedGroups],
     );
     const [promoPreview, setPromoPreview] = useState<PromoPreview | null>(null);
+    // True while a preview refetch is in flight — keep the previous preview on
+    // screen and soften the total instead of blanking to client/₹0 mid-update.
+    const [promoPreviewUpdating, setPromoPreviewUpdating] = useState(false);
     React.useEffect(() => {
-        if (selectedGroups.length === 0) { setPromoPreview(null); return; }
+        if (selectedGroups.length === 0) {
+            // Cart reload blips briefly empty the selection; do not wipe the last
+            // good preview or the bill snaps between client and server values.
+            if (!isCartLoading) {
+                setPromoPreview(null);
+                setPromoPreviewUpdating(false);
+            }
+            return;
+        }
         const items = selectedGroups.flatMap(g => g.items
             .filter(i => !i.isPromoFree)
             .map(i => ({
                 productId: i.productId, vendorId: g.vendorId, quantity: i.quantity,
             })));
         let cancelled = false;
+        setPromoPreviewUpdating(true);
         const t = setTimeout(() => {
             fetch('/api/v1/promotions/preview', {
                 method: 'POST',
@@ -254,14 +266,16 @@ export default function CartPage() {
             })
                 .then(r => r.json())
                 .then(json => { if (!cancelled && json?.success) setPromoPreview(json.data as PromoPreview); })
-                .catch(() => {});
+                .catch(() => {})
+                .finally(() => { if (!cancelled) setPromoPreviewUpdating(false); });
         }, 350);
         return () => { cancelled = true; clearTimeout(t); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedItemsSig]);
+    }, [selectedItemsSig, isCartLoading]);
 
     // Bill values — use the server-authoritative preview once loaded (a pricelist
     // can re-price items vs the optimistic client cart), else the client totals.
+    // While a refetch is in flight we keep the previous preview (not null).
     const promoDiscount = promoPreview?.totalPromoDiscount ?? 0;
     const promoLabel = promoPreview && promoPreview.autoPromos.length === 1
         ? promoPreview.autoPromos[0].promotionName
@@ -270,6 +284,10 @@ export default function CartPage() {
     const billGST = promoPreview ? promoPreview.totalGST : itemGST;
     const billSubtotal = promoPreview ? promoPreview.subtotal : itemTotal;
     const totalPay = Math.max(0, billSubtotal - promoDiscount);
+    const billAmountClass = cn(
+        'transition-opacity duration-200',
+        promoPreviewUpdating && 'opacity-50',
+    );
     const bxgyFreeItems = promoPreview?.bxgyFreeItems ?? [];
     const freeItemsValue = bxgyFreeItems.reduce((sum, item) => {
         const cartItem = cart.find((c) => c.productId === item.productId);
@@ -545,16 +563,16 @@ export default function CartPage() {
                                 <div className="px-7 py-6 space-y-4">
                                     <div className="flex justify-between items-center">
                                         <span className="text-[15px] text-[#4C4F4D] font-medium">Taxable</span>
-                                        <span className="text-[15px] font-bold text-[#181725]">₹{billTaxable.toFixed(2)}</span>
+                                        <span className={cn('text-[15px] font-bold text-[#181725]', billAmountClass)}>₹{billTaxable.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between items-center">
                                         <span className="text-[15px] text-[#4C4F4D] font-medium">GST (incl.)</span>
-                                        <span className="text-[15px] font-bold text-[#181725]">₹{billGST.toFixed(2)}</span>
+                                        <span className={cn('text-[15px] font-bold text-[#181725]', billAmountClass)}>₹{billGST.toFixed(2)}</span>
                                     </div>
                                     {promoDiscount > 0 && (
                                         <div className="flex justify-between items-center">
                                             <span className="text-[15px] text-[#53B175] font-medium">Store Offer{promoLabel ? ` (${promoLabel})` : ''}</span>
-                                            <span className="text-[15px] font-bold text-[#53B175]">−₹{promoDiscount.toFixed(2)}</span>
+                                            <span className={cn('text-[15px] font-bold text-[#53B175]', billAmountClass)}>−₹{promoDiscount.toFixed(2)}</span>
                                         </div>
                                     )}
                                 </div>
@@ -562,7 +580,7 @@ export default function CartPage() {
                                     <div className="border-t border-dashed border-[#D0D0D0] pt-5">
                                         <div className="flex justify-between items-baseline mb-1">
                                             <span className="text-[18px] font-bold text-[#181725]">Amount to Pay</span>
-                                            <span className="text-[26px] font-black text-primary">₹{totalPay.toFixed(2)}</span>
+                                            <span className={cn('text-[26px] font-black text-primary', billAmountClass)}>₹{totalPay.toFixed(2)}</span>
                                         </div>
                                         <p className="text-[12px] text-primary font-bold">Includes all taxes and fees</p>
                                     </div>
@@ -602,21 +620,21 @@ export default function CartPage() {
                             <div className="px-5 py-4 space-y-3">
                                 <div className="flex justify-between">
                                     <span className="text-[14px] text-gray-500 font-medium">Taxable</span>
-                                    <span className="text-[14px] font-bold text-[#181725]">₹{billTaxable.toFixed(2)}</span>
+                                    <span className={cn('text-[14px] font-bold text-[#181725]', billAmountClass)}>₹{billTaxable.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-[14px] text-gray-500 font-medium">GST (incl.)</span>
-                                    <span className="text-[14px] font-bold text-[#181725]">₹{billGST.toFixed(2)}</span>
+                                    <span className={cn('text-[14px] font-bold text-[#181725]', billAmountClass)}>₹{billGST.toFixed(2)}</span>
                                 </div>
                                 {promoDiscount > 0 && (
                                     <div className="flex justify-between">
                                         <span className="text-[14px] text-[#53B175] font-medium">Store Offer{promoLabel ? ` (${promoLabel})` : ''}</span>
-                                        <span className="text-[14px] font-bold text-[#53B175]">−₹{promoDiscount.toFixed(2)}</span>
+                                        <span className={cn('text-[14px] font-bold text-[#53B175]', billAmountClass)}>−₹{promoDiscount.toFixed(2)}</span>
                                     </div>
                                 )}
                                 <div className="border-t border-dashed border-gray-200 pt-3 flex justify-between items-baseline">
                                     <span className="text-[16px] font-bold text-[#181725]">Total</span>
-                                    <span className="text-[22px] font-black text-primary">₹{totalPay.toFixed(2)}</span>
+                                    <span className={cn('text-[22px] font-black text-primary', billAmountClass)}>₹{totalPay.toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
@@ -640,6 +658,34 @@ export default function CartPage() {
                             : paymentMethod === 'razorpay' ? `Pay ₹${totalPay.toFixed(2)} with Razorpay` : `Confirm & Pay ₹${totalPay.toFixed(2)}`
                         }
                     </button>
+                </div>
+            </div>
+        );
+    }
+
+    // --- LOADING (context switch) — do not flash the empty-cart screen ---
+    if (isCartLoading && cart.length === 0) {
+        return (
+            <div className="min-h-screen bg-[#F2F3F2] flex flex-col pb-24 md:pb-16">
+                <header className="md:hidden flex items-center justify-center px-4 h-14 bg-[#F2F3F2] sticky top-[12px] z-50">
+                    <h1 className="text-[20px] font-bold text-[#181725]">Cart</h1>
+                </header>
+                <div className="hidden md:block bg-[#F7F8FA] border-b border-gray-100">
+                    <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] py-6">
+                        <div className="h-8 w-48 rounded-lg bg-gray-200 animate-pulse" />
+                    </div>
+                </div>
+                <div className="flex-1 px-4 space-y-3 pt-2 md:max-w-[var(--container-max)] md:mx-auto md:px-[var(--container-padding)] md:pt-8 md:w-full">
+                    {[0, 1, 2].map((i) => (
+                        <div key={i} className="bg-white rounded-2xl p-4 flex gap-4 animate-pulse">
+                            <div className="w-20 h-20 rounded-xl bg-gray-100 shrink-0" />
+                            <div className="flex-1 space-y-3 py-1">
+                                <div className="h-4 w-3/4 rounded bg-gray-100" />
+                                <div className="h-3 w-1/2 rounded bg-gray-50" />
+                                <div className="h-4 w-24 rounded bg-gray-100" />
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         );
@@ -1099,11 +1145,11 @@ export default function CartPage() {
                             <div className="px-7 py-5 space-y-4 border-t border-[#F0F0F0]">
                                 <div className="flex justify-between items-center">
                                     <span className="text-[15px] text-[#4C4F4D] font-medium">Taxable</span>
-                                    <span className="text-[15px] font-bold text-[#181725]">₹{billTaxable.toFixed(2)}</span>
+                                    <span className={cn('text-[15px] font-bold text-[#181725]', billAmountClass)}>₹{billTaxable.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-[15px] text-[#4C4F4D] font-medium">GST (incl.)</span>
-                                    <span className="text-[15px] font-bold text-[#181725]">₹{billGST.toFixed(2)}</span>
+                                    <span className={cn('text-[15px] font-bold text-[#181725]', billAmountClass)}>₹{billGST.toFixed(2)}</span>
                                 </div>
                                 <PromoSavingsSummary
                                     bxgyFreeItems={bxgyFreeItems}
@@ -1119,7 +1165,7 @@ export default function CartPage() {
                                 <div className="border-t border-dashed border-[#D0D0D0] pt-5">
                                     <div className="flex justify-between items-baseline">
                                         <span className="text-[18px] font-bold text-[#181725]">Total</span>
-                                        <span className="text-[24px] font-black text-[#181725]">₹{totalPay.toFixed(2)}</span>
+                                        <span className={cn('text-[24px] font-black text-[#181725]', billAmountClass)}>₹{totalPay.toFixed(2)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1156,11 +1202,11 @@ export default function CartPage() {
                     <div className="px-5 pt-5 pb-2 space-y-4">
                         <div className="flex justify-between items-center">
                             <span className="text-[14px] text-[#4C4F4D] font-medium">Taxable</span>
-                            <span className="text-[14px] font-bold text-[#181725]">₹ {billTaxable.toFixed(2)}</span>
+                            <span className={cn('text-[14px] font-bold text-[#181725]', billAmountClass)}>₹ {billTaxable.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between items-center">
                             <span className="text-[14px] text-[#4C4F4D] font-medium">GST (incl.)</span>
-                            <span className="text-[14px] font-bold text-[#181725]">₹ {billGST.toFixed(2)}</span>
+                            <span className={cn('text-[14px] font-bold text-[#181725]', billAmountClass)}>₹ {billGST.toFixed(2)}</span>
                         </div>
                         <PromoSavingsSummary
                             bxgyFreeItems={bxgyFreeItems}
@@ -1175,7 +1221,7 @@ export default function CartPage() {
                             <div className="flex justify-between items-baseline">
                                 <span className="text-[16px] font-bold text-[#181725]">To Pay</span>
                                 <div className="flex flex-col items-end">
-                                    <span className="text-[20px] font-extrabold text-[#181725]">₹ {totalPay.toFixed(2)}</span>
+                                    <span className={cn('text-[20px] font-extrabold text-[#181725]', billAmountClass)}>₹ {totalPay.toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
