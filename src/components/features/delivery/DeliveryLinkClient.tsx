@@ -458,30 +458,6 @@ export default function DeliveryLinkClient({ token, fulfilmentId }: DeliveryLink
           </div>
         )}
 
-        <section className="rounded-[12px] border border-[#E5EBE9] bg-white p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Package className="h-4 w-4 text-[#0F766E]" />
-            <h2 className="text-[14px] font-bold">Products</h2>
-          </div>
-          <ul className="divide-y divide-[#F0F0F0]">
-            {data.order.items.map((item) => (
-              <li key={item.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
-                <div className="min-w-0">
-                  <p className="text-[13px] font-semibold leading-snug">{item.productName}</p>
-                  {(item.sku || item.unit) && (
-                    <p className="mt-0.5 text-[11px] text-[#7C7C7C]">
-                      {[item.sku, item.unit].filter(Boolean).join(' · ')}
-                    </p>
-                  )}
-                </div>
-                <p className="shrink-0 text-[13px] font-bold tabular-nums">
-                  ×{item.qty}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-
         {actionError && (
           <p className="rounded-[10px] border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] font-medium text-rose-800 print:hidden">
             {actionError}
@@ -642,6 +618,30 @@ export default function DeliveryLinkClient({ token, fulfilmentId }: DeliveryLink
               </div>
             </div>
           )}
+        </section>
+
+        <section className="rounded-[12px] border border-[#E5EBE9] bg-white p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Package className="h-4 w-4 text-[#0F766E]" />
+            <h2 className="text-[14px] font-bold">Products</h2>
+          </div>
+          <ul className="divide-y divide-[#F0F0F0]">
+            {data.order.items.map((item) => (
+              <li key={item.id} className="flex items-start justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold leading-snug">{item.productName}</p>
+                  {(item.sku || item.unit) && (
+                    <p className="mt-0.5 text-[11px] text-[#7C7C7C]">
+                      {[item.sku, item.unit].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                </div>
+                <p className="shrink-0 text-[13px] font-bold tabular-nums">
+                  ×{item.qty}
+                </p>
+              </li>
+            ))}
+          </ul>
         </section>
       </main>
     </div>
