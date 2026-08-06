@@ -32,6 +32,20 @@ jobs:
               return;
             }
 
+            // A run cancelled because a newer push superseded it looks identical to
+            // an acquisition failure (no runner, no steps). Never resurrect those.
+            if (run.head_branch) {
+              const branch = await github.rest.repos.getBranch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: run.head_branch,
+              });
+              if (branch.data.commit.sha !== run.head_sha) {
+                core.info(`Skip: ${run.head_sha.slice(0, 7)} is no longer the tip of ${run.head_branch}`);
+                return;
+              }
+            }
+
             const { data } = await github.rest.actions.listJobsForWorkflowRun({
               owner: context.repo.owner,
               repo: context.repo.repo,
