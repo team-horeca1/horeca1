@@ -1,31 +1,73 @@
 name: CI / Deploy
 
-# One pipeline: type-check + lint + DB integrity (gate) -> build image on GitHub
-# (cached) -> push to GHCR -> SSH to the droplet and pull the SHA-pinned image +
-# migrate + restart. Builds off the droplet so deploys are ~40s, never starve the
-# droplet CPU, and can't run stale code. Reuses the existing DO_SSH_PRIVATE_KEY secret.
+# One pipeline: gates (type-check + lint, migrations + drift) run in parallel ->
+# build image on GitHub (cached) -> push to GHCR -> SSH to the droplet and pull
+# the SHA-pinned image + migrate + restart. Builds off the droplet so deploys are
+# ~40s, never starve the droplet CPU, and can't run stale code.
 #
-# Resilience notes (2026-08):
-# - Pin ubuntu-24.04 (not ubuntu-latest) to avoid alias/capacity churn.
-# - Job-level concurrency: CI can cancel stale runs; deploy stays serial.
-# - DB integrity runs inside `ci` so master pushes don't fight for two runners at t=0.
+# Notes (2026-08-06):
+# - `master` is pushed to two remotes (team-horeca1 = canonical/public,
+#   AneeVerse = private mirror). Only the canonical repo may build and deploy,
+#   otherwise two runs race to SSH the same droplet and the mirror burns paid
+#   Actions minutes.
+# - Gates run as two parallel jobs so the gate is ~6 min instead of ~11 serial.
+# - Only `deploy` takes the prod lock; builds may overlap safely.
+# - ubuntu-24.04 is pinned instead of ubuntu-latest so image alias moves cannot
+#   change the pool we queue against.
 
 on:
   push:
     branches: [master]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.vscode/**'
   pull_request:
     branches: [master]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.vscode/**'
+  # Lets us re-deploy the current master without pushing a dummy commit.
+  workflow_dispatch:
 
 env:
   IMAGE: ghcr.io/team-horeca1/horeca1
+  NPM_FLAGS: --prefer-offline --no-audit --fund=false
 
 jobs:
-  ci:
+  checks:
     name: Type check & lint
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 20
     concurrency:
-      group: ci-${{ github.workflow }}-${{ github.ref }}
+      group: checks-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci ${{ env.NPM_FLAGS }}
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Audit API permissions (strict)
+        run: node scripts/audit-api-permissions.mjs --strict
+      - name: Verify RBAC matrix (static)
+        run: node scripts/verify-rbac-matrix.mjs
+
+  db:
+    name: Migrations & drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: db-${{ github.ref }}
       cancel-in-progress: true
     services:
       postgres:
@@ -50,17 +92,9 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - name: Install dependencies
-        run: npm ci
+        run: npm ci ${{ env.NPM_FLAGS }}
       - name: Generate Prisma client
         run: npx prisma generate
-      - name: Type check
-        run: npx tsc --noEmit
-      - name: Lint
-        run: npm run lint
-      - name: Audit API permissions (strict)
-        run: node scripts/audit-api-permissions.mjs --strict
-      - name: Verify RBAC matrix (static)
-        run: node scripts/verify-rbac-matrix.mjs
       - name: Migrations apply cleanly to a fresh database
         run: npx prisma migrate deploy
       - name: schema.prisma has not drifted from the migrations
@@ -83,14 +117,13 @@ jobs:
 
   build:
     name: Build & push image
-    needs: ci
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    needs: [checks, db]
+    if: >
+      github.repository == 'team-horeca1/horeca1' &&
+      github.ref == 'refs/heads/master' &&
+      github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    # Serialise image publishes / deploys only — do not block the CI gate.
-    concurrency:
-      group: deploy-master
-      cancel-in-progress: false
     permissions:
       contents: read
       packages: write
@@ -130,10 +163,12 @@ jobs:
   deploy:
     name: Deploy to production
     needs: build
+    if: github.repository == 'team-horeca1/horeca1'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # Only the prod deploy is serialised — two deploys must never overlap.
     concurrency:
-      group: deploy-master
+      group: deploy-prod
       cancel-in-progress: false
     permissions:
       packages: read

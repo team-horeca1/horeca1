@@ -16,6 +16,7 @@
     "worker:reconciliation": "npx tsx src/workers/reconciliation.worker.ts",
     "tunnel": "ssh -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 5433:127.0.0.1:5432 -L 6380:127.0.0.1:6379 root@64.227.187.210 -N",
     "db:sync-from-prod": "node scripts/sync-prod-db-to-local.mjs",
+    "deploy:prod": "node scripts/deploy-prod.mjs",
     "migrate:prod": "npx prisma migrate deploy",
     "verify:order-snapshots": "npx tsx scripts/verify-order-snapshots.ts",
     "test": "vitest run",
