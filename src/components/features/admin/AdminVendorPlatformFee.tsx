@@ -22,8 +22,8 @@ export function AdminVendorPlatformFee({ vendorId, platformFeePct, globalDefault
   const save = async () => {
     if (useCustom) {
       const n = Number(customPct);
-      if (!Number.isFinite(n) || n < 5 || n > 25) {
-        toast.error('Custom rate must be between 5% and 25%');
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        toast.error('Custom rate must be between 0% and 100%');
         return;
       }
     }
@@ -84,8 +84,8 @@ export function AdminVendorPlatformFee({ vendorId, platformFeePct, globalDefault
             <label className="block text-[12px] font-bold text-[#7C7C7C] mb-1">Custom platform fee (%)</label>
             <input
               type="number"
-              min="5"
-              max="25"
+              min="0"
+              max="100"
               step="0.5"
               value={customPct}
               onChange={(e) => setCustomPct(e.target.value)}

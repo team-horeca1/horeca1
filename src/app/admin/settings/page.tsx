@@ -15,7 +15,7 @@ export default function SettingsPage() {
     const [supportPhone, setSupportPhone] = useState('+91 98765 43210');
 
     // Business Settings
-    const [platformFeePct, setPlatformFeePct] = useState('10');
+    const [platformFeePct, setPlatformFeePct] = useState('5');
     const [minOrderValue, setMinOrderValue] = useState('500');
     const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState('2000');
 
@@ -162,7 +162,7 @@ export default function SettingsPage() {
                         <input
                             type="number"
                             min="0"
-                            max="25"
+                            max="100"
                             step="0.5"
                             value={platformFeePct}
                             onChange={(e) => setPlatformFeePct(e.target.value)}
@@ -171,7 +171,7 @@ export default function SettingsPage() {
                         <p className="text-[11px] text-[#AEAEAE] mt-1.5">
                             Deducted from vendor earnings on each delivered order. Override per vendor on their detail page.
                         </p>
-                        <PlatformFeeCalculator pct={Number(platformFeePct) || 10} />
+                        <PlatformFeeCalculator pct={Number(platformFeePct) || 5} />
                     </div>
                     <div>
                         <label className="block text-[13px] font-bold text-[#4B4B4B] mb-1.5">Minimum Order Value (&#8377;)</label>

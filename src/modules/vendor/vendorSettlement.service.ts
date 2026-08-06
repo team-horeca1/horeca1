@@ -20,7 +20,7 @@ async function getDefaultPlatformFeePct(db: Prisma.TransactionClient | typeof pr
   const settings = await db.platformSetting.findFirst({
     select: { defaultCommissionPct: true },
   });
-  return Number(settings?.defaultCommissionPct ?? 10);
+  return Number(settings?.defaultCommissionPct ?? 5);
 }
 
 /** Resolve effective platform fee % for a vendor (custom override or global default). */

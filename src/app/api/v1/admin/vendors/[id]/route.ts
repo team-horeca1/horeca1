@@ -184,8 +184,8 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         allowedFields.platformFeePct = null;
       } else {
         const pct = Number(body.platformFeePct);
-        if (!Number.isFinite(pct) || pct < 5 || pct > 25) {
-          throw Errors.badRequest('Platform fee must be between 5% and 25%');
+        if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+          throw Errors.badRequest('Platform fee must be between 0% and 100%');
         }
         allowedFields.platformFeePct = pct;
       }

@@ -240,7 +240,7 @@ export default function VendorDetailsPage() {
     const [ownerPassword, setOwnerPassword] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [globalDefaultFeePct, setGlobalDefaultFeePct] = useState(10);
+    const [globalDefaultFeePct, setGlobalDefaultFeePct] = useState(5);
     const [togglingVerification, setTogglingVerification] = useState(false);
     const [documents, setDocuments] = useState<VendorDocument[]>([]);
     const [updatingDoc, setUpdatingDoc] = useState<string | null>(null);
