@@ -298,8 +298,11 @@ export default function VendorStorePage() {
             result = result.filter(p =>
                 (p.name ?? '').toLowerCase().includes(q) ||
                 (p.displayName ?? '').toLowerCase().includes(q) ||
+                (p.brandName ?? '').toLowerCase().includes(q) ||
+                (p.sku ?? '').toLowerCase().includes(q) ||
                 (p.category ?? '').toLowerCase().includes(q) ||
-                (p.description ?? '').toLowerCase().includes(q)
+                (p.description ?? '').toLowerCase().includes(q) ||
+                (p.tags ?? []).some(t => t.toLowerCase().includes(q))
             );
         }
 

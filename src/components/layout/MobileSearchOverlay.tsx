@@ -7,6 +7,19 @@ import { cn } from '@/lib/utils';
 import { dal } from '@/lib/dal';
 import type { Vendor, VendorProduct, VendorSummary, Category } from '@/types';
 import { useCart } from '@/context/CartContext';
+import { BrandStoreCard } from '@/components/features/brand/BrandStoreCard';
+
+interface SearchBrand {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+    bannerUrl: string | null;
+    tagline: string | null;
+    categories: string[];
+    bgColor: string | null;
+    showcaseImages: string[];
+}
 
 interface MobileSearchOverlayProps {
     isOpen: boolean;
@@ -26,6 +39,7 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
     const [searchResultVendors, setSearchResultVendors] = useState<VendorSummary[]>([]);
     // Categories matching the search query (derived from matched products on the server)
     const [searchResultCategories, setSearchResultCategories] = useState<Category[]>([]);
+    const [searchResultBrands, setSearchResultBrands] = useState<SearchBrand[]>([]);
 
     useEffect(() => {
         dal.vendors.list().then((res) => setVendors(res.vendors)).catch(console.error);
@@ -48,6 +62,7 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                 setFilteredItems([]);
                 setSearchResultVendors([]);
                 setSearchResultCategories([]);
+                setSearchResultBrands([]);
             });
             return;
         }
@@ -57,10 +72,12 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                 // Use API-returned vendors (vendors that carry the searched product)
                 setSearchResultVendors(res.vendors);
                 setSearchResultCategories(res.categories);
+                setSearchResultBrands(res.brands as SearchBrand[]);
             }).catch(() => {
                 setFilteredItems([]);
                 setSearchResultVendors([]);
                 setSearchResultCategories([]);
+                setSearchResultBrands([]);
             });
         }, 300); // debounce 300ms
         return () => clearTimeout(timeout);
@@ -168,6 +185,8 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                         <span>{filteredItems.length} product{filteredItems.length === 1 ? '' : 's'}</span>
                         <span className="w-1 h-1 rounded-full bg-gray-300" />
                         <span>{displayVendors.length} vendor{displayVendors.length === 1 ? '' : 's'}</span>
+                        <span className="w-1 h-1 rounded-full bg-gray-300" />
+                        <span>{searchResultBrands.length} brand{searchResultBrands.length === 1 ? '' : 's'}</span>
                     </div>
                 )}
             </div>
@@ -221,8 +240,12 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                         );
                     }
 
-                    // === Search mode: 3 sections ===
-                    const hasAny = searchResultCategories.length > 0 || filteredItems.length > 0 || displayVendors.length > 0;
+                    // === Search mode: categories / products / vendors / brands ===
+                    const hasAny =
+                        searchResultCategories.length > 0 ||
+                        filteredItems.length > 0 ||
+                        displayVendors.length > 0 ||
+                        searchResultBrands.length > 0;
 
                     if (!hasAny) {
                         return (
@@ -262,28 +285,50 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                                 </section>
                             )}
 
+                            {/* === BLOCK 1b: BRANDS === */}
+                            {searchResultBrands.length > 0 && (
+                                <section className="bg-white rounded-[16px] p-5 shadow-sm border border-gray-50">
+                                    <h2 className="text-[16px] font-bold text-[#181725] mb-4">Brands</h2>
+                                    <div className="grid grid-cols-2 min-[500px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                        {searchResultBrands.map((b) => (
+                                            <BrandStoreCard
+                                                key={b.id}
+                                                name={b.name}
+                                                slug={b.slug}
+                                                logoUrl={b.logoUrl ?? undefined}
+                                                productImages={b.showcaseImages.length > 0 ? [b.showcaseImages[0]] : []}
+                                                categories={b.categories}
+                                                bgColor={b.bgColor ?? '#f0faf4'}
+                                            />
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+
                             {/* === BLOCK 2: PRODUCTS === */}
                             {filteredItems.length > 0 && (
                                 <section className="bg-white rounded-[16px] p-5 shadow-sm border border-gray-50">
                                     <h2 className="text-[16px] font-bold text-[#181725] mb-4">Products</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {filteredItems.slice(0, 6).map((item) => (
+                                        {filteredItems.slice(0, 6).map((item) => {
+                                            const label = item.displayName || item.name;
                                             // Per UI/UX Notes #5: Search-based journey always ends at a Vendor Store.
                                             // Clicking a product opens its vendor's store with the product name
                                             // pre-filled in the in-store search, so user lands at "Select Vendor →
                                             // Vendor → Add Items" — never on a standalone product page.
+                                            return (
                                             <Link
                                                 key={item.id}
-                                                href={`/vendor/${item.vendorId}?q=${encodeURIComponent(item.name)}`}
+                                                href={`/vendor/${item.vendorId}?q=${encodeURIComponent(label)}`}
                                                 onClick={onClose}
                                                 className="flex items-center gap-4 p-4 border border-[#EEEEEE] rounded-[20px] active:scale-[0.98] transition-all hover:border-[#53B175]/30 hover:bg-gray-50/50 group w-full text-left"
                                             >
                                                 <div className="w-[50px] h-[60px] flex items-center justify-center p-1 shrink-0 overflow-hidden bg-white rounded-lg">
-                                                    <img src={item.images[0]} alt={item.name} className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform" />
+                                                    <img src={item.images[0]} alt={label} className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="text-[15px] font-bold text-[#181725] leading-tight group-hover:text-[#53B175] transition-colors line-clamp-1">
-                                                        {item.name}
+                                                        {label}
                                                     </div>
                                                     <div className="text-[12px] text-gray-400 mt-1 font-medium truncate flex items-center gap-1">
                                                         <span className="text-[#53B175]">from</span>
@@ -291,7 +336,8 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                                                     </div>
                                                 </div>
                                             </Link>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                     {filteredItems.length > 6 && (
                                         <Link

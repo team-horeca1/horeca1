@@ -40,10 +40,12 @@ export interface VendorSummary {
 
 export interface Product {
     id: string;
-    name: string;                // raw distributor product name (used in cart, orders, invoices)
-    displayName?: string;        // brand-canonical name when mapped, else equals name (used in discovery)
+    name: string;                // raw distributor product name (used in orders, invoices)
+    displayName?: string;        // brand-canonical name when mapped, else equals name (used in discovery, cart, checkout)
     brandName?: string;          // brand name when mapped (e.g. "Amul")
     brandSlug?: string;          // brand slug for /brand/[slug] link
+    /** Present when a brand mapping overrides discovery/cart/checkout fields; `name` stays raw for orders/invoices. */
+    brandOverride?: { brandName: string; fields: string[] };
     description: string;
     price: number;
     originalPrice?: number;
@@ -84,6 +86,10 @@ export interface VendorProduct extends Product {
     hasStorePromotion?: boolean;
     /** True when `price` is a server-resolved customer-specific price (price list / override). */
     customerPriceApplied?: boolean;
+    /** Optional SKU for in-store / overlay search matching. */
+    sku?: string;
+    /** Product tags for search matching. */
+    tags?: string[];
 }
 
 export interface BulkPriceTier {

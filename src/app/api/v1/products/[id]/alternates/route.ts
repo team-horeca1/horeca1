@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
+import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
 import { attachCustomerPricing } from '@/modules/pricing/catalog-pricing';
@@ -46,6 +47,7 @@ const productInclude = {
   vendor: { select: { id: true, businessName: true, logoUrl: true, minOrderValue: true } },
   inventories: { select: { qtyAvailable: true, qtyReserved: true } },
   category: { select: { id: true, name: true } },
+  brandMappings: productBrandMappingsInclude,
 } as const;
 
 const baseFilter: Prisma.ProductWhereInput = {

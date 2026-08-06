@@ -5,6 +5,7 @@
 //      3. Matching categories
 //      This 3-block response lets the frontend show a rich search results page
 // PUBLIC: No login needed
+// SearchService also matches brand-mapped display names + partial tags/aliases.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { SearchService } from '@/modules/catalog/search.service';
@@ -19,13 +20,15 @@ const searchService = new SearchService();
 
 export async function GET(req: NextRequest) {
   try {
-    // Rate limit: 30 searches per IP per minute
-    const { allowed } = await checkRateLimit(`search:${getClientIp(req)}`, 30, 60000);
-    if (!allowed) {
-      return NextResponse.json(
-        { success: false, error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' } },
-        { status: 429, headers: { 'Retry-After': '60' } }
-      );
+    // Rate limit: 30 searches per IP per minute (skip in development)
+    if (process.env.NODE_ENV !== 'development') {
+      const { allowed } = await checkRateLimit(`search:${getClientIp(req)}`, 30, 60000);
+      if (!allowed) {
+        return NextResponse.json(
+          { success: false, error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' } },
+          { status: 429, headers: { 'Retry-After': '60' } }
+        );
+      }
     }
 
     const queryParams = Object.fromEntries(req.nextUrl.searchParams);

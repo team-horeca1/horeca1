@@ -1,4 +1,4 @@
-import { getApprovedDistributorKeys, filterAuthorizedMappings } from '@/lib/brandAuthorizedDistributor';
+import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { aggregateInventories } from '@/lib/inventoryHelpers';
 import {
   loadFulfillmentStockContext,
@@ -907,24 +907,12 @@ export class CatalogService {
         },
       },
       vendor: { select: { id: true, businessName: true, logoUrl: true, vendorCode: true } },
-      brandMappings: {
-        where: { status: { in: ['verified' as const, 'auto_mapped' as const] } },
-        select: {
-          brandId: true,
-          brandMasterProduct: {
-            select: {
-              name: true,
-              brand: { select: { name: true, slug: true } },
-            },
-          },
-        },
-        orderBy: { confidenceScore: 'desc' as const },
-        take: 1,
-      },
+      brandMappings: productBrandMappingsInclude,
     };
 
-    const approvedKeys = await getApprovedDistributorKeys({ vendorId });
-
+    // Pass brandMappings through unfiltered — discovery surfaces apply brand
+    // detail overrides for any verified/auto_mapped link. Public brand store
+    // still gates on approved distributors in BrandService.getStoreBySlug.
     const mapOne = (p: {
       id: string;
       inventories: InvRow[];
@@ -943,11 +931,7 @@ export class CatalogService {
       return {
         ...p,
         inventories: [{ qtyAvailable, qtyReserved: 0 }],
-        brandMappings: filterAuthorizedMappings(
-          p.brandMappings as Parameters<typeof filterAuthorizedMappings>[0],
-          vendorId,
-          approvedKeys,
-        ),
+        brandMappings: p.brandMappings,
         categoryName: p.category?.name || '',
         categorySlug: p.category?.slug || '',
         in_stock: qtyAvailable > 0,
@@ -1076,7 +1060,11 @@ export class CatalogService {
       orderBy: { sortOrder: 'asc' },
       include: {
         products: {
-          include: { product: true },
+          include: {
+            product: {
+              include: { brandMappings: productBrandMappingsInclude },
+            },
+          },
           orderBy: { sortOrder: 'asc' },
           take: 10,
         },

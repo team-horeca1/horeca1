@@ -158,23 +158,85 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
       : (grossBasePrice > effectivePriceGross ? grossBasePrice : undefined);
   }
 
-  // Brand mapping → discovery-surface name override.
-  // When a verified/auto-mapped BrandProductMapping is attached, the brand's canonical name
-  // becomes the displayName. Cart and order history paths intentionally render `name` (not displayName).
+  // Brand mapping → discovery + cart + checkout overrides (name, images, category, description, packSize/unit).
+  // Orders and invoices intentionally render raw `name` (not displayName / brandOverride) for GST traceability.
   const rawName = (p.name as string) || '';
   const brandMappings = p.brandMappings as Array<Record<string, unknown>> | undefined;
   const activeMapping = brandMappings?.[0];
   const masterProduct = activeMapping?.brandMasterProduct as Record<string, unknown> | undefined;
   const masterBrand = masterProduct?.brand as Record<string, unknown> | undefined;
-  const displayName = (masterProduct?.name as string) || rawName;
+  const masterCategory = masterProduct?.categoryRel as Record<string, unknown> | undefined;
   const brandName = (masterBrand?.name as string) || undefined;
   const brandSlug = (masterBrand?.slug as string) || undefined;
+  const overrideFields: string[] = [];
+
+  const masterName = typeof masterProduct?.name === 'string' ? masterProduct.name.trim() : '';
+  const displayName = masterName || rawName;
+  if (masterName) overrideFields.push('name');
+
+  let description = (p.description as string) || '';
+  const masterDescription =
+    typeof masterProduct?.description === 'string' ? masterProduct.description.trim() : '';
+  if (masterDescription) {
+    description = masterDescription;
+    overrideFields.push('description');
+  }
+
+  const supplierImages: string[] = Array.isArray(p.images) && (p.images as string[]).length > 0
+    ? (p.images as string[]).filter((u): u is string => typeof u === 'string' && u.length > 0)
+    : p.imageUrl
+      ? [p.imageUrl as string]
+      : [];
+  const masterImageList = Array.isArray(masterProduct?.images)
+    ? (masterProduct.images as string[]).filter((u): u is string => typeof u === 'string' && u.length > 0)
+    : [];
+  const masterImageUrl =
+    typeof masterProduct?.imageUrl === 'string' && masterProduct.imageUrl.trim()
+      ? masterProduct.imageUrl.trim()
+      : '';
+  const brandImages = masterImageList.length > 0
+    ? masterImageList
+    : masterImageUrl
+      ? [masterImageUrl]
+      : [];
+  let images = supplierImages;
+  if (brandImages.length > 0) {
+    images = brandImages;
+    overrideFields.push('images');
+  }
+
+  let category =
+    (p.categoryName as string) ||
+    ((p.category as Record<string, unknown>)?.name as string) ||
+    '';
+  let categoryId =
+    (p.categoryId as string) ||
+    ((p.category as Record<string, unknown>)?.id as string) ||
+    undefined;
+  const masterCategoryName =
+    typeof masterCategory?.name === 'string' ? masterCategory.name.trim() : '';
+  if (masterCategoryName) {
+    category = masterCategoryName;
+    if (typeof masterCategory?.id === 'string' && masterCategory.id) {
+      categoryId = masterCategory.id;
+    }
+    overrideFields.push('category');
+  }
 
   // packSize and unit are stored separately in the DB (e.g. packSize='500', unit='ml').
   // For display, combine them: '500 ml'. If packSize already contains the unit
   // (e.g. legacy data like '500ml'), leave it as-is to avoid '500ml ml'.
-  const rawPackSize = ((p.packSize as string) || '').trim();
-  const rawUnit = ((p.unit as string) || '').trim();
+  let rawPackSize = ((p.packSize as string) || '').trim();
+  let rawUnit = ((p.unit as string) || '').trim();
+  const masterPackSize =
+    typeof masterProduct?.packSize === 'string' ? masterProduct.packSize.trim() : '';
+  const masterUnit =
+    typeof masterProduct?.unit === 'string' ? masterProduct.unit.trim() : '';
+  if (masterPackSize || masterUnit) {
+    if (masterPackSize) rawPackSize = masterPackSize;
+    if (masterUnit) rawUnit = masterUnit;
+    overrideFields.push('packSize');
+  }
   let packSizeDisplay: string;
   if (!rawPackSize && !rawUnit) {
     packSizeDisplay = '1 unit';
@@ -188,17 +250,23 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
     packSizeDisplay = `${rawPackSize} ${rawUnit}`;
   }
 
+  const brandOverride =
+    brandName && overrideFields.length > 0
+      ? { brandName, fields: overrideFields }
+      : undefined;
+
   return {
     id: p.id as string,
     name: rawName,
     displayName,
     brandName,
     brandSlug,
-    description: (p.description as string) || '',
+    brandOverride,
+    description,
     price: effectivePriceGross,
     originalPrice: strikePriceGross,
-    images: p.imageUrl ? [p.imageUrl as string] : [],
-    category: (p.categoryName as string) || (p.category as Record<string, unknown>)?.name as string || '',
+    images,
+    category,
     packSize: packSizeDisplay,
     unit: rawUnit || 'unit',
     stock: inventory
@@ -215,7 +283,7 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
     vendorId: (p.vendorId as string) || (vendor.id as string) || '',
     vendorName: (vendor.businessName as string) || '',
     vendorLogo: (vendor.logoUrl as string) || '',
-    categoryId: (p.categoryId as string) || ((p.category as Record<string, unknown>)?.id as string) || undefined,
+    categoryId,
     categoryParentId: ((p.category as Record<string, unknown>)?.parentId as string) || undefined,
     categoryParentName: (((p.category as Record<string, unknown>)?.parent as Record<string, unknown>)?.name as string) || undefined,
     categoryImage: ((p.category as Record<string, unknown>)?.imageUrl as string) || undefined,
@@ -256,6 +324,8 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
     customerPriceApplied: customerPriceApplied || undefined,
     taxPercent,
     taxableRate: effectivePrice,
+    sku: typeof p.sku === 'string' ? p.sku : undefined,
+    tags: Array.isArray(p.tags) ? (p.tags as string[]).filter(Boolean) : undefined,
     metadata: p.metadata,
   };
 }

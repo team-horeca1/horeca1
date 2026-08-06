@@ -45,7 +45,18 @@ interface ApiProduct {
     vendor: { id: string; businessName: string; slug: string; logoUrl: string | null; rating: number; minOrderValue: number } | null;
     priceSlabs: { minQty: number; maxQty: number | null; price: number }[];
     inventory: { qtyAvailable: number } | null;
-    brandMappings?: { brandMasterProduct: { name: string; brand: { name: string; slug: string } } }[];
+    brandMappings?: {
+        brandMasterProduct: {
+            name: string;
+            imageUrl?: string | null;
+            images?: string[];
+            description?: string | null;
+            packSize?: string | null;
+            unit?: string | null;
+            categoryRel?: { id: string; name: string; slug: string } | null;
+            brand: { name: string; slug: string };
+        };
+    }[];
     /** Server-resolved customer-specific price (price list / override) for the logged-in buyer. */
     customerPricing?: { unitPrice: number; source: string };
 }
@@ -69,10 +80,11 @@ export default function ProductDetailPage() {
             .finally(() => setPageLoading(false));
     }, [id]);
 
-    // Derived display values
+    // Derived display values — brand mapping overrides discovery fields;
+    // cart still gets raw `name` via vendorProductForContext below.
     const rawProductName = apiProduct?.name || '';
     const brandMapping = apiProduct?.brandMappings?.[0]?.brandMasterProduct;
-    const productName = brandMapping?.name || rawProductName; // brand canonical name on PDP if mapped
+    const productName = brandMapping?.name?.trim() || rawProductName;
     const brandName = brandMapping?.brand?.name as string | undefined;
     const brandSlug = brandMapping?.brand?.slug as string | undefined;
     const vendorName = apiProduct?.vendor?.businessName || '';
@@ -86,10 +98,54 @@ export default function ProductDetailPage() {
     const customerStrikePrice = hasCustomerPrice && Number(apiProduct?.basePrice ?? 0) > productPrice
         ? Number(apiProduct?.basePrice)
         : null;
-    const productImage = apiProduct?.imageUrl || apiProduct?.images?.[0] || '/images/product/product-img3.png';
-    const productCategory = apiProduct?.category?.name || '';
-    const productUnit = apiProduct?.packSize || '1 unit';
-    const productDescription = apiProduct?.description || 'Premium quality product sourced for professional kitchens.';
+
+    const brandImages = (brandMapping?.images ?? []).filter(
+        (u): u is string => typeof u === 'string' && u.length > 0,
+    );
+    const brandImageUrl = brandMapping?.imageUrl?.trim() || '';
+    const productImage =
+        brandImages[0] ||
+        brandImageUrl ||
+        apiProduct?.imageUrl ||
+        apiProduct?.images?.[0] ||
+        '/images/product/product-img3.png';
+
+    const productCategory =
+        brandMapping?.categoryRel?.name?.trim() ||
+        apiProduct?.category?.name ||
+        '';
+
+    const brandDescription = brandMapping?.description?.trim() || '';
+    const productDescription =
+        brandDescription ||
+        apiProduct?.description ||
+        'Premium quality product sourced for professional kitchens.';
+
+    const rawPack = (brandMapping?.packSize?.trim() || apiProduct?.packSize || '').trim();
+    const rawUnit = (brandMapping?.unit?.trim() || apiProduct?.unit || '').trim();
+    let productUnit: string;
+    if (!rawPack && !rawUnit) {
+        productUnit = '1 unit';
+    } else if (!rawUnit) {
+        productUnit = rawPack;
+    } else if (!rawPack) {
+        productUnit = rawUnit;
+    } else if (rawPack.toLowerCase().includes(rawUnit.toLowerCase())) {
+        productUnit = rawPack;
+    } else {
+        productUnit = `${rawPack} ${rawUnit}`;
+    }
+
+    const brandOverrideFields: string[] = [];
+    if (brandMapping?.name?.trim()) brandOverrideFields.push('name');
+    if (brandImages.length > 0 || brandImageUrl) brandOverrideFields.push('images');
+    if (brandMapping?.categoryRel?.name?.trim()) brandOverrideFields.push('category');
+    if (brandDescription) brandOverrideFields.push('description');
+    if (brandMapping?.packSize?.trim() || brandMapping?.unit?.trim()) brandOverrideFields.push('packSize');
+    const brandOverride =
+        brandName && brandOverrideFields.length > 0
+            ? { brandName, fields: brandOverrideFields }
+            : undefined;
     // Slab tiers are outranked (and ignored by the cart) when a customer price applies — hide them.
     const apiPriceSlabs = apiProduct?.priceSlabs;
     const bulkPrices = useMemo(
@@ -115,14 +171,18 @@ export default function ProductDetailPage() {
         vendorId: apiProduct?.vendor?.id || '',
         vendorName: apiProduct?.vendor?.businessName || '',
         vendorLogo: apiProduct?.vendor?.logoUrl || '',
-        name: productName,
+        name: rawProductName,
+        displayName: productName,
+        brandName,
+        brandSlug,
+        brandOverride,
         description: productDescription,
         category: productCategory,
         price: productPrice,
         originalPrice: apiProduct?.originalPrice ?? productPrice,
         images: [productImage],
         packSize: productUnit,
-        unit: apiProduct?.unit || productUnit,
+        unit: rawUnit || apiProduct?.unit || productUnit,
         stock: stockQty,
         isActive: true,
         createdAt: new Date(),
@@ -131,7 +191,7 @@ export default function ProductDetailPage() {
         creditBadge: false,
         minOrderQuantity: bulkPrices[0]?.minQty || 1,
         customerPriceApplied: hasCustomerPrice || undefined,
-    }), [apiProduct, id, productName, productDescription, productCategory, productPrice, productImage, productUnit, stockQty, bulkPrices, hasCustomerPrice]);
+    }), [apiProduct, id, rawProductName, productName, brandName, brandSlug, brandOverride, productDescription, productCategory, productPrice, productImage, productUnit, rawUnit, stockQty, bulkPrices, hasCustomerPrice]);
 
     // Track recently viewed vendor for "Continue Ordering" section
     const [dalVendors, setDalVendors] = useState<DalVendor[]>([]);

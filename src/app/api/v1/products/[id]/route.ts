@@ -3,7 +3,7 @@
 // PUBLIC: No auth required
 
 import { NextRequest, NextResponse } from 'next/server';
-import { filterProductBrandMappings } from '@/lib/brandAuthorizedDistributor';
+import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { attachCustomerPricing } from '@/modules/pricing/catalog-pricing';
@@ -36,20 +36,7 @@ export async function GET(req: NextRequest) {
         vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true, rating: true, minOrderValue: true } },
         priceSlabs: { orderBy: { minQty: 'asc' }, select: { minQty: true, maxQty: true, price: true, promoPrice: true } },
         inventories: { select: { qtyAvailable: true, qtyReserved: true } },
-        brandMappings: {
-          where: { status: { in: ['verified', 'auto_mapped'] } },
-          select: {
-            brandId: true,
-            brandMasterProduct: {
-              select: {
-                name: true,
-                brand: { select: { name: true, slug: true } },
-              },
-            },
-          },
-          orderBy: { confidenceScore: 'desc' },
-          take: 1,
-        },
+        brandMappings: productBrandMappingsInclude,
       },
     });
 
@@ -59,15 +46,15 @@ export async function GET(req: NextRequest) {
 
     // Logged-in buyers see THEIR price (price lists / overrides) on the
     // detail page — same resolver the cart uses.
-    const [filtered] = await filterProductBrandMappings([{
-      ...withLegacyInventory(product),
-      vendorId: product.vendorId ?? undefined,
-    }]);
+    // Brand mapping overrides apply for any verified/auto_mapped link (no
+    // distributor-approval gate on discovery/PDP). Public brand store still
+    // filters approved distributors in BrandService.getStoreBySlug.
+    const enriched = withLegacyInventory(product);
     const priced = await attachCustomerPricing([{
-      ...filtered,
+      ...enriched,
       id: product.id,
       basePrice: product.basePrice,
-      vendorId: product.vendorId ?? filtered.vendor?.id ?? undefined,
+      vendorId: product.vendorId ?? enriched.vendor?.id ?? undefined,
     }]);
     const withPromos = await attachActivePromotions(priced);
     return NextResponse.json({ success: true, data: withPromos[0] });

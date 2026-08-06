@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
-import { getApprovedDistributorKeys, filterAuthorizedMappings } from '@/lib/brandAuthorizedDistributor';
+import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import {
   loadFulfillmentStockContext,
   sellableForContext,
@@ -19,23 +19,40 @@ const PRODUCT_INCLUDE = {
   priceSlabs: { orderBy: { sortOrder: 'asc' as const } },
   inventories: { select: { outletId: true, qtyAvailable: true, qtyReserved: true } },
   category: { select: { id: true, name: true, slug: true, imageUrl: true } },
-  brandMappings: {
-    where: { status: { in: ['verified' as const, 'auto_mapped' as const] } },
-    select: {
-      brandId: true,
-      brandMasterProduct: {
-        select: {
-          name: true,
-          brand: { select: { name: true, slug: true } },
-        },
-      },
-    },
-    orderBy: { confidenceScore: 'desc' as const },
-    take: 1,
-  },
+  brandMappings: productBrandMappingsInclude,
 } satisfies Prisma.ProductInclude;
 
 type ProductWithIncludes = Prisma.ProductGetPayload<{ include: typeof PRODUCT_INCLUDE }>;
+
+const LIVE_MAPPING_STATUSES = ['verified', 'auto_mapped'] as const;
+
+/**
+ * Partial / case-insensitive match on String[] columns (Prisma `has` is exact only).
+ * Also covers brand-master tags/aliases via live mappings.
+ */
+async function tagAliasCandidateIds(query: string): Promise<string[]> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>(
+    Prisma.sql`
+      SELECT DISTINCT p.id
+      FROM   products p
+      LEFT JOIN brand_product_mappings m
+        ON m.distributor_product_id = p.id
+       AND m.status IN ('verified', 'auto_mapped')
+      LEFT JOIN brand_master_products bmp
+        ON bmp.id = m.brand_master_product_id
+      WHERE  p.is_active = true
+        AND  p.approval_status = 'approved'
+        AND (
+              EXISTS (SELECT 1 FROM unnest(p.tags) t WHERE t ILIKE ${'%' + query + '%'})
+           OR EXISTS (SELECT 1 FROM unnest(p.alias_names) a WHERE a ILIKE ${'%' + query + '%'})
+           OR EXISTS (SELECT 1 FROM unnest(bmp.tags) t WHERE t ILIKE ${'%' + query + '%'})
+           OR EXISTS (SELECT 1 FROM unnest(bmp.alias_names) a WHERE a ILIKE ${'%' + query + '%'})
+        )
+      LIMIT 100
+    `,
+  );
+  return rows.map((r) => r.id);
+}
 
 export class SearchService {
   async search(query: string, pincode?: string, cursor?: string, limit = 20) {
@@ -43,8 +60,12 @@ export class SearchService {
       ? { vendor: { isActive: true, serviceAreas: { some: { pincode, isActive: true } } } }
       : {};
 
+    const arrayMatchIds = await tagAliasCandidateIds(query);
+
     // ── Phase 1: exact ILIKE match ──────────────────────────────────────────
     // Fast path — hits existing btree/GIN indexes, very high confidence results.
+    // Also matches brand-mapped display names (BrandMasterProduct) so buyers
+    // find cards that show overridden names like "amd 16ram".
     const exactWhere: Prisma.ProductWhereInput = {
       isActive: true,
       approvalStatus: 'approved',
@@ -56,8 +77,19 @@ export class SearchService {
         { brand: { contains: query, mode: 'insensitive' } },
         { category: { name: { contains: query, mode: 'insensitive' } } },
         { vendor: { businessName: { contains: query, mode: 'insensitive' } } },
-        { tags: { has: query.toLowerCase() } },
-        { aliasNames: { has: query.toLowerCase() } },
+        {
+          brandMappings: {
+            some: {
+              status: { in: [...LIVE_MAPPING_STATUSES] },
+              OR: [
+                { brandMasterProduct: { name: { contains: query, mode: 'insensitive' } } },
+                { brandMasterProduct: { sku: { contains: query, mode: 'insensitive' } } },
+                { brand: { name: { contains: query, mode: 'insensitive' } } },
+              ],
+            },
+          },
+        },
+        ...(arrayMatchIds.length > 0 ? [{ id: { in: arrayMatchIds } }] : []),
       ],
     };
 
@@ -111,22 +143,10 @@ export class SearchService {
       products = exactProducts;
     }
 
+    // Brand mappings pass through unfiltered — search/discovery apply brand
+    // detail overrides for any verified/auto_mapped link. Public brand store
+    // still gates on approved distributors in BrandService.getStoreBySlug.
     const vendorIds = [...new Set(products.map((p) => p.vendorId).filter((id): id is string => id != null))];
-    const brandIds = new Set<string>();
-    for (const p of products) {
-      for (const m of p.brandMappings ?? []) {
-        if (m.brandId) brandIds.add(m.brandId);
-      }
-    }
-    const approvedKeys = brandIds.size > 0 && vendorIds.length > 0
-      ? await getApprovedDistributorKeys()
-      : new Set<string>();
-    products = products.map((p) => {
-      const vendorId = p.vendorId ?? p.vendor?.id;
-      if (!vendorId || !p.brandMappings?.length) return p;
-      const filtered = filterAuthorizedMappings(p.brandMappings, vendorId, approvedKeys);
-      return filtered.length === p.brandMappings.length ? p : { ...p, brandMappings: filtered };
-    });
 
     // Align search stock with checkout fulfillment rules (per vendor).
     const stockCtxByVendor = new Map<string, Awaited<ReturnType<typeof loadFulfillmentStockContext>>>();

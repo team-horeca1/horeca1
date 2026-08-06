@@ -5,6 +5,7 @@
 // PUBLIC: No auth — promotional surface anyone can browse.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
 import { attachCustomerPricing } from '@/modules/pricing/catalog-pricing';
@@ -86,6 +87,7 @@ export async function GET(req: NextRequest) {
         inventories: { select: { qtyAvailable: true } },
         category: { select: { id: true, name: true } },
         priceSlabs: { orderBy: { minQty: 'asc' }, take: 3 },
+        brandMappings: productBrandMappingsInclude,
       },
       orderBy: { updatedAt: 'desc' },
       take: limit * 4,
