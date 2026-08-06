@@ -1578,10 +1578,23 @@ model BrandMasterProduct {
   slug            String  @db.VarChar(255)          // url-safe slug derived from name
   description     String? @db.Text
   imageUrl        String? @map("image_url") @db.VarChar(512)
+  images          String[] @default([]) @map("images")
   packSize        String? @map("pack_size") @db.VarChar(100)
   unit            String? @db.VarChar(50)
   sku             String? @db.VarChar(100)          // mirrors MasterProduct.sku when linked
   category        String? @db.VarChar(100)          // display category label
+  hsn             String?  @db.VarChar(50)
+  barcode         String?  @db.VarChar(100)
+  ean             String?  @db.VarChar(50)
+  vegNonVeg       VegType? @map("veg_non_veg")
+  storageType     String?  @map("storage_type") @db.VarChar(50)
+  shelfLifeDays   Int?     @map("shelf_life_days")
+  countryOfOrigin String?  @map("country_of_origin") @db.VarChar(100)
+  fssaiRef        String?  @map("fssai_ref") @db.VarChar(50)
+  netWeight       Decimal? @map("net_weight") @db.Decimal(10, 3)
+  netWeightUnit   String?  @map("net_weight_unit") @db.VarChar(20)
+  tags            String[] @default([]) @map("tags")
+  aliasNames      String[] @default([]) @map("alias_names")
   isActive        Boolean @default(true) @map("is_active")
   sortOrder       Int     @default(0) @map("sort_order")
   // Embedding for AI-assisted brand mapping (Phase 3).
@@ -3265,7 +3278,7 @@ model PlatformSetting {
   platformName          String   @default("HoReCa1") @map("platform_name") @db.VarChar(120)
   contactEmail          String?  @map("contact_email") @db.VarChar(255)
   supportPhone          String?  @map("support_phone") @db.VarChar(30)
-  defaultCommissionPct  Decimal  @default(10) @map("default_commission_pct") @db.Decimal(5, 2)
+  defaultCommissionPct  Decimal  @default(5) @map("default_commission_pct") @db.Decimal(5, 2)
   minOrderValue         Decimal  @default(500) @map("min_order_value") @db.Decimal(10, 2)
   freeDeliveryThreshold Decimal  @default(2000) @map("free_delivery_threshold") @db.Decimal(10, 2)
   emailNotifications    Boolean  @default(true) @map("email_notifications")
