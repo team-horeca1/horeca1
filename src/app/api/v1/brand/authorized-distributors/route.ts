@@ -1,5 +1,5 @@
 // GET   /api/v1/brand/authorized-distributors — list linked distributors
-// POST  /api/v1/brand/authorized-distributors — add / approve / reject a vendor
+// POST  /api/v1/brand/authorized-distributors — add / approve / reject / unapprove a vendor
 // PATCH /api/v1/brand/authorized-distributors — same as POST
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -9,13 +9,13 @@ import { brandOnly } from '@/middleware/rbac';
 import { resolveBrandContext } from '@/lib/resolveBrandId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
-import { approveDistributorByBrand, rejectDistributorAuth } from '@/lib/brandAuthorizedDistributor';
+import { approveDistributorByBrand, rejectDistributorAuth, unapproveDistributorByBrand, healRejectedDistributorsWithLiveMappings } from '@/lib/brandAuthorizedDistributor';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import type { AuthContext } from '@/middleware/auth';
 
 const actionSchema = z.object({
   vendorId: z.string().uuid(),
-  action: z.enum(['add', 'approve', 'reject']),
+  action: z.enum(['add', 'approve', 'reject', 'unapprove']),
   note: z.string().max(500).optional(),
 });
 
@@ -24,6 +24,9 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
     requirePermission(ctx, 'vendors.view');
     const { brandId } = await resolveBrandContext(ctx, req);
     const status = req.nextUrl.searchParams.get('status') ?? undefined;
+
+    // Rejected + live mappings → pending so they show under Requests
+    await healRejectedDistributorsWithLiveMappings({ brandId });
 
     const rows = await prisma.brandAuthorizedDistributor.findMany({
       where: {
@@ -80,6 +83,18 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
         entity: 'BrandAuthorizedDistributor',
         entityId: row.id,
         metadata: { vendorId, brandId },
+      });
+      return NextResponse.json({ success: true, data: row });
+    }
+
+    if (action === 'unapprove') {
+      const row = await unapproveDistributorByBrand(brandId, vendorId, ctx.userId, note);
+      if (!row) throw Errors.notFound('Distributor link');
+      logAction(ctx, req, {
+        action: AUDIT_ACTIONS.brandDistributorUnapproved,
+        entity: 'BrandAuthorizedDistributor',
+        entityId: row.id,
+        metadata: { vendorId, brandId, status: row.status },
       });
       return NextResponse.json({ success: true, data: row });
     }

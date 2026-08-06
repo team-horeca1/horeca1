@@ -25,9 +25,25 @@ export const createBrandProductSchema = z.object({
   categoryIds: z.array(z.string().uuid()).max(12).optional(),
   sortOrder: z.number().int().optional(),
   masterProductId: z.string().uuid().optional(),
+  // Product-detail fields (no tax / pricing — those stay on supplier Product)
+  hsn: z.string().max(50).optional(),
+  barcode: z.string().max(100).optional(),
+  ean: z.string().max(50).optional(),
+  vegNonVeg: z.enum(['veg', 'nonveg', 'egg']).optional(),
+  storageType: z.string().max(50).optional(),
+  shelfLifeDays: z.number().int().min(0).max(3650).optional(),
+  countryOfOrigin: z.string().max(100).optional(),
+  fssaiRef: z.string().max(50).optional(),
+  netWeight: z.number().nonnegative().optional(),
+  netWeightUnit: z.string().max(20).optional(),
+  images: z.array(z.string().url()).max(20).optional(),
+  tags: z.array(z.string().max(80)).max(50).optional(),
+  aliasNames: z.array(z.string().max(255)).max(50).optional(),
 });
 
 export const updateBrandProductSchema = createBrandProductSchema.partial();
+
+export type CreateBrandProductInput = z.infer<typeof createBrandProductSchema>;
 
 export const listBrandsSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(20),

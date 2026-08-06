@@ -168,9 +168,6 @@ export function validateBrandProfile(
           errors.phone = 'Enter a valid 10-digit mobile number';
         }
         if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
-        if (!hasPhone && hasEmail && (!password || password.length < 6)) {
-          errors.password = 'Password is required when registering with email only';
-        }
       }
     } else {
       if (!phone || phone.length !== 10) errors.phone = 'Enter a valid 10-digit mobile number';
@@ -179,6 +176,9 @@ export function validateBrandProfile(
     if (context === 'adminCreate') {
       if (!email || !EMAIL_RE.test(email)) errors.email = 'Owner email is required';
       if (!password || password.length < 6) errors.password = 'Password must be at least 6 characters';
+    } else if (context === 'publicRegister') {
+      if (!password) errors.password = 'Password is required';
+      else if (password.length < 6) errors.password = 'Password must be at least 6 characters';
     } else if (password && password.length < 6) {
       errors.password = 'Password must be at least 6 characters';
     }
@@ -216,12 +216,7 @@ export function validateFieldBlur(field: string, value: string): string {
       return v.length > 0 && v.length < 2 ? 'First name is required' : v.length === 0 ? 'First name is required' : '';
     case 'brandType':
       return v.length === 0 ? 'Brand type is required' : '';
-    case 'subType':
-      return v.length === 0 ? 'Sub-type is required' : '';
-    case 'phone':
-      return v.length > 0 && v.replace(/\D/g, '').slice(-10).length !== 10
-        ? 'Enter a valid 10-digit mobile number'
-        : v.length === 0 ? 'Enter a valid 10-digit mobile number' : '';
+    // phone / subType: judged on submit only (OR-rule / conditional sub-types)
     case 'email':
       return v.length > 0 && !EMAIL_RE.test(v) ? 'Enter a valid email address' : '';
     case 'password':

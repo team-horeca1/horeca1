@@ -35,7 +35,7 @@ export function mappingStatusLabel(
 export function distributorAuthLabel(status: string | null | undefined): { label: string; tone: MappingStatusTone } {
   switch (status) {
     case 'approved': return { label: 'Approved', tone: 'live' };
-    case 'rejected': return { label: 'Rejected', tone: 'rejected' };
+    case 'rejected': return { label: 'Unlinked', tone: 'rejected' };
     case 'pending': return { label: 'Pending approval', tone: 'pending' };
     default: return { label: 'Not authorized', tone: 'pending' };
   }

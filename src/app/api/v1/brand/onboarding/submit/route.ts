@@ -54,8 +54,19 @@ function parseBody(raw: unknown) {
     }
     if (phone && !PHONE_RE.test(phone)) throw Errors.badRequest('Invalid phone number');
     if (ownerEmail && !EMAIL_RE.test(ownerEmail)) throw Errors.badRequest('Invalid email address');
-    if (!hasPhone && (!parsed.password || parsed.password.length < 6)) {
-      throw Errors.badRequest('Password is required when registering with email only');
+    // Email-only path: login identity must match the OTP-verified address.
+    // Prevents verifying A then swapping Primary Contact email to unverified B.
+    if (!hasPhone) {
+      const otpEmail = (parsed.verifiedEmail || '').trim().toLowerCase();
+      if (!otpEmail || !EMAIL_RE.test(otpEmail)) {
+        throw Errors.badRequest('Email is not verified. Please verify your email first.');
+      }
+      if (ownerEmail !== otpEmail) {
+        throw Errors.badRequest('Email must match the address you verified with OTP.');
+      }
+    }
+    if (!parsed.password || parsed.password.length < 6) {
+      throw Errors.badRequest('Password is required');
     }
   }
 

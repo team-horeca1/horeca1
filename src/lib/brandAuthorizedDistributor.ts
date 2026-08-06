@@ -58,11 +58,73 @@ export async function getApprovedDistributorKeys(
   return new Set(rows.map((r) => distributorAuthKey(r.brandId, r.vendorId)));
 }
 export async function ensurePendingDistributorAuth(brandId: string, vendorId: string): Promise<void> {
-  await prisma.brandAuthorizedDistributor.upsert({
+  const existing = await prisma.brandAuthorizedDistributor.findUnique({
     where: { brandId_vendorId: { brandId, vendorId } },
-    create: { brandId, vendorId, status: 'pending' },
-    update: {},
   });
+
+  if (!existing) {
+    await prisma.brandAuthorizedDistributor.create({
+      data: { brandId, vendorId, status: 'pending' },
+    });
+    return;
+  }
+
+  // Reopen if brand had unlinked but vendor still maps / remaps. Leave approved/pending alone.
+  if (existing.status === 'rejected') {
+    await prisma.brandAuthorizedDistributor.update({
+      where: { brandId_vendorId: { brandId, vendorId } },
+      data: {
+        status: 'pending',
+        rejectedAt: null,
+        rejectedBy: null,
+        brandApprovedAt: null,
+        brandApprovedBy: null,
+      },
+    });
+  }
+}
+
+const LIVE_MAPPING_STATUSES = ['verified', 'auto_mapped', 'pending_review'] as const;
+
+/** Reopen rejected distributor auth when the vendor still has live product mappings. */
+export async function healRejectedDistributorsWithLiveMappings(filter: {
+  brandId?: string;
+  vendorId?: string;
+}): Promise<number> {
+  const rejected = await prisma.brandAuthorizedDistributor.findMany({
+    where: {
+      status: 'rejected',
+      ...(filter.brandId && { brandId: filter.brandId }),
+      ...(filter.vendorId && { vendorId: filter.vendorId }),
+    },
+    select: { id: true, brandId: true, vendorId: true },
+  });
+  if (rejected.length === 0) return 0;
+
+  const toHeal: string[] = [];
+  for (const row of rejected) {
+    const live = await prisma.brandProductMapping.count({
+      where: {
+        brandId: row.brandId,
+        status: { in: [...LIVE_MAPPING_STATUSES] },
+        distributorProduct: { vendorId: row.vendorId },
+      },
+    });
+    if (live > 0) toHeal.push(row.id);
+  }
+  if (toHeal.length === 0) return 0;
+
+  const result = await prisma.brandAuthorizedDistributor.updateMany({
+    where: { id: { in: toHeal } },
+    data: {
+      status: 'pending',
+      rejectedAt: null,
+      rejectedBy: null,
+      brandApprovedAt: null,
+      brandApprovedBy: null,
+    },
+  });
+  return result.count;
 }
 
 export async function approveDistributorByBrand(
@@ -87,6 +149,34 @@ export async function approveDistributorByBrand(
       status: 'approved',
       brandApprovedAt: now,
       brandApprovedBy: userId,
+      rejectedAt: null,
+      rejectedBy: null,
+      ...(note !== undefined && { note }),
+    },
+    include: {
+      vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true } },
+    },
+  });
+}
+
+/** Demote an approved distributor back to pending (Requests). Does not create a row. */
+export async function unapproveDistributorByBrand(
+  brandId: string,
+  vendorId: string,
+  _userId: string,
+  note?: string,
+) {
+  const existing = await prisma.brandAuthorizedDistributor.findUnique({
+    where: { brandId_vendorId: { brandId, vendorId } },
+  });
+  if (!existing) return null;
+
+  return prisma.brandAuthorizedDistributor.update({
+    where: { brandId_vendorId: { brandId, vendorId } },
+    data: {
+      status: 'pending',
+      brandApprovedAt: null,
+      brandApprovedBy: null,
       rejectedAt: null,
       rejectedBy: null,
       ...(note !== undefined && { note }),
@@ -143,7 +233,7 @@ export async function rejectDistributorAuth(
   note?: string,
 ) {
   const now = new Date();
-  return prisma.brandAuthorizedDistributor.upsert({
+  const row = await prisma.brandAuthorizedDistributor.upsert({
     where: { brandId_vendorId: { brandId, vendorId } },
     create: {
       brandId,
@@ -163,7 +253,50 @@ export async function rejectDistributorAuth(
       vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true } },
     },
   });
+
+  // Soft-reject live product mappings so Unlink fully disconnects (no heal loop).
+  await prisma.brandProductMapping.updateMany({
+    where: {
+      brandId,
+      status: { in: [...LIVE_MAPPING_STATUSES] },
+      distributorProduct: { vendorId },
+    },
+    data: {
+      status: 'rejected',
+      reviewNote: note ?? 'Unlinked by brand',
+      reviewedBy: userId,
+      updatedAt: now,
+    },
+  });
+
+  return row;
 }
+
+/**
+ * Prisma include fragment for customer-facing brand overrides on Product.
+ * Loads the active verified/auto_mapped mapping plus the master fields the DAL
+ * needs to override name, images, category, description, and packSize/unit.
+ */
+export const productBrandMappingsInclude = {
+  where: { status: { in: ['verified' as const, 'auto_mapped' as const] } },
+  select: {
+    brandId: true,
+    brandMasterProduct: {
+      select: {
+        name: true,
+        imageUrl: true,
+        images: true,
+        description: true,
+        packSize: true,
+        unit: true,
+        categoryRel: { select: { id: true, name: true, slug: true } },
+        brand: { select: { name: true, slug: true } },
+      },
+    },
+  },
+  orderBy: { confidenceScore: 'desc' as const },
+  take: 1,
+};
 
 /** Strip brandMappings whose vendor is not an approved distributor for that brand. */
 export async function filterProductBrandMappings<

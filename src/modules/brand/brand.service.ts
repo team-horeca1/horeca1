@@ -9,6 +9,8 @@ import { runMappingForProduct, runMappingForBrand, embedBrandMasterProduct } fro
 import { validateMasterSku } from '@/lib/sku';
 import { assertLeafCategory, syncMasterProductCategories } from '@/modules/catalog/catalog.service';
 import { pushMasterCategoriesToVendorListings } from '@/modules/catalog/master-sync.service';
+import type { CreateBrandProductInput } from './brand.validator';
+
 function slugify(str: string): string {
   return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
@@ -89,19 +91,6 @@ interface UpdateBrandInput {
   categories?: string[];
   bgColor?: string;
   showcaseImages?: string[];
-}
-
-interface CreateBrandProductInput {
-  name: string;
-  description?: string;
-  imageUrl?: string;
-  packSize?: string;
-  unit?: string;
-  sku?: string;
-  categoryId?: string;        // primary (back-compat); auto-derived from categoryIds[0] when omitted
-  categoryIds?: string[];     // multi-category
-  sortOrder?: number;
-  masterProductId?: string;
 }
 
 // ── Service ──────────────────────────────────────────────────
@@ -686,12 +675,25 @@ export class BrandService {
         name: input.name,
         description: input.description,
         imageUrl: input.imageUrl,
+        images: input.images ?? [],
         packSize: input.packSize,
         unit: input.unit,
         sku: input.sku,
         sortOrder: input.sortOrder,
         categoryId: primaryCategoryId,
         categoryIds,
+        hsn: input.hsn,
+        barcode: input.barcode,
+        ean: input.ean,
+        vegNonVeg: input.vegNonVeg,
+        storageType: input.storageType,
+        shelfLifeDays: input.shelfLifeDays,
+        countryOfOrigin: input.countryOfOrigin,
+        fssaiRef: input.fssaiRef,
+        netWeight: input.netWeight,
+        netWeightUnit: input.netWeightUnit,
+        tags: input.tags ?? [],
+        aliasNames: input.aliasNames ?? [],
       },
     });
 
@@ -800,6 +802,7 @@ export class BrandService {
     if (!product) throw Errors.notFound('Product not found');
 
     // Keep categoryId in sync when categoryIds changes (primary = first entry).
+    // Spread passes through all validated detail fields (hsn, images, aliasNames, …).
     const data: Record<string, unknown> = { ...input };
     if (input.categoryIds !== undefined) {
       data.categoryIds = input.categoryIds;
@@ -834,7 +837,9 @@ export class BrandService {
 
     // Re-embed + re-map when name (or other text-affecting fields) changed.
     if (input.name || input.packSize !== undefined || input.unit !== undefined
-        || input.categoryId !== undefined || input.categoryIds !== undefined) {
+        || input.categoryId !== undefined || input.categoryIds !== undefined
+        || input.aliasNames !== undefined || input.description !== undefined
+        || input.tags !== undefined) {
       embedBrandMasterProduct(productId)
         .catch(console.error)
         .finally(() => runMappingForProduct(productId).catch(console.error));
