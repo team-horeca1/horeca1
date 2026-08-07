@@ -22,12 +22,14 @@ import {
     AlertCircle,
     Copy,
     Check,
+    Store,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CategoryMultiPicker } from '@/components/features/brand/CategoryMultiPicker';
 import { ImageUploadField } from '@/components/ui/ImageUploadField';
 import { AdminUserTeamPanel } from '@/components/features/admin/AdminUserTeamPanel';
+import BrandFormModal from '@/components/features/admin/BrandFormModal';
 import {
     AdminEntityDetailHeader,
     AdminEntityStatsRow,
@@ -126,6 +128,7 @@ export default function AdminBrandEditPage() {
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [rejectNote, setRejectNote] = useState('');
     const [activeTab, setActiveTab] = useState<'overview' | 'storefront' | 'team'>('overview');
+    const [showStorefrontModal, setShowStorefrontModal] = useState(false);
 
     const [form, setForm] = useState({
         name: '',
@@ -293,8 +296,9 @@ export default function AdminBrandEditPage() {
     const owner = brand.user;
     // Admin-created brands have no owner account (or a placeholder internal email) and
     // no submitted onboarding profile — treat those as a blank "create storefront" form.
-    const isDraftStorefront = !owner || owner.email.includes('brand.internal.horeca1');
-    const hasApplication = !!ba || (!!owner && !owner.email.includes('brand.internal.horeca1'));
+    // Phone-only owners have a real account with email=null and are NOT drafts.
+    const isDraftStorefront = !owner || (!!owner.email && owner.email.includes('brand.internal.horeca1'));
+    const hasApplication = !!ba || (!!owner && !(owner.email?.includes('brand.internal.horeca1')));
     const billingParts = [
         ba?.billingAddressLine,
         ba?.billingCity,
@@ -375,8 +379,20 @@ export default function AdminBrandEditPage() {
                 </div>
             )}
             {isDraftStorefront && !fromApprovals && (
-                <div className="bg-[#EEF8F1] border border-[#299E60]/25 rounded-[12px] p-4 text-[13px] font-semibold text-[#1f6b41] shadow-sm">
-                    This is an admin-managed brand with no owner application. Fill in the storefront tab — logo, banner, info and categories — then Save to publish it.
+                <div className="bg-[#EEF8F1] border border-[#299E60]/25 rounded-[12px] p-4 shadow-sm flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+                    <div className="text-[13px] font-semibold text-[#1f6b41]">
+                        This is an admin-managed brand with no owner application. Create a storefront to attach an owner login and full profile — or fill media on the Storefront tab and Save.
+                    </div>
+                    {canEditBrand && (
+                        <button
+                            type="button"
+                            onClick={() => setShowStorefrontModal(true)}
+                            className="h-[38px] px-4 shrink-0 bg-[#299E60] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                            <Store size={14} />
+                            Create Storefront
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -743,6 +759,17 @@ export default function AdminBrandEditPage() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {showStorefrontModal && (
+                <BrandFormModal
+                    brand={{ id: brand.id, name: brand.name }}
+                    onClose={() => setShowStorefrontModal(false)}
+                    onCreated={() => {
+                        setShowStorefrontModal(false);
+                        void loadBrand();
+                    }}
+                />
             )}
         </div>
     );

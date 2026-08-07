@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * BrandFormModal — Quick create (name only) or full storefront setup.
+ * BrandFormModal — Quick create (name only), full storefront setup,
+ * or upgrade an existing name-only brand into a storefront.
  */
 
 import { useState } from 'react';
@@ -23,6 +24,8 @@ import {
 import { buildAdminBrandPayload } from '@/lib/brandProfileMapper';
 
 interface Props {
+  /** When set, modal upgrades this name-only brand into a full storefront. */
+  brand?: { id: string; name: string };
   onClose: () => void;
   onCreated: (brand: { id: string; name: string; slug: string }) => void;
 }
@@ -50,8 +53,9 @@ const BRAND_FIELD_ORDER = [
   'gstin', 'outletName', 'addressLine', 'pincode',
 ];
 
-export default function BrandFormModal({ onClose, onCreated }: Props) {
-  const [mode, setMode] = useState<Mode>('quick');
+export default function BrandFormModal({ brand, onClose, onCreated }: Props) {
+  const isUpgrade = !!brand;
+  const [mode, setMode] = useState<Mode>(isUpgrade ? 'full' : 'quick');
   const [quickName, setQuickName] = useState('');
   const [tab, setTab] = useState<Tab>('overview');
   const [submitting, setSubmitting] = useState(false);
@@ -66,9 +70,13 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
   } = useFormFeedback();
   const [showPwd, setShowPwd] = useState(false);
   const [password, setPassword] = useState('');
+  const seededName = brand?.name?.trim() ?? '';
   const [profile, setProfile] = useState<BrandProfileValues>({
     ...EMPTY_BRAND_PROFILE,
     leadStatus: 'Lead',
+    ...(seededName
+      ? { displayName: seededName, name: seededName, legalName: seededName }
+      : {}),
   });
 
   const handleQuickSave = async () => {
@@ -135,7 +143,10 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
           password,
         },
       );
-      const res = await fetch('/api/v1/admin/brands', {
+      const endpoint = isUpgrade
+        ? `/api/v1/admin/brands/${brand.id}/storefront`
+        : '/api/v1/admin/brands';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -152,7 +163,7 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
         });
         return;
       }
-      toast.success('Brand created with storefront profile');
+      toast.success(isUpgrade ? 'Storefront created' : 'Brand created with storefront profile');
       if (json.data) onCreated(json.data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';
@@ -178,15 +189,22 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
     admin: { ops: true },
   };
 
+  const title = isUpgrade ? `Create Storefront — ${brand.name}` : 'Add Brand';
+  const subtitle = isUpgrade
+    ? 'Attach an owner login and full brand profile to this catalog label'
+    : mode === 'quick'
+      ? 'Save a brand name for catalog use, or open the full storefront form'
+      : 'Full brand storefront profile';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-white rounded-[20px] w-full max-w-[720px] shadow-2xl max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#EEEEEE] shrink-0">
           <div>
-            <h3 className="text-[18px] font-[900] text-[#181725]">Add Brand</h3>
+            <h3 className="text-[18px] font-[900] text-[#181725]">{title}</h3>
             <p className="text-[12px] text-[#AEAEAE] font-medium mt-0.5">
-              {mode === 'quick' ? 'Save a brand name for catalog use, or open the full storefront form' : 'Full brand storefront profile'}
+              {subtitle}
             </p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F5] text-[#AEAEAE]">
@@ -251,10 +269,17 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
 
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
               {tab === 'overview' && (
-                <TextField label="Owner Email" required type="email" value={profile.email ?? ''}
+                <TextField
+                  label="Owner Email (optional if mobile provided)"
+                  type="email"
+                  value={profile.email ?? ''}
                   dataField="email"
                   error={fieldErrors.email}
-                  onChange={v => { setProfile(p => ({ ...p, email: v })); if (fieldErrors.email) clearFieldError('email'); }}
+                  onChange={v => {
+                    setProfile(p => ({ ...p, email: v }));
+                    if (fieldErrors.email) clearFieldError('email');
+                    if (fieldErrors.phone) clearFieldError('phone');
+                  }}
                   onBlur={() => {
                     const msg = validateFieldBlur('email', profile.email ?? '');
                     setFieldErrors(prev => {
@@ -263,14 +288,20 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
                       return next;
                     });
                   }}
-                  placeholder="brand@company.com" />
+                  placeholder="brand@company.com"
+                />
               )}
               <BrandProfileForm
                 value={profile}
                 onChange={patch => {
                   setProfile(p => ({ ...p, ...patch }));
+                  const contactTouched = 'email' in patch || 'phone' in patch || 'mobilePhone' in patch;
                   for (const key of Object.keys(patch)) {
                     if (fieldErrors[key]) clearFieldError(key);
+                  }
+                  if (contactTouched) {
+                    if (fieldErrors.email) clearFieldError('email');
+                    if (fieldErrors.phone) clearFieldError('phone');
                   }
                 }}
                 errors={fieldErrors}
@@ -283,6 +314,7 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
                   });
                 }}
                 requireLocationFields={false}
+                contactMode="relaxed"
                 visibleSections={tabSections[tab]}
                 showPassword={tab === 'overview'}
                 password={password}
@@ -294,15 +326,24 @@ export default function BrandFormModal({ onClose, onCreated }: Props) {
             </div>
 
             <div className="px-6 py-4 border-t border-[#EEEEEE] flex items-center justify-between gap-3 shrink-0">
-              <button type="button" onClick={() => { setMode('quick'); clearErrors(); }}
-                className="h-[42px] px-4 text-[13px] font-bold text-[#7C7C7C] hover:text-[#181725]">
-                ← Back to quick create
-              </button>
-              <div className="flex items-center gap-2">
+              {isUpgrade ? (
                 <button type="button" onClick={onClose}
                   className="h-[42px] px-5 bg-[#F5F5F5] text-[#7C7C7C] rounded-[10px] text-[13px] font-bold hover:bg-[#EEEEEE]">
                   Cancel
                 </button>
+              ) : (
+                <button type="button" onClick={() => { setMode('quick'); clearErrors(); }}
+                  className="h-[42px] px-4 text-[13px] font-bold text-[#7C7C7C] hover:text-[#181725]">
+                  ← Back to quick create
+                </button>
+              )}
+              <div className="flex items-center gap-2">
+                {!isUpgrade && (
+                  <button type="button" onClick={onClose}
+                    className="h-[42px] px-5 bg-[#F5F5F5] text-[#7C7C7C] rounded-[10px] text-[13px] font-bold hover:bg-[#EEEEEE]">
+                    Cancel
+                  </button>
+                )}
                 <button onClick={handleFullSubmit} disabled={submitting}
                   className={cn(FORM.primaryBtn, 'h-[42px] px-6 text-[13px]')}>
                   {submitting ? <Loader2 size={14} className="animate-spin" /> : null}

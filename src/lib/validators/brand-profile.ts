@@ -156,7 +156,9 @@ export function validateBrandProfile(
     } else if (brandType && subTypesForBrandType(brandType).length > 0) {
       errors.subType = 'Sub-type is required';
     }
-    const relaxedContact = isRegisterEmailOtpEnabled() && context === 'publicRegister';
+    // adminCreate always uses email-OR-phone; publicRegister only when email OTP is enabled.
+    const relaxedContact =
+      context === 'adminCreate' || (isRegisterEmailOtpEnabled() && context === 'publicRegister');
     if (relaxedContact) {
       const hasPhone = phone.length === 10;
       const hasEmail = !!email && EMAIL_RE.test(email);
@@ -174,7 +176,6 @@ export function validateBrandProfile(
       if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
     }
     if (context === 'adminCreate') {
-      if (!email || !EMAIL_RE.test(email)) errors.email = 'Owner email is required';
       if (!password || password.length < 6) errors.password = 'Password must be at least 6 characters';
     } else if (context === 'publicRegister') {
       if (!password) errors.password = 'Password is required';

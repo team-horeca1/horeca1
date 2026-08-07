@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import BrandFormModal from '@/components/features/admin/BrandFormModal';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useAdminImpersonate } from '@/hooks/useAdminImpersonate';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -81,6 +82,7 @@ export default function AdminBrandsPage() {
     const canEditBrands = has('brands.edit');
     const canDeleteBrands = has('brands.delete');
     const confirm = useConfirm();
+    const { start: startBrandImpersonate } = useAdminImpersonate('brand');
 
     const [searchQuery, setSearchQuery] = useState('');
     const [brands, setBrands] = useState<Brand[]>([]);
@@ -88,9 +90,11 @@ export default function AdminBrandsPage() {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [brandFilter, setBrandFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
     const [showCreate, setShowCreate] = useState(false);
+    const [storefrontTarget, setStorefrontTarget] = useState<{ id: string; name: string } | null>(null);
     const [activeMenu, setActiveMenu] = useState<{ id: string; top: number; right: number } | null>(null);
     const [rejectTarget, setRejectTarget] = useState<{ id: string; name: string } | null>(null);
     const [rejectNote, setRejectNote] = useState('');
+    const canCreateStorefront = canCreateBrand || canEditBrands;
 
     // View Mode switcher
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
@@ -313,7 +317,7 @@ export default function AdminBrandsPage() {
             ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredBrands.map((brand) => {
-                        const isDummyEmail = brand.user?.email?.includes('brand.internal.horeca1') || !brand.user;
+                        const needsStorefront = brand.user?.email?.includes('brand.internal.horeca1') || !brand.user;
                         const statusVariant = STATUS_VARIANT[brand.approvalStatus] ?? 'pending';
                         return (
                             <div
@@ -368,13 +372,13 @@ export default function AdminBrandsPage() {
                                     <div className="space-y-2 mt-auto pt-2 border-t border-[#F3F4F6]">
                                         <div className="flex items-center justify-between text-[12px] font-semibold">
                                             <span className="text-[#9CA3AF]">Owner:</span>
-                                            {isDummyEmail ? (
+                                            {needsStorefront ? (
                                                 <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200/50 px-1.5 py-0.5 rounded-[4px]">Admin Managed</span>
                                             ) : (
                                                 <span className="text-[#374151] truncate max-w-[120px]">{brand.user?.fullName ?? '—'}</span>
                                             )}
                                         </div>
-                                        {!isDummyEmail && brand.user?.email && (
+                                        {!needsStorefront && brand.user?.email && (
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <Mail size={13} className="text-[#9CA3AF] shrink-0" />
                                                 <span className="text-[12px] font-semibold text-[#4B5563] truncate">{brand.user.email}</span>
@@ -405,13 +409,24 @@ export default function AdminBrandsPage() {
                                 {/* Action Buttons */}
                                 <div className="p-4 border-t border-[#D1D5DB] bg-white flex flex-col gap-2 rounded-b-[16px]">
                                     <div onClick={(e) => e.stopPropagation()}>
-                                        <AdminImpersonateButton
-                                            target="brand"
-                                            entityId={brand.id}
-                                            label="Impersonate"
-                                            variant="primary"
-                                            className="w-full h-[38px] text-[12px] font-bold"
-                                        />
+                                        {needsStorefront && canCreateStorefront ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setStorefrontTarget({ id: brand.id, name: brand.name })}
+                                                className="w-full h-[38px] px-3 bg-[#299E60] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                                            >
+                                                <Store size={14} />
+                                                Create Storefront
+                                            </button>
+                                        ) : (
+                                            <AdminImpersonateButton
+                                                target="brand"
+                                                entityId={brand.id}
+                                                label="Impersonate"
+                                                variant="primary"
+                                                className="w-full h-[38px] text-[12px] font-bold"
+                                            />
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Link
@@ -457,7 +472,7 @@ export default function AdminBrandsPage() {
                     </AdminRegistryTableHead>
                     <AdminRegistryTableBody>
                             {filteredBrands.map((brand, i) => {
-                                const isDummyEmail = brand.user?.email?.includes('brand.internal.horeca1') || !brand.user;
+                                const needsStorefront = brand.user?.email?.includes('brand.internal.horeca1') || !brand.user;
                                 const statusVariant = STATUS_VARIANT[brand.approvalStatus] ?? 'pending';
                                 return (
                                     <tr
@@ -493,7 +508,7 @@ export default function AdminBrandsPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-3 text-[13px] font-bold text-[#374151] align-middle border-r border-[#D1D5DB]">
-                                            {isDummyEmail ? (
+                                            {needsStorefront ? (
                                                 <span className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200/50 px-2 py-0.5 rounded-[6px]">Admin Managed</span>
                                             ) : (
                                                 brand.user?.fullName ?? '—'
@@ -501,13 +516,13 @@ export default function AdminBrandsPage() {
                                         </td>
                                         <td className="px-6 py-3 align-middle border-r border-[#D1D5DB]">
                                             <div className="flex flex-col gap-0.5">
-                                                {!isDummyEmail && brand.user?.email && (
+                                                {!needsStorefront && brand.user?.email && (
                                                     <span className="text-[13px] font-medium text-[#4B5563] truncate block max-w-[200px]">{brand.user.email}</span>
                                                 )}
                                                 {brand.user?.phone && (
                                                     <span className="text-[11px] text-[#9CA3AF] font-semibold font-mono">{brand.user.phone}</span>
                                                 )}
-                                                {isDummyEmail && !brand.user?.phone && (
+                                                {needsStorefront && !brand.user?.phone && (
                                                     <span className="text-[12px] text-[#9CA3AF]">—</span>
                                                 )}
                                             </div>
@@ -520,13 +535,24 @@ export default function AdminBrandsPage() {
                                                 onDetailsClick={(e) => e.stopPropagation()}
                                                 impersonateButton={
                                                     <div onClick={(e) => e.stopPropagation()}>
-                                                        <AdminImpersonateButton
-                                                            target="brand"
-                                                            entityId={brand.id}
-                                                            label="Impersonate"
-                                                            variant="primary"
-                                                            className="h-[34px] px-3 text-[12px] whitespace-nowrap"
-                                                        />
+                                                        {needsStorefront && canCreateStorefront ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setStorefrontTarget({ id: brand.id, name: brand.name })}
+                                                                className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm"
+                                                            >
+                                                                <Store size={13} />
+                                                                Create Storefront
+                                                            </button>
+                                                        ) : (
+                                                            <AdminImpersonateButton
+                                                                target="brand"
+                                                                entityId={brand.id}
+                                                                label="Impersonate"
+                                                                variant="primary"
+                                                                className="h-[34px] px-3 text-[12px] whitespace-nowrap"
+                                                            />
+                                                        )}
                                                     </div>
                                                 }
                                                 extraActions={
@@ -547,7 +573,7 @@ export default function AdminBrandsPage() {
                                                     ) : undefined
                                                 }
                                                 menuOpen={activeMenu?.id === brand.id}
-                                                showMenu={canEditBrands || canDeleteBrands}
+                                                showMenu={canEditBrands || canDeleteBrands || (needsStorefront && !!brand.user)}
                                                 onMenuToggle={(e) => {
                                                     e.stopPropagation();
                                                     if (activeMenu?.id === brand.id) {
@@ -570,8 +596,19 @@ export default function AdminBrandsPage() {
                 {(() => {
                     const b = brands.find(x => x.id === activeMenu?.id);
                     if (!b) return null;
+                    const needsStorefront = b.user?.email?.includes('brand.internal.horeca1') || !b.user;
                     return (
                         <>
+                            {needsStorefront && !!b.user && (
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => {
+                                        setActiveMenu(null);
+                                        void startBrandImpersonate(b.id);
+                                    }}
+                                    icon={<Building2 size={14} className="text-[#299E60]" />}
+                                    label="Impersonate (placeholder)"
+                                />
+                            )}
                             {canEditBrands && b.approvalStatus !== 'rejected' && (
                                 <AdminRegistryOverflowMenuItem
                                     onClick={() => { setActiveMenu(null); setRejectTarget({ id: b.id, name: b.name }); }}
@@ -598,6 +635,17 @@ export default function AdminBrandsPage() {
                     onCreated={(data) => {
                         setBrands(prev => [{ ...(data as Brand), _count: { masterProducts: 0, productMappings: 0 } }, ...prev]);
                         setShowCreate(false);
+                    }}
+                />
+            )}
+
+            {storefrontTarget && (
+                <BrandFormModal
+                    brand={storefrontTarget}
+                    onClose={() => setStorefrontTarget(null)}
+                    onCreated={() => {
+                        setStorefrontTarget(null);
+                        void fetchData();
                     }}
                 />
             )}

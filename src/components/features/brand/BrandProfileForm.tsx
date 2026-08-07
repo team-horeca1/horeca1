@@ -64,8 +64,8 @@ export interface BrandProfileFormProps {
   requireLocationFields?: boolean;
   /**
    * Contact channel labels / required markers.
-   * `relaxed` = public register with email-OR-phone (matches validateBrandProfile publicRegister).
-   * Admin / add-business stay `strict` (mobile still required).
+   * `relaxed` = email-OR-phone (public register with email OTP, admin create/storefront).
+   * Add-business stays `strict` (mobile still required).
    */
   contactMode?: 'strict' | 'relaxed';
   /** Lock the OTP-verified channel so the user cannot swap to an unverified contact. */
