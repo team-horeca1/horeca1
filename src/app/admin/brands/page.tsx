@@ -13,7 +13,6 @@ import {
     Boxes,
     Trash2,
     X,
-    MessageSquare,
     ClipboardList,
     ExternalLink,
     ShieldCheck,
@@ -178,7 +177,7 @@ export default function AdminBrandsPage() {
         setActiveMenu(null);
         const ok = await confirm({
             title: `Delete ${brand.name}?`,
-            message: 'This permanently removes the brand along with all its catalog products, distributor links, team members, and distributor invites. Cannot be undone.',
+            message: 'This permanently removes the brand along with all its catalog products, distributor links, and team members. Cannot be undone.',
             confirmText: 'Delete brand',
             tone: 'danger',
         });
@@ -228,14 +227,7 @@ export default function AdminBrandsPage() {
                 title="Brands Registry"
                 subtitle="Review brand applications, manage storefronts, and audit catalog mappings"
                 actions={
-                    <>
-                        <Link
-                            href="/admin/brand-distributor-invites"
-                            className="h-[44px] px-4 bg-white border border-[#E5E7EB] hover:bg-gray-50 text-[#374151] rounded-[12px] text-[13px] font-bold flex items-center gap-2 transition-colors shadow-sm"
-                        >
-                            <MessageSquare size={16} /> Distributor Invites
-                        </Link>
-                        {canCreateBrand && (
+                    canCreateBrand ? (
                             <button
                                 onClick={() => setShowCreate(true)}
                                 className="h-[44px] px-5 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] active:scale-95 transition-all shadow-md shadow-[#299E60]/10 flex items-center gap-2 shrink-0"
@@ -243,8 +235,7 @@ export default function AdminBrandsPage() {
                                 <Plus size={16} />
                                 Add Brand
                             </button>
-                        )}
-                    </>
+                    ) : undefined
                 }
             />
 

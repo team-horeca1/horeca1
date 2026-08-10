@@ -51,7 +51,6 @@ const ROUTES = [
   '/admin/ledger',
   '/admin/promotions',
   '/admin/audit-logs',
-  '/admin/brand-distributor-invites',
   '/vendor/dashboard',
   '/vendor/products',
   '/vendor/orders',

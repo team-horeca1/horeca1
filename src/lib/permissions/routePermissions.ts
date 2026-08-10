@@ -29,7 +29,6 @@ function permFromLinks(links: PortalNavLink[]): RouteRule[] {
 const ADMIN_EXTRA: RouteRule[] = [
   { prefix: '/admin/vendors', perm: 'vendors.view' },
   { prefix: '/admin/brands', perm: 'brands.view' },
-  { prefix: '/admin/brand-distributor-invites', perm: 'brands.view' },
   { prefix: '/admin/customers', perm: 'customers.view' },
   { prefix: '/admin/orders', perm: 'orders.view' },
   { prefix: '/admin/returns', perm: 'orders.view' },
