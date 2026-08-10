@@ -1,4 +1,5 @@
 import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
+import { brandOverrideDeviations } from '@/lib/brandOverrideFields';
 import { aggregateInventories } from '@/lib/inventoryHelpers';
 import {
   loadFulfillmentStockContext,
@@ -26,6 +27,41 @@ import {
 import { auditProductDiff, logProductFieldChanges } from '@/lib/product-audit';
 import { canTransitionApproval } from '@/modules/catalog/approval-state';
 import { transitionProductApproval } from '@/modules/catalog/approval-state.service';
+
+/** Brand mappings soft-rejected because the vendor edited brand-owned fields. */
+export type UnlinkedBrandMapping = {
+  id: string;
+  brandId: string;
+  brandName: string;
+  masterName: string;
+};
+
+const brandMasterForOverrideSelect = {
+  name: true,
+  description: true,
+  packSize: true,
+  unit: true,
+  hsn: true,
+  barcode: true,
+  fssaiRef: true,
+  vegNonVeg: true,
+  storageType: true,
+  shelfLifeDays: true,
+  countryOfOrigin: true,
+  tags: true,
+  aliasNames: true,
+  categoryId: true,
+  categoryIds: true,
+  imageUrl: true,
+  images: true,
+  packageWeight: true,
+  weightUnit: true,
+  packageLength: true,
+  packageWidth: true,
+  packageHeight: true,
+  dimensionUnit: true,
+  brand: { select: { name: true } },
+} as const;
 
 type Db = Prisma.TransactionClient | typeof prisma;
 
@@ -1103,6 +1139,7 @@ export class CatalogService {
     basedOnProductId?: string;
     basedOnBrandMasterProductId?: string;
     listingStatus?: 'draft' | 'submitted';
+    metadata?: Record<string, unknown>;
   }) {
     const {
       basedOnProductId,
@@ -1115,14 +1152,132 @@ export class CatalogService {
     const isDraft = listingStatus === 'draft';
     let resolvedVendorSku: string | undefined = vendorSku?.trim() || undefined;
 
+    const isBlankField = (value: unknown): boolean => {
+      if (value == null) return true;
+      if (typeof value === 'string') return value.trim().length === 0;
+      if (Array.isArray(value)) return value.length === 0;
+      return false;
+    };
+    const decimalOrUndefined = (value: unknown): number | undefined => {
+      if (value == null) return undefined;
+      const n =
+        typeof value === 'object' && value !== null && 'toNumber' in value
+          ? (value as Prisma.Decimal).toNumber()
+          : Number(value);
+      return Number.isFinite(n) ? n : undefined;
+    };
+
+    // Resolve brand canonical SKU early so we can inherit categories / backfill
+    // blanks before leaf-category validation (API callers may send only the id).
+    type BrandMasterCreateRow = {
+      id: string;
+      brandId: string;
+      name: string;
+      description: string | null;
+      imageUrl: string | null;
+      images: string[];
+      packSize: string | null;
+      unit: string | null;
+      sku: string | null;
+      hsn: string | null;
+      barcode: string | null;
+      ean: string | null;
+      fssaiRef: string | null;
+      vegNonVeg: 'veg' | 'nonveg' | 'egg' | null;
+      storageType: string | null;
+      shelfLifeDays: number | null;
+      countryOfOrigin: string | null;
+      tags: string[];
+      aliasNames: string[];
+      categoryId: string | null;
+      categoryIds: string[];
+      masterProductId: string | null;
+      packageWeight: Prisma.Decimal | null;
+      weightUnit: string | null;
+      packageLength: Prisma.Decimal | null;
+      packageWidth: Prisma.Decimal | null;
+      packageHeight: Prisma.Decimal | null;
+      dimensionUnit: string | null;
+      brand: { name: string };
+    };
+    let brandMasterRow: BrandMasterCreateRow | null = null;
+    let brandMaster: { id: string; brandId: string; name: string; brandName: string } | null = null;
+    if (basedOnBrandMasterProductId) {
+      brandMasterRow = await prisma.brandMasterProduct.findFirst({
+        where: {
+          id: basedOnBrandMasterProductId,
+          isActive: true,
+          brand: { isActive: true, approvalStatus: 'approved' },
+        },
+        select: {
+          id: true,
+          brandId: true,
+          name: true,
+          description: true,
+          imageUrl: true,
+          images: true,
+          packSize: true,
+          unit: true,
+          sku: true,
+          hsn: true,
+          barcode: true,
+          ean: true,
+          fssaiRef: true,
+          vegNonVeg: true,
+          storageType: true,
+          shelfLifeDays: true,
+          countryOfOrigin: true,
+          tags: true,
+          aliasNames: true,
+          categoryId: true,
+          categoryIds: true,
+          masterProductId: true,
+          packageWeight: true,
+          weightUnit: true,
+          packageLength: true,
+          packageWidth: true,
+          packageHeight: true,
+          dimensionUnit: true,
+          brand: { select: { name: true } },
+        },
+      });
+      if (brandMasterRow) {
+        brandMaster = {
+          id: brandMasterRow.id,
+          brandId: brandMasterRow.brandId,
+          name: brandMasterRow.name,
+          brandName: brandMasterRow.brand.name,
+        };
+        if (brandMasterRow.masterProductId) {
+          productData.masterProductId = brandMasterRow.masterProductId;
+        } else if (brandMasterRow.sku) {
+          const linked = await prisma.masterProduct.findFirst({
+            where: {
+              sku: { equals: brandMasterRow.sku, mode: 'insensitive' },
+              approvalStatus: 'approved',
+            },
+            select: { id: true },
+          });
+          if (linked) productData.masterProductId = linked.id;
+        }
+      }
+    }
+
     // Resolve the category set: prefer the explicit multi-category array, fall
-    // back to the single legacy categoryId, then inherit the master's category.
+    // back to the single legacy categoryId, then inherit brand / master categories.
     // The first entry is the "primary" — mirrored into Product.categoryId and
     // flagged isPrimary=true in the join table so existing single-category
     // queries (filtering, breadcrumbs) keep working unchanged.
     let resolvedCategoryIds = categoryIds && categoryIds.length > 0
       ? categoryIds
       : (data.categoryId ? [data.categoryId] : []);
+    if (resolvedCategoryIds.length === 0 && brandMasterRow) {
+      if (brandMasterRow.categoryIds.length > 0) {
+        resolvedCategoryIds = [...brandMasterRow.categoryIds];
+      } else if (brandMasterRow.categoryId) {
+        resolvedCategoryIds = [brandMasterRow.categoryId];
+      }
+    }
     if (resolvedCategoryIds.length === 0 && productData.masterProductId) {
       const m = await prisma.masterProduct.findUnique({
         where: { id: productData.masterProductId },
@@ -1174,42 +1329,122 @@ export class CatalogService {
       }
     }
 
-    // If based on a brand canonical product, inherit master link when available.
-    let brandMaster: { id: string; brandId: string; name: string; brandName: string } | null = null;
-    if (basedOnBrandMasterProductId) {
-      const mp = await prisma.brandMasterProduct.findFirst({
-        where: {
-          id: basedOnBrandMasterProductId,
-          isActive: true,
-          brand: { isActive: true, approvalStatus: 'approved' },
-        },
-        select: {
-          id: true,
-          brandId: true,
-          name: true,
-          sku: true,
-          masterProductId: true,
-          brand: { select: { name: true } },
-        },
-      });
-      if (mp) {
+    // Brand catalog pick → auto-approve + backfill any blank payload fields from the
+    // canonical SKU (API callers get the same result as the vendor UI prefill).
+    if (brandMasterRow) {
+      if (!isDraft) {
         approvalStatus = 'approved';
-        if (mp.masterProductId) {
-          productData.masterProductId = mp.masterProductId;
-        } else if (mp.sku) {
-          const linked = await prisma.masterProduct.findFirst({
-            where: { sku: { equals: mp.sku, mode: 'insensitive' }, approvalStatus: 'approved' },
-            select: { id: true },
-          });
-          if (linked) productData.masterProductId = linked.id;
+      }
+      productData.brand = brandMasterRow.brand.name;
+
+      if (isBlankField(productData.name) && brandMasterRow.name) {
+        productData.name = brandMasterRow.name;
+      }
+      if (isBlankField(productData.description) && brandMasterRow.description) {
+        productData.description = brandMasterRow.description;
+      }
+      if (isBlankField(productData.packSize) && brandMasterRow.packSize) {
+        productData.packSize = brandMasterRow.packSize;
+      }
+      if (isBlankField(productData.unit) && brandMasterRow.unit) {
+        productData.unit = brandMasterRow.unit;
+      }
+      if (isBlankField(productData.hsn) && brandMasterRow.hsn) {
+        productData.hsn = brandMasterRow.hsn;
+      }
+      if (isBlankField(productData.barcode) && brandMasterRow.barcode) {
+        productData.barcode = brandMasterRow.barcode;
+      }
+      if (isBlankField(productData.fssaiRef) && brandMasterRow.fssaiRef) {
+        productData.fssaiRef = brandMasterRow.fssaiRef;
+      }
+      if (isBlankField(productData.storageType) && brandMasterRow.storageType) {
+        productData.storageType = brandMasterRow.storageType;
+      }
+      if (isBlankField(productData.countryOfOrigin) && brandMasterRow.countryOfOrigin) {
+        productData.countryOfOrigin = brandMasterRow.countryOfOrigin;
+      }
+      if (productData.shelfLifeDays == null && brandMasterRow.shelfLifeDays != null) {
+        productData.shelfLifeDays = brandMasterRow.shelfLifeDays;
+      }
+      if (
+        isBlankField(productData.vegNonVeg) &&
+        (brandMasterRow.vegNonVeg === 'veg' ||
+          brandMasterRow.vegNonVeg === 'nonveg' ||
+          brandMasterRow.vegNonVeg === 'egg')
+      ) {
+        productData.vegNonVeg = brandMasterRow.vegNonVeg;
+      }
+      if (isBlankField(productData.tags) && brandMasterRow.tags.length > 0) {
+        productData.tags = brandMasterRow.tags;
+      }
+      if (isBlankField(productData.aliasNames) && brandMasterRow.aliasNames.length > 0) {
+        productData.aliasNames = brandMasterRow.aliasNames;
+      }
+
+      const brandImages = brandMasterRow.images.filter((u) => typeof u === 'string' && u.length > 0);
+      const brandImageUrl =
+        brandImages[0] ||
+        (brandMasterRow.imageUrl && brandMasterRow.imageUrl.trim()
+          ? brandMasterRow.imageUrl.trim()
+          : undefined);
+      if (isBlankField(productData.imageUrl) && brandImageUrl) {
+        productData.imageUrl = brandImageUrl;
+      }
+      if (isBlankField(productData.images) && (brandImages.length > 0 || brandImageUrl)) {
+        productData.images = brandImages.length > 0 ? brandImages : brandImageUrl ? [brandImageUrl] : [];
+      }
+
+      // Packaging / EAN live under Product.metadata — merge brand values into blanks only.
+      const existingMeta =
+        productData.metadata && typeof productData.metadata === 'object' && !Array.isArray(productData.metadata)
+          ? { ...(productData.metadata as Record<string, unknown>) }
+          : {};
+      const existingPackaging =
+        existingMeta.packaging &&
+        typeof existingMeta.packaging === 'object' &&
+        !Array.isArray(existingMeta.packaging)
+          ? { ...(existingMeta.packaging as Record<string, unknown>) }
+          : {};
+      const existingIdentifiers =
+        existingMeta.identifiers &&
+        typeof existingMeta.identifiers === 'object' &&
+        !Array.isArray(existingMeta.identifiers)
+          ? { ...(existingMeta.identifiers as Record<string, unknown>) }
+          : {};
+
+      const brandPackaging: Record<string, unknown> = {
+        packageWeight: decimalOrUndefined(brandMasterRow.packageWeight),
+        weightUnit: brandMasterRow.weightUnit?.trim() || undefined,
+        packageLength: decimalOrUndefined(brandMasterRow.packageLength),
+        packageWidth: decimalOrUndefined(brandMasterRow.packageWidth),
+        packageHeight: decimalOrUndefined(brandMasterRow.packageHeight),
+        dimensionUnit: brandMasterRow.dimensionUnit?.trim() || undefined,
+      };
+      for (const [key, value] of Object.entries(brandPackaging)) {
+        if (value == null || value === '') continue;
+        if (isBlankField(existingPackaging[key])) {
+          existingPackaging[key] = value;
         }
-        brandMaster = { id: mp.id, brandId: mp.brandId, name: mp.name, brandName: mp.brand.name };
-        productData.brand = mp.brand.name;
+      }
+      if (brandMasterRow.ean?.trim() && isBlankField(existingIdentifiers.ean)) {
+        existingIdentifiers.ean = brandMasterRow.ean.trim();
+      }
+      if (Object.keys(existingPackaging).length > 0) {
+        existingMeta.packaging = existingPackaging;
+      }
+      if (Object.keys(existingIdentifiers).length > 0) {
+        existingMeta.identifiers = existingIdentifiers;
+      }
+      if (Object.keys(existingMeta).length > 0) {
+        productData.metadata = existingMeta;
       }
     }
 
     // Master catalog match → instant approved listing with admin-assigned SKU.
-    if (!isDraft && productData.masterProductId) {
+    // Brand-catalog creates already auto-approve above; skip POS-SKU enforcement so a
+    // linked MasterProduct id does not block brand-sourced listings.
+    if (!isDraft && productData.masterProductId && !brandMaster) {
       const master = await prisma.masterProduct.findFirst({
         where: { id: productData.masterProductId, approvalStatus: 'approved', isActive: true },
         select: {
@@ -1252,6 +1487,25 @@ export class CatalogService {
       });
       if (dup) {
         throw Errors.conflict(`You already list "${dup.name}" for this master SKU. Edit the existing product instead.`);
+      }
+    } else if (!isDraft && brandMaster && productData.masterProductId) {
+      // Brand pick may soft-link a MasterProduct — still block duplicate listings.
+      const dup = await prisma.product.findFirst({
+        where: {
+          vendorId,
+          masterProductId: productData.masterProductId,
+          slug: { not: { startsWith: TOMBSTONE_PREFIX } },
+        },
+        select: { id: true, name: true },
+      });
+      if (dup) {
+        throw Errors.conflict(`You already list "${dup.name}" for this master SKU. Edit the existing product instead.`);
+      }
+      if (!resolvedVendorSku && typeof productData.sku === 'string' && productData.sku.trim()) {
+        resolvedVendorSku = productData.sku.trim();
+      }
+      if (!productData.sku?.trim()) {
+        delete productData.sku;
       }
     } else if (approvalStatus === 'pending' && !isDraft) {
       // New vendor submission — admin reviews and assigns catalog SKU before it goes live.
@@ -1297,9 +1551,14 @@ export class CatalogService {
     const draftBasePrice =
       productData.basePrice != null && productData.basePrice > 0 ? productData.basePrice : 0.01;
 
+    const { metadata: productMetadata, ...productFields } = productData;
+
     const created = await prisma.product.create({
       data: {
-        ...productData,
+        ...productFields,
+        ...(productMetadata !== undefined
+          ? { metadata: productMetadata as Prisma.InputJsonValue }
+          : {}),
         vendorSku: resolvedVendorSku,
         vendorId,
         basePrice: isDraft ? draftBasePrice : productData.basePrice,
@@ -1434,12 +1693,128 @@ export class CatalogService {
     return 'pending';
   }
 
+  /**
+   * Instant-approve a catalog-linked listing on rejected-resubmit or draft→publish.
+   * Mutates `data` in place (approvalStatus + master backfill). Transient
+   * basedOn* keys must still be stripped by the caller before prisma.product.update.
+   */
+  private async applyInstantApprovalOnSubmit(
+    product: {
+      id: string;
+      masterProductId: string | null;
+      sku: string | null;
+      vendorSku: string | null;
+    },
+    vendorId: string,
+    data: Record<string, unknown>,
+    categoryIds?: string[],
+  ): Promise<void> {
+    const mergedMasterId =
+      (typeof data.masterProductId === 'string' ? data.masterProductId : null) ??
+      product.masterProductId;
+    const basedOnProductId =
+      typeof data.basedOnProductId === 'string' ? data.basedOnProductId : undefined;
+    let basedOnBrandMasterProductId =
+      typeof data.basedOnBrandMasterProductId === 'string'
+        ? data.basedOnBrandMasterProductId
+        : undefined;
+
+    // Drafts autosaved with a brand pick keep a verified mapping even when the
+    // publish PATCH omits basedOnBrandMasterProductId (e.g. after adoptDraftProduct).
+    if (!basedOnBrandMasterProductId) {
+      const mapping = await prisma.brandProductMapping.findFirst({
+        where: {
+          distributorProductId: product.id,
+          status: 'verified',
+          matchedBy: 'manually_verified',
+        },
+        select: { brandMasterProductId: true },
+      });
+      if (mapping) {
+        basedOnBrandMasterProductId = mapping.brandMasterProductId;
+      }
+    }
+
+    const approvalStatus = await this.evaluateInstantApproval({
+      vendorId,
+      masterProductId: mergedMasterId,
+      basedOnProductId,
+      basedOnBrandMasterProductId,
+      excludeProductId: product.id,
+    });
+
+    if (approvalStatus === 'approved') {
+      const vendorSkuInput = typeof data.vendorSku === 'string' ? data.vendorSku : undefined;
+      // Pending drafts keep POS in vendorSku while sku is null — prefer vendorSku
+      // over product.sku so publish does not falsely require a new POS code.
+      const posSku =
+        vendorSkuInput?.trim() ||
+        (typeof data.sku === 'string' ? data.sku.trim() : '') ||
+        product.vendorSku?.trim() ||
+        product.sku?.trim() ||
+        '';
+
+      if (mergedMasterId) {
+        const master = await prisma.masterProduct.findFirst({
+          where: { id: mergedMasterId, approvalStatus: 'approved', isActive: true },
+          select: {
+            id: true,
+            name: true,
+            brand: true,
+            sku: true,
+            categoryId: true,
+            imageUrl: true,
+            images: true,
+          },
+        });
+        if (master) {
+          data.name = master.name;
+          if (master.brand) data.brand = master.brand;
+          delete data.vendorSku;
+          if (posSku) {
+            data.sku = await composeVendorProductSku(vendorId, posSku, product.id);
+            data.vendorSku = posSku;
+          } else {
+            throw Errors.badRequest('Your POS SKU is required when listing a catalog item.');
+          }
+          data.masterProductId = master.id;
+          if (master.imageUrl && !data.imageUrl) data.imageUrl = master.imageUrl;
+          if (
+            master.images.length > 0 &&
+            (!Array.isArray(data.images) || (data.images as string[]).length === 0)
+          ) {
+            data.images = master.images;
+          }
+          if (!data.categoryId && !categoryIds?.length) {
+            data.categoryId = master.categoryId;
+          }
+        }
+      } else if (posSku) {
+        // Brand-only (or basedOn) approve with no resolved master — still compose
+        // listing sku so edit form / storefront have a stable composed code.
+        delete data.vendorSku;
+        data.sku = await composeVendorProductSku(vendorId, posSku, product.id);
+        data.vendorSku = posSku;
+      }
+    }
+
+    data.approvalStatus = approvalStatus;
+    data.approvalNote = null;
+    data.approvedBy = null;
+    data.approvedAt = null;
+    data.pendingEditPayload = Prisma.JsonNull;
+  }
+
   async updateProduct(
     productId: string,
     vendorId: string,
     data: Record<string, unknown>,
     actorUserId?: string,
   ) {
+    // Snapshot before mutations — brand override deviation check must see the
+    // vendor-submitted values (incl. categoryIds / packaging), not the stripped Prisma write set.
+    const brandOverridePayload: Record<string, unknown> = { ...data };
+
     const product = await prisma.product.findFirst({
       where: { id: productId, vendorId },
     });
@@ -1613,77 +1988,16 @@ export class CatalogService {
       }
     }
 
-    if (isResubmit) {
-      const mergedMasterId =
-        (typeof data.masterProductId === 'string' ? data.masterProductId : null) ??
-        product.masterProductId;
-      const basedOnProductId =
-        typeof data.basedOnProductId === 'string' ? data.basedOnProductId : undefined;
-      const basedOnBrandMasterProductId =
-        typeof data.basedOnBrandMasterProductId === 'string'
-          ? data.basedOnBrandMasterProductId
-          : undefined;
-
-      const approvalStatus = await this.evaluateInstantApproval({
-        vendorId,
-        masterProductId: mergedMasterId,
-        basedOnProductId,
-        basedOnBrandMasterProductId,
-        excludeProductId: productId,
-      });
-
-      if (approvalStatus === 'approved' && mergedMasterId) {
-        const master = await prisma.masterProduct.findFirst({
-          where: { id: mergedMasterId, approvalStatus: 'approved', isActive: true },
-          select: {
-            id: true,
-            name: true,
-            brand: true,
-            sku: true,
-            categoryId: true,
-            imageUrl: true,
-            images: true,
-          },
-        });
-        if (master) {
-          data.name = master.name;
-          if (master.brand) data.brand = master.brand;
-          const vendorSkuInput = typeof data.vendorSku === 'string' ? data.vendorSku : undefined;
-          delete data.vendorSku;
-          const posSku =
-            vendorSkuInput?.trim() ||
-            (typeof data.sku === 'string' ? data.sku.trim() : '') ||
-            product.sku?.trim() ||
-            '';
-          if (posSku) {
-            data.sku = await composeVendorProductSku(vendorId, posSku, productId);
-            data.vendorSku = posSku;
-          } else {
-            throw Errors.badRequest('Your POS SKU is required when listing a catalog item.');
-          }
-          data.masterProductId = master.id;
-          if (master.imageUrl && !data.imageUrl) data.imageUrl = master.imageUrl;
-          if (
-            master.images.length > 0 &&
-            (!Array.isArray(data.images) || (data.images as string[]).length === 0)
-          ) {
-            data.images = master.images;
-          }
-          if (!data.categoryId && !categoryIds?.length) {
-            data.categoryId = master.categoryId;
-          }
-        }
-      }
-
-      data.approvalStatus = approvalStatus;
-      data.approvalNote = null;
-      data.approvedBy = null;
-      data.approvedAt = null;
-      data.pendingEditPayload = Prisma.JsonNull;
+    if (isResubmit || isPublishing) {
+      await this.applyInstantApprovalOnSubmit(product, vendorId, data, categoryIds);
     }
 
+    // Not Product columns — Zod may pass them through; strip before Prisma update.
+    delete data.basedOnProductId;
+    delete data.basedOnBrandMasterProductId;
+
     // Enforce the approval state machine for any in-flow status change
-    // (material edit → pending_edit, resubmit → pending|approved). Initial
+    // (material edit → pending_edit, resubmit/publish → pending|approved). Initial
     // status on create is set elsewhere and is not a transition.
     if (
       typeof data.approvalStatus === 'string' &&
@@ -1711,7 +2025,7 @@ export class CatalogService {
       await syncProductCategories(productId, categoryIds);
     }
 
-    if (isResubmit) {
+    if (isResubmit || isPublishing) {
       if (updated.approvalStatus === 'approved') {
         emitEvent('ProductApproved', {
           productId: updated.id,
@@ -1729,15 +2043,50 @@ export class CatalogService {
           productName: updated.name,
         });
       }
-    } else if (isPublishing && updated.approvalStatus === 'pending') {
-      emitEvent('ProductSubmitted', {
-        productId: updated.id,
-        vendorId,
-        productName: updated.name,
+    }
+
+    // Auto-unlink: if the vendor edited any brand-owned override field away from the
+    // brand master, soft-reject live mappings (same as manual Unlink). Compare against
+    // the master — not the stored Product — so price/MOQ/stock-only edits keep the link.
+    const liveMappings = await prisma.brandProductMapping.findMany({
+      where: {
+        distributorProductId: productId,
+        status: { in: ['verified', 'auto_mapped'] },
+      },
+      select: {
+        id: true,
+        brandId: true,
+        brandMasterProduct: { select: brandMasterForOverrideSelect },
+      },
+    });
+
+    const unlinkedBrandMappings: UnlinkedBrandMapping[] = [];
+    for (const mapping of liveMappings) {
+      const deviations = brandOverrideDeviations(
+        brandOverridePayload,
+        mapping.brandMasterProduct,
+      );
+      if (deviations.length === 0) continue;
+
+      await prisma.brandProductMapping.update({
+        where: { id: mapping.id },
+        data: {
+          status: 'rejected',
+          matchedBy: 'manually_verified',
+          reviewedBy: actorUserId ?? null,
+          reviewNote: 'Auto-unlinked: supplier edited product',
+        },
+      });
+
+      unlinkedBrandMappings.push({
+        id: mapping.id,
+        brandId: mapping.brandId,
+        brandName: mapping.brandMasterProduct.brand.name,
+        masterName: mapping.brandMasterProduct.name,
       });
     }
 
-    return updated;
+    return { ...updated, unlinkedBrandMappings };
   }
 
   /** Admin approves a pending_edit — apply queued payload to live listing. */

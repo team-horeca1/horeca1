@@ -275,20 +275,45 @@ export async function rejectDistributorAuth(
 /**
  * Prisma include fragment for customer-facing brand overrides on Product.
  * Loads the active verified/auto_mapped mapping plus the master fields the DAL
- * needs to override name, images, category, description, and packSize/unit.
+ * needs to override name, images, category, description, packSize/unit,
+ * logistics, and packaging.
  */
 export const productBrandMappingsInclude = {
   where: { status: { in: ['verified' as const, 'auto_mapped' as const] } },
   select: {
+    id: true,
+    status: true,
     brandId: true,
+    brandMasterProductId: true,
     brandMasterProduct: {
       select: {
+        id: true,
         name: true,
         imageUrl: true,
         images: true,
         description: true,
         packSize: true,
         unit: true,
+        sku: true,
+        hsn: true,
+        barcode: true,
+        fssaiRef: true,
+        vegNonVeg: true,
+        storageType: true,
+        shelfLifeDays: true,
+        countryOfOrigin: true,
+        tags: true,
+        aliasNames: true,
+        netWeight: true,
+        netWeightUnit: true,
+        packageWeight: true,
+        weightUnit: true,
+        packageLength: true,
+        packageWidth: true,
+        packageHeight: true,
+        dimensionUnit: true,
+        categoryId: true,
+        categoryIds: true,
         categoryRel: { select: { id: true, name: true, slug: true } },
         brand: { select: { name: true, slug: true } },
       },

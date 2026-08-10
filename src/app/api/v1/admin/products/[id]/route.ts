@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
@@ -82,6 +83,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
           include: { category: { select: { id: true, name: true, slug: true } } },
         },
         masterProduct: { select: { id: true, sku: true, name: true, brand: true } },
+        brandMappings: productBrandMappingsInclude,
       },
     });
 
@@ -233,7 +235,8 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         product.packSize ?? undefined,
         product.unit ?? undefined,
         product.sku ?? undefined,
-        product.masterProductId || undefined
+        product.masterProductId || undefined,
+        product.id,
       ).catch(console.error);
     }
 

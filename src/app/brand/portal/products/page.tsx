@@ -39,10 +39,20 @@ interface MasterProduct {
     fssaiRef?: string | null;
     netWeight?: string | number | null;
     netWeightUnit?: string | null;
+    packageWeight?: string | number | null;
+    weightUnit?: string | null;
+    packageLength?: string | number | null;
+    packageWidth?: string | number | null;
+    packageHeight?: string | number | null;
+    dimensionUnit?: string | null;
     tags?: string[];
     aliasNames?: string[];
     isActive: boolean;
     createdAt: string;
+    approvalStatus?: 'approved' | 'pending' | 'rejected';
+    approvalNote?: string | null;
+    /** Live brand catalog vs waiting on admin master-catalog approval. */
+    source?: 'brand_catalog' | 'pending_master';
     _count: { mappings: number };
 }
 
@@ -70,12 +80,18 @@ function productToForm(p: MasterProduct): BrandProductFormData {
         fssaiRef: p.fssaiRef ?? '',
         netWeight: p.netWeight != null ? String(p.netWeight) : '',
         netWeightUnit: p.netWeightUnit ?? '',
+        packageWeight: p.packageWeight != null ? String(p.packageWeight) : '',
+        weightUnit: p.weightUnit || 'kg',
+        packageLength: p.packageLength != null ? String(p.packageLength) : '',
+        packageWidth: p.packageWidth != null ? String(p.packageWidth) : '',
+        packageHeight: p.packageHeight != null ? String(p.packageHeight) : '',
+        dimensionUnit: p.dimensionUnit || 'cm',
         tags: Array.isArray(p.tags) ? p.tags : [],
         aliasNames: Array.isArray(p.aliasNames) ? p.aliasNames : [],
     };
 }
 
-/** Optional detail fields shared by create/update payloads (API may ignore until validator is extended). */
+/** Optional detail fields shared by create/update/pending-submit payloads. */
 function detailFieldsPayload(form: BrandProductFormData): Record<string, unknown> {
     const payload: Record<string, unknown> = {};
     if (form.description.trim()) payload.description = form.description.trim();
@@ -93,6 +109,20 @@ function detailFieldsPayload(form: BrandProductFormData): Record<string, unknown
         payload.netWeight = Number(form.netWeight);
     }
     if (form.netWeightUnit.trim()) payload.netWeightUnit = form.netWeightUnit.trim();
+    if (form.packageWeight.trim() !== '' && !Number.isNaN(Number(form.packageWeight))) {
+        payload.packageWeight = Number(form.packageWeight);
+    }
+    if (form.weightUnit.trim()) payload.weightUnit = form.weightUnit.trim();
+    if (form.packageLength.trim() !== '' && !Number.isNaN(Number(form.packageLength))) {
+        payload.packageLength = Number(form.packageLength);
+    }
+    if (form.packageWidth.trim() !== '' && !Number.isNaN(Number(form.packageWidth))) {
+        payload.packageWidth = Number(form.packageWidth);
+    }
+    if (form.packageHeight.trim() !== '' && !Number.isNaN(Number(form.packageHeight))) {
+        payload.packageHeight = Number(form.packageHeight);
+    }
+    if (form.dimensionUnit.trim()) payload.dimensionUnit = form.dimensionUnit.trim();
     if (form.tags.length > 0) payload.tags = form.tags;
     if (form.aliasNames.length > 0) payload.aliasNames = form.aliasNames;
     return payload;
@@ -313,12 +343,16 @@ export default function BrandProductsPage() {
                                     <th className="px-6 py-3.5 text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wider">Product</th>
                                     <th className="px-6 py-3.5 text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wider">Pack Size</th>
                                     <th className="px-6 py-3.5 text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wider">Category</th>
+                                    <th className="px-6 py-3.5 text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wider">Status</th>
                                     <th className="px-6 py-3.5 text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wider">Distributors</th>
                                     <th className="px-6 py-3.5 text-[11px] font-bold text-[#7C7C7C] uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[#F5F5F5]">
-                                {products.map((product) => (
+                                {products.map((product) => {
+                                    const isPendingMaster = product.source === 'pending_master';
+                                    const status = product.approvalStatus ?? 'approved';
+                                    return (
                                     <tr key={product.id} className="hover:bg-[#FAFAFA] transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -339,32 +373,60 @@ export default function BrandProductsPage() {
                                         <td className="px-6 py-4 text-[13px] text-[#7C7C7C]">{formatPackSize(product.packSize, product.unit) || '—'}</td>
                                         <td className="px-6 py-4 text-[13px] text-[#7C7C7C]">{product.category ?? '—'}</td>
                                         <td className="px-6 py-4">
-                                            <span className={cn(
-                                                'text-[12px] font-[900] px-2.5 py-1 rounded-[6px]',
-                                                product._count.mappings > 0 ? 'bg-[#EEF8F1] text-[#53B175]' : 'bg-[#F8F9FB] text-[#AEAEAE]'
-                                            )}>
-                                                {product._count.mappings} matched
+                                            <span
+                                                className={cn(
+                                                    'text-[11px] font-[900] px-2.5 py-1 rounded-[6px]',
+                                                    status === 'pending' && 'bg-[#FFF8E6] text-[#B45309]',
+                                                    status === 'rejected' && 'bg-[#FEF2F2] text-[#E74C3C]',
+                                                    status === 'approved' && 'bg-[#EEF8F1] text-[#53B175]',
+                                                )}
+                                                title={status === 'rejected' && product.approvalNote ? product.approvalNote : undefined}
+                                            >
+                                                {status === 'pending'
+                                                    ? 'Pending Approval'
+                                                    : status === 'rejected'
+                                                        ? 'Rejected'
+                                                        : 'Approved'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => openEdit(product)}
-                                                    className="h-[32px] w-[32px] flex items-center justify-center bg-[#F0F4FF] text-[#3B82F6] rounded-[8px] hover:bg-[#3B82F6] hover:text-white transition-colors"
-                                                >
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(product.id)}
-                                                    disabled={!!actionLoading}
-                                                    className="h-[32px] w-[32px] flex items-center justify-center bg-[#FEF2F2] text-[#E74C3C] rounded-[8px] hover:bg-[#E74C3C] hover:text-white transition-colors disabled:opacity-50"
-                                                >
-                                                    {actionLoading === product.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                                                </button>
-                                            </div>
+                                            {isPendingMaster ? (
+                                                <span className="text-[12px] font-medium text-[#AEAEAE]">—</span>
+                                            ) : (
+                                                <span className={cn(
+                                                    'text-[12px] font-[900] px-2.5 py-1 rounded-[6px]',
+                                                    product._count.mappings > 0 ? 'bg-[#EEF8F1] text-[#53B175]' : 'bg-[#F8F9FB] text-[#AEAEAE]'
+                                                )}>
+                                                    {product._count.mappings} matched
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {isPendingMaster ? (
+                                                <span className="text-[12px] text-[#AEAEAE] font-medium">
+                                                    {status === 'pending' ? 'Awaiting admin' : '—'}
+                                                </span>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => openEdit(product)}
+                                                        className="h-[32px] w-[32px] flex items-center justify-center bg-[#F0F4FF] text-[#3B82F6] rounded-[8px] hover:bg-[#3B82F6] hover:text-white transition-colors"
+                                                    >
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(product.id)}
+                                                        disabled={!!actionLoading}
+                                                        className="h-[32px] w-[32px] flex items-center justify-center bg-[#FEF2F2] text-[#E74C3C] rounded-[8px] hover:bg-[#E74C3C] hover:text-white transition-colors disabled:opacity-50"
+                                                    >
+                                                        {actionLoading === product.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                                    </button>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

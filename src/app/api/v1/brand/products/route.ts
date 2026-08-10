@@ -14,8 +14,8 @@ const brandService = new BrandService();
 
 export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   requirePermission(ctx, 'products.view');
-  const userId = await resolveUserId(ctx, req);
-  const products = await brandService.listMyProducts(userId);
+  const { brandId } = await resolveBrandContext(ctx, req);
+  const products = await brandService.listMyProducts(brandId);
   return NextResponse.json({ success: true, data: products });
 });
 

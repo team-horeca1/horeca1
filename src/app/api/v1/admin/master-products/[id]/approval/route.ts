@@ -10,6 +10,10 @@ import { emitEvent } from '@/events/emitter';
 import { requirePermission } from '@/lib/permissions/engine';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
+import {
+  brandMasterFieldsFromSubmitDetails,
+  readBrandSubmitDetails,
+} from '@/modules/brand/brand.validator';
 import { sendProductRejectedNotifications } from '@/lib/productRejectionNotifications';
 import { validateMasterSku } from '@/lib/sku';
 
@@ -42,7 +46,18 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
 
     const existing = await prisma.masterProduct.findUnique({
       where: { id },
-      select: { id: true, name: true, brand: true, categoryId: true, imageUrl: true, packSize: true, uom: true, sku: true, suggestedBy: true },
+      select: {
+        id: true,
+        name: true,
+        brand: true,
+        categoryId: true,
+        imageUrl: true,
+        packSize: true,
+        uom: true,
+        sku: true,
+        suggestedBy: true,
+        metadata: true,
+      },
     });
     if (!existing) throw Errors.notFound('Master product');
 
@@ -76,35 +91,78 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
 
       // If brand user suggested this master, auto-create their BrandMasterProduct link.
       if (existing.suggestedBy) {
-        const brand = await prisma.brand.findFirst({
-          where: { userId: existing.suggestedBy },
-          orderBy: { createdAt: 'desc' },
-          select: { id: true },
-        });
+        const metaBrandId =
+          existing.metadata &&
+          typeof existing.metadata === 'object' &&
+          !Array.isArray(existing.metadata) &&
+          typeof (existing.metadata as Record<string, unknown>).brandId === 'string'
+            ? ((existing.metadata as Record<string, unknown>).brandId as string)
+            : null;
+
+        const brand = metaBrandId
+          ? await prisma.brand.findUnique({ where: { id: metaBrandId }, select: { id: true } })
+          : await prisma.brand.findFirst({
+              where: { userId: existing.suggestedBy },
+              orderBy: { createdAt: 'desc' },
+              select: { id: true },
+            });
         if (brand) {
           const slug = slugify(existing.name);
-          await prisma.brandMasterProduct.upsert({
-            where: { brandId_slug: { brandId: brand.id, slug } },
-            create: {
-              brandId: brand.id,
-              masterProductId: master.id,
-              name: existing.name,
-              slug,
-              sku: existing.sku,
-              categoryId: existing.categoryId,
-              categoryIds: [existing.categoryId],
-              imageUrl: existing.imageUrl,
-              packSize: existing.packSize,
-              unit: existing.uom,
-            },
-            update: {
-              masterProductId: master.id,
-              sku: finalSku,
-              ...(existing.packSize ? { packSize: existing.packSize } : {}),
-              ...(existing.uom ? { unit: existing.uom } : {}),
-              isActive: true,
-            },
+          const detailFields = brandMasterFieldsFromSubmitDetails(
+            readBrandSubmitDetails(existing.metadata),
+          );
+          const createData = {
+            brandId: brand.id,
+            masterProductId: master.id,
+            name: existing.name,
+            slug,
+            sku: finalSku,
+            categoryId: existing.categoryId,
+            categoryIds: [existing.categoryId],
+            imageUrl: existing.imageUrl,
+            packSize: existing.packSize,
+            unit: existing.uom,
+            ...detailFields,
+          };
+          const updateData = {
+            masterProductId: master.id,
+            sku: finalSku,
+            ...(existing.packSize ? { packSize: existing.packSize } : {}),
+            ...(existing.uom ? { unit: existing.uom } : {}),
+            ...detailFields,
+            isActive: true,
+          };
+
+          // Identity-first: masterProductId / sku before brandId_slug so a
+          // renamed submission updates the existing brand catalog row.
+          const byMaster = await prisma.brandMasterProduct.findFirst({
+            where: { brandId: brand.id, masterProductId: master.id },
+            select: { id: true },
           });
+          const bySku =
+            !byMaster && finalSku
+              ? await prisma.brandMasterProduct.findFirst({
+                  where: {
+                    brandId: brand.id,
+                    sku: { equals: finalSku, mode: 'insensitive' },
+                  },
+                  select: { id: true },
+                })
+              : null;
+          const existingBmp = byMaster ?? bySku;
+
+          if (existingBmp) {
+            await prisma.brandMasterProduct.update({
+              where: { id: existingBmp.id },
+              data: updateData,
+            });
+          } else {
+            await prisma.brandMasterProduct.upsert({
+              where: { brandId_slug: { brandId: brand.id, slug } },
+              create: createData,
+              update: updateData,
+            });
+          }
         }
       }
 

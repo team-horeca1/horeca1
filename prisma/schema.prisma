@@ -1593,6 +1593,13 @@ model BrandMasterProduct {
   fssaiRef        String?  @map("fssai_ref") @db.VarChar(50)
   netWeight       Decimal? @map("net_weight") @db.Decimal(10, 3)
   netWeightUnit   String?  @map("net_weight_unit") @db.VarChar(20)
+  // Shipping / carton packaging (distinct from net product weight above).
+  packageWeight   Decimal? @map("package_weight") @db.Decimal(10, 3)
+  weightUnit      String?  @map("weight_unit") @db.VarChar(20)
+  packageLength   Decimal? @map("package_length") @db.Decimal(10, 3)
+  packageWidth    Decimal? @map("package_width") @db.Decimal(10, 3)
+  packageHeight   Decimal? @map("package_height") @db.Decimal(10, 3)
+  dimensionUnit   String?  @map("dimension_unit") @db.VarChar(20)
   tags            String[] @default([]) @map("tags")
   aliasNames      String[] @default([]) @map("alias_names")
   isActive        Boolean @default(true) @map("is_active")

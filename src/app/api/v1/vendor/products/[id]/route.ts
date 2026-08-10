@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
+import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { CatalogService, getCategoryPickerMeta } from '@/modules/catalog/catalog.service';
@@ -14,6 +15,7 @@ import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import { logProductFieldChanges, summarizePriceSlabs } from '@/lib/product-audit';
+import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
 /** Absolute http(s) URL or app-relative path (seeded products use /images/...). */
 const imageRef = z.string().refine(
@@ -54,6 +56,9 @@ const updateProductSchema = z.object({
   substituteIds: z.array(z.string().uuid()).optional(),
   // Allow re-linking to a different Horeca1 master SKU on edit (not forced).
   masterProductId: z.string().uuid().optional(),
+  // Catalog link for instant-approval on publish / resubmit (stripped by Zod until now).
+  basedOnProductId: z.string().uuid().optional(),
+  basedOnBrandMasterProductId: z.string().uuid().optional(),
   categoryId: z.string().uuid().optional(),
   // Multi-category — when provided, replaces the existing category set. First
   // entry becomes the new primary (mirrored into Product.categoryId).
@@ -88,6 +93,23 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
 
     const catalogService = new CatalogService();
     const updated = await catalogService.updateProduct(productId, vendorId, productData, ctx.userId);
+
+    // One audit entry per mapping soft-rejected because the vendor edited brand-owned fields.
+    for (const mapping of updated.unlinkedBrandMappings) {
+      logAction(ctx, req, {
+        action: AUDIT_ACTIONS.brandMappingUnlinked,
+        entity: 'BrandProductMapping',
+        entityId: mapping.id,
+        metadata: {
+          brandName: mapping.brandName,
+          masterName: mapping.masterName,
+          brandId: mapping.brandId,
+          productId,
+          reason: 'vendor_edit',
+          actor: 'vendor',
+        },
+      });
+    }
 
     // Replace price slabs if provided
     if (priceSlabs !== undefined) {
@@ -128,7 +150,8 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         updated.packSize ?? undefined,
         updated.unit ?? undefined,
         updated.sku ?? undefined,
-        updated.masterProductId || undefined
+        updated.masterProductId || undefined,
+        updated.id,
       ).catch(console.error);
     }
 
@@ -157,6 +180,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
           include: { category: { select: { id: true, name: true, slug: true } } },
         },
         masterProduct: { select: { id: true, sku: true, name: true, brand: true } },
+        // Live brand mapping (verified/auto_mapped) for edit-panel override prefill + Unlink.
+        brandMappings: productBrandMappingsInclude,
       },
     });
     if (!product) throw Errors.notFound('Product');

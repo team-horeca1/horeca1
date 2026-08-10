@@ -2,8 +2,8 @@
 // PROTECTED: brand only.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { BrandService } from '@/modules/brand/brand.service';
+import { brandMasterSubmitSchema } from '@/modules/brand/brand.validator';
 import { brandOnly } from '@/middleware/rbac';
 import { resolveUserId, resolveBrandContext } from '@/lib/resolveBrandId';
 import { requirePermission } from '@/lib/permissions/engine';
@@ -12,21 +12,12 @@ import type { AuthContext } from '@/middleware/auth';
 
 const brandService = new BrandService();
 
-const submitSchema = z.object({
-  name: z.string().min(2).max(255),
-  sku: z.string().min(2).max(40),
-  categoryId: z.string().uuid(),
-  imageUrl: z.string().url().optional(),
-  uom: z.string().max(50).optional(),
-  packSize: z.string().max(100).optional(),
-});
-
 export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
     await resolveBrandContext(ctx, req);
     requirePermission(ctx, 'products.create');
     const userId = await resolveUserId(ctx, req);
-    const input = submitSchema.parse(await req.json());
+    const input = brandMasterSubmitSchema.parse(await req.json());
     const master = await brandService.submitPendingMasterProduct(userId, input);
     return NextResponse.json({ success: true, data: master }, { status: 201 });
   } catch (error) {

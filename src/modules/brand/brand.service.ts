@@ -1,4 +1,4 @@
-import type { ApprovalStatus } from '@prisma/client';
+import type { ApprovalStatus, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { aggregateInventories } from '@/lib/inventoryHelpers';
 import { getApprovedDistributorKeys, distributorAuthKey } from '@/lib/brandAuthorizedDistributor';
@@ -9,10 +9,36 @@ import { runMappingForProduct, runMappingForBrand, embedBrandMasterProduct } fro
 import { validateMasterSku } from '@/lib/sku';
 import { assertLeafCategory, syncMasterProductCategories } from '@/modules/catalog/catalog.service';
 import { pushMasterCategoriesToVendorListings } from '@/modules/catalog/master-sync.service';
-import type { CreateBrandProductInput } from './brand.validator';
+import type {
+  BrandMasterSubmitInput,
+  CreateBrandProductInput,
+} from './brand.validator';
+import {
+  BRAND_SUBMIT_DETAILS_META_KEY,
+  pickBrandSubmitDetails,
+  readBrandSubmitDetails,
+} from './brand.validator';
 
 function slugify(str: string): string {
   return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+/** Unique slug for (brandId, slug) — suffixes -2, -3… on collisions. */
+async function uniqueBrandProductSlug(
+  brandId: string,
+  name: string,
+  excludeProductId?: string,
+): Promise<string> {
+  const slugBase = slugify(name) || 'product';
+  let slug = slugBase;
+  for (let n = 2; ; n++) {
+    const clash = await prisma.brandMasterProduct.findUnique({
+      where: { brandId_slug: { brandId, slug } },
+      select: { id: true },
+    });
+    if (!clash || (excludeProductId && clash.id === excludeProductId)) return slug;
+    slug = `${slugBase}-${n}`;
+  }
 }
 
 /**
@@ -617,20 +643,110 @@ export class BrandService {
   }
 
   // ── Brand: list own master products ───────────────────────
-  async listMyProducts(userId: string) {
-    const brandId = await this.getBrandIdForUser(userId);
-    return prisma.brandMasterProduct.findMany({
-      where: { brandId, isActive: true },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-      include: {
-        categoryRel: { select: { id: true, name: true } },
-        _count: {
-          select: {
-            mappings: { where: { status: 'verified' } },
-          },
-        },
+  // Includes live BrandMasterProduct rows plus pending/rejected MasterProduct
+  // submissions from this brand (new SKUs wait for admin before a BMP is created).
+  async listMyProducts(brandId: string) {
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
+      select: {
+        id: true,
+        name: true,
+        userId: true,
+        teamMembers: { select: { userId: true } },
       },
     });
+    if (!brand) throw Errors.notFound('Brand profile not found');
+
+    const brandUserIds = Array.from(
+      new Set([
+        ...(brand.userId ? [brand.userId] : []),
+        ...brand.teamMembers.map((m) => m.userId),
+      ]),
+    );
+
+    const [live, pendingMasters] = await Promise.all([
+      prisma.brandMasterProduct.findMany({
+        where: { brandId, isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        include: {
+          categoryRel: { select: { id: true, name: true } },
+          _count: {
+            select: {
+              mappings: { where: { status: 'verified' } },
+            },
+          },
+        },
+      }),
+      prisma.masterProduct.findMany({
+        where: {
+          approvalStatus: { in: ['pending', 'rejected'] },
+          OR: [
+            ...(brandUserIds.length > 0
+              ? [{ suggestedBy: { in: brandUserIds } }]
+              : []),
+            { metadata: { path: ['brandId'], equals: brandId } },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          category: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
+
+    const liveRows = live.map((p) => ({
+      ...p,
+      category: p.categoryRel?.name ?? p.category ?? null,
+      approvalStatus: 'approved' as const,
+      approvalNote: null as string | null,
+      source: 'brand_catalog' as const,
+    }));
+
+    const pendingRows = pendingMasters.map((m) => {
+      const details = readBrandSubmitDetails(m.metadata);
+      return {
+        id: m.id,
+        name: m.name,
+        packSize: m.packSize,
+        unit: m.uom,
+        imageUrl: m.imageUrl,
+        images: m.images,
+        sku: m.sku,
+        description: details.description ?? null,
+        category: m.category?.name ?? null,
+        categoryId: m.categoryId,
+        categoryIds: [m.categoryId],
+        categoryRel: m.category,
+        hsn: details.hsn ?? null,
+        barcode: details.barcode ?? null,
+        ean: details.ean ?? null,
+        vegNonVeg: details.vegNonVeg ?? null,
+        storageType: details.storageType ?? null,
+        shelfLifeDays: details.shelfLifeDays ?? null,
+        countryOfOrigin: details.countryOfOrigin ?? null,
+        fssaiRef: details.fssaiRef ?? null,
+        netWeight: details.netWeight ?? null,
+        netWeightUnit: details.netWeightUnit ?? null,
+        packageWeight: details.packageWeight ?? null,
+        weightUnit: details.weightUnit ?? null,
+        packageLength: details.packageLength ?? null,
+        packageWidth: details.packageWidth ?? null,
+        packageHeight: details.packageHeight ?? null,
+        dimensionUnit: details.dimensionUnit ?? null,
+        tags: details.tags ?? [],
+        aliasNames: details.aliasNames ?? m.aliasNames ?? [],
+        isActive: m.isActive,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+        approvalStatus: m.approvalStatus as 'pending' | 'rejected',
+        approvalNote: m.approvalNote,
+        source: 'pending_master' as const,
+        _count: { mappings: 0 },
+      };
+    });
+
+    // Pending first, then live catalog alphabetically.
+    return [...pendingRows, ...liveRows];
   }
 
   // ── Brand: find master product by SKU (brand-scoped) ───────
@@ -658,14 +774,7 @@ export class BrandService {
 
     // Slug is unique per (brandId, slug) — suffix -2, -3… on name collisions so
     // same-named SKUs (batches, pack variants) don't hit the DB constraint.
-    const slugBase = slugify(input.name) || 'product';
-    let slug = slugBase;
-    for (let n = 2; await prisma.brandMasterProduct.findUnique({
-      where: { brandId_slug: { brandId, slug } },
-      select: { id: true },
-    }); n++) {
-      slug = `${slugBase}-${n}`;
-    }
+    const slug = await uniqueBrandProductSlug(brandId, input.name);
 
     const product = await prisma.brandMasterProduct.create({
       data: {
@@ -692,6 +801,12 @@ export class BrandService {
         fssaiRef: input.fssaiRef,
         netWeight: input.netWeight,
         netWeightUnit: input.netWeightUnit,
+        packageWeight: input.packageWeight,
+        weightUnit: input.weightUnit,
+        packageLength: input.packageLength,
+        packageWidth: input.packageWidth,
+        packageHeight: input.packageHeight,
+        dimensionUnit: input.dimensionUnit,
         tags: input.tags ?? [],
         aliasNames: input.aliasNames ?? [],
       },
@@ -746,10 +861,7 @@ export class BrandService {
   }
 
   // ── Brand: submit new master catalog entry for admin approval ──
-  async submitPendingMasterProduct(
-    userId: string,
-    input: { name: string; sku: string; categoryId: string; imageUrl?: string; packSize?: string; uom?: string },
-  ) {
+  async submitPendingMasterProduct(userId: string, input: BrandMasterSubmitInput) {
     const brandId = await this.getBrandIdForUser(userId);
     const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { name: true } });
     if (!brand) throw Errors.notFound('Brand profile not found');
@@ -770,6 +882,16 @@ export class BrandService {
 
     await assertLeafCategory([input.categoryId]);
 
+    // Detail fields have no MasterProduct columns — stash for BrandMasterProduct on approve.
+    // brandId at the top level lets the brand portal list pending submissions reliably.
+    const brandDetails = pickBrandSubmitDetails(input);
+    const metadata: Prisma.InputJsonValue = {
+      brandId,
+      ...(Object.keys(brandDetails).length > 0
+        ? { [BRAND_SUBMIT_DETAILS_META_KEY]: brandDetails }
+        : {}),
+    };
+
     const master = await prisma.masterProduct.create({
       data: {
         sku: skuCheck.normalized,
@@ -779,8 +901,12 @@ export class BrandService {
         imageUrl: input.imageUrl ?? null,
         packSize: input.packSize?.trim() || null,
         uom: input.uom?.trim() || null,
+        // Promote list-shaped fields onto native MasterProduct columns when present.
+        ...(brandDetails.images ? { images: brandDetails.images } : {}),
+        ...(brandDetails.aliasNames ? { aliasNames: brandDetails.aliasNames } : {}),
         approvalStatus: 'pending',
         suggestedBy: userId,
+        metadata,
       },
     });
 
@@ -810,6 +936,11 @@ export class BrandService {
       if (input.categoryId === undefined) {
         data.categoryId = input.categoryIds[0] ?? null;
       }
+    }
+
+    // Keep slug in sync with name so brandId_slug upserts / sync lookups don't fork.
+    if (typeof input.name === 'string' && input.name.trim() && input.name.trim() !== product.name) {
+      data.slug = await uniqueBrandProductSlug(brandId, input.name.trim(), productId);
     }
 
     const updated = await prisma.brandMasterProduct.update({
@@ -863,12 +994,12 @@ export class BrandService {
   }
 
   // ── Brand: get product-level coverage (for portal mappings page) ──────
-  async getDistributorCoverage(userId: string) {
+  async getDistributorCoverage(userId: string, vendorId?: string) {
     const brandId = await this.getBrandIdForUser(userId);
 
     const approvedKeys = await getApprovedDistributorKeys({ brandId });
     const authRows = await prisma.brandAuthorizedDistributor.findMany({
-      where: { brandId },
+      where: { brandId, ...(vendorId ? { vendorId } : {}) },
       select: { vendorId: true, status: true, brandApprovedAt: true, adminApprovedAt: true },
     });
     const authByVendor = new Map(authRows.map((a) => [a.vendorId, a]));
@@ -878,7 +1009,10 @@ export class BrandService {
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       include: {
         mappings: {
-          where: { status: { not: 'rejected' } },
+          where: {
+            status: { not: 'rejected' },
+            ...(vendorId ? { distributorProduct: { vendorId } } : {}),
+          },
           include: {
             distributorProduct: {
               select: {
@@ -919,10 +1053,11 @@ export class BrandService {
 
     for (const mp of masterProducts) {
       for (const m of mp.mappings) {
-        const vendorId = m.distributorProduct.vendorId;
-        if (!vendorId) continue;
-        const auth = authByVendor.get(vendorId);
-        const isAuthApproved = approvedKeys.has(distributorAuthKey(brandId, vendorId));
+        const mappingVendorId = m.distributorProduct.vendorId;
+        if (!mappingVendorId) continue;
+        if (vendorId && mappingVendorId !== vendorId) continue;
+        const auth = authByVendor.get(mappingVendorId);
+        const isAuthApproved = approvedKeys.has(distributorAuthKey(brandId, mappingVendorId));
         coveredProductIds.add(mp.id);
         rows.push({
           mappingId: m.id,
@@ -936,7 +1071,7 @@ export class BrandService {
           distributorPackSize: m.distributorProduct.packSize,
           status: m.status,
           confidenceScore: Number(m.confidenceScore),
-          vendorId,
+          vendorId: mappingVendorId,
           vendorName: m.distributorProduct.vendor?.businessName ?? '—',
           vendorLogo: m.distributorProduct.vendor?.logoUrl ?? null,
           distributorAuthStatus: auth?.status ?? null,
@@ -945,6 +1080,8 @@ export class BrandService {
       }
     }
 
+    // Mapping counts / productsCovered come from filtered rows when vendorId is set.
+    // totalProducts stays the brand catalog size so coverage ratio remains meaningful.
     const activeMappings = rows.filter(
       (r) => (r.status === 'auto_mapped' || r.status === 'verified') && r.isAuthApproved,
     ).length;
@@ -1148,6 +1285,18 @@ export class BrandService {
   }
 }
 
+/**
+ * Upsert a brand catalog row from a vendor/admin listing or master product.
+ *
+ * Resolution is identity-first so renames never fork a new BrandMasterProduct:
+ * 1. brandId + masterProductId
+ * 2. existing BrandProductMapping for distributorProductId (any status)
+ * 3. brandId + sku (case-insensitive)
+ * 4. brandId + slug / name (legacy)
+ *
+ * On hit: brand owns name/slug — only fill empty scalars and backfill masterProductId.
+ * On miss: create with masterProductId set from birth.
+ */
 export async function syncProductToBrand(
   brandName: string | null | undefined,
   name: string,
@@ -1157,6 +1306,7 @@ export async function syncProductToBrand(
   unit: string | null | undefined,
   sku: string | null | undefined,
   masterProductId?: string,
+  distributorProductId?: string,
 ) {
   if (!brandName) return;
 
@@ -1164,29 +1314,70 @@ export async function syncProductToBrand(
     // Find approved brand with matching name (case-insensitive)
     const brand = await prisma.brand.findFirst({
       where: { name: { equals: brandName.trim(), mode: 'insensitive' }, approvalStatus: 'approved' },
-      select: { id: true }
+      select: { id: true },
     });
     if (!brand) return;
 
-    const slug = slugify(name);
-    const existing = await prisma.brandMasterProduct.findFirst({
-      where: { brandId: brand.id, OR: [{ slug }, { name: { equals: name.trim(), mode: 'insensitive' } }] }
-    });
+    const trimmedName = name.trim();
+    const trimmedSku = sku?.trim() || null;
+    const trimmedPack = packSize?.trim() || null;
+    const trimmedUnit = unit?.trim() || null;
+    const slug = slugify(trimmedName);
+
+    // Identity-first lookup — never create a fork when the same master/SKU/mapping exists.
+    let existing =
+      masterProductId
+        ? await prisma.brandMasterProduct.findFirst({
+            where: { brandId: brand.id, masterProductId },
+          })
+        : null;
+
+    if (!existing && distributorProductId) {
+      const mapping = await prisma.brandProductMapping.findFirst({
+        where: { brandId: brand.id, distributorProductId },
+        select: { brandMasterProduct: true },
+        orderBy: { updatedAt: 'desc' },
+      });
+      existing = mapping?.brandMasterProduct ?? null;
+    }
+
+    if (!existing && trimmedSku) {
+      existing = await prisma.brandMasterProduct.findFirst({
+        where: {
+          brandId: brand.id,
+          sku: { equals: trimmedSku, mode: 'insensitive' },
+        },
+      });
+    }
+
+    if (!existing) {
+      existing = await prisma.brandMasterProduct.findFirst({
+        where: {
+          brandId: brand.id,
+          OR: [
+            { slug },
+            { name: { equals: trimmedName, mode: 'insensitive' } },
+          ],
+        },
+      });
+    }
 
     let brandMasterProduct = existing;
     if (!existing) {
+      const uniqueSlug = await uniqueBrandProductSlug(brand.id, trimmedName);
       brandMasterProduct = await prisma.brandMasterProduct.create({
         data: {
           brandId: brand.id,
-          name: name.trim(),
-          slug,
+          masterProductId: masterProductId || null,
+          name: trimmedName,
+          slug: uniqueSlug,
           imageUrl: imageUrl || null,
-          packSize: packSize?.trim() || null,
-          unit: unit?.trim() || null,
-          sku: sku || null,
+          packSize: trimmedPack,
+          unit: trimmedUnit,
+          sku: trimmedSku,
           categoryId: categoryId || null,
           categoryIds: categoryId ? [categoryId] : [],
-        }
+        },
       });
 
       // Embed and map in the background
@@ -1194,31 +1385,31 @@ export async function syncProductToBrand(
         .catch(console.error)
         .finally(() => runMappingForProduct(brandMasterProduct!.id).catch(console.error));
     } else {
-      // Update existing brand master product fields if they are different or missing
+      // Brand owns name/slug — only fill empty scalars; backfill masterProductId.
       brandMasterProduct = await prisma.brandMasterProduct.update({
         where: { id: existing.id },
         data: {
-          masterProductId: masterProductId || existing.masterProductId || null,
-          imageUrl: imageUrl || existing.imageUrl || null,
-          packSize: packSize?.trim() || existing.packSize || null,
-          unit: unit?.trim() || existing.unit || null,
-          sku: sku || existing.sku || null,
-          categoryId: categoryId || existing.categoryId || null,
+          masterProductId: existing.masterProductId || masterProductId || null,
+          imageUrl: existing.imageUrl || imageUrl || null,
+          packSize: existing.packSize || trimmedPack,
+          unit: existing.unit || trimmedUnit,
+          sku: existing.sku || trimmedSku,
+          categoryId: existing.categoryId || categoryId || null,
           categoryIds: categoryId
             ? Array.from(new Set([...(existing.categoryIds || []), categoryId]))
             : existing.categoryIds,
-        }
+        },
       });
     }
 
     if (masterProductId && brandMasterProduct) {
       const distProducts = await prisma.product.findMany({
         where: { masterProductId, isActive: true },
-        select: { id: true }
+        select: { id: true },
       });
       if (distProducts.length > 0) {
         await prisma.brandProductMapping.createMany({
-          data: distProducts.map(dp => ({
+          data: distProducts.map((dp) => ({
             brandId: brand.id,
             brandMasterProductId: brandMasterProduct!.id,
             distributorProductId: dp.id,

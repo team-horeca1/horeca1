@@ -67,17 +67,52 @@ interface MasterProductDetail {
 interface VendorProductDetail {
     id: string;
     name: string;
+    slug?: string | null;
+    description?: string | null;
     sku: string | null;
     vendorSku: string | null;
     brand: string | null;
     basePrice: number;
+    originalPrice?: number | null;
+    taxPercent?: number | null;
+    minOrderQty?: number | null;
+    creditEligible?: boolean;
+    packSize?: string | null;
+    unit?: string | null;
+    hsn?: string | null;
+    fssaiRef?: string | null;
+    barcode?: string | null;
+    countryOfOrigin?: string | null;
+    vegNonVeg?: string | null;
+    storageType?: string | null;
+    shelfLifeDays?: number | null;
+    tags?: string[];
+    aliasNames?: string[];
+    images?: string[];
     imageUrl: string | null;
+    metadata?: Record<string, unknown> | null;
     approvalStatus: string;
     category: { id: string; name: string } | null;
+    categoryLinks?: Array<{ category?: { id: string; name: string } | null; isPrimary?: boolean }>;
     vendor: { businessName: string } | null;
     inventory?: { qtyAvailable: number } | null;
     inventories?: Array<{ qtyAvailable: number }>;
+    priceSlabs?: Array<{
+        minQty: number;
+        maxQty?: number | null;
+        price: number;
+        promoPrice?: number | null;
+    }>;
     masterProduct: { id: string; sku: string; name: string } | null;
+    brandMappings?: Array<{
+        id: string;
+        status: string;
+        brandId: string;
+        brandMasterProduct?: {
+            name?: string | null;
+            brand?: { name: string; slug: string } | null;
+        } | null;
+    }>;
     pendingEditPayload?: Record<string, unknown> | null;
 }
 
@@ -130,6 +165,50 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
             <p className="text-[14px] font-semibold text-[#181725]">{value || '—'}</p>
         </div>
     );
+}
+
+function ReviewSection({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <div className="space-y-3 pt-4 border-t border-[#F5F5F5] first:pt-0 first:border-t-0">
+            <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider">{title}</p>
+            <div className="grid grid-cols-2 gap-4">{children}</div>
+        </div>
+    );
+}
+
+function formatMoney(value: number | string | null | undefined): string {
+    if (value == null || value === '') return '—';
+    const n = Number(value);
+    if (Number.isNaN(n)) return String(value);
+    return `₹${n.toLocaleString('en-IN')}`;
+}
+
+function joinList(values: string[] | null | undefined): string {
+    if (!values || values.length === 0) return '';
+    return values.filter(Boolean).join(', ');
+}
+
+function asMetaRecord(metadata: unknown): Record<string, Record<string, unknown>> {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return {};
+    const root = metadata as Record<string, unknown>;
+    const section = (key: string): Record<string, unknown> => {
+        const value = root[key];
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+        return value as Record<string, unknown>;
+    };
+    return {
+        packaging: section('packaging'),
+        identifiers: section('identifiers'),
+        accounting: section('accounting'),
+        inventory: section('inventory'),
+        attributes: section('attributes'),
+    };
+}
+
+function metaScalar(value: unknown): string {
+    if (value == null || value === '') return '';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    return String(value);
 }
 
 function typeLabel(target: ReviewTarget): string {
@@ -264,7 +343,11 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                 const p: VendorProductDetail = json.data;
                 setVendorProduct(p);
                 setTitle(p.name);
-                setStatusLabel(p.approvalStatus);
+                setStatusLabel(
+                    p.approvalStatus === 'pending_edit'
+                        ? 'Edit Pending'
+                        : p.approvalStatus,
+                );
                 setIsApproved(p.approvalStatus === 'approved');
                 setProductForm({
                     name: p.name,
@@ -894,64 +977,204 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
             }
             return (
                 <div className="space-y-6 p-6">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-start gap-4">
                         {vendorProduct.imageUrl ? (
-                            <img src={vendorProduct.imageUrl} alt="" className="w-16 h-16 rounded-[10px] object-cover border" />
+                            <img src={vendorProduct.imageUrl} alt="" className="w-16 h-16 rounded-[10px] object-cover border shrink-0" />
                         ) : (
-                            <div className="w-16 h-16 rounded-[10px] bg-[#F8F9FB] flex items-center justify-center"><Package size={24} className="text-[#AEAEAE]" /></div>
+                            <div className="w-16 h-16 rounded-[10px] bg-[#F8F9FB] flex items-center justify-center shrink-0"><Package size={24} className="text-[#AEAEAE]" /></div>
                         )}
-                        <div>
-                            <h3 className="text-[18px] font-[900] text-[#181725]">{vendorProduct.name}</h3>
+                        <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-[18px] font-[900] text-[#181725]">{vendorProduct.name}</h3>
+                                {vendorProduct.brandMappings && vendorProduct.brandMappings.length > 0 && (
+                                    <span className="text-[10px] font-[900] px-2 py-0.5 rounded-[6px] uppercase bg-[#EEF8F1] text-[#299E60]">
+                                        Brand mapped
+                                    </span>
+                                )}
+                                {vendorProduct.approvalStatus === 'pending_edit' && (
+                                    <span className="text-[10px] font-[900] px-2 py-0.5 rounded-[6px] uppercase bg-[#FFF8E1] text-[#8B6914]">
+                                        Edit Pending
+                                    </span>
+                                )}
+                            </div>
                             {vendorProduct.sku && <p className="text-[12px] text-[#AEAEAE]">SKU: {vendorProduct.sku}</p>}
+                            {vendorProduct.brandMappings?.[0]?.brandMasterProduct?.brand?.name && (
+                                <p className="text-[12px] text-[#299E60] font-semibold mt-0.5">
+                                    {vendorProduct.brandMappings[0].brandMasterProduct.brand.name}
+                                    {vendorProduct.brandMappings[0].brandMasterProduct.name
+                                        ? ` · ${vendorProduct.brandMappings[0].brandMasterProduct.name}`
+                                        : ''}
+                                </p>
+                            )}
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <DetailRow label="Vendor" value={vendorProduct.vendor?.businessName} />
-                        <DetailRow label="Brand" value={vendorProduct.brand} />
-                        <DetailRow label="Category" value={vendorProduct.category?.name} />
-                        <DetailRow label="Price" value={`₹${Number(vendorProduct.basePrice).toLocaleString('en-IN')}`} />
-                        <DetailRow label="POS SKU" value={vendorProduct.vendorSku ?? vendorProduct.sku} />
-                        <DetailRow label="Catalog SKU" value={vendorProduct.masterProduct?.sku} />
-                        <DetailRow label="Stock" value={(() => {
-                          const rows = vendorProduct.inventories;
-                          const qty = vendorProduct.inventory?.qtyAvailable
-                            ?? (rows?.length ? rows.reduce((s, r) => s + r.qtyAvailable, 0) : null);
-                          return qty != null ? String(qty) : '—';
-                        })()} />
-                        <DetailRow label="Status" value={vendorProduct.approvalStatus} />
-                    </div>
+
+                    {(() => {
+                        const meta = asMetaRecord(vendorProduct.metadata);
+                        const packaging = meta.packaging;
+                        const identifiers = meta.identifiers;
+                        const categoryNames = (() => {
+                            const linked = (vendorProduct.categoryLinks ?? [])
+                                .map((l) => l.category?.name)
+                                .filter((n): n is string => Boolean(n));
+                            if (linked.length > 0) return linked.join(', ');
+                            return vendorProduct.category?.name ?? '';
+                        })();
+                        const stockQty = (() => {
+                            const rows = vendorProduct.inventories;
+                            return vendorProduct.inventory?.qtyAvailable
+                                ?? (rows?.length ? rows.reduce((s, r) => s + r.qtyAvailable, 0) : null);
+                        })();
+                        const gallery = [
+                            ...(vendorProduct.imageUrl ? [vendorProduct.imageUrl] : []),
+                            ...(Array.isArray(vendorProduct.images) ? vendorProduct.images : []),
+                        ].filter((url, idx, arr) => url && arr.indexOf(url) === idx);
+
+                        return (
+                            <>
+                                <ReviewSection title="Identity">
+                                    <DetailRow label="Vendor" value={vendorProduct.vendor?.businessName} />
+                                    <DetailRow label="Brand" value={vendorProduct.brand} />
+                                    <DetailRow label="Slug" value={vendorProduct.slug} />
+                                    <DetailRow label="POS SKU" value={vendorProduct.vendorSku ?? vendorProduct.sku} />
+                                    <DetailRow label="Catalog SKU" value={vendorProduct.masterProduct?.sku} />
+                                    <DetailRow label="Category" value={categoryNames} />
+                                    <DetailRow label="Status" value={vendorProduct.approvalStatus} />
+                                    <DetailRow label="Stock" value={stockQty != null ? String(stockQty) : '—'} />
+                                    <div className="col-span-2">
+                                        <DetailRow label="Description" value={vendorProduct.description} />
+                                    </div>
+                                </ReviewSection>
+
+                                <ReviewSection title="Compliance">
+                                    <DetailRow label="HSN" value={vendorProduct.hsn} />
+                                    <DetailRow label="FSSAI Ref" value={vendorProduct.fssaiRef} />
+                                    <DetailRow label="Barcode" value={vendorProduct.barcode} />
+                                    <DetailRow label="Country of Origin" value={vendorProduct.countryOfOrigin} />
+                                </ReviewSection>
+
+                                <ReviewSection title="Specs">
+                                    <DetailRow label="Veg / Non-Veg" value={vendorProduct.vegNonVeg} />
+                                    <DetailRow label="Storage" value={vendorProduct.storageType} />
+                                    <DetailRow label="Shelf Life (days)" value={vendorProduct.shelfLifeDays != null ? String(vendorProduct.shelfLifeDays) : ''} />
+                                    <DetailRow label="Pack Size" value={vendorProduct.packSize} />
+                                    <DetailRow label="Unit" value={vendorProduct.unit} />
+                                </ReviewSection>
+
+                                <ReviewSection title="Commerce">
+                                    <DetailRow label="Base Price" value={formatMoney(vendorProduct.basePrice)} />
+                                    <DetailRow label="MRP / Original" value={formatMoney(vendorProduct.originalPrice)} />
+                                    <DetailRow label="Tax %" value={vendorProduct.taxPercent != null ? String(vendorProduct.taxPercent) : ''} />
+                                    <DetailRow label="Min Order Qty" value={vendorProduct.minOrderQty != null ? String(vendorProduct.minOrderQty) : ''} />
+                                    <DetailRow label="Credit Eligible" value={vendorProduct.creditEligible ? 'Yes' : 'No'} />
+                                    <div className="col-span-2">
+                                        <FieldLabel>Price Slabs</FieldLabel>
+                                        {vendorProduct.priceSlabs && vendorProduct.priceSlabs.length > 0 ? (
+                                            <ul className="mt-1 space-y-1">
+                                                {vendorProduct.priceSlabs.map((slab, idx) => (
+                                                    <li key={`${slab.minQty}-${idx}`} className="text-[13px] font-semibold text-[#181725]">
+                                                        Qty {slab.minQty}
+                                                        {slab.maxQty != null ? `–${slab.maxQty}` : '+'}
+                                                        {' → '}
+                                                        {formatMoney(slab.price)}
+                                                        {slab.promoPrice != null ? ` (promo ${formatMoney(slab.promoPrice)})` : ''}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-[14px] font-semibold text-[#181725]">—</p>
+                                        )}
+                                    </div>
+                                </ReviewSection>
+
+                                <ReviewSection title="Packaging & Identifiers">
+                                    <DetailRow
+                                        label="Package Weight"
+                                        value={
+                                            packaging.packageWeight != null && packaging.packageWeight !== ''
+                                                ? `${metaScalar(packaging.packageWeight)}${packaging.weightUnit ? ` ${metaScalar(packaging.weightUnit)}` : ''}`
+                                                : ''
+                                        }
+                                    />
+                                    <DetailRow
+                                        label="Dimensions (L×W×H)"
+                                        value={
+                                            packaging.packageLength != null || packaging.packageWidth != null || packaging.packageHeight != null
+                                                ? [
+                                                    metaScalar(packaging.packageLength) || '—',
+                                                    metaScalar(packaging.packageWidth) || '—',
+                                                    metaScalar(packaging.packageHeight) || '—',
+                                                ].join(' × ') + (packaging.dimensionUnit ? ` ${metaScalar(packaging.dimensionUnit)}` : '')
+                                                : ''
+                                        }
+                                    />
+                                    <DetailRow label="EAN" value={metaScalar(identifiers.ean)} />
+                                    <DetailRow label="ISBN" value={metaScalar(identifiers.isbn)} />
+                                </ReviewSection>
+
+                                <ReviewSection title="Search Terms">
+                                    <div className="col-span-2">
+                                        <DetailRow label="Tags" value={joinList(vendorProduct.tags)} />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <DetailRow label="Alias Names" value={joinList(vendorProduct.aliasNames)} />
+                                    </div>
+                                </ReviewSection>
+
+                                <div className="space-y-3 pt-4 border-t border-[#F5F5F5]">
+                                    <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider">Images</p>
+                                    {gallery.length > 0 ? (
+                                        <div className="flex flex-wrap gap-2">
+                                            {gallery.map((url) => (
+                                                <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block">
+                                                    <img
+                                                        src={url}
+                                                        alt=""
+                                                        className="w-16 h-16 rounded-[8px] object-cover border border-[#EEEEEE] hover:border-[#299E60]/50"
+                                                    />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-[14px] font-semibold text-[#181725]">—</p>
+                                    )}
+                                </div>
+                            </>
+                        );
+                    })()}
+
                     {vendorProduct.approvalStatus === 'pending_edit' && vendorProduct.pendingEditPayload && (() => {
-                        const pending = vendorProduct.pendingEditPayload as Record<string, any>;
+                        const pending = vendorProduct.pendingEditPayload as Record<string, unknown>;
                         const diffFields: Array<{ label: string; oldVal: React.ReactNode; newVal: React.ReactNode }> = [];
 
                         if (pending.name !== undefined && pending.name !== vendorProduct.name) {
-                            diffFields.push({ label: 'Product Name', oldVal: vendorProduct.name, newVal: pending.name });
+                            diffFields.push({ label: 'Product Name', oldVal: vendorProduct.name, newVal: String(pending.name) });
                         }
                         if (pending.brand !== undefined && pending.brand !== vendorProduct.brand) {
-                            diffFields.push({ label: 'Brand', oldVal: vendorProduct.brand, newVal: pending.brand });
+                            diffFields.push({ label: 'Brand', oldVal: vendorProduct.brand, newVal: pending.brand as React.ReactNode });
                         }
-                        if (pending.hsn !== undefined && pending.hsn !== (vendorProduct as any).hsn) {
-                            diffFields.push({ label: 'HSN Code', oldVal: (vendorProduct as any).hsn, newVal: pending.hsn });
+                        if (pending.hsn !== undefined && pending.hsn !== vendorProduct.hsn) {
+                            diffFields.push({ label: 'HSN Code', oldVal: vendorProduct.hsn, newVal: pending.hsn as React.ReactNode });
                         }
-                        if (pending.packSize !== undefined && pending.packSize !== (vendorProduct as any).packSize) {
-                            diffFields.push({ label: 'Pack Size', oldVal: (vendorProduct as any).packSize, newVal: pending.packSize });
+                        if (pending.packSize !== undefined && pending.packSize !== vendorProduct.packSize) {
+                            diffFields.push({ label: 'Pack Size', oldVal: vendorProduct.packSize, newVal: pending.packSize as React.ReactNode });
                         }
-                        if (pending.unit !== undefined && pending.unit !== (vendorProduct as any).unit) {
-                            diffFields.push({ label: 'Unit', oldVal: (vendorProduct as any).unit, newVal: pending.unit });
+                        if (pending.unit !== undefined && pending.unit !== vendorProduct.unit) {
+                            diffFields.push({ label: 'Unit', oldVal: vendorProduct.unit, newVal: pending.unit as React.ReactNode });
                         }
-                        if (pending.vegNonVeg !== undefined && pending.vegNonVeg !== (vendorProduct as any).vegNonVeg) {
-                            diffFields.push({ label: 'Veg/Non-Veg', oldVal: (vendorProduct as any).vegNonVeg, newVal: pending.vegNonVeg });
+                        if (pending.vegNonVeg !== undefined && pending.vegNonVeg !== vendorProduct.vegNonVeg) {
+                            diffFields.push({ label: 'Veg/Non-Veg', oldVal: vendorProduct.vegNonVeg, newVal: pending.vegNonVeg as React.ReactNode });
                         }
                         if (pending.imageUrl !== undefined && pending.imageUrl !== vendorProduct.imageUrl) {
                             diffFields.push({
                                 label: 'Image',
                                 oldVal: vendorProduct.imageUrl ? <img src={vendorProduct.imageUrl} alt="Current" className="w-12 h-12 object-contain rounded border border-gray-200 bg-gray-50" /> : '—',
-                                newVal: pending.imageUrl ? <img src={pending.imageUrl} alt="Proposed" className="w-12 h-12 object-contain rounded border border-[#E2B755] bg-yellow-50/20" /> : '—',
+                                newVal: typeof pending.imageUrl === 'string' && pending.imageUrl ? <img src={pending.imageUrl} alt="Proposed" className="w-12 h-12 object-contain rounded border border-[#E2B755] bg-yellow-50/20" /> : '—',
                             });
                         }
                         if (pending.images !== undefined) {
-                            const oldImgs = (vendorProduct as any).images || [];
-                            const newImgs = pending.images || [];
+                            const oldImgs = vendorProduct.images || [];
+                            const newImgs = Array.isArray(pending.images) ? pending.images.filter((x): x is string => typeof x === 'string') : [];
                             const oldStr = [...oldImgs].sort().join(',');
                             const newStr = [...newImgs].sort().join(',');
                             if (oldStr !== newStr) {
@@ -970,13 +1193,14 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                                 });
                             }
                         }
-                        if (pending.categoryIds !== undefined) {
-                            const oldCats = (vendorProduct as any).categoryLinks?.map((l: any) => l.category?.name).filter(Boolean) || [];
+                        if (pending.categoryIds !== undefined && Array.isArray(pending.categoryIds)) {
+                            const oldCats = (vendorProduct.categoryLinks ?? []).map((l) => l.category?.name).filter((n): n is string => Boolean(n));
                             if (oldCats.length === 0 && vendorProduct.category?.name) {
                                 oldCats.push(vendorProduct.category.name);
                             }
-                            const newCats = pending.categoryIds.map((id: string) => {
-                                return allCategories.find((c) => c.id === id)?.name || id;
+                            const newCats = pending.categoryIds.map((id) => {
+                                const cid = String(id);
+                                return allCategories.find((c) => c.id === cid)?.name || cid;
                             });
                             const oldStr = [...oldCats].sort().join(', ');
                             const newStr = [...newCats].sort().join(', ');
@@ -993,7 +1217,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                             <div className="space-y-3 pt-2 border-t border-[#F5F5F5] bg-[#FFF8E1] rounded-[10px] p-4">
                                 <div className="flex justify-between items-center">
                                     <p className="text-[12px] font-bold text-[#8B6914] uppercase text-xs tracking-wide">Queued material changes</p>
-                                    {pending.submittedAt && (
+                                    {typeof pending.submittedAt === 'string' && (
                                         <p className="text-[11px] text-[#8B6914]/80 font-bold">
                                             Submitted on {new Date(pending.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                                         </p>
@@ -1221,7 +1445,11 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                         {statusLabel && (
                             <span className={cn(
                                 'shrink-0 text-[10px] font-[900] px-2.5 py-1 rounded-[6px] uppercase',
-                                isApproved ? 'bg-[#EEF8F1] text-[#299E60]' : 'bg-[#FFF7E6] text-[#F59E0B]',
+                                isApproved
+                                    ? 'bg-[#EEF8F1] text-[#299E60]'
+                                    : statusLabel === 'Edit Pending' || vendorProduct?.approvalStatus === 'pending_edit'
+                                        ? 'bg-[#FFF8E1] text-[#8B6914]'
+                                        : 'bg-[#FFF7E6] text-[#F59E0B]',
                             )}>
                                 {statusLabel}
                             </span>

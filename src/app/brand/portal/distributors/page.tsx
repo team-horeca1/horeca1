@@ -3,14 +3,21 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import {
-    Users, Plus, Loader2, Search, MapPin, Building2, UserPlus, Trash2, Check, X,
+    Users, Plus, Loader2, Search, MapPin, Building2, UserPlus, Trash2, Check, X, ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import DistributorMappedProductsModal from '@/components/features/brand/DistributorMappedProductsModal';
 
 const AddVendorWizard = dynamic(
     () => import('@/components/features/admin/AddVendorWizard').then((m) => m.AddVendorWizard),
     { ssr: false },
 );
+
+type MappingPreview = {
+    vendorId: string;
+    vendorName: string;
+    status: 'pending' | 'approved';
+};
 
 interface AuthorizedDistributor {
     id: string;
@@ -54,11 +61,35 @@ function mappedLabel(count: number) {
     return `${count} of your SKU${count === 1 ? '' : 's'} mapped`;
 }
 
+function MappedCountControl({
+    count,
+    onOpen,
+}: {
+    count: number;
+    onOpen: () => void;
+}) {
+    const label = mappedLabel(count);
+    if (count <= 0) {
+        return <span>{label}</span>;
+    }
+    return (
+        <button
+            type="button"
+            onClick={onOpen}
+            className="inline-flex items-center gap-0.5 text-[#53B175] font-semibold underline underline-offset-2 hover:text-[#3d9e5f]"
+        >
+            {label}
+            <ChevronRight size={12} className="shrink-0" />
+        </button>
+    );
+}
+
 export default function BrandDistributorsPage() {
     const [distributors, setDistributors] = useState<AuthorizedDistributor[]>([]);
     const [loading, setLoading] = useState(true);
     const [actingId, setActingId] = useState<string | null>(null);
     const [showCreate, setShowCreate] = useState(false);
+    const [mappingPreview, setMappingPreview] = useState<MappingPreview | null>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [searchCity, setSearchCity] = useState('');
@@ -132,6 +163,7 @@ export default function BrandDistributorsPage() {
         try {
             await postAction(vendorId, 'approve');
             toast.success(`${name} approved as distributor`);
+            setMappingPreview(null);
             fetchDistributors();
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : 'Failed to approve');
@@ -145,6 +177,7 @@ export default function BrandDistributorsPage() {
         try {
             await postAction(vendorId, 'reject');
             toast.success('Distributor unlinked');
+            setMappingPreview(null);
             fetchDistributors();
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : 'Failed to unlink');
@@ -270,33 +303,43 @@ export default function BrandDistributorsPage() {
                             </p>
                         ) : (
                             <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
-                                {approved.map((d) => (
-                                    <div key={d.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <VendorAvatar logoUrl={d.vendor.logoUrl} />
-                                            <div className="min-w-0">
-                                                <p className="text-[13px] font-bold text-[#181725] truncate">{d.vendor.businessName}</p>
-                                                <p className="text-[11px] text-gray-500 flex items-center gap-1 flex-wrap">
-                                                    {d.vendor.city && (
-                                                        <span className="inline-flex items-center gap-0.5">
-                                                            <MapPin size={10} /> {d.vendor.city}
-                                                        </span>
-                                                    )}
-                                                    {d.vendor.city && <span>·</span>}
-                                                    <span>{mappedLabel(d.vendor._count?.products ?? 0)}</span>
-                                                </p>
+                                {approved.map((d) => {
+                                    const mapped = d.vendor._count?.products ?? 0;
+                                    return (
+                                        <div key={d.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <VendorAvatar logoUrl={d.vendor.logoUrl} />
+                                                <div className="min-w-0">
+                                                    <p className="text-[13px] font-bold text-[#181725] truncate">{d.vendor.businessName}</p>
+                                                    <p className="text-[11px] text-gray-500 flex items-center gap-1 flex-wrap">
+                                                        {d.vendor.city && (
+                                                            <span className="inline-flex items-center gap-0.5">
+                                                                <MapPin size={10} /> {d.vendor.city}
+                                                            </span>
+                                                        )}
+                                                        {d.vendor.city && <span>·</span>}
+                                                        <MappedCountControl
+                                                            count={mapped}
+                                                            onOpen={() => setMappingPreview({
+                                                                vendorId: d.vendorId,
+                                                                vendorName: d.vendor.businessName,
+                                                                status: 'approved',
+                                                            })}
+                                                        />
+                                                    </p>
+                                                </div>
                                             </div>
+                                            <button
+                                                onClick={() => removeDistributor(d.vendorId)}
+                                                disabled={actingId === d.vendorId}
+                                                className="h-[32px] px-3 bg-gray-50 text-gray-600 rounded-lg text-[12px] font-bold hover:bg-red-50 hover:text-red-600 disabled:opacity-50 flex items-center gap-1"
+                                            >
+                                                {actingId === d.vendorId ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                                                Remove
+                                            </button>
                                         </div>
-                                        <button
-                                            onClick={() => removeDistributor(d.vendorId)}
-                                            disabled={actingId === d.vendorId}
-                                            className="h-[32px] px-3 bg-gray-50 text-gray-600 rounded-lg text-[12px] font-bold hover:bg-red-50 hover:text-red-600 disabled:opacity-50 flex items-center gap-1"
-                                        >
-                                            {actingId === d.vendorId ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                                            Remove
-                                        </button>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
@@ -340,7 +383,14 @@ export default function BrandDistributorsPage() {
                                                             </span>
                                                         )}
                                                         {d.vendor.city && <span>·</span>}
-                                                        <span>{mappedLabel(mapped)}</span>
+                                                        <MappedCountControl
+                                                            count={mapped}
+                                                            onOpen={() => setMappingPreview({
+                                                                vendorId: d.vendorId,
+                                                                vendorName: d.vendor.businessName,
+                                                                status: 'pending',
+                                                            })}
+                                                        />
                                                     </p>
                                                 </div>
                                             </div>
@@ -380,6 +430,30 @@ export default function BrandDistributorsPage() {
                         toast.success('Distributor created and linked');
                         fetchDistributors();
                     }}
+                />
+            )}
+
+            {mappingPreview && (
+                <DistributorMappedProductsModal
+                    vendorId={mappingPreview.vendorId}
+                    vendorName={mappingPreview.vendorName}
+                    authStatus={mappingPreview.status}
+                    onClose={() => setMappingPreview(null)}
+                    onApprove={
+                        mappingPreview.status === 'pending'
+                            ? () => {
+                                void approveRequest(mappingPreview.vendorId, mappingPreview.vendorName);
+                            }
+                            : undefined
+                    }
+                    onUnlink={
+                        mappingPreview.status === 'pending'
+                            ? () => {
+                                void unlinkRequest(mappingPreview.vendorId);
+                            }
+                            : undefined
+                    }
+                    busy={actingId === mappingPreview.vendorId}
                 />
             )}
         </div>

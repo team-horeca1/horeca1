@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
+import { getCategoryPickerMeta } from '@/modules/catalog/catalog.service';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
@@ -67,7 +68,12 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
           taxPercent: true,
           minOrderQty: true,
           creditEligible: true,
+          categoryId: true,
           category: { select: { id: true, name: true, slug: true } },
+          categoryLinks: {
+            select: { categoryId: true, isPrimary: true },
+            orderBy: [{ isPrimary: 'desc' }, { categoryId: 'asc' }],
+          },
           vendor: { select: { businessName: true } },
         },
         take: 8,
@@ -97,10 +103,24 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         : [],
     ]);
 
+    const suggestions = await Promise.all(
+      catalogProducts.map(async (p) => {
+        const rawIds =
+          p.categoryLinks.length > 0
+            ? p.categoryLinks.map((l) => l.categoryId)
+            : p.categoryId
+              ? [p.categoryId]
+              : [];
+        const { categoryIds, categoryLeafMissing } = await getCategoryPickerMeta(rawIds);
+        const { categoryLinks: _links, categoryId: _cid, ...rest } = p;
+        return { ...rest, categoryIds, categoryLeafMissing };
+      }),
+    );
+
     return NextResponse.json({
       success: true,
       data: {
-        suggestions: catalogProducts,
+        suggestions,
         ownMatches: ownProducts,
       },
     });

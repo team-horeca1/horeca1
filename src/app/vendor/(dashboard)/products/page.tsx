@@ -6,10 +6,15 @@ import {
     Search, Plus, Loader2, Package, Pencil, X,
     ChevronRight, ChevronLeft, Info, ImageIcon, Settings as SettingsIcon, Trash2,
     BarChart3, BoxIcon, Tag, IndianRupee, Star, Wand2,
-    ChevronDown, FileSpreadsheet, AlertCircle, Clock,
+    ChevronDown, FileSpreadsheet, AlertCircle, Clock, Unlink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseVendorSku, resolveVendorCode } from '@/lib/sku';
+import {
+    UNIT_OPTIONS,
+    WEIGHT_UNIT_OPTIONS,
+    DIMENSION_UNIT_OPTIONS,
+} from '@/lib/productUnits';
 import { toast } from 'sonner';
 import { ProductEssentialsFields } from '@/components/features/shared/productForm/ProductEssentialsFields';
 import VendorProductImportModal from '@/components/features/vendor/VendorProductImportModal';
@@ -27,10 +32,48 @@ import {
     focusFirstProductFormError,
     type ProductValidationField,
 } from '@/components/features/shared/productFormValidation';
+import { brandOverrideDeviations } from '@/lib/brandOverrideFields';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
+
+interface BrandMappingSummary {
+    id: string;
+    status: string;
+    brandMasterProductId?: string;
+    brandMasterProduct?: {
+        id?: string;
+        name: string;
+        imageUrl: string | null;
+        images?: string[] | null;
+        packSize?: string | null;
+        unit?: string | null;
+        description?: string | null;
+        sku?: string | null;
+        hsn?: string | null;
+        barcode?: string | null;
+        fssaiRef?: string | null;
+        vegNonVeg?: 'veg' | 'nonveg' | 'egg' | null;
+        storageType?: string | null;
+        shelfLifeDays?: number | null;
+        countryOfOrigin?: string | null;
+        tags?: string[] | null;
+        aliasNames?: string[] | null;
+        netWeight?: number | string | null;
+        netWeightUnit?: string | null;
+        packageWeight?: number | string | null;
+        weightUnit?: string | null;
+        packageLength?: number | string | null;
+        packageWidth?: number | string | null;
+        packageHeight?: number | string | null;
+        dimensionUnit?: string | null;
+        categoryId?: string | null;
+        categoryIds?: string[] | null;
+        categoryRel?: { id?: string; name: string; slug: string } | null;
+        brand?: { name: string; slug: string } | null;
+    } | null;
+}
 
 interface VendorProduct {
     id: string;
@@ -68,10 +111,14 @@ interface VendorProduct {
     priceSlabs?: { minQty: number; maxQty?: number | null; price: number }[];
     approvalStatus?: 'pending' | 'approved' | 'rejected' | 'pending_edit';
     approvalNote?: string | null;
+    /** Queued material edit (image) awaiting admin review — live fields stay unchanged until approve. */
+    pendingEditPayload?: Record<string, unknown> | null;
     listingStatus?: 'draft' | 'submitted';
     vegNonVeg?: 'veg' | 'nonveg' | 'egg' | null;
     storageType?: string | null;
     metadata?: any;
+    /** Live verified/auto_mapped brand overlay (list API via productBrandMappingsInclude). */
+    brandMappings?: BrandMappingSummary[];
 }
 
 interface Category {
@@ -159,8 +206,6 @@ interface ProductForm {
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
-
-const UNIT_OPTIONS = ['kg', 'g', 'ml', 'L', 'piece', 'pack', 'box', 'dozen', 'case', 'bag', 'bottle', 'can', 'carton', 'tray'];
 
 const EMPTY_FORM: ProductForm = {
     name: '',
@@ -262,13 +307,143 @@ function calcSavingsPercent(base: string, original: string): number | null {
     return Math.round(((o - b) / o) * 100);
 }
 
+/** Coerce Prisma Decimal / number / non-empty string into a form string. */
+function brandScalarToFormString(value: unknown): string {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+    return '';
+}
+
+function brandStringList(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value.filter((u): u is string => typeof u === 'string' && u.trim().length > 0);
+}
+
+/** Map free-text brand unit onto the vendor UNIT_OPTIONS dropdown when possible. */
+function matchUnitOption(unit: string | null | undefined): string {
+    if (!unit?.trim()) return '';
+    const trimmed = unit.trim();
+    const hit = UNIT_OPTIONS.find((u) => u.toLowerCase() === trimmed.toLowerCase());
+    return hit ?? trimmed;
+}
+
+function matchWeightUnitOption(unit: string | null | undefined): string {
+    if (!unit?.trim()) return '';
+    const trimmed = unit.trim();
+    const hit = WEIGHT_UNIT_OPTIONS.find((u) => u.toLowerCase() === trimmed.toLowerCase());
+    return hit ?? trimmed;
+}
+
+function matchDimensionUnitOption(unit: string | null | undefined): string {
+    if (!unit?.trim()) return '';
+    const trimmed = unit.trim();
+    const hit = DIMENSION_UNIT_OPTIONS.find((u) => u.toLowerCase() === trimmed.toLowerCase());
+    return hit ?? trimmed;
+}
+
+/** Prefill overridable form fields from a live brand master when brand values are non-empty. */
+function applyBrandMasterOverride(
+    formPayload: ProductForm,
+    bmp: BrandMappingSummary['brandMasterProduct'] | null | undefined,
+): ProductForm {
+    if (!bmp) return formPayload;
+    const masterImageList = Array.isArray(bmp.images)
+        ? bmp.images.filter((u): u is string => typeof u === 'string' && u.length > 0)
+        : [];
+    const masterImageUrl =
+        typeof bmp.imageUrl === 'string' && bmp.imageUrl.trim() ? bmp.imageUrl.trim() : '';
+    const brandImages =
+        masterImageList.length > 0 ? masterImageList : masterImageUrl ? [masterImageUrl] : [];
+    const masterName = typeof bmp.name === 'string' ? bmp.name.trim() : '';
+    const masterDescription =
+        typeof bmp.description === 'string' ? bmp.description.trim() : '';
+    const masterPackSize = typeof bmp.packSize === 'string' ? bmp.packSize.trim() : '';
+    const masterUnit = typeof bmp.unit === 'string' ? bmp.unit.trim() : '';
+    const masterBrand =
+        typeof bmp.brand?.name === 'string' ? bmp.brand.name.trim() : '';
+    const brandMultiCategoryIds =
+        Array.isArray(bmp.categoryIds) && bmp.categoryIds.length > 0
+            ? bmp.categoryIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+            : [];
+    const brandPrimaryCategoryId =
+        typeof bmp.categoryId === 'string' && bmp.categoryId
+            ? bmp.categoryId
+            : typeof bmp.categoryRel?.id === 'string' && bmp.categoryRel.id
+                ? bmp.categoryRel.id
+                : null;
+    const masterSku = brandScalarToFormString(bmp.sku);
+    const masterHsn = brandScalarToFormString(bmp.hsn);
+    const masterBarcode = brandScalarToFormString(bmp.barcode);
+    const masterFssaiRef = brandScalarToFormString(bmp.fssaiRef);
+    const masterStorageType = brandScalarToFormString(bmp.storageType);
+    const masterCountryOfOrigin = brandScalarToFormString(bmp.countryOfOrigin);
+    const masterShelfLifeDays =
+        bmp.shelfLifeDays != null && Number.isFinite(Number(bmp.shelfLifeDays))
+            ? String(bmp.shelfLifeDays)
+            : '';
+    const masterVegNonVeg =
+        bmp.vegNonVeg === 'veg' || bmp.vegNonVeg === 'nonveg' || bmp.vegNonVeg === 'egg'
+            ? bmp.vegNonVeg
+            : '';
+    const masterTags = brandStringList(bmp.tags);
+    const masterAliasNames = brandStringList(bmp.aliasNames);
+    const masterPackageWeight = brandScalarToFormString(bmp.packageWeight);
+    const masterWeightUnit = brandScalarToFormString(bmp.weightUnit);
+    const masterPackageLength = brandScalarToFormString(bmp.packageLength);
+    const masterPackageWidth = brandScalarToFormString(bmp.packageWidth);
+    const masterPackageHeight = brandScalarToFormString(bmp.packageHeight);
+    const masterDimensionUnit = brandScalarToFormString(bmp.dimensionUnit);
+
+    return {
+        ...formPayload,
+        name: masterName || formPayload.name,
+        description: masterDescription || formPayload.description,
+        packSize: masterPackSize || formPayload.packSize,
+        unit: masterUnit || formPayload.unit,
+        brand: masterBrand || formPayload.brand,
+        imageUrl: brandImages[0] || formPayload.imageUrl,
+        images: brandImages.length > 0 ? brandImages : formPayload.images,
+        // Prefer brand multi-set; never collapse a product multi-set to a single categoryRel.
+        categoryIds:
+            brandMultiCategoryIds.length > 0
+                ? brandMultiCategoryIds
+                : formPayload.categoryIds.length > 0
+                    ? formPayload.categoryIds
+                    : brandPrimaryCategoryId
+                        ? [brandPrimaryCategoryId]
+                        : formPayload.categoryIds,
+        catalogSku: masterSku || formPayload.catalogSku,
+        hsn: masterHsn || formPayload.hsn,
+        barcode: masterBarcode || formPayload.barcode,
+        fssaiRef: masterFssaiRef || formPayload.fssaiRef,
+        vegNonVeg: masterVegNonVeg || formPayload.vegNonVeg,
+        storageType: masterStorageType || formPayload.storageType,
+        shelfLifeDays: masterShelfLifeDays || formPayload.shelfLifeDays,
+        countryOfOrigin: masterCountryOfOrigin || formPayload.countryOfOrigin,
+        tags: masterTags.length > 0 ? masterTags : formPayload.tags,
+        aliasNames: masterAliasNames.length > 0 ? masterAliasNames : formPayload.aliasNames,
+        packageWeight: masterPackageWeight || formPayload.packageWeight,
+        weightUnit: masterWeightUnit || formPayload.weightUnit,
+        packageLength: masterPackageLength || formPayload.packageLength,
+        packageWidth: masterPackageWidth || formPayload.packageWidth,
+        packageHeight: masterPackageHeight || formPayload.packageHeight,
+        dimensionUnit: masterDimensionUnit || formPayload.dimensionUnit,
+    };
+}
+
 type FormSnapshotMeta = {
     masterProductId: string | null;
     basedOnProductId: string | null;
+    basedOnBrandMasterProductId: string | null;
 };
 
 function serializeFormSnapshot(form: ProductForm, meta: FormSnapshotMeta): string {
     return JSON.stringify({ form, ...meta });
+}
+
+function sameImageList(a: string[], b: string[]): boolean {
+    if (a.length !== b.length) return false;
+    return a.every((v, i) => v === b[i]);
 }
 
 function logisticsFieldsFromListProduct(product: VendorProduct) {
@@ -449,7 +624,42 @@ interface ProductSuggestion {
     minOrderQty?: number | null;
     creditEligible?: boolean;
     category?: { id: string; name: string; slug: string } | null;
+    categoryIds?: string[];
     vendor?: { businessName: string } | null;
+}
+
+/** Shape returned by GET /api/v1/brand-master-products */
+interface BrandMasterSuggestion {
+    id: string;
+    name: string;
+    description?: string | null;
+    packSize?: string | null;
+    unit?: string | null;
+    sku?: string | null;
+    imageUrl?: string | null;
+    images?: string[] | null;
+    category?: string | null;
+    hsn?: string | null;
+    barcode?: string | null;
+    fssaiRef?: string | null;
+    vegNonVeg?: 'veg' | 'nonveg' | 'egg' | null;
+    storageType?: string | null;
+    shelfLifeDays?: number | null;
+    countryOfOrigin?: string | null;
+    tags?: string[] | null;
+    aliasNames?: string[] | null;
+    netWeight?: number | string | null;
+    netWeightUnit?: string | null;
+    packageWeight?: number | string | null;
+    weightUnit?: string | null;
+    packageLength?: number | string | null;
+    packageWidth?: number | string | null;
+    packageHeight?: number | string | null;
+    dimensionUnit?: string | null;
+    categoryId?: string | null;
+    categoryIds?: string[] | null;
+    categoryRel?: { id: string; name: string } | null;
+    brand?: { id: string; name: string; slug: string; logoUrl?: string | null } | null;
 }
 
 export default function VendorProductsPage() {
@@ -481,6 +691,7 @@ export default function VendorProductsPage() {
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
     const [basedOnProductId, setBasedOnProductId] = useState<string | null>(null);
     const [masterProductId, setMasterProductId] = useState<string | null>(null);
+    const [basedOnBrandMasterProductId, setBasedOnBrandMasterProductId] = useState<string | null>(null);
     const [catalogSearch, setCatalogSearch] = useState('');
     const [noCatalogMatch, setNoCatalogMatch] = useState(false);
     const [masterSuggestions, setMasterSuggestions] = useState<Array<{
@@ -492,6 +703,7 @@ export default function VendorProductsPage() {
         taxPercent?: number | string;
         images?: string[];
     }>>([]);
+    const [brandSuggestions, setBrandSuggestions] = useState<BrandMasterSuggestion[]>([]);
     const [categoryPickerKey, setCategoryPickerKey] = useState(0);
     const [brandSuggesting, setBrandSuggesting] = useState(false);
     const suggestionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -532,14 +744,24 @@ export default function VendorProductsPage() {
     }>>([]);
     const [lastSavedSnapshot, setLastSavedSnapshot] = useState('');
     const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+    /** Brand master used for client-side override deviation checks (mirrors overlay source). */
+    const [editBrandMasterProduct, setEditBrandMasterProduct] = useState<
+        BrandMappingSummary['brandMasterProduct'] | null
+    >(null);
+    const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+    /** Post-overlay image baseline for dirty checks (brand overlay can differ from stored Product). */
+    const loadedImagesRef = useRef<{ imageUrl: string; images: string[] }>({
+        imageUrl: '',
+        images: [],
+    });
     const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const skipDraftAutosaveRef = useRef(false);
     const draftSlugRef = useRef<string | null>(null);
     const [draftSavedOnce, setDraftSavedOnce] = useState(false);
 
     const captureSnapshot = useCallback(
-        () => serializeFormSnapshot(form, { masterProductId, basedOnProductId }),
-        [form, masterProductId, basedOnProductId]
+        () => serializeFormSnapshot(form, { masterProductId, basedOnProductId, basedOnBrandMasterProductId }),
+        [form, masterProductId, basedOnProductId, basedOnBrandMasterProductId]
     );
 
     const isFormDirty = useCallback(() => {
@@ -547,7 +769,11 @@ export default function VendorProductsPage() {
         const baseline =
             lastSavedSnapshot !== ''
                 ? lastSavedSnapshot
-                : serializeFormSnapshot(EMPTY_FORM, { masterProductId: null, basedOnProductId: null });
+                : serializeFormSnapshot(EMPTY_FORM, {
+                    masterProductId: null,
+                    basedOnProductId: null,
+                    basedOnBrandMasterProductId: null,
+                });
         return current !== baseline;
     }, [captureSnapshot, lastSavedSnapshot]);
 
@@ -564,10 +790,14 @@ export default function VendorProductsPage() {
 
     const isFormEffectivelyEmpty = useCallback(() => {
         return (
-            serializeFormSnapshot(form, { masterProductId, basedOnProductId }) ===
-            serializeFormSnapshot(EMPTY_FORM, { masterProductId: null, basedOnProductId: null })
+            serializeFormSnapshot(form, { masterProductId, basedOnProductId, basedOnBrandMasterProductId }) ===
+            serializeFormSnapshot(EMPTY_FORM, {
+                masterProductId: null,
+                basedOnProductId: null,
+                basedOnBrandMasterProductId: null,
+            })
         );
-    }, [form, masterProductId, basedOnProductId]);
+    }, [form, masterProductId, basedOnProductId, basedOnBrandMasterProductId]);
 
     /* ---- Data fetching ---- */
 
@@ -672,6 +902,7 @@ export default function VendorProductsPage() {
         if (query.length < 2) {
             setSuggestions([]);
             setMasterSuggestions([]);
+            setBrandSuggestions([]);
             setOwnMatches([]);
             setShowSuggestions(false);
             setNoCatalogMatch(false);
@@ -690,6 +921,7 @@ export default function VendorProductsPage() {
                 if (masterJson.success && masterJson.data?.length === 1) {
                     setMasterSuggestions(masterJson.data);
                     setSuggestions([]);
+                    setBrandSuggestions([]);
                     setOwnMatches([]);
                     setShowSuggestions(true);
                     setNoCatalogMatch(false);
@@ -697,19 +929,25 @@ export default function VendorProductsPage() {
                 }
             }
 
-            const [res, masterRes] = await Promise.all([
+            const [res, masterRes, brandRes] = await Promise.all([
                 fetch(`/api/v1/vendor/products/suggestions?q=${encodeURIComponent(trimmed)}`),
                 fetch(`/api/v1/master-products?search=${encodeURIComponent(trimmed)}&limit=8`),
+                fetch(`/api/v1/brand-master-products?q=${encodeURIComponent(trimmed)}&limit=8`),
             ]);
             const json = await res.json();
             const masterJson = await masterRes.json();
+            const brandJson = await brandRes.json();
             const s = json.success ? (json.data.suggestions || []) : [];
             const own = json.success ? (json.data.ownMatches || []) : [];
             const masters = masterJson.success ? (masterJson.data || []) : [];
+            const brandsList: BrandMasterSuggestion[] = brandJson.success
+                ? (brandJson.data?.products || [])
+                : [];
             setSuggestions(s);
             setMasterSuggestions(masters);
+            setBrandSuggestions(brandsList);
             setOwnMatches(own);
-            if (s.length > 0 || own.length > 0 || masters.length > 0) {
+            if (s.length > 0 || own.length > 0 || masters.length > 0 || brandsList.length > 0) {
                 setShowSuggestions(true);
                 setNoCatalogMatch(false);
             } else {
@@ -719,6 +957,7 @@ export default function VendorProductsPage() {
         } catch {
             setSuggestions([]);
             setMasterSuggestions([]);
+            setBrandSuggestions([]);
             setOwnMatches([]);
             setNoCatalogMatch(false);
         } finally {
@@ -729,11 +968,13 @@ export default function VendorProductsPage() {
     const clearCatalogSelection = () => {
         setMasterProductId(null);
         setBasedOnProductId(null);
+        setBasedOnBrandMasterProductId(null);
         setCatalogSearch('');
         setNoCatalogMatch(false);
         setShowSuggestions(false);
         setSuggestions([]);
         setMasterSuggestions([]);
+        setBrandSuggestions([]);
         setOwnMatches([]);
         setForm(prev => ({
             ...prev,
@@ -749,12 +990,12 @@ export default function VendorProductsPage() {
     };
 
     const isCatalogSearchEnabled = useCallback(() => {
-        if (masterProductId || basedOnProductId) return false;
+        if (masterProductId || basedOnProductId || basedOnBrandMasterProductId) return false;
         if (!editingProduct) return true;
         if (editingProduct.approvalStatus === 'rejected') return true;
         if (editingProduct.listingStatus === 'draft') return true;
         return false;
-    }, [editingProduct, masterProductId, basedOnProductId]);
+    }, [editingProduct, masterProductId, basedOnProductId, basedOnBrandMasterProductId]);
 
     const handleProductNameChange = (name: string) => {
         setForm(prev => ({ ...prev, name, slug: slugify(name) }));
@@ -772,6 +1013,7 @@ export default function VendorProductsPage() {
             setShowSuggestions(false);
             setSuggestions([]);
             setMasterSuggestions([]);
+            setBrandSuggestions([]);
             setOwnMatches([]);
             return;
         }
@@ -785,10 +1027,44 @@ export default function VendorProductsPage() {
 
     const renderCatalogSuggestionPanel = () => {
         if (!catalogSearchEnabled) return null;
+        const hasCatalogHits =
+            masterSuggestions.length > 0 || brandSuggestions.length > 0 || suggestions.length > 0;
         return (
             <>
-                {showSuggestions && (masterSuggestions.length > 0 || suggestions.length > 0) && (
+                {showSuggestions && hasCatalogHits && (
                     <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-[#EEEEEE] rounded-[10px] shadow-lg max-h-[280px] overflow-y-auto">
+                        {brandSuggestions.length > 0 && (
+                            <>
+                                <div className="px-3 py-1.5 bg-[#F8F9FB] border-b border-[#EEEEEE] text-[10px] font-bold text-[#AEAEAE] uppercase tracking-wider">
+                                    Brand Catalog — instant approval
+                                </div>
+                                {brandSuggestions.map((b) => (
+                                    <button
+                                        key={b.id}
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => fillFromBrandMaster(b)}
+                                        className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-[#EEF8F1] transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-[#181725] truncate">{b.name}</p>
+                                            <p className="text-[11px] text-[#AEAEAE] truncate">
+                                                {b.brand?.name ? `Brand: ${b.brand.name}` : ''}
+                                                {b.sku ? `${b.brand?.name ? ' • ' : ''}SKU: ${b.sku}` : ''}
+                                            </p>
+                                        </div>
+                                        {b.imageUrl && (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img
+                                                src={b.imageUrl}
+                                                alt=""
+                                                className="w-8 h-8 rounded-[6px] object-cover border border-[#EEEEEE] shrink-0"
+                                            />
+                                        )}
+                                    </button>
+                                ))}
+                            </>
+                        )}
                         {masterSuggestions.length > 0 && (
                             <>
                                 <div className="px-3 py-1.5 bg-[#F8F9FB] border-b border-[#EEEEEE] text-[10px] font-bold text-[#AEAEAE] uppercase tracking-wider">
@@ -925,10 +1201,12 @@ export default function VendorProductsPage() {
         skipDraftAutosaveRef.current = true;
         setMasterProductId(m.id);
         setBasedOnProductId(null);
+        setBasedOnBrandMasterProductId(null);
         setCatalogSearch(`${m.sku} — ${m.name}`);
         setNoCatalogMatch(false);
         setShowSuggestions(false);
         setMasterSuggestions([]);
+        setBrandSuggestions([]);
         const categoryIds = m.categoryIds?.length
             ? m.categoryIds
             : m.category?.id
@@ -947,6 +1225,81 @@ export default function VendorProductsPage() {
             unit: m.uom || prev.unit,
             taxPercent: m.taxPercent != null ? String(m.taxPercent) : prev.taxPercent,
             categoryIds,
+        }));
+        setTimeout(() => {
+            skipDraftAutosaveRef.current = false;
+        }, 500);
+    };
+
+    const fillFromBrandMaster = (bmp: BrandMasterSuggestion) => {
+        skipDraftAutosaveRef.current = true;
+        setBasedOnBrandMasterProductId(bmp.id);
+        setMasterProductId(null);
+        setBasedOnProductId(null);
+        setCatalogSearch(bmp.sku ? `${bmp.sku} — ${bmp.name}` : bmp.name);
+        setNoCatalogMatch(false);
+        setShowSuggestions(false);
+        setBrandSuggestions([]);
+        setMasterSuggestions([]);
+        setSuggestions([]);
+
+        const imageList = Array.isArray(bmp.images)
+            ? bmp.images.filter((u): u is string => typeof u === 'string' && u.length > 0)
+            : [];
+        const primaryImage =
+            imageList[0]
+            || (typeof bmp.imageUrl === 'string' && bmp.imageUrl.trim() ? bmp.imageUrl.trim() : '');
+        const categoryIds =
+            Array.isArray(bmp.categoryIds) && bmp.categoryIds.length > 0
+                ? bmp.categoryIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+                : bmp.categoryId
+                    ? [bmp.categoryId]
+                    : bmp.categoryRel?.id
+                        ? [bmp.categoryRel.id]
+                        : [];
+        const vegNonVeg =
+            bmp.vegNonVeg === 'veg' || bmp.vegNonVeg === 'nonveg' || bmp.vegNonVeg === 'egg'
+                ? bmp.vegNonVeg
+                : '';
+
+        setForm(prev => ({
+            ...prev,
+            name: bmp.name,
+            slug: slugify(bmp.name),
+            catalogSku: bmp.sku || '',
+            vendorSku: '',
+            sku: '',
+            description: bmp.description?.trim() || '',
+            packSize: bmp.packSize?.trim() || '',
+            unit: matchUnitOption(bmp.unit) || prev.unit,
+            brand: bmp.brand?.name || prev.brand,
+            categoryIds: categoryIds.length > 0 ? categoryIds : prev.categoryIds,
+            imageUrl: primaryImage || prev.imageUrl,
+            images: imageList.length > 0 ? imageList : (primaryImage ? [primaryImage] : prev.images),
+            hsn: brandScalarToFormString(bmp.hsn) || prev.hsn,
+            barcode: brandScalarToFormString(bmp.barcode) || prev.barcode,
+            fssaiRef: brandScalarToFormString(bmp.fssaiRef) || prev.fssaiRef,
+            vegNonVeg: vegNonVeg || prev.vegNonVeg,
+            storageType: brandScalarToFormString(bmp.storageType) || prev.storageType,
+            shelfLifeDays:
+                bmp.shelfLifeDays != null && Number.isFinite(Number(bmp.shelfLifeDays))
+                    ? String(bmp.shelfLifeDays)
+                    : prev.shelfLifeDays,
+            countryOfOrigin: brandScalarToFormString(bmp.countryOfOrigin) || prev.countryOfOrigin,
+            tags: (() => {
+                const t = brandStringList(bmp.tags);
+                return t.length > 0 ? t : prev.tags;
+            })(),
+            aliasNames: (() => {
+                const a = brandStringList(bmp.aliasNames);
+                return a.length > 0 ? a : prev.aliasNames;
+            })(),
+            packageWeight: brandScalarToFormString(bmp.packageWeight) || prev.packageWeight,
+            weightUnit: matchWeightUnitOption(bmp.weightUnit) || prev.weightUnit,
+            packageLength: brandScalarToFormString(bmp.packageLength) || prev.packageLength,
+            packageWidth: brandScalarToFormString(bmp.packageWidth) || prev.packageWidth,
+            packageHeight: brandScalarToFormString(bmp.packageHeight) || prev.packageHeight,
+            dimensionUnit: matchDimensionUnitOption(bmp.dimensionUnit) || prev.dimensionUnit,
         }));
         setTimeout(() => {
             skipDraftAutosaveRef.current = false;
@@ -984,13 +1337,21 @@ export default function VendorProductsPage() {
     const fillFromSuggestion = (s: ProductSuggestion) => {
         setBasedOnProductId(s.id);
         setMasterProductId(null);
+        setBasedOnBrandMasterProductId(null);
         setCatalogSearch(s.sku ? `${s.sku} — ${s.name}` : s.name);
         setNoCatalogMatch(false);
         setShowSuggestions(false);
         setSuggestions([]);
-        // Suggestion gives us category by slug — resolve to ID for the multi-select.
+        setBrandSuggestions([]);
         const matched = s.category?.slug ? categories.find(c => c.slug === s.category!.slug) : null;
-        const seedCategoryIds = matched ? [matched.id] : [];
+        const seedCategoryIds =
+            Array.isArray(s.categoryIds) && s.categoryIds.length > 0
+                ? s.categoryIds
+                : s.category?.id
+                    ? [s.category.id]
+                    : matched
+                        ? [matched.id]
+                        : [];
         setForm(prev => ({
             ...prev,
             name: s.name,
@@ -1000,7 +1361,10 @@ export default function VendorProductsPage() {
             originalPrice: s.originalPrice != null ? String(s.originalPrice) : '',
             packSize: s.packSize || '',
             unit: s.unit || '',
-            sku: s.sku || prev.sku,
+            // New listing needs its own POS — do not copy the source composed SKU.
+            sku: '',
+            vendorSku: '',
+            catalogSku: s.sku || prev.catalogSku,
             hsn: s.hsn || prev.hsn,
             brand: s.brand || '',
             barcode: s.barcode || prev.barcode,
@@ -1028,7 +1392,7 @@ export default function VendorProductsPage() {
     /* ---- Draft autosave payload ---- */
 
     const buildProductBody = useCallback((opts: { isDraft: boolean }) => {
-        const isNewSubmission = !editingProduct && !masterProductId && !basedOnProductId;
+        const isNewSubmission = !editingProduct && !masterProductId && !basedOnProductId && !basedOnBrandMasterProductId;
         const parsedBase = form.basePrice ? parseFloat(form.basePrice) : 0;
 
         const metadata = {
@@ -1144,9 +1508,29 @@ export default function VendorProductsPage() {
             body.priceSlabs = slabs;
         }
 
-        if (basedOnProductId && !editingProduct) {
+        if (
+            basedOnProductId &&
+            (!editingProduct ||
+                editingProduct.approvalStatus === 'rejected' ||
+                editingProduct.listingStatus === 'draft')
+        ) {
             body.basedOnProductId = basedOnProductId;
         }
+
+        if (
+            basedOnBrandMasterProductId &&
+            (!editingProduct ||
+                editingProduct.approvalStatus === 'rejected' ||
+                editingProduct.listingStatus === 'draft')
+        ) {
+            body.basedOnBrandMasterProductId = basedOnBrandMasterProductId;
+        }
+
+        const catalogLinkedIdentity = !!(
+            masterProductId ||
+            basedOnBrandMasterProductId ||
+            basedOnProductId
+        );
 
         if (
             masterProductId &&
@@ -1155,6 +1539,10 @@ export default function VendorProductsPage() {
                 editingProduct.listingStatus === 'draft')
         ) {
             body.masterProductId = masterProductId;
+        }
+
+        if (catalogLinkedIdentity) {
+            // Catalog UI binds POS to vendorSku (master / brand / basedOn).
             if (form.vendorSku.trim()) {
                 body.vendorSku = form.vendorSku.trim();
             }
@@ -1186,12 +1574,29 @@ export default function VendorProductsPage() {
             // Name is editable on vendor listings (past orders keep OrderItem.productName).
             delete body.slug;
             delete body.brand;
-            delete body.imageUrl;
-            delete body.images;
+
+            // Only send images when the vendor changed them vs the post-overlay
+            // baseline. Always sending would false-queue brand-overlaid images as
+            // pending_edit on every price-only save of a mapped product.
+            const baseline = loadedImagesRef.current;
+            const nextImageUrl = (form.imageUrl || '').trim();
+            const nextImages = form.images.filter(Boolean);
+            const imageUrlChanged = nextImageUrl !== (baseline.imageUrl || '').trim();
+            const imagesChanged = !sameImageList(nextImages, baseline.images);
+
+            if (!imageUrlChanged) {
+                delete body.imageUrl;
+            }
+            if (!imagesChanged) {
+                delete body.images;
+            } else {
+                // Allow clearing additional images (empty array); undefined would skip detection.
+                body.images = nextImages;
+            }
         }
 
         return body;
-    }, [form, editingProduct, masterProductId, basedOnProductId]);
+    }, [form, editingProduct, masterProductId, basedOnProductId, basedOnBrandMasterProductId]);
 
     const saveDraftRef = useRef<(force?: boolean) => Promise<boolean>>(async () => false);
     const discardEmptyDraftRef = useRef<() => Promise<boolean>>(async () => false);
@@ -1235,6 +1640,10 @@ export default function VendorProductsPage() {
             listingStatus: 'draft',
         };
         setEditingProduct(draftProduct);
+        loadedImagesRef.current = {
+            imageUrl: (typeof p.imageUrl === 'string' ? p.imageUrl : '') || '',
+            images: [],
+        };
         setProducts(prev => {
             if (prev.some(existing => existing.id === p.id)) {
                 return prev.map(existing =>
@@ -1362,7 +1771,11 @@ export default function VendorProductsPage() {
             setDraftSavedOnce(false);
             setDraftSaveError(null);
             syncSavedSnapshot(
-                serializeFormSnapshot(EMPTY_FORM, { masterProductId: null, basedOnProductId: null }),
+                serializeFormSnapshot(EMPTY_FORM, {
+                    masterProductId: null,
+                    basedOnProductId: null,
+                    basedOnBrandMasterProductId: null,
+                }),
             );
             return true;
         } catch {
@@ -1392,10 +1805,15 @@ export default function VendorProductsPage() {
         setFieldErrors({});
         setBasedOnProductId(null);
         setMasterProductId(null);
+        setBasedOnBrandMasterProductId(null);
+        setEditBrandMasterProduct(null);
+        setShowUnlinkConfirm(false);
+        loadedImagesRef.current = { imageUrl: '', images: [] };
         setCatalogSearch('');
         setNoCatalogMatch(false);
         setSuggestions([]);
         setMasterSuggestions([]);
+        setBrandSuggestions([]);
         setShowSuggestions(false);
         setShowCloseConfirm(false);
         setLastSavedSnapshot('');
@@ -1419,7 +1837,10 @@ export default function VendorProductsPage() {
         setFormError('');
         setFieldErrors({});
         setShowCloseConfirm(false);
+        setShowUnlinkConfirm(false);
         setMasterProductId(null);
+        setBasedOnBrandMasterProductId(null);
+        setEditBrandMasterProduct(null);
         setCatalogSearch('');
         setIsPanelOpen(true);
         setLoadingProduct(true);
@@ -1438,11 +1859,19 @@ export default function VendorProductsPage() {
             const histJson = await histRes.json();
             setAuditLogs(histJson.success ? histJson.data : []);
 
+            const apiBrandMappings = Array.isArray(p.brandMappings)
+                ? (p.brandMappings as BrandMappingSummary[])
+                : product.brandMappings;
             setEditingProduct({
                 ...product,
                 approvalStatus: p.approvalStatus ?? product.approvalStatus,
                 approvalNote: p.approvalNote ?? product.approvalNote ?? null,
+                pendingEditPayload:
+                    p.pendingEditPayload && typeof p.pendingEditPayload === 'object'
+                        ? (p.pendingEditPayload as Record<string, unknown>)
+                        : null,
                 listingStatus: p.listingStatus ?? product.listingStatus ?? 'submitted',
+                brandMappings: apiBrandMappings,
             });
             setMasterProductId(
                 typeof p.masterProductId === 'string' ? p.masterProductId : null
@@ -1459,14 +1888,31 @@ export default function VendorProductsPage() {
                     : (fallbackId ? [fallbackId] : []);
 
             const masterRow = p.masterProduct as { sku?: string } | null | undefined;
-            const catalogSku = masterRow?.sku ?? '';
+            const liveMapping = apiBrandMappings?.[0];
+            const brandMasterId =
+                (typeof liveMapping?.brandMasterProductId === 'string'
+                    ? liveMapping.brandMasterProductId
+                    : null)
+                || (typeof liveMapping?.brandMasterProduct?.id === 'string'
+                    ? liveMapping.brandMasterProduct.id
+                    : null);
+            setBasedOnBrandMasterProductId(brandMasterId);
+            setEditBrandMasterProduct(liveMapping?.brandMasterProduct ?? null);
+
+            const catalogSku =
+                (typeof liveMapping?.brandMasterProduct?.sku === 'string'
+                    ? liveMapping.brandMasterProduct.sku
+                    : '')
+                || masterRow?.sku
+                || '';
             const posSku =
                 (typeof p.vendorSku === 'string' && p.vendorSku.trim()) ||
                 parseVendorSku(p.sku ?? '', vendorCodePreview).posSku;
-            const isCatalogLinked =
-                Boolean(typeof p.masterProductId === 'string' && p.masterProductId) ||
-                p.approvalStatus === 'approved';
-            const displaySku = isCatalogLinked ? (p.sku || '') : (posSku || p.sku || '');
+            const hasCatalogIdentity =
+                Boolean(typeof p.masterProductId === 'string' && p.masterProductId)
+                || Boolean(brandMasterId);
+            // Catalog UI binds POS to vendorSku; standalone binds the SKU input to sku.
+            const displaySku = hasCatalogIdentity ? (p.sku || '') : (posSku || p.sku || '');
 
             const meta = (p.metadata && typeof p.metadata === 'object' ? p.metadata : {}) as Record<string, any>;
             const acc = meta.accounting || {};
@@ -1475,79 +1921,87 @@ export default function VendorProductsPage() {
             const ids = meta.identifiers || {};
             const att = meta.attributes || {};
 
-            const formPayload = {
-                name: p.name || '',
-                slug: p.slug || '',
-                categoryIds: editCategoryIds,
-                basePrice: p.basePrice != null ? String(p.basePrice) : '',
-                originalPrice: p.originalPrice != null ? String(p.originalPrice) : '',
-                packSize: p.packSize || '',
-                unit: p.unit || '',
-                sku: displaySku,
-                catalogSku,
-                vendorSku: posSku,
-                hsn: p.hsn || '',
-                fssaiRef: p.fssaiRef || '',
-                brand: p.brand || '',
-                barcode: p.barcode || '',
-                description: p.description || '',
-                imageUrl: p.imageUrl || '',
-                images: Array.isArray(p.images) ? p.images : [],
-                tags: Array.isArray(p.tags) ? p.tags : [],
-                aliasNames: Array.isArray(p.aliasNames) ? p.aliasNames : [],
-                substituteIds: Array.isArray(p.substituteIds) ? p.substituteIds : [],
-                vegNonVeg: (p.vegNonVeg || listLogistics.vegNonVeg || '') as '' | 'veg' | 'nonveg' | 'egg',
-                storageType: p.storageType || listLogistics.storageType || '',
-                shelfLifeDays:
-                    p.shelfLifeDays != null
-                        ? String(p.shelfLifeDays)
-                        : listLogistics.shelfLifeDays,
-                countryOfOrigin: p.countryOfOrigin || listLogistics.countryOfOrigin || '',
-                taxPercent: p.taxPercent != null ? String(p.taxPercent) : '0',
-                minOrderQty:
-                    p.minOrderQty != null
-                        ? String(p.minOrderQty)
-                        : listLogistics.minOrderQty,
-                creditEligible: !!p.creditEligible,
-                isFeatured: !!p.isFeatured,
-                priceSlabs: Array.isArray(p.priceSlabs)
-                    ? p.priceSlabs.map((s: { minQty: number; price: number }) => ({
-                        minQty: String(s.minQty),
-                        price: String(s.price),
-                    }))
-                    : [],
-                account: acc.account || '',
-                accountCode: acc.accountCode || '',
-                taxable: acc.taxable ?? true,
-                exemptionReason: acc.exemptionReason || '',
-                taxabilityType: acc.taxabilityType || 'taxable',
-                productType: att.productType || 'goods',
-                source: att.source || '',
-                referenceId: att.referenceId || '',
-                lastSync: att.lastSync || '',
-                inventoryAccount: acc.inventoryAccount || '',
-                inventoryAccountCode: acc.inventoryAccountCode || '',
-                valuationMethod: inv.valuationMethod || 'FIFO',
-                reorderPoint: inv.reorderPoint != null ? String(inv.reorderPoint) : '',
-                openingStock: inv.openingStock != null ? String(inv.openingStock) : '',
-                itemType: att.itemType || 'standard',
-                sellable: att.sellable ?? true,
-                purchasable: att.purchasable ?? true,
-                trackInventory: inv.trackInventory ?? true,
-                packageWeight: pkg.packageWeight != null ? String(pkg.packageWeight) : '',
-                packageLength: pkg.packageLength != null ? String(pkg.packageLength) : '',
-                packageWidth: pkg.packageWidth != null ? String(pkg.packageWidth) : '',
-                packageHeight: pkg.packageHeight != null ? String(pkg.packageHeight) : '',
-                dimensionUnit: pkg.dimensionUnit || 'cm',
-                weightUnit: pkg.weightUnit || 'kg',
-                ean: ids.ean || '',
-                isbn: ids.isbn || '',
-                platformCommission: acc.platformCommission != null ? String(acc.platformCommission) : '',
-                itemStatus: att.itemStatus || 'Active',
-                activeOnlineStore: att.activeOnlineStore ?? true,
-            };
+            const formPayload = applyBrandMasterOverride(
+                {
+                    name: p.name || '',
+                    slug: p.slug || '',
+                    categoryIds: editCategoryIds,
+                    basePrice: p.basePrice != null ? String(p.basePrice) : '',
+                    originalPrice: p.originalPrice != null ? String(p.originalPrice) : '',
+                    packSize: p.packSize || '',
+                    unit: p.unit || '',
+                    sku: displaySku,
+                    catalogSku,
+                    vendorSku: posSku,
+                    hsn: p.hsn || '',
+                    fssaiRef: p.fssaiRef || '',
+                    brand: p.brand || '',
+                    barcode: p.barcode || '',
+                    description: p.description || '',
+                    imageUrl: p.imageUrl || '',
+                    images: Array.isArray(p.images) ? p.images : [],
+                    tags: Array.isArray(p.tags) ? p.tags : [],
+                    aliasNames: Array.isArray(p.aliasNames) ? p.aliasNames : [],
+                    substituteIds: Array.isArray(p.substituteIds) ? p.substituteIds : [],
+                    vegNonVeg: (p.vegNonVeg || listLogistics.vegNonVeg || '') as '' | 'veg' | 'nonveg' | 'egg',
+                    storageType: p.storageType || listLogistics.storageType || '',
+                    shelfLifeDays:
+                        p.shelfLifeDays != null
+                            ? String(p.shelfLifeDays)
+                            : listLogistics.shelfLifeDays,
+                    countryOfOrigin: p.countryOfOrigin || listLogistics.countryOfOrigin || '',
+                    taxPercent: p.taxPercent != null ? String(p.taxPercent) : '0',
+                    minOrderQty:
+                        p.minOrderQty != null
+                            ? String(p.minOrderQty)
+                            : listLogistics.minOrderQty,
+                    creditEligible: !!p.creditEligible,
+                    isFeatured: !!p.isFeatured,
+                    priceSlabs: Array.isArray(p.priceSlabs)
+                        ? p.priceSlabs.map((s: { minQty: number; price: number }) => ({
+                            minQty: String(s.minQty),
+                            price: String(s.price),
+                        }))
+                        : [],
+                    account: acc.account || '',
+                    accountCode: acc.accountCode || '',
+                    taxable: acc.taxable ?? true,
+                    exemptionReason: acc.exemptionReason || '',
+                    taxabilityType: acc.taxabilityType || 'taxable',
+                    productType: att.productType || 'goods',
+                    source: att.source || '',
+                    referenceId: att.referenceId || '',
+                    lastSync: att.lastSync || '',
+                    inventoryAccount: acc.inventoryAccount || '',
+                    inventoryAccountCode: acc.inventoryAccountCode || '',
+                    valuationMethod: inv.valuationMethod || 'FIFO',
+                    reorderPoint: inv.reorderPoint != null ? String(inv.reorderPoint) : '',
+                    openingStock: inv.openingStock != null ? String(inv.openingStock) : '',
+                    itemType: att.itemType || 'standard',
+                    sellable: att.sellable ?? true,
+                    purchasable: att.purchasable ?? true,
+                    trackInventory: inv.trackInventory ?? true,
+                    packageWeight: pkg.packageWeight != null ? String(pkg.packageWeight) : '',
+                    packageLength: pkg.packageLength != null ? String(pkg.packageLength) : '',
+                    packageWidth: pkg.packageWidth != null ? String(pkg.packageWidth) : '',
+                    packageHeight: pkg.packageHeight != null ? String(pkg.packageHeight) : '',
+                    dimensionUnit: pkg.dimensionUnit || 'cm',
+                    weightUnit: pkg.weightUnit || 'kg',
+                    ean: ids.ean || '',
+                    isbn: ids.isbn || '',
+                    platformCommission: acc.platformCommission != null ? String(acc.platformCommission) : '',
+                    itemStatus: att.itemStatus || 'Active',
+                    activeOnlineStore: att.activeOnlineStore ?? true,
+                },
+                apiBrandMappings?.[0]?.brandMasterProduct,
+            );
 
             setForm(formPayload);
+            // Baseline = what the vendor sees (includes brand overlay), not raw Product row.
+            loadedImagesRef.current = {
+                imageUrl: formPayload.imageUrl || '',
+                images: formPayload.images.filter(Boolean),
+            };
             setCategoryPickerKey((k) => k + 1);
             syncSavedSnapshot(
                 serializeFormSnapshot(
@@ -1555,6 +2009,7 @@ export default function VendorProductsPage() {
                     {
                         masterProductId: typeof p.masterProductId === 'string' ? p.masterProductId : null,
                         basedOnProductId: null,
+                        basedOnBrandMasterProductId: brandMasterId,
                     }
                 )
             );
@@ -1568,43 +2023,58 @@ export default function VendorProductsPage() {
             const fallbackPos =
                 listLogistics.vendorSku ||
                 parseVendorSku(product.sku ?? '', vendorCodePreview).posSku;
-            setForm({
-                ...EMPTY_FORM,
-                name: product.name,
-                slug: product.slug,
-                categoryIds: fallbackMatch ? [fallbackMatch.id] : [],
-                basePrice: String(product.basePrice),
-                originalPrice: '',
-                packSize: product.packSize || '',
-                unit: product.unit || '',
-                sku: fallbackPos || product.sku || '',
-                catalogSku: '',
-                vendorSku: fallbackPos,
-                hsn: product.hsn || '',
-                fssaiRef: product.fssaiRef || '',
-                brand: product.brand || '',
-                barcode: product.barcode || '',
-                description: product.description || '',
-                imageUrl: product.imageUrl || '',
-                images: product.images ?? [],
-                tags: product.tags ?? [],
-                aliasNames: product.aliasNames ?? [],
-                vegNonVeg: listLogistics.vegNonVeg,
-                storageType: listLogistics.storageType,
-                shelfLifeDays: listLogistics.shelfLifeDays,
-                countryOfOrigin: listLogistics.countryOfOrigin,
-                taxPercent: product.taxPercent != null ? String(product.taxPercent) : '0',
-                minOrderQty: listLogistics.minOrderQty,
-                creditEligible: product.creditEligible,
-                isFeatured: product.isFeatured,
-                substituteIds: product.substituteIds ?? [],
-                priceSlabs: product.priceSlabs
-                    ? product.priceSlabs.map((s) => ({
-                        minQty: String(s.minQty),
-                        price: String(s.price),
-                    }))
-                    : [],
-            });
+            const fallbackBrandMasterId =
+                product.brandMappings?.[0]?.brandMasterProductId
+                || product.brandMappings?.[0]?.brandMasterProduct?.id
+                || null;
+            setBasedOnBrandMasterProductId(fallbackBrandMasterId);
+            setEditBrandMasterProduct(product.brandMappings?.[0]?.brandMasterProduct ?? null);
+            const fallbackCatalogIdentity = Boolean(fallbackBrandMasterId);
+            const fallbackForm = applyBrandMasterOverride(
+                {
+                    ...EMPTY_FORM,
+                    name: product.name,
+                    slug: product.slug,
+                    categoryIds: fallbackMatch ? [fallbackMatch.id] : [],
+                    basePrice: String(product.basePrice),
+                    originalPrice: '',
+                    packSize: product.packSize || '',
+                    unit: product.unit || '',
+                    sku: fallbackCatalogIdentity ? (product.sku || '') : (fallbackPos || product.sku || ''),
+                    catalogSku: product.brandMappings?.[0]?.brandMasterProduct?.sku || '',
+                    vendorSku: fallbackPos,
+                    hsn: product.hsn || '',
+                    fssaiRef: product.fssaiRef || '',
+                    brand: product.brand || '',
+                    barcode: product.barcode || '',
+                    description: product.description || '',
+                    imageUrl: product.imageUrl || '',
+                    images: product.images ?? [],
+                    tags: product.tags ?? [],
+                    aliasNames: product.aliasNames ?? [],
+                    vegNonVeg: listLogistics.vegNonVeg,
+                    storageType: listLogistics.storageType,
+                    shelfLifeDays: listLogistics.shelfLifeDays,
+                    countryOfOrigin: listLogistics.countryOfOrigin,
+                    taxPercent: product.taxPercent != null ? String(product.taxPercent) : '0',
+                    minOrderQty: listLogistics.minOrderQty,
+                    creditEligible: product.creditEligible,
+                    isFeatured: product.isFeatured,
+                    substituteIds: product.substituteIds ?? [],
+                    priceSlabs: product.priceSlabs
+                        ? product.priceSlabs.map((s) => ({
+                            minQty: String(s.minQty),
+                            price: String(s.price),
+                        }))
+                        : [],
+                },
+                product.brandMappings?.[0]?.brandMasterProduct,
+            );
+            setForm(fallbackForm);
+            loadedImagesRef.current = {
+                imageUrl: fallbackForm.imageUrl || '',
+                images: fallbackForm.images.filter(Boolean),
+            };
             setCategoryPickerKey((k) => k + 1);
             syncSavedSnapshot();
         } finally {
@@ -1679,7 +2149,9 @@ export default function VendorProductsPage() {
         setDraftSavedOnce(false);
         setIsPanelOpen(false);
         setEditingProduct(null);
+        setEditBrandMasterProduct(null);
         setShowCloseConfirm(false);
+        setShowUnlinkConfirm(false);
         setLastSavedSnapshot('');
         setDraftSaving(false);
     };
@@ -1745,6 +2217,7 @@ export default function VendorProductsPage() {
         form,
         masterProductId,
         basedOnProductId,
+        basedOnBrandMasterProductId,
         canAutosaveDraft,
         isFormDirty,
         isFormEffectivelyEmpty,
@@ -1829,42 +2302,8 @@ export default function VendorProductsPage() {
 
     /* ---- Submit ---- */
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (draftSaveTimeoutRef.current) clearTimeout(draftSaveTimeoutRef.current);
-        const isNewSubmission = !editingProduct && !masterProductId && !basedOnProductId;
+    const performProductSave = async () => {
         const publishingDraft = editingProduct?.listingStatus === 'draft';
-        const needsCategory =
-            (isNewSubmission || publishingDraft) &&
-            !masterProductId &&
-            !basedOnProductId;
-        const requireVendorSku = !!(
-            masterProductId &&
-            (!editingProduct || editingProduct.approvalStatus === 'rejected' || publishingDraft)
-        );
-
-        const errors = validateProductEssentials(
-            {
-                ...form,
-                sku: requireVendorSku ? form.vendorSku : form.sku,
-            },
-            {
-                portal: 'vendor',
-                requireVendorSku,
-                requireBasePrice: true,
-                skipCategory: !needsCategory,
-            },
-        );
-
-        if (Object.keys(errors).length > 0) {
-            setFormError('');
-            setFieldErrors(errors);
-            focusFirstProductFormError(errors);
-            const firstMsg = Object.values(errors)[0];
-            if (firstMsg) toast.error(firstMsg);
-            return;
-        }
-
         setSaving(true);
         setFormError('');
         setFieldErrors({});
@@ -1889,22 +2328,58 @@ export default function VendorProductsPage() {
             const json = await res.json();
             if (!json.success) throw new Error(json.error?.message || 'Failed to save product');
 
+            const p = json.data as VendorProduct & {
+                categoryId?: string;
+                unlinkedBrandMappings?: Array<{ brandName?: string }>;
+            };
+            const unlinked = Array.isArray(p.unlinkedBrandMappings) ? p.unlinkedBrandMappings : [];
+            const unlinkedBrandNames = [
+                ...new Set(
+                    unlinked
+                        .map((m) => (typeof m.brandName === 'string' ? m.brandName.trim() : ''))
+                        .filter(Boolean),
+                ),
+            ];
+
             syncSavedSnapshot();
+            if (unlinked.length > 0) {
+                // Drop overlay state before close so Mapped badge / banner / Unlink
+                // cannot flash back if the panel remounts from the same product.
+                setEditBrandMasterProduct(null);
+                setEditingProduct((prev) => (prev ? { ...prev, brandMappings: [] } : prev));
+            }
             closePanelImmediate();
 
-            const p = json.data;
-            if (!editingProduct && p.approvalStatus === 'pending') {
+            if (unlinked.length > 0 && p.approvalStatus === 'pending_edit') {
+                const brandLabel = unlinkedBrandNames.join(', ') || 'brand';
+                toast.success(
+                    `Unlinked from ${brandLabel}. Image sent for review — your current image stays live until an admin approves it.`,
+                );
+            } else if (unlinked.length > 0) {
+                const brandLabel = unlinkedBrandNames.join(', ') || 'brand';
+                toast.success(`Unlinked from ${brandLabel} — your values are now live.`);
+            } else if (!editingProduct && p.approvalStatus === 'pending') {
                 toast.success('Product submitted — admin will review and assign a SKU before it goes live.');
             } else if (!editingProduct) {
                 toast.success('Product added successfully.');
-            } else if (editingProduct.approvalStatus === 'rejected') {
+            } else if (editingProduct.approvalStatus === 'rejected' || publishingDraft) {
                 if (p.approvalStatus === 'approved') {
                     toast.success('Product approved automatically — it is now live on the marketplace.');
+                } else if (publishingDraft && p.approvalStatus === 'pending') {
+                    toast.success('Product submitted — admin will review and assign a SKU before it goes live.');
                 } else {
                     toast.success('Sent for admin review — we will notify you once approved.');
                 }
             } else if (editingProduct.approvalStatus === 'pending') {
-                toast.success('Product updated (still pending review).');
+                if (p.approvalStatus === 'approved') {
+                    toast.success('Product approved automatically — it is now live on the marketplace.');
+                } else {
+                    toast.success('Product updated (still pending review).');
+                }
+            } else if (p.approvalStatus === 'pending_edit') {
+                toast.success(
+                    'Image sent for review — your current image stays live until an admin approves it.',
+                );
             } else {
                 toast.success('Product updated.');
             }
@@ -1933,6 +2408,12 @@ export default function VendorProductsPage() {
                     tags: p.tags ?? null,
                     approvalStatus: p.approvalStatus ?? existing.approvalStatus,
                     approvalNote: p.approvalNote ?? null,
+                    pendingEditPayload:
+                        p.pendingEditPayload && typeof p.pendingEditPayload === 'object'
+                            ? (p.pendingEditPayload as Record<string, unknown>)
+                            : p.approvalStatus === 'pending_edit'
+                                ? existing.pendingEditPayload ?? null
+                                : null,
                     listingStatus: p.listingStatus ?? 'submitted',
                     countryOfOrigin: p.countryOfOrigin ?? existing.countryOfOrigin ?? null,
                     shelfLifeDays:
@@ -1940,6 +2421,15 @@ export default function VendorProductsPage() {
                     vegNonVeg: p.vegNonVeg ?? existing.vegNonVeg ?? null,
                     storageType: p.storageType ?? existing.storageType ?? null,
                     vendorSku: p.vendorSku ?? existing.vendorSku ?? null,
+                    // After auto-unlink, list must show saved Product values (not brand overlay).
+                    ...(unlinked.length > 0
+                        ? {
+                            brandMappings: [],
+                            name: p.name ?? existing.name,
+                            slug: p.slug ?? existing.slug,
+                            images: p.images ?? existing.images ?? null,
+                        }
+                        : {}),
                 } : existing));
             } else {
                 // Prepend new product so it appears at the top immediately
@@ -1985,6 +2475,57 @@ export default function VendorProductsPage() {
         }
     };
 
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (draftSaveTimeoutRef.current) clearTimeout(draftSaveTimeoutRef.current);
+        const isNewSubmission = !editingProduct && !masterProductId && !basedOnProductId && !basedOnBrandMasterProductId;
+        const publishingDraft = editingProduct?.listingStatus === 'draft';
+        const needsCategory =
+            (isNewSubmission || publishingDraft) &&
+            !masterProductId &&
+            !basedOnProductId &&
+            !basedOnBrandMasterProductId;
+        // Must mirror the rendered identity: the catalog-linked layout hides the
+        // standalone SKU input and binds POS to vendorSku.
+        const requireVendorSku = !!(
+            masterProductId || basedOnBrandMasterProductId || basedOnProductId
+        );
+
+        const errors = validateProductEssentials(
+            {
+                ...form,
+                sku: requireVendorSku ? form.vendorSku : form.sku,
+            },
+            {
+                portal: 'vendor',
+                requireVendorSku,
+                requireBasePrice: true,
+                skipCategory: !needsCategory,
+            },
+        );
+
+        if (Object.keys(errors).length > 0) {
+            setFormError('');
+            setFieldErrors(errors);
+            focusFirstProductFormError(errors);
+            const firstMsg = Object.values(errors)[0];
+            if (firstMsg) toast.error(firstMsg);
+            return;
+        }
+
+        const liveMapping = editingProduct?.brandMappings?.[0];
+        const brandMaster = editBrandMasterProduct ?? liveMapping?.brandMasterProduct ?? null;
+        if (editingProduct && liveMapping?.id && brandMaster) {
+            const body = buildProductBody({ isDraft: false });
+            if (brandOverrideDeviations(body, brandMaster).length > 0) {
+                setShowUnlinkConfirm(true);
+                return;
+            }
+        }
+
+        await performProductSave();
+    };
+
     /* ---- Toggle active ---- */
 
     const toggleActive = async (product: VendorProduct) => {
@@ -2024,6 +2565,28 @@ export default function VendorProductsPage() {
             // Revert on error
             setProducts(prev => prev.map(p => p.id === product.id ? { ...p, isFeatured: product.isFeatured } : p));
             toast.error('Failed to update featured status');
+        }
+    };
+
+    /* ---- Unlink brand mapping (restore supplier values on storefront) ---- */
+
+    const handleUnlinkMapping = async (product: VendorProduct, e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        const mappingId = product.brandMappings?.[0]?.id;
+        if (!mappingId) return;
+        try {
+            const res = await fetch(`/api/v1/vendor/brand-mappings/${mappingId}`, { method: 'DELETE' });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error?.message || 'Unlink failed');
+            toast.success('Unlinked — supplier values restored');
+            setEditBrandMasterProduct(null);
+            await fetchProducts(false);
+            // Re-open edit panel without brand overlay so form shows saved Product values.
+            if (editingProduct?.id === product.id && isPanelOpen) {
+                await openEditPanel({ ...product, brandMappings: [] });
+            }
+        } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Unlink failed');
         }
     };
 
@@ -2126,7 +2689,7 @@ export default function VendorProductsPage() {
 
     const grossRate = calcGrossRate(form.basePrice, form.taxPercent);
     const taxAmount = calcTaxAmount(form.basePrice, form.taxPercent);
-    const identityFromCatalog = !!masterProductId || !!basedOnProductId;
+    const identityFromCatalog = !!masterProductId || !!basedOnProductId || !!basedOnBrandMasterProductId;
     const isNewSubmission = !editingProduct && !identityFromCatalog;
     const savings = calcSavingsPercent(grossRate, form.originalPrice);
 
@@ -2271,7 +2834,13 @@ export default function VendorProductsPage() {
                         )}>
                             {tab === 'all'
                                 ? products.length
-                                : products.filter((p) => p.approvalStatus === tab).length}
+                                : tab === 'pending'
+                                    ? products.filter(
+                                        (p) =>
+                                            p.approvalStatus === 'pending'
+                                            || p.approvalStatus === 'pending_edit',
+                                    ).length
+                                    : products.filter((p) => p.approvalStatus === tab).length}
                         </span>
                     </button>
                 ))}
@@ -2305,17 +2874,34 @@ export default function VendorProductsPage() {
                                             title="Select all on this page"
                                         />
                                     </th>
-                                    <th className="px-6 py-4 text-left text-[12px] font-bold text-[#AEAEAE] uppercase">Product</th>
-                                    <th className="px-6 py-4 text-left text-[12px] font-bold text-[#AEAEAE] uppercase">Category</th>
-                                    <th className="px-6 py-4 text-center text-[12px] font-bold text-[#AEAEAE] uppercase">Price (Gross)</th>
-                                    <th className="px-6 py-4 text-center text-[12px] font-bold text-[#AEAEAE] uppercase">Stock</th>
-                                    <th className="px-6 py-4 text-center text-[12px] font-bold text-[#AEAEAE] uppercase">Approval</th>
-                                    <th className="px-6 py-4 text-center text-[12px] font-bold text-[#AEAEAE] uppercase">Status</th>
-                                    <th className="px-6 py-4 text-center text-[12px] font-bold text-[#AEAEAE] uppercase">Actions</th>
+                                    <th className="px-6 py-4 text-left text-[12px] font-bold text-[#AEAEAE] uppercase whitespace-nowrap">Product</th>
+                                    <th className="px-6 py-4 text-left text-[12px] font-bold text-[#AEAEAE] uppercase whitespace-nowrap w-[160px]">Category</th>
+                                    <th className="px-6 py-4 text-center text-[12px] font-bold text-[#AEAEAE] uppercase whitespace-nowrap w-[170px]">Price (Gross)</th>
+                                    <th className="px-6 py-4 text-center text-[12px] font-bold text-[#AEAEAE] uppercase whitespace-nowrap w-[96px]">Stock</th>
+                                    <th className="px-6 py-4 text-center text-[12px] font-bold text-[#AEAEAE] uppercase whitespace-nowrap w-[132px]">Approval</th>
+                                    <th className="px-6 py-4 text-center text-[12px] font-bold text-[#AEAEAE] uppercase whitespace-nowrap w-[116px]">Status</th>
+                                    <th className="px-6 py-4 text-center text-[12px] font-bold text-[#AEAEAE] uppercase whitespace-nowrap w-[212px]">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[#F5F5F5]">
-                                {paginatedProducts.map((product) => (
+                                {paginatedProducts.map((product) => {
+                                    const liveMapping = product.brandMappings?.[0];
+                                    const brandMaster = liveMapping?.brandMasterProduct;
+                                    const isMapped = Boolean(liveMapping?.id && brandMaster);
+                                    const displayName = isMapped ? brandMaster!.name : product.name;
+                                    const displayImage =
+                                        (isMapped
+                                            ? (brandMaster!.imageUrl || brandMaster!.images?.[0] || null)
+                                            : null) || product.imageUrl;
+                                    const displayPack =
+                                        (isMapped ? brandMaster!.packSize : null) || product.packSize;
+                                    const displayCategory =
+                                        (isMapped ? brandMaster!.categoryRel?.name : null) || product.categoryName;
+                                    const showStruckName =
+                                        isMapped &&
+                                        product.name.trim().toLowerCase() !== brandMaster!.name.trim().toLowerCase();
+
+                                    return (
                                     <tr
                                         key={product.id}
                                         className={cn(
@@ -2335,19 +2921,39 @@ export default function VendorProductsPage() {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-[44px] h-[44px] rounded-[10px] bg-[#F1F4F9] overflow-hidden shrink-0 flex items-center justify-center">
-                                                    {product.imageUrl ? (
-                                                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                                                    {displayImage ? (
+                                                        <img src={displayImage} alt={displayName} className="w-full h-full object-cover" />
                                                     ) : (
                                                         <Package size={18} className="text-[#AEAEAE]" />
                                                     )}
                                                 </div>
-                                                <div>
-                                                    <p className="text-[14px] font-bold text-[#181725]">{product.name}</p>
-                                                    {product.packSize && <p className="text-[12px] text-[#7C7C7C]">{product.packSize}</p>}
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <p className="text-[14px] font-bold text-[#181725] truncate">{displayName}</p>
+                                                        {isMapped && (
+                                                            <span
+                                                                className="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#EEF8F1] text-[#299E60]"
+                                                                title={
+                                                                    brandMaster!.brand?.name
+                                                                        ? `Brand override — ${brandMaster!.brand.name}`
+                                                                        : 'Brand override'
+                                                                }
+                                                            >
+                                                                Mapped
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[12px] text-[#7C7C7C] truncate min-h-[18px] leading-[18px]">
+                                                        {displayPack}
+                                                        {displayPack && showStruckName && <span className="mx-1.5 text-[#E5E7EB]">|</span>}
+                                                        {showStruckName && (
+                                                            <span className="text-[#AEAEAE] line-through">{product.name}</span>
+                                                        )}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-[13px] text-[#7C7C7C] font-medium">{product.categoryName || '\u2014'}</td>
+                                        <td className="px-6 py-4 text-[13px] text-[#7C7C7C] font-medium">{displayCategory || '\u2014'}</td>
                                         <td className="px-6 py-4 text-center">
                                              <div className="flex flex-col items-center justify-center">
                                                  <span className="text-[14px] font-black text-[#181725] tabular-nums">
@@ -2410,7 +3016,7 @@ export default function VendorProductsPage() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center justify-center gap-2">
+                                            <div className="flex items-center justify-center gap-1.5">
                                                 <button
                                                     onClick={() => toggleFeatured(product)}
                                                     className={cn(
@@ -2433,6 +3039,18 @@ export default function VendorProductsPage() {
                                                 >
                                                     <Pencil size={16} />
                                                 </button>
+                                                {/* Slot stays reserved so the toggle/delete controls line up on every row */}
+                                                <div className="w-[32px] shrink-0 flex justify-center">
+                                                    {liveMapping?.id && (
+                                                        <button
+                                                            onClick={(e) => void handleUnlinkMapping(product, e)}
+                                                            className="p-2 hover:bg-[#FFF0F0] rounded-[8px] transition-colors text-[#AEAEAE] hover:text-[#E74C3C]"
+                                                            title="Unlink — revert to supplier values"
+                                                        >
+                                                            <Unlink size={16} />
+                                                        </button>
+                                                    )}
+                                                </div>
                                                 <button
                                                     onClick={() => toggleActive(product)}
                                                     className="relative inline-flex h-[22px] w-[40px] shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200"
@@ -2454,7 +3072,8 @@ export default function VendorProductsPage() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -2558,11 +3177,16 @@ export default function VendorProductsPage() {
                                 <h2 className="text-[22px] font-[900] text-[#181725]">
                                     {editingProduct ? 'Edit Product' : 'Add Product'}
                                 </h2>
-                                <div className="flex items-center gap-2 mt-0.5">
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                     {editingProduct && (
                                         <p className="text-[12px] text-[#AEAEAE] font-medium">
                                             ID: {editingProduct.id}
                                         </p>
+                                    )}
+                                    {editingProduct?.brandMappings?.[0]?.id && (
+                                        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#EEF8F1] text-[#299E60]">
+                                            Mapped
+                                        </span>
                                     )}
                                     {(draftSaving || draftSaveError || (draftSavedOnce && editingProduct?.listingStatus === 'draft')) && (
                                         <span className={cn(
@@ -2594,13 +3218,27 @@ export default function VendorProductsPage() {
                                     )}
                                 </div>
                             </div>
-                            <button
-                                type="button"
-                                onClick={requestClosePanel}
-                                className="w-[40px] h-[40px] rounded-[12px] flex items-center justify-center hover:bg-[#F8F9FB] text-[#7C7C7C] hover:text-[#181725] transition-all"
-                            >
-                                <X size={20} />
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                                {editingProduct?.brandMappings?.[0]?.id && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => void handleUnlinkMapping(editingProduct, e)}
+                                        disabled={loadingProduct || saving}
+                                        className="h-[40px] px-3 rounded-[12px] flex items-center gap-1.5 hover:bg-[#FFF0F0] text-[#7C7C7C] hover:text-[#E74C3C] transition-all disabled:opacity-50"
+                                        title="Unlink — revert to supplier values"
+                                    >
+                                        <Unlink size={16} />
+                                        <span className="text-[13px] font-bold">Unlink</span>
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={requestClosePanel}
+                                    className="w-[40px] h-[40px] rounded-[12px] flex items-center justify-center hover:bg-[#F8F9FB] text-[#7C7C7C] hover:text-[#181725] transition-all"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto bg-[#F8F9FB] px-4 lg:px-8 py-4">
@@ -2631,19 +3269,70 @@ export default function VendorProductsPage() {
                                         </div>
                                     )}
 
+                                    {editingProduct?.approvalStatus === 'pending_edit' && (() => {
+                                        const pending = editingProduct.pendingEditPayload;
+                                        const queuedUrl =
+                                            typeof pending?.imageUrl === 'string' && pending.imageUrl.trim()
+                                                ? pending.imageUrl.trim()
+                                                : Array.isArray(pending?.images)
+                                                    ? pending.images.find(
+                                                        (u): u is string => typeof u === 'string' && u.trim().length > 0,
+                                                    )
+                                                    : undefined;
+                                        if (!queuedUrl) return null;
+                                        return (
+                                            <div className="bg-[#FFF7E6] border border-[#F5D78E] text-[#8B6914] text-[13px] p-4 rounded-[10px] flex items-start gap-3">
+                                                <Clock size={18} className="shrink-0 mt-0.5 text-[#F59E0B]" />
+                                                <div className="flex-1 space-y-2 min-w-0">
+                                                    <p className="font-bold text-[#181725]">Image edit pending review</p>
+                                                    <p className="text-[#7C7C7C]">
+                                                        Your current image stays live on the storefront until an admin approves the new one.
+                                                    </p>
+                                                    <div className="flex items-center gap-2 pt-1">
+                                                        <img
+                                                            src={queuedUrl}
+                                                            alt="Queued product image"
+                                                            className="w-14 h-14 rounded-[8px] object-cover border border-[#F5D78E] bg-white"
+                                                        />
+                                                        <span className="text-[11px] font-bold text-[#F59E0B] uppercase tracking-wide">
+                                                            Queued
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {editingProduct?.brandMappings?.[0]?.id && (
+                                        <div className="rounded-[10px] bg-[#EEF8F1] border border-[#299E60]/30 px-4 py-3 flex items-start gap-3">
+                                            <Info size={16} className="shrink-0 mt-0.5 text-[#299E60]" />
+                                            <p className="text-[12px] font-medium text-[#299E60]">
+                                                Brand override — storefront shows the brand SKU. Price and stock edits keep the link. Changing brand details (name, pack, HSN, images, etc.) and saving will unlink this product so your values go live.
+                                            </p>
+                                        </div>
+                                    )}
+
                                     <ProductEssentialsFields
                                         portal="vendor"
-                                        identityMode={masterProductId ? 'catalog-linked' : 'standalone'}
+                                        identityMode={
+                                            masterProductId || basedOnBrandMasterProductId || basedOnProductId
+                                                ? 'catalog-linked'
+                                                : 'standalone'
+                                        }
                                         nameField={renderProductNameField(
-                                            masterProductId ? 'sm:col-span-2 xl:col-span-4' : 'sm:col-span-2 xl:col-span-5',
+                                            masterProductId || basedOnBrandMasterProductId || basedOnProductId
+                                                ? 'sm:col-span-2 xl:col-span-4'
+                                                : 'sm:col-span-2 xl:col-span-5',
                                         )}
                                         catalogBanner={
                                             (!editingProduct || editingProduct.approvalStatus === 'rejected') && identityFromCatalog ? (
                                                 <div className="rounded-[10px] bg-[#EEF8F1] border border-[#299E60]/30 px-4 py-3 flex items-center justify-between gap-3">
                                                     <p className="text-[12px] font-medium text-[#299E60]">
-                                                        {masterProductId
-                                                            ? `Linked to master catalog — ${catalogSearch || form.name}`
-                                                            : `Based on approved product — ${catalogSearch || form.name}`}
+                                                        {basedOnBrandMasterProductId
+                                                            ? `Linked to brand catalog — ${catalogSearch || form.name}`
+                                                            : masterProductId
+                                                                ? `Linked to master catalog — ${catalogSearch || form.name}`
+                                                                : `Based on approved product — ${catalogSearch || form.name}`}
                                                     </p>
                                                     <button
                                                         type="button"
@@ -3051,9 +3740,9 @@ export default function VendorProductsPage() {
                                                         onChange={e => updateField('weightUnit', e.target.value)}
                                                         className={selectCls}
                                                     >
-                                                        <option value="kg">kg</option>
-                                                        <option value="g">g</option>
-                                                        <option value="lbs">lbs</option>
+                                                        {WEIGHT_UNIT_OPTIONS.map(u => (
+                                                            <option key={u} value={u}>{u}</option>
+                                                        ))}
                                                     </select>
                                                 </div>
                                             </div>
@@ -3101,9 +3790,9 @@ export default function VendorProductsPage() {
                                                             onChange={e => updateField('dimensionUnit', e.target.value)}
                                                             className={selectCls}
                                                         >
-                                                            <option value="cm">cm</option>
-                                                            <option value="mm">mm</option>
-                                                            <option value="inch">inch</option>
+                                                            {DIMENSION_UNIT_OPTIONS.map(u => (
+                                                                <option key={u} value={u}>{u}</option>
+                                                            ))}
                                                         </select>
                                                     </div>
                                                 </div>
@@ -3416,6 +4105,54 @@ export default function VendorProductsPage() {
                                     className="flex-1 h-[44px] bg-[#E74C3C] text-white rounded-[10px] text-[14px] font-bold hover:bg-[#d44234] transition-colors"
                                 >
                                     Discard
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Save & Unlink confirmation (brand override field edited) */}
+            {showUnlinkConfirm && (
+                <>
+                    <div
+                        className="fixed inset-0 bg-black/40 z-[80]"
+                        onClick={() => !saving && setShowUnlinkConfirm(false)}
+                    />
+                    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-[16px] shadow-xl max-w-[420px] w-full p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-[40px] h-[40px] rounded-full bg-[#EEF8F1] flex items-center justify-center shrink-0">
+                                    <Unlink size={20} className="text-[#299E60]" />
+                                </div>
+                                <h3 className="text-[18px] font-bold text-[#181725]">Save &amp; Unlink</h3>
+                            </div>
+                            <p className="text-[14px] text-[#7C7C7C] mb-6">
+                                Saving will unlink this product from{' '}
+                                <strong className="text-[#181725]">
+                                    {editBrandMasterProduct?.brand?.name
+                                        || editingProduct?.brandMappings?.[0]?.brandMasterProduct?.brand?.name
+                                        || 'this brand'}
+                                </strong>
+                                . Your values go live; you can map it again anytime.
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowUnlinkConfirm(false)}
+                                    disabled={saving}
+                                    className="flex-1 h-[44px] border border-[#EEEEEE] rounded-[10px] text-[14px] font-bold text-[#181725] hover:bg-[#F8F9FB] transition-colors disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => void performProductSave()}
+                                    disabled={saving}
+                                    className="flex-1 h-[44px] bg-[#299E60] text-white rounded-[10px] text-[14px] font-bold hover:bg-[#238a54] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {saving && <Loader2 size={16} className="animate-spin" />}
+                                    {saving ? 'Saving...' : 'Save & Unlink'}
                                 </button>
                             </div>
                         </div>

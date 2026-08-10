@@ -742,7 +742,8 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
               updatedProduct.packSize ?? undefined,
               updatedProduct.unit ?? undefined,
               updatedProduct.sku ?? undefined,
-              updatedProduct.masterProductId || undefined
+              updatedProduct.masterProductId || undefined,
+              updatedProduct.id,
             ).catch(console.error);
           }
 
@@ -840,7 +841,8 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
               product.packSize ?? undefined,
               product.unit ?? undefined,
               product.sku ?? undefined,
-              product.masterProductId || undefined
+              product.masterProductId || undefined,
+              product.id,
             ).catch(console.error);
           }
 

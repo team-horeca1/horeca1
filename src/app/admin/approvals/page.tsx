@@ -357,13 +357,26 @@ export default function ApprovalsPage() {
                                     <th className="px-6 py-4 text-[12px] font-bold text-[#7C7C7C] uppercase">Vendor</th>
                                     <th className="px-6 py-4 text-[12px] font-bold text-[#7C7C7C] uppercase">Category</th>
                                     <th className="px-6 py-4 text-[12px] font-bold text-[#7C7C7C] uppercase">Price</th>
+                                    <th className="px-6 py-4 text-[12px] font-bold text-[#7C7C7C] uppercase">Type</th>
                                     <th className="px-6 py-4 text-[12px] font-bold text-[#7C7C7C] uppercase">Submitted</th>
                                     <th className="px-6 py-4 text-[12px] font-bold text-[#7C7C7C] uppercase">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[#F5F5F5]">
-                                {filteredProducts.map(product => (
-                                    <tr key={product.id} className="hover:bg-[#FAFAFA] transition-colors">
+                                {filteredProducts.map(product => {
+                                    const isEditPending = product.approvalStatus === 'pending_edit';
+                                    const typeLabel = product.kind === 'master'
+                                        ? 'Master Catalog'
+                                        : isEditPending
+                                            ? 'Edit Pending'
+                                            : 'New Submission';
+                                    const typeCls = product.kind === 'master'
+                                        ? 'bg-[#EEF8F1] text-[#299E60]'
+                                        : isEditPending
+                                            ? 'bg-[#FFF8E1] text-[#8B6914]'
+                                            : 'bg-[#FFF7E6] text-[#F59E0B]';
+                                    return (
+                                    <tr key={`${product.kind ?? 'vendor'}-${product.id}`} className="hover:bg-[#FAFAFA] transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 {product.imageUrl ? (
@@ -396,6 +409,14 @@ export default function ApprovalsPage() {
                                         <td className="px-6 py-4 text-[13px] font-bold text-[#181725]">
                                             {product.kind === 'master' ? '—' : formatINR(Number(product.basePrice))}
                                         </td>
+                                        <td className="px-6 py-4">
+                                            <span className={cn(
+                                                'text-[11px] font-[900] px-2.5 py-1 rounded-[6px] uppercase whitespace-nowrap',
+                                                typeCls,
+                                            )}>
+                                                {typeLabel}
+                                            </span>
+                                        </td>
                                         <td className="px-6 py-4 text-[13px] text-[#7C7C7C]">{formatDate(product.createdAt)}</td>
                                         <td className="px-6 py-4">
                                             <button
@@ -410,9 +431,10 @@ export default function ApprovalsPage() {
                                             </button>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                                 {filteredProducts.length === 0 && (
-                                    <tr><td colSpan={6} className="py-16 text-center">
+                                    <tr><td colSpan={7} className="py-16 text-center">
                                         <Package size={36} className="mx-auto text-[#EEEEEE] mb-2" />
                                         <p className="text-[#AEAEAE] font-bold text-[14px]">No pending products</p>
                                     </td></tr>

@@ -32,6 +32,11 @@ import {
     List,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+    UNIT_OPTIONS,
+    WEIGHT_UNIT_OPTIONS,
+    DIMENSION_UNIT_OPTIONS,
+} from '@/lib/productUnits';
 import Link from 'next/link';
 import { ImageUpload, MultiImageUpload } from '@/components/ui/ImageUpload';
 import ProductImportModal from '@/components/features/admin/ProductImportModal';
@@ -191,9 +196,7 @@ interface ProductFormData {
     activeOnlineStore: boolean;
 }
 
-// Same enum-like constants used by vendor form. GST slabs are government-fixed,
-// units are universal SI/business units — these are not "mock data".
-const UNIT_OPTIONS = ['kg', 'g', 'ml', 'L', 'piece', 'pack', 'box', 'dozen', 'case', 'bag', 'bottle', 'can', 'carton', 'tray'];
+// GST slabs are government-fixed — not mock data.
 const TAX_OPTIONS = ['0', '5', '12', '18', '28'];
 
 function getPageRange(current: number, total: number): (number | 'gap')[] {
@@ -2764,9 +2767,9 @@ export default function ProductsPage() {
                                                     onChange={e => updateField('weightUnit', e.target.value)}
                                                     className={selectCls}
                                                 >
-                                                    <option value="kg">kg</option>
-                                                    <option value="g">g</option>
-                                                    <option value="lbs">lbs</option>
+                                                    {WEIGHT_UNIT_OPTIONS.map(u => (
+                                                        <option key={u} value={u}>{u}</option>
+                                                    ))}
                                                 </select>
                                             </div>
                                         </div>
@@ -2814,9 +2817,9 @@ export default function ProductsPage() {
                                                         onChange={e => updateField('dimensionUnit', e.target.value)}
                                                         className={selectCls}
                                                     >
-                                                        <option value="cm">cm</option>
-                                                        <option value="mm">mm</option>
-                                                        <option value="inch">inch</option>
+                                                        {DIMENSION_UNIT_OPTIONS.map(u => (
+                                                            <option key={u} value={u}>{u}</option>
+                                                        ))}
                                                     </select>
                                                 </div>
                                             </div>

@@ -13,6 +13,11 @@ import FormSection, {
 } from '@/components/features/shared/FormSection';
 import { CategoryHierarchyPicker } from '@/components/features/brand/CategoryHierarchyPicker';
 import { ImageUpload } from '@/components/ui/ImageUpload';
+import {
+  UNIT_OPTIONS,
+  WEIGHT_UNIT_OPTIONS,
+  DIMENSION_UNIT_OPTIONS,
+} from '@/lib/productUnits';
 import { toast } from 'sonner';
 
 export type BrandVegNonVeg = '' | 'veg' | 'nonveg' | 'egg';
@@ -36,6 +41,12 @@ export interface BrandProductFormData {
   fssaiRef: string;
   netWeight: string;
   netWeightUnit: string;
+  packageWeight: string;
+  weightUnit: string;
+  packageLength: string;
+  packageWidth: string;
+  packageHeight: string;
+  dimensionUnit: string;
   tags: string[];
   aliasNames: string[];
 }
@@ -59,6 +70,12 @@ export const EMPTY_BRAND_PRODUCT_FORM: BrandProductFormData = {
   fssaiRef: '',
   netWeight: '',
   netWeightUnit: '',
+  packageWeight: '',
+  weightUnit: 'kg',
+  packageLength: '',
+  packageWidth: '',
+  packageHeight: '',
+  dimensionUnit: 'cm',
   tags: [],
   aliasNames: [],
 };
@@ -494,14 +511,21 @@ export default function BrandProductForm({
                     <p className="text-[11px] text-[#AEAEAE] mt-1">How much is in one sellable unit</p>
                   </div>
                   <div>
-                    <FieldLabel>Unit / container</FieldLabel>
-                    <input
-                      type="text"
+                    <FieldLabel>Unit</FieldLabel>
+                    <select
                       value={form.unit}
                       onChange={(e) => setField('unit', e.target.value)}
-                      placeholder="e.g. Bottle, Pouch, Pc"
-                      className={productFormInputCls}
-                    />
+                      className={productFormSelectCls}
+                    >
+                      <option value="">Select unit</option>
+                      {UNIT_OPTIONS.map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                      {form.unit
+                        && !(UNIT_OPTIONS as readonly string[]).includes(form.unit) && (
+                        <option value={form.unit}>{form.unit}</option>
+                      )}
+                    </select>
                     <p className="text-[11px] text-[#AEAEAE] mt-1">Packaging type — not the quantity</p>
                   </div>
                   <div>
@@ -529,6 +553,87 @@ export default function BrandProductForm({
                       <option value="l">l</option>
                       <option value="ml">ml</option>
                     </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-[#EEEEEE]">
+                  <div>
+                    <FieldLabel>Package Weight</FieldLabel>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.packageWeight}
+                      onChange={(e) => setField('packageWeight', e.target.value)}
+                      placeholder="0.00"
+                      className={productFormInputCls}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Weight Unit</FieldLabel>
+                    <select
+                      value={form.weightUnit}
+                      onChange={(e) => setField('weightUnit', e.target.value)}
+                      className={productFormSelectCls}
+                    >
+                      {WEIGHT_UNIT_OPTIONS.map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-[#EEEEEE]">
+                  <h4 className="text-[14px] font-bold text-[#181725]">Dimensions</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div>
+                      <FieldLabel>Length</FieldLabel>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.packageLength}
+                        onChange={(e) => setField('packageLength', e.target.value)}
+                        placeholder="0.00"
+                        className={productFormInputCls}
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>Width</FieldLabel>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.packageWidth}
+                        onChange={(e) => setField('packageWidth', e.target.value)}
+                        placeholder="0.00"
+                        className={productFormInputCls}
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>Height</FieldLabel>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.packageHeight}
+                        onChange={(e) => setField('packageHeight', e.target.value)}
+                        placeholder="0.00"
+                        className={productFormInputCls}
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>Dimension Unit</FieldLabel>
+                      <select
+                        value={form.dimensionUnit}
+                        onChange={(e) => setField('dimensionUnit', e.target.value)}
+                        className={productFormSelectCls}
+                      >
+                        {DIMENSION_UNIT_OPTIONS.map((u) => (
+                          <option key={u} value={u}>{u}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               </FormSection>

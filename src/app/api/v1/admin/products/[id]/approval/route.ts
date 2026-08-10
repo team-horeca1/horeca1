@@ -203,7 +203,8 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
           product.packSize ?? undefined,
           product.unit ?? undefined,
           product.sku ?? undefined,
-          product.masterProductId || undefined
+          product.masterProductId || undefined,
+          product.id,
         ).catch(console.error);
       }
 
