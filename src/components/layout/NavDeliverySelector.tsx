@@ -127,7 +127,9 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
   const settling = status === 'loading' || (status === 'authenticated' && loading);
 
   // Remember the last resolved label so session blips keep showing it instead of a skeleton.
-  if (!settling) {
+  // Must run in an effect — setState during render causes an extra paint / chip flicker.
+  useEffect(() => {
+    if (settling) return;
     const nextGood: StickyDeliverTo =
       status === 'authenticated' && currentAccount && currentOutlet
         ? {
@@ -135,21 +137,30 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
             label: currentOutlet.requiresAddressUpdate
               ? 'Add address'
               : (currentOutlet.pincode ?? currentOutlet.name),
-            needsAddress: currentOutlet.requiresAddressUpdate,
+            needsAddress: Boolean(currentOutlet.requiresAddressUpdate),
           }
         : {
             mode: 'fallback',
             label: fallbackLabel,
           };
-    if (
-      !lastGood ||
-      lastGood.mode !== nextGood.mode ||
-      lastGood.label !== nextGood.label ||
-      lastGood.needsAddress !== nextGood.needsAddress
-    ) {
-      setLastGood(nextGood);
-    }
-  }
+    setLastGood((prev) => {
+      if (
+        prev &&
+        prev.mode === nextGood.mode &&
+        prev.label === nextGood.label &&
+        prev.needsAddress === nextGood.needsAddress
+      ) {
+        return prev;
+      }
+      return nextGood;
+    });
+  }, [
+    settling,
+    status,
+    currentAccount,
+    currentOutlet,
+    fallbackLabel,
+  ]);
 
   if (settling) {
     if (lastGood) {
@@ -228,13 +239,15 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
               }
               setOutletOpen(!outletOpen);
             }}
-            className="flex items-center gap-1 px-2.5 py-1.5 border border-gray-100 rounded-full bg-[#F7F7F7] shadow-sm hover:bg-gray-100 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-100 rounded-full bg-[#F7F7F7] shadow-sm hover:bg-gray-100 transition-colors"
           >
             {needsAddress
-              ? <AlertCircle size={12} className="text-amber-500 shrink-0" />
-              : <MapPin size={12} className="text-[#53B175] shrink-0" />}
-            <span className="text-[11px] font-bold text-gray-700 truncate max-w-[70px]">{currentOutlet.pincode ?? outletName}</span>
-            <ChevronDown size={11} className="text-gray-400 shrink-0" />
+              ? <AlertCircle size={13} className="text-amber-500 shrink-0" />
+              : <MapPin size={13} className="text-[#53B175] shrink-0" />}
+            <span className="text-[12px] font-bold text-gray-700 truncate max-w-[140px]">
+              {needsAddress ? 'Add address' : (currentOutlet.pincode ?? outletName)}
+            </span>
+            <ChevronDown size={13} className="text-gray-400 shrink-0" />
           </button>
           {outletOpen && !customerImpersonating && (
             <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-xl z-[10500] w-[200px] p-1.5 max-h-[min(60vh,320px)] overflow-y-auto">
@@ -282,11 +295,11 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
             }
             setOutletOpen(!outletOpen);
           }}
-          className="flex items-center gap-2 px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50 hover:bg-gray-100 hover:border-gray-300 transition-all cursor-pointer w-[195px]"
+          className="flex items-center gap-2.5 px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 hover:bg-gray-100 hover:border-gray-300 transition-all cursor-pointer shrink-0 w-[195px]"
         >
           {needsAddress
-            ? <AlertCircle size={14} className="text-amber-500 shrink-0" />
-            : <MapPin size={14} className="text-[#53B175] shrink-0" />}
+            ? <AlertCircle size={15} className="text-amber-500 shrink-0" />
+            : <MapPin size={15} className="text-[#53B175] shrink-0" />}
           <div className="flex flex-col items-start min-w-0 flex-1">
             <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider leading-none">Deliver to</span>
             <span className={`text-[12px] font-bold truncate leading-tight mt-0.5 w-full text-left ${needsAddress ? 'text-amber-600' : 'text-gray-800'}`}>
