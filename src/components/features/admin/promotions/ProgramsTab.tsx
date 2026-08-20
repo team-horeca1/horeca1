@@ -8,9 +8,15 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-type WelcomeReward = 'wallet_credit' | 'coupon_flat' | 'coupon_percentage' | 'cashback' | 'free_delivery';
-type SideReward = 'wallet_credit' | 'coupon_flat' | 'coupon_percentage' | 'cashback';
+type WelcomeReward = 'wallet_credit' | 'coupon_flat' | 'coupon_percentage' | 'free_delivery';
+type SideReward = 'wallet_credit' | 'coupon_flat' | 'coupon_percentage';
 type ReferralTrigger = 'signup' | 'first_order' | 'first_order_mov';
+
+/** Legacy `cashback` issued the same H1 Wallet credit — collapse it in the UI. */
+function normalizeProgramRewardType(t: string): WelcomeReward | SideReward {
+    if (t === 'cashback') return 'wallet_credit';
+    return t as WelcomeReward | SideReward;
+}
 
 interface WelcomeForm {
     isActive: boolean;
@@ -58,12 +64,13 @@ const emptyReferral: ReferralForm = {
 
 const WELCOME_TYPES: Array<{ id: WelcomeReward; label: string }> = [
     { id: 'wallet_credit', label: 'H1 Wallet credit' },
-    { id: 'cashback', label: 'Cashback (H1 Wallet)' },
     { id: 'coupon_flat', label: 'Personal coupon (₹)' },
     { id: 'coupon_percentage', label: 'Personal coupon (%)' },
     { id: 'free_delivery', label: 'Free delivery (once)' },
 ];
-const SIDE_TYPES: Array<{ id: SideReward; label: string }> = WELCOME_TYPES.filter((t) => t.id !== 'free_delivery') as Array<{ id: SideReward; label: string }>;
+const SIDE_TYPES: Array<{ id: SideReward; label: string }> = WELCOME_TYPES.filter(
+    (t): t is { id: SideReward; label: string } => t.id !== 'free_delivery',
+);
 
 const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-medium focus:outline-none focus:border-[#53B175]';
 const labelCls = 'block text-[11px] font-bold text-gray-500 mb-1';
@@ -92,8 +99,8 @@ function RewardFields({
     hideMinOrder?: boolean;
 }) {
     return (
-        <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+            <div className="sm:col-span-2">
                 <label className={labelCls}>Reward type</label>
                 <select className={inputCls} value={form.rewardType} onChange={(e) => set({ rewardType: e.target.value })}>
                     {types.map((t) => <option key={String(t.id)} value={String(t.id)}>{t.label}</option>)}
@@ -145,7 +152,7 @@ export function ProgramsTab() {
             if (w?.data) {
                 setWelcome({
                     isActive: Boolean(w.data.isActive),
-                    rewardType: w.data.rewardType,
+                    rewardType: normalizeProgramRewardType(String(w.data.rewardType)) as WelcomeReward,
                     rewardValue: dec(w.data.rewardValue),
                     minOrderValue: dec(w.data.minOrderValue),
                     validDays: intStr(w.data.validDays),
@@ -155,7 +162,7 @@ export function ProgramsTab() {
             if (f?.data) {
                 setFirst({
                     isActive: Boolean(f.data.isActive),
-                    rewardType: f.data.rewardType,
+                    rewardType: normalizeProgramRewardType(String(f.data.rewardType)) as SideReward,
                     rewardValue: dec(f.data.rewardValue),
                     minOrderValue: dec(f.data.minOrderValue),
                     validDays: intStr(f.data.validDays),
@@ -167,11 +174,11 @@ export function ProgramsTab() {
                     isActive: Boolean(r.data.isActive),
                     trigger: r.data.trigger,
                     minOrderValue: dec(r.data.minOrderValue),
-                    referrerRewardType: r.data.referrerRewardType,
+                    referrerRewardType: normalizeProgramRewardType(String(r.data.referrerRewardType)) as SideReward,
                     referrerRewardValue: dec(r.data.referrerRewardValue),
                     referrerMaxDiscount: dec(r.data.referrerMaxDiscount),
                     referrerValidDays: intStr(r.data.referrerValidDays),
-                    referredRewardType: r.data.referredRewardType,
+                    referredRewardType: normalizeProgramRewardType(String(r.data.referredRewardType)) as SideReward,
                     referredRewardValue: dec(r.data.referredRewardValue),
                     referredMaxDiscount: dec(r.data.referredMaxDiscount),
                     referredValidDays: intStr(r.data.referredValidDays),

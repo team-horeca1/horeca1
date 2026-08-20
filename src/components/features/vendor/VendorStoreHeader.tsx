@@ -237,13 +237,8 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                             </p>
                         </div>
 
-                        {/* Right-side CTAs — primary order + secondary deals (not twin buttons) */}
-                        <div className="flex-shrink-0 ml-4 hidden lg:flex flex-col items-stretch gap-2.5 w-[min(100%,220px)]">
-                            {vendor.deliverySchedule && (
-                                <span className="self-end bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-lg">
-                                    Next · {vendor.deliverySchedule}
-                                </span>
-                            )}
+                        {/* Right-side CTAs — primary order + secondary deals */}
+                        <div className="flex-shrink-0 ml-4 hidden lg:flex flex-col items-stretch justify-center gap-2.5 w-[min(100%,220px)]">
                             <button
                                 type="button"
                                 onClick={() => {
