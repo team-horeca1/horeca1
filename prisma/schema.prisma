@@ -49,39 +49,41 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-
 // ═══ USER ═════════════════════════════════════════════
 
 model User {
-  id            String    @id @default(uuid()) @db.Uuid
-  email         String?   @unique @db.VarChar(255)
-  emailVerified DateTime? @map("email_verified")
-  password      String?   @db.VarChar(255)
+  id                  String    @id @default(uuid()) @db.Uuid
+  email               String?   @unique @db.VarChar(255)
+  emailVerified       DateTime? @map("email_verified")
+  password            String?   @db.VarChar(255)
   // AES-GCM encrypted copy of last admin-set password (for admin reveal on detail pages).
-  adminPasswordCipher String? @map("admin_password_cipher") @db.Text
-  phone         String?   @unique @db.VarChar(20)
-  fullName      String    @default("") @map("full_name") @db.VarChar(255)
-  image         String?   @db.VarChar(512)
-  role          Role      @default(customer)
-  pincode       String?   @db.VarChar(10)
-  businessName  String?   @map("business_name") @db.VarChar(255)
-  gstNumber     String?   @map("gst_number") @db.VarChar(20)
-  isActive      Boolean   @default(true) @map("is_active")
-  profileCompletedAt DateTime? @map("profile_completed_at") @db.Timestamptz
+  adminPasswordCipher String?   @map("admin_password_cipher") @db.Text
+  phone               String?   @unique @db.VarChar(20)
+  fullName            String    @default("") @map("full_name") @db.VarChar(255)
+  image               String?   @db.VarChar(512)
+  role                Role      @default(customer)
+  pincode             String?   @db.VarChar(10)
+  businessName        String?   @map("business_name") @db.VarChar(255)
+  gstNumber           String?   @map("gst_number") @db.VarChar(20)
+  isActive            Boolean   @default(true) @map("is_active")
+  profileCompletedAt  DateTime? @map("profile_completed_at") @db.Timestamptz
   // V2.2: human-readable HCID display, e.g. "HC-A4F2-9X3K". Generated at signup via src/lib/hcid.ts.
-  hcidDisplay   String    @unique @map("hcid_display") @db.VarChar(20)
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  hcidDisplay         String    @unique @map("hcid_display") @db.VarChar(20)
+  // Promo Engine Phase C — unique /invite/<token> link. Generated lazily (nullable
+  // until first share) so existing users don't need a migration backfill.
+  referralToken       String?   @unique @map("referral_token") @db.VarChar(64)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   accounts Account[]
   sessions Session[]
 
-  linkedAccounts  LinkedAccount[] @relation("MyLinks")
-  linkedBy        LinkedAccount[] @relation("LinkedToMe")
+  linkedAccounts LinkedAccount[] @relation("MyLinks")
+  linkedBy       LinkedAccount[] @relation("LinkedToMe")
 
   vendors         Vendor[]
   brands          Brand[]
-  carts           Cart[]   // V2.2: one cart per (businessAccountId, outletId)
+  carts           Cart[] // V2.2: one cart per (businessAccountId, outletId)
   wallet          Wallet?
   orders          Order[]
   quickOrderLists QuickOrderList[]
@@ -99,8 +101,8 @@ model User {
   adminMembership   AdminTeamMember?   @relation("AdminMembership")
   adminInvitesSent  AdminTeamMember[]  @relation("AdminInvites")
   savedAddresses    SavedAddress[]
-  returnRequests    ReturnRequest[] @relation("CustomerReturnRequests")
-  cancelRequests    CancelRequest[] @relation("CustomerCancelRequests")
+  returnRequests    ReturnRequest[]    @relation("CustomerReturnRequests")
+  cancelRequests    CancelRequest[]    @relation("CustomerCancelRequests")
   pushSubscriptions PushSubscription[]
 
   // V2.2 — multi-account access
@@ -109,23 +111,30 @@ model User {
   userRoles          UserRole[]              @relation("UserRoles")
 
   // V2.2 Phase 1 — Salesman Commission
-  salespersonProfile     Salesperson[]        @relation("UserSalespersonProfile")
-  approvedAccruals       CommissionAccrual[]  @relation("CommissionApprover")
+  salespersonProfile Salesperson[]       @relation("UserSalespersonProfile")
+  approvedAccruals   CommissionAccrual[] @relation("CommissionApprover")
 
   // V2.2 Phase 4 — Pricelist assignments targeting this user
-  priceListAssignments   PriceListAssignment[] @relation("PriceListAssignmentUser")
+  priceListAssignments PriceListAssignment[] @relation("PriceListAssignmentUser")
 
   // Promo Engine Phase 1 — cashback earned by this user (order-linked + direct grants)
-  cashbackEntries        CashbackEntry[]
+  cashbackEntries      CashbackEntry[]
+  welcomeGrant         WelcomeGrant?
+  firstOrderGrant      FirstOrderGrant?
+  referralClicks       ReferralClick[]       @relation("ReferralClickReferrer")
+  referredAttribution  ReferralAttribution?  @relation("ReferredUser")
+  referralAttributions ReferralAttribution[] @relation("ReferrerUser")
+  payoutInvites        PayoutInvite[]        @relation("PayoutInviteUser")
+  payoutInvitesCreated PayoutInvite[]        @relation("PayoutInviteCreator")
 
-  productAuditLogs       ProductAuditLog[] @relation("ProductAuditActor")
-  priceHistoryChanges    PriceHistory[]    @relation("PriceHistoryActor")
-  orderEvents            OrderEvent[]      @relation("OrderEventActor")
-  orderShipments         OrderShipment[]   @relation("OrderShipmentActor")
-  fulfilmentEvents       FulfilmentEvent[] @relation("FulfilmentEventActor")
-  deliveryEvents         DeliveryEvent[]   @relation("DeliveryEventActor")
-  returnEvents           ReturnEvent[]     @relation("ReturnEventActor")
-  returnInspections      ReturnInspection[] @relation("ReturnInspectionVerifier")
+  productAuditLogs       ProductAuditLog[]       @relation("ProductAuditActor")
+  priceHistoryChanges    PriceHistory[]          @relation("PriceHistoryActor")
+  orderEvents            OrderEvent[]            @relation("OrderEventActor")
+  orderShipments         OrderShipment[]         @relation("OrderShipmentActor")
+  fulfilmentEvents       FulfilmentEvent[]       @relation("FulfilmentEventActor")
+  deliveryEvents         DeliveryEvent[]         @relation("DeliveryEventActor")
+  returnEvents           ReturnEvent[]           @relation("ReturnEventActor")
+  returnInspections      ReturnInspection[]      @relation("ReturnInspectionVerifier")
   masterProductRevisions MasterProductRevision[] @relation("MasterRevisionActor")
   stockTransfersCreated  StockTransfer[]         @relation("StockTransferCreator")
 
@@ -186,135 +195,135 @@ model LinkedAccount {
 // ═══ VENDOR ═══════════════════════════════════════════
 
 model Vendor {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String   @map("user_id") @db.Uuid
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
   // Supplier Foundation: Online Store under a Business (N stores per BusinessAccount).
-  businessAccountId String @map("business_account_id") @db.Uuid
-  businessName  String   @map("business_name") @db.VarChar(255)
+  businessAccountId String   @map("business_account_id") @db.Uuid
+  businessName      String   @map("business_name") @db.VarChar(255)
   // Customer-facing / portal display name (falls back to businessName).
-  displayName   String?  @map("display_name") @db.VarChar(255)
+  displayName       String?  @map("display_name") @db.VarChar(255)
   // First Online Store created under the Business (migration backfill = true).
-  isPrimaryStore Boolean @default(false) @map("is_primary_store")
+  isPrimaryStore    Boolean  @default(false) @map("is_primary_store")
   // Silent default warehouse outlet for this Online Store (inventory/fulfillment FKs).
-  defaultOutletId String? @unique @map("default_outlet_id") @db.Uuid
-  slug          String   @unique @db.VarChar(255)
+  defaultOutletId   String?  @unique @map("default_outlet_id") @db.Uuid
+  slug              String   @unique @db.VarChar(255)
   // Short admin-assigned code used as the vendor SKU prefix (e.g. MAN-MANJRSYP123).
-  vendorCode    String?  @unique @map("vendor_code") @db.VarChar(20)
-  description   String?  @db.Text
-  logoUrl       String?  @map("logo_url") @db.VarChar(512)
-  bannerUrl     String?  @map("banner_url") @db.VarChar(512)
-  rating        Decimal  @default(0) @db.Decimal(2, 1)
-  minOrderValue Decimal  @default(0) @map("min_order_value") @db.Decimal(10, 2)
-  creditEnabled Boolean  @default(false) @map("credit_enabled")
-  isActive      Boolean  @default(true) @map("is_active")
-  isVerified    Boolean  @default(false) @map("is_verified")
+  vendorCode        String?  @unique @map("vendor_code") @db.VarChar(20)
+  description       String?  @db.Text
+  logoUrl           String?  @map("logo_url") @db.VarChar(512)
+  bannerUrl         String?  @map("banner_url") @db.VarChar(512)
+  rating            Decimal  @default(0) @db.Decimal(2, 1)
+  minOrderValue     Decimal  @default(0) @map("min_order_value") @db.Decimal(10, 2)
+  creditEnabled     Boolean  @default(false) @map("credit_enabled")
+  isActive          Boolean  @default(true) @map("is_active")
+  isVerified        Boolean  @default(false) @map("is_verified")
   // Registered business address — shown on tax invoices as "Bill From / Shipped From".
-  addressLine   String?  @map("address_line") @db.Text
-  city          String?  @db.VarChar(100)
-  state         String?  @db.VarChar(100)
-  addressPincode String? @map("address_pincode") @db.VarChar(10)
-  gstNumber     String?  @map("gst_number") @db.VarChar(20)
+  addressLine       String?  @map("address_line") @db.Text
+  city              String?  @db.VarChar(100)
+  state             String?  @db.VarChar(100)
+  addressPincode    String?  @map("address_pincode") @db.VarChar(10)
+  gstNumber         String?  @map("gst_number") @db.VarChar(20)
   // Null = use PlatformSetting.defaultCommissionPct
-  platformFeePct Decimal? @map("platform_fee_pct") @db.Decimal(5, 2)
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  platformFeePct    Decimal? @map("platform_fee_pct") @db.Decimal(5, 2)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  user               User                 @relation(fields: [userId], references: [id])
-  businessAccount    BusinessAccount      @relation(fields: [businessAccountId], references: [id])
-  defaultOutlet      Outlet?              @relation("VendorDefaultOutlet", fields: [defaultOutletId], references: [id], onDelete: SetNull)
-  serviceAreas       ServiceArea[]
-  products           Product[]
-  priceSlabs         PriceSlab[]
-  inventory          Inventory[]
-  deliverySlots      DeliverySlot[]
-  orders             Order[]
-  cartItems          CartItem[]
-  quickOrderLists    QuickOrderList[]
-  quickOrderItems    QuickOrderListItem[]
-  payments           Payment[]
-  creditAccounts     CreditAccount[]
-  creditWallets      CreditWallet[]
-  creditTxns         CreditTransaction[]
-  customerVendors    CustomerVendor[]
-  collectionProducts CollectionProduct[]
-  reviews            Review[]
-  teamMembers        VendorTeamMember[]
-  documents          VendorDocument[]
-  vendorWallet       VendorWallet?
-  vendorCustomers    VendorCustomer[]    @relation("VendorCustomerMapping")
-  priceLists         PriceList[]
-  priceHistory       PriceHistory[]
-  settlements        VendorSettlement[]
-  promotions         Promotion[]
-  customerTasks      VendorCustomerTask[]
-  customerPrices     VendorCustomerPrice[]
-  salespersons       Salesperson[]
-  commissionRules    CommissionRule[]
-  commissionAccruals CommissionAccrual[]
-  coupons            Coupon[]
-  cashbackCampaigns  CashbackCampaign[]
-  customerGroups     CustomerGroup[]
-  combos             ProductCombo[]
-  brandAuthorizations BrandAuthorizedDistributor[]
-  picklists           Picklist[]
-  dispatches          Dispatch[]
-  goodsReceipts       GoodsReceipt[]
-  stockTransfers      StockTransfer[]
-  fulfilments         Fulfilment[]
-  deliveryResources   DeliveryResource[]
+  user                    User                         @relation(fields: [userId], references: [id])
+  businessAccount         BusinessAccount              @relation(fields: [businessAccountId], references: [id])
+  defaultOutlet           Outlet?                      @relation("VendorDefaultOutlet", fields: [defaultOutletId], references: [id], onDelete: SetNull)
+  serviceAreas            ServiceArea[]
+  products                Product[]
+  priceSlabs              PriceSlab[]
+  inventory               Inventory[]
+  deliverySlots           DeliverySlot[]
+  orders                  Order[]
+  cartItems               CartItem[]
+  quickOrderLists         QuickOrderList[]
+  quickOrderItems         QuickOrderListItem[]
+  payments                Payment[]
+  creditAccounts          CreditAccount[]
+  creditWallets           CreditWallet[]
+  creditTxns              CreditTransaction[]
+  customerVendors         CustomerVendor[]
+  collectionProducts      CollectionProduct[]
+  reviews                 Review[]
+  teamMembers             VendorTeamMember[]
+  documents               VendorDocument[]
+  vendorWallet            VendorWallet?
+  vendorCustomers         VendorCustomer[]             @relation("VendorCustomerMapping")
+  priceLists              PriceList[]
+  priceHistory            PriceHistory[]
+  settlements             VendorSettlement[]
+  promotions              Promotion[]
+  customerTasks           VendorCustomerTask[]
+  customerPrices          VendorCustomerPrice[]
+  salespersons            Salesperson[]
+  commissionRules         CommissionRule[]
+  commissionAccruals      CommissionAccrual[]
+  coupons                 Coupon[]
+  cashbackCampaigns       CashbackCampaign[]
+  customerGroups          CustomerGroup[]
+  combos                  ProductCombo[]
+  brandAuthorizations     BrandAuthorizedDistributor[]
+  picklists               Picklist[]
+  dispatches              Dispatch[]
+  goodsReceipts           GoodsReceipt[]
+  stockTransfers          StockTransfer[]
+  fulfilments             Fulfilment[]
+  deliveryResources       DeliveryResource[]
   deliveryBoyAccessTokens DeliveryBoyAccessToken[]
-  storeScopedRoles    UserRole[]          @relation("UserRoleOnlineStore")
+  storeScopedRoles        UserRole[]                   @relation("UserRoleOnlineStore")
 
   // Ordering defaults applied to new products and checkout
-  defaultMOQ          Int?      @map("default_moq")
-  defaultTaxPercent   Decimal?  @map("default_tax_percent") @db.Decimal(5, 2)
-  deliveryFee         Decimal?  @map("delivery_fee") @db.Decimal(10, 2)
-  freeDeliveryAbove   Decimal?  @map("free_delivery_above") @db.Decimal(10, 2)
-  returnPolicy        String?   @map("return_policy") @db.Text
-  cancellationPolicy  String?   @map("cancellation_policy") @db.Text
+  defaultMOQ         Int?     @map("default_moq")
+  defaultTaxPercent  Decimal? @map("default_tax_percent") @db.Decimal(5, 2)
+  deliveryFee        Decimal? @map("delivery_fee") @db.Decimal(10, 2)
+  freeDeliveryAbove  Decimal? @map("free_delivery_above") @db.Decimal(10, 2)
+  returnPolicy       String?  @map("return_policy") @db.Text
+  cancellationPolicy String?  @map("cancellation_policy") @db.Text
 
   // Bank account details for settlements
-  bankAccountName   String?  @map("bank_account_name") @db.VarChar(100)
-  bankAccountNumber String?  @map("bank_account_number") @db.VarChar(30)
-  bankIfsc          String?  @map("bank_ifsc") @db.VarChar(15)
-  bankName          String?  @map("bank_name") @db.VarChar(100)
-  bankAccountType   String?  @map("bank_account_type") @db.VarChar(20)
+  bankAccountName   String? @map("bank_account_name") @db.VarChar(100)
+  bankAccountNumber String? @map("bank_account_number") @db.VarChar(30)
+  bankIfsc          String? @map("bank_ifsc") @db.VarChar(15)
+  bankName          String? @map("bank_name") @db.VarChar(100)
+  bankAccountType   String? @map("bank_account_type") @db.VarChar(20)
 
   // Enabled payment modes: cod, prepaid, credit, cheque, discco
-  paymentModes      String[] @default([]) @map("payment_modes")
+  paymentModes String[] @default([]) @map("payment_modes")
 
   // Per-event per-channel notification preferences JSON
-  notificationPrefs Json     @default("{}") @map("notification_prefs")
+  notificationPrefs Json @default("{}") @map("notification_prefs")
 
   // Onboarding wizard fields (collected at /vendor/register)
-  tradeName             String?  @map("trade_name") @db.VarChar(255)
-  vendorType            String?  @map("vendor_type") @db.VarChar(50)
-  setupProgress         Json?    @map("setup_progress")
+  tradeName             String? @map("trade_name") @db.VarChar(255)
+  vendorType            String? @map("vendor_type") @db.VarChar(50)
+  setupProgress         Json?   @map("setup_progress")
   // Supplier Foundation: Online Store is the stock unit — multi-warehouse retired.
-  multiWarehouseEnabled Boolean  @default(false) @map("multi_warehouse_enabled")
-  autoDisableOos        Boolean  @default(false) @map("auto_disable_oos")
-  panNumber             String?  @map("pan_number") @db.VarChar(20)
-  authorizedPersonName  String?  @map("authorized_person_name") @db.VarChar(255)
-  authorizedPersonPhone String?  @map("authorized_person_phone") @db.VarChar(20)
-  authorizedPersonEmail String?  @map("authorized_person_email") @db.VarChar(255)
-  pickupAddressLine     String?  @map("pickup_address_line") @db.Text
-  pickupCity            String?  @map("pickup_city") @db.VarChar(100)
-  pickupState           String?  @map("pickup_state") @db.VarChar(100)
-  pickupPincode         String?  @map("pickup_pincode") @db.VarChar(10)
-  deliveryCapability    String?  @map("delivery_capability") @db.VarChar(20)
-  fssaiNumber           String?  @map("fssai_number") @db.VarChar(50)
-  udyamNumber           String?  @map("udyam_number") @db.VarChar(50)
-  cinNumber             String?  @map("cin_number") @db.VarChar(50)
+  multiWarehouseEnabled Boolean @default(false) @map("multi_warehouse_enabled")
+  autoDisableOos        Boolean @default(false) @map("auto_disable_oos")
+  panNumber             String? @map("pan_number") @db.VarChar(20)
+  authorizedPersonName  String? @map("authorized_person_name") @db.VarChar(255)
+  authorizedPersonPhone String? @map("authorized_person_phone") @db.VarChar(20)
+  authorizedPersonEmail String? @map("authorized_person_email") @db.VarChar(255)
+  pickupAddressLine     String? @map("pickup_address_line") @db.Text
+  pickupCity            String? @map("pickup_city") @db.VarChar(100)
+  pickupState           String? @map("pickup_state") @db.VarChar(100)
+  pickupPincode         String? @map("pickup_pincode") @db.VarChar(10)
+  deliveryCapability    String? @map("delivery_capability") @db.VarChar(20)
+  fssaiNumber           String? @map("fssai_number") @db.VarChar(50)
+  udyamNumber           String? @map("udyam_number") @db.VarChar(50)
+  cinNumber             String? @map("cin_number") @db.VarChar(50)
 
   // Profile Mastersheet — Tier A onboarding (CSV rows 13–20, attribute master 72–83)
-  subType               String?   @map("sub_type") @db.VarChar(80)
-  vendorTypeSelections  Json?     @map("vendor_type_selections")
-  categoriesHandled     String[]  @default([]) @map("categories_handled")
-  businessSize          String?   @map("business_size") @db.VarChar(50)
-  coverage              String?   @db.VarChar(120)
-  warehouseCount        Int?      @map("warehouse_count")
-  deliveryFleet         Boolean?  @map("delivery_fleet")
-  monthlySupplyBand     String?   @map("monthly_supply_band") @db.VarChar(50)
+  subType              String?  @map("sub_type") @db.VarChar(80)
+  vendorTypeSelections Json?    @map("vendor_type_selections")
+  categoriesHandled    String[] @default([]) @map("categories_handled")
+  businessSize         String?  @map("business_size") @db.VarChar(50)
+  coverage             String?  @db.VarChar(120)
+  warehouseCount       Int?     @map("warehouse_count")
+  deliveryFleet        Boolean? @map("delivery_fleet")
+  monthlySupplyBand    String?  @map("monthly_supply_band") @db.VarChar(50)
 
   @@index([slug])
   @@index([isActive])
@@ -360,14 +369,14 @@ model DeliverySlot {
 }
 
 model CustomerVendor {
-  id            String    @id @default(uuid()) @db.Uuid
-  userId        String    @map("user_id") @db.Uuid
-  vendorId      String    @map("vendor_id") @db.Uuid
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  vendorId          String    @map("vendor_id") @db.Uuid
   // V2.2: ownership shifted to (businessAccountId, vendorId). Legacy unique replaced in Step C.
-  businessAccountId String @map("business_account_id") @db.Uuid
-  isFavorite    Boolean   @default(false) @map("is_favorite")
-  lastOrderedAt DateTime? @map("last_ordered_at") @db.Timestamptz
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  businessAccountId String    @map("business_account_id") @db.Uuid
+  isFavorite        Boolean   @default(false) @map("is_favorite")
+  lastOrderedAt     DateTime? @map("last_ordered_at") @db.Timestamptz
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   vendor          Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
@@ -383,12 +392,12 @@ model CustomerVendor {
 // ═══ CATALOG ═════════════════════════════════════════
 
 model Category {
-  id        String     @id @default(uuid()) @db.Uuid
-  name      String     @db.VarChar(255)
-  slug      String     @unique @db.VarChar(255)
-  parentId  String?    @map("parent_id") @db.Uuid
-  imageUrl  String?    @map("image_url") @db.VarChar(512)
-  sortOrder Int        @default(0) @map("sort_order")
+  id             String         @id @default(uuid()) @db.Uuid
+  name           String         @db.VarChar(255)
+  slug           String         @unique @db.VarChar(255)
+  parentId       String?        @map("parent_id") @db.Uuid
+  imageUrl       String?        @map("image_url") @db.VarChar(512)
+  sortOrder      Int            @default(0) @map("sort_order")
   isActive       Boolean        @default(true) @map("is_active")
   approvalStatus ApprovalStatus @default(approved) @map("approval_status")
   approvalNote   String?        @map("approval_note") @db.Text
@@ -397,16 +406,16 @@ model Category {
   suggestedBy    String?        @map("suggested_by") @db.Uuid
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
 
-  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children Category[] @relation("CategoryTree")
-  products Product[]
-  productLinks ProductCategory[]
+  parent              Category?               @relation("CategoryTree", fields: [parentId], references: [id])
+  children            Category[]              @relation("CategoryTree")
+  products            Product[]
+  productLinks        ProductCategory[]
   brandMasterProducts BrandMasterProduct[]
-  masterProducts MasterProduct[]
+  masterProducts      MasterProduct[]
   // M2M: a sub-category may belong to multiple parent categories.
-  parentLinks      CategoryCategory[] @relation("SubCategoryParents")
-  subCategoryLinks CategoryCategory[] @relation("ParentSubCategories")
-  masterProductLinks MasterProductCategory[]
+  parentLinks         CategoryCategory[]      @relation("SubCategoryParents")
+  subCategoryLinks    CategoryCategory[]      @relation("ParentSubCategories")
+  masterProductLinks  MasterProductCategory[]
 
   @@index([parentId])
   @@index([slug])
@@ -430,64 +439,64 @@ model CategoryCategory {
 }
 
 model Product {
-  id              String   @id @default(uuid()) @db.Uuid
-  vendorId        String?  @map("vendor_id") @db.Uuid
-  categoryId      String?  @map("category_id") @db.Uuid
+  id                 String         @id @default(uuid()) @db.Uuid
+  vendorId           String?        @map("vendor_id") @db.Uuid
+  categoryId         String?        @map("category_id") @db.Uuid
   // Central "Horeca1 SKU" master this vendor listing maps to. Column is nullable
   // at the DB level during the backfill window; presence is enforced at the
   // application layer (Zod + catalog.service) so every new product picks a master.
   // A follow-up migration flips this to NOT NULL once backfill verifies 0 nulls.
-  masterProductId String?  @map("master_product_id") @db.Uuid
-  name            String   @db.VarChar(255)
-  slug            String   @db.VarChar(255)
-  description     String?  @db.Text
-  imageUrl        String?  @map("image_url") @db.VarChar(512)
-  images          String[] @default([]) @map("images")
-  packSize        String?  @map("pack_size") @db.VarChar(100)
-  unit            String?  @db.VarChar(50)
-  sku             String?  @db.VarChar(100)
+  masterProductId    String?        @map("master_product_id") @db.Uuid
+  name               String         @db.VarChar(255)
+  slug               String         @db.VarChar(255)
+  description        String?        @db.Text
+  imageUrl           String?        @map("image_url") @db.VarChar(512)
+  images             String[]       @default([]) @map("images")
+  packSize           String?        @map("pack_size") @db.VarChar(100)
+  unit               String?        @db.VarChar(50)
+  sku                String?        @db.VarChar(100)
   // Raw POS code without vendor prefix; `sku` stores `{vendorCode}-{vendorSku}`.
-  vendorSku       String?  @map("vendor_sku") @db.VarChar(100)
-  hsn             String?  @db.VarChar(50)
-  fssaiRef        String?  @map("fssai_ref") @db.VarChar(50)
-  brand           String?  @db.VarChar(150)
-  barcode         String?  @db.VarChar(100)
-  tags            String[] @default([]) @map("tags")
-  aliasNames      String[] @default([]) @map("alias_names")
-  shelfLifeDays   Int?     @map("shelf_life_days")
-  countryOfOrigin String?  @map("country_of_origin") @db.VarChar(100)
-  basePrice       Decimal  @map("base_price") @db.Decimal(10, 2)       // Taxable rate (before tax)
-  originalPrice   Decimal? @map("original_price") @db.Decimal(10, 2)  // MRP / strikethrough price
-  taxPercent      Decimal  @default(0) @map("tax_percent") @db.Decimal(5, 2)
-  promoPrice      Decimal? @map("promo_price") @db.Decimal(10, 2)     // Promo taxable rate (single unit)
-  promoStartTime  String?  @map("promo_start_time") @db.VarChar(5)    // HH:mm format e.g. "18:00"
-  promoEndTime    String?  @map("promo_end_time") @db.VarChar(5)      // HH:mm format e.g. "09:00"
-  minOrderQty     Int      @default(1) @map("min_order_qty")
-  vegNonVeg       VegType?       @map("veg_non_veg")
-  storageType     String?        @map("storage_type") @db.VarChar(50)
-  substituteIds   String[]       @default([]) @map("substitute_ids") @db.Uuid
-  creditEligible  Boolean        @default(false) @map("credit_eligible")
-  isFeatured      Boolean        @default(false) @map("is_featured")
-  isActive        Boolean        @default(true) @map("is_active")
-  listingStatus   ListingStatus  @default(submitted) @map("listing_status")
-  approvalStatus  ApprovalStatus @default(pending) @map("approval_status")
-  approvalNote    String?        @map("approval_note") @db.Text
-  approvedBy      String?        @map("approved_by") @db.Uuid
-  approvedAt      DateTime?      @map("approved_at") @db.Timestamptz
-  pendingEditPayload Json?       @map("pending_edit_payload")
+  vendorSku          String?        @map("vendor_sku") @db.VarChar(100)
+  hsn                String?        @db.VarChar(50)
+  fssaiRef           String?        @map("fssai_ref") @db.VarChar(50)
+  brand              String?        @db.VarChar(150)
+  barcode            String?        @db.VarChar(100)
+  tags               String[]       @default([]) @map("tags")
+  aliasNames         String[]       @default([]) @map("alias_names")
+  shelfLifeDays      Int?           @map("shelf_life_days")
+  countryOfOrigin    String?        @map("country_of_origin") @db.VarChar(100)
+  basePrice          Decimal        @map("base_price") @db.Decimal(10, 2) // Taxable rate (before tax)
+  originalPrice      Decimal?       @map("original_price") @db.Decimal(10, 2) // MRP / strikethrough price
+  taxPercent         Decimal        @default(0) @map("tax_percent") @db.Decimal(5, 2)
+  promoPrice         Decimal?       @map("promo_price") @db.Decimal(10, 2) // Promo taxable rate (single unit)
+  promoStartTime     String?        @map("promo_start_time") @db.VarChar(5) // HH:mm format e.g. "18:00"
+  promoEndTime       String?        @map("promo_end_time") @db.VarChar(5) // HH:mm format e.g. "09:00"
+  minOrderQty        Int            @default(1) @map("min_order_qty")
+  vegNonVeg          VegType?       @map("veg_non_veg")
+  storageType        String?        @map("storage_type") @db.VarChar(50)
+  substituteIds      String[]       @default([]) @map("substitute_ids") @db.Uuid
+  creditEligible     Boolean        @default(false) @map("credit_eligible")
+  isFeatured         Boolean        @default(false) @map("is_featured")
+  isActive           Boolean        @default(true) @map("is_active")
+  listingStatus      ListingStatus  @default(submitted) @map("listing_status")
+  approvalStatus     ApprovalStatus @default(pending) @map("approval_status")
+  approvalNote       String?        @map("approval_note") @db.Text
+  approvedBy         String?        @map("approved_by") @db.Uuid
+  approvedAt         DateTime?      @map("approved_at") @db.Timestamptz
+  pendingEditPayload Json?          @map("pending_edit_payload")
   metadata           Json?          @default("{}")
-  archivedAt      DateTime?      @map("archived_at") @db.Timestamptz
+  archivedAt         DateTime?      @map("archived_at") @db.Timestamptz
   // Embedding for AI-assisted brand mapping (Phase 3). Empty array = not yet embedded.
   // embeddingModel records which provider+model produced the vector so we know when to re-embed.
-  embedding       Float[]        @default([]) @map("embedding")
-  embeddingModel  String?        @map("embedding_model") @db.VarChar(80)
-  embeddingUpdatedAt DateTime?   @map("embedding_updated_at") @db.Timestamptz
-  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  embedding          Float[]        @default([]) @map("embedding")
+  embeddingModel     String?        @map("embedding_model") @db.VarChar(80)
+  embeddingUpdatedAt DateTime?      @map("embedding_updated_at") @db.Timestamptz
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  vendor              Vendor?              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  category            Category?            @relation(fields: [categoryId], references: [id])
-  masterProduct       MasterProduct?       @relation("MasterToVendorProduct", fields: [masterProductId], references: [id], onDelete: Restrict)
+  vendor              Vendor?               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  category            Category?             @relation(fields: [categoryId], references: [id])
+  masterProduct       MasterProduct?        @relation("MasterToVendorProduct", fields: [masterProductId], references: [id], onDelete: Restrict)
   categoryLinks       ProductCategory[]
   priceSlabs          PriceSlab[]
   inventories         Inventory[]
@@ -497,8 +506,8 @@ model Product {
   collectionProducts  CollectionProduct[]
   brandMappings       BrandProductMapping[]
   priceListItems      PriceListItem[]
-  promoBuyRules       Promotion[]     @relation("PromoBuyProduct")
-  promoGetRules       Promotion[]     @relation("PromoGetProduct")
+  promoBuyRules       Promotion[]           @relation("PromoBuyProduct")
+  promoGetRules       Promotion[]           @relation("PromoGetProduct")
   customerPrices      VendorCustomerPrice[]
   comboItems          ComboItem[]
   auditLogs           ProductAuditLog[]
@@ -565,7 +574,7 @@ model PriceHistory {
   newValue    String?  @map("new_value") @db.Text
   source      String   @db.VarChar(32)
   reason      String?  @db.VarChar(200)
-  changedBy  String?  @map("changed_by") @db.Uuid
+  changedBy   String?  @map("changed_by") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   vendor    Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
@@ -603,31 +612,31 @@ model MasterProductRevision {
 // to NOT NULL by a follow-up migration). `categoryId` MUST be a leaf (level-2)
 // sub-category — enforced by assertLeafCategory in catalog.service.ts.
 model MasterProduct {
-  id             String   @id @default(uuid()) @db.Uuid
-  sku            String   @unique @db.VarChar(40)              // Admin-entered canonical SKU (e.g. RIC-BAS-001)
-  name           String   @db.VarChar(255)
-  aliasNames     String[] @default([]) @map("alias_names")
-  brand          String?  @db.VarChar(150)
-  packSize       String?  @map("pack_size") @db.VarChar(100)
-  uom            String?  @db.VarChar(50)
-  taxPercent     Decimal  @default(0) @map("tax_percent") @db.Decimal(5, 2)
-  imageUrl       String?  @map("image_url") @db.VarChar(512)
-  images         String[] @default([]) @map("images")
-  searchKeywords String[] @default([]) @map("search_keywords")
-  categoryId     String   @map("category_id") @db.Uuid
-  isActive       Boolean  @default(true) @map("is_active")
+  id             String         @id @default(uuid()) @db.Uuid
+  sku            String         @unique @db.VarChar(40) // Admin-entered canonical SKU (e.g. RIC-BAS-001)
+  name           String         @db.VarChar(255)
+  aliasNames     String[]       @default([]) @map("alias_names")
+  brand          String?        @db.VarChar(150)
+  packSize       String?        @map("pack_size") @db.VarChar(100)
+  uom            String?        @db.VarChar(50)
+  taxPercent     Decimal        @default(0) @map("tax_percent") @db.Decimal(5, 2)
+  imageUrl       String?        @map("image_url") @db.VarChar(512)
+  images         String[]       @default([]) @map("images")
+  searchKeywords String[]       @default([]) @map("search_keywords")
+  categoryId     String         @map("category_id") @db.Uuid
+  isActive       Boolean        @default(true) @map("is_active")
   approvalStatus ApprovalStatus @default(approved) @map("approval_status")
   approvalNote   String?        @map("approval_note") @db.Text
   approvedBy     String?        @map("approved_by") @db.Uuid
   approvedAt     DateTime?      @map("approved_at") @db.Timestamptz
   suggestedBy    String?        @map("suggested_by") @db.Uuid
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-  metadata       Json?    @default("{}")
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  metadata       Json?          @default("{}")
 
-  category            Category             @relation(fields: [categoryId], references: [id])
+  category            Category                @relation(fields: [categoryId], references: [id])
   categoryLinks       MasterProductCategory[]
-  vendorProducts      Product[]            @relation("MasterToVendorProduct")
+  vendorProducts      Product[]               @relation("MasterToVendorProduct")
   brandMasterProducts BrandMasterProduct[]
   revisions           MasterProductRevision[]
 
@@ -660,7 +669,7 @@ model PriceSlab {
   vendorId   String   @map("vendor_id") @db.Uuid
   minQty     Int      @map("min_qty")
   maxQty     Int?     @map("max_qty")
-  price      Decimal  @db.Decimal(10, 2)            // Regular taxable rate per unit
+  price      Decimal  @db.Decimal(10, 2) // Regular taxable rate per unit
   promoPrice Decimal? @map("promo_price") @db.Decimal(10, 2) // Promo taxable rate per unit
   sortOrder  Int      @default(0) @map("sort_order")
 
@@ -708,17 +717,17 @@ model CollectionProduct {
 // taxable bundle rate; originalPrice (optional) is the summed list price for a
 // strikethrough. Optional validity window gates when the combo is live.
 model ProductCombo {
-  id            String   @id @default(uuid()) @db.Uuid
-  vendorId      String   @map("vendor_id") @db.Uuid
-  name          String   @db.VarChar(255)
-  comboPrice    Decimal  @map("combo_price") @db.Decimal(10, 2)
-  originalPrice Decimal? @map("original_price") @db.Decimal(10, 2)
-  imageUrl      String?  @map("image_url") @db.VarChar(512)
-  isActive      Boolean  @default(true) @map("is_active")
+  id            String    @id @default(uuid()) @db.Uuid
+  vendorId      String    @map("vendor_id") @db.Uuid
+  name          String    @db.VarChar(255)
+  comboPrice    Decimal   @map("combo_price") @db.Decimal(10, 2)
+  originalPrice Decimal?  @map("original_price") @db.Decimal(10, 2)
+  imageUrl      String?   @map("image_url") @db.VarChar(512)
+  isActive      Boolean   @default(true) @map("is_active")
   validFrom     DateTime? @map("valid_from") @db.Timestamptz
   validTo       DateTime? @map("valid_to") @db.Timestamptz
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   vendor Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   items  ComboItem[]
@@ -771,12 +780,12 @@ model Inventory {
 // ═══ CART ═════════════════════════════════════════════
 
 model Cart {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
   // V2.2: cart re-keyed to (userId, businessAccountId, outletId). NOT NULL + composite unique after Step C.
-  businessAccountId String @map("business_account_id") @db.Uuid
-  outletId          String @map("outlet_id") @db.Uuid
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  businessAccountId String   @map("business_account_id") @db.Uuid
+  outletId          String   @map("outlet_id") @db.Uuid
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   user            User            @relation(fields: [userId], references: [id])
   businessAccount BusinessAccount @relation(fields: [businessAccountId], references: [id])
@@ -809,85 +818,90 @@ model CartItem {
 // ═══ ORDERS ══════════════════════════════════════════
 
 model Order {
-  id             String       @id @default(uuid()) @db.Uuid
-  orderNumber    String       @unique @map("order_number") @db.VarChar(50)
-  userId         String       @map("user_id") @db.Uuid
-  vendorId       String       @map("vendor_id") @db.Uuid
+  id                        String       @id @default(uuid()) @db.Uuid
+  orderNumber               String       @unique @map("order_number") @db.VarChar(50)
+  userId                    String       @map("user_id") @db.Uuid
+  vendorId                  String       @map("vendor_id") @db.Uuid
   // V2.2: outlet-stamped order with snapshotted delivery address. NOT NULL after Step C.
-  businessAccountId        String @map("business_account_id") @db.Uuid
-  outletId                 String @map("outlet_id") @db.Uuid
+  businessAccountId         String       @map("business_account_id") @db.Uuid
+  outletId                  String       @map("outlet_id") @db.Uuid
   // Vendor warehouse that fulfills this order (may differ from customer delivery outlet).
-  fulfillmentOutletId      String? @map("fulfillment_outlet_id") @db.Uuid
-  deliveryAddressSnapshot  Json   @map("delivery_address_snapshot")
-  status         OrderStatus  @default(pending)
-  subtotal       Decimal      @db.Decimal(12, 2)
-  promoDiscount  Decimal      @default(0) @map("promo_discount") @db.Decimal(10, 2)
-  promotionId    String?      @map("promotion_id") @db.Uuid
+  fulfillmentOutletId       String?      @map("fulfillment_outlet_id") @db.Uuid
+  deliveryAddressSnapshot   Json         @map("delivery_address_snapshot")
+  status                    OrderStatus  @default(pending)
+  subtotal                  Decimal      @db.Decimal(12, 2)
+  promoDiscount             Decimal      @default(0) @map("promo_discount") @db.Decimal(10, 2)
+  promotionId               String?      @map("promotion_id") @db.Uuid
   // Promo Engine Phase 1 — coupon applied at checkout (code snapshotted so the
   // order history survives coupon deletion) + prepaid-wallet amount redeemed.
-  couponId       String?      @map("coupon_id") @db.Uuid
-  couponCode     String?      @map("coupon_code") @db.VarChar(40)
-  couponDiscount Decimal      @default(0) @map("coupon_discount") @db.Decimal(10, 2)
-  walletApplied  Decimal      @default(0) @map("wallet_applied") @db.Decimal(12, 2)
-  taxAmount      Decimal      @default(0) @map("tax_amount") @db.Decimal(12, 2)
-  totalAmount    Decimal      @map("total_amount") @db.Decimal(12, 2)
-  paymentMethod  String?      @map("payment_method") @db.VarChar(30)
-  paymentStatus  PaymentState @default(unpaid) @map("payment_status")
-  deliverySlotId String?      @map("delivery_slot_id") @db.Uuid
-  deliveryDate   DateTime?    @map("delivery_date") @db.Date
-  notes              String?      @db.Text
-  rejectionReason    String?      @map("rejection_reason") @db.Text
-  acceptedAt         DateTime?    @map("accepted_at") @db.Timestamptz
-  rejectedAt         DateTime?    @map("rejected_at") @db.Timestamptz
-  isPartial          Boolean      @default(false) @map("is_partial")
-  deliveryProofType  String?      @map("delivery_proof_type") @db.VarChar(20)
-  deliveryProofUrl   String?      @map("delivery_proof_url") @db.Text
-  deliveryNotes      String?      @map("delivery_notes") @db.Text
-  customerDeleted    Boolean      @default(false) @map("customer_deleted")
+  couponId                  String?      @map("coupon_id") @db.Uuid
+  couponCode                String?      @map("coupon_code") @db.VarChar(40)
+  couponDiscount            Decimal      @default(0) @map("coupon_discount") @db.Decimal(10, 2)
+  walletApplied             Decimal      @default(0) @map("wallet_applied") @db.Decimal(12, 2)
+  // Groups every PO created in the same checkout so cashback can be evaluated
+  // once for the whole cart (Rule 5) and settlement can recompute from remaining
+  // non-cancelled siblings. Null on orders placed before this column existed.
+  checkoutGroupId           String?      @map("checkout_group_id") @db.Uuid
+  taxAmount                 Decimal      @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  totalAmount               Decimal      @map("total_amount") @db.Decimal(12, 2)
+  paymentMethod             String?      @map("payment_method") @db.VarChar(30)
+  paymentStatus             PaymentState @default(unpaid) @map("payment_status")
+  deliverySlotId            String?      @map("delivery_slot_id") @db.Uuid
+  deliveryDate              DateTime?    @map("delivery_date") @db.Date
+  notes                     String?      @db.Text
+  rejectionReason           String?      @map("rejection_reason") @db.Text
+  acceptedAt                DateTime?    @map("accepted_at") @db.Timestamptz
+  rejectedAt                DateTime?    @map("rejected_at") @db.Timestamptz
+  isPartial                 Boolean      @default(false) @map("is_partial")
+  deliveryProofType         String?      @map("delivery_proof_type") @db.VarChar(20)
+  deliveryProofUrl          String?      @map("delivery_proof_url") @db.Text
+  deliveryNotes             String?      @map("delivery_notes") @db.Text
+  customerDeleted           Boolean      @default(false) @map("customer_deleted")
   // V2.2 Phase 5 — delivery OTP proof. Generated when the order goes out for
   // delivery, sent to the customer, and verified on the delivered transition
   // when proofType='otp'. Fully optional — alternate proof types ignore these.
-  deliveryOtp           String?   @map("delivery_otp") @db.VarChar(6)
-  deliveryOtpExpiresAt  DateTime? @map("delivery_otp_expires_at") @db.Timestamptz
-  deliveryOtpVerifiedAt DateTime? @map("delivery_otp_verified_at") @db.Timestamptz
-  deliveredAt        DateTime?    @map("delivered_at") @db.Timestamptz
-  ewayBillNo         String?      @map("eway_bill_no") @db.VarChar(30)
+  deliveryOtp               String?      @map("delivery_otp") @db.VarChar(6)
+  deliveryOtpExpiresAt      DateTime?    @map("delivery_otp_expires_at") @db.Timestamptz
+  deliveryOtpVerifiedAt     DateTime?    @map("delivery_otp_verified_at") @db.Timestamptz
+  deliveredAt               DateTime?    @map("delivered_at") @db.Timestamptz
+  ewayBillNo                String?      @map("eway_bill_no") @db.VarChar(30)
   // V2.2 Phase 1 — salesman attribution. Snapshotted at order creation
   // so commission survives reassignment of the customer's salesperson later.
-  salespersonId      String?      @map("salesperson_id") @db.Uuid
+  salespersonId             String?      @map("salesperson_id") @db.Uuid
   // Settlement snapshot — written once at delivery; never recomputed
-  settlementGrossAmount Decimal? @map("settlement_gross_amount") @db.Decimal(12, 2)
-  settlementPlatformFeePct Decimal? @map("settlement_platform_fee_pct") @db.Decimal(5, 2)
-  settlementPlatformFee Decimal? @map("settlement_platform_fee") @db.Decimal(12, 2)
-  settlementGatewayFee Decimal? @map("settlement_gateway_fee") @db.Decimal(12, 2)
-  settlementNetVendorAmount Decimal? @map("settlement_net_vendor_amount") @db.Decimal(12, 2)
-  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  settlementGrossAmount     Decimal?     @map("settlement_gross_amount") @db.Decimal(12, 2)
+  settlementPlatformFeePct  Decimal?     @map("settlement_platform_fee_pct") @db.Decimal(5, 2)
+  settlementPlatformFee     Decimal?     @map("settlement_platform_fee") @db.Decimal(12, 2)
+  settlementGatewayFee      Decimal?     @map("settlement_gateway_fee") @db.Decimal(12, 2)
+  settlementNetVendorAmount Decimal?     @map("settlement_net_vendor_amount") @db.Decimal(12, 2)
+  createdAt                 DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                 DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  user            User            @relation(fields: [userId], references: [id])
-  vendor          Vendor          @relation(fields: [vendorId], references: [id])
-  promotion       Promotion?      @relation(fields: [promotionId], references: [id])
-  coupon          Coupon?         @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  couponRedemption CouponRedemption?
-  cashbackEntry   CashbackEntry?
-  businessAccount BusinessAccount @relation(fields: [businessAccountId], references: [id])
-  outlet          Outlet          @relation(fields: [outletId], references: [id])
-  fulfillmentOutlet Outlet?       @relation("OrderFulfillmentOutlet", fields: [fulfillmentOutletId], references: [id], onDelete: SetNull)
-  deliverySlot    DeliverySlot?   @relation(fields: [deliverySlotId], references: [id])
-  salesperson     Salesperson?    @relation(fields: [salespersonId], references: [id], onDelete: SetNull)
-  items          OrderItem[]
-  payments       Payment[]
-  creditTxns     CreditTransaction[]
-  review         Review?
-  returnRequests ReturnRequest[]
-  replacementReturns ReturnRequest[] @relation("ReturnReplacementOrder")
-  commissionAccruals CommissionAccrual[]
-  picklists          Picklist[]
-  dispatches         Dispatch[]
-  events             OrderEvent[]
-  cancelRequest      CancelRequest?
-  shipments          OrderShipment[]
-  fulfilment         Fulfilment?
+  user                 User                  @relation(fields: [userId], references: [id])
+  vendor               Vendor                @relation(fields: [vendorId], references: [id])
+  promotion            Promotion?            @relation(fields: [promotionId], references: [id])
+  coupon               Coupon?               @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponRedemption     CouponRedemption?
+  cashbackEntry        CashbackEntry?
+  firstOrderGrant      FirstOrderGrant?
+  businessAccount      BusinessAccount       @relation(fields: [businessAccountId], references: [id])
+  outlet               Outlet                @relation(fields: [outletId], references: [id])
+  fulfillmentOutlet    Outlet?               @relation("OrderFulfillmentOutlet", fields: [fulfillmentOutletId], references: [id], onDelete: SetNull)
+  deliverySlot         DeliverySlot?         @relation(fields: [deliverySlotId], references: [id])
+  salesperson          Salesperson?          @relation(fields: [salespersonId], references: [id], onDelete: SetNull)
+  items                OrderItem[]
+  payments             Payment[]
+  creditTxns           CreditTransaction[]
+  review               Review?
+  returnRequests       ReturnRequest[]
+  replacementReturns   ReturnRequest[]       @relation("ReturnReplacementOrder")
+  commissionAccruals   CommissionAccrual[]
+  picklists            Picklist[]
+  dispatches           Dispatch[]
+  events               OrderEvent[]
+  cancelRequest        CancelRequest?
+  shipments            OrderShipment[]
+  fulfilment           Fulfilment?
   deliveryAccessTokens DeliveryAccessToken[]
 
   @@index([userId])
@@ -897,6 +911,7 @@ model Order {
   @@index([fulfillmentOutletId])
   @@index([status])
   @@index([salespersonId])
+  @@index([checkoutGroupId])
   @@index([createdAt(sort: Desc)])
   @@map("orders")
 }
@@ -940,15 +955,15 @@ model CancelRequest {
 }
 
 enum OrderStatus {
-  draft               // V2.2 Phase 5 — saved PO, not yet submitted (no reservation)
+  draft // V2.2 Phase 5 — saved PO, not yet submitted (no reservation)
   pending
   confirmed
   processing
-  ready_for_dispatch  // V2.2 Phase 5 — packed, awaiting pickup
+  ready_for_dispatch // V2.2 Phase 5 — packed, awaiting pickup
   shipped
   partially_delivered // V2.2 Phase 5 — some lines delivered, balance pending
   delivered
-  returned            // V2.2 Phase 5 — goods returned after delivery
+  returned // V2.2 Phase 5 — goods returned after delivery
   cancelled
 }
 
@@ -960,10 +975,10 @@ enum PaymentState {
 }
 
 model OrderItem {
-  id          String  @id @default(uuid()) @db.Uuid
-  orderId     String  @map("order_id") @db.Uuid
-  productId   String  @map("product_id") @db.Uuid
-  productName  String  @map("product_name") @db.VarChar(255)
+  id           String   @id @default(uuid()) @db.Uuid
+  orderId      String   @map("order_id") @db.Uuid
+  productId    String   @map("product_id") @db.Uuid
+  productName  String   @map("product_name") @db.VarChar(255)
   // Snapshotted at order time — invoices/orders use these, not live product fields.
   productSku   String?  @map("product_sku") @db.VarChar(100)
   hsn          String?  @db.VarChar(50)
@@ -972,15 +987,15 @@ model OrderItem {
   categoryName String?  @map("category_name") @db.VarChar(255)
   taxPercent   Decimal? @map("tax_percent") @db.Decimal(5, 2)
   quantity     Int
-  fulfilledQty Int     @default(0) @map("fulfilled_qty")
+  fulfilledQty Int      @default(0) @map("fulfilled_qty")
   // Backorder — qty that will never ship. balance = quantity - fulfilledQty - cancelledQty
-  cancelledQty Int     @default(0) @map("cancelled_qty")
-  unitPrice    Decimal @map("unit_price") @db.Decimal(10, 2)
-  totalPrice   Decimal @map("total_price") @db.Decimal(12, 2)
+  cancelledQty Int      @default(0) @map("cancelled_qty")
+  unitPrice    Decimal  @map("unit_price") @db.Decimal(10, 2)
+  totalPrice   Decimal  @map("total_price") @db.Decimal(12, 2)
 
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
-  shipmentItems OrderShipmentItem[]
+  order           Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product             @relation(fields: [productId], references: [id])
+  shipmentItems   OrderShipmentItem[]
   fulfilmentItems FulfilmentItem[]
   returnItems     ReturnItem[]
 
@@ -988,17 +1003,19 @@ model OrderItem {
   @@map("order_items")
 }
 
-/** Partial-fulfillment shipment audit trail (Shipment 1, Shipment 2, …). */
+/**
+ * Partial-fulfillment shipment audit trail (Shipment 1, Shipment 2, …).
+ */
 model OrderShipment {
-  id          String   @id @default(uuid()) @db.Uuid
-  orderId     String   @map("order_id") @db.Uuid
-  shipmentNo  Int      @map("shipment_no")
-  actorId     String?  @map("actor_id") @db.Uuid
-  notes       String?  @db.Text
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id         String   @id @default(uuid()) @db.Uuid
+  orderId    String   @map("order_id") @db.Uuid
+  shipmentNo Int      @map("shipment_no")
+  actorId    String?  @map("actor_id") @db.Uuid
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  actor User? @relation("OrderShipmentActor", fields: [actorId], references: [id], onDelete: SetNull)
+  order Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actor User?               @relation("OrderShipmentActor", fields: [actorId], references: [id], onDelete: SetNull)
   items OrderShipmentItem[]
 
   @@unique([orderId, shipmentNo])
@@ -1007,10 +1024,10 @@ model OrderShipment {
 }
 
 model OrderShipmentItem {
-  id         String @id @default(uuid()) @db.Uuid
-  shipmentId String @map("shipment_id") @db.Uuid
+  id          String @id @default(uuid()) @db.Uuid
+  shipmentId  String @map("shipment_id") @db.Uuid
   orderItemId String @map("order_item_id") @db.Uuid
-  qty        Int
+  qty         Int
 
   shipment  OrderShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   orderItem OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
@@ -1027,7 +1044,7 @@ model Review {
   orderId   String   @unique @map("order_id") @db.Uuid
   userId    String   @map("user_id") @db.Uuid
   vendorId  String   @map("vendor_id") @db.Uuid
-  rating    Int      // 1–5 stars
+  rating    Int // 1–5 stars
   comment   String?  @db.Text
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
@@ -1043,18 +1060,18 @@ model Review {
 // ═══ QUICK ORDER LISTS ═══════════════════════════════
 
 model QuickOrderList {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  vendorId  String   @map("vendor_id") @db.Uuid
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  vendorId          String   @map("vendor_id") @db.Uuid
   // V2.2: scope = (businessAccountId, vendorId). userId stays as creator/audit metadata.
-  businessAccountId String @map("business_account_id") @db.Uuid
-  name      String   @db.VarChar(255)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  businessAccountId String   @map("business_account_id") @db.Uuid
+  name              String   @db.VarChar(255)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vendor          Vendor                 @relation(fields: [vendorId], references: [id])
-  businessAccount BusinessAccount        @relation(fields: [businessAccountId], references: [id])
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vendor          Vendor               @relation(fields: [vendorId], references: [id])
+  businessAccount BusinessAccount      @relation(fields: [businessAccountId], references: [id])
   items           QuickOrderListItem[]
 
   @@index([userId])
@@ -1280,56 +1297,56 @@ model GlobalCreditConfig {
 // H1 wallet per user — enforced by partial unique indexes in the migration (a Prisma
 // @@unique on a nullable column does NOT stop duplicate NULLs in Postgres).
 model CreditWallet {
-  id                    String              @id @default(uuid()) @db.Uuid
-  userId                String              @map("user_id") @db.Uuid
-  vendorId              String?             @map("vendor_id") @db.Uuid
-  status                CreditWalletStatus  @default(ACTIVE)
+  id       String             @id @default(uuid()) @db.Uuid
+  userId   String             @map("user_id") @db.Uuid
+  vendorId String?            @map("vendor_id") @db.Uuid
+  status   CreditWalletStatus @default(ACTIVE)
 
-  creditLimit           Decimal             @map("credit_limit") @db.Decimal(12, 2)
-  availableCredit       Decimal             @map("available_credit") @db.Decimal(12, 2)
-  usedCredit            Decimal             @default(0) @map("used_credit") @db.Decimal(12, 2)
-  outstandingAmount     Decimal             @default(0) @map("outstanding_amount") @db.Decimal(12, 2)
+  creditLimit       Decimal @map("credit_limit") @db.Decimal(12, 2)
+  availableCredit   Decimal @map("available_credit") @db.Decimal(12, 2)
+  usedCredit        Decimal @default(0) @map("used_credit") @db.Decimal(12, 2)
+  outstandingAmount Decimal @default(0) @map("outstanding_amount") @db.Decimal(12, 2)
 
   // Principal captured when the wallet first goes overdue — compound interest is
   // computed on (this + accrued interest), NOT on the live outstanding (which would
   // double-compound late fees + prior interest).
-  overdueBaseAmount     Decimal?            @map("overdue_base_amount") @db.Decimal(12, 2)
+  overdueBaseAmount Decimal? @map("overdue_base_amount") @db.Decimal(12, 2)
 
-  currentDueDate        DateTime?           @map("current_due_date") @db.Timestamptz
-  lastUtilizationDate   DateTime?           @map("last_utilization_date") @db.Timestamptz
-  overdueDays           Int                 @default(0) @map("overdue_days")
+  currentDueDate      DateTime? @map("current_due_date") @db.Timestamptz
+  lastUtilizationDate DateTime? @map("last_utilization_date") @db.Timestamptz
+  overdueDays         Int       @default(0) @map("overdue_days")
 
   // Manual reactivation with dues: scheduler must NOT immediately re-blacklist.
-  blacklistExempt       Boolean             @default(false) @map("blacklist_exempt")
-  blacklistedAt         DateTime?           @map("blacklisted_at") @db.Timestamptz
-  reactivatedAt         DateTime?           @map("reactivated_at") @db.Timestamptz
+  blacklistExempt Boolean   @default(false) @map("blacklist_exempt")
+  blacklistedAt   DateTime? @map("blacklisted_at") @db.Timestamptz
+  reactivatedAt   DateTime? @map("reactivated_at") @db.Timestamptz
 
-  overrideRepaymentMode   CreditRepaymentMode? @map("override_repayment_mode")
-  overrideBillingModel    BillingModelType?    @map("override_billing_model")
-  overrideCreditLimit     Decimal?            @map("override_credit_limit") @db.Decimal(12, 2)
-  overrideCreditTenure    Int?                @map("override_credit_tenure")
-  overrideGracePeriod     Int?                @map("override_grace_period")
-  overrideBlacklistDays   Int?                @map("override_blacklist_days")
-  overrideInterestRate    Decimal?            @map("override_interest_rate") @db.Decimal(6, 3)
-  overrideInterestFreqDays Int?               @map("override_interest_freq_days")
-  overridePenaltyAmount   Decimal?            @map("override_penalty_amount") @db.Decimal(12, 2)
-  overridePenaltyFreqDays Int?                @map("override_penalty_freq_days")
+  overrideRepaymentMode    CreditRepaymentMode? @map("override_repayment_mode")
+  overrideBillingModel     BillingModelType?    @map("override_billing_model")
+  overrideCreditLimit      Decimal?             @map("override_credit_limit") @db.Decimal(12, 2)
+  overrideCreditTenure     Int?                 @map("override_credit_tenure")
+  overrideGracePeriod      Int?                 @map("override_grace_period")
+  overrideBlacklistDays    Int?                 @map("override_blacklist_days")
+  overrideInterestRate     Decimal?             @map("override_interest_rate") @db.Decimal(6, 3)
+  overrideInterestFreqDays Int?                 @map("override_interest_freq_days")
+  overridePenaltyAmount    Decimal?             @map("override_penalty_amount") @db.Decimal(12, 2)
+  overridePenaltyFreqDays  Int?                 @map("override_penalty_freq_days")
 
   // Vendor CRM fields (workflow status is vendor-managed; runtime status is system-owned)
-  workflowStatus          CreditWorkflowStatus @default(IN_PROGRESS) @map("workflow_status")
-  assignedOwnerId         String?             @map("assigned_owner_id") @db.Uuid
-  vendorNotes             String?             @map("vendor_notes") @db.Text
+  workflowStatus  CreditWorkflowStatus @default(IN_PROGRESS) @map("workflow_status")
+  assignedOwnerId String?              @map("assigned_owner_id") @db.Uuid
+  vendorNotes     String?              @map("vendor_notes") @db.Text
 
-  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt             DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  user                  User                @relation(fields: [userId], references: [id])
-  vendor                Vendor?             @relation(fields: [vendorId], references: [id])
-  assignedOwner         VendorTeamMember?   @relation("CreditWalletOwner", fields: [assignedOwnerId], references: [id], onDelete: SetNull)
-  transactions          CreditWalletTxn[]
-  repayments            CreditWalletRepayment[]
-  penalties             CreditWalletPenalty[]
-  auditLogs             CreditWalletAuditLog[]
+  user          User                    @relation(fields: [userId], references: [id])
+  vendor        Vendor?                 @relation(fields: [vendorId], references: [id])
+  assignedOwner VendorTeamMember?       @relation("CreditWalletOwner", fields: [assignedOwnerId], references: [id], onDelete: SetNull)
+  transactions  CreditWalletTxn[]
+  repayments    CreditWalletRepayment[]
+  penalties     CreditWalletPenalty[]
+  auditLogs     CreditWalletAuditLog[]
 
   @@index([userId])
   @@index([vendorId])
@@ -1338,33 +1355,33 @@ model CreditWallet {
 }
 
 model CreditWalletTxn {
-  id               String              @id @default(uuid()) @db.Uuid
-  walletId         String              @map("wallet_id") @db.Uuid
-  type             CreditWalletTxnType
-  amount           Decimal             @db.Decimal(12, 2)
-  balanceAfterTxn  Decimal             @map("balance_after_txn") @db.Decimal(12, 2)
-  referenceId      String?             @map("reference_id")
-  note             String?             @db.Text
-  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  id              String              @id @default(uuid()) @db.Uuid
+  walletId        String              @map("wallet_id") @db.Uuid
+  type            CreditWalletTxnType
+  amount          Decimal             @db.Decimal(12, 2)
+  balanceAfterTxn Decimal             @map("balance_after_txn") @db.Decimal(12, 2)
+  referenceId     String?             @map("reference_id")
+  note            String?             @db.Text
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz
 
-  wallet           CreditWallet        @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  wallet CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
   @@index([walletId])
   @@map("credit_wallet_transactions")
 }
 
 model CreditWalletRepayment {
-  id                 String       @id @default(uuid()) @db.Uuid
-  walletId           String       @map("wallet_id") @db.Uuid
-  amount             Decimal      @db.Decimal(12, 2)
-  repaymentMethod    String       @map("repayment_method")
-  razorpayOrderId    String?      @map("razorpay_order_id")
+  id                String   @id @default(uuid()) @db.Uuid
+  walletId          String   @map("wallet_id") @db.Uuid
+  amount            Decimal  @db.Decimal(12, 2)
+  repaymentMethod   String   @map("repayment_method")
+  razorpayOrderId   String?  @map("razorpay_order_id")
   // DB-level idempotency: a captured payment can be applied at most once.
-  razorpayPaymentId  String?      @unique @map("razorpay_payment_id")
-  status             String       @default("PENDING")
-  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  razorpayPaymentId String?  @unique @map("razorpay_payment_id")
+  status            String   @default("PENDING")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  wallet             CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  wallet CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
   @@index([walletId])
   @@index([razorpayOrderId])
@@ -1372,15 +1389,15 @@ model CreditWalletRepayment {
 }
 
 model CreditWalletPenalty {
-  id            String            @id @default(uuid()) @db.Uuid
-  walletId      String            @map("wallet_id") @db.Uuid
-  type          CreditPenaltyType
-  amount        Decimal           @db.Decimal(12, 2)
-  appliedDate   DateTime          @map("applied_date") @db.Date
-  status        String            @default("APPLIED")
-  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  id          String            @id @default(uuid()) @db.Uuid
+  walletId    String            @map("wallet_id") @db.Uuid
+  type        CreditPenaltyType
+  amount      Decimal           @db.Decimal(12, 2)
+  appliedDate DateTime          @map("applied_date") @db.Date
+  status      String            @default("APPLIED")
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz
 
-  wallet        CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  wallet CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
   // Per-day idempotency: one INTEREST and one LATE_FEE row per wallet per day max,
   // so a re-run of the daily scheduler can't double-charge.
@@ -1390,36 +1407,35 @@ model CreditWalletPenalty {
 }
 
 model CreditWalletAuditLog {
-  id                 String       @id @default(uuid()) @db.Uuid
-  walletId           String       @map("wallet_id") @db.Uuid
-  action             String
-  performedBy        String       @map("performed_by")
-  previousValue      String?      @map("previous_value") @db.Text
-  newValue           String?      @map("new_value") @db.Text
-  remarks            String?      @db.Text
-  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  id            String   @id @default(uuid()) @db.Uuid
+  walletId      String   @map("wallet_id") @db.Uuid
+  action        String
+  performedBy   String   @map("performed_by")
+  previousValue String?  @map("previous_value") @db.Text
+  newValue      String?  @map("new_value") @db.Text
+  remarks       String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  wallet             CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  wallet CreditWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
   @@index([walletId])
   @@map("credit_wallet_audit_logs")
 }
 
-
 // ═══ NOTIFICATIONS ══════════════════════════════════
 
 model Notification {
-  id            String             @id @default(uuid()) @db.Uuid
-  userId        String             @map("user_id") @db.Uuid
-  type          String             @db.VarChar(30)
+  id            String              @id @default(uuid()) @db.Uuid
+  userId        String              @map("user_id") @db.Uuid
+  type          String              @db.VarChar(30)
   channel       NotificationChannel
-  title         String?            @db.VarChar(255)
-  body          String?            @db.Text
-  referenceId   String?            @map("reference_id") @db.Uuid
-  referenceType String?            @map("reference_type") @db.VarChar(30)
-  status        NotificationStatus @default(pending)
-  readAt        DateTime?          @map("read_at") @db.Timestamptz
-  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  title         String?             @db.VarChar(255)
+  body          String?             @db.Text
+  referenceId   String?             @map("reference_id") @db.Uuid
+  referenceType String?             @map("reference_type") @db.VarChar(30)
+  status        NotificationStatus  @default(pending)
+  readAt        DateTime?           @map("read_at") @db.Timestamptz
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id])
 
@@ -1448,52 +1464,52 @@ enum NotificationStatus {
 
 // The brand company entity (e.g. "Kissan", "Everest")
 model Brand {
-  id              String         @id @default(uuid()) @db.Uuid
+  id                    String         @id @default(uuid()) @db.Uuid
   // Nullable: a brand can exist as a pure catalog label (created via product
   // import / vendor add) with no backing login account. The account is
   // provisioned only when the real brand company onboards to the portal.
-  userId          String?        @map("user_id") @db.Uuid
+  userId                String?        @map("user_id") @db.Uuid
   // V2.2: Brand is a 1:1 extension of BusinessAccount (isBrand=true) when an
   // account exists; null for label-only brands.
-  businessAccountId String?      @unique @map("business_account_id") @db.Uuid
-  name            String         @unique @db.VarChar(255)
-  slug            String         @unique @db.VarChar(255)
-  description     String?        @db.Text
-  logoUrl         String?        @map("logo_url") @db.VarChar(512)
-  bannerUrl       String?        @map("banner_url") @db.VarChar(512)
-  website         String?        @db.VarChar(512)
-  tagline         String?        @db.VarChar(512)
-  categories      String[]       @default([]) @map("categories")
-  bgColor         String?        @map("bg_color") @db.VarChar(20)
-  showcaseImages  String[]       @default([]) @map("showcase_images")
+  businessAccountId     String?        @unique @map("business_account_id") @db.Uuid
+  name                  String         @unique @db.VarChar(255)
+  slug                  String         @unique @db.VarChar(255)
+  description           String?        @db.Text
+  logoUrl               String?        @map("logo_url") @db.VarChar(512)
+  bannerUrl             String?        @map("banner_url") @db.VarChar(512)
+  website               String?        @db.VarChar(512)
+  tagline               String?        @db.VarChar(512)
+  categories            String[]       @default([]) @map("categories")
+  bgColor               String?        @map("bg_color") @db.VarChar(20)
+  showcaseImages        String[]       @default([]) @map("showcase_images")
   // Profile Mastersheet — Tier A onboarding (CSV rows 22–29, attribute master 84–93).
   // `categories` holds Product Categories from the mastersheet.
-  brandType             String?  @map("brand_type") @db.VarChar(80)
-  subType               String?  @map("sub_type") @db.VarChar(80)
-  businessSize          String?  @map("business_size") @db.VarChar(50)
-  distributionPresence  String?  @map("distribution_presence") @db.VarChar(120)
-  targetSegments        String[] @default([]) @map("target_segments")
-  horecaFocused         Boolean? @map("horeca_focused")
-  retailFocused         Boolean? @map("retail_focused")
+  brandType             String?        @map("brand_type") @db.VarChar(80)
+  subType               String?        @map("sub_type") @db.VarChar(80)
+  businessSize          String?        @map("business_size") @db.VarChar(50)
+  distributionPresence  String?        @map("distribution_presence") @db.VarChar(120)
+  targetSegments        String[]       @default([]) @map("target_segments")
+  horecaFocused         Boolean?       @map("horeca_focused")
+  retailFocused         Boolean?       @map("retail_focused")
   // Tier B — admin-only after onboarding
-  brandTier             String?  @map("brand_tier") @db.VarChar(50)
-  marketplaceVisibility String?  @map("marketplace_visibility") @db.VarChar(50)
-  creditSupport         Boolean? @map("credit_support")
-  leadStatus            String?  @map("lead_status") @db.VarChar(50)
-  approvalStatus  ApprovalStatus @default(pending) @map("approval_status")
-  isActive        Boolean        @default(true) @map("is_active")
-  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  brandTier             String?        @map("brand_tier") @db.VarChar(50)
+  marketplaceVisibility String?        @map("marketplace_visibility") @db.VarChar(50)
+  creditSupport         Boolean?       @map("credit_support")
+  leadStatus            String?        @map("lead_status") @db.VarChar(50)
+  approvalStatus        ApprovalStatus @default(pending) @map("approval_status")
+  isActive              Boolean        @default(true) @map("is_active")
+  createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  user            User?                 @relation(fields: [userId], references: [id])
-  businessAccount BusinessAccount?      @relation(fields: [businessAccountId], references: [id])
-  masterProducts  BrandMasterProduct[]
-  productMappings BrandProductMapping[]
-  teamMembers     BrandTeamMember[]
-  distributorInvites BrandDistributorInvite[]
+  user                   User?                        @relation(fields: [userId], references: [id])
+  businessAccount        BusinessAccount?             @relation(fields: [businessAccountId], references: [id])
+  masterProducts         BrandMasterProduct[]
+  productMappings        BrandProductMapping[]
+  teamMembers            BrandTeamMember[]
+  distributorInvites     BrandDistributorInvite[]
   authorizedDistributors BrandAuthorizedDistributor[]
   // V2.2 Phase 4 — pricelists assigned to this brand
-  priceListAssignments PriceListAssignment[] @relation("PriceListAssignmentBrand")
+  priceListAssignments   PriceListAssignment[]        @relation("PriceListAssignmentBrand")
 
   @@index([slug])
   @@index([approvalStatus])
@@ -1505,21 +1521,21 @@ model Brand {
 // Brand owners fill a form to introduce a candidate distributor; admin team
 // reviews and onboards manually. Once onboarded, link `vendorId` for traceability.
 model BrandDistributorInvite {
-  id            String                       @id @default(uuid()) @db.Uuid
-  brandId       String                       @map("brand_id") @db.Uuid
-  contactName   String                       @map("contact_name") @db.VarChar(255)
-  email         String                       @db.VarChar(255)
-  phone         String?                      @db.VarChar(30)
-  businessName  String                       @map("business_name") @db.VarChar(255)
-  city          String?                      @db.VarChar(100)
-  pincode       String?                      @db.VarChar(10)
-  notes         String?                      @db.Text
-  status        BrandDistributorInviteStatus @default(pending)
-  vendorId      String?                      @map("vendor_id") @db.Uuid // populated once admin onboards
-  reviewedBy    String?                      @map("reviewed_by") @db.Uuid
-  reviewNote    String?                      @map("review_note") @db.Text
-  createdAt     DateTime                     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id           String                       @id @default(uuid()) @db.Uuid
+  brandId      String                       @map("brand_id") @db.Uuid
+  contactName  String                       @map("contact_name") @db.VarChar(255)
+  email        String                       @db.VarChar(255)
+  phone        String?                      @db.VarChar(30)
+  businessName String                       @map("business_name") @db.VarChar(255)
+  city         String?                      @db.VarChar(100)
+  pincode      String?                      @db.VarChar(10)
+  notes        String?                      @db.Text
+  status       BrandDistributorInviteStatus @default(pending)
+  vendorId     String?                      @map("vendor_id") @db.Uuid // populated once admin onboards
+  reviewedBy   String?                      @map("reviewed_by") @db.Uuid
+  reviewNote   String?                      @map("review_note") @db.Text
+  createdAt    DateTime                     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
 
@@ -1569,51 +1585,51 @@ model BrandAuthorizedDistributor {
 
 // Brand's canonical product catalog (the truth layer — no pricing)
 model BrandMasterProduct {
-  id              String   @id @default(uuid()) @db.Uuid
-  brandId         String   @map("brand_id") @db.Uuid
-  masterProductId String?  @map("master_product_id") @db.Uuid
-  categoryId      String?  @map("category_id") @db.Uuid               // primary (legacy single-category display)
-  categoryIds     String[] @default([]) @map("category_ids") @db.Uuid  // all categories this product belongs to
-  name            String  @db.VarChar(255)          // canonical name e.g. "Kissan Tomato Ketchup 1kg"
-  slug            String  @db.VarChar(255)          // url-safe slug derived from name
-  description     String? @db.Text
-  imageUrl        String? @map("image_url") @db.VarChar(512)
-  images          String[] @default([]) @map("images")
-  packSize        String? @map("pack_size") @db.VarChar(100)
-  unit            String? @db.VarChar(50)
-  sku             String? @db.VarChar(100)          // mirrors MasterProduct.sku when linked
-  category        String? @db.VarChar(100)          // display category label
-  hsn             String?  @db.VarChar(50)
-  barcode         String?  @db.VarChar(100)
-  ean             String?  @db.VarChar(50)
-  vegNonVeg       VegType? @map("veg_non_veg")
-  storageType     String?  @map("storage_type") @db.VarChar(50)
-  shelfLifeDays   Int?     @map("shelf_life_days")
-  countryOfOrigin String?  @map("country_of_origin") @db.VarChar(100)
-  fssaiRef        String?  @map("fssai_ref") @db.VarChar(50)
-  netWeight       Decimal? @map("net_weight") @db.Decimal(10, 3)
-  netWeightUnit   String?  @map("net_weight_unit") @db.VarChar(20)
+  id                 String    @id @default(uuid()) @db.Uuid
+  brandId            String    @map("brand_id") @db.Uuid
+  masterProductId    String?   @map("master_product_id") @db.Uuid
+  categoryId         String?   @map("category_id") @db.Uuid // primary (legacy single-category display)
+  categoryIds        String[]  @default([]) @map("category_ids") @db.Uuid // all categories this product belongs to
+  name               String    @db.VarChar(255) // canonical name e.g. "Kissan Tomato Ketchup 1kg"
+  slug               String    @db.VarChar(255) // url-safe slug derived from name
+  description        String?   @db.Text
+  imageUrl           String?   @map("image_url") @db.VarChar(512)
+  images             String[]  @default([]) @map("images")
+  packSize           String?   @map("pack_size") @db.VarChar(100)
+  unit               String?   @db.VarChar(50)
+  sku                String?   @db.VarChar(100) // mirrors MasterProduct.sku when linked
+  category           String?   @db.VarChar(100) // display category label
+  hsn                String?   @db.VarChar(50)
+  barcode            String?   @db.VarChar(100)
+  ean                String?   @db.VarChar(50)
+  vegNonVeg          VegType?  @map("veg_non_veg")
+  storageType        String?   @map("storage_type") @db.VarChar(50)
+  shelfLifeDays      Int?      @map("shelf_life_days")
+  countryOfOrigin    String?   @map("country_of_origin") @db.VarChar(100)
+  fssaiRef           String?   @map("fssai_ref") @db.VarChar(50)
+  netWeight          Decimal?  @map("net_weight") @db.Decimal(10, 3)
+  netWeightUnit      String?   @map("net_weight_unit") @db.VarChar(20)
   // Shipping / carton packaging (distinct from net product weight above).
-  packageWeight   Decimal? @map("package_weight") @db.Decimal(10, 3)
-  weightUnit      String?  @map("weight_unit") @db.VarChar(20)
-  packageLength   Decimal? @map("package_length") @db.Decimal(10, 3)
-  packageWidth    Decimal? @map("package_width") @db.Decimal(10, 3)
-  packageHeight   Decimal? @map("package_height") @db.Decimal(10, 3)
-  dimensionUnit   String?  @map("dimension_unit") @db.VarChar(20)
-  tags            String[] @default([]) @map("tags")
-  aliasNames      String[] @default([]) @map("alias_names")
-  isActive        Boolean @default(true) @map("is_active")
-  sortOrder       Int     @default(0) @map("sort_order")
+  packageWeight      Decimal?  @map("package_weight") @db.Decimal(10, 3)
+  weightUnit         String?   @map("weight_unit") @db.VarChar(20)
+  packageLength      Decimal?  @map("package_length") @db.Decimal(10, 3)
+  packageWidth       Decimal?  @map("package_width") @db.Decimal(10, 3)
+  packageHeight      Decimal?  @map("package_height") @db.Decimal(10, 3)
+  dimensionUnit      String?   @map("dimension_unit") @db.VarChar(20)
+  tags               String[]  @default([]) @map("tags")
+  aliasNames         String[]  @default([]) @map("alias_names")
+  isActive           Boolean   @default(true) @map("is_active")
+  sortOrder          Int       @default(0) @map("sort_order")
   // Embedding for AI-assisted brand mapping (Phase 3).
   embedding          Float[]   @default([]) @map("embedding")
   embeddingModel     String?   @map("embedding_model") @db.VarChar(80)
   embeddingUpdatedAt DateTime? @map("embedding_updated_at") @db.Timestamptz
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  brand         Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  masterProduct MasterProduct?    @relation(fields: [masterProductId], references: [id], onDelete: SetNull)
-  categoryRel   Category?         @relation(fields: [categoryId], references: [id])
+  brand         Brand                 @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  masterProduct MasterProduct?        @relation(fields: [masterProductId], references: [id], onDelete: SetNull)
+  categoryRel   Category?             @relation(fields: [categoryId], references: [id])
   mappings      BrandProductMapping[]
 
   @@unique([brandId, slug])
@@ -1637,9 +1653,9 @@ model BrandProductMapping {
   createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt            DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  brand               Brand               @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  brandMasterProduct  BrandMasterProduct  @relation(fields: [brandMasterProductId], references: [id], onDelete: Cascade)
-  distributorProduct  Product             @relation(fields: [distributorProductId], references: [id], onDelete: Cascade)
+  brand              Brand              @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  brandMasterProduct BrandMasterProduct @relation(fields: [brandMasterProductId], references: [id], onDelete: Cascade)
+  distributorProduct Product            @relation(fields: [distributorProductId], references: [id], onDelete: Cascade)
 
   @@unique([brandMasterProductId, distributorProductId])
   @@index([brandId])
@@ -1670,10 +1686,10 @@ model VendorTeamMember {
   invitedBy String?  @map("invited_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  vendor    Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  user      User         @relation("VendorMemberships", fields: [userId], references: [id], onDelete: Cascade)
-  inviter   User?        @relation("VendorInvites", fields: [invitedBy], references: [id])
-  roleRef   AccountRole? @relation("VendorTeamMemberRole", fields: [roleId], references: [id], onDelete: Restrict)
+  vendor                Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  user                  User           @relation("VendorMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  inviter               User?          @relation("VendorInvites", fields: [invitedBy], references: [id])
+  roleRef               AccountRole?   @relation("VendorTeamMemberRole", fields: [roleId], references: [id], onDelete: Restrict)
   assignedCreditWallets CreditWallet[] @relation("CreditWalletOwner")
 
   @@unique([vendorId, userId])
@@ -1691,10 +1707,10 @@ model BrandTeamMember {
   invitedBy String?  @map("invited_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  brand     Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  user      User         @relation("BrandMemberships", fields: [userId], references: [id], onDelete: Cascade)
-  inviter   User?        @relation("BrandInvites", fields: [invitedBy], references: [id])
-  roleRef   AccountRole? @relation("BrandTeamMemberRole", fields: [roleId], references: [id], onDelete: Restrict)
+  brand   Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  user    User         @relation("BrandMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  inviter User?        @relation("BrandInvites", fields: [invitedBy], references: [id])
+  roleRef AccountRole? @relation("BrandTeamMemberRole", fields: [roleId], references: [id], onDelete: Restrict)
 
   @@unique([brandId, userId])
   @@index([userId])
@@ -1710,9 +1726,9 @@ model AdminTeamMember {
   invitedBy String?  @map("invited_by") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  user      User         @relation("AdminMembership", fields: [userId], references: [id], onDelete: Cascade)
-  inviter   User?        @relation("AdminInvites", fields: [invitedBy], references: [id])
-  roleRef   AccountRole? @relation("AdminTeamMemberRole", fields: [roleId], references: [id], onDelete: Restrict)
+  user    User         @relation("AdminMembership", fields: [userId], references: [id], onDelete: Cascade)
+  inviter User?        @relation("AdminInvites", fields: [invitedBy], references: [id])
+  roleRef AccountRole? @relation("AdminTeamMemberRole", fields: [roleId], references: [id], onDelete: Restrict)
 
   @@index([roleId])
   @@map("admin_team_members")
@@ -1741,8 +1757,8 @@ model SavedAddress {
   isDefault    Boolean  @default(false) @map("is_default")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  outlet       Outlet?  @relation(fields: [outletId], references: [id])
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outlet Outlet? @relation(fields: [outletId], references: [id])
 
   @@index([userId])
   @@index([outletId])
@@ -1774,45 +1790,45 @@ model AuditLog {
 
 // S9 Returns Workspace — multiple returns per order; statuses independent of Order/Fulfilment.
 model ReturnRequest {
-  id                 String    @id @default(uuid()) @db.Uuid
-  orderId            String    @map("order_id") @db.Uuid
-  customerId         String    @map("customer_id") @db.Uuid
+  id                  String    @id @default(uuid()) @db.Uuid
+  orderId             String    @map("order_id") @db.Uuid
+  customerId          String    @map("customer_id") @db.Uuid
   // Snapshotted commercial invoice ref (= order.orderNumber); no Invoice entity.
-  invoiceNumber      String?   @map("invoice_number") @db.VarChar(50)
+  invoiceNumber       String?   @map("invoice_number") @db.VarChar(50)
   // return | replacement | refund | claim (see RETURN_TYPES) — String avoids reserved `return` enum.
-  type               String    @default("return") @db.VarChar(20)
-  reason             String    @db.Text
+  type                String    @default("return") @db.VarChar(20)
+  reason              String    @db.Text
   // S9 lifecycle string (see RETURN_STATUSES); legacy values migrated in SQL.
-  status             String    @default("new") @db.VarChar(40)
-  adminNote          String?   @map("admin_note") @db.Text
-  refundAmount       Decimal?  @map("refund_amount") @db.Decimal(12, 2)
-  resolutionType     String?   @map("resolution_type") @db.VarChar(20)
-  creditNoteNumber   String?   @map("credit_note_number") @db.VarChar(50)
-  creditNoteAmount   Decimal?  @map("credit_note_amount") @db.Decimal(12, 2)
-  pickupAt           DateTime? @map("pickup_at") @db.Timestamptz
-  pickupAddress      String?   @map("pickup_address") @db.Text
-  pickupNotes        String?   @map("pickup_notes") @db.Text
+  status              String    @default("new") @db.VarChar(40)
+  adminNote           String?   @map("admin_note") @db.Text
+  refundAmount        Decimal?  @map("refund_amount") @db.Decimal(12, 2)
+  resolutionType      String?   @map("resolution_type") @db.VarChar(20)
+  creditNoteNumber    String?   @map("credit_note_number") @db.VarChar(50)
+  creditNoteAmount    Decimal?  @map("credit_note_amount") @db.Decimal(12, 2)
+  pickupAt            DateTime? @map("pickup_at") @db.Timestamptz
+  pickupAddress       String?   @map("pickup_address") @db.Text
+  pickupNotes         String?   @map("pickup_notes") @db.Text
   // Assigned delivery boy for return pickup (same roster as fulfilment dispatch).
-  deliveryResourceId String?   @map("delivery_resource_id") @db.Uuid
+  deliveryResourceId  String?   @map("delivery_resource_id") @db.Uuid
   // Return pickup OTP — same pattern as Order.deliveryOtp (SMS to customer, boy verifies via /r/).
   pickupOtp           String?   @map("pickup_otp") @db.VarChar(6)
   pickupOtpExpiresAt  DateTime? @map("pickup_otp_expires_at") @db.Timestamptz
   pickupOtpVerifiedAt DateTime? @map("pickup_otp_verified_at") @db.Timestamptz
   // Skip-pickup audit (expensive / no physical accept) — allows CN without inventory.
-  pickupSkippedAt    DateTime? @map("pickup_skipped_at") @db.Timestamptz
-  pickupSkipReason   String?   @map("pickup_skip_reason") @db.Text
-  goodsReceivedAt    DateTime? @map("goods_received_at") @db.Timestamptz
-  replacementOrderId String?   @map("replacement_order_id") @db.Uuid
-  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  pickupSkippedAt     DateTime? @map("pickup_skipped_at") @db.Timestamptz
+  pickupSkipReason    String?   @map("pickup_skip_reason") @db.Text
+  goodsReceivedAt     DateTime? @map("goods_received_at") @db.Timestamptz
+  replacementOrderId  String?   @map("replacement_order_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  order            Order              @relation(fields: [orderId], references: [id])
-  customer         User               @relation("CustomerReturnRequests", fields: [customerId], references: [id])
-  replacementOrder Order?             @relation("ReturnReplacementOrder", fields: [replacementOrderId], references: [id], onDelete: SetNull)
-  deliveryResource DeliveryResource?  @relation(fields: [deliveryResourceId], references: [id], onDelete: SetNull)
-  items            ReturnItem[]
-  events           ReturnEvent[]
-  inspection       ReturnInspection?
+  order              Order                     @relation(fields: [orderId], references: [id])
+  customer           User                      @relation("CustomerReturnRequests", fields: [customerId], references: [id])
+  replacementOrder   Order?                    @relation("ReturnReplacementOrder", fields: [replacementOrderId], references: [id], onDelete: SetNull)
+  deliveryResource   DeliveryResource?         @relation(fields: [deliveryResourceId], references: [id], onDelete: SetNull)
+  items              ReturnItem[]
+  events             ReturnEvent[]
+  inspection         ReturnInspection?
   pickupAccessTokens ReturnPickupAccessToken[]
 
   @@index([orderId])
@@ -1860,15 +1876,15 @@ enum ReturnDisposition {
 }
 
 model ReturnItem {
-  id              String              @id @default(uuid()) @db.Uuid
-  returnRequestId String              @map("return_request_id") @db.Uuid
-  orderItemId     String              @map("order_item_id") @db.Uuid
-  requestedQty    Int                 @map("requested_qty")
-  approvedQty     Int?                @map("approved_qty")
+  id              String             @id @default(uuid()) @db.Uuid
+  returnRequestId String             @map("return_request_id") @db.Uuid
+  orderItemId     String             @map("order_item_id") @db.Uuid
+  requestedQty    Int                @map("requested_qty")
+  approvedQty     Int?               @map("approved_qty")
   reason          ReturnItemReason
-  decision        ReturnItemDecision  @default(pending)
+  decision        ReturnItemDecision @default(pending)
   disposition     ReturnDisposition?
-  note            String?             @db.Text
+  note            String?            @db.Text
 
   returnRequest ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
   orderItem     OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
@@ -1976,9 +1992,9 @@ model VendorDocument {
 
 model WebhookEvent {
   id              String   @id @default(uuid()) @db.Uuid
-  provider        String   @db.VarChar(20)            // 'razorpay' | future
+  provider        String   @db.VarChar(20) // 'razorpay' | future
   providerEventId String   @map("provider_event_id") @db.VarChar(100)
-  event           String   @db.VarChar(60)            // e.g. 'payment.captured'
+  event           String   @db.VarChar(60) // e.g. 'payment.captured'
   receivedAt      DateTime @default(now()) @map("received_at") @db.Timestamptz
 
   @@unique([provider, providerEventId])
@@ -2024,74 +2040,74 @@ enum RoleScope {
 // Top-level tenancy entity. A single User (HCID) can belong to many BusinessAccounts.
 // `isCustomer`/`isVendor`/`isBrand` flags let one account play multiple roles.
 model BusinessAccount {
-  id              String   @id @default(uuid()) @db.Uuid
-  legalName       String   @map("legal_name") @db.VarChar(255)
-  displayName     String?  @map("display_name") @db.VarChar(255)
-  gstin           String?  @db.VarChar(20)
-  pan             String?  @db.VarChar(20)
-  fssaiNumber     String?  @map("fssai_number") @db.VarChar(50)
-  billingAddressLine String? @map("billing_address_line") @db.Text
-  billingCity     String?  @map("billing_city") @db.VarChar(100)
-  billingState    String?  @map("billing_state") @db.VarChar(100)
-  billingPincode  String?  @map("billing_pincode") @db.VarChar(10)
-  businessType    String?  @map("business_type") @db.VarChar(50)
+  id                   String                @id @default(uuid()) @db.Uuid
+  legalName            String                @map("legal_name") @db.VarChar(255)
+  displayName          String?               @map("display_name") @db.VarChar(255)
+  gstin                String?               @db.VarChar(20)
+  pan                  String?               @db.VarChar(20)
+  fssaiNumber          String?               @map("fssai_number") @db.VarChar(50)
+  billingAddressLine   String?               @map("billing_address_line") @db.Text
+  billingCity          String?               @map("billing_city") @db.VarChar(100)
+  billingState         String?               @map("billing_state") @db.VarChar(100)
+  billingPincode       String?               @map("billing_pincode") @db.VarChar(10)
+  businessType         String?               @map("business_type") @db.VarChar(50)
   // Customer master-datasheet attributes (Profile Mastersheet). Free-text/nullable
   // so they can be set via signup, admin edit, or bulk import. Filterable in admin.
-  subType             String?  @map("sub_type") @db.VarChar(80)
-  vendorTypeSelections Json?   @map("vendor_type_selections")
-  cuisine             String?  @map("cuisine") @db.VarChar(120)
-  businessSize        String?  @map("business_size") @db.VarChar(50)
-  businessStructure   String?  @map("business_structure") @db.VarChar(50)
-  serviceModel        String?  @map("service_model") @db.VarChar(120)
-  monthlyPurchaseBand String?  @map("monthly_purchase_band") @db.VarChar(50)
-  procurementFrequency String? @map("procurement_frequency") @db.VarChar(50)
-  designation         String?  @map("designation") @db.VarChar(120)
-  leadStatus          String?  @map("lead_status") @db.VarChar(50)
-  creditType          String?  @map("credit_type") @db.VarChar(50)
-  manualTags          String[] @default([]) @map("manual_tags")
-  aiTags              String[] @default([]) @map("ai_tags")
-  behaviourTags       String[] @default([]) @map("behaviour_tags")
+  subType              String?               @map("sub_type") @db.VarChar(80)
+  vendorTypeSelections Json?                 @map("vendor_type_selections")
+  cuisine              String?               @map("cuisine") @db.VarChar(120)
+  businessSize         String?               @map("business_size") @db.VarChar(50)
+  businessStructure    String?               @map("business_structure") @db.VarChar(50)
+  serviceModel         String?               @map("service_model") @db.VarChar(120)
+  monthlyPurchaseBand  String?               @map("monthly_purchase_band") @db.VarChar(50)
+  procurementFrequency String?               @map("procurement_frequency") @db.VarChar(50)
+  designation          String?               @map("designation") @db.VarChar(120)
+  leadStatus           String?               @map("lead_status") @db.VarChar(50)
+  creditType           String?               @map("credit_type") @db.VarChar(50)
+  manualTags           String[]              @default([]) @map("manual_tags")
+  aiTags               String[]              @default([]) @map("ai_tags")
+  behaviourTags        String[]              @default([]) @map("behaviour_tags")
   // Zoho-style customer/vendor parity fields (V2.2). Most are free-text/nullable
   // so they can be set on create, admin edit, or bulk import.
-  customerType        String   @default("business") @map("customer_type") @db.VarChar(20) // business | individual
-  salutation          String?  @db.VarChar(20)
-  firstName           String?  @map("first_name") @db.VarChar(120)
-  lastName            String?  @map("last_name") @db.VarChar(120)
-  companyName         String?  @map("company_name") @db.VarChar(255)
-  customerLanguage    String   @default("en") @map("customer_language") @db.VarChar(20)
-  taxPreference       String   @default("taxable") @map("tax_preference") @db.VarChar(20) // taxable | exempt
-  gstTreatment        String?  @map("gst_treatment") @db.VarChar(40)
-  placeOfSupply       String?  @map("place_of_supply") @db.VarChar(100)
-  currency            String   @default("INR") @db.VarChar(10)
-  creditLimit         Decimal? @map("credit_limit") @db.Decimal(12, 2)
-  paymentTerms        String?  @map("payment_terms") @db.VarChar(40)
-  enablePortal        Boolean  @default(false) @map("enable_portal")
-  workPhone           String?  @map("work_phone") @db.VarChar(20)
-  mobilePhone         String?  @map("mobile_phone") @db.VarChar(20)
-  remarks             String?  @db.Text
-  customFields        Json     @default("{}") @map("custom_fields")
-  isCustomer      Boolean  @default(true)  @map("is_customer")
-  isVendor        Boolean  @default(false) @map("is_vendor")
-  isBrand         Boolean  @default(false) @map("is_brand")
-  status          BusinessAccountStatus @default(active)
-  primaryOutletId String?  @unique @map("primary_outlet_id") @db.Uuid
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  customerType         String                @default("business") @map("customer_type") @db.VarChar(20) // business | individual
+  salutation           String?               @db.VarChar(20)
+  firstName            String?               @map("first_name") @db.VarChar(120)
+  lastName             String?               @map("last_name") @db.VarChar(120)
+  companyName          String?               @map("company_name") @db.VarChar(255)
+  customerLanguage     String                @default("en") @map("customer_language") @db.VarChar(20)
+  taxPreference        String                @default("taxable") @map("tax_preference") @db.VarChar(20) // taxable | exempt
+  gstTreatment         String?               @map("gst_treatment") @db.VarChar(40)
+  placeOfSupply        String?               @map("place_of_supply") @db.VarChar(100)
+  currency             String                @default("INR") @db.VarChar(10)
+  creditLimit          Decimal?              @map("credit_limit") @db.Decimal(12, 2)
+  paymentTerms         String?               @map("payment_terms") @db.VarChar(40)
+  enablePortal         Boolean               @default(false) @map("enable_portal")
+  workPhone            String?               @map("work_phone") @db.VarChar(20)
+  mobilePhone          String?               @map("mobile_phone") @db.VarChar(20)
+  remarks              String?               @db.Text
+  customFields         Json                  @default("{}") @map("custom_fields")
+  isCustomer           Boolean               @default(true) @map("is_customer")
+  isVendor             Boolean               @default(false) @map("is_vendor")
+  isBrand              Boolean               @default(false) @map("is_brand")
+  status               BusinessAccountStatus @default(active)
+  primaryOutletId      String?               @unique @map("primary_outlet_id") @db.Uuid
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  members         BusinessAccountMember[]
-  outlets         Outlet[]
-  contactPersons  ContactPerson[]
-  roles           AccountRole[]
-  userRoles       UserRole[]
+  members              BusinessAccountMember[]
+  outlets              Outlet[]
+  contactPersons       ContactPerson[]
+  roles                AccountRole[]
+  userRoles            UserRole[]
   // Supplier Foundation: N Online Stores (Vendor rows) per Business.
-  vendors         Vendor[]
-  brand           Brand?
-  orders          Order[]
-  carts           Cart[]
-  quickOrderLists QuickOrderList[]
-  customerVendors CustomerVendor[]
+  vendors              Vendor[]
+  brand                Brand?
+  orders               Order[]
+  carts                Cart[]
+  quickOrderLists      QuickOrderList[]
+  customerVendors      CustomerVendor[]
   // V2.2 Phase 4 — pricelists assigned to this BA
-  priceListAssignments PriceListAssignment[] @relation("PriceListAssignmentBA")
+  priceListAssignments PriceListAssignment[]   @relation("PriceListAssignmentBA")
 
   @@index([isVendor])
   @@index([isBrand])
@@ -2140,11 +2156,11 @@ model Outlet {
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  businessAccount BusinessAccount @relation(fields: [businessAccountId], references: [id], onDelete: Cascade)
-  orders          Order[]
-  carts           Cart[]
-  userRoles       UserRole[]
-  savedAddresses  SavedAddress[]
+  businessAccount      BusinessAccount       @relation(fields: [businessAccountId], references: [id], onDelete: Cascade)
+  orders               Order[]
+  carts                Cart[]
+  userRoles            UserRole[]
+  savedAddresses       SavedAddress[]
   // V2.2 Phase 4 — pricelists assigned to this outlet
   priceListAssignments PriceListAssignment[] @relation("PriceListAssignmentOutlet")
   inventories          Inventory[]
@@ -2179,7 +2195,7 @@ model ContactPerson {
   isPrimary         Boolean  @default(false) @map("is_primary")
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  businessAccount   BusinessAccount @relation(fields: [businessAccountId], references: [id], onDelete: Cascade)
+  businessAccount BusinessAccount @relation(fields: [businessAccountId], references: [id], onDelete: Cascade)
 
   @@index([businessAccountId])
   @@map("contact_persons")
@@ -2200,11 +2216,11 @@ model AccountRole {
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  businessAccount    BusinessAccount?    @relation(fields: [businessAccountId], references: [id], onDelete: Cascade)
-  userRoles          UserRole[]
-  vendorTeamMembers  VendorTeamMember[]  @relation("VendorTeamMemberRole")
-  brandTeamMembers   BrandTeamMember[]   @relation("BrandTeamMemberRole")
-  adminTeamMembers   AdminTeamMember[]   @relation("AdminTeamMemberRole")
+  businessAccount   BusinessAccount?   @relation(fields: [businessAccountId], references: [id], onDelete: Cascade)
+  userRoles         UserRole[]
+  vendorTeamMembers VendorTeamMember[] @relation("VendorTeamMemberRole")
+  brandTeamMembers  BrandTeamMember[]  @relation("BrandTeamMemberRole")
+  adminTeamMembers  AdminTeamMember[]  @relation("AdminTeamMemberRole")
 
   @@unique([businessAccountId, name])
   @@index([isTemplate, scope])
@@ -2300,9 +2316,9 @@ model VendorSettlement {
   createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  vendor  Vendor                  @relation(fields: [vendorId], references: [id])
-  wallet  VendorWallet            @relation(fields: [walletId], references: [id])
-  orders  VendorSettlementOrder[]
+  vendor Vendor                  @relation(fields: [vendorId], references: [id])
+  wallet VendorWallet            @relation(fields: [walletId], references: [id])
+  orders VendorSettlementOrder[]
 
   @@index([vendorId])
   @@index([status])
@@ -2317,12 +2333,12 @@ enum SettlementStatus {
 }
 
 model VendorSettlementOrder {
-  id           String   @id @default(uuid()) @db.Uuid
-  settlementId String   @map("settlement_id") @db.Uuid
-  orderId      String   @map("order_id") @db.Uuid
-  orderAmount  Decimal  @map("order_amount") @db.Decimal(12, 2)
-  platformFee  Decimal  @default(0) @map("platform_fee") @db.Decimal(12, 2)
-  netAmount    Decimal  @map("net_amount") @db.Decimal(12, 2)
+  id           String  @id @default(uuid()) @db.Uuid
+  settlementId String  @map("settlement_id") @db.Uuid
+  orderId      String  @map("order_id") @db.Uuid
+  orderAmount  Decimal @map("order_amount") @db.Decimal(12, 2)
+  platformFee  Decimal @default(0) @map("platform_fee") @db.Decimal(12, 2)
+  netAmount    Decimal @map("net_amount") @db.Decimal(12, 2)
 
   settlement VendorSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
 
@@ -2334,24 +2350,24 @@ model VendorSettlementOrder {
 // ═══ VENDOR CUSTOMER MAPPING ═════════════════════════
 
 model VendorCustomer {
-  id           String               @id @default(uuid()) @db.Uuid
-  vendorId     String               @map("vendor_id") @db.Uuid
-  userId       String               @map("user_id") @db.Uuid
-  status       VendorCustomerStatus @default(active)
-  priceListId  String?              @map("price_list_id") @db.Uuid
-  territory       String?              @db.VarChar(100)
+  id                  String               @id @default(uuid()) @db.Uuid
+  vendorId            String               @map("vendor_id") @db.Uuid
+  userId              String               @map("user_id") @db.Uuid
+  status              VendorCustomerStatus @default(active)
+  priceListId         String?              @map("price_list_id") @db.Uuid
+  territory           String?              @db.VarChar(100)
   // Legacy free-text salesperson name. Preserved for one release cycle so
   // bulk-import scripts still parse old files; new code reads salespersonId
   // first and falls back to this string only when the FK is null.
-  salesExecutive  String?              @map("sales_executive") @db.VarChar(100)
-  salespersonId   String?              @map("salesperson_id") @db.Uuid
-  deliveryRoute   String?              @map("delivery_route") @db.VarChar(100)
-  tags            String[]             @default([]) @map("tags")
-  notes           String?              @db.Text
-  paymentTerms    String?              @map("payment_terms") @db.VarChar(50)
-  allowedPaymentModes String[]         @default(["cod", "prepaid", "credit", "cheque"]) @map("allowed_payment_modes")
-  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  salesExecutive      String?              @map("sales_executive") @db.VarChar(100)
+  salespersonId       String?              @map("salesperson_id") @db.Uuid
+  deliveryRoute       String?              @map("delivery_route") @db.VarChar(100)
+  tags                String[]             @default([]) @map("tags")
+  notes               String?              @db.Text
+  paymentTerms        String?              @map("payment_terms") @db.VarChar(50)
+  allowedPaymentModes String[]             @default(["cod", "prepaid", "credit", "cheque"]) @map("allowed_payment_modes")
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   vendor      Vendor       @relation("VendorCustomerMapping", fields: [vendorId], references: [id], onDelete: Cascade)
   user        User         @relation("VendorCustomerUser", fields: [userId], references: [id])
@@ -2391,25 +2407,25 @@ enum VendorCustomerStatus {
 // ═══ PRICE LISTS ═════════════════════════════════════
 
 model PriceList {
-  id              String   @id @default(uuid()) @db.Uuid
-  vendorId        String   @map("vendor_id") @db.Uuid
-  name            String   @db.VarChar(255)
+  id              String    @id @default(uuid()) @db.Uuid
+  vendorId        String    @map("vendor_id") @db.Uuid
+  name            String    @db.VarChar(255)
   // Global fallback discount applied when no PriceListItem matches a
   // given product. Items override this per-product via customPrice or
   // their own discountPercent.
-  discountPercent Decimal  @default(0) @map("discount_percent") @db.Decimal(5, 2)
-  isActive        Boolean  @default(true) @map("is_active")
+  discountPercent Decimal   @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  isActive        Boolean   @default(true) @map("is_active")
   // List-level validity window. When set, the resolver ignores this list
   // outside [validFrom, validTo] and the customer falls back to base/other.
   validFrom       DateTime? @map("valid_from") @db.Timestamptz
   validTo         DateTime? @map("valid_to") @db.Timestamptz
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  vendor      Vendor                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  items       PriceListItem[]
-  customers   VendorCustomer[]
-  assignments PriceListAssignment[]
+  vendor       Vendor                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  items        PriceListItem[]
+  customers    VendorCustomer[]
+  assignments  PriceListAssignment[]
   priceHistory PriceHistory[]
 
   @@unique([vendorId, name])
@@ -2434,17 +2450,17 @@ model PriceListItem {
   schemeFreeQty   Int?        @map("scheme_free_qty")
 
   // V2.2 Phase 5 — pricing cell attributes
-  isLocked        Boolean   @default(false) @map("is_locked")
-  validFrom       DateTime? @map("valid_from") @db.Timestamptz
-  validTo         DateTime? @map("valid_to") @db.Timestamptz
-  note            String?   @db.Text
-  scheduledPrice  Decimal?  @map("scheduled_price") @db.Decimal(10, 2)
-  scheduledFrom   DateTime? @map("scheduled_from") @db.Timestamptz
-  scheduledTo     DateTime? @map("scheduled_to") @db.Timestamptz
-  history         Json?     @default("[]")
+  isLocked       Boolean   @default(false) @map("is_locked")
+  validFrom      DateTime? @map("valid_from") @db.Timestamptz
+  validTo        DateTime? @map("valid_to") @db.Timestamptz
+  note           String?   @db.Text
+  scheduledPrice Decimal?  @map("scheduled_price") @db.Decimal(10, 2)
+  scheduledFrom  DateTime? @map("scheduled_from") @db.Timestamptz
+  scheduledTo    DateTime? @map("scheduled_to") @db.Timestamptz
+  history        Json?     @default("[]")
 
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   priceList PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
   product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -2560,13 +2576,13 @@ model CustomerGroupMember {
 // ═══ PROMOTIONS ═══════════════════════════════════════
 
 model Promotion {
-  id          String        @id @default(uuid()) @db.Uuid
-  vendorId    String        @map("vendor_id") @db.Uuid
-  name        String        @db.VarChar(120)
-  type        PromotionType
-  isActive    Boolean       @default(true) @map("is_active")
-  startDate   DateTime?     @map("start_date") @db.Timestamptz
-  endDate     DateTime?     @map("end_date") @db.Timestamptz
+  id        String        @id @default(uuid()) @db.Uuid
+  vendorId  String        @map("vendor_id") @db.Uuid
+  name      String        @db.VarChar(120)
+  type      PromotionType
+  isActive  Boolean       @default(true) @map("is_active")
+  startDate DateTime?     @map("start_date") @db.Timestamptz
+  endDate   DateTime?     @map("end_date") @db.Timestamptz
 
   // Conditions
   minOrderValue Decimal? @map("min_order_value") @db.Decimal(10, 2)
@@ -2603,13 +2619,13 @@ enum PromotionType {
 }
 
 model VendorCustomerPrice {
-  id          String   @id @default(uuid()) @db.Uuid
-  vendorId    String   @map("vendor_id") @db.Uuid
-  customerId  String   @map("customer_id") @db.Uuid
-  productId   String   @map("product_id") @db.Uuid
-  price       Decimal  @db.Decimal(10, 2)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id         String   @id @default(uuid()) @db.Uuid
+  vendorId   String   @map("vendor_id") @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  productId  String   @map("product_id") @db.Uuid
+  price      Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   vendor  Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -2758,10 +2774,10 @@ model DeliveryResource {
   createdAt DateTime             @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  vendor      Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  fulfilments Fulfilment[]
-  dispatches  Dispatch[]
-  returnRequests ReturnRequest[]
+  vendor          Vendor                   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  fulfilments     Fulfilment[]
+  dispatches      Dispatch[]
+  returnRequests  ReturnRequest[]
   boyAccessTokens DeliveryBoyAccessToken[]
 
   @@index([vendorId])
@@ -2785,15 +2801,15 @@ model Fulfilment {
   createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  vendor           Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  outlet           Outlet?           @relation(fields: [outletId], references: [id], onDelete: SetNull)
-  deliveryResource DeliveryResource? @relation(fields: [deliveryResourceId], references: [id], onDelete: SetNull)
-  items            FulfilmentItem[]
-  events           FulfilmentEvent[]
-  deliveryEvents   DeliveryEvent[]
-  picklists        Picklist[]
-  dispatches       Dispatch[]
+  order                Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor               Vendor                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  outlet               Outlet?               @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  deliveryResource     DeliveryResource?     @relation(fields: [deliveryResourceId], references: [id], onDelete: SetNull)
+  items                FulfilmentItem[]
+  events               FulfilmentEvent[]
+  deliveryEvents       DeliveryEvent[]
+  picklists            Picklist[]
+  dispatches           Dispatch[]
   deliveryAccessTokens DeliveryAccessToken[]
 
   @@index([vendorId])
@@ -2972,7 +2988,7 @@ model Salesperson {
   name      String   @db.VarChar(255)
   phone     String?  @db.VarChar(15)
   email     String?  @db.VarChar(255)
-  code      String?  @db.VarChar(30)  // vendor's internal employee id
+  code      String?  @db.VarChar(30) // vendor's internal employee id
   userId    String?  @map("user_id") @db.Uuid
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
@@ -3045,7 +3061,7 @@ model CommissionAccrual {
   ratePercent   Decimal?                @map("rate_percent") @db.Decimal(5, 2)
   rateFixed     Decimal?                @map("rate_fixed") @db.Decimal(12, 2)
   accruedAmount Decimal                 @map("accrued_amount") @db.Decimal(12, 2)
-  period        String                  @db.VarChar(7)  // 'YYYY-MM'
+  period        String                  @db.VarChar(7) // 'YYYY-MM'
   status        CommissionAccrualStatus @default(pending)
   approvedBy    String?                 @map("approved_by") @db.Uuid
   approvedAt    DateTime?               @map("approved_at") @db.Timestamptz
@@ -3125,6 +3141,10 @@ enum CashbackEntryStatus {
 enum CashbackEntrySource {
   order
   direct_grant
+  welcome
+  first_order
+  referral
+  payout_invite
 
   @@map("cashback_entry_source")
 }
@@ -3150,14 +3170,18 @@ model Coupon {
 
   // Optional scope narrowing — empty arrays mean "whole store" (vendor coupon)
   // or "whole platform" (platform coupon). Brand match is on Product.brand text.
-  categoryIds String[] @default([]) @map("category_ids") @db.Uuid
-  productIds  String[] @default([]) @map("product_ids") @db.Uuid
-  brandNames  String[] @default([]) @map("brand_names")
+  categoryIds     String[] @default([]) @map("category_ids") @db.Uuid
+  productIds      String[] @default([]) @map("product_ids") @db.Uuid
+  brandNames      String[] @default([]) @map("brand_names")
+  // Empty = every customer. Non-empty = personal / admin-targeted coupon
+  // (Welcome, First Order, Referral, CouponModal picker). No CustomerGroup bind.
+  audienceUserIds String[] @default([]) @map("audience_user_ids") @db.Uuid
 
   // Stacking (brief: per-promo "can be clubbed" checkboxes).
   // Rule 1 (one coupon per checkout) is hard-coded in the service.
   stacksWithVendorPromo Boolean @default(true) @map("stacks_with_vendor_promo")
   stacksWithCashback    Boolean @default(true) @map("stacks_with_cashback")
+  stacksWithWallet      Boolean @default(true) @map("stacks_with_wallet")
 
   isActive    Boolean @default(true) @map("is_active")
   createdById String? @map("created_by_id") @db.Uuid
@@ -3165,9 +3189,12 @@ model Coupon {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  vendor      Vendor?            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  redemptions CouponRedemption[]
-  orders      Order[]
+  vendor           Vendor?            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  redemptions      CouponRedemption[]
+  orders           Order[]
+  welcomeGrants    WelcomeGrant[]
+  firstOrderGrants FirstOrderGrant[]
+  referralRewards  ReferralReward[]
 
   @@index([vendorId, isActive])
   @@index([isActive, endDate])
@@ -3218,7 +3245,9 @@ model CashbackCampaign {
 
   // Rule 2 (coupon + cashback) — per-campaign "can be clubbed" checkbox.
   // Rule 5 (single highest cashback source) is hard-coded in the service.
+  // Rule 6 — when false, skip this campaign if Rewards Wallet was used as payment.
   stacksWithCoupon Boolean @default(true) @map("stacks_with_coupon")
+  stacksWithWallet Boolean @default(true) @map("stacks_with_wallet")
 
   isActive    Boolean @default(true) @map("is_active")
   createdById String? @map("created_by_id") @db.Uuid
@@ -3235,17 +3264,22 @@ model CashbackCampaign {
 }
 
 // A single earned (or granted) cashback. Order-linked entries are created at
-// checkout in `pending` and settled on delivery; direct grants (admin "reward
-// this user" flow) are created already-approved/credited with no order.
-// Campaign terms are snapshotted so settlement survives campaign edits AND
-// admin order modifications (amount is recomputed from the snapshot at delivery).
+// checkout in `pending` and settled on delivery; direct grants, welcome / first-
+// order / referral cashback, and payout-invite claims use the matching source
+// and have no campaign. Campaign terms are snapshotted so settlement survives
+// campaign edits AND admin order modifications (amount is recomputed from the
+// snapshot at delivery).
 model CashbackEntry {
-  id         String              @id @default(uuid()) @db.Uuid
-  campaignId String?             @map("campaign_id") @db.Uuid
-  userId     String              @map("user_id") @db.Uuid
-  orderId    String?             @unique @map("order_id") @db.Uuid
-  vendorId   String?             @map("vendor_id") @db.Uuid // funding vendor, for reporting
-  source     CashbackEntrySource @default(order)
+  id              String              @id @default(uuid()) @db.Uuid
+  campaignId      String?             @map("campaign_id") @db.Uuid
+  userId          String              @map("user_id") @db.Uuid
+  orderId         String?             @unique @map("order_id") @db.Uuid
+  // One order-sourced entry per checkout. Null on direct grants / payout invites
+  // (Postgres unique allows multiple NULLs). Settlement recomputes from remaining
+  // non-cancelled POs that share this id.
+  checkoutGroupId String?             @unique @map("checkout_group_id") @db.Uuid
+  vendorId        String?             @map("vendor_id") @db.Uuid // funding vendor, for reporting
+  source          CashbackEntrySource @default(order)
 
   amount      Decimal             @db.Decimal(10, 2)
   destination CashbackDestination
@@ -3269,14 +3303,243 @@ model CashbackEntry {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  campaign CashbackCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  user     User              @relation(fields: [userId], references: [id])
-  order    Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  campaign        CashbackCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  user            User              @relation(fields: [userId], references: [id])
+  order           Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  welcomeGrant    WelcomeGrant?
+  firstOrderGrant FirstOrderGrant?
+  referralReward  ReferralReward?
+  payoutInvite    PayoutInvite?
 
   @@index([userId, status])
   @@index([campaignId])
   @@index([status, destination])
   @@map("cashback_entries")
+}
+
+// ═══════════════════════════════════════════════════════
+//  PROMO ENGINE — Phase C (Welcome / First Order / Referral / Payout)
+// ═══════════════════════════════════════════════════════
+//
+// Admin-managed singleton programs (one row each, keyed by singletonKey='default').
+// Issuance tables are unique on userId (or attribution+side) so retries are
+// idempotent. Cashback issued here uses CashbackEntrySource welcome / first_order
+// / referral / payout_invite — never a second order-sourced entry.
+
+enum ProgramRewardType {
+  wallet_credit
+  coupon_flat
+  coupon_percentage
+  cashback
+  free_delivery
+
+  @@map("program_reward_type")
+}
+
+enum ReferralTrigger {
+  signup
+  first_order
+  first_order_mov
+
+  @@map("referral_trigger")
+}
+
+enum ReferralRewardSide {
+  referrer
+  referred
+
+  @@map("referral_reward_side")
+}
+
+enum PayoutInviteStatus {
+  pending
+  claimed
+  cancelled
+
+  @@map("payout_invite_status")
+}
+
+model WelcomeOffer {
+  id            String            @id @default(uuid()) @db.Uuid
+  singletonKey  String            @unique @default("default") @map("singleton_key") @db.VarChar(20)
+  isActive      Boolean           @default(false) @map("is_active")
+  rewardType    ProgramRewardType @map("reward_type")
+  rewardValue   Decimal           @map("reward_value") @db.Decimal(10, 2)
+  minOrderValue Decimal?          @map("min_order_value") @db.Decimal(12, 2)
+  validDays     Int?              @map("valid_days")
+  maxDiscount   Decimal?          @map("max_discount") @db.Decimal(10, 2)
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  grants WelcomeGrant[]
+
+  @@map("welcome_offers")
+}
+
+// One grant per user. For free_delivery the row IS the entitlement — consumedAt
+// is set once at checkout when shipping would otherwise apply.
+model WelcomeGrant {
+  id              String            @id @default(uuid()) @db.Uuid
+  userId          String            @unique @map("user_id") @db.Uuid
+  offerId         String            @map("offer_id") @db.Uuid
+  rewardType      ProgramRewardType @map("reward_type")
+  rewardValue     Decimal           @map("reward_value") @db.Decimal(10, 2)
+  couponId        String?           @map("coupon_id") @db.Uuid
+  cashbackEntryId String?           @unique @map("cashback_entry_id") @db.Uuid
+  walletTxnId     String?           @unique @map("wallet_txn_id") @db.Uuid
+  consumedAt      DateTime?         @map("consumed_at") @db.Timestamptz
+  consumedOrderId String?           @map("consumed_order_id") @db.Uuid
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offer         WelcomeOffer   @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  coupon        Coupon?        @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  cashbackEntry CashbackEntry? @relation(fields: [cashbackEntryId], references: [id], onDelete: SetNull)
+
+  @@index([offerId])
+  @@map("welcome_grants")
+}
+
+model FirstOrderOffer {
+  id            String            @id @default(uuid()) @db.Uuid
+  singletonKey  String            @unique @default("default") @map("singleton_key") @db.VarChar(20)
+  isActive      Boolean           @default(false) @map("is_active")
+  rewardType    ProgramRewardType @map("reward_type")
+  rewardValue   Decimal           @map("reward_value") @db.Decimal(10, 2)
+  minOrderValue Decimal?          @map("min_order_value") @db.Decimal(12, 2)
+  validDays     Int?              @map("valid_days")
+  maxDiscount   Decimal?          @map("max_discount") @db.Decimal(10, 2)
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  grants FirstOrderGrant[]
+
+  @@map("first_order_offers")
+}
+
+model FirstOrderGrant {
+  id              String            @id @default(uuid()) @db.Uuid
+  userId          String            @unique @map("user_id") @db.Uuid
+  offerId         String            @map("offer_id") @db.Uuid
+  orderId         String?           @unique @map("order_id") @db.Uuid
+  checkoutGroupId String?           @map("checkout_group_id") @db.Uuid
+  rewardType      ProgramRewardType @map("reward_type")
+  rewardValue     Decimal           @map("reward_value") @db.Decimal(10, 2)
+  couponId        String?           @map("coupon_id") @db.Uuid
+  cashbackEntryId String?           @unique @map("cashback_entry_id") @db.Uuid
+  walletTxnId     String?           @unique @map("wallet_txn_id") @db.Uuid
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offer         FirstOrderOffer @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  order         Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  coupon        Coupon?         @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  cashbackEntry CashbackEntry?  @relation(fields: [cashbackEntryId], references: [id], onDelete: SetNull)
+
+  @@index([offerId])
+  @@index([checkoutGroupId])
+  @@map("first_order_grants")
+}
+
+model ReferralProgram {
+  id            String          @id @default(uuid()) @db.Uuid
+  singletonKey  String          @unique @default("default") @map("singleton_key") @db.VarChar(20)
+  isActive      Boolean         @default(false) @map("is_active")
+  trigger       ReferralTrigger @default(signup)
+  minOrderValue Decimal?        @map("min_order_value") @db.Decimal(12, 2)
+
+  referrerRewardType  ProgramRewardType @map("referrer_reward_type")
+  referrerRewardValue Decimal           @map("referrer_reward_value") @db.Decimal(10, 2)
+  referrerMaxDiscount Decimal?          @map("referrer_max_discount") @db.Decimal(10, 2)
+  referrerValidDays   Int?              @map("referrer_valid_days")
+
+  referredRewardType  ProgramRewardType @map("referred_reward_type")
+  referredRewardValue Decimal           @map("referred_reward_value") @db.Decimal(10, 2)
+  referredMaxDiscount Decimal?          @map("referred_max_discount") @db.Decimal(10, 2)
+  referredValidDays   Int?              @map("referred_valid_days")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("referral_programs")
+}
+
+model ReferralClick {
+  id         String   @id @default(uuid()) @db.Uuid
+  token      String   @map("token") @db.VarChar(64)
+  referrerId String   @map("referrer_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  referrer    User                 @relation("ReferralClickReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  attribution ReferralAttribution?
+
+  @@index([token, createdAt])
+  @@index([referrerId])
+  @@map("referral_clicks")
+}
+
+// referredUserId unique — no reassignment. Self-referral is rejected in the service.
+model ReferralAttribution {
+  id             String   @id @default(uuid()) @db.Uuid
+  referredUserId String   @unique @map("referred_user_id") @db.Uuid
+  referrerId     String   @map("referrer_id") @db.Uuid
+  clickId        String?  @unique @map("click_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  referredUser User             @relation("ReferredUser", fields: [referredUserId], references: [id], onDelete: Cascade)
+  referrer     User             @relation("ReferrerUser", fields: [referrerId], references: [id], onDelete: Restrict)
+  click        ReferralClick?   @relation(fields: [clickId], references: [id], onDelete: SetNull)
+  rewards      ReferralReward[]
+
+  @@index([referrerId])
+  @@map("referral_attributions")
+}
+
+model ReferralReward {
+  id              String             @id @default(uuid()) @db.Uuid
+  attributionId   String             @map("attribution_id") @db.Uuid
+  side            ReferralRewardSide
+  rewardType      ProgramRewardType  @map("reward_type")
+  rewardValue     Decimal            @map("reward_value") @db.Decimal(10, 2)
+  couponId        String?            @map("coupon_id") @db.Uuid
+  cashbackEntryId String?            @unique @map("cashback_entry_id") @db.Uuid
+  walletTxnId     String?            @unique @map("wallet_txn_id") @db.Uuid
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz
+
+  attribution   ReferralAttribution @relation(fields: [attributionId], references: [id], onDelete: Cascade)
+  coupon        Coupon?             @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  cashbackEntry CashbackEntry?      @relation(fields: [cashbackEntryId], references: [id], onDelete: SetNull)
+
+  @@unique([attributionId, side])
+  @@map("referral_rewards")
+}
+
+// Magic-link UPI payout. Amount is stored here — the public claim form must not
+// be trusted for amount. Token is unguessable; one claim; optional pre-selected user.
+model PayoutInvite {
+  id              String             @id @default(uuid()) @db.Uuid
+  token           String             @unique @db.VarChar(64)
+  amount          Decimal            @db.Decimal(10, 2)
+  notes           String?            @db.Text
+  expiresAt       DateTime           @map("expires_at") @db.Timestamptz
+  userId          String?            @map("user_id") @db.Uuid
+  createdById     String             @map("created_by_id") @db.Uuid
+  status          PayoutInviteStatus @default(pending)
+  claimedAt       DateTime?          @map("claimed_at") @db.Timestamptz
+  claimedName     String?            @map("claimed_name") @db.VarChar(255)
+  claimedUpiId    String?            @map("claimed_upi_id") @db.VarChar(100)
+  cashbackEntryId String?            @unique @map("cashback_entry_id") @db.Uuid
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user          User?          @relation("PayoutInviteUser", fields: [userId], references: [id], onDelete: SetNull)
+  createdBy     User           @relation("PayoutInviteCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  cashbackEntry CashbackEntry? @relation(fields: [cashbackEntryId], references: [id], onDelete: SetNull)
+
+  @@index([status, expiresAt])
+  @@index([createdById])
+  @@index([userId])
+  @@map("payout_invites")
 }
 
 // Global, single-row platform configuration edited from the admin Settings page.

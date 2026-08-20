@@ -24,7 +24,50 @@ const eslintConfig = defineConfig([
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/purity": "warn",
     }
-  }
+  },
+  // Client UI trees must not pull Node/server packages into the browser graph.
+  {
+    files: [
+      "src/components/**/*.{ts,tsx}",
+      "src/context/**/*.{ts,tsx}",
+      "src/hooks/**/*.{ts,tsx}",
+      "src/app/**/*.tsx",
+    ],
+    ignores: ["src/app/api/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@prisma/client",
+              message: "Do not import Prisma into client UI. Use API routes / server components.",
+            },
+            {
+              name: "pdfkit",
+              message: "pdfkit is server-only.",
+            },
+            {
+              name: "bullmq",
+              message: "bullmq is server-only.",
+            },
+            {
+              name: "ioredis",
+              message: "ioredis is server-only.",
+            },
+            {
+              name: "fs",
+              message: "Node fs is server-only.",
+            },
+            {
+              name: "node:fs",
+              message: "Node fs is server-only.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

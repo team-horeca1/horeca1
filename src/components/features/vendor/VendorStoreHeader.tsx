@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Star, MapPin, Phone, Share2, ChevronLeft, Image as ImageIcon, Navigation, ClipboardList, CreditCard, Clock, Megaphone } from 'lucide-react';
+import React, { useState } from 'react';
+import { Star, MapPin, Phone, Share2, ChevronLeft, Image as ImageIcon, Navigation, ClipboardList, CreditCard, Clock, Megaphone, Tag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import type { Vendor, StorePromotion } from '@/types';
 import { VENDOR_COVERS } from '@/components/features/homepage/VendorCardShared';
 import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
+import { OffersSheet } from '@/components/features/promo/OffersSheet';
 
 interface VendorStoreHeaderProps {
     vendor: Vendor;
@@ -22,6 +23,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
     const router = useRouter();
     const { status } = useSession();
     const isLoggedIn = status === 'authenticated';
+    const [dealsOpen, setDealsOpen] = useState(false);
     const coverIndex = Math.abs(vendor.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % VENDOR_COVERS.length;
     const coverImage = vendor.coverImage || VENDOR_COVERS[coverIndex];
     // The detail page hero box renders the vendor's LOGO, not their card cover.
@@ -127,6 +129,19 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                         <ClipboardList size={16} className="text-[#53B175]" strokeWidth={3} />
                         My Lists
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => setDealsOpen(true)}
+                        className="shrink-0 bg-white border-2 border-[#181725]/10 px-4 py-2 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-black text-[#181725] shadow-sm"
+                    >
+                        <Tag size={16} strokeWidth={2.5} className="text-[#53B175]" />
+                        Deals
+                        {storePromos.length > 0 && (
+                            <span className="min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-[#53B175] text-white text-[10px] font-black flex items-center justify-center">
+                                {storePromos.length}
+                            </span>
+                        )}
+                    </button>
                 </div>
 
                 {storePromos.length > 0 && (
@@ -222,24 +237,38 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                             </p>
                         </div>
 
-                        {/* Right-side CTA stack */}
-                        <div className="flex-shrink-0 ml-4 hidden lg:flex flex-col items-end gap-2">
+                        {/* Right-side CTAs — primary order + secondary deals (not twin buttons) */}
+                        <div className="flex-shrink-0 ml-4 hidden lg:flex flex-col items-stretch gap-2.5 w-[min(100%,220px)]">
                             {vendor.deliverySchedule && (
-                                <span className="bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
-                                    🚚 Next: {vendor.deliverySchedule}
+                                <span className="self-end bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-lg">
+                                    Next · {vendor.deliverySchedule}
                                 </span>
                             )}
                             <button
+                                type="button"
                                 onClick={() => {
                                     onTabChange('all');
                                     setTimeout(() => {
                                         window.scrollTo({ top: window.innerHeight * 0.45, behavior: 'smooth' });
                                     }, 50);
                                 }}
-                                className="bg-[#181725] text-white px-7 py-3 rounded-2xl flex items-center gap-2 text-[1rem] font-bold hover:scale-105 transition-all shadow-xl whitespace-nowrap"
+                                className="w-full bg-white text-[#181725] px-[clamp(1rem,2vw,1.5rem)] py-[clamp(0.7rem,1.2vw,0.85rem)] rounded-2xl flex items-center justify-center gap-2 text-[clamp(0.9rem,1.2vw,1rem)] font-bold shadow-lg hover:bg-white/95 transition-colors"
                             >
                                 Start Ordering
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M9 18l6-6-6-6" /></svg>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDealsOpen(true)}
+                                className="w-full bg-transparent text-white px-[clamp(1rem,2vw,1.5rem)] py-[clamp(0.65rem,1.1vw,0.8rem)] rounded-2xl flex items-center justify-center gap-2 text-[clamp(0.85rem,1.1vw,0.95rem)] font-bold border-2 border-white/50 hover:bg-white/10 hover:border-white transition-colors"
+                            >
+                                <Tag size={16} strokeWidth={2.5} aria-hidden />
+                                Deals & Coupons
+                                {storePromos.length > 0 && (
+                                    <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-white text-[#22844f] text-[11px] font-black flex items-center justify-center">
+                                        {storePromos.length}
+                                    </span>
+                                )}
                             </button>
                         </div>
                     </div>
@@ -302,6 +331,13 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                     ))}
                 </div>
             </div>
+
+            <OffersSheet
+                open={dealsOpen}
+                onClose={() => setDealsOpen(false)}
+                vendorId={vendor.id}
+                vendorName={vendor.name}
+            />
         </div>
     );
 }

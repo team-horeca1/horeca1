@@ -22,6 +22,7 @@ import {
   promotionService,
   evaluateVendorPromo,
   evaluateBxgyForCart,
+  couponSuppressesVendorPromos,
   type CheckoutDraftItem,
   type CouponApplication,
 } from '@/modules/promotion/promotion.service';
@@ -181,7 +182,7 @@ export class OrderService {
     // via the address id cookie), so the order total matches the cart/storefront.
     const deliveryGeo = await getDeliveryGeo(userId);
     const isDraft = input.saveDraft === true;
-    return prisma.$transaction(async (tx) => {
+    const created = await prisma.$transaction(async (tx) => {
       const orders: Array<{
         id: string;
         orderNumber: string;
@@ -206,6 +207,15 @@ export class OrderService {
         fulfillmentOutletId: string;
       }
       const prepared: PreparedOrder[] = [];
+
+      // Rule 3 — a coupon that cannot club with vendor promos must skip BXGY
+      // free lines AND pct/flat before they are merged into the PO. Peek the
+      // flag first so an invalid code still fails later in applyCouponToCheckout
+      // without having already written free goods / usage.
+      const suppressVendorPromosEarly =
+        !isDraft && input.couponCode
+          ? await couponSuppressesVendorPromos(tx, input.couponCode)
+          : false;
 
       for (const vo of input.vendorOrders) {
         const fulfillmentOutletId = await this.fulfillmentRouter.resolveFulfillmentOutlet({
@@ -392,7 +402,9 @@ export class OrderService {
           });
         }
 
-        const bxgyResults = await evaluateBxgyForCart(tx, vo.vendorId, paidItemsForBxgy);
+        const bxgyResults = suppressVendorPromosEarly
+          ? []
+          : await evaluateBxgyForCart(tx, vo.vendorId, paidItemsForBxgy);
         for (const bxgy of bxgyResults) {
           if (bxgy.freeUnits <= 0) continue;
           appliedBxgyPromoIds.add(bxgy.promotionId);
@@ -439,8 +451,10 @@ export class OrderService {
         //     via the shared helper — the SAME selection the checkout preview
         //     uses, so the previewed Store Offer equals what we deduct here.
         //     Usage is counted in PASS 2 — a non-stacking coupon (Rule 3) may
-        //     suppress the promo, and a suppressed promo must not consume a use.
-        const vendorPromo = await evaluateVendorPromo(tx, vo.vendorId, subtotal);
+        //     suppress pct/flat AND BXGY, and a suppressed promo must not consume a use.
+        const vendorPromo = suppressVendorPromosEarly
+          ? null
+          : await evaluateVendorPromo(tx, vo.vendorId, subtotal);
         const promoDiscount = vendorPromo?.discount ?? 0;
         const appliedPromoId = vendorPromo?.promotionId ?? null;
 
@@ -461,17 +475,33 @@ export class OrderService {
       // ── Coupon (Rule 1: ONE code per checkout). Validated + allocated over
       // the prepared orders; a coupon that can't be clubbed with vendor promos
       // (Rule 3) suppresses them for this checkout — without consuming a use.
+      // First-order coupon-type offers auto-apply when the shopper did not
+      // enter a code (they still lose it if they pick a different coupon).
       let couponApp: CouponApplication | null = null;
-      if (!isDraft && input.couponCode) {
-        couponApp = await promotionService.applyCouponToCheckout(tx, {
-          code: input.couponCode,
+      let firstOrderCouponId: string | null = null;
+      const couponDrafts = prepared.map((p) => ({
+        vendorId: p.vo.vendorId,
+        subtotal: p.subtotal,
+        promoDiscount: p.promoDiscount,
+        items: p.draftItems,
+      }));
+      let couponCode = input.couponCode ?? null;
+      if (!isDraft && !couponCode) {
+        const auto = await promotionService.autoFirstOrderCoupon(tx, {
           userId,
-          drafts: prepared.map((p) => ({
-            vendorId: p.vo.vendorId,
-            subtotal: p.subtotal,
-            promoDiscount: p.promoDiscount,
-            items: p.draftItems,
-          })),
+          drafts: couponDrafts,
+          createIfMissing: true,
+        });
+        if (auto) {
+          couponCode = auto.code;
+          firstOrderCouponId = auto.couponId;
+        }
+      }
+      if (!isDraft && couponCode) {
+        couponApp = await promotionService.applyCouponToCheckout(tx, {
+          code: couponCode,
+          userId,
+          drafts: couponDrafts,
         });
         if (couponApp.suppressVendorPromos) {
           for (const p of prepared) {
@@ -481,11 +511,12 @@ export class OrderService {
         }
       }
 
-      // ── Prepaid wallet redemption (Rule 6). Applied AFTER discounts in the
-      // brief's calculation sequence. Online payments keep a ₹1 combined floor
-      // because Razorpay cannot charge ₹0.
+      // ── Prepaid Rewards Wallet redemption (Rule 6). Applied AFTER discounts.
+      // A coupon with stacksWithWallet=false ignores useWallet. Online payments
+      // keep a ₹1 combined floor because Razorpay cannot charge ₹0.
       let walletShares: number[] = prepared.map(() => 0);
-      if (!isDraft && input.useWallet) {
+      const couponBlocksWallet = !!couponApp && !couponApp.coupon.stacksWithWallet;
+      if (!isDraft && input.useWallet && !couponBlocksWallet) {
         const balance = await promotionService.getWalletBalance(tx, userId);
         const payables = prepared.map((p, i) =>
           round2(Math.max(0, p.subtotal - p.promoDiscount - (couponApp?.perOrder[i] ?? 0))),
@@ -547,6 +578,7 @@ export class OrderService {
             couponCode: couponShare > 0 ? couponApp!.coupon.code : null,
             couponDiscount: couponShare,
             walletApplied,
+            checkoutGroupId,
             totalAmount,
             paymentMethod: input.paymentMethod,
             deliverySlotId: vo.deliverySlotId,
@@ -596,20 +628,28 @@ export class OrderService {
         if (couponShare > 0) redemptionRows.push({ orderId: order.id, amount: couponShare });
         if (walletApplied > 0) walletRows.push({ orderId: order.id, amount: walletApplied });
 
-        // Cashback (Rule 5 — single highest source) evaluated per order on the
-        // goods value the customer pays (wallet is payment, not discount).
-        if (!isDraft) {
-          await promotionService.evaluateCashbackForOrder(tx, {
-            userId,
-            orderId: order.id,
-            vendorId: vo.vendorId,
-            base: round2(Math.max(0, p.subtotal - p.promoDiscount - couponShare)),
-            couponAppliedOnOrder: couponShare > 0,
-            couponBlocksCashback: !!couponApp && !couponApp.coupon.stacksWithCashback,
-          });
-        }
-
         orders.push(order);
+      }
+
+      // Cashback (Rule 5) — one source for the entire checkout, after every PO
+      // exists so the winning entry can attach to a real orderId.
+      if (!isDraft) {
+        await promotionService.evaluateCashbackForCheckout(tx, {
+          userId,
+          checkoutGroupId,
+          pos: orders.map((order, i) => {
+            const p = prepared[i];
+            const couponShare = couponApp?.perOrder[i] ?? 0;
+            return {
+              orderId: order.id,
+              vendorId: p.vo.vendorId,
+              base: round2(Math.max(0, p.subtotal - p.promoDiscount - couponShare)),
+            };
+          }),
+          couponApplied: !!couponApp,
+          couponBlocksCashback: !!couponApp && !couponApp.coupon.stacksWithCashback,
+          walletApplied: walletRows.length > 0,
+        });
       }
 
       // ── Persist the coupon use (one per checkout) + the wallet debit ledger.
@@ -620,6 +660,14 @@ export class OrderService {
           checkoutGroupId,
           rows: redemptionRows,
         });
+        if (firstOrderCouponId && firstOrderCouponId === couponApp.coupon.id) {
+          await promotionService.captureFirstOrderCouponGrant(tx, {
+            userId,
+            couponId: couponApp.coupon.id,
+            orderId: orders[0]!.id,
+            checkoutGroupId,
+          });
+        }
       }
       if (walletRows.length > 0) {
         await promotionService.debitWalletForCheckout(tx, { userId, rows: walletRows });
@@ -656,6 +704,15 @@ export class OrderService {
 
       return { orders };
     }, { isolationLevel: 'Serializable' });
+
+    if (!isDraft && created.orders.length > 0) {
+      try {
+        await promotionService.onOrdersBecameSuccessful(created.orders.map((o) => o.id));
+      } catch (err) {
+        console.error('[Order] Program issuance after checkout failed:', err);
+      }
+    }
+    return created;
   }
 
   async list(userId: string, options: { status?: string; vendorId?: string; cursor?: string; limit?: number }) {
@@ -909,16 +966,23 @@ export class OrderService {
       // S8 — create Fulfilment aggregate on accept (idempotent).
       await ensureFulfilmentForOrder(order.id, { actorId: ctx.userId, tx });
 
-      // Promo Engine Phase 1 — drafts skip cashback at save time; evaluate it
-      // now that the order is real. (Drafts can't carry coupons, but compute
-      // the base defensively in case that ever changes.)
-      await promotionService.evaluateCashbackForOrder(tx, {
+      // Promo Engine — drafts skip cashback at save time; evaluate once for
+      // this PO (its own checkout group) now that the order is real.
+      const checkoutGroupId = order.checkoutGroupId ?? randomUUID();
+      if (!order.checkoutGroupId) {
+        await tx.order.update({ where: { id: order.id }, data: { checkoutGroupId } });
+      }
+      await promotionService.evaluateCashbackForCheckout(tx, {
         userId: ctx.userId,
-        orderId: order.id,
-        vendorId: order.vendorId,
-        base: round2(Math.max(0, Number(order.subtotal) - Number(order.promoDiscount) - Number(order.couponDiscount))),
-        couponAppliedOnOrder: Number(order.couponDiscount) > 0,
+        checkoutGroupId,
+        pos: [{
+          orderId: order.id,
+          vendorId: order.vendorId,
+          base: round2(Math.max(0, Number(order.subtotal) - Number(order.promoDiscount) - Number(order.couponDiscount))),
+        }],
+        couponApplied: Number(order.couponDiscount) > 0,
         couponBlocksCashback: false,
+        walletApplied: Number(order.walletApplied) > 0,
       });
 
       setImmediate(() => emitEvent('OrderCreated', {
@@ -1897,6 +1961,13 @@ export class OrderService {
       });
       if (!order) throw Errors.notFound('Order');
 
+      // Same-status PATCH is a no-op (must run before the transition guard so
+      // re-deliver / re-confirm does not 400 and can stay idempotent for
+      // cashback settle + program issuance callers).
+      if (order.status === status) {
+        return order;
+      }
+
       // Rule 12 — cancel only before packing (pending/confirmed). After Packed → Returns.
       if (status === 'cancelled' && !force && !OrderService.isCancellableStatus(order.status)) {
         throw Errors.badRequest(
@@ -1913,10 +1984,6 @@ export class OrderService {
           `Cannot move order from "${order.status}" to "${status}". ` +
           `Allowed next states: ${validNext.length ? validNext.join(', ') : 'none'}.`
         );
-      }
-      if (order.status === status) {
-        // No-op: nothing to change (avoids a spurious side-effect re-run).
-        return order;
       }
 
       if (status === 'shipped') {
@@ -2030,11 +2097,15 @@ export class OrderService {
       }
 
       // Promo Engine Phase 1 side-effects — all idempotent, all inside this tx:
-      //   cancelled → reverse the coupon use, refund the prepaid-wallet amount,
-      //               void the pending cashback.
-      //   delivered → settle the cashback (credit wallet / approve UPI payout).
-      //   returned  → void the cashback; a credited one is clawed back from
-      //               the wallet (clamped at the current balance).
+      //   cancelled → reverse the coupon use, refund the Rewards Wallet amount,
+      //               void the pending cashback on the attached (winning) PO.
+      //               Sibling POs do not each hold an entry; settlement of the
+      //               winning PO recomputes from remaining non-cancelled POs.
+      //   delivered → settle the cashback (credit Rewards Wallet / approve UPI).
+      //   returned  → void the cashback on the attached PO. ReturnRequest close
+      //               already reaches this path — do NOT also claw back inside
+      //               return.service (would double-cancel). Partial-return
+      //               pro-rata is a remaining product decision.
       if (status === 'cancelled') {
         await promotionService.reverseCouponForOrder(tx, orderId);
         await promotionService.refundWalletForOrder(tx, {
@@ -2163,6 +2234,21 @@ export class OrderService {
         await this.syncOpenFulfilmentToDelivered(orderId);
       } catch (err) {
         console.error('[Order] Sync fulfilment on delivered failed:', err);
+      }
+    }
+
+    if (
+      status === 'confirmed' ||
+      status === 'processing' ||
+      status === 'ready_for_dispatch' ||
+      status === 'shipped' ||
+      status === 'partially_delivered' ||
+      status === 'delivered'
+    ) {
+      try {
+        await promotionService.onOrdersBecameSuccessful([orderId]);
+      } catch (err) {
+        console.error('[Order] Program issuance after status change failed:', err);
       }
     }
 

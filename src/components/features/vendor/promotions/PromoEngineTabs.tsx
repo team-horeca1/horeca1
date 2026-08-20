@@ -8,6 +8,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Loader2, Plus, Pencil, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { CouponScopeFields } from '@/components/features/promo/CouponScopePickers';
 
 interface VendorCouponRow {
     id: string;
@@ -24,7 +25,11 @@ interface VendorCouponRow {
     usedCount: number;
     stacksWithVendorPromo: boolean;
     stacksWithCashback: boolean;
+    stacksWithWallet: boolean;
     isActive: boolean;
+    categoryIds: string[];
+    productIds: string[];
+    brandNames: string[];
 }
 
 interface VendorCampaignRow {
@@ -42,6 +47,7 @@ interface VendorCampaignRow {
     usedAmount: string | number;
     usedCount: number;
     stacksWithCoupon: boolean;
+    stacksWithWallet: boolean;
     isActive: boolean;
 }
 
@@ -66,13 +72,15 @@ interface CouponForm {
     code: string; name: string; discountType: 'flat' | 'percentage'; discountValue: string;
     maxDiscount: string; minOrderValue: string; startDate: string; endDate: string;
     usageLimit: string; perUserLimit: string;
-    stacksWithVendorPromo: boolean; stacksWithCashback: boolean; isActive: boolean;
+    stacksWithVendorPromo: boolean; stacksWithCashback: boolean; stacksWithWallet: boolean; isActive: boolean;
+    categoryIds: string[]; productIds: string[]; brandNames: string[];
 }
 
 const emptyCouponForm: CouponForm = {
     code: '', name: '', discountType: 'flat', discountValue: '', maxDiscount: '',
     minOrderValue: '', startDate: '', endDate: '', usageLimit: '', perUserLimit: '',
-    stacksWithVendorPromo: true, stacksWithCashback: true, isActive: true,
+    stacksWithVendorPromo: true, stacksWithCashback: true, stacksWithWallet: true, isActive: true,
+    categoryIds: [], productIds: [], brandNames: [],
 };
 
 export function VendorCouponsTab() {
@@ -185,7 +193,11 @@ function VendorCouponModal({ editing, onClose, onSaved }: { editing: VendorCoupo
                 perUserLimit: editing.perUserLimit != null ? String(editing.perUserLimit) : '',
                 stacksWithVendorPromo: editing.stacksWithVendorPromo,
                 stacksWithCashback: editing.stacksWithCashback,
+                stacksWithWallet: editing.stacksWithWallet !== false,
                 isActive: editing.isActive,
+                categoryIds: editing.categoryIds ?? [],
+                productIds: editing.productIds ?? [],
+                brandNames: editing.brandNames ?? [],
             }
             : emptyCouponForm,
     );
@@ -212,7 +224,11 @@ function VendorCouponModal({ editing, onClose, onSaved }: { editing: VendorCoupo
                 perUserLimit: num(form.perUserLimit) ?? null,
                 stacksWithVendorPromo: form.stacksWithVendorPromo,
                 stacksWithCashback: form.stacksWithCashback,
+                stacksWithWallet: form.stacksWithWallet,
                 isActive: form.isActive,
+                categoryIds: form.categoryIds,
+                productIds: form.productIds,
+                brandNames: form.brandNames,
             };
             const res = await fetch(editing ? `/api/v1/vendor/coupons/${editing.id}` : '/api/v1/vendor/coupons', {
                 method: editing ? 'PATCH' : 'POST',
@@ -233,7 +249,7 @@ function VendorCouponModal({ editing, onClose, onSaved }: { editing: VendorCoupo
 
     return (
         <div className="fixed inset-0 z-[10020] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-            <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-5">
                     <h3 className="text-[16px] font-bold text-[#181725]">{editing ? `Edit ${editing.code}` : 'New Store Coupon'}</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X size={18} /></button>
@@ -286,6 +302,14 @@ function VendorCouponModal({ editing, onClose, onSaved }: { editing: VendorCoupo
                         <label className={labelCls}>Per-User Limit</label>
                         <input className={inputCls} type="number" min="1" value={form.perUserLimit} onChange={(e) => set({ perUserLimit: e.target.value })} placeholder="Unlimited" />
                     </div>
+                    <CouponScopeFields
+                        categoryIds={form.categoryIds}
+                        productIds={form.productIds}
+                        brandNames={form.brandNames}
+                        productSource="vendor"
+                        focusBorder="focus:border-[#299E60]"
+                        onChange={(patch) => set(patch)}
+                    />
                 </div>
                 <div className="mt-4 space-y-2">
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
@@ -295,6 +319,10 @@ function VendorCouponModal({ editing, onClose, onSaved }: { editing: VendorCoupo
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#299E60]" checked={form.stacksWithCashback} onChange={(e) => set({ stacksWithCashback: e.target.checked })} />
                         Can be clubbed with cashback offers
+                    </label>
+                    <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
+                        <input type="checkbox" className="accent-[#299E60]" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
+                        Can be clubbed with H1 Wallet
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#299E60]" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
@@ -317,15 +345,15 @@ function VendorCouponModal({ editing, onClose, onSaved }: { editing: VendorCoupo
 
 interface CampaignForm {
     name: string; cashbackType: 'flat' | 'percentage'; cashbackValue: string;
-    maxCashback: string; minOrderValue: string; destination: 'wallet' | 'upi';
+    maxCashback: string; minOrderValue: string;
     startDate: string; endDate: string; perUserLimit: string; totalBudget: string;
-    stacksWithCoupon: boolean; isActive: boolean;
+    stacksWithCoupon: boolean; stacksWithWallet: boolean; isActive: boolean;
 }
 
 const emptyCampaignForm: CampaignForm = {
     name: '', cashbackType: 'flat', cashbackValue: '', maxCashback: '', minOrderValue: '',
-    destination: 'wallet', startDate: '', endDate: '', perUserLimit: '', totalBudget: '',
-    stacksWithCoupon: true, isActive: true,
+    startDate: '', endDate: '', perUserLimit: '', totalBudget: '',
+    stacksWithCoupon: true, stacksWithWallet: true, isActive: true,
 };
 
 export function VendorCashbackTab() {
@@ -399,7 +427,7 @@ export function VendorCashbackTab() {
                                     <td className={cn(tdCls, 'font-bold text-[#181725]')}>{c.name}</td>
                                     <td className={tdCls}>{c.cashbackType === 'flat' ? inr(c.cashbackValue) : `${Number(c.cashbackValue)}%${c.maxCashback ? ` (max ${inr(c.maxCashback)})` : ''}`}</td>
                                     <td className={tdCls}>{c.minOrderValue ? inr(c.minOrderValue) : '—'}</td>
-                                    <td className={tdCls}>{c.destination === 'wallet' ? 'Wallet' : 'UPI'}</td>
+                                    <td className={tdCls}>{c.destination === 'wallet' ? 'H1 Wallet' : 'UPI (legacy)'}</td>
                                     <td className={tdCls}>{c.totalBudget ? `${inr(c.usedAmount)} / ${inr(c.totalBudget)}` : inr(c.usedAmount)}</td>
                                     <td className={tdCls}>{fmtDate(c.startDate)} → {fmtDate(c.endDate)}</td>
                                     <td className={tdCls}>{c.usedCount}</td>
@@ -433,12 +461,12 @@ function VendorCampaignModal({ editing, onClose, onSaved }: { editing: VendorCam
                 cashbackValue: String(editing.cashbackValue ?? ''),
                 maxCashback: editing.maxCashback != null ? String(editing.maxCashback) : '',
                 minOrderValue: editing.minOrderValue != null ? String(editing.minOrderValue) : '',
-                destination: editing.destination,
                 startDate: editing.startDate ? editing.startDate.slice(0, 10) : '',
                 endDate: editing.endDate ? editing.endDate.slice(0, 10) : '',
                 perUserLimit: editing.perUserLimit != null ? String(editing.perUserLimit) : '',
                 totalBudget: editing.totalBudget != null ? String(editing.totalBudget) : '',
                 stacksWithCoupon: editing.stacksWithCoupon,
+                stacksWithWallet: editing.stacksWithWallet !== false,
                 isActive: editing.isActive,
             }
             : emptyCampaignForm,
@@ -459,12 +487,12 @@ function VendorCampaignModal({ editing, onClose, onSaved }: { editing: VendorCam
                 cashbackValue: num(form.cashbackValue),
                 maxCashback: num(form.maxCashback) ?? null,
                 minOrderValue: num(form.minOrderValue) ?? null,
-                destination: form.destination,
                 startDate: toIsoStart(form.startDate) ?? null,
                 endDate: toIsoEnd(form.endDate) ?? null,
                 perUserLimit: num(form.perUserLimit) ?? null,
                 totalBudget: num(form.totalBudget) ?? null,
                 stacksWithCoupon: form.stacksWithCoupon,
+                stacksWithWallet: form.stacksWithWallet,
                 isActive: form.isActive,
             };
             const res = await fetch(editing ? `/api/v1/vendor/cashback/${editing.id}` : '/api/v1/vendor/cashback', {
@@ -518,13 +546,6 @@ function VendorCampaignModal({ editing, onClose, onSaved }: { editing: VendorCam
                         <input className={inputCls} type="number" min="0" value={form.minOrderValue} onChange={(e) => set({ minOrderValue: e.target.value })} />
                     </div>
                     <div>
-                        <label className={labelCls}>Reward Destination</label>
-                        <select className={inputCls} value={form.destination} onChange={(e) => set({ destination: e.target.value as 'wallet' | 'upi' })}>
-                            <option value="wallet">Rewards Wallet (auto-credit)</option>
-                            <option value="upi">UPI (admin pays out manually)</option>
-                        </select>
-                    </div>
-                    <div>
                         <label className={labelCls}>Total Budget (₹)</label>
                         <input className={inputCls} type="number" min="0" value={form.totalBudget} onChange={(e) => set({ totalBudget: e.target.value })} placeholder="Unlimited" />
                     </div>
@@ -541,10 +562,15 @@ function VendorCampaignModal({ editing, onClose, onSaved }: { editing: VendorCam
                         <input className={inputCls} type="number" min="1" value={form.perUserLimit} onChange={(e) => set({ perUserLimit: e.target.value })} placeholder="Unlimited" />
                     </div>
                 </div>
+                <p className="mt-3 text-[11px] text-gray-400 font-medium">Credits the customer&apos;s H1 Wallet after delivery.</p>
                 <div className="mt-4 space-y-2">
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#299E60]" checked={form.stacksWithCoupon} onChange={(e) => set({ stacksWithCoupon: e.target.checked })} />
                         Can be clubbed with coupons
+                    </label>
+                    <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
+                        <input type="checkbox" className="accent-[#299E60]" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
+                        Can be clubbed with H1 Wallet payment
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#299E60]" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />

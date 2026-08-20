@@ -1,13 +1,16 @@
 'use client';
 
 // /admin/promotions — Promo Engine Phase 1 admin console.
-// Tabs: Coupons (platform + vendor oversight), Cashback campaigns, and the
-// Payouts & Grants queue (manual UPI transfers + direct user incentives).
+// Tabs: Coupons, Cashback campaigns, Programs (welcome / first-order / referral),
+// and Payouts (UPI magic links + optional instant H1 Wallet grants).
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, Plus, Pencil, Trash2, Gift, Ticket, IndianRupee, Search, X } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Gift, Ticket, IndianRupee, Search, X, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { ProgramsTab } from '@/components/features/admin/promotions/ProgramsTab';
+import { PayoutInviteModal } from '@/components/features/admin/promotions/PayoutInviteModal';
+import { AudienceUserPicker, CouponScopeFields } from '@/components/features/promo/CouponScopePickers';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -28,7 +31,12 @@ interface CouponRow {
     usedCount: number;
     stacksWithVendorPromo: boolean;
     stacksWithCashback: boolean;
+    stacksWithWallet: boolean;
     isActive: boolean;
+    categoryIds: string[];
+    productIds: string[];
+    brandNames: string[];
+    audienceUserIds: string[];
     _count?: { redemptions: number };
 }
 
@@ -49,6 +57,7 @@ interface CampaignRow {
     usedAmount: string | number;
     usedCount: number;
     stacksWithCoupon: boolean;
+    stacksWithWallet: boolean;
     isActive: boolean;
     _count?: { entries: number };
 }
@@ -58,7 +67,7 @@ interface EntryRow {
     amount: string | number;
     destination: 'wallet' | 'upi';
     status: 'pending' | 'approved' | 'credited' | 'paid' | 'cancelled';
-    source: 'order' | 'direct_grant';
+    source: 'order' | 'direct_grant' | 'welcome' | 'first_order' | 'referral' | 'payout_invite';
     upiId: string | null;
     paidReference: string | null;
     createdAt: string;
@@ -75,7 +84,7 @@ interface UserHit {
     businessName: string | null;
 }
 
-type Tab = 'coupons' | 'cashback' | 'payouts';
+type Tab = 'coupons' | 'cashback' | 'programs' | 'payouts';
 
 const inr = (v: string | number | null | undefined) => `₹${Number(v ?? 0).toLocaleString('en-IN')}`;
 const fmtDate = (v: string | null) => (v ? new Date(v).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
@@ -98,14 +107,16 @@ interface CouponFormState {
     code: string; name: string; discountType: 'flat' | 'percentage'; discountValue: string;
     maxDiscount: string; minOrderValue: string; startDate: string; endDate: string;
     usageLimit: string; perUserLimit: string;
-    stacksWithVendorPromo: boolean; stacksWithCashback: boolean; isActive: boolean;
+    stacksWithVendorPromo: boolean; stacksWithCashback: boolean; stacksWithWallet: boolean; isActive: boolean;
+    categoryIds: string[]; productIds: string[]; brandNames: string[]; audienceUserIds: string[];
 }
 
 const emptyCouponForm: CouponFormState = {
     code: '', name: '', discountType: 'flat', discountValue: '',
     maxDiscount: '', minOrderValue: '', startDate: '', endDate: '',
     usageLimit: '', perUserLimit: '',
-    stacksWithVendorPromo: true, stacksWithCashback: true, isActive: true,
+    stacksWithVendorPromo: true, stacksWithCashback: true, stacksWithWallet: true, isActive: true,
+    categoryIds: [], productIds: [], brandNames: [], audienceUserIds: [],
 };
 
 function CouponModal({ editing, onClose, onSaved }: { editing: CouponRow | null; onClose: () => void; onSaved: () => void }) {
@@ -124,7 +135,12 @@ function CouponModal({ editing, onClose, onSaved }: { editing: CouponRow | null;
                 perUserLimit: editing.perUserLimit != null ? String(editing.perUserLimit) : '',
                 stacksWithVendorPromo: editing.stacksWithVendorPromo,
                 stacksWithCashback: editing.stacksWithCashback,
+                stacksWithWallet: editing.stacksWithWallet !== false,
                 isActive: editing.isActive,
+                categoryIds: editing.categoryIds ?? [],
+                productIds: editing.productIds ?? [],
+                brandNames: editing.brandNames ?? [],
+                audienceUserIds: editing.audienceUserIds ?? [],
             }
             : emptyCouponForm,
     );
@@ -151,7 +167,12 @@ function CouponModal({ editing, onClose, onSaved }: { editing: CouponRow | null;
                 perUserLimit: num(form.perUserLimit) ?? null,
                 stacksWithVendorPromo: form.stacksWithVendorPromo,
                 stacksWithCashback: form.stacksWithCashback,
+                stacksWithWallet: form.stacksWithWallet,
                 isActive: form.isActive,
+                categoryIds: form.categoryIds,
+                productIds: form.productIds,
+                brandNames: form.brandNames,
+                audienceUserIds: form.audienceUserIds,
             };
             const res = await fetch(editing ? `/api/v1/admin/promotions/coupons/${editing.id}` : '/api/v1/admin/promotions/coupons', {
                 method: editing ? 'PATCH' : 'POST',
@@ -172,7 +193,7 @@ function CouponModal({ editing, onClose, onSaved }: { editing: CouponRow | null;
 
     return (
         <div className="fixed inset-0 z-[10020] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-            <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-5">
                     <h3 className="text-[16px] font-bold text-[#181725]">{editing ? `Edit ${editing.code}` : 'New Platform Coupon'}</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X size={18} /></button>
@@ -225,6 +246,17 @@ function CouponModal({ editing, onClose, onSaved }: { editing: CouponRow | null;
                         <label className={labelCls}>Per-User Limit</label>
                         <input className={inputCls} type="number" min="1" value={form.perUserLimit} onChange={(e) => set({ perUserLimit: e.target.value })} placeholder="Unlimited" />
                     </div>
+                    <CouponScopeFields
+                        categoryIds={form.categoryIds}
+                        productIds={form.productIds}
+                        brandNames={form.brandNames}
+                        productSource="admin"
+                        onChange={(patch) => set(patch)}
+                    />
+                    <AudienceUserPicker
+                        userIds={form.audienceUserIds}
+                        onChange={(audienceUserIds) => set({ audienceUserIds })}
+                    />
                 </div>
                 <div className="mt-4 space-y-2">
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
@@ -234,6 +266,10 @@ function CouponModal({ editing, onClose, onSaved }: { editing: CouponRow | null;
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#53B175]" checked={form.stacksWithCashback} onChange={(e) => set({ stacksWithCashback: e.target.checked })} />
                         Can be clubbed with cashback offers
+                    </label>
+                    <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
+                        <input type="checkbox" className="accent-[#53B175]" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
+                        Can be clubbed with H1 Wallet
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#53B175]" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
@@ -256,15 +292,15 @@ function CouponModal({ editing, onClose, onSaved }: { editing: CouponRow | null;
 
 interface CampaignFormState {
     name: string; cashbackType: 'flat' | 'percentage'; cashbackValue: string;
-    maxCashback: string; minOrderValue: string; destination: 'wallet' | 'upi';
+    maxCashback: string; minOrderValue: string;
     startDate: string; endDate: string; perUserLimit: string; totalBudget: string;
-    stacksWithCoupon: boolean; isActive: boolean;
+    stacksWithCoupon: boolean; stacksWithWallet: boolean; isActive: boolean;
 }
 
 const emptyCampaignForm: CampaignFormState = {
     name: '', cashbackType: 'flat', cashbackValue: '', maxCashback: '', minOrderValue: '',
-    destination: 'wallet', startDate: '', endDate: '', perUserLimit: '', totalBudget: '',
-    stacksWithCoupon: true, isActive: true,
+    startDate: '', endDate: '', perUserLimit: '', totalBudget: '',
+    stacksWithCoupon: true, stacksWithWallet: true, isActive: true,
 };
 
 function CampaignModal({ editing, onClose, onSaved }: { editing: CampaignRow | null; onClose: () => void; onSaved: () => void }) {
@@ -276,12 +312,12 @@ function CampaignModal({ editing, onClose, onSaved }: { editing: CampaignRow | n
                 cashbackValue: String(editing.cashbackValue ?? ''),
                 maxCashback: editing.maxCashback != null ? String(editing.maxCashback) : '',
                 minOrderValue: editing.minOrderValue != null ? String(editing.minOrderValue) : '',
-                destination: editing.destination,
                 startDate: editing.startDate ? editing.startDate.slice(0, 10) : '',
                 endDate: editing.endDate ? editing.endDate.slice(0, 10) : '',
                 perUserLimit: editing.perUserLimit != null ? String(editing.perUserLimit) : '',
                 totalBudget: editing.totalBudget != null ? String(editing.totalBudget) : '',
                 stacksWithCoupon: editing.stacksWithCoupon,
+                stacksWithWallet: editing.stacksWithWallet !== false,
                 isActive: editing.isActive,
             }
             : emptyCampaignForm,
@@ -302,12 +338,12 @@ function CampaignModal({ editing, onClose, onSaved }: { editing: CampaignRow | n
                 cashbackValue: num(form.cashbackValue),
                 maxCashback: num(form.maxCashback) ?? null,
                 minOrderValue: num(form.minOrderValue) ?? null,
-                destination: form.destination,
                 startDate: toIsoStart(form.startDate) ?? null,
                 endDate: toIsoEnd(form.endDate) ?? null,
                 perUserLimit: num(form.perUserLimit) ?? null,
                 totalBudget: num(form.totalBudget) ?? null,
                 stacksWithCoupon: form.stacksWithCoupon,
+                stacksWithWallet: form.stacksWithWallet,
                 isActive: form.isActive,
             };
             const res = await fetch(editing ? `/api/v1/admin/promotions/cashback/${editing.id}` : '/api/v1/admin/promotions/cashback', {
@@ -361,13 +397,6 @@ function CampaignModal({ editing, onClose, onSaved }: { editing: CampaignRow | n
                         <input className={inputCls} type="number" min="0" value={form.minOrderValue} onChange={(e) => set({ minOrderValue: e.target.value })} />
                     </div>
                     <div>
-                        <label className={labelCls}>Reward Destination</label>
-                        <select className={inputCls} value={form.destination} onChange={(e) => set({ destination: e.target.value as 'wallet' | 'upi' })}>
-                            <option value="wallet">Rewards Wallet (auto-credit)</option>
-                            <option value="upi">UPI (manual payout)</option>
-                        </select>
-                    </div>
-                    <div>
                         <label className={labelCls}>Total Budget (₹)</label>
                         <input className={inputCls} type="number" min="0" value={form.totalBudget} onChange={(e) => set({ totalBudget: e.target.value })} placeholder="Unlimited" />
                     </div>
@@ -384,10 +413,15 @@ function CampaignModal({ editing, onClose, onSaved }: { editing: CampaignRow | n
                         <input className={inputCls} type="number" min="1" value={form.perUserLimit} onChange={(e) => set({ perUserLimit: e.target.value })} placeholder="Unlimited" />
                     </div>
                 </div>
+                <p className="mt-3 text-[11px] text-gray-400 font-medium">Credits the customer&apos;s H1 Wallet after delivery.</p>
                 <div className="mt-4 space-y-2">
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#53B175]" checked={form.stacksWithCoupon} onChange={(e) => set({ stacksWithCoupon: e.target.checked })} />
                         Can be clubbed with coupons
+                    </label>
+                    <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
+                        <input type="checkbox" className="accent-[#53B175]" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
+                        Can be clubbed with H1 Wallet payment
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
                         <input type="checkbox" className="accent-[#53B175]" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
@@ -414,7 +448,6 @@ function GrantModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
     const [searching, setSearching] = useState(false);
     const [selected, setSelected] = useState<UserHit | null>(null);
     const [amount, setAmount] = useState('');
-    const [destination, setDestination] = useState<'wallet' | 'upi'>('wallet');
     const [notes, setNotes] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -443,11 +476,11 @@ function GrantModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
             const res = await fetch('/api/v1/admin/promotions/grant', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: selected.id, amount: num(amount), destination, notes: notes.trim() || null }),
+                body: JSON.stringify({ userId: selected.id, amount: num(amount), destination: 'wallet', notes: notes.trim() || null }),
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json?.error?.message || 'Grant failed');
-            toast.success(destination === 'wallet' ? 'Incentive credited to wallet' : 'Incentive created — user will claim with UPI');
+            toast.success('Incentive credited to H1 Wallet');
             onSaved();
             onClose();
         } catch (err) {
@@ -461,7 +494,7 @@ function GrantModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
         <div className="fixed inset-0 z-[10020] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
             <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between mb-5">
-                    <h3 className="text-[16px] font-bold text-[#181725]">Reward a User</h3>
+                    <h3 className="text-[16px] font-bold text-[#181725]">Instant H1 Wallet grant</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 cursor-pointer"><X size={18} /></button>
                 </div>
 
@@ -502,24 +535,18 @@ function GrantModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
                         <label className={labelCls}>Amount (₹) *</label>
                         <input className={inputCls} type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)} />
                     </div>
-                    <div>
-                        <label className={labelCls}>Send To</label>
-                        <select className={inputCls} value={destination} onChange={(e) => setDestination(e.target.value as 'wallet' | 'upi')}>
-                            <option value="wallet">Rewards Wallet (instant)</option>
-                            <option value="upi">UPI (user claims, then pay)</option>
-                        </select>
-                    </div>
                     <div className="col-span-2">
                         <label className={labelCls}>Notes (internal)</label>
                         <input className={inputCls} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. loyalty reward — June campaign" />
                     </div>
                 </div>
+                <p className="mt-3 text-[11px] text-gray-400 font-medium">Credits H1 Wallet immediately. For UPI, create a payout link instead.</p>
                 <button
                     onClick={submit}
                     disabled={saving || !selected}
                     className="mt-5 w-full py-2.5 rounded-xl bg-[#53B175] text-white text-[13px] font-bold hover:bg-[#48a068] disabled:opacity-50 transition-colors cursor-pointer"
                 >
-                    {saving ? <Loader2 size={15} className="animate-spin mx-auto" /> : 'Send Incentive'}
+                    {saving ? <Loader2 size={15} className="animate-spin mx-auto" /> : 'Credit H1 Wallet'}
                 </button>
             </div>
         </div>
@@ -538,8 +565,13 @@ export default function AdminPromotionsPage() {
     const [couponModal, setCouponModal] = useState<{ open: boolean; editing: CouponRow | null }>({ open: false, editing: null });
     const [campaignModal, setCampaignModal] = useState<{ open: boolean; editing: CampaignRow | null }>({ open: false, editing: null });
     const [grantOpen, setGrantOpen] = useState(false);
+    const [inviteOpen, setInviteOpen] = useState(false);
 
     const load = useCallback(async (which: Tab, statusFilter: string) => {
+        if (which === 'programs') {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
             if (which === 'coupons') {
@@ -613,6 +645,7 @@ export default function AdminPromotionsPage() {
     const TABS: Array<{ id: Tab; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = [
         { id: 'coupons', label: 'Coupons', icon: Ticket },
         { id: 'cashback', label: 'Cashback Campaigns', icon: Gift },
+        { id: 'programs', label: 'Programs', icon: Sparkles },
         { id: 'payouts', label: 'Payouts & Grants', icon: IndianRupee },
     ];
 
@@ -621,7 +654,7 @@ export default function AdminPromotionsPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                 <div>
                     <h1 className="text-[clamp(1.2rem,1.5vw+0.6rem,1.6rem)] font-bold text-[#181725]">Promotions</h1>
-                    <p className="text-[12px] text-gray-400 font-medium">Coupons, cashback campaigns and direct user incentives.</p>
+                    <p className="text-[12px] text-gray-400 font-medium">Coupons, cashback, growth programs, and UPI payout links.</p>
                 </div>
                 <div className="flex gap-2">
                     {tab === 'coupons' && (
@@ -635,9 +668,14 @@ export default function AdminPromotionsPage() {
                         </button>
                     )}
                     {tab === 'payouts' && (
-                        <button onClick={() => setGrantOpen(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold hover:bg-[#48a068] transition-colors cursor-pointer">
-                            <Plus size={14} /> Reward a User
-                        </button>
+                        <>
+                            <button onClick={() => setGrantOpen(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-[#181725] text-[12px] font-bold hover:bg-gray-50 transition-colors cursor-pointer">
+                                Instant H1 Wallet grant
+                            </button>
+                            <button onClick={() => setInviteOpen(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold hover:bg-[#48a068] transition-colors cursor-pointer">
+                                <Plus size={14} /> Create payout link
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -657,7 +695,9 @@ export default function AdminPromotionsPage() {
                 ))}
             </div>
 
-            {loading ? (
+            {tab === 'programs' ? (
+                <ProgramsTab />
+            ) : loading ? (
                 <div className="flex items-center justify-center py-20">
                     <Loader2 size={28} className="text-[#53B175] animate-spin" />
                 </div>
@@ -697,6 +737,8 @@ export default function AdminPromotionsPage() {
                                         <span title="Clubs with vendor discounts" className={c.stacksWithVendorPromo ? 'text-[#53B175]' : 'text-gray-300'}>V</span>
                                         {' · '}
                                         <span title="Clubs with cashback" className={c.stacksWithCashback ? 'text-[#53B175]' : 'text-gray-300'}>C</span>
+                                        {' · '}
+                                        <span title="Clubs with H1 Wallet" className={c.stacksWithWallet ? 'text-[#53B175]' : 'text-gray-300'}>W</span>
                                     </td>
                                     <td className={tdCls}>
                                         <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-green-50 text-[#53B175]' : 'bg-gray-100 text-gray-400')}>
@@ -741,7 +783,7 @@ export default function AdminPromotionsPage() {
                                         {c.cashbackType === 'flat' ? inr(c.cashbackValue) : `${Number(c.cashbackValue)}%${c.maxCashback ? ` (max ${inr(c.maxCashback)})` : ''}`}
                                     </td>
                                     <td className={tdCls}>{c.minOrderValue ? inr(c.minOrderValue) : '—'}</td>
-                                    <td className={tdCls}>{c.destination === 'wallet' ? 'Wallet' : 'UPI'}</td>
+                                    <td className={tdCls}>{c.destination === 'wallet' ? 'H1 Wallet' : 'UPI (legacy)'}</td>
                                     <td className={tdCls}>{c.totalBudget ? `${inr(c.usedAmount)} / ${inr(c.totalBudget)}` : inr(c.usedAmount)}</td>
                                     <td className={tdCls}>{fmtDate(c.startDate)} → {fmtDate(c.endDate)}</td>
                                     <td className={tdCls}>{c.usedCount}</td>
@@ -801,10 +843,15 @@ export default function AdminPromotionsPage() {
                                         </td>
                                         <td className={cn(tdCls, 'font-bold')}>{inr(e.amount)}</td>
                                         <td className={tdCls}>
-                                            {e.source === 'direct_grant' ? 'Direct incentive' : e.campaign?.name ?? 'Order cashback'}
+                                            {e.source === 'direct_grant' ? 'Direct incentive'
+                                                : e.source === 'payout_invite' ? 'Payout invite'
+                                                    : e.source === 'welcome' ? 'Welcome'
+                                                        : e.source === 'first_order' ? 'First order'
+                                                            : e.source === 'referral' ? 'Referral'
+                                                                : e.campaign?.name ?? 'Order cashback'}
                                             {e.order?.orderNumber ? <span className="text-gray-400"> · {e.order.orderNumber}</span> : null}
                                         </td>
-                                        <td className={tdCls}>{e.destination === 'wallet' ? 'Wallet' : 'UPI'}</td>
+                                        <td className={tdCls}>{e.destination === 'wallet' ? 'H1 Wallet' : 'UPI'}</td>
                                         <td className={tdCls}>{e.upiId ?? <span className="text-gray-300">not claimed</span>}</td>
                                         <td className={tdCls}>
                                             <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold',
@@ -834,6 +881,7 @@ export default function AdminPromotionsPage() {
             {couponModal.open && <CouponModal editing={couponModal.editing} onClose={() => setCouponModal({ open: false, editing: null })} onSaved={refresh} />}
             {campaignModal.open && <CampaignModal editing={campaignModal.editing} onClose={() => setCampaignModal({ open: false, editing: null })} onSaved={refresh} />}
             {grantOpen && <GrantModal onClose={() => setGrantOpen(false)} onSaved={refresh} />}
+            {inviteOpen && <PayoutInviteModal onClose={() => setInviteOpen(false)} onSaved={refresh} />}
         </div>
     );
 }

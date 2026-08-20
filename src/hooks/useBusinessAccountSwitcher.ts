@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { useCart } from '@/context/CartContext';
+import { useOptionalCart } from '@/context/CartContext';
 import { clearForcePickerCookie, clearDismissFlag } from '@/lib/postLoginPicker';
 import { redirectIfPortalMismatch } from '@/lib/portalRouting';
 import { ACCOUNTS_REFRESH_EVENT } from '@/lib/addressUsability';
@@ -77,7 +77,8 @@ export function useBusinessAccountSwitcher() {
   const { data: session, update } = useSession();
   const pathname = usePathname();
   const router = useRouter();
-  const { clearCart } = useCart();
+  const cart = useOptionalCart();
+  const clearCart = cart?.clearCart;
 
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -683,7 +684,7 @@ export function useBusinessAccountSwitcher() {
   ]);
 
   const handleSignOut = useCallback(async () => {
-    clearCart();
+    clearCart?.();
     clearForcePickerCookie();
     clearDismissFlag();
     clearUserClientStores(userId);

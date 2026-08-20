@@ -26,7 +26,7 @@ import { useAddress } from '@/context/AddressContext';
 import { InitialPincodeOverlay } from './InitialPincodeOverlay';
 import { PushBell } from '../features/PushBell';
 import { NotificationBell } from '../features/NotificationBell';
-import { dal } from '@/lib/dal';
+import { dalClient as dal } from '@/lib/dalClient';
 import type { Category } from '@/types';
 import { NavDeliverySelector } from './NavDeliverySelector';
 import { isAdminCustomerImpersonationActive, isAnyAdminImpersonationActive } from '@/lib/clearImpersonation';
@@ -183,7 +183,7 @@ export function Navbar() {
     const badgeCount = isCartLoading ? lastKnownTotalItems : totalItems;
     const { selectedAddress, setSelectedAddress } = useAddress();
 
-    const [apiCategories, setApiCategories] = React.useState<NavStyledCategory[]>(readCachedNavCategories);
+    const [apiCategories, setApiCategories] = React.useState<NavStyledCategory[]>([]);
     const [isAdminImpersonating, setIsAdminImpersonating] = React.useState(false);
     const [isCustomerImpersonating, setIsCustomerImpersonating] = React.useState(false);
     const [vendorAppApproved, setVendorAppApproved] = React.useState(false);
@@ -240,6 +240,7 @@ export function Navbar() {
     const isAccountPage = pathname?.startsWith('/account');
     const isDeliveryBoyLink = pathname?.startsWith('/d/');
     const isReturnPickupLink = pathname?.startsWith('/r/');
+    const isPayoutLink = pathname?.startsWith('/payout/');
 
     const availableAccounts = (session?.user as {
         availableAccounts?: Array<{ isVendor?: boolean; isBrand?: boolean }>;
@@ -281,7 +282,8 @@ export function Navbar() {
         isShipmentPage ||
         isAccountPage ||
         isDeliveryBoyLink ||
-        isReturnPickupLink
+        isReturnPickupLink ||
+        isPayoutLink
     ) {
         return null;
     }
@@ -442,7 +444,7 @@ export function Navbar() {
                                     );
                                 })}
                                 {reserveRewardsSlot ? (
-                                    <DesktopNavSlotPlaceholder label="Rewards" Icon={Gift} />
+                                    <DesktopNavSlotPlaceholder label="H1 Wallet" Icon={Gift} />
                                 ) : showRewardsLink ? (
                                     <Link
                                         href="/rewards"
@@ -452,7 +454,7 @@ export function Navbar() {
                                         )}
                                     >
                                         <Gift size={21} strokeWidth={pathname === '/rewards' ? 2 : 1.5} />
-                                        <span className="text-[10px] font-medium leading-none">Rewards</span>
+                                        <span className="text-[10px] font-medium leading-none">H1 Wallet</span>
                                     </Link>
                                 ) : null}
                             </div>

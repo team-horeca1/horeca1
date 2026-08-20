@@ -10,7 +10,8 @@ import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { updateCouponSchema } from '@/modules/promotion/promotion.validator';
-import { couponUpdateData } from '@/modules/promotion/promotion.mappers';
+import { couponUpdateData, omitCouponAudience } from '@/modules/promotion/promotion.mappers';
+import { assertVendorCouponScope } from '@/modules/promotion/promotion.service';
 
 function extractId(req: NextRequest) {
   return new URL(req.url).pathname.split('/').at(-1) ?? '';
@@ -22,19 +23,16 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     requirePermission(ctx, 'promotions.edit');
 
     const id = extractId(req);
-    const body = updateCouponSchema.parse(await req.json());
+    const body = omitCouponAudience(updateCouponSchema.parse(await req.json()));
 
     const existing = await prisma.coupon.findFirst({ where: { id, vendorId } });
     if (!existing) throw Errors.notFound('Coupon');
 
-    if (body.productIds?.length) {
-      const owned = await prisma.product.count({
-        where: { id: { in: body.productIds }, vendorId },
-      });
-      if (owned !== body.productIds.length) {
-        throw Errors.badRequest('One or more selected products do not belong to your store');
-      }
-    }
+    await assertVendorCouponScope(prisma, vendorId, {
+      productIds: body.productIds,
+      categoryIds: body.categoryIds,
+      brandNames: body.brandNames,
+    });
 
     const updated = await prisma.coupon.update({ where: { id }, data: couponUpdateData(body) });
 

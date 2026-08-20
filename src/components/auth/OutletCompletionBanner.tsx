@@ -44,7 +44,8 @@ export function OutletCompletionBanner() {
     pathname?.startsWith('/vendor') ||
     pathname?.startsWith('/brand/portal') ||
     pathname?.startsWith('/d/') ||
-    pathname?.startsWith('/r/')
+    pathname?.startsWith('/r/') ||
+    pathname?.startsWith('/payout/')
   ) {
     return null;
   }

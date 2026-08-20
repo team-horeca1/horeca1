@@ -13,7 +13,8 @@ import { resolveVendorId, resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { createCouponSchema } from '@/modules/promotion/promotion.validator';
-import { couponCreateData } from '@/modules/promotion/promotion.mappers';
+import { couponCreateData, omitCouponAudience } from '@/modules/promotion/promotion.mappers';
+import { assertVendorCouponScope } from '@/modules/promotion/promotion.service';
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
@@ -37,20 +38,16 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     const { vendorId } = await resolveVendorContext(ctx, req);
     requirePermission(ctx, 'promotions.create');
 
-    const body = createCouponSchema.parse(await req.json());
+    const body = omitCouponAudience(createCouponSchema.parse(await req.json()));
 
     const existing = await prisma.coupon.findUnique({ where: { code: body.code } });
     if (existing) throw Errors.badRequest(`Coupon code "${body.code}" already exists`);
 
-    // Product scope must stay inside this vendor's catalog.
-    if (body.productIds?.length) {
-      const owned = await prisma.product.count({
-        where: { id: { in: body.productIds }, vendorId },
-      });
-      if (owned !== body.productIds.length) {
-        throw Errors.badRequest('One or more selected products do not belong to your store');
-      }
-    }
+    await assertVendorCouponScope(prisma, vendorId, {
+      productIds: body.productIds,
+      categoryIds: body.categoryIds,
+      brandNames: body.brandNames,
+    });
 
     const coupon = await prisma.coupon.create({
       data: couponCreateData(body, vendorId, ctx.userId),

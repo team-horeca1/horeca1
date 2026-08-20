@@ -32,8 +32,10 @@ export function couponCreateData(body: CreateCoupon, ownerVendorId: string | nul
     categoryIds: body.categoryIds ?? [],
     productIds: body.productIds ?? [],
     brandNames: body.brandNames ?? [],
+    audienceUserIds: body.audienceUserIds ?? [],
     stacksWithVendorPromo: body.stacksWithVendorPromo ?? true,
     stacksWithCashback: body.stacksWithCashback ?? true,
+    stacksWithWallet: body.stacksWithWallet ?? true,
     isActive: body.isActive ?? true,
     createdById,
   };
@@ -54,10 +56,19 @@ export function couponUpdateData(body: UpdateCoupon) {
     ...(body.categoryIds !== undefined && { categoryIds: body.categoryIds }),
     ...(body.productIds !== undefined && { productIds: body.productIds }),
     ...(body.brandNames !== undefined && { brandNames: body.brandNames }),
+    ...(body.audienceUserIds !== undefined && { audienceUserIds: body.audienceUserIds }),
     ...(body.stacksWithVendorPromo !== undefined && { stacksWithVendorPromo: body.stacksWithVendorPromo }),
     ...(body.stacksWithCashback !== undefined && { stacksWithCashback: body.stacksWithCashback }),
+    ...(body.stacksWithWallet !== undefined && { stacksWithWallet: body.stacksWithWallet }),
     ...(body.isActive !== undefined && { isActive: body.isActive }),
   };
+}
+
+/** Vendor coupon routes must not persist audience targeting. */
+export function omitCouponAudience<T extends { audienceUserIds?: unknown }>(body: T): Omit<T, 'audienceUserIds'> {
+  const rest = { ...body };
+  delete rest.audienceUserIds;
+  return rest;
 }
 
 export function campaignCreateData(body: CreateCampaign, ownerVendorId: string | null, createdById: string) {
@@ -69,12 +80,13 @@ export function campaignCreateData(body: CreateCampaign, ownerVendorId: string |
     cashbackValue: body.cashbackValue,
     maxCashback: body.maxCashback ?? null,
     minOrderValue: body.minOrderValue ?? null,
-    destination: body.destination ?? ('wallet' as const),
+    destination: 'wallet' as const,
     startDate: body.startDate ? new Date(body.startDate) : null,
     endDate: body.endDate ? new Date(body.endDate) : null,
     perUserLimit: body.perUserLimit ?? null,
     totalBudget: body.totalBudget ?? null,
     stacksWithCoupon: body.stacksWithCoupon ?? true,
+    stacksWithWallet: body.stacksWithWallet ?? true,
     isActive: body.isActive ?? true,
     createdById,
   };
@@ -88,12 +100,13 @@ export function campaignUpdateData(body: UpdateCampaign) {
     ...(body.cashbackValue !== undefined && { cashbackValue: body.cashbackValue }),
     ...(body.maxCashback !== undefined && { maxCashback: body.maxCashback }),
     ...(body.minOrderValue !== undefined && { minOrderValue: body.minOrderValue }),
-    ...(body.destination !== undefined && { destination: body.destination }),
+    destination: 'wallet' as const,
     ...(body.startDate !== undefined && { startDate: body.startDate ? new Date(body.startDate) : null }),
     ...(body.endDate !== undefined && { endDate: body.endDate ? new Date(body.endDate) : null }),
     ...(body.perUserLimit !== undefined && { perUserLimit: body.perUserLimit }),
     ...(body.totalBudget !== undefined && { totalBudget: body.totalBudget }),
     ...(body.stacksWithCoupon !== undefined && { stacksWithCoupon: body.stacksWithCoupon }),
+    ...(body.stacksWithWallet !== undefined && { stacksWithWallet: body.stacksWithWallet }),
     ...(body.isActive !== undefined && { isActive: body.isActive }),
   };
 }

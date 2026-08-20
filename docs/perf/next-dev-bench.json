@@ -1,0 +1,77 @@
+{
+  "measuredAt": "2026-08-20T10:23:43.049Z",
+  "platform": "win32",
+  "opts": {
+    "runs": 1,
+    "port": 3014,
+    "skipIncremental": false,
+    "route": "/",
+    "controlRoute": "/login"
+  },
+  "summary": {
+    "runs": 1,
+    "ok": 1,
+    "startupMs": {
+      "median": 6305,
+      "p95": 6305
+    },
+    "readyInMs": {
+      "median": 3900,
+      "p95": 3900
+    },
+    "firstRequestMs": {
+      "median": 2473,
+      "p95": 2473
+    },
+    "firstTtfbMs": {
+      "median": 2454,
+      "p95": 2454
+    },
+    "warmRequestMs": {
+      "median": 157,
+      "p95": 157
+    },
+    "controlRequestMs": {
+      "median": 155,
+      "p95": 155
+    },
+    "incrementalCompileMs": {
+      "median": 11011,
+      "p95": 11011
+    },
+    "memoryMb": {
+      "median": 11,
+      "p95": 11
+    }
+  },
+  "runs": [
+    {
+      "runIndex": 0,
+      "port": 3014,
+      "startupMs": 6305,
+      "readyInMs": 3900,
+      "firstRequest": {
+        "status": 200,
+        "ttfbMs": 2454,
+        "bodyMs": 2473,
+        "bytes": 116528
+      },
+      "warmRequest": {
+        "status": 200,
+        "ttfbMs": 146,
+        "bodyMs": 157,
+        "bytes": 116094
+      },
+      "controlRequest": {
+        "status": 200,
+        "ttfbMs": 148,
+        "bodyMs": 155,
+        "bytes": 31479
+      },
+      "incrementalCompileMs": 11011,
+      "memoryMb": 11,
+      "error": null,
+      "incrementalNote": "HMR log not detected; timed request cycle only"
+    }
+  ]
+}

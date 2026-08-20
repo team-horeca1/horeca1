@@ -27,7 +27,13 @@ function withRateLimit(handler: (req: NextRequest) => Promise<Response>) {
   return async (req: NextRequest) => {
     // Skip in development — session polling + HMR easily trip the bucket,
     // and Redis may be shared with prod via tunnel.
-    if (process.env.NODE_ENV !== 'development') {
+    // Local Playwright against `next start` also needs this: production mode
+    // otherwise caps sign-in at 30/min and flakes program e2e after a few roles.
+    const skip =
+      process.env.NODE_ENV === 'development'
+      || process.env.DISABLE_AUTH_RATE_LIMIT === '1'
+      || process.env.PLAYWRIGHT_TEST === '1';
+    if (!skip) {
       const limit = authLimitForPath(req.nextUrl.pathname);
       if (limit) {
         const ip = getClientIp(req);

@@ -162,6 +162,12 @@ export class PaymentService {
 
     // Idempotency: already captured by a prior verify or webhook
     if (payments.every((p) => p.status === 'captured')) {
+      try {
+        const { promotionService } = await import('@/modules/promotion/promotion.service');
+        await promotionService.onOrdersBecameSuccessful(payments.map((p) => p.orderId));
+      } catch (err) {
+        console.error('[Payment] Program issuance on already-captured verify failed:', err);
+      }
       return { success: true, payment_status: 'captured', orders_paid: payments.length, alreadyCaptured: true };
     }
 
@@ -194,6 +200,13 @@ export class PaymentService {
         userId: payment.userId,
         vendorId: payment.vendorId,
       });
+    }
+
+    try {
+      const { promotionService } = await import('@/modules/promotion/promotion.service');
+      await promotionService.onOrdersBecameSuccessful(payments.map((p) => p.orderId));
+    } catch (err) {
+      console.error('[Payment] Program issuance after verify failed:', err);
     }
 
     return { success: true, payment_status: 'captured', orders_paid: payments.length };
@@ -316,6 +329,13 @@ export class PaymentService {
           userId: payment.userId,
           vendorId: payment.vendorId,
         });
+      }
+
+      try {
+        const { promotionService } = await import('@/modules/promotion/promotion.service');
+        await promotionService.onOrdersBecameSuccessful(payments.map((p) => p.orderId));
+      } catch (err) {
+        console.error('[Payment] Program issuance after webhook capture failed:', err);
       }
 
       return { processed: true, event };

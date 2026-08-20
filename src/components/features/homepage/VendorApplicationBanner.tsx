@@ -88,7 +88,8 @@ export function VendorApplicationBanner() {
     pathname?.startsWith('/admin') ||
     pathname?.startsWith('/account') ||
     pathname?.startsWith('/d/') ||
-    pathname?.startsWith('/r/')
+    pathname?.startsWith('/r/') ||
+    pathname?.startsWith('/payout/')
   ) {
     return null;
   }

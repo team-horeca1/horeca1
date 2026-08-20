@@ -1,0 +1,33 @@
+{
+  "measuredAt": "2026-08-20T10:16:01.389Z",
+  "platform": "win32",
+  "label": "pre-architecture-cuts",
+  "opts": {
+    "runs": 1,
+    "port": 3010,
+    "skipIncremental": true,
+    "route": "/",
+    "controlRoute": "/login"
+  },
+  "summary": {
+    "runs": 1,
+    "ok": 1,
+    "startupMs": { "median": 8417, "p95": 8417 },
+    "readyInMs": { "median": null, "p95": null },
+    "firstRequestMs": { "median": 48539, "p95": 48539 },
+    "firstTtfbMs": { "median": 48502, "p95": 48502 },
+    "warmRequestMs": { "median": 375, "p95": 375 },
+    "controlRequestMs": { "median": 4926, "p95": 4926 },
+    "note": "Root layout still mounted Maps/Cart/Navbar for every route. Homepage sections static."
+  },
+  "runs": [
+    {
+      "runIndex": 0,
+      "port": 3010,
+      "startupMs": 8417,
+      "firstRequest": { "status": 200, "ttfbMs": 48502, "bodyMs": 48539, "bytes": 83260 },
+      "warmRequest": { "status": 200, "ttfbMs": 336, "bodyMs": 375, "bytes": 83278 },
+      "controlRequest": { "status": 200, "ttfbMs": 4896, "bodyMs": 4926, "bytes": 50770 }
+    }
+  ]
+}

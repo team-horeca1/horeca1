@@ -1,0 +1,76 @@
+{
+  "measuredAt": "2026-08-20T10:22:56.965Z",
+  "platform": "win32",
+  "opts": {
+    "runs": 1,
+    "port": 3013,
+    "skipIncremental": true,
+    "route": "/",
+    "controlRoute": "/login"
+  },
+  "summary": {
+    "runs": 1,
+    "ok": 1,
+    "startupMs": {
+      "median": 9439,
+      "p95": 9439
+    },
+    "readyInMs": {
+      "median": 5600,
+      "p95": 5600
+    },
+    "firstRequestMs": {
+      "median": 3795,
+      "p95": 3795
+    },
+    "firstTtfbMs": {
+      "median": 3767,
+      "p95": 3767
+    },
+    "warmRequestMs": {
+      "median": 203,
+      "p95": 203
+    },
+    "controlRequestMs": {
+      "median": 507,
+      "p95": 507
+    },
+    "incrementalCompileMs": {
+      "median": null,
+      "p95": null
+    },
+    "memoryMb": {
+      "median": 11,
+      "p95": 11
+    }
+  },
+  "runs": [
+    {
+      "runIndex": 0,
+      "port": 3013,
+      "startupMs": 9439,
+      "readyInMs": 5600,
+      "firstRequest": {
+        "status": 200,
+        "ttfbMs": 3767,
+        "bodyMs": 3795,
+        "bytes": 116553
+      },
+      "warmRequest": {
+        "status": 200,
+        "ttfbMs": 182,
+        "bodyMs": 203,
+        "bytes": 116087
+      },
+      "controlRequest": {
+        "status": 200,
+        "ttfbMs": 496,
+        "bodyMs": 507,
+        "bytes": 31486
+      },
+      "incrementalCompileMs": null,
+      "memoryMb": 11,
+      "error": null
+    }
+  ]
+}

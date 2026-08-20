@@ -643,7 +643,7 @@ function StoreOffersTab() {
 // ─── Main Page (Promo Engine Phase 1) ─────────────────────────────────────────
 // Three tools side by side: auto-applied Store Offers (legacy), Coupons
 // (code-based, customer applies at checkout) and Cashback campaigns
-// (earned on delivery → Rewards Wallet / UPI).
+// (earned on delivery → Rewards Wallet).
 
 export default function PromotionsPage() {
   const [tab, setTab] = useState<'offers' | 'coupons' | 'cashback'>('offers');

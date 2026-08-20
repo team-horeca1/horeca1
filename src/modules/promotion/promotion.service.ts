@@ -5,10 +5,13 @@
 //   Rule 2  Coupon + Cashback        — per-campaign `stacksWithCoupon` +
 //                                      per-coupon `stacksWithCashback`.
 //   Rule 3  Coupon + Vendor discount — per-coupon `stacksWithVendorPromo`;
-//                                      when false the auto vendor promo is
-//                                      suppressed for that checkout.
-//   Rule 5  ONE cashback source       — highest eligible campaign wins.
-//   Rule 6  Wallet usable alongside promotions (prepaid Wallet redemption).
+//                                      when false, pct/flat AND BXGY are
+//                                      skipped for that checkout.
+//   Rule 5  ONE cashback source per checkout (highest of platform-on-combined
+//           goods + each vendor campaign on that PO). One CashbackEntry.
+//   Rule 6  H1 Wallet usable alongside promotions unless the coupon's
+//           `stacksWithWallet` is false. A campaign with `stacksWithWallet`
+//           false is skipped when wallet was used as payment.
 //
 // Calculation sequence (per the brief): price → vendor discount → coupon →
 // wallet redemption → final payable → cashback computed on what the customer
@@ -18,6 +21,7 @@
 import { prisma } from '@/lib/prisma';
 import type { Prisma, Coupon, CashbackEntry } from '@prisma/client';
 import { Errors } from '@/middleware/errorHandler';
+import * as programs from './promotion-issuance';
 import {
   resolveUnitPrice,
   computeSchemeBilledQty,
@@ -101,13 +105,56 @@ type LivePromotionRow = Awaited<ReturnType<typeof fetchLivePromotionsForVendors>
 export interface CouponApplication {
   coupon: Pick<
     Coupon,
-    'id' | 'code' | 'name' | 'stacksWithVendorPromo' | 'stacksWithCashback'
+    'id' | 'code' | 'name' | 'stacksWithVendorPromo' | 'stacksWithCashback' | 'stacksWithWallet'
   >;
-  /** When true, the caller must drop the auto vendor promos for this checkout. */
+  /** When true, the caller must drop the auto vendor promos (pct/flat AND BXGY). */
   suppressVendorPromos: boolean;
   /** Discount allocated per draft, aligned with the drafts array. */
   perOrder: number[];
   totalDiscount: number;
+}
+
+export interface CheckoutCashbackPo {
+  orderId: string;
+  vendorId: string;
+  /** subtotal − vendor promo − coupon (goods the customer pays for). */
+  base: number;
+}
+
+/** Server-computed checkout estimate — the frontend must not invent this amount. */
+export interface EstimatedCashbackPreview {
+  estimatedAmount: number;
+  destination: 'wallet' | 'upi';
+  settlesOn: 'delivery';
+  campaignName: string;
+}
+
+export interface PublicCouponOffer {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  discountType: string;
+  discountValue: number;
+  maxDiscount: number | null;
+  minOrderValue: number | null;
+  endDate: Date | null;
+  vendorId: string | null;
+  vendorName: string | null;
+  hasScope: boolean;
+}
+
+export interface PublicStoreOffer {
+  id: string;
+  kind: 'vendor_promo' | 'cashback';
+  name: string;
+  badgeLabel: string;
+  type: string;
+  description: string | null;
+  vendorId: string | null;
+  vendorName: string | null;
+  minOrderValue: number | null;
+  endDate: Date | null;
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────
@@ -123,6 +170,109 @@ function itemMatchesScope(coupon: Coupon, item: CheckoutDraftItem): boolean {
     if (coupon.brandNames.some((n) => n.toLowerCase() === b)) return true;
   }
   return false;
+}
+
+/**
+ * Peek the coupon's Rule 3 flag before BXGY / vendor-promo evaluation.
+ * Invalid codes return false (caller still fails later in applyCouponToCheckout).
+ */
+export async function couponSuppressesVendorPromos(db: Db, code: string): Promise<boolean> {
+  const coupon = await db.coupon.findUnique({
+    where: { code: code.trim().toUpperCase() },
+    select: { isActive: true, stacksWithVendorPromo: true },
+  });
+  return !!coupon?.isActive && !coupon.stacksWithVendorPromo;
+}
+
+/**
+ * Vendor coupon scope must stay inside this vendor's catalog. Never trusts a
+ * body `vendorId` — the caller passes the resolved vendor from session.
+ */
+export async function assertVendorCouponScope(
+  db: Db,
+  vendorId: string,
+  scope: { categoryIds?: string[]; productIds?: string[]; brandNames?: string[] },
+): Promise<void> {
+  if (scope.productIds && scope.productIds.length > 0) {
+    const owned = await db.product.count({
+      where: { id: { in: scope.productIds }, vendorId },
+    });
+    if (owned !== scope.productIds.length) {
+      throw Errors.badRequest('One or more selected products do not belong to your store');
+    }
+  }
+
+  if (scope.categoryIds && scope.categoryIds.length > 0) {
+    const unique = Array.from(new Set(scope.categoryIds));
+    const [primary, linked] = await Promise.all([
+      db.product.findMany({
+        where: { vendorId, categoryId: { in: unique } },
+        select: { categoryId: true },
+        distinct: ['categoryId'],
+      }),
+      db.productCategory.findMany({
+        where: { categoryId: { in: unique }, product: { vendorId } },
+        select: { categoryId: true },
+        distinct: ['categoryId'],
+      }),
+    ]);
+    const found = new Set<string>();
+    for (const row of primary) {
+      if (row.categoryId) found.add(row.categoryId);
+    }
+    for (const row of linked) found.add(row.categoryId);
+    if (unique.some((id) => !found.has(id))) {
+      throw Errors.badRequest('One or more selected categories are not in your catalog');
+    }
+  }
+
+  if (scope.brandNames && scope.brandNames.length > 0) {
+    const unique = Array.from(new Set(scope.brandNames.map((n) => n.trim()).filter(Boolean)));
+    const products = await db.product.findMany({
+      where: { vendorId, brand: { not: null } },
+      select: { brand: true },
+      distinct: ['brand'],
+    });
+    const catalog = new Set(
+      products.map((p) => (p.brand ?? '').trim().toLowerCase()).filter(Boolean),
+    );
+    if (unique.some((name) => !catalog.has(name.toLowerCase()))) {
+      throw Errors.badRequest('One or more selected brands are not in your catalog');
+    }
+  }
+}
+
+function cashbackAmountForBase(
+  campaign: { cashbackType: string; cashbackValue: unknown; maxCashback?: unknown | null },
+  base: number,
+): number {
+  let amount =
+    campaign.cashbackType === 'flat'
+      ? Math.min(Number(campaign.cashbackValue), base)
+      : r2((base * Number(campaign.cashbackValue)) / 100);
+  if (campaign.cashbackType === 'percentage' && campaign.maxCashback) {
+    amount = Math.min(amount, Number(campaign.maxCashback));
+  }
+  return r2(Math.max(0, amount));
+}
+
+function goodsBase(order: { subtotal: unknown; promoDiscount: unknown; couponDiscount: unknown }): number {
+  return r2(
+    Math.max(0, Number(order.subtotal) - Number(order.promoDiscount) - Number(order.couponDiscount)),
+  );
+}
+
+function pickAttachOrderId(
+  pos: CheckoutCashbackPo[],
+  campaignVendorId: string | null,
+): string {
+  const pool = campaignVendorId ? pos.filter((p) => p.vendorId === campaignVendorId) : pos;
+  const candidates = pool.length > 0 ? pool : pos;
+  let best = candidates[0];
+  for (const p of candidates) {
+    if (p.base > best.base) best = p;
+  }
+  return best.orderId;
 }
 
 /** Proportional split of `total` over `weights`, rounded to paise, exact sum. */
@@ -456,6 +606,10 @@ async function loadAndValidateCoupon(
   if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
     throw Errors.badRequest('This coupon has reached its usage limit');
   }
+  if (coupon.audienceUserIds.length > 0 && !coupon.audienceUserIds.includes(args.userId)) {
+    throw Errors.badRequest('This coupon is not available for your account');
+  }
+
   if (coupon.perUserLimit !== null) {
     // One multi-vendor checkout = one use → count distinct active checkout groups.
     const groups = await db.couponRedemption.findMany({
@@ -526,6 +680,7 @@ async function loadAndValidateCoupon(
       name: coupon.name,
       stacksWithVendorPromo: coupon.stacksWithVendorPromo,
       stacksWithCashback: coupon.stacksWithCashback,
+      stacksWithWallet: coupon.stacksWithWallet,
     },
     suppressVendorPromos,
     perOrder,
@@ -544,6 +699,116 @@ async function notifyInApp(
   await db.notification.create({
     data: { userId, type: 'promo', channel: 'in_app', status: 'sent', title, body, referenceId, referenceType },
   });
+}
+
+type CashbackPoBase = { vendorId: string; base: number };
+
+/**
+ * Pick the single highest cashback campaign for a checkout (Rule 5). Shared by
+ * persist (`evaluateCashbackForCheckout`) and the estimate-only preview.
+ */
+async function selectWinningCashbackCampaign(
+  db: Db,
+  args: {
+    userId: string;
+    pos: CashbackPoBase[];
+    couponApplied: boolean;
+    couponBlocksCashback: boolean;
+    walletApplied: boolean;
+  },
+) {
+  const pos = args.pos.filter((p) => p.base > 0);
+  if (pos.length === 0) return null;
+  if (args.couponApplied && args.couponBlocksCashback) return null;
+
+  const combinedBase = r2(pos.reduce((a, p) => a + p.base, 0));
+  const vendorIds = Array.from(new Set(pos.map((p) => p.vendorId)));
+  const baseByVendor = new Map<string, number>();
+  for (const p of pos) {
+    baseByVendor.set(p.vendorId, r2((baseByVendor.get(p.vendorId) ?? 0) + p.base));
+  }
+
+  const now = new Date();
+  const campaigns = await db.cashbackCampaign.findMany({
+    where: {
+      isActive: true,
+      OR: [{ vendorId: null }, { vendorId: { in: vendorIds } }],
+      AND: [
+        { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+        { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+      ],
+    },
+  });
+
+  let best: { campaign: (typeof campaigns)[number]; amount: number } | null = null;
+  for (const c of campaigns) {
+    if (args.couponApplied && !c.stacksWithCoupon) continue;
+    if (args.walletApplied && !c.stacksWithWallet) continue;
+
+    const base = c.vendorId ? (baseByVendor.get(c.vendorId) ?? 0) : combinedBase;
+    if (base <= 0) continue;
+    if (c.minOrderValue && base < Number(c.minOrderValue)) continue;
+
+    const amount = cashbackAmountForBase(c, base);
+    if (amount <= 0) continue;
+    if (c.totalBudget && Number(c.usedAmount) + amount > Number(c.totalBudget)) continue;
+    if (c.perUserLimit !== null) {
+      const earned = await db.cashbackEntry.count({
+        where: { campaignId: c.id, userId: args.userId, status: { not: 'cancelled' } },
+      });
+      if (earned >= c.perUserLimit) continue;
+    }
+
+    if (!best || amount > best.amount) best = { campaign: c, amount };
+  }
+  return best;
+}
+
+export function cashbackOfferBadge(c: {
+  cashbackType: string;
+  cashbackValue: unknown;
+  maxCashback: unknown;
+  minOrderValue: unknown;
+}): string {
+  const minVal = c.minOrderValue != null ? Number(c.minOrderValue) : 0;
+  const minSuffix = minVal > 0 ? ` on orders above ₹${minVal.toFixed(0)}` : '';
+  // Marketing surface shows campaign face value as an upper bound — checkout
+  // estimates the order-capped amount via preview. Always say "Up to".
+  if (c.cashbackType === 'percentage') {
+    const cap = c.maxCashback ? ` (max ₹${Number(c.maxCashback).toFixed(0)})` : '';
+    return `Up to ${Number(c.cashbackValue).toFixed(0)}% cashback${cap}${minSuffix}`;
+  }
+  return `Up to ₹${Number(c.cashbackValue).toFixed(0)} cashback${minSuffix}`;
+}
+
+function vendorPromoOfferBadge(p: {
+  type: string;
+  name: string;
+  minQty: number | null;
+  getQty: number | null;
+  buyProductId: string | null;
+  getProductId: string | null;
+  discountPct: unknown;
+  discountFlat: unknown;
+  minOrderValue: unknown;
+}): string {
+  if (p.type === 'bxgy' && p.buyProductId) {
+    const minQty = p.minQty ?? 1;
+    const getQty = p.getQty ?? 1;
+    return bxgyBadgeLabel(minQty, getQty, p.buyProductId === p.getProductId);
+  }
+  const minVal = p.minOrderValue != null ? Number(p.minOrderValue) : 0;
+  if (p.type === 'pct_discount' && p.discountPct) {
+    return minVal > 0
+      ? `${Number(p.discountPct).toFixed(0)}% off orders above ₹${minVal.toFixed(0)}`
+      : `${Number(p.discountPct).toFixed(0)}% off`;
+  }
+  if (p.type === 'flat_discount' && p.discountFlat) {
+    return minVal > 0
+      ? `₹${Number(p.discountFlat).toFixed(0)} off orders above ₹${minVal.toFixed(0)}`
+      : `₹${Number(p.discountFlat).toFixed(0)} off`;
+  }
+  return p.name;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────
@@ -605,77 +870,43 @@ export const promotionService = {
         where: { id: redemption.couponId, usedCount: { gt: 0 } },
         data: { usedCount: { decrement: 1 } },
       });
+      await programs.releaseFirstOrderCouponGrant(tx, redemption.checkoutGroupId);
     }
   },
 
   // ── Cashback: checkout + delivery lifecycle ────────────────────────────
 
   /**
-   * Rule 5 — evaluate all eligible campaigns (platform + this order's vendor)
-   * and create ONE pending entry for the single highest payout. Campaign terms
-   * are snapshotted on the entry so settlement at delivery survives campaign
-   * edits and admin order modifications.
+   * Rule 5 — one cashback source per checkout. Platform campaigns score on the
+   * combined goods base; each vendor campaign scores on that PO's goods base.
+   * Highest amount wins. One CashbackEntry attached to the winning PO (or the
+   * largest PO when a platform campaign wins). Campaign terms are snapshotted
+   * so settlement at delivery survives campaign edits and admin modifications.
    */
-  async evaluateCashbackForOrder(
+  async evaluateCashbackForCheckout(
     tx: Db,
     args: {
       userId: string;
-      orderId: string;
-      vendorId: string;
-      /** subtotal − vendor promo − coupon (what the customer pays for goods). */
-      base: number;
-      couponAppliedOnOrder: boolean;
+      checkoutGroupId: string;
+      pos: CheckoutCashbackPo[];
+      couponApplied: boolean;
       /** Per-coupon stacksWithCashback=false blocks all cashback on the checkout. */
       couponBlocksCashback: boolean;
+      /** True when H1 Wallet was actually debited on this checkout. */
+      walletApplied: boolean;
     },
-  ): Promise<{ id: string; amount: number } | null> {
-    if (args.base <= 0) return null;
-    if (args.couponAppliedOnOrder && args.couponBlocksCashback) return null;
-
-    const now = new Date();
-    const campaigns = await tx.cashbackCampaign.findMany({
-      where: {
-        isActive: true,
-        OR: [{ vendorId: null }, { vendorId: args.vendorId }],
-        AND: [
-          { OR: [{ startDate: null }, { startDate: { lte: now } }] },
-          { OR: [{ endDate: null }, { endDate: { gte: now } }] },
-        ],
-      },
-    });
-
-    let best: { campaign: (typeof campaigns)[number]; amount: number } | null = null;
-    for (const c of campaigns) {
-      if (args.couponAppliedOnOrder && !c.stacksWithCoupon) continue;
-      if (c.minOrderValue && args.base < Number(c.minOrderValue)) continue;
-
-      let amount =
-        c.cashbackType === 'flat'
-          ? Math.min(Number(c.cashbackValue), args.base)
-          : r2((args.base * Number(c.cashbackValue)) / 100);
-      if (c.cashbackType === 'percentage' && c.maxCashback) {
-        amount = Math.min(amount, Number(c.maxCashback));
-      }
-      amount = r2(amount);
-      if (amount <= 0) continue;
-
-      if (c.totalBudget && Number(c.usedAmount) + amount > Number(c.totalBudget)) continue;
-      if (c.perUserLimit !== null) {
-        const earned = await tx.cashbackEntry.count({
-          where: { campaignId: c.id, userId: args.userId, status: { not: 'cancelled' } },
-        });
-        if (earned >= c.perUserLimit) continue;
-      }
-
-      if (!best || amount > best.amount) best = { campaign: c, amount };
-    }
+  ): Promise<{ id: string; amount: number; orderId: string } | null> {
+    const pos = args.pos.filter((p) => p.base > 0);
+    const best = await selectWinningCashbackCampaign(tx, { ...args, pos });
     if (!best) return null;
 
+    const orderId = pickAttachOrderId(pos, best.campaign.vendorId);
     const entry = await tx.cashbackEntry.create({
       data: {
         campaignId: best.campaign.id,
         userId: args.userId,
-        orderId: args.orderId,
+        orderId,
+        checkoutGroupId: args.checkoutGroupId,
         vendorId: best.campaign.vendorId,
         source: 'order',
         amount: best.amount,
@@ -691,26 +922,44 @@ export const promotionService = {
       where: { id: best.campaign.id },
       data: { usedAmount: { increment: best.amount }, usedCount: { increment: 1 } },
     });
-    return { id: entry.id, amount: best.amount };
+    return { id: entry.id, amount: best.amount, orderId };
   },
 
   /**
-   * On delivery: recompute from the snapshot against the order's FINAL totals
-   * (admin may have edited/split the order), then credit the wallet or move a
-   * UPI payout to `approved`. Idempotent — only acts on `pending` entries.
+   * On delivery: recompute from the snapshot against remaining non-cancelled
+   * POs in the checkout group (legacy entries without checkoutGroupId still
+   * use this order alone). Then credit the H1 Wallet or move a UPI payout
+   * to `approved`. Idempotent — only acts on `pending` entries.
    */
   async settleCashbackForOrder(tx: Db, orderId: string): Promise<void> {
     const entry = await tx.cashbackEntry.findUnique({ where: { orderId } });
     if (!entry || entry.status !== 'pending') return;
 
-    const order = await tx.order.findUnique({
-      where: { id: orderId },
-      select: { subtotal: true, promoDiscount: true, couponDiscount: true },
-    });
-    if (!order) return;
-    const base = r2(
-      Math.max(0, Number(order.subtotal) - Number(order.promoDiscount) - Number(order.couponDiscount)),
-    );
+    let base: number;
+    if (entry.checkoutGroupId) {
+      const siblings = await tx.order.findMany({
+        where: {
+          checkoutGroupId: entry.checkoutGroupId,
+          status: { notIn: ['cancelled', 'returned', 'draft'] },
+        },
+        select: { vendorId: true, subtotal: true, promoDiscount: true, couponDiscount: true },
+      });
+      const remaining = entry.vendorId
+        ? siblings.filter((o) => o.vendorId === entry.vendorId)
+        : siblings;
+      if (remaining.length === 0) {
+        await this.cancelCashbackForOrder(tx, orderId);
+        return;
+      }
+      base = r2(remaining.reduce((a, o) => a + goodsBase(o), 0));
+    } else {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { subtotal: true, promoDiscount: true, couponDiscount: true },
+      });
+      if (!order) return;
+      base = goodsBase(order);
+    }
 
     // Re-qualify + recompute from the snapshotted terms.
     if (entry.minOrderValue && base < Number(entry.minOrderValue)) {
@@ -719,14 +968,14 @@ export const promotionService = {
     }
     let amount = Number(entry.amount);
     if (entry.cashbackType && entry.cashbackValue) {
-      amount =
-        entry.cashbackType === 'flat'
-          ? Math.min(Number(entry.cashbackValue), base)
-          : r2((base * Number(entry.cashbackValue)) / 100);
-      if (entry.cashbackType === 'percentage' && entry.maxCashback) {
-        amount = Math.min(amount, Number(entry.maxCashback));
-      }
-      amount = r2(amount);
+      amount = cashbackAmountForBase(
+        {
+          cashbackType: entry.cashbackType,
+          cashbackValue: entry.cashbackValue,
+          maxCashback: entry.maxCashback,
+        },
+        base,
+      );
     }
     if (amount <= 0) {
       await this.cancelCashbackForOrder(tx, orderId);
@@ -764,7 +1013,7 @@ export const promotionService = {
         tx,
         entry.userId,
         'Cashback credited 🎉',
-        `₹${amount.toLocaleString('en-IN')} cashback has been credited to your wallet.`,
+        `₹${amount.toLocaleString('en-IN')} cashback has been credited to your H1 Wallet.`,
         entry.id,
         'cashback',
       );
@@ -871,7 +1120,7 @@ export const promotionService = {
         amount: row.amount,
         referenceId: row.orderId,
         referenceType: 'order_redemption',
-        notes: 'Wallet applied at checkout',
+        notes: 'H1 Wallet applied at checkout',
       })),
     });
   },
@@ -898,7 +1147,7 @@ export const promotionService = {
         amount: order.walletApplied,
         referenceId: order.id,
         referenceType: 'order_redemption_refund',
-        notes: 'Wallet refund — order cancelled',
+        notes: 'H1 Wallet refund — order cancelled',
       },
     });
   },
@@ -918,8 +1167,9 @@ export const promotionService = {
    * wrongly report "empty cart".
    *
    * Rule 3 — a coupon with `stacksWithVendorPromo = false` suppresses the auto
-   * promos at checkout, so the returned `autoPromos`/`totalPromoDiscount` are
-   * the EFFECTIVE (post-suppression) values for the current code.
+   * pct/flat promos AND BXGY at checkout, so the returned `autoPromos` /
+   * `totalPromoDiscount` / `bxgyFreeItems` are the EFFECTIVE (post-suppression)
+   * values for the current code.
    */
   async previewPromotions(args: {
     userId: string;
@@ -927,6 +1177,7 @@ export const promotionService = {
     outletId: string;
     items: PreviewItemInput[];
     code?: string | null;
+    useWallet?: boolean;
   }): Promise<{
     subtotal: number;
     subtotalTaxable: number;
@@ -941,9 +1192,10 @@ export const promotionService = {
       promotionName: string;
     }>;
     coupon:
-      | { valid: true; code: string; name: string; estimatedDiscount: number; stacksWithCashback: boolean }
+      | { valid: true; code: string; name: string; estimatedDiscount: number; stacksWithCashback: boolean; stacksWithWallet: boolean }
       | { valid: false; message: string }
       | null;
+    estimatedCashback: EstimatedCashbackPreview | null;
   }> {
     const emptyCoupon = args.code
       ? { valid: false as const, message: 'No items found in your cart. Please add items before applying a coupon.' }
@@ -957,6 +1209,7 @@ export const promotionService = {
         totalPromoDiscount: 0,
         bxgyFreeItems: [],
         coupon: emptyCoupon,
+        estimatedCashback: null,
       };
     }
 
@@ -1055,6 +1308,7 @@ export const promotionService = {
         totalPromoDiscount: 0,
         bxgyFreeItems: [],
         coupon: emptyCoupon,
+        estimatedCashback: null,
       };
     }
 
@@ -1113,29 +1367,59 @@ export const promotionService = {
 
     // Coupon (optional).
     let coupon:
-      | { valid: true; code: string; name: string; estimatedDiscount: number; stacksWithCashback: boolean }
+      | { valid: true; code: string; name: string; estimatedDiscount: number; stacksWithCashback: boolean; stacksWithWallet: boolean }
       | { valid: false; message: string }
       | null = null;
     let suppressVendorPromos = false;
+    let couponPerOrder: number[] = drafts.map(() => 0);
+    let couponBlocksCashback = false;
+    let couponBlocksWallet = false;
     if (args.code) {
       try {
         const app = await loadAndValidateCoupon(prisma, { code: args.code, userId: args.userId, drafts });
         suppressVendorPromos = app.suppressVendorPromos;
+        couponPerOrder = app.perOrder;
+        couponBlocksCashback = !app.coupon.stacksWithCashback;
+        couponBlocksWallet = !app.coupon.stacksWithWallet;
         coupon = {
           valid: true,
           code: app.coupon.code,
           name: app.coupon.name,
           estimatedDiscount: app.totalDiscount,
           stacksWithCashback: app.coupon.stacksWithCashback,
+          stacksWithWallet: app.coupon.stacksWithWallet,
         };
       } catch (error) {
         coupon = { valid: false, message: error instanceof Error ? error.message : 'Invalid coupon code' };
       }
     }
 
-    // Effective (post-suppression) auto promos for the current code.
+    // Effective (post-suppression) auto promos + BXGY for the current code.
     const effectiveAutoPromos = suppressVendorPromos ? [] : autoPromos;
     const totalPromoDiscount = r2(effectiveAutoPromos.reduce((a, p) => a + p.discount, 0));
+    const effectiveBxgy = suppressVendorPromos ? [] : mergeBxgyFreeItems(bxgyFreeItems);
+
+    const promoByVendor = new Map(effectiveAutoPromos.map((p) => [p.vendorId, p.discount]));
+    const cashbackPos = drafts.map((d, i) => ({
+      vendorId: d.vendorId,
+      base: r2(Math.max(0, d.subtotal - (promoByVendor.get(d.vendorId) ?? 0) - (couponPerOrder[i] ?? 0))),
+    }));
+    const walletApplied = Boolean(args.useWallet) && !couponBlocksWallet;
+    const winner = await selectWinningCashbackCampaign(prisma, {
+      userId: args.userId,
+      pos: cashbackPos,
+      couponApplied: coupon?.valid === true,
+      couponBlocksCashback,
+      walletApplied,
+    });
+    const estimatedCashback: EstimatedCashbackPreview | null = winner
+      ? {
+          estimatedAmount: winner.amount,
+          destination: winner.campaign.destination,
+          settlesOn: 'delivery',
+          campaignName: winner.campaign.name,
+        }
+      : null;
 
     return {
       subtotal,
@@ -1143,8 +1427,9 @@ export const promotionService = {
       totalGST,
       autoPromos: effectiveAutoPromos,
       totalPromoDiscount,
-      bxgyFreeItems: mergeBxgyFreeItems(bxgyFreeItems),
+      bxgyFreeItems: effectiveBxgy,
       coupon,
+      estimatedCashback,
     };
   },
 
@@ -1170,6 +1455,123 @@ export const promotionService = {
     return { walletBalance: balance, entries, walletTransactions: txns };
   },
 
+  /**
+   * Customer deals surface: live coupons + store offers (vendor pct/flat/BXGY
+   * and cashback campaigns). When `vendorId` is set, only platform + that
+   * vendor — never another vendor's private coupons. Otherwise platform +
+   * vendors visible for the delivery pincode (same rule as catalog).
+   */
+  async listPublicOffers(args: {
+    userId: string;
+    vendorId?: string | null;
+    pincode?: string | null;
+  }): Promise<{ coupons: PublicCouponOffer[]; storeOffers: PublicStoreOffer[] }> {
+    const now = new Date();
+    const pincode = args.pincode && /^\d{6}$/.test(args.pincode) ? args.pincode : null;
+    const vendorVisibility: Prisma.VendorWhereInput = {
+      isActive: true,
+      isVerified: true,
+      ...(pincode ? { serviceAreas: { some: { pincode, isActive: true } } } : {}),
+    };
+    const vendorScope: Prisma.CouponWhereInput = args.vendorId
+      ? { OR: [{ vendorId: null }, { vendorId: args.vendorId }] }
+      : { OR: [{ vendorId: null }, { vendor: vendorVisibility }] };
+
+    const [couponRows, promoRows, campaignRows] = await Promise.all([
+      prisma.coupon.findMany({
+        where: {
+          isActive: true,
+          AND: [
+            { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+            { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+            {
+              OR: [
+                { audienceUserIds: { isEmpty: true } },
+                { audienceUserIds: { has: args.userId } },
+              ],
+            },
+            vendorScope,
+          ],
+        },
+        include: { vendor: { select: { id: true, businessName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+      prisma.promotion.findMany({
+        where: {
+          ...livePromotionWhere(now),
+          ...(args.vendorId ? { vendorId: args.vendorId } : { vendor: vendorVisibility }),
+        },
+        include: { vendor: { select: { id: true, businessName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+      prisma.cashbackCampaign.findMany({
+        where: {
+          isActive: true,
+          AND: [
+            { OR: [{ startDate: null }, { startDate: { lte: now } }] },
+            { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+            args.vendorId
+              ? { OR: [{ vendorId: null }, { vendorId: args.vendorId }] }
+              : { OR: [{ vendorId: null }, { vendor: vendorVisibility }] },
+          ],
+        },
+        include: { vendor: { select: { id: true, businessName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+    ]);
+
+    const coupons: PublicCouponOffer[] = couponRows
+      .filter((c) => c.usageLimit === null || c.usedCount < c.usageLimit)
+      .map((c) => ({
+        id: c.id,
+        code: c.code,
+        name: c.name,
+        description: c.description,
+        discountType: c.discountType,
+        discountValue: Number(c.discountValue),
+        maxDiscount: c.maxDiscount != null ? Number(c.maxDiscount) : null,
+        minOrderValue: c.minOrderValue != null ? Number(c.minOrderValue) : null,
+        endDate: c.endDate,
+        vendorId: c.vendorId,
+        vendorName: c.vendor?.businessName ?? null,
+        hasScope: c.productIds.length > 0 || c.categoryIds.length > 0 || c.brandNames.length > 0,
+      }));
+
+    const storeOffers: PublicStoreOffer[] = [
+      ...promoRows.filter(promotionWithinUsage).map((p) => ({
+        id: p.id,
+        kind: 'vendor_promo' as const,
+        name: p.name,
+        badgeLabel: vendorPromoOfferBadge(p),
+        type: p.type,
+        description: null,
+        vendorId: p.vendorId,
+        vendorName: p.vendor.businessName,
+        minOrderValue: p.minOrderValue != null ? Number(p.minOrderValue) : null,
+        endDate: p.endDate,
+      })),
+      ...campaignRows
+        .filter((c) => !c.totalBudget || Number(c.usedAmount) < Number(c.totalBudget))
+        .map((c) => ({
+          id: c.id,
+          kind: 'cashback' as const,
+          name: c.name,
+          badgeLabel: cashbackOfferBadge(c),
+          type: c.cashbackType,
+          description: c.description,
+          vendorId: c.vendorId,
+          vendorName: c.vendor?.businessName ?? null,
+          minOrderValue: c.minOrderValue != null ? Number(c.minOrderValue) : null,
+          endDate: c.endDate,
+        })),
+    ];
+
+    return { coupons, storeOffers };
+  },
+
   /** Customer attaches their UPI ID to an unclaimed UPI cashback. */
   async claimUpi(entryId: string, userId: string, upiId: string): Promise<CashbackEntry> {
     const entry = await prisma.cashbackEntry.findFirst({
@@ -1177,7 +1579,7 @@ export const promotionService = {
     });
     if (!entry) throw Errors.notFound('Cashback entry');
     if (entry.destination !== 'upi') {
-      throw Errors.badRequest('This cashback is credited to your wallet — no UPI ID needed');
+      throw Errors.badRequest('This cashback is credited to your H1 Wallet — no UPI ID needed');
     }
     if (entry.status !== 'pending' && entry.status !== 'approved') {
       throw Errors.badRequest('This cashback can no longer be claimed');
@@ -1244,7 +1646,7 @@ export const promotionService = {
           tx,
           args.userId,
           'You received an incentive 🎁',
-          `₹${amount.toLocaleString('en-IN')} has been credited to your Horeca1 wallet.`,
+          `₹${amount.toLocaleString('en-IN')} has been credited to your H1 Wallet.`,
           entry.id,
           'cashback',
         );
@@ -1289,5 +1691,74 @@ export const promotionService = {
       );
       return updated;
     });
+  },
+
+  // ── Phase C programs (welcome / first-order / referral / payout) ───────
+
+  hasSuccessfulOrder(userId: string, opts?: { excludeOrderIds?: string[] }) {
+    return programs.hasSuccessfulOrder(prisma, userId, opts);
+  },
+
+  autoFirstOrderCoupon(
+    tx: Db,
+    args: { userId: string; drafts: Array<{ subtotal: number; promoDiscount: number }>; createIfMissing: boolean },
+  ) {
+    return programs.autoFirstOrderCoupon(tx, args);
+  },
+
+  captureFirstOrderCouponGrant(
+    tx: Db,
+    args: { userId: string; couponId: string; orderId: string; checkoutGroupId: string },
+  ) {
+    return programs.captureFirstOrderCouponGrant(tx, args);
+  },
+
+  onOrdersBecameSuccessful(orderIds: string[]) {
+    return programs.onOrdersBecameSuccessful(orderIds);
+  },
+
+  issueWelcomeForUser(userId: string) {
+    return programs.issueWelcomeForUser(userId);
+  },
+
+  attributeReferralOnSignup(args: { referredUserId: string; token: string }) {
+    return programs.attributeReferralOnSignup(args);
+  },
+
+  recordReferralClick(token: string) {
+    return programs.recordReferralClick(token);
+  },
+
+  getMyReferral(userId: string, opts?: { originOverride?: string | null }) {
+    return programs.getMyReferral(userId, opts);
+  },
+
+  getWelcomeOffer() {
+    return programs.getWelcomeOffer();
+  },
+  upsertWelcomeOffer(data: Parameters<typeof programs.upsertWelcomeOffer>[0]) {
+    return programs.upsertWelcomeOffer(data);
+  },
+  getFirstOrderOffer() {
+    return programs.getFirstOrderOffer();
+  },
+  upsertFirstOrderOffer(data: Parameters<typeof programs.upsertFirstOrderOffer>[0]) {
+    return programs.upsertFirstOrderOffer(data);
+  },
+  getReferralProgram() {
+    return programs.getReferralProgram();
+  },
+  upsertReferralProgram(data: Parameters<typeof programs.upsertReferralProgram>[0]) {
+    return programs.upsertReferralProgram(data);
+  },
+
+  createPayoutInvite(args: Parameters<typeof programs.createPayoutInvite>[0]) {
+    return programs.createPayoutInvite(args);
+  },
+  getPayoutInvitePublic(token: string) {
+    return programs.getPayoutInvitePublic(token);
+  },
+  claimPayoutInvite(args: Parameters<typeof programs.claimPayoutInvite>[0]) {
+    return programs.claimPayoutInvite(args);
   },
 };

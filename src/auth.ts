@@ -17,6 +17,8 @@ import { flatten } from '@/lib/permissions/engine';
 import { isOwnerRoleName } from '@/lib/permissions/portalFeatures';
 import type { Role } from '@prisma/client';
 import { backfillAdminPasswordCipherIfMissing } from '@/lib/adminPasswordCipher';
+import { emitEvent } from '@/events/emitter';
+import { REFERRAL_COOKIE } from '@/lib/referralCookie';
 
 function vendorSlug(name: string): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
@@ -239,6 +241,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               },
             });
           }
+
+          let referralToken: string | undefined;
+          try {
+            const { cookies } = await import('next/headers');
+            const raw = (await cookies()).get(REFERRAL_COOKIE)?.value?.trim();
+            if (raw && /^[A-Za-z0-9_-]{16,64}$/.test(raw)) referralToken = raw;
+          } catch {
+            // authorize() can run outside a request cookie store
+          }
+          emitEvent('UserRegistered', {
+            userId: user.id,
+            email: user.email ?? '',
+            role,
+            referralToken,
+          });
         }
 
         if (!user || !user.isActive) return null;

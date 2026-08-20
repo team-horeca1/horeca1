@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { RotateCcw, ListOrdered, Store } from 'lucide-react';
+import { RotateCcw, ListOrdered, Store, BadgePercent } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +46,16 @@ export function QuickActions() {
             bgClass: 'bg-gradient-to-br from-amber-50 to-orange-50',
             borderHover: 'hover:border-amber-300',
         },
+        {
+            href: '/deals',
+            icon: BadgePercent,
+            label: 'Deals & Discounts',
+            desc: 'Coupons & offers',
+            gradient: 'from-[#53B175] to-emerald-700',
+            shadowColor: 'shadow-emerald-500/20',
+            bgClass: 'bg-gradient-to-br from-amber-50 to-green-50',
+            borderHover: 'hover:border-[#53B175]',
+        },
     ];
 
     if (!isMounted || !isLoggedIn) return null;
@@ -53,14 +63,14 @@ export function QuickActions() {
     return (
         <section className="w-full py-4 md:py-6 bg-white">
             <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
-                <div className="grid grid-cols-3 md:flex md:items-center md:justify-center gap-2.5 md:gap-5 lg:gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 md:gap-5 lg:gap-6">
                     {actions.map((action) => (
                         <Link
                             key={action.label}
                             href={action.href}
                             className={cn(
                                 "group relative flex flex-col md:flex-row items-center gap-2 md:gap-5 p-3 md:p-5 lg:p-6",
-                                "md:flex-1 md:max-w-[380px]",
+                                "md:min-w-0",
                                 "rounded-2xl md:rounded-[24px]",
                                 action.bgClass,
                                 "border border-gray-100/80",

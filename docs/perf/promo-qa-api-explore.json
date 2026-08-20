@@ -1,0 +1,229 @@
+{
+  "base": "http://localhost:3000",
+  "at": "2026-08-20T11:00:37.415Z",
+  "findings": [
+    {
+      "name": "GET /",
+      "status": "PASS",
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "GET /deals",
+      "status": "PASS",
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "GET /rewards",
+      "status": "PASS",
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "GET /wallet",
+      "status": "PASS",
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "GET /login",
+      "status": "PASS",
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "GET /admin/promotions",
+      "status": "PASS",
+      "detail": "HTTP 307"
+    },
+    {
+      "name": "GET /vendor/promotions",
+      "status": "PASS",
+      "detail": "HTTP 307"
+    },
+    {
+      "name": "Login customer",
+      "status": "PASS",
+      "detail": "\"chef@tajpalace.com\""
+    },
+    {
+      "name": "Login admin",
+      "status": "PASS",
+      "detail": "\"admin@horeca1.com\""
+    },
+    {
+      "name": "Login vendor A",
+      "status": "PASS",
+      "detail": "\"fresh@dailyfreshfoods.com\""
+    },
+    {
+      "name": "Login vendor B",
+      "status": "PASS",
+      "detail": "\"owner@spicetrail.in\""
+    },
+    {
+      "name": "Login brand",
+      "status": "PASS",
+      "detail": "\"brand@kitchensmith.com\""
+    },
+    {
+      "name": "Customer mint admin coupon denied",
+      "status": "PASS",
+      "detail": "HTTP 403 {\"success\":false,\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"You don't have permission for this action\"}}"
+    },
+    {
+      "name": "Brand list vendor coupons denied",
+      "status": "PASS",
+      "detail": "HTTP 403"
+    },
+    {
+      "name": "Customer GET admin coupons denied",
+      "status": "PASS",
+      "detail": "HTTP 403"
+    },
+    {
+      "name": "Vendor coupon create scoped",
+      "status": "PASS",
+      "detail": "HTTP 201 vendorId=f7b39a20-720b-4619-bcac-a45064b12a6e"
+    },
+    {
+      "name": "Vendor audienceUserIds stripped",
+      "status": "PASS",
+      "detail": "HTTP 400 audience=undefined"
+    },
+    {
+      "name": "Admin list coupons",
+      "status": "PASS",
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "Admin list cashback",
+      "status": "PASS",
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "Vendor A→B IDOR coupon PATCH",
+      "status": "PASS",
+      "detail": "id=e7867444-4fe3-4874-b889-7c9600996a1e HTTP 404"
+    },
+    {
+      "name": "Preview invalid coupon",
+      "status": "PASS",
+      "detail": "HTTP 200 {\"success\":true,\"data\":{\"subtotal\":0,\"subtotalTaxable\":0,\"totalGST\":0,\"autoPromos\":[],\"totalPromoDiscount\":0,\"bxgyFreeItems\":[],\"coupon\":{\"valid\":false,\"message\":\"No items found in your cart. Please a"
+    },
+    {
+      "name": "Preview rejects client discountAmount",
+      "status": "PASS",
+      "detail": "HTTP 200 applied=0 {\"success\":true,\"data\":{\"subtotal\":520,\"subtotalTaxable\":520,\"totalGST\":0,\"autoPromos\":[],\"totalPromoDiscount\":0,\"bxgyFreeItems\":[],\"coupon\":{\"valid\":false,\"message\":\"Invalid coupon code\"},\"estimatedC"
+    },
+    {
+      "name": "Admin create MOV coupon",
+      "status": "PASS",
+      "detail": "HTTP 201"
+    },
+    {
+      "name": "Coupon MOV below threshold",
+      "status": "PASS",
+      "detail": "HTTP 200 coupon={\"valid\":false,\"message\":\"Add items worth ₹50,000 or more to use this coupon\"}"
+    },
+    {
+      "name": "Coupon MOV above threshold preview",
+      "status": "PASS",
+      "detail": "HTTP 200 coupon={\"valid\":true,\"code\":\"QAPOK1787223627219\",\"name\":\"QA preview MOV ok\",\"estimatedDiscount\":50,\"stacksWithCashback\":true,\"stacksWithWallet\":true}"
+    },
+    {
+      "name": "Admin cashback upi→wallet coerce",
+      "status": "PASS",
+      "detail": "HTTP 201 destination=wallet"
+    },
+    {
+      "name": "Payout CSRF origin reject",
+      "status": "PASS",
+      "detail": "HTTP 403"
+    },
+    {
+      "name": "Vendor list cashback",
+      "status": "PASS",
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "Vendor cashback upi→wallet",
+      "status": "PASS",
+      "detail": "destination=wallet"
+    },
+    {
+      "name": "Admin program welcome GET",
+      "status": "PASS",
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "Admin program first-order GET",
+      "status": "PASS",
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "Admin program referral GET",
+      "status": "PASS",
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "Customer claim foreign/missing reward",
+      "status": "PASS",
+      "detail": "HTTP 400"
+    },
+    {
+      "name": "Customer offers list",
+      "status": "PASS",
+      "detail": "HTTP 200"
+    },
+    {
+      "name": "Customer rewards",
+      "status": "PASS",
+      "detail": "HTTP 200 {\"success\":true,\"data\":{\"walletBalance\":124,\"entries\":[{\"id\":\"b5cfe0b5-a777-4e9a-be6a-98623252480c\",\"campaignId\":null,\"u"
+    },
+    {
+      "name": "Duplicate coupon code race",
+      "status": "PASS",
+      "detail": "statuses=201/400"
+    },
+    {
+      "name": "Boundary coupon negative value",
+      "status": "PASS",
+      "detail": "HTTP 400"
+    },
+    {
+      "name": "Boundary coupon zero value",
+      "status": "PASS",
+      "detail": "HTTP 400"
+    },
+    {
+      "name": "Boundary coupon huge percent",
+      "status": "PASS",
+      "detail": "HTTP 400"
+    },
+    {
+      "name": "Brand portal promo create",
+      "status": "N/A",
+      "detail": "Deferred — no brand promo routes"
+    },
+    {
+      "name": "Campaign UPI destination UI",
+      "status": "N/A",
+      "detail": "Coerced to wallet by design"
+    },
+    {
+      "name": "Partial-return line clawback",
+      "status": "N/A",
+      "detail": "Full clawback on returned only"
+    },
+    {
+      "name": "Headed Playwright MCP UI exploration",
+      "status": "BLOCKED",
+      "detail": "MCP server not connected"
+    }
+  ],
+  "bugs": [],
+  "summary": {
+    "pass": 39,
+    "fail": 0,
+    "blocked": 1,
+    "na": 3,
+    "bugs": 0
+  }
+}

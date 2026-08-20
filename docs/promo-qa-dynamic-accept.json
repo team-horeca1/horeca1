@@ -1,0 +1,87 @@
+{
+  "BASE": "http://localhost:3000",
+  "TAG": "DYNMT1H3MYT",
+  "findings": [
+    {
+      "name": "login admin",
+      "status": "PASS",
+      "detail": "admin@horeca1.com"
+    },
+    {
+      "name": "login customer",
+      "status": "PASS",
+      "detail": "chef@tajpalace.com"
+    },
+    {
+      "name": "resolve product",
+      "status": "PASS",
+      "detail": "47df1f6e-93b2-4da3-b5b5-35d9d9cf4c27/aad322fe-fed8-44db-8ef3-36477f96954d"
+    },
+    {
+      "name": "create Discount A",
+      "status": "PASS",
+      "detail": "HTTP 201"
+    },
+    {
+      "name": "preview Discount A config-driven",
+      "status": "PASS",
+      "detail": "sub=1040 est=100 expected≈100"
+    },
+    {
+      "name": "create Discount B",
+      "status": "PASS",
+      "detail": "HTTP 201"
+    },
+    {
+      "name": "preview Discount B below MOV",
+      "status": "PASS",
+      "detail": "{\"valid\":false,\"message\":\"Add items worth ₹1,500 or more to use this coupon\"}"
+    },
+    {
+      "name": "preview Discount C flat 75",
+      "status": "PASS",
+      "detail": "{\"valid\":true,\"code\":\"DYNMT1H3MYTC75\",\"name\":\"DYNMT1H3MYT flat75\",\"estimatedDiscount\":75,\"stacksWithCashback\":true,\"stacksWithWallet\":true}"
+    },
+    {
+      "name": "create Cashback A upi→wallet",
+      "status": "PASS",
+      "detail": "dest=wallet HTTP 201"
+    },
+    {
+      "name": "create Cashback B flat100",
+      "status": "PASS",
+      "detail": "HTTP 201"
+    },
+    {
+      "name": "offers badge Up to for new cashbacks",
+      "status": "PASS",
+      "detail": "n=2 labels=Up to ₹100 cashback | Up to 5% cashback (max ₹50)"
+    },
+    {
+      "name": "referral invite uses request origin/path",
+      "status": "PASS",
+      "detail": "url=http://localhost:3000/invite/t0_LJpqFad0IPbJVp4VhzUKS6-dIspEA path=/invite/t0_LJpqFad0IPbJVp4VhzUKS6-dIspEA"
+    },
+    {
+      "name": "reject 101%",
+      "status": "PASS",
+      "detail": "HTTP 400"
+    },
+    {
+      "name": "reject neg flat",
+      "status": "PASS",
+      "detail": "HTTP 400"
+    },
+    {
+      "name": "cleanup deactivate created",
+      "status": "PASS",
+      "detail": "n=5"
+    }
+  ],
+  "bugs": [],
+  "summary": {
+    "pass": 15,
+    "fail": 0,
+    "bugs": 0
+  }
+}

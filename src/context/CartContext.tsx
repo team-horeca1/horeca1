@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import type { VendorProduct, CartItem, VendorCartGroup, BulkPriceTier, VendorPromoSummary } from '@/types';
-import { dal } from '@/lib/dal';
+import { dalClient as dal } from '@/lib/dalClient';
 import { cartStorageKey, migrateLegacyKey } from '@/lib/userScopedStorage';
 import {
     isAdminCustomerImpersonationActive,
@@ -688,4 +688,9 @@ export function useCart() {
         throw new Error('useCart must be used within a CartProvider');
     }
     return context;
+}
+
+/** Safe outside storefront (admin/vendor portals have no CartProvider). */
+export function useOptionalCart() {
+    return useContext(CartContext);
 }

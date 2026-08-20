@@ -39,8 +39,11 @@ export const createCouponSchema = z
     categoryIds: z.array(z.string().uuid()).max(100).optional(),
     productIds: z.array(z.string().uuid()).max(500).optional(),
     brandNames: z.array(z.string().min(1).max(150)).max(100).optional(),
+    // Admin-only targeting. Vendor routes strip this before persist.
+    audienceUserIds: z.array(z.string().uuid()).max(200).optional(),
     stacksWithVendorPromo: z.boolean().optional(),
     stacksWithCashback: z.boolean().optional(),
+    stacksWithWallet: z.boolean().optional(),
     isActive: z.boolean().optional(),
   })
   .refine(valueTypePair, { message: 'Percentage discount cannot exceed 100', path: ['discountValue'] })
@@ -62,8 +65,10 @@ export const updateCouponSchema = z
     categoryIds: z.array(z.string().uuid()).max(100).optional(),
     productIds: z.array(z.string().uuid()).max(500).optional(),
     brandNames: z.array(z.string().min(1).max(150)).max(100).optional(),
+    audienceUserIds: z.array(z.string().uuid()).max(200).optional(),
     stacksWithVendorPromo: z.boolean().optional(),
     stacksWithCashback: z.boolean().optional(),
+    stacksWithWallet: z.boolean().optional(),
     isActive: z.boolean().optional(),
   })
   .refine(dateWindow, { message: 'End date must be after start date', path: ['endDate'] });
@@ -82,12 +87,16 @@ export const createCashbackCampaignSchema = z
     cashbackValue: z.number().positive(),
     maxCashback: z.number().positive().optional().nullable(),
     minOrderValue: z.number().min(0).optional().nullable(),
-    destination: destinationSchema.optional(),
+    // Campaigns always credit Rewards Wallet. `upi` remains valid on CashbackEntry
+    // for payout invites + leftover historical campaigns; new/updated campaigns
+    // cannot choose it. Extra `destination` on the body is coerced to wallet.
+    destination: destinationSchema.optional().transform(() => 'wallet' as const),
     startDate: isoDate.optional().nullable(),
     endDate: isoDate.optional().nullable(),
     perUserLimit: z.number().int().min(1).optional().nullable(),
     totalBudget: z.number().positive().optional().nullable(),
     stacksWithCoupon: z.boolean().optional(),
+    stacksWithWallet: z.boolean().optional(),
     isActive: z.boolean().optional(),
   })
   .refine((d) => d.cashbackType !== 'percentage' || d.cashbackValue <= 100, {
@@ -104,12 +113,16 @@ export const updateCashbackCampaignSchema = z
     cashbackValue: z.number().positive().optional(),
     maxCashback: z.number().positive().optional().nullable(),
     minOrderValue: z.number().min(0).optional().nullable(),
-    destination: destinationSchema.optional(),
+    // Campaigns always credit Rewards Wallet. `upi` remains valid on CashbackEntry
+    // for payout invites + leftover historical campaigns; new/updated campaigns
+    // cannot choose it. Extra `destination` on the body is coerced to wallet.
+    destination: destinationSchema.optional().transform(() => 'wallet' as const),
     startDate: isoDate.optional().nullable(),
     endDate: isoDate.optional().nullable(),
     perUserLimit: z.number().int().min(1).optional().nullable(),
     totalBudget: z.number().positive().optional().nullable(),
     stacksWithCoupon: z.boolean().optional(),
+    stacksWithWallet: z.boolean().optional(),
     isActive: z.boolean().optional(),
   })
   .refine(dateWindow, { message: 'End date must be after start date', path: ['endDate'] });
@@ -143,3 +156,102 @@ export const listEntriesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().uuid().optional(),
 });
+
+// ─── Phase C programs ────────────────────────────────────────────────────
+
+export const programRewardTypeSchema = z.enum([
+  'wallet_credit',
+  'coupon_flat',
+  'coupon_percentage',
+  'cashback',
+  'free_delivery',
+]);
+
+const firstOrderRewardTypeSchema = z.enum([
+  'wallet_credit',
+  'coupon_flat',
+  'coupon_percentage',
+  'cashback',
+]);
+
+const referralSideRewardTypeSchema = z.enum([
+  'wallet_credit',
+  'coupon_flat',
+  'coupon_percentage',
+  'cashback',
+]);
+
+const programValuePair = (d: { rewardType: string; rewardValue: number }) =>
+  d.rewardType !== 'coupon_percentage' || d.rewardValue <= 100;
+
+export const upsertWelcomeOfferSchema = z
+  .object({
+    isActive: z.boolean(),
+    rewardType: programRewardTypeSchema,
+    rewardValue: z.number().positive(),
+    minOrderValue: z.number().min(0).optional().nullable(),
+    validDays: z.number().int().min(1).max(3650).optional().nullable(),
+    maxDiscount: z.number().positive().optional().nullable(),
+  })
+  .refine(programValuePair, { message: 'Percentage value cannot exceed 100', path: ['rewardValue'] });
+
+export const upsertFirstOrderOfferSchema = z
+  .object({
+    isActive: z.boolean(),
+    rewardType: firstOrderRewardTypeSchema,
+    rewardValue: z.number().positive(),
+    minOrderValue: z.number().min(0).optional().nullable(),
+    validDays: z.number().int().min(1).max(3650).optional().nullable(),
+    maxDiscount: z.number().positive().optional().nullable(),
+  })
+  .refine(programValuePair, { message: 'Percentage value cannot exceed 100', path: ['rewardValue'] });
+
+export const upsertReferralProgramSchema = z
+  .object({
+    isActive: z.boolean(),
+    trigger: z.enum(['signup', 'first_order', 'first_order_mov']),
+    minOrderValue: z.number().min(0).optional().nullable(),
+    referrerRewardType: referralSideRewardTypeSchema,
+    referrerRewardValue: z.number().positive(),
+    referrerMaxDiscount: z.number().positive().optional().nullable(),
+    referrerValidDays: z.number().int().min(1).max(3650).optional().nullable(),
+    referredRewardType: referralSideRewardTypeSchema,
+    referredRewardValue: z.number().positive(),
+    referredMaxDiscount: z.number().positive().optional().nullable(),
+    referredValidDays: z.number().int().min(1).max(3650).optional().nullable(),
+  })
+  .refine(
+    (d) => d.referrerRewardType !== 'coupon_percentage' || d.referrerRewardValue <= 100,
+    { message: 'Percentage value cannot exceed 100', path: ['referrerRewardValue'] },
+  )
+  .refine(
+    (d) => d.referredRewardType !== 'coupon_percentage' || d.referredRewardValue <= 100,
+    { message: 'Percentage value cannot exceed 100', path: ['referredRewardValue'] },
+  )
+  .refine((d) => d.trigger !== 'first_order_mov' || (d.minOrderValue != null && d.minOrderValue > 0), {
+    message: 'MOV is required when the trigger is first order above MOV',
+    path: ['minOrderValue'],
+  });
+
+export const createPayoutInviteSchema = z.object({
+  amount: z.number().positive().max(1_000_000),
+  notes: z.string().max(500).optional().nullable(),
+  userId: z.string().uuid().optional().nullable(),
+  expiresInDays: z.number().int().min(1).max(90).optional(),
+});
+
+export const claimPayoutInviteSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  upiId: z
+    .string()
+    .min(5)
+    .max(100)
+    .regex(/^[\w.\-]{2,}@[A-Za-z]{2,}$/, 'Enter a valid UPI ID, e.g. name@upi'),
+});
+
+export const programTokenSchema = z
+  .string()
+  .min(16)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/, 'Invalid token');
+

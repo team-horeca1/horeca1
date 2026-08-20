@@ -25,59 +25,85 @@ async function sessionEmail(page: Page): Promise<string | null> {
 /**
  * Auth.js credentials callback — bypasses login UI overlays (location picker, etc.).
  * Prefer this for prod E2E account switches.
+ *
+ * Uses the Playwright APIRequestContext (cookie jar shared with the page) instead of
+ * in-page fetch — Turbopack login pages often throw "Failed to fetch" mid-compile.
  */
 export async function credentialsLogin(page: Page, email: string, password: string) {
-  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+  const origin = BASE_URL.replace(/\/$/, '');
+  // Stale session/callback cookies (esp. AUTH_URL port mismatch) break the next login.
+  await page.context().clearCookies();
+  await page.goto(`${origin}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+  const api = page.context().request;
   let lastStatus = 0;
   let lastHint = '';
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const status = await page.evaluate(
-      async (payload) => {
-        const csrfRes = await fetch('/api/auth/csrf', { credentials: 'include' });
-        const csrf = await csrfRes.json();
-        const body = new URLSearchParams();
-        body.set('csrfToken', csrf.csrfToken);
-        body.set('callbackUrl', '/');
-        body.set('json', 'true');
-        body.set('email', payload.email);
-        body.set('password', payload.password);
-        const res = await fetch('/api/auth/callback/credentials?', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body,
-          credentials: 'include',
-          redirect: 'follow',
-        });
-        // Follow redirects so Set-Cookie from the callback is applied; opaque
-        // redirect:manual often reports status 0 in Chromium.
-        return { status: res.status, url: res.url, text: '' };
-      },
-      { email, password },
-    );
-    lastStatus = status.status;
-    lastHint = status.text || status.url;
-    if (status.status === 429 || /error=CredentialsSignin/i.test(status.url)) {
-      // Prod auth rate limiter / brief auth lockout
-      await page.waitForTimeout(Math.min(20_000 * (attempt + 1), 60_000));
-      await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {});
+    let status = 0;
+    let url = '';
+    try {
+      const csrfRes = await api.get(`${origin}/api/auth/csrf`);
+      if (!csrfRes.ok()) {
+        lastStatus = csrfRes.status();
+        lastHint = `csrf ${csrfRes.status()}`;
+        await page.waitForTimeout(500 * (attempt + 1));
+        await page.goto(`${origin}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {});
+        continue;
+      }
+      const csrf = (await csrfRes.json()) as { csrfToken?: string };
+      if (!csrf.csrfToken) {
+        lastHint = 'missing csrfToken';
+        await page.waitForTimeout(500 * (attempt + 1));
+        continue;
+      }
+      // Do NOT follow redirects: AUTH_URL may still point at an old port (e.g. :3001)
+      // while the app under test is on PLAYWRIGHT_BASE_URL (:3000). Session cookies are
+      // set on the 302; following Location would ECONNREFUSED the wrong host.
+      const res = await api.post(`${origin}/api/auth/callback/credentials?`, {
+        form: {
+          csrfToken: csrf.csrfToken,
+          callbackUrl: `${origin}/`,
+          json: 'true',
+          email,
+          password,
+        },
+        maxRedirects: 0,
+      });
+      status = res.status();
+      url = res.headers()['location'] || res.url();
+    } catch (err) {
+      lastHint = err instanceof Error ? err.message : String(err);
+      await page.waitForTimeout(500 * (attempt + 1));
+      await page.goto(`${origin}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {});
       continue;
     }
-    if (status.status >= 400) {
-      throw new Error(`Credentials login failed (${status.status}) for ${email}: ${lastHint}`);
+    lastStatus = status;
+    lastHint = url;
+    if (status === 429) {
+      await page.waitForTimeout(Math.min(20_000 * (attempt + 1), 60_000));
+      await page.goto(`${origin}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {});
+      continue;
     }
+    if (/error=CredentialsSignin/i.test(url)) {
+      await page.waitForTimeout(1_000 * (attempt + 1));
+      await page.goto(`${origin}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {});
+      continue;
+    }
+    if (status >= 400) {
+      throw new Error(`Credentials login failed (${status}) for ${email}: ${lastHint}`);
+    }
+    // Ensure the browser document picks up cookies from the shared jar.
+    await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {});
     try {
       await expect
         .poll(async () => Boolean(await sessionEmail(page)), {
-          timeout: 12_000,
+          timeout: 15_000,
           intervals: [100, 250, 500, 1000],
         })
         .toBe(true);
-      await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {});
       return;
     } catch {
-      // Auth.js often returns 200 with an error URL when credentials are wrong / CSRF stale
       await page.waitForTimeout(1_000 * (attempt + 1));
-      await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {});
+      await page.goto(`${origin}/login`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {});
     }
   }
   throw new Error(

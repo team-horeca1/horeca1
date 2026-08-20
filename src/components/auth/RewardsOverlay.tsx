@@ -38,7 +38,7 @@ export function RewardsOverlay({ isOpen, onClose }: RewardsOverlayProps) {
                     <button onClick={onClose} className="p-1 hover:bg-gray-50 rounded-full transition-colors absolute left-4 md:hidden z-10">
                         <ChevronLeft size={20} className="text-[#181725]" />
                     </button>
-                    <h2 className="w-full text-center md:text-left text-[17px] md:text-[20px] font-[700] text-[#181725]">Rewards</h2>
+                    <h2 className="w-full text-center md:text-left text-[17px] md:text-[20px] font-[700] text-[#181725]">H1 Wallet</h2>
                     <button onClick={onClose} className="hidden md:flex p-2 hover:bg-gray-100 rounded-full transition-colors absolute right-4 z-10">
                         <X size={20} className="text-gray-500" />
                     </button>

@@ -41,6 +41,7 @@
   ],
   "exclude": [
     "node_modules",
+    "e2e",
     "prisma/seed.ts",
     "prisma/generate-prod-sql.ts",
     "prisma/export-local-to-prod.ts",

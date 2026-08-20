@@ -1,28 +1,30 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import {
     ShoppingCart,
     Users,
     Store,
     Wallet,
-    TrendingUp,
     ChevronRight,
     Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-    AreaChart,
-    Area,
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-} from 'recharts';
+
+const AdminDashboardCharts = dynamic(
+  () => import('@/components/features/admin/AdminDashboardCharts'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[411px]">
+        <div className="bg-white rounded-[14px] border border-[#EEEEEE] animate-pulse" />
+        <div className="bg-white rounded-[14px] border border-[#EEEEEE] animate-pulse" />
+      </div>
+    ),
+  },
+);
 
 // Format Indian currency: 115000 → "₹ 1,15,000"
 function formatINR(val: number): string {
@@ -51,47 +53,6 @@ interface DashboardData {
         user: { id: string; fullName: string; email: string };
     }[];
 }
-
-const formatYAxis = (value: number) => {
-    if (value === 0) return '0';
-    if (value >= 100000) return `${Math.floor(value / 100000)},${String(Math.floor((value % 100000) / 1000)).padStart(2, '0')},000`;
-    if (value >= 1000) return `${(value / 1000).toFixed(0)},000`;
-    return value.toString();
-};
-
-/* Custom rounded bar shape with gradient fill */
-const RoundedBar = (props: Record<string, number>) => {
-    const { x, y, width, height } = props;
-    const radius = 5;
-    if (height <= 0) return null;
-    return (
-        <path
-            d={`
-                M${x},${y + height}
-                L${x},${y + radius}
-                Q${x},${y} ${x + radius},${y}
-                L${x + width - radius},${y}
-                Q${x + width},${y} ${x + width},${y + radius}
-                L${x + width},${y + height}
-                Z
-            `}
-            fill="url(#barGradient)"
-        />
-    );
-};
-
-/* Custom tooltip */
-const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) => {
-    if (active && payload && payload.length) {
-        return (
-            <div className="bg-white border border-[#EEEEEE] rounded-xl shadow-lg px-4 py-3">
-                <p className="text-[12px] text-[#7C7C7C] font-medium">{label}</p>
-                <p className="text-[16px] font-bold text-[#181725]">₹ {payload[0].value.toLocaleString('en-IN')}</p>
-            </div>
-        );
-    }
-    return null;
-};
 
 export default function DashboardPage() {
     const [data, setData] = useState<DashboardData | null>(null);
@@ -152,104 +113,8 @@ export default function DashboardPage() {
                 ))}
             </div>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Sales Overview - Area Chart */}
-                <div className="bg-white p-10 rounded-[14px] border border-[#EEEEEE] shadow-sm min-h-[411px]">
-                    <h3 className="text-[18px] font-bold text-[#181725] mb-6">Orders Overview</h3>
-                    <div className="h-[340px] w-full">
-                        {(!data?.monthlyData || data.monthlyData.length === 0) ? (
-                            <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                                <TrendingUp size={40} className="mb-3 opacity-30" />
-                                <p className="text-[14px] font-medium">No order data yet</p>
-                            </div>
-                        ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={data.monthlyData.map(d => ({ month: d.month, value: d.orders }))} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#299E60" />
-                                        <stop offset="30%" stopColor="#3DB876" />
-                                        <stop offset="60%" stopColor="#7DD4A3" />
-                                        <stop offset="85%" stopColor="#C2EDDA" />
-                                        <stop offset="100%" stopColor="#FFFFFF" />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="4 4" stroke="#C8C8C8" />
-                                <XAxis
-                                    dataKey="month"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 12, fill: '#7C7C7C', fontWeight: 600 }}
-                                    dy={10}
-                                />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 11, fill: '#7C7C7C', fontWeight: 500 }}
-                                    width={40}
-                                />
-                                <Tooltip formatter={(val) => [val, 'Orders']} />
-                                <Area
-                                    type="monotone"
-                                    dataKey="value"
-                                    stroke="none"
-                                    strokeWidth={0}
-                                    fill="url(#salesGradient)"
-                                    dot={false}
-                                    activeDot={{ r: 5, fill: '#fff', stroke: '#299E60', strokeWidth: 2 }}
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                        )}
-                    </div>
-                </div>
-
-                {/* Monthly Revenue - Bar Chart */}
-                <div className="bg-white p-10 rounded-[14px] border border-[#EEEEEE] shadow-sm min-h-[411px]">
-                    <h3 className="text-[18px] font-bold text-[#181725] mb-6">Monthly Revenue</h3>
-                    <div className="h-[340px] w-full">
-                        {(!data?.monthlyData || data.monthlyData.length === 0) ? (
-                            <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                                <Wallet size={40} className="mb-3 opacity-30" />
-                                <p className="text-[14px] font-medium">No revenue data yet</p>
-                            </div>
-                        ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={data.monthlyData.map(d => ({ month: d.month, value: d.revenue }))} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#55DB94" stopOpacity={1} />
-                                        <stop offset="100%" stopColor="#004721" stopOpacity={1} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="4 4" stroke="#C8C8C8" vertical={false} />
-                                <XAxis
-                                    dataKey="month"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 12, fill: '#7C7C7C', fontWeight: 600 }}
-                                    dy={10}
-                                />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 11, fill: '#7C7C7C', fontWeight: 500 }}
-                                    tickFormatter={formatYAxis}
-                                    width={65}
-                                />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Bar
-                                    dataKey="value"
-                                    barSize={27}
-                                    shape={<RoundedBar />}
-                                />
-                            </BarChart>
-                        </ResponsiveContainer>
-                        )}
-                    </div>
-                </div>
-            </div>
+            {/* Charts Section — recharts loaded in a deferred chunk */}
+            <AdminDashboardCharts monthlyData={data?.monthlyData ?? []} />
 
             {/* Order Status Breakdown & Recent Vendors */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

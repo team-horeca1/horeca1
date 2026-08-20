@@ -57,9 +57,19 @@ export async function attachActivePromotions<T extends PromotableProduct>(
 
 /** Live store-wide pct/flat promos for vendor header banners. */
 export async function getVendorStoreWidePromos(
-  vendorId: string,
+  vendorIdOrSlug: string,
 ): Promise<VendorStoreWidePromo[]> {
   try {
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let vendorId = vendorIdOrSlug;
+    if (!UUID_RE.test(vendorIdOrSlug)) {
+      const v = await prisma.vendor.findFirst({
+        where: { slug: vendorIdOrSlug },
+        select: { id: true },
+      });
+      if (!v) return [];
+      vendorId = v.id;
+    }
     const promos = await fetchLivePromotionsForVendors(prisma, [vendorId]);
     const map = buildVendorWidePromoMap(promos);
     return map.get(vendorId) ?? [];

@@ -26,6 +26,7 @@ const previewSchema = z.object({
     )
     .max(500),
   code: z.string().min(3).max(40).optional(),
+  useWallet: z.boolean().optional(),
 });
 
 export const POST = withAuth(async (req: NextRequest, ctx) => {
@@ -47,6 +48,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       outletId: storefrontCtx.outletId,
       items: body.items,
       code: body.code ?? null,
+      useWallet: body.useWallet ?? false,
     });
 
     return NextResponse.json({ success: true, data: result });

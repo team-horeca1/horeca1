@@ -16,41 +16,41 @@ interface SignupInput {
   pincode?: string;
   businessName?: string;
   gstNumber?: string;
+  referralToken?: string;
 }
 
 export class AuthService {
   async signup(input: SignupInput) {
-    // Canonical 10-digit phone — see src/lib/phone.ts. Stored prefixed
-    // ("+91…") in the past, which broke phone-based login lookups.
-    const phone = normalizePhone(input.phone);
-    if (input.phone && !phone) throw Errors.badRequest('Invalid phone number');
+  const email = input.email.trim().toLowerCase();
+  const phone = normalizePhone(input.phone);
+  if (input.phone && !phone) throw Errors.badRequest('Invalid phone number');
 
-    const existing = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email: input.email },
-          ...(phone ? [{ phone: { in: phoneLookupVariants(phone) } }] : []),
-        ],
-      },
-    });
+  const existing = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email },
+        ...(phone ? [{ phone: { in: phoneLookupVariants(phone) } }] : []),
+      ],
+    },
+  });
 
-    if (existing) {
-      const field = existing.email === input.email ? 'email' : 'phone';
-      throw Errors.fieldError(
-        field,
-        `${field === 'email' ? 'Email' : 'Phone'} already exists`,
-        409,
-      );
-    }
+  if (existing) {
+    const field = existing.email === email ? 'email' : 'phone';
+    throw Errors.fieldError(
+      field,
+      `${field === 'email' ? 'Email' : 'Phone'} already exists`,
+      409,
+    );
+  }
 
-    const hashedPassword = await bcrypt.hash(input.password, 12);
-    const hcidDisplay = await uniqueHcid();
+  const hashedPassword = await bcrypt.hash(input.password, 12);
+  const hcidDisplay = await uniqueHcid();
 
-    // All users start as 'customer' — vendors get promoted after admin approval
-    const user = await prisma.user.create({
-      data: {
-        email: input.email,
-        password: hashedPassword,
+  // All users start as 'customer' — vendors get promoted after admin approval
+  const user = await prisma.user.create({
+    data: {
+      email,
+      password: hashedPassword,
         fullName: input.fullName,
         phone,
         role: 'customer',
@@ -105,7 +105,23 @@ export class AuthService {
       userId: user.id,
       email: user.email ?? '',
       role: input.role || 'customer',
+      referralToken: input.referralToken,
     });
+
+    // Promo program side-effects must not rely solely on the in-process event bus:
+    // Turbopack/HMR can briefly leave UserRegistered with 0 listeners. Issuance is
+    // idempotent (welcome grant unique; referral attribute no-ops if already set).
+    try {
+      const { promotionService } = await import('@/modules/promotion/promotion.service');
+      await promotionService.issueWelcomeForUser(user.id).catch(() => {});
+      if (input.referralToken) {
+        await promotionService
+          .attributeReferralOnSignup({ referredUserId: user.id, token: input.referralToken })
+          .catch(() => {});
+      }
+    } catch {
+      /* listener path may still succeed */
+    }
 
     return user;
   }

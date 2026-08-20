@@ -12,9 +12,11 @@ function createPrismaClient() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     // Connection pool limits to prevent exhaustion under high load
-    max: 20,              // Max connections in pool
-    idleTimeoutMillis: 30000, // Close idle connections after 30s
-    connectionTimeoutMillis: 5000, // Fail fast if can't connect in 5s
+    max: Number(process.env.PG_POOL_MAX ?? 20) || 20,
+    idleTimeoutMillis: 30_000,
+    // Windows Docker/WSL Postgres can stall briefly under Serializable promos;
+    // 5s was too aggressive and surfaced as Auth.js CredentialsSignin.
+    connectionTimeoutMillis: Number(process.env.PG_POOL_CONNECT_TIMEOUT_MS ?? 20_000) || 20_000,
   });
 
   const adapter = new PrismaPg(pool as any);

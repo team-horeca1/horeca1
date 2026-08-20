@@ -353,6 +353,18 @@ export function registerEventListeners(): void {
         referenceId: payload.userId,
         referenceType: 'user',
       });
+
+      const { promotionService } = await import('@/modules/promotion/promotion.service');
+      await promotionService.issueWelcomeForUser(payload.userId).catch((err) => {
+        console.error('[Events] Welcome offer issuance failed:', err);
+      });
+      if (payload.referralToken) {
+        await promotionService
+          .attributeReferralOnSignup({ referredUserId: payload.userId, token: payload.referralToken })
+          .catch((err) => {
+            console.error('[Events] Referral attribution failed:', err);
+          });
+      }
     } catch (error) {
       console.error('[Events] UserRegistered listener failed:', error);
     }

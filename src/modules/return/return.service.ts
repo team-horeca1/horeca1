@@ -793,6 +793,8 @@ export async function adminProcessReturnRefund(
   }
 
   if (order.status !== 'returned') {
+    // Cashback clawback runs inside orderService.updateStatus('returned').
+    // Do not also call cancelCashbackForOrder here — that would double-cancel.
     await orderService.updateStatus(
       order.id,
       order.vendorId,
@@ -2133,6 +2135,8 @@ export class ReturnService {
       normalized !== 'rejected' &&
       (ret.resolutionType === 'credit_note' || ret.creditNoteNumber)
     ) {
+      // Cashback clawback runs inside updateStatus('returned') — do not add a
+      // second cancelCashbackForOrder here (would double-cancel).
       await (await this.getOrderService()).updateStatus(
         ret.order.id,
         vendorId,

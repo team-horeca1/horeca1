@@ -37,7 +37,8 @@ export function NewsletterBanner() {
                         {/* Left Content */}
                         <div className="flex flex-col max-w-lg text-center md:text-left w-full md:w-auto md:max-w-[460px] lg:max-w-lg pt-16 md:pt-24">
                             <h2 className="text-[28px] md:text-[36px] lg:text-[50px] font-bold text-white leading-tight mb-2">
-                                Don&apos;t Miss Out on<br />
+                                Don&apos;t Miss Out on{' '}
+                                <br className="md:hidden" />
                                 Grocery Deals
                             </h2>
                             <p className="text-[13px] md:text-[15px] text-white/90 uppercase tracking-[2px] mb-8 font-semibold">

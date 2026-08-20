@@ -2,16 +2,24 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const isDev = process.env.NODE_ENV === "development";
+/** Docker bind-mounts need polling; host `dev:turbo` uses native FS events. */
+const useFsPolling =
+  isDev &&
+  (process.env.WATCHPACK_POLLING === "true" ||
+    process.env.CHOKIDAR_USEPOLLING === "true" ||
+    process.env.HORECA_DOCKER_DEV === "1");
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  output: process.env.HORECA_SKIP_STANDALONE === '1' ? undefined : 'standalone',
 
-  reactCompiler: true,
+  // Dev: React Compiler adds compile work; keep it for production builds only.
+  // Toggle HORECA_REACT_COMPILER=1 to force-on in development for A/B.
+  reactCompiler:
+    process.env.NODE_ENV === 'production' || process.env.HORECA_REACT_COMPILER === '1',
   reactStrictMode: true,
 
-  // Docker/Windows bind mounts often miss native FS events. Poll so Turbopack
-  // (and Webpack) pick up edits without restarting the container.
-  ...(isDev ? { watchOptions: { pollIntervalMs: 1000 } } : {}),
+  // Only poll when explicitly opted-in (Docker compose sets WATCHPACK_POLLING).
+  ...(useFsPolling ? { watchOptions: { pollIntervalMs: 1000 } } : {}),
 
   // pdfkit ships .afm font metric files alongside its JS that webpack cannot bundle.
   // Marking it external means Next loads it from node_modules at runtime, so
@@ -61,10 +69,8 @@ const nextConfig: NextConfig = {
   // from "twice" to "once, at commit time".
   typescript: { ignoreBuildErrors: true },
 
-  // Same reasoning for lint — we run `npm run lint` locally before
-  // every commit; the build doesn't need to repeat it.
-  // @ts-expect-error — `eslint` is a valid Next build key but absent from the NextConfig type.
-  eslint: { ignoreDuringBuilds: true },
+  // Lint runs via `npm run lint` / CI — Next 16 no longer accepts `eslint`
+  // in next.config (was warning as unrecognized).
 
   async headers() {
     return [
@@ -81,7 +87,9 @@ const nextConfig: NextConfig = {
   },
 
   experimental: {
-    optimizePackageImports: ['lucide-react', 'react-icons'],
+    // react-icons is not a dependency — only lucide-react is used.
+    // recharts is barrel-heavy on admin/vendor dashboards.
+    optimizePackageImports: ['lucide-react', 'recharts'],
     // Note: we don't enable Next.js's experimental scrollRestoration — it fires
     // BEFORE async-loaded sections (Top Rated, Vendors, etc.) populate, so the
     // saved scrollY ends up clamped to a shorter document height and lands at
@@ -90,15 +98,21 @@ const nextConfig: NextConfig = {
   },
 };
 
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
+
 export default withSentryConfig(nextConfig, {
   org: "horeca1",
   project: "javascript-nextjs",
 
   // Source map upload auth token
-  authToken: process.env.SENTRY_AUTH_TOKEN,
+  authToken: sentryAuthToken,
 
-  // Upload wider set of client source files for better stack traces
-  widenClientFileUpload: true,
+  // Wider client upload + sourcemap upload are CI-only (local builds were
+  // spending 15–30s in runAfterProductionCompile).
+  widenClientFileUpload: Boolean(process.env.CI),
+  sourcemaps: {
+    disable: !process.env.CI,
+  },
 
   // Proxy route to bypass ad-blockers (prod only — in local dev the tunnel
   // repeatedly ECONNRESET's when Sentry ingest is unreachable and adds noise

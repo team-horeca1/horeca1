@@ -95,6 +95,8 @@ export interface UserRegisteredPayload {
   userId: string;
   email: string;
   role: string;
+  /** Present when the new user arrived via `/invite/<token>`. */
+  referralToken?: string;
 }
 
 export interface VendorOnboardedPayload {
