@@ -14,7 +14,7 @@ export type BrandMasterLike = {
   brand?: { name?: unknown; slug?: unknown } | null;
 };
 
-export function resolveSellableDisplayName(vendorProductName: string, _master?: BrandMasterLike | null): string {
+export function resolveSellableDisplayName(vendorProductName: string): string {
   return (vendorProductName || '').trim();
 }
 

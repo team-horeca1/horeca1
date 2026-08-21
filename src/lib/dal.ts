@@ -176,7 +176,7 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
   const overrideFields: string[] = [];
 
   // Sellable product title = vendor Product.name (never brand-master name).
-  const displayName = resolveSellableDisplayName(rawName, masterProduct);
+  const displayName = resolveSellableDisplayName(rawName);
 
   let description = (p.description as string) || '';
   if (!description.trim()) {

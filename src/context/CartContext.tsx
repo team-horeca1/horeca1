@@ -192,7 +192,7 @@ function parseApiCart(apiData: { vendorGroups: unknown[]; total: number }): {
             const vp: VendorProduct = {
                 id: product.id as string,
                 name: rawName,
-                displayName: resolveSellableDisplayName(rawName, masterProduct),
+                displayName: resolveSellableDisplayName(rawName),
                 brandName,
                 brandSlug,
                 brandOverride: brandName && overrideFields.length > 0

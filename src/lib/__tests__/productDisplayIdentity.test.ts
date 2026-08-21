@@ -6,19 +6,17 @@ import {
 
 describe('resolveSellableDisplayName (QA-03)', () => {
   it('keeps vendor SKU name when brand master name differs', () => {
-    expect(
-      resolveSellableDisplayName('Fresh Onions', { name: 'All Purpose Flour 1kg' }),
-    ).toBe('Fresh Onions');
+    expect(resolveSellableDisplayName('Fresh Onions')).toBe('Fresh Onions');
   });
 
   it('does not fall back to brand master when vendor name is present', () => {
-    expect(resolveSellableDisplayName('Alphonso Mangoes', { name: 'Mango Box' })).toBe(
+    expect(resolveSellableDisplayName('Alphonso Mangoes')).toBe(
       'Alphonso Mangoes',
     );
   });
 
   it('trims whitespace', () => {
-    expect(resolveSellableDisplayName('  Potatoes  ', { name: 'Other' })).toBe('Potatoes');
+    expect(resolveSellableDisplayName('  Potatoes  ')).toBe('Potatoes');
   });
 });
 

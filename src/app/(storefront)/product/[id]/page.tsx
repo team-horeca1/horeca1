@@ -88,7 +88,7 @@ export default function ProductDetailPage() {
     // Brand mapping may fill media/description/pack gaps and brand badge only.
     const rawProductName = apiProduct?.name || '';
     const brandMapping = apiProduct?.brandMappings?.[0]?.brandMasterProduct;
-    const productName = resolveSellableDisplayName(rawProductName, brandMapping);
+    const productName = resolveSellableDisplayName(rawProductName);
     const brandName = brandMapping?.brand?.name as string | undefined;
     const brandSlug = brandMapping?.brand?.slug as string | undefined;
     const vendorName = apiProduct?.vendor?.businessName || '';
