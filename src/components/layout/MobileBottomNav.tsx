@@ -51,7 +51,7 @@ export function MobileBottomNav({ onCategoriesClick, onStoreClick, onAccountClic
 
     return (
         <div
-            className="md:hidden fixed bottom-0 left-0 right-0 z-[9999] bg-white border-t border-gray-100 pb-safe-area-inset-bottom h-[72px]"
+            className="lg:hidden fixed bottom-0 left-0 right-0 z-[9999] bg-white border-t border-gray-100 pb-safe-area-inset-bottom h-[72px]"
             style={{
                 boxShadow: '0 -4px 20px rgba(0,0,0,0.05)',
                 transform: 'translate3d(0, 0, 0)',

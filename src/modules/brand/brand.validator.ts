@@ -12,7 +12,11 @@ export const createBrandSchema = z.object({
   showcaseImages: z.array(z.string().url()).max(5).optional(),
 });
 
-export const updateBrandSchema = createBrandSchema.partial();
+/** PATCH may clear media by sending null (settings UI remove buttons). */
+export const updateBrandSchema = createBrandSchema.partial().extend({
+  logoUrl: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+  bannerUrl: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+});
 
 export const createBrandProductSchema = z.object({
   name: z.string().min(2).max(255),

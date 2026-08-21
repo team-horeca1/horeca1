@@ -665,7 +665,7 @@ export default function CartPage() {
     // --- LOADING (context switch) — do not flash the empty-cart screen ---
     if (isCartLoading && cart.length === 0) {
         return (
-            <div className="min-h-screen bg-[#F2F3F2] flex flex-col pb-24 md:pb-16">
+            <div className="min-h-screen bg-[#F2F3F2] flex flex-col pb-24 lg:pb-16">
                 <header className="md:hidden flex items-center justify-center px-4 h-14 bg-[#F2F3F2] sticky top-[12px] z-50">
                     <h1 className="text-[20px] font-bold text-[#181725]">Cart</h1>
                 </header>
@@ -706,7 +706,7 @@ export default function CartPage() {
 
     // --- CART SCREEN ---
     return (
-        <div className="min-h-screen bg-[#F2F3F2] flex flex-col pb-24 md:pb-16">
+        <div className="min-h-screen bg-[#F2F3F2] flex flex-col pb-24 lg:pb-16">
             {/* Mobile Header */}
             <header className="md:hidden flex items-center justify-between px-4 h-14 bg-[#F2F3F2] sticky top-[12px] z-50">
                 <button onClick={() => router.back()} className="p-2 -ml-2">

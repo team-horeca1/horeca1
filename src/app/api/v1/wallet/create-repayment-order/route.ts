@@ -45,7 +45,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       data: {
         repaymentId: repayment.id,
         razorpayOrderId: razorpayOrder.id,
-        amount: razorpayOrder.amount,
+        amount: Number(razorpayOrder.amount),
         currency: razorpayOrder.currency,
         keyId: process.env.RAZORPAY_KEY_ID,
       },

@@ -110,8 +110,8 @@ interface CreateBrandInput {
 interface UpdateBrandInput {
   name?: string;
   description?: string;
-  logoUrl?: string;
-  bannerUrl?: string;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
   website?: string;
   tagline?: string;
   categories?: string[];
@@ -633,12 +633,15 @@ export class BrandService {
     });
     if (!brand) throw Errors.notFound('Brand profile not found');
 
+    const data: Record<string, unknown> = { ...input };
+    // Empty string from the settings URL field = clear media.
+    if (input.logoUrl === '') data.logoUrl = null;
+    if (input.bannerUrl === '') data.bannerUrl = null;
+    if (input.name) data.slug = slugify(input.name);
+
     return prisma.brand.update({
       where: { id: brand.id },
-      data: {
-        ...input,
-        ...(input.name ? { slug: slugify(input.name) } : {}),
-      },
+      data,
     });
   }
 

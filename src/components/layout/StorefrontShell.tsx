@@ -33,7 +33,7 @@ export function StorefrontShell({ children }: { children: React.ReactNode }) {
           </div>
           <OutletCompletionBanner />
           <VendorApplicationBanner />
-          <main className="w-full min-h-screen pb-20 md:pb-0">{children}</main>
+          <main className="w-full min-h-screen pb-20 lg:pb-0">{children}</main>
           <Footer />
           <MandatoryAddressGate />
         </CartProvider>

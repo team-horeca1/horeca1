@@ -92,11 +92,15 @@ async function startRepayment(
     const json = await res.json();
     if (!res.ok || !json.success) throw new Error(json.error?.message || 'Could not start repayment');
     const { razorpayOrderId, amount: paise, currency, keyId } = json.data;
+    const amountPaise = Number(paise);
+    if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
+      throw new Error('Invalid repayment amount from server');
+    }
 
     const rzp = new RazorpayCtor({
       key: keyId,
       order_id: razorpayOrderId,
-      amount: paise,
+      amount: amountPaise,
       currency,
       name: 'Horeca1',
       description: 'DiSCCO repayment',

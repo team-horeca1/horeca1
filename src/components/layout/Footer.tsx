@@ -63,7 +63,7 @@ export function Footer() {
 
     return (
         <footer className={cn(
-            "w-full bg-white relative overflow-hidden pb-20 md:pb-0"
+            "w-full bg-white relative overflow-hidden pb-20 lg:pb-0"
         )}>
             <div className="max-w-[var(--container-max)] mx-auto px-5 md:px-[var(--container-padding)] relative z-10">
                 {/* Main Footer Section */}

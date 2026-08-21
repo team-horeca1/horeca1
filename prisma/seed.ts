@@ -62,6 +62,23 @@ const SEED_TEMPLATES: Array<{ name: string; scope: 'account' | 'vendor' | 'brand
   { name: 'Accountant', scope: 'account', description: 'Finance + payments visibility', permissions: perms({ dashboard: ['view'], orders: ['view'], payments: ['view','approve'], creditLine: ['view','approve'] }) },
   { name: 'Viewer', scope: 'account', description: 'Read-only across account modules', permissions: viewOnly(ACCOUNT_MODULES) },
   { name: 'Vendor Admin', scope: 'vendor', description: 'Full vendor portal access', permissions: allScopePermissions(VENDOR_MODULES) },
+  // Legacy-mapped team roles (TeamRole enum + invite UI). Keep in sync with
+  // VENDOR_ROLE_TO_ENUM in src/app/api/v1/vendor/team/route.ts.
+  { name: 'Vendor Manager', scope: 'vendor', description: 'Full vendor operations — no team management', permissions: perms({
+    dashboard: ['view'], orders: ['view', 'create', 'edit', 'delete', 'approve'], products: ['view', 'create', 'edit', 'delete'],
+    inventory: ['view', 'create', 'edit', 'delete'], grn: ['view', 'create', 'edit'], dispatch: ['view', 'create', 'edit'],
+    deliveries: ['view', 'edit'], customers: ['view'], outlets: ['view'], analytics: ['view'],
+    promotions: ['view', 'create', 'edit'], wallet: ['view'], creditLine: ['view', 'approve'], settings: ['view', 'edit'],
+  }) },
+  { name: 'Vendor Editor', scope: 'vendor', description: 'Orders, products, inventory write — no settings or team', permissions: perms({
+    dashboard: ['view'], orders: ['view', 'create', 'edit'], products: ['view', 'create', 'edit'],
+    inventory: ['view', 'create', 'edit'], grn: ['view', 'create', 'edit'], dispatch: ['view', 'create', 'edit'],
+    outlets: ['view'], promotions: ['view'],
+  }) },
+  { name: 'Vendor Viewer', scope: 'vendor', description: 'Read-only vendor portal', permissions: viewOnly([
+    'dashboard', 'orders', 'products', 'inventory', 'grn', 'dispatch', 'deliveries',
+    'wallet', 'customers', 'outlets', 'analytics', 'promotions', 'settings', 'creditLine',
+  ]) },
   { name: 'Sales Rep', scope: 'vendor', description: 'Customer-facing sales', permissions: perms({ dashboard: ['view'], orders: ['view','create','edit'], customers: ['view','create','edit'], products: ['view'], inventory: ['view'], promotions: ['view','create','edit'], salespersons: ['view'], commissions: ['view'] }) },
   { name: 'Order Manager', scope: 'vendor', description: 'Order processing + dispatch', permissions: perms({ dashboard: ['view'], orders: ['view','edit','approve'], returns: ['view','edit','approve'], dispatch: ['view','create','edit'], deliveries: ['view','edit'], grn: ['view'], inventory: ['view'] }) },
   { name: 'Warehouse Manager', scope: 'vendor', description: 'Inventory + GRN', permissions: perms({ inventory: ['view','create','edit','delete'], grn: ['view','create','edit'], dispatch: ['view','create'], products: ['view'] }) },

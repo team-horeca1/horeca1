@@ -309,7 +309,7 @@ export function Navbar() {
             )}
 
             {/* ── Mobile Header ── */}
-            <header className="md:hidden w-full bg-white relative z-[10000] sticky top-0 border-b border-gray-100">
+            <header className="lg:hidden w-full bg-white relative z-[10000] sticky top-0 border-b border-gray-100">
                 <div className="w-full py-3 px-4 space-y-3">
                     {/* Row 1: Logo | Location | Notifications | Cart */}
                     <div className="flex items-center justify-between px-1">
@@ -374,7 +374,7 @@ export function Navbar() {
 
             {/* ── Desktop Navbar — single sticky row, no green bar ── */}
             <div className={cn(
-                "hidden md:block sticky top-0 z-[10000] bg-white border-b border-gray-100 transition-shadow duration-300",
+                "hidden lg:block sticky top-0 z-[10000] bg-white border-b border-gray-100 transition-shadow duration-300",
                 isScrolled && "shadow-[0_4px_24px_rgba(0,0,0,0.06)]"
             )}>
                 <nav className="w-full">
@@ -504,7 +504,7 @@ export function Navbar() {
             {/* Mobile — Categories Bottom Sheet */}
             <div
                 className={cn(
-                    "fixed inset-0 z-[10000] bg-black/40 transition-opacity duration-300 md:hidden",
+                    "fixed inset-0 z-[10000] bg-black/40 transition-opacity duration-300 lg:hidden",
                     isCategoriesSidebarOpen ? "opacity-100 visible" : "opacity-0 invisible"
                 )}
                 onClick={() => {
