@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
         brand: true,
         tags: true,
         isActive: true,
+        approvalStatus: true,
         category: { select: { id: true, name: true, slug: true } },
         vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true, rating: true, minOrderValue: true } },
         priceSlabs: { orderBy: { minQty: 'asc' }, select: { minQty: true, maxQty: true, price: true, promoPrice: true } },
@@ -40,7 +41,9 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    if (!product || !product.isActive) {
+    // Marketplace PDP is public — only approved, active listings may be shown.
+    // Pending/rejected products stay available to vendor/admin via their own APIs.
+    if (!product || !product.isActive || product.approvalStatus !== 'approved') {
       throw Errors.notFound('Product not found');
     }
 
