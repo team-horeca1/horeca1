@@ -19,7 +19,7 @@ import {
   tryAcquireBootstrapLock,
   releaseBootstrapLock,
 } from '@/lib/authTabSync';
-import { clearUserClientStores } from '@/lib/userScopedStorage';
+import { clearUserClientStores, localCartHasItems } from '@/lib/userScopedStorage';
 import { clientLogout, markSigningOut } from '@/lib/clientLogout';
 import { readEnteredStore } from '@/lib/supplierPortalLevel';
 import { toast } from 'sonner';
@@ -627,6 +627,16 @@ export function useBusinessAccountSwitcher() {
       );
 
     if (needsPrimarySwitch) {
+      // Keep shopping BA while the storefront cart still has items — switching to
+      // the vendor/brand BA would hydrate an empty cart and wipe the shopping mirror.
+      if (
+        stuckOnShoppingBa
+        && userId
+        && activeBusinessAccountId
+        && localCartHasItems(userId, activeBusinessAccountId, activeOutletId)
+      ) {
+        return;
+      }
       if (!tryAcquireBootstrapLock()) return;
       bootstrapAttempted.current = true;
       void switchAccount(primary.id, defaultOutletId ?? undefined).catch(() => {

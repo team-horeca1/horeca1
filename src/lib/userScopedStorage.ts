@@ -19,6 +19,23 @@ export function cartStorageKey(
   return `horeca_cart:${userId}`;
 }
 
+/** True when the scoped cart mirror has at least one line (client-only check). */
+export function localCartHasItems(
+  userId?: string | null,
+  businessAccountId?: string | null,
+  outletId?: string | null,
+): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem(cartStorageKey(userId, businessAccountId, outletId));
+    if (!raw) return false;
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function wishlistStorageKey(userId?: string | null): string {
   return userId ? `horeca_wishlist:${userId}` : 'horeca_wishlist:guest';
 }

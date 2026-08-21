@@ -20,6 +20,10 @@ import {
     YourPriceChip,
     promoTotalCaption,
 } from '@/components/features/promotions/PromotionBenefits';
+import {
+    CheckoutOffersPanel,
+    type CheckoutOfferChoicesView,
+} from '@/components/features/promo/CheckoutOffersPanel';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 // window.Razorpay is typed in src/types/razorpay.d.ts
@@ -103,7 +107,7 @@ interface CustomerCreditWallet {
 }
 
 // Shape returned by POST /api/v1/promotions/preview — auto vendor promos
-// (post-suppression effective values) + optional coupon eval.
+// (post-suppression effective values) + optional coupon eval + offerChoices.
 interface PromoPreviewResponse {
     subtotal: number;
     subtotalTaxable: number;
@@ -127,6 +131,31 @@ interface PromoPreviewResponse {
         settlesOn: 'delivery';
         campaignName: string;
     } | null;
+    offerChoices?: CheckoutOfferChoicesView;
+}
+
+const EMPTY_OFFER_CHOICES: CheckoutOfferChoicesView = {
+    coupons: [],
+    cashbacks: [],
+    storeOffers: [],
+};
+
+function normalizeOfferChoices(raw: CheckoutOfferChoicesView | undefined): CheckoutOfferChoicesView {
+    if (!raw) return EMPTY_OFFER_CHOICES;
+    return {
+        coupons: (raw.coupons ?? []).map((c) => ({
+            ...c,
+            endDate: c.endDate != null ? String(c.endDate) : null,
+        })),
+        cashbacks: (raw.cashbacks ?? []).map((c) => ({
+            ...c,
+            endDate: c.endDate != null ? String(c.endDate) : null,
+        })),
+        storeOffers: (raw.storeOffers ?? []).map((c) => ({
+            ...c,
+            endDate: c.endDate != null ? String(c.endDate) : null,
+        })),
+    };
 }
 
 const PAYMENT_OPTIONS = [
@@ -416,6 +445,7 @@ function CheckoutPageContent() {
     // actually use (a pricelist can differ from the optimistic client cart).
     const [previewSubtotal, setPreviewSubtotal] = useState<number | null>(null);
     const [estimatedCashback, setEstimatedCashback] = useState<PromoPreviewResponse['estimatedCashback']>(null);
+    const [offerChoices, setOfferChoices] = useState<CheckoutOfferChoicesView>(EMPTY_OFFER_CHOICES);
     // Soften totals while a preview refetch is in flight; keep prior values
     // instead of clearing to null (which snaps the bill to client totals).
     const [promoPreviewUpdating, setPromoPreviewUpdating] = useState(false);
@@ -653,7 +683,18 @@ function CheckoutPageContent() {
     // effective post-suppression values. Throws on transport/HTTP error.
     const fetchPromoPreview = async (code?: string): Promise<PromoPreviewResponse> => {
         const items = buildItemsPayload();
-        if (items.length === 0) return { subtotal: 0, subtotalTaxable: 0, totalGST: 0, autoPromos: [], totalPromoDiscount: 0, coupon: null, estimatedCashback: null };
+        if (items.length === 0) {
+            return {
+                subtotal: 0,
+                subtotalTaxable: 0,
+                totalGST: 0,
+                autoPromos: [],
+                totalPromoDiscount: 0,
+                coupon: null,
+                estimatedCashback: null,
+                offerChoices: EMPTY_OFFER_CHOICES,
+            };
+        }
         const res = await fetch('/api/v1/promotions/preview', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -666,6 +707,15 @@ function CheckoutPageContent() {
         const json = await res.json();
         if (!res.ok) throw new Error(json?.error?.message || 'Could not load offers');
         return json.data as PromoPreviewResponse;
+    };
+
+    const applyPreviewPayload = (data: PromoPreviewResponse) => {
+        setPreviewSubtotal(Number(data.subtotal) || 0);
+        setAutoPromoDiscount(Number(data.totalPromoDiscount) || 0);
+        setAutoPromos(data.autoPromos || []);
+        setBxgyFreeItems(data.bxgyFreeItems || []);
+        setEstimatedCashback(data.estimatedCashback ?? null);
+        setOfferChoices(normalizeOfferChoices(data.offerChoices));
     };
 
     // Auto-applied vendor promos — previewed on BOTH the review and payment
@@ -687,6 +737,7 @@ function CheckoutPageContent() {
                 setAutoPromos([]);
                 setBxgyFreeItems([]);
                 setEstimatedCashback(null);
+                setOfferChoices(EMPTY_OFFER_CHOICES);
                 setPromoPreviewUpdating(false);
             }
             return;
@@ -697,11 +748,7 @@ function CheckoutPageContent() {
             fetchPromoPreview(appliedCoupon?.code)
                 .then(data => {
                     if (cancelled) return;
-                    setPreviewSubtotal(Number(data.subtotal) || 0);
-                    setAutoPromoDiscount(Number(data.totalPromoDiscount) || 0);
-                    setAutoPromos(data.autoPromos || []);
-                    setBxgyFreeItems(data.bxgyFreeItems || []);
-                    setEstimatedCashback(data.estimatedCashback ?? null);
+                    applyPreviewPayload(data);
                 })
                 .catch(() => {})
                 .finally(() => { if (!cancelled) setPromoPreviewUpdating(false); });
@@ -710,19 +757,14 @@ function CheckoutPageContent() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedItemsSig, sessionStatus, draftId, isCartLoading, useRewardsWallet]);
 
-    const applyCoupon = async () => {
-        const code = couponInput.trim().toUpperCase();
+    const applyCouponCode = async (rawCode: string) => {
+        const code = rawCode.trim().toUpperCase();
         if (!code) return;
         setCouponValidating(true);
         setCouponError(null);
         try {
             const data = await fetchPromoPreview(code);
-            // Auto promos returned alongside reflect this code's suppression.
-            setPreviewSubtotal(Number(data.subtotal) || 0);
-            setAutoPromoDiscount(Number(data.totalPromoDiscount) || 0);
-            setAutoPromos(data.autoPromos || []);
-            setBxgyFreeItems(data.bxgyFreeItems || []);
-            setEstimatedCashback(data.estimatedCashback ?? null);
+            applyPreviewPayload(data);
             const c = data.coupon;
             if (c && c.valid) {
                 setAppliedCoupon({
@@ -731,6 +773,7 @@ function CheckoutPageContent() {
                     estimatedDiscount: Number(c.estimatedDiscount) || 0,
                     stacksWithWallet: c.stacksWithWallet !== false,
                 });
+                setCouponInput(c.code);
                 if (c.stacksWithWallet === false) setUseRewardsWallet(false);
             } else {
                 setAppliedCoupon(null);
@@ -744,6 +787,10 @@ function CheckoutPageContent() {
         }
     };
 
+    const applyCoupon = async () => {
+        await applyCouponCode(couponInput);
+    };
+
     // Removing a coupon restores any auto promos it had suppressed.
     const removeCoupon = async () => {
         setAppliedCoupon(null);
@@ -752,11 +799,7 @@ function CheckoutPageContent() {
         if (draftId) return;
         try {
             const data = await fetchPromoPreview();
-            setPreviewSubtotal(Number(data.subtotal) || 0);
-            setAutoPromoDiscount(Number(data.totalPromoDiscount) || 0);
-            setAutoPromos(data.autoPromos || []);
-            setBxgyFreeItems(data.bxgyFreeItems || []);
-            setEstimatedCashback(data.estimatedCashback ?? null);
+            applyPreviewPayload(data);
         } catch { /* keep the prior estimate on failure */ }
     };
 
@@ -1571,66 +1614,22 @@ function CheckoutPageContent() {
 
                             {/* Coupon + Rewards Wallet (Promo Engine Phase 1) — drafts don't support promos */}
                             {!draftId && (
-                                <div className="bg-white rounded-2xl border border-[#E2E2E2] p-5 text-left shadow-sm space-y-4">
-                                    <div>
-                                        <p className="text-[12px] font-bold text-[#181725] mb-2">Have a coupon?</p>
-                                        {appliedCoupon ? (
-                                            <div className="flex items-center justify-between bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
-                                                <div className="min-w-0">
-                                                    <p className="text-[13px] font-bold text-[#53B175] tracking-wide">{appliedCoupon.code}</p>
-                                                    <p className="text-[11px] text-gray-500 truncate">
-                                                        {appliedCoupon.name} · saves ~₹{couponDiscountEst.toLocaleString('en-IN')}
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={removeCoupon}
-                                                    className="text-[11px] font-bold text-red-500 hover:underline shrink-0 ml-3 cursor-pointer"
-                                                >
-                                                    Remove
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="flex gap-2">
-                                                <input
-                                                    value={couponInput}
-                                                    onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(null); }}
-                                                    onKeyDown={(e) => { if (e.key === 'Enter') applyCoupon(); }}
-                                                    placeholder="Enter coupon code"
-                                                    className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-gray-200 text-[13px] font-semibold uppercase tracking-wide focus:outline-none focus:border-[#53B175]"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={applyCoupon}
-                                                    disabled={couponValidating || !couponInput.trim()}
-                                                    className="shrink-0 px-4 py-2.5 rounded-xl bg-[#181725] text-white text-[12px] font-bold disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-black transition-colors cursor-pointer"
-                                                >
-                                                    {couponValidating ? <Loader2 size={14} className="animate-spin" /> : 'Apply'}
-                                                </button>
-                                            </div>
-                                        )}
-                                        {couponError && <p className="text-[11px] font-bold text-red-500 mt-1.5">{couponError}</p>}
-                                    </div>
-                                    {rewardsBalance > 0 && (
-                                        <label className={`flex items-center justify-between gap-3 bg-amber-50/60 border border-amber-100 rounded-xl px-3 py-2.5 ${couponBlocksWallet ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
-                                            <div className="min-w-0">
-                                                <p className="text-[13px] font-bold text-[#181725]">Use H1 Wallet</p>
-                                                <p className="text-[11px] text-gray-500">
-                                                    {couponBlocksWallet
-                                                        ? 'This coupon cannot be clubbed with H1 Wallet'
-                                                        : `Balance ₹${rewardsBalance.toLocaleString('en-IN')}${useRewardsWallet && walletUseEst > 0 ? ` — applying ₹${walletUseEst.toLocaleString('en-IN')}` : ''}`}
-                                                </p>
-                                            </div>
-                                            <input
-                                                type="checkbox"
-                                                checked={useRewardsWallet && !couponBlocksWallet}
-                                                disabled={couponBlocksWallet}
-                                                onChange={(e) => setUseRewardsWallet(e.target.checked)}
-                                                className="w-4 h-4 accent-[#53B175] shrink-0"
-                                            />
-                                        </label>
-                                    )}
-                                </div>
+                                <CheckoutOffersPanel
+                                    offerChoices={offerChoices}
+                                    appliedCode={appliedCoupon?.code ?? null}
+                                    couponInput={couponInput}
+                                    couponError={couponError}
+                                    couponValidating={couponValidating}
+                                    onCouponInputChange={(v) => { setCouponInput(v); setCouponError(null); }}
+                                    onApplyInput={applyCoupon}
+                                    onSelectCoupon={(code) => { void applyCouponCode(code); }}
+                                    onRemoveCoupon={() => { void removeCoupon(); }}
+                                    rewardsBalance={rewardsBalance}
+                                    useRewardsWallet={useRewardsWallet}
+                                    walletUseEst={walletUseEst}
+                                    couponBlocksWallet={couponBlocksWallet}
+                                    onToggleWallet={setUseRewardsWallet}
+                                />
                             )}
 
                             {/* Summary card */}

@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { OffersList } from './OffersList';
 
@@ -15,6 +16,12 @@ export function OffersSheet({
   vendorId?: string;
   vendorName?: string;
 }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    Promise.resolve().then(() => setMounted(true));
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -29,10 +36,12 @@ export function OffersSheet({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-[80] flex items-end md:items-center justify-center">
+  // z-[10001] clears sticky Navbar (z-[10000]) and MobileBottomNav (z-[9999]).
+  // Portal to body so a parent stacking context cannot trap the overlay.
+  return createPortal(
+    <div className="fixed inset-0 z-[10001] flex items-end md:items-center justify-center">
       <button
         type="button"
         aria-label="Close deals"
@@ -65,6 +74,7 @@ export function OffersSheet({
           <OffersList vendorId={vendorId} compact />
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

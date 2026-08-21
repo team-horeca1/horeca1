@@ -288,6 +288,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const userRole = (session?.user as { role?: string } | undefined)?.role;
     const activeBAId = sessionUser.activeBusinessAccountId as string | undefined;
     const activeOutletId = sessionUser.activeOutletId as string | undefined;
+    const activeBAType = sessionUser.activeBusinessAccountType as
+        | { isCustomer?: boolean; isVendor?: boolean; isBrand?: boolean }
+        | undefined;
     const [cart, setCart] = useState<CartItemWithId[]>([]);
     const [apiGroupMeta, setApiGroupMeta] = useState<Record<string, ApiGroupMeta>>({});
     const [isInitialized, setIsInitialized] = useState(false);
@@ -295,11 +298,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Last identity we finished loading for — session blips reuse this for silent revalidate.
     const lastContextKeyRef = useRef<string | null>(null);
 
-    // Storefront cart APIs are customer-only (AUD-011) — skip for vendor/brand/admin unless impersonating
+    // Align with requireStorefrontAccess: customer role OR active BA isCustomer
+    // (vendor JWT shopping on a customer BA must use server cart, not fragile local-only).
     const shouldUseServerCart =
         !isLoggedIn ||
         customerImpersonating ||
-        userRole === 'customer';
+        userRole === 'customer' ||
+        activeBAType?.isCustomer === true;
 
     const applyApiCart = useCallback((apiData: { vendorGroups: unknown[]; total: number }) => {
         const { items, groupMeta } = parseApiCart(apiData);
@@ -350,8 +355,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (isLoggedIn && !shouldUseServerCart) {
-            // Vendor/brand/admin portals must not poll /api/v1/cart
+            // Vendor/brand/admin without a customer BA — local cart only (no /api/v1/cart).
+            // Must reload from localStorage after remount (Dashboard → storefront), otherwise
+            // the earlier setCart([]) + mirror effect permanently wipes the cart.
             setApiGroupMeta({});
+            if (!silent) {
+                setCart(loadLocalCart(userId, activeBAId, activeOutletId));
+            }
             lastContextKeyRef.current = contextKey;
             setIsInitialized(true);
             return;
