@@ -369,9 +369,9 @@ export default function VendorStorePage() {
                     <div className="flex items-center gap-3 bg-purple-50 border border-purple-100 rounded-xl px-4 py-3">
                         <CreditCard size={18} className="text-purple-600 shrink-0" />
                         <div className="min-w-0">
-                            <p className="text-[13px] font-bold text-purple-900">H1 / DiSCCO Credit with {vendor.name}</p>
+                            <p className="text-[13px] font-bold text-purple-900">DiSCCO · {vendor.name}</p>
                             <p className="text-[12px] text-purple-700">
-                                ₹{vendorCredit.available.toLocaleString('en-IN')} available of ₹{vendorCredit.limit.toLocaleString('en-IN')} limit
+                                ₹{vendorCredit.available.toLocaleString('en-IN')} available · Buy Now, Pay Later
                             </p>
                         </div>
                     </div>

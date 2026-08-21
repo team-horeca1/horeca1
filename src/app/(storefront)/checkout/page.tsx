@@ -4,7 +4,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft, Clock, CheckCircle2, Shield, User, Loader2, Check, MapPin, AlertCircle, ChevronDown } from 'lucide-react';
-import { Zap, BadgePercent, Banknote, FileText, Wallet as WalletIcon } from 'lucide-react';
+import { Zap, CreditCard, Banknote, FileText } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useSession } from 'next-auth/react';
 import { dal } from '@/lib/dal';
@@ -92,14 +92,13 @@ interface DraftOrderDetail {
     items: DraftOrderItem[];
 }
 
-// Shape returned by GET /api/v1/wallet — one row per credit line the customer
-// holds (the H1 platform wallet has `vendor: null`, vendor-specific lines have
-// `vendorId` + `vendor`). Decimal fields arrive as strings over JSON.
+// Shape returned by GET /api/v1/wallet — one DiSCCO credit line per supplier
+// (vendorId set) or Horeca1 platform credit (vendorId null). Not H1 Wallet cash.
 interface CustomerCreditWallet {
     id: string;
     vendorId: string | null;
     vendor: { id: string; businessName: string } | null;
-    status: 'ACTIVE' | 'BLOCKED' | 'BLACKLISTED';
+    status: string;
     creditLimit: string;
     availableCredit: string;
     outstandingAmount: string;
@@ -170,18 +169,17 @@ const PAYMENT_OPTIONS = [
   },
   {
     id: 'credit',
-    name: 'DiSCCO Credit Line',
-    desc: 'Pay later with credit',
-    icon: BadgePercent,
+    name: 'DiSCCO',
+    desc: 'Buy Now, Pay Later',
+    icon: CreditCard,
     badgeBg: 'bg-purple-50',
     badgeText: 'text-purple-600',
-    tag: 'B2B CREDIT',
   },
   {
     id: 'wallet',
-    name: 'H1 / DiSCCO Credit',
-    desc: 'Pay later from your credit line',
-    icon: WalletIcon,
+    name: 'Horeca1 Credit',
+    desc: 'Buy Now, Pay Later',
+    icon: CreditCard,
     badgeBg: 'bg-yellow-50',
     badgeText: 'text-yellow-600',
   },
@@ -428,7 +426,7 @@ function CheckoutPageContent() {
     // Per-vendor order notes / delivery instructions (Req 7).
     const [notesByVendor, setNotesByVendor] = useState<Record<string, string>>({});
     // Promo Engine Phase 1 — coupon + Rewards Wallet (prepaid cashback balance,
-    // distinct from H1 / DiSCCO Credit).
+    // distinct from DiSCCO / Horeca1 platform credit lines).
     const [couponInput, setCouponInput] = useState('');
     const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; name: string; estimatedDiscount: number; stacksWithWallet: boolean } | null>(null);
     const [couponError, setCouponError] = useState<string | null>(null);
@@ -565,14 +563,32 @@ function CheckoutPageContent() {
 
     const availablePaymentOptions = useMemo(() => {
         const vendorIds = selectedGroups.map((g) => g.vendorId);
-        if (!vendorIds.length) return PAYMENT_OPTIONS;
-        let intersection = new Set(allowedModesByVendor[vendorIds[0]] ?? DEFAULT_VENDOR_PAYMENT_MODES);
-        for (const vid of vendorIds.slice(1)) {
-            const modes = new Set(allowedModesByVendor[vid] ?? DEFAULT_VENDOR_PAYMENT_MODES);
-            intersection = new Set([...intersection].filter((m) => modes.has(m)));
+        let modes: Set<string>;
+        if (!vendorIds.length) {
+            modes = new Set(DEFAULT_VENDOR_PAYMENT_MODES);
+        } else {
+            modes = new Set(allowedModesByVendor[vendorIds[0]] ?? DEFAULT_VENDOR_PAYMENT_MODES);
+            for (const vid of vendorIds.slice(1)) {
+                const next = new Set(allowedModesByVendor[vid] ?? DEFAULT_VENDOR_PAYMENT_MODES);
+                modes = new Set([...modes].filter((m) => next.has(m)));
+            }
         }
-        return PAYMENT_OPTIONS.filter((opt) => intersection.has(PAYMENT_TO_VENDOR_MODE[opt.id] ?? opt.id));
-    }, [selectedGroups, allowedModesByVendor]);
+
+        return PAYMENT_OPTIONS.filter((opt) => {
+            if (!modes.has(PAYMENT_TO_VENDOR_MODE[opt.id] ?? opt.id)) return false;
+            // Hide DiSCCO unless at least one selected PO has that supplier's line
+            if (opt.id === 'credit') {
+                if (!creditWalletsLoaded) return false;
+                return selectedGroups.some((g) => !!creditWalletsByVendor[g.vendorId]);
+            }
+            // Hide Horeca1 Credit unless a platform credit line exists
+            if (opt.id === 'wallet') {
+                if (!creditWalletsLoaded) return false;
+                return !!platformWallet;
+            }
+            return true;
+        });
+    }, [selectedGroups, allowedModesByVendor, creditWalletsLoaded, creditWalletsByVendor, platformWallet]);
 
     const toggleVendor = (vendorId: string) => {
         setExcludedVendorIds(prev => {
@@ -635,7 +651,11 @@ function CheckoutPageContent() {
         return selectedGroups.map(group => {
             const wallet = creditWalletsByVendor[group.vendorId] ?? null;
             const available = wallet ? Number(wallet.availableCredit) || 0 : 0;
-            const blocked = wallet ? wallet.status === 'BLACKLISTED' || wallet.status === 'BLOCKED' : false;
+            const blocked = wallet
+                ? wallet.status === 'BLACKLISTED' || wallet.status === 'BLOCKED'
+                    || wallet.status === 'FROZEN' || wallet.status === 'SUSPENDED'
+                    || wallet.status === 'EXPIRED' || wallet.status === 'CANCELLED'
+                : false;
             const insufficient = !wallet || available < group.subtotal;
             return {
                 group,
@@ -645,9 +665,9 @@ function CheckoutPageContent() {
                 blocked,
                 ok: !!wallet && !blocked && available >= group.subtotal,
                 reason: !wallet
-                    ? 'No credit line set up with this vendor.'
+                    ? 'No DiSCCO credit with this supplier.'
                     : blocked
-                        ? `This credit line is ${wallet.status === 'BLACKLISTED' ? 'blacklisted' : 'blocked'}.`
+                        ? `This credit line is ${wallet.status.toLowerCase()}.`
                         : insufficient
                             ? 'Available credit is less than this order amount.'
                             : null,
@@ -857,12 +877,14 @@ function CheckoutPageContent() {
     const promoLabel = autoPromos.length === 1 ? autoPromos[0].promotionName : undefined;
 
     const walletEligibility = useMemo(() => {
-        if (!creditWalletsLoaded) return { ok: false, loading: true, reason: 'Loading H1 / DiSCCO Credit details...' };
+        if (!creditWalletsLoaded) return { ok: false, loading: true, reason: 'Loading Horeca1 platform credit…' };
         if (!platformWallet) {
-            return { ok: false, reason: 'No H1 / DiSCCO Credit line found.' };
+            return { ok: false, reason: 'Horeca1 Credit is not available for this account.' };
         }
         const available = Number(platformWallet.availableCredit) || 0;
-        const blocked = platformWallet.status === 'BLACKLISTED' || platformWallet.status === 'BLOCKED';
+        const blocked = platformWallet.status === 'BLACKLISTED' || platformWallet.status === 'BLOCKED'
+            || platformWallet.status === 'FROZEN' || platformWallet.status === 'SUSPENDED'
+            || platformWallet.status === 'EXPIRED' || platformWallet.status === 'CANCELLED';
         const insufficient = available < selectedTotal;
         return {
             wallet: platformWallet,
@@ -871,9 +893,9 @@ function CheckoutPageContent() {
             blocked,
             ok: !blocked && available >= selectedTotal,
             reason: blocked
-                ? `H1 / DiSCCO Credit is ${platformWallet.status === 'BLACKLISTED' ? 'blacklisted' : 'blocked'}.`
+                ? `Horeca1 platform credit is ${platformWallet.status.toLowerCase()}.`
                 : insufficient
-                    ? 'Available balance is less than the total order amount.'
+                    ? 'Available platform credit is less than the total order amount.'
                     : null,
         };
     }, [platformWallet, selectedTotal, creditWalletsLoaded]);
@@ -1412,50 +1434,27 @@ function CheckoutPageContent() {
                                                         )}
 
                                                         {/* Inline Balance badges */}
-                                                        {opt.id === 'wallet' && creditWalletsLoaded && platformWallet && (
-                                                            platformWallet.status === 'BLACKLISTED' || platformWallet.status === 'BLOCKED' ? (
-                                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 uppercase">
-                                                                    {platformWallet.status.toLowerCase()}
-                                                                </span>
-                                                            ) : walletBalance !== null && walletBalance < selectedTotal ? (
-                                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600">
-                                                                    Bal: ₹{walletBalance.toLocaleString('en-IN')} (Insufficient)
-                                                                </span>
-                                                            ) : walletBalance !== null ? (
-                                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-[#53B175]">
-                                                                    Bal: ₹{walletBalance.toLocaleString('en-IN')}
-                                                                </span>
-                                                            ) : null
+                                                        {opt.id === 'wallet' && creditWalletsLoaded && platformWallet && walletBalance !== null && (
+                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${walletBalance < selectedTotal ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-[#53B175]'}`}>
+                                                                ₹{walletBalance.toLocaleString('en-IN')} available
+                                                            </span>
                                                         )}
 
-                                                        {opt.id === 'credit' && creditWalletsLoaded && (
-                                                            selectedGroups.length === 1 ? (
-                                                                (() => {
-                                                                    const wallet = creditWalletsByVendor[selectedGroups[0].vendorId];
-                                                                    if (!wallet) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-50 text-gray-500">No Credit Setup</span>;
-                                                                    const avail = Number(wallet.availableCredit) || 0;
-                                                                    if (wallet.status === 'BLACKLISTED' || wallet.status === 'BLOCKED') {
-                                                                        return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 uppercase">{wallet.status.toLowerCase()}</span>;
-                                                                    }
-                                                                    if (avail < selectedGroups[0].subtotal) {
-                                                                        return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600">Limit: ₹{avail.toLocaleString('en-IN')} (Insufficient)</span>;
-                                                                    }
-                                                                    return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-[#53B175]">Limit: ₹{avail.toLocaleString('en-IN')}</span>;
-                                                                })()
-                                                            ) : selectedGroups.length > 1 ? (
-                                                                (() => {
-                                                                    const allOk = creditEligibility.every(c => c.ok);
-                                                                    const totalAvail = creditEligibility.reduce((sum, c) => sum + c.available, 0);
-                                                                    if (allOk) {
-                                                                        return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-[#53B175]">Limit: ₹{totalAvail.toLocaleString('en-IN')}</span>;
-                                                                    }
-                                                                    const blockedCount = creditEligibility.filter(c => c.blocked).length;
-                                                                    const insufficientCount = creditEligibility.filter(c => !c.blocked && c.available < c.group.subtotal).length;
-                                                                    if (blockedCount > 0) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600">{blockedCount} Blocked</span>;
-                                                                    if (insufficientCount > 0) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600">{insufficientCount} Insufficient</span>;
-                                                                    return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600">Unavailable</span>;
-                                                                })()
-                                                            ) : null
+                                                        {opt.id === 'credit' && creditWalletsLoaded && selectedGroups.length === 1 && (() => {
+                                                            const wallet = creditWalletsByVendor[selectedGroups[0].vendorId];
+                                                            if (!wallet) return null;
+                                                            const avail = Number(wallet.availableCredit) || 0;
+                                                            const name = wallet.vendor?.businessName ?? selectedGroups[0].vendorName;
+                                                            return (
+                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${avail < selectedGroups[0].subtotal ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-[#53B175]'}`}>
+                                                                    {name} · ₹{avail.toLocaleString('en-IN')}
+                                                                </span>
+                                                            );
+                                                        })()}
+                                                        {opt.id === 'credit' && creditWalletsLoaded && selectedGroups.length > 1 && (
+                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${creditEligibility.every(c => c.ok) ? 'bg-green-50 text-[#53B175]' : 'bg-rose-50 text-rose-600'}`}>
+                                                                {creditEligibility.every(c => c.ok) ? 'Per supplier' : 'Not available for all POs'}
+                                                            </span>
                                                         )}
                                                     </div>
                                                     <span className="text-[12px] md:text-[13px] text-gray-400 font-medium block mt-0.5">{opt.desc}</span>
@@ -1533,22 +1532,28 @@ function CheckoutPageContent() {
                                     {creditEligibility.map(({ group, wallet, available, remaining, ok, reason }) => (
                                         <div key={group.vendorId} className="bg-purple-50 rounded-2xl p-4 border border-purple-100 text-left shadow-sm">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <Shield size={15} className="text-purple-600" />
-                                                <span className="text-[12px] font-bold text-purple-800 truncate">
+                                                <CreditCard size={15} className="text-purple-600" />
+                                                <span className="text-[13px] font-bold text-purple-800 truncate">
                                                     {wallet?.vendor?.businessName ?? group.vendorName}
                                                 </span>
                                             </div>
                                             <div className="space-y-1 text-[12px]">
                                                 <div className="flex justify-between">
-                                                    <span className="text-purple-600">Available Credit</span>
+                                                    <span className="text-purple-600">Available</span>
                                                     <span className="font-bold text-purple-800">{wallet ? `₹${available.toLocaleString('en-IN')}` : '—'}</span>
                                                 </div>
+                                                {wallet && Number(wallet.outstandingAmount) > 0 && (
+                                                    <div className="flex justify-between">
+                                                        <span className="text-purple-600">Outstanding</span>
+                                                        <span className="font-bold text-rose-600">₹{Number(wallet.outstandingAmount).toLocaleString('en-IN')}</span>
+                                                    </div>
+                                                )}
                                                 <div className="flex justify-between">
-                                                    <span className="text-purple-600">This PO Value</span>
+                                                    <span className="text-purple-600">This order</span>
                                                     <span className="font-bold text-purple-800">₹{group.subtotal.toLocaleString('en-IN')}</span>
                                                 </div>
                                                 <div className="flex justify-between border-t border-purple-100/50 pt-1 mt-1">
-                                                    <span className="text-purple-600">Remaining Limit</span>
+                                                    <span className="text-purple-600">After this order</span>
                                                     <span className={`font-bold ${remaining < 0 ? 'text-red-600' : 'text-purple-800'}`}>
                                                         {wallet ? `₹${remaining.toLocaleString('en-IN')}` : '—'}
                                                     </span>
@@ -1564,42 +1569,31 @@ function CheckoutPageContent() {
                                     ))}
                                     {!creditAllSelectionsValid && (
                                         <div className="text-[11px] font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl p-3 text-left">
-                                            Credit limit validation failed for one or more POs.
+                                            DiSCCO requires a credit line with each supplier in this order.
                                         </div>
                                     )}
                                 </div>
                             )}
 
-                            {/* Wallet details card */}
                             {selectedPayment === 'wallet' && creditWalletsLoaded && platformWallet && (
                                 <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-100 text-left shadow-sm">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <WalletIcon size={15} className="text-yellow-600" />
-                                        <span className="text-[12px] font-bold text-yellow-800">H1 / DiSCCO Credit</span>
+                                        <CreditCard size={15} className="text-yellow-600" />
+                                        <span className="text-[13px] font-bold text-yellow-800">Horeca1 Credit</span>
                                     </div>
                                     <div className="space-y-1 text-[12px]">
                                         <div className="flex justify-between">
-                                            <span className="text-yellow-600">Credit available</span>
+                                            <span className="text-yellow-600">Available</span>
                                             <span className="font-bold text-yellow-800">₹{walletBalance?.toLocaleString('en-IN') ?? '—'}</span>
                                         </div>
                                         {Number(platformWallet.outstandingAmount) > 0 && (
-                                            <>
-                                                <div className="flex justify-between">
-                                                    <span className="text-yellow-600">Outstanding Due</span>
-                                                    <span className="font-bold text-rose-600">₹{Number(platformWallet.outstandingAmount).toLocaleString('en-IN')}</span>
-                                                </div>
-                                                {platformWallet.currentDueDate && (
-                                                    <div className="flex justify-between">
-                                                        <span className="text-yellow-600">Due Date</span>
-                                                        <span className="font-bold text-rose-600">
-                                                            {new Date(platformWallet.currentDueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </>
+                                            <div className="flex justify-between">
+                                                <span className="text-yellow-600">Outstanding</span>
+                                                <span className="font-bold text-rose-600">₹{Number(platformWallet.outstandingAmount).toLocaleString('en-IN')}</span>
+                                            </div>
                                         )}
                                         <div className="flex justify-between border-t border-yellow-200/50 pt-1 mt-1">
-                                            <span className="text-yellow-600">This Order Total</span>
+                                            <span className="text-yellow-600">This order</span>
                                             <span className="font-bold text-yellow-800">₹{selectedTotal.toLocaleString('en-IN')}</span>
                                         </div>
                                     </div>

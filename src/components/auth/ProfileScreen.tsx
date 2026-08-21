@@ -93,6 +93,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         totalOutstanding: number;
         hasOverdue: boolean;
         hasWallets: boolean;
+        lineCount: number;
     } | null>(null);
 
     const { data: session, update: updateSession } = useSession();
@@ -215,6 +216,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                         totalOutstanding,
                         hasOverdue,
                         hasWallets: wallets.length > 0,
+                        lineCount: wallets.length,
                     });
                 }
                 const p = profileJson?.success ? profileJson.data : null;
@@ -343,20 +345,30 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         { id: 'payment', label: 'Payment Management', desc: 'Cards, UPI & banking', icon: CreditCard, onClick: () => setIsPaymentOpen(true) },
         {
             id: 'credit-wallet',
-            label: 'Credit & Wallets',
+            label: 'DiSCCO Credit',
             desc: creditSummary
                 ? creditSummary.hasWallets
-                    ? creditSummary.totalOutstanding > 0 
-                        ? `Outstanding: ₹${creditSummary.totalOutstanding.toLocaleString('en-IN')} · Pay dues` 
-                        : `Available: ₹${creditSummary.totalAvailable.toLocaleString('en-IN')} of ₹${creditSummary.totalLimit.toLocaleString('en-IN')}`
-                    : 'No credit limit assigned yet'
-                : 'Manage outstanding balances and pay dues',
+                    ? creditSummary.totalOutstanding > 0
+                        ? `${creditSummary.lineCount} line${creditSummary.lineCount === 1 ? '' : 's'} · ₹${creditSummary.totalOutstanding.toLocaleString('en-IN')} due`
+                        : `${creditSummary.lineCount} supplier line${creditSummary.lineCount === 1 ? '' : 's'}`
+                    : 'No credit assigned yet'
+                : 'Buy Now, Pay Later',
             icon: CreditCard,
             onClick: () => {
                 onClose();
                 router.push('/wallet');
             }
-        }
+        },
+        {
+            id: 'h1-wallet',
+            label: 'H1 Wallet',
+            desc: 'Available to spend at checkout',
+            icon: CreditCard,
+            onClick: () => {
+                onClose();
+                router.push('/rewards');
+            }
+        },
     ];
 
     // Business Account management — hide for platform admins (they use /admin).
@@ -525,7 +537,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 </div>
                             </div>
 
-                            {/* Mobile Credit Card summary */}
+                            {/* Mobile DiSCCO summary */}
                             {creditSummary && creditSummary.hasWallets && (
                                 <div className="mb-4 bg-gradient-to-br from-[#1b5e3a] to-[#2e7d32] text-white rounded-2xl p-5 shadow-md relative overflow-hidden">
                                     <div className="absolute right-0 bottom-0 opacity-10 translate-x-4 translate-y-4">
@@ -533,43 +545,37 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                     </div>
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="text-[10px] uppercase tracking-wider text-emerald-200 font-bold">Horeca1 Credit Wallet</p>
-                                            <h3 className="text-[20px] font-black mt-1">₹{creditSummary.totalAvailable.toLocaleString('en-IN')}</h3>
-                                            <p className="text-[10px] text-emerald-100/80 mt-0.5">Available of ₹{creditSummary.totalLimit.toLocaleString('en-IN')} limit</p>
+                                            <p className="text-[10px] uppercase tracking-wider text-emerald-200 font-bold">DiSCCO</p>
+                                            <h3 className="text-[20px] font-black mt-1">Buy Now, Pay Later</h3>
+                                            <p className="text-[10px] text-emerald-100/80 mt-0.5">
+                                                {creditSummary.lineCount} supplier credit line{creditSummary.lineCount === 1 ? '' : 's'}
+                                            </p>
                                         </div>
                                         {creditSummary.totalOutstanding > 0 && (
                                             <span className={cn(
                                                 "px-2.5 py-1 rounded-full text-[10px] font-bold border",
-                                                creditSummary.hasOverdue 
-                                                    ? "bg-red-500/20 text-red-100 border-red-400/30 animate-pulse" 
+                                                creditSummary.hasOverdue
+                                                    ? "bg-red-500/20 text-red-100 border-red-400/30 animate-pulse"
                                                     : "bg-amber-500/20 text-amber-100 border-amber-400/30"
                                             )}>
-                                                {creditSummary.hasOverdue ? 'Overdue' : 'Outstanding'}
+                                                {creditSummary.hasOverdue ? 'Overdue' : 'Due'}
                                             </span>
                                         )}
                                     </div>
 
-                                    {/* Progress Bar */}
-                                    <div className="mt-4">
-                                        <div className="w-full bg-[#144228] rounded-full h-1.5 overflow-hidden">
-                                            <div 
-                                                className="bg-emerald-400 h-full rounded-full transition-all duration-500" 
-                                                style={{ width: `${(creditSummary.totalAvailable / (creditSummary.totalLimit || 1)) * 100}%` }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-4 pt-3 border-t border-emerald-700/40 flex justify-between items-center">
+                                    <div className="mt-4 grid grid-cols-2 gap-3">
                                         <div>
                                             <p className="text-[9px] text-emerald-200/80 uppercase font-bold">Outstanding</p>
                                             <p className="text-[13px] font-bold">₹{creditSummary.totalOutstanding.toLocaleString('en-IN')}</p>
                                         </div>
-                                        <button 
-                                            onClick={() => { onClose(); router.push('/wallet'); }}
-                                            className="bg-white text-[#1b5e3a] hover:bg-emerald-50 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
-                                        >
-                                            {creditSummary.totalOutstanding > 0 ? 'Repay Now' : 'View Details'}
-                                        </button>
+                                        <div className="flex items-end justify-end">
+                                            <button
+                                                onClick={() => { onClose(); router.push('/wallet'); }}
+                                                className="bg-white text-[#1b5e3a] hover:bg-emerald-50 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
+                                            >
+                                                View Credit
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -915,52 +921,43 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                     )}
                                 </div>
 
-                                {/* Desktop Credit Card summary */}
+                                {/* Desktop DiSCCO summary */}
                                 {creditSummary && creditSummary.hasWallets && (
                                     <div className="bg-gradient-to-r from-[#1b5e3a] via-[#246c43] to-[#2e7d32] text-white rounded-2xl p-6 shadow-md relative overflow-hidden border border-emerald-800/20">
                                         <div className="absolute right-0 bottom-0 opacity-10 translate-x-6 translate-y-6">
                                             <CreditCard size={180} strokeWidth={1} />
                                         </div>
                                         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                                            <div className="flex-1 space-y-4">
+                                            <div className="flex-1 space-y-3">
                                                 <div className="flex items-center gap-3">
                                                     <span className="p-2 rounded-xl bg-white/10 text-white shrink-0">
                                                         <CreditCard size={20} />
                                                     </span>
                                                     <div>
-                                                        <p className="text-[10px] uppercase tracking-wider text-emerald-200 font-bold">Credit Wallet Summary</p>
-                                                        <h3 className="text-[22px] font-black leading-tight mt-0.5">₹{creditSummary.totalAvailable.toLocaleString('en-IN')} Available</h3>
+                                                        <p className="text-[10px] uppercase tracking-wider text-emerald-200 font-bold">DiSCCO</p>
+                                                        <h3 className="text-[22px] font-black leading-tight mt-0.5">Buy Now, Pay Later</h3>
+                                                        <p className="text-[11px] text-emerald-100/80 mt-0.5">
+                                                            {creditSummary.lineCount} supplier credit line{creditSummary.lineCount === 1 ? '' : 's'}
+                                                        </p>
                                                     </div>
                                                 </div>
 
-                                                <div className="grid grid-cols-3 gap-4 max-w-md pt-1">
-                                                    <div>
-                                                        <p className="text-[10px] text-emerald-200/80 font-semibold">Total Limit</p>
-                                                        <p className="text-[16px] font-bold">₹{creditSummary.totalLimit.toLocaleString('en-IN')}</p>
-                                                    </div>
+                                                <div className="grid grid-cols-2 gap-4 max-w-sm pt-1">
                                                     <div>
                                                         <p className="text-[10px] text-emerald-200/80 font-semibold">Outstanding</p>
-                                                        <p className="text-[16px] font-bold text-emerald-100">₹{creditSummary.totalOutstanding.toLocaleString('en-IN')}</p>
+                                                        <p className="text-[16px] font-bold">₹{creditSummary.totalOutstanding.toLocaleString('en-IN')}</p>
                                                     </div>
                                                     <div>
                                                         <p className="text-[10px] text-emerald-200/80 font-semibold">Status</p>
                                                         <span className={cn(
                                                             "inline-block mt-0.5 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase border",
-                                                            creditSummary.hasOverdue 
-                                                                ? "bg-red-500/20 text-red-100 border-red-400/30 animate-pulse" 
+                                                            creditSummary.hasOverdue
+                                                                ? "bg-red-500/20 text-red-100 border-red-400/30"
                                                                 : "bg-emerald-500/20 text-emerald-100 border-emerald-400/30"
                                                         )}>
-                                                            {creditSummary.hasOverdue ? 'Overdue Dues' : 'Healthy'}
+                                                            {creditSummary.hasOverdue ? 'Overdue' : 'Active'}
                                                         </span>
                                                     </div>
-                                                </div>
-
-                                                {/* Progress Bar */}
-                                                <div className="w-full bg-[#144228] rounded-full h-2 overflow-hidden max-w-md">
-                                                    <div 
-                                                        className="bg-emerald-400 h-full rounded-full transition-all duration-500" 
-                                                        style={{ width: `${(creditSummary.totalAvailable / (creditSummary.totalLimit || 1)) * 100}%` }}
-                                                    />
                                                 </div>
                                             </div>
 
@@ -969,13 +966,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                     onClick={() => { onClose(); router.push('/wallet'); }}
                                                     className="bg-white text-[#1b5e3a] hover:bg-emerald-50 text-[13px] font-black px-6 py-3 rounded-xl transition-all shadow-sm hover:shadow active:scale-[0.98] duration-150 cursor-pointer text-center"
                                                 >
-                                                    {creditSummary.totalOutstanding > 0 ? 'Pay Overdue Dues' : 'Manage Credit'}
-                                                </button>
-                                                <button
-                                                    onClick={() => { onClose(); router.push('/wallet'); }}
-                                                    className="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-[12px] font-bold px-6 py-2 rounded-xl transition-all active:scale-[0.98] duration-150 cursor-pointer text-center"
-                                                >
-                                                    View Statement
+                                                    View Credit
                                                 </button>
                                             </div>
                                         </div>

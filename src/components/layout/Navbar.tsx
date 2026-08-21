@@ -12,7 +12,8 @@ import {
     Store,
     ClipboardList,
     LayoutDashboard,
-    Gift,
+    Wallet,
+    CreditCard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -444,18 +445,30 @@ export function Navbar() {
                                     );
                                 })}
                                 {reserveRewardsSlot ? (
-                                    <DesktopNavSlotPlaceholder label="H1 Wallet" Icon={Gift} />
+                                    <DesktopNavSlotPlaceholder label="Wallet" Icon={Wallet} />
                                 ) : showRewardsLink ? (
-                                    <Link
-                                        href="/rewards"
-                                        className={cn(
-                                            "flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl transition-colors shrink-0",
-                                            pathname === '/rewards' ? "text-primary bg-primary/5" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-                                        )}
-                                    >
-                                        <Gift size={21} strokeWidth={pathname === '/rewards' ? 2 : 1.5} />
-                                        <span className="text-[10px] font-medium leading-none">H1 Wallet</span>
-                                    </Link>
+                                    <>
+                                        <Link
+                                            href="/rewards"
+                                            className={cn(
+                                                "flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl transition-colors shrink-0",
+                                                pathname === '/rewards' ? "text-primary bg-primary/5" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                                            )}
+                                        >
+                                            <Wallet size={21} strokeWidth={pathname === '/rewards' ? 2 : 1.5} />
+                                            <span className="text-[10px] font-medium leading-none">Wallet</span>
+                                        </Link>
+                                        <Link
+                                            href="/wallet"
+                                            className={cn(
+                                                "flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl transition-colors shrink-0",
+                                                pathname?.startsWith('/wallet') ? "text-primary bg-primary/5" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                                            )}
+                                        >
+                                            <CreditCard size={21} strokeWidth={pathname?.startsWith('/wallet') ? 2 : 1.5} />
+                                            <span className="text-[10px] font-medium leading-none">DiSCCO</span>
+                                        </Link>
+                                    </>
                                 ) : null}
                             </div>
 

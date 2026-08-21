@@ -157,9 +157,6 @@ export default function RewardsPage() {
         <div className="min-h-screen bg-gray-50/50">
             <div className="max-w-3xl mx-auto px-[clamp(1rem,3vw,2rem)] py-[clamp(1.5rem,4vw,3rem)]">
                 <h1 className="text-[clamp(1.4rem,2vw+0.8rem,1.9rem)] font-bold text-[#181725] mb-1">H1 Wallet</h1>
-                <p className="text-[13px] text-gray-400 font-medium mb-6">
-                    Cashback and incentives you can spend at checkout. Separate from <span className="text-gray-600 font-semibold">DiSCCO</span> (pay later credit).
-                </p>
 
                 {/* Wallet balance card */}
                 <div className="bg-[#181725] rounded-2xl p-6 mb-6 text-white relative overflow-hidden">
@@ -169,7 +166,7 @@ export default function RewardsPage() {
                     <p className="text-[clamp(1.8rem,3vw+1rem,2.6rem)] font-black tracking-tight">
                         ₹{balance.toLocaleString('en-IN')}
                     </p>
-                    <p className="text-[12px] text-white/50 font-medium mt-1">Apply it at checkout — look for “Use H1 Wallet”. Not DiSCCO pay-later credit.</p>
+                    <p className="text-[13px] text-white/55 font-medium mt-1">Available to spend</p>
                 </div>
 
                 {referral && (
@@ -179,7 +176,7 @@ export default function RewardsPage() {
                             <h2 className="text-[15px] font-bold text-[#181725]">Invite friends</h2>
                         </div>
                         <p className="text-[12px] text-gray-400 font-medium mb-3">
-                            Share your unique link. Rewards credit to your H1 Wallet — not DiSCCO.
+                            Share your unique link. Rewards credit to your H1 Wallet.
                         </p>
                         <div className="flex gap-2">
                             <input

@@ -1,26 +1,32 @@
 'use client';
 
-// Customer credit wallet dashboard — H1 wallet + vendor credit lines, with
-// outstanding/limit/due, repay-now (Razorpay), and transaction history.
-import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, Wallet as WalletIcon, AlertCircle } from 'lucide-react';
+// Customer DiSCCO — Buy Now, Pay Later. Separate from H1 Wallet (/rewards).
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { AlertCircle, ChevronRight, CreditCard, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { dueLabel } from '@/lib/creditDueLabel';
 
-interface Txn { id: string; type: string; amount: string; balanceAfterTxn: string; note: string | null; createdAt: string }
+interface Txn {
+  id: string;
+  type: string;
+  amount: string;
+  note: string | null;
+  createdAt: string;
+}
+
 interface CreditWallet {
   id: string;
   vendor: { id: string; businessName: string } | null;
-  status: 'ACTIVE' | 'BLOCKED' | 'BLACKLISTED';
+  status: string;
   creditLimit: string;
   availableCredit: string;
-  usedCredit: string;
+  reservedAmount?: string;
   outstandingAmount: string;
   currentDueDate: string | null;
   transactions: Txn[];
 }
 
-// Access Razorpay via a local cast (avoids re-declaring the global Window type,
-// which is already augmented in cart/checkout pages).
 interface RazorpayHandlerResponse {
   razorpay_order_id: string;
   razorpay_payment_id: string;
@@ -30,7 +36,9 @@ type RazorpayCtor = new (options: Record<string, unknown>) => { open: () => void
 const getRazorpayCtor = (): RazorpayCtor | undefined =>
   (window as unknown as { Razorpay?: RazorpayCtor }).Razorpay;
 
-function inr(v: string | number) { return `₹${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`; }
+function inr(v: string | number) {
+  return `₹${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+}
 
 function loadRazorpay(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -43,7 +51,87 @@ function loadRazorpay(): Promise<boolean> {
   });
 }
 
-export default function WalletPage() {
+function lineTitle(w: CreditWallet) {
+  return w.vendor?.businessName ?? 'Horeca1 Credit';
+}
+
+function StatusBadge({ status }: { status: string }) {
+  if (status === 'ACTIVE') return null;
+  if (status === 'BLACKLISTED') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">
+        <AlertCircle size={11} /> Blacklisted
+      </span>
+    );
+  }
+  if (status === 'BLOCKED' || status === 'FROZEN') {
+    return <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">{status === 'FROZEN' ? 'Frozen' : 'Blocked'}</span>;
+  }
+  if (status === 'SUSPENDED' || status === 'EXPIRED' || status === 'CANCELLED') {
+    return <span className="text-[11px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{status.charAt(0) + status.slice(1).toLowerCase()}</span>;
+  }
+  return null;
+}
+
+async function startRepayment(
+  walletId: string,
+  amount: number,
+  onDone: () => void,
+  setBusy: (v: boolean) => void,
+) {
+  setBusy(true);
+  try {
+    const ok = await loadRazorpay();
+    const RazorpayCtor = getRazorpayCtor();
+    if (!ok || !RazorpayCtor) throw new Error('Could not load payment gateway');
+    const res = await fetch('/api/v1/wallet/create-repayment-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ walletId, amount }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error?.message || 'Could not start repayment');
+    const { razorpayOrderId, amount: paise, currency, keyId } = json.data;
+
+    const rzp = new RazorpayCtor({
+      key: keyId,
+      order_id: razorpayOrderId,
+      amount: paise,
+      currency,
+      name: 'Horeca1',
+      description: 'DiSCCO repayment',
+      handler: async (resp: RazorpayHandlerResponse) => {
+        try {
+          const v = await fetch('/api/v1/wallet/verify-repayment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+            }),
+          });
+          const vj = await v.json();
+          if (!v.ok || !vj.success) throw new Error(vj.error?.message || 'Could not verify payment');
+          toast.success('Payment received');
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : 'Payment verification failed');
+        } finally {
+          onDone();
+        }
+      },
+      modal: { ondismiss: () => setBusy(false) },
+      theme: { color: '#53B175' },
+    });
+    rzp.open();
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : 'Repayment failed');
+  } finally {
+    setBusy(false);
+  }
+}
+
+export default function DisccoCreditPage() {
   const [wallets, setWallets] = useState<CreditWallet[]>([]);
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState<string | null>(null);
@@ -59,137 +147,101 @@ export default function WalletPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const repay = async (w: CreditWallet) => {
-    const outstanding = Number(w.outstandingAmount);
-    if (outstanding <= 0) return;
-    setPayingId(w.id);
-    try {
-      const ok = await loadRazorpay();
-      const RazorpayCtor = getRazorpayCtor();
-      if (!ok || !RazorpayCtor) throw new Error('Could not load payment gateway');
-      const res = await fetch('/api/v1/wallet/create-repayment-order', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletId: w.id, amount: outstanding }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error?.message || 'Could not start repayment');
-      const { razorpayOrderId, amount, currency, keyId } = json.data;
+  const lines = useMemo(
+    () => [...wallets].sort((a, b) => Number(b.outstandingAmount) - Number(a.outstandingAmount)),
+    [wallets],
+  );
 
-      const rzp = new RazorpayCtor({
-        key: keyId,
-        order_id: razorpayOrderId,
-        amount, currency,
-        name: 'Horeca1',
-        description: 'Credit wallet repayment',
-        // Verify synchronously the instant Razorpay confirms payment — this is
-        // what actually applies the repayment to the wallet. The webhook is only
-        // a server-side backup and does NOT fire in test mode / on localhost.
-        handler: async (resp: RazorpayHandlerResponse) => {
-          try {
-            const v = await fetch('/api/v1/wallet/verify-repayment', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_order_id: resp.razorpay_order_id,
-                razorpay_payment_id: resp.razorpay_payment_id,
-                razorpay_signature: resp.razorpay_signature,
-              }),
-            });
-            const vj = await v.json();
-            if (!v.ok || !vj.success) throw new Error(vj.error?.message || 'Could not verify payment');
-            toast.success('Payment received — your wallet is updated');
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Payment verification failed — contact support if charged');
-          } finally {
-            load();
-          }
-        },
-        modal: { ondismiss: () => setPayingId(null) },
-        theme: { color: '#299e60' },
-      });
-      rzp.open();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Repayment failed');
-    } finally {
-      setPayingId(null);
-    }
-  };
+  const overdueCount = useMemo(
+    () => lines.filter((w) => dueLabel(w.currentDueDate, Number(w.outstandingAmount)).tone === 'overdue').length,
+    [lines],
+  );
 
   if (loading) {
-    return <div className="flex items-center justify-center py-24"><Loader2 className="animate-spin text-[#299e60]" size={32} /></div>;
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="animate-spin text-[#53B175]" size={28} />
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] py-8 space-y-6">
-      <div>
-        <div className="flex items-center gap-2">
-          <WalletIcon className="text-[#299e60]" size={24} />
-          <h1 className="text-[clamp(20px,4vw,28px)] font-bold text-[#181725]">H1 / DiSCCO Credit</h1>
+    <div className="max-w-3xl mx-auto px-[clamp(1rem,3vw,2rem)] py-[clamp(1.5rem,4vw,3rem)] space-y-6">
+      <header>
+        <div className="flex items-center gap-2.5">
+          <CreditCard className="text-[#53B175]" size={22} strokeWidth={1.75} />
+          <h1 className="text-[clamp(1.4rem,2vw+0.8rem,1.9rem)] font-bold text-[#181725]">DiSCCO</h1>
         </div>
-        <p className="text-[13px] text-gray-400 font-medium mt-1">
-          Pay-later credit lines (DiSCCO). Cashback lives in your <a href="/rewards" className="text-[#299e60] font-semibold hover:underline">H1 Wallet</a>.
-        </p>
-      </div>
+        <p className="text-[14px] text-gray-500 font-medium mt-1">Buy Now, Pay Later</p>
+        {overdueCount > 0 && (
+          <p className="text-[13px] text-rose-600 font-semibold mt-2">
+            {overdueCount} line{overdueCount === 1 ? '' : 's'} overdue
+          </p>
+        )}
+      </header>
 
-      {wallets.length === 0 && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-gray-500">
-          <p className="text-[15px] font-semibold">No H1 / DiSCCO Credit line yet</p>
-          <p className="text-[13px] mt-1">Credit unlocks after a few successful orders, or a vendor/admin can assign you a credit line.</p>
+      {lines.length === 0 && (
+        <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center">
+          <p className="text-[15px] font-semibold text-[#181725]">No DiSCCO credit yet</p>
+          <p className="text-[13px] text-gray-500 mt-1">Ask your supplier to enable Buy Now, Pay Later for your account.</p>
         </div>
       )}
 
-      {wallets.map((w) => {
-        const outstanding = Number(w.outstandingAmount);
-        const overdue = w.currentDueDate ? new Date(w.currentDueDate) < new Date() : false;
-        return (
-          <div key={w.id} className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
-            <div className="p-5 flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-[12px] font-semibold uppercase tracking-wide text-gray-400">{w.vendor ? w.vendor.businessName : 'H1 / DiSCCO Credit'}</p>
-                <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <Stat label="Credit Limit" value={inr(w.creditLimit)} />
-                  <Stat label="Available" value={inr(w.availableCredit)} accent="green" />
-                  <Stat label="Outstanding" value={inr(w.outstandingAmount)} accent={outstanding > 0 ? 'red' : undefined} />
-                  <Stat label="Due Date" value={w.currentDueDate ? new Date(w.currentDueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'} accent={overdue ? 'red' : undefined} />
+      <div className="space-y-3">
+        {lines.map((w) => {
+          const outstanding = Number(w.outstandingAmount);
+          const due = dueLabel(w.currentDueDate, outstanding);
+          const dueClass =
+            due.tone === 'overdue' ? 'text-rose-600'
+              : due.tone === 'soon' ? 'text-amber-700'
+                : 'text-gray-500';
+
+          return (
+            <div key={w.id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-[16px] font-bold text-[#181725] truncate">{lineTitle(w)}</h2>
+                    <StatusBadge status={w.status} />
+                  </div>
+                  <p className="text-[clamp(1.35rem,2vw+0.6rem,1.75rem)] font-bold text-[#181725] mt-2 tracking-tight">
+                    {inr(w.availableCredit)}{' '}
+                    <span className="text-[13px] font-medium text-gray-400">available</span>
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
+                    {outstanding > 0 ? (
+                      <span className="font-semibold text-rose-600">{inr(outstanding)} outstanding</span>
+                    ) : (
+                      <span className="text-gray-500">No outstanding</span>
+                    )}
+                    <span className={`font-medium ${dueClass}`}>{due.text}</span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                {w.status === 'BLACKLISTED' && <span className="inline-flex items-center gap-1 text-[12px] font-bold text-rose-600 bg-rose-50 px-3 py-1 rounded-full"><AlertCircle size={13} /> Blacklisted</span>}
-                {w.status === 'BLOCKED' && <span className="text-[12px] font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">Blocked</span>}
-                <button
-                  onClick={() => repay(w)}
-                  disabled={outstanding <= 0 || payingId === w.id}
-                  className="bg-[#299e60] text-white text-[13px] font-bold px-5 py-2.5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#22844f] transition-colors"
-                >
-                  {payingId === w.id ? 'Opening…' : outstanding > 0 ? `Repay ${inr(outstanding)}` : 'Nothing due'}
-                </button>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  {outstanding > 0 && (
+                    <button
+                      type="button"
+                      disabled={payingId === w.id}
+                      onClick={() => {
+                        void startRepayment(w.id, outstanding, load, (busy) => setPayingId(busy ? w.id : null));
+                      }}
+                      className="bg-[#53B175] text-white text-[13px] font-bold px-4 py-2 rounded-xl disabled:opacity-40 hover:bg-[#469E66] transition-colors"
+                    >
+                      {payingId === w.id ? 'Opening…' : 'Repay'}
+                    </button>
+                  )}
+                  <Link
+                    href={`/wallet/${w.id}`}
+                    className="inline-flex items-center gap-0.5 text-[13px] font-semibold text-[#53B175] hover:underline"
+                  >
+                    View Credit <ChevronRight size={14} />
+                  </Link>
+                </div>
               </div>
             </div>
-            {w.transactions.length > 0 && (
-              <div className="border-t border-gray-100 bg-gray-50/40 px-5 py-3">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Recent activity</p>
-                <div className="space-y-1.5 max-h-48 overflow-auto">
-                  {w.transactions.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between text-[12px]">
-                      <span className="text-gray-600">{t.note || t.type} <span className="text-gray-400">· {new Date(t.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span></span>
-                      <span className={t.type === 'REPAYMENT' || t.type === 'REVERSAL' ? 'text-green-600 font-semibold' : 'text-[#181725] font-semibold'}>{inr(t.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function Stat({ label, value, accent }: { label: string; value: string; accent?: 'green' | 'red' }) {
-  const color = accent === 'green' ? 'text-[#299e60]' : accent === 'red' ? 'text-rose-600' : 'text-[#181725]';
-  return (
-    <div>
-      <p className="text-[11px] text-gray-400 font-medium">{label}</p>
-      <p className={`text-[16px] font-bold ${color}`}>{value}</p>
+          );
+        })}
+      </div>
     </div>
   );
 }
