@@ -35,6 +35,12 @@ export const POST = withRateLimit(withRole(['admin', 'vendor', 'customer', 'bran
     }
 
     // Validate file size
+    if (file.size <= 0) {
+      return NextResponse.json(
+        { success: false, error: { message: 'File is empty' } },
+        { status: 400 },
+      );
+    }
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
         { success: false, error: { message: `File too large. Max size: 10MB` } },
