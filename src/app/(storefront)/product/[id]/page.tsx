@@ -26,6 +26,10 @@ import { toast } from 'sonner';
 import { dal } from '@/lib/dal';
 import type { Vendor as DalVendor, VendorProduct } from '@/types';
 import AlternateVendorsStrip from '@/components/features/product/AlternateVendorsStrip';
+import {
+    resolveSellableDisplayName,
+    resolveSellableImages,
+} from '@/lib/productDisplayIdentity';
 
 // --- API Product Type ---
 interface ApiProduct {
@@ -80,11 +84,11 @@ export default function ProductDetailPage() {
             .finally(() => setPageLoading(false));
     }, [id]);
 
-    // Derived display values — brand mapping overrides discovery fields;
-    // cart still gets raw `name` via vendorProductForContext below.
+    // Sellable SKU identity for marketplace PDP — vendor Product.name wins.
+    // Brand mapping may fill media/description/pack gaps and brand badge only.
     const rawProductName = apiProduct?.name || '';
     const brandMapping = apiProduct?.brandMappings?.[0]?.brandMasterProduct;
-    const productName = brandMapping?.name?.trim() || rawProductName;
+    const productName = resolveSellableDisplayName(rawProductName, brandMapping);
     const brandName = brandMapping?.brand?.name as string | undefined;
     const brandSlug = brandMapping?.brand?.slug as string | undefined;
     const vendorName = apiProduct?.vendor?.businessName || '';
@@ -99,30 +103,30 @@ export default function ProductDetailPage() {
         ? Number(apiProduct?.basePrice)
         : null;
 
-    const brandImages = (brandMapping?.images ?? []).filter(
-        (u): u is string => typeof u === 'string' && u.length > 0,
+    const supplierImages = [
+        ...(apiProduct?.imageUrl ? [apiProduct.imageUrl] : []),
+        ...((apiProduct?.images ?? []).filter((u): u is string => typeof u === 'string' && u.length > 0)),
+    ];
+    // Dedupe while preserving order
+    const uniqueSupplierImages = [...new Set(supplierImages)];
+    const { images: resolvedImages, usedBrandFallback } = resolveSellableImages(
+        uniqueSupplierImages,
+        brandMapping,
     );
-    const brandImageUrl = brandMapping?.imageUrl?.trim() || '';
-    const productImage =
-        brandImages[0] ||
-        brandImageUrl ||
-        apiProduct?.imageUrl ||
-        apiProduct?.images?.[0] ||
-        '/images/product/product-img3.png';
+    const productImage = resolvedImages[0] || '/images/product/product-img3.png';
 
-    const productCategory =
-        brandMapping?.categoryRel?.name?.trim() ||
-        apiProduct?.category?.name ||
-        '';
+    const productCategory = apiProduct?.category?.name || '';
 
     const brandDescription = brandMapping?.description?.trim() || '';
     const productDescription =
+        (apiProduct?.description?.trim() || '') ||
         brandDescription ||
-        apiProduct?.description ||
         'Premium quality product sourced for professional kitchens.';
 
-    const rawPack = (brandMapping?.packSize?.trim() || apiProduct?.packSize || '').trim();
-    const rawUnit = (brandMapping?.unit?.trim() || apiProduct?.unit || '').trim();
+    const vendorPack = (apiProduct?.packSize || '').trim();
+    const vendorUnit = (apiProduct?.unit || '').trim();
+    const rawPack = (vendorPack || brandMapping?.packSize?.trim() || '').trim();
+    const rawUnit = (vendorUnit || brandMapping?.unit?.trim() || '').trim();
     let productUnit: string;
     if (!rawPack && !rawUnit) {
         productUnit = '1 unit';
@@ -137,11 +141,11 @@ export default function ProductDetailPage() {
     }
 
     const brandOverrideFields: string[] = [];
-    if (brandMapping?.name?.trim()) brandOverrideFields.push('name');
-    if (brandImages.length > 0 || brandImageUrl) brandOverrideFields.push('images');
-    if (brandMapping?.categoryRel?.name?.trim()) brandOverrideFields.push('category');
-    if (brandDescription) brandOverrideFields.push('description');
-    if (brandMapping?.packSize?.trim() || brandMapping?.unit?.trim()) brandOverrideFields.push('packSize');
+    if (usedBrandFallback) brandOverrideFields.push('images');
+    if (!apiProduct?.description?.trim() && brandDescription) brandOverrideFields.push('description');
+    if ((!vendorPack && brandMapping?.packSize?.trim()) || (!vendorUnit && brandMapping?.unit?.trim())) {
+        brandOverrideFields.push('packSize');
+    }
     const brandOverride =
         brandName && brandOverrideFields.length > 0
             ? { brandName, fields: brandOverrideFields }
