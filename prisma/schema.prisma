@@ -1404,6 +1404,8 @@ model CreditWallet {
   @@index([userId])
   @@index([vendorId])
   @@index([status, currentDueDate])
+  @@index([creditSource])
+  @@index([validUntil])
   @@map("credit_wallets")
 }
 
