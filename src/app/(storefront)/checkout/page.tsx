@@ -1617,6 +1617,8 @@ function CheckoutPageContent() {
                                 <CheckoutOffersPanel
                                     offerChoices={offerChoices}
                                     appliedCode={appliedCoupon?.code ?? null}
+                                    appliedName={appliedCoupon?.name ?? null}
+                                    appliedSavings={appliedCoupon?.estimatedDiscount ?? null}
                                     couponInput={couponInput}
                                     couponError={couponError}
                                     couponValidating={couponValidating}
