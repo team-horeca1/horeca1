@@ -234,21 +234,15 @@ export function CheckoutOffersPanel({
                       return (
                         <li
                           key={c.id}
-                          className={`relative overflow-hidden rounded-2xl border transition-colors ${
+                          className={`rounded-2xl border transition-colors ${
                             selected
-                              ? 'bg-green-50/90 border-[#53B175]/50 shadow-sm'
+                              ? 'bg-green-50/90 border-[#53B175]/40 shadow-sm'
                               : disabled
                                 ? 'bg-gray-50 border-gray-100 opacity-55'
                                 : 'bg-white border-gray-200 hover:border-[#53B175]/45'
                           }`}
                         >
-                          <div className="flex">
-                            <div
-                              className={`w-1.5 shrink-0 ${
-                                selected ? 'bg-[#53B175]' : disabled ? 'bg-gray-300' : 'bg-[#53B175]/70'
-                              }`}
-                            />
-                            <div className="flex-1 min-w-0 p-3.5 flex items-start justify-between gap-3">
+                          <div className="p-3.5 flex items-start justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <div className="inline-flex items-center gap-1.5 rounded-md bg-[#181725] text-white px-2 py-1">
                                   <Ticket size={11} className="shrink-0 opacity-80" />
@@ -295,7 +289,6 @@ export function CheckoutOffersPanel({
                                   </button>
                                 )}
                               </div>
-                            </div>
                           </div>
                         </li>
                       );
