@@ -10,6 +10,10 @@ import {
     IMPERSONATION_CHANGED_EVENT,
 } from '@/lib/clearImpersonation';
 import { subscribeAuthTabEvents } from '@/lib/authTabSync';
+import {
+    resolveSellableDisplayName,
+    resolveSellableImages,
+} from '@/lib/productDisplayIdentity';
 
 // CartItem extended with API item ID (needed for PATCH/DELETE on server cart)
 interface CartItemWithId extends CartItem {
@@ -171,8 +175,8 @@ function parseApiCart(apiData: { vendorGroups: unknown[]; total: number }): {
                 ? Math.round(originalTaxableRate * (1 + taxPercent / 100) * 100) / 100
                 : 0;
 
-            // Brand mapping → cart/checkout display overrides. `name` stays the raw
-            // supplier name so orders and invoices keep GST traceability.
+            // Brand mapping may supply brand badge / fallback media. Cart/checkout
+            // title is always the sellable vendor Product.name (never brand-master).
             const rawName = (product.name as string) || '';
             const brandMappings = (product.brandMappings as Array<Record<string, unknown>>) || [];
             const masterProduct = brandMappings[0]?.brandMasterProduct as Record<string, unknown> | undefined;
@@ -181,25 +185,14 @@ function parseApiCart(apiData: { vendorGroups: unknown[]; total: number }): {
             const brandSlug = (masterBrand?.slug as string) || undefined;
             const overrideFields: string[] = [];
 
-            const masterName = typeof masterProduct?.name === 'string' ? masterProduct.name.trim() : '';
-            if (masterName) overrideFields.push('name');
-
             const supplierImages = product.imageUrl ? [product.imageUrl as string] : [];
-            const masterImageList = Array.isArray(masterProduct?.images)
-                ? (masterProduct.images as string[]).filter((u): u is string => typeof u === 'string' && u.length > 0)
-                : [];
-            const masterImageUrl = typeof masterProduct?.imageUrl === 'string' ? masterProduct.imageUrl.trim() : '';
-            const brandImages = masterImageList.length > 0
-                ? masterImageList
-                : masterImageUrl
-                    ? [masterImageUrl]
-                    : [];
-            if (brandImages.length > 0) overrideFields.push('images');
+            const { images, usedBrandFallback } = resolveSellableImages(supplierImages, masterProduct);
+            if (usedBrandFallback) overrideFields.push('images');
 
             const vp: VendorProduct = {
                 id: product.id as string,
                 name: rawName,
-                displayName: masterName || rawName,
+                displayName: resolveSellableDisplayName(rawName, masterProduct),
                 brandName,
                 brandSlug,
                 brandOverride: brandName && overrideFields.length > 0
@@ -208,7 +201,7 @@ function parseApiCart(apiData: { vendorGroups: unknown[]; total: number }): {
                 description: '',
                 price: grossPrice,                 // gross price shown to customer
                 originalPrice: grossMRP || grossPrice,
-                images: brandImages.length > 0 ? brandImages : supplierImages,
+                images,
                 category: '',
                 packSize: (product.packSize as string) || '1 unit',
                 unit: (product.unit as string) || 'unit',

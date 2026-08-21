@@ -1073,6 +1073,27 @@ function CheckoutPageContent() {
         );
     }
 
+    // Redirect to login if unauthenticated
+    if (sessionStatus === 'unauthenticated') {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50/50">
+                <Loader2 size={36} className="text-[#53B175] animate-spin mb-4" />
+                <p className="text-[14px] text-gray-400 font-medium">Redirecting to login...</p>
+            </div>
+        );
+    }
+
+    // Wait for cart hydrate before claiming empty — otherwise /checkout flashes
+    // "Your cart is empty" while CartContext is still loading (QA-06).
+    if (!draftId && (sessionStatus === 'loading' || isCartLoading)) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50/50">
+                <Loader2 size={36} className="text-[#53B175] animate-spin mb-4" />
+                <p className="text-[14px] text-gray-400 font-medium">Loading checkout...</p>
+            </div>
+        );
+    }
+
     if (!draftId && groups.length === 0) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50/50">
@@ -1083,16 +1104,6 @@ function CheckoutPageContent() {
                         Browse vendors
                     </Link>
                 </div>
-            </div>
-        );
-    }
-
-    // Redirect to login if unauthenticated
-    if (sessionStatus === 'unauthenticated') {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50/50">
-                <Loader2 size={36} className="text-[#53B175] animate-spin mb-4" />
-                <p className="text-[14px] text-gray-400 font-medium">Redirecting to login...</p>
             </div>
         );
     }

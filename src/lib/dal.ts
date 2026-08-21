@@ -12,6 +12,10 @@
 
 import type { Vendor, VendorProduct, BulkPriceTier, Category, VendorSummary, OrderList, OrderListItem } from '@/types';
 import { aggregateInventories } from '@/lib/inventoryHelpers';
+import {
+  resolveSellableDisplayName,
+  resolveSellableImages,
+} from '@/lib/productDisplayIdentity';
 
 // Base URL for API calls — works both server-side and client-side
 function getBaseUrl() {
@@ -158,28 +162,30 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
       : (grossBasePrice > effectivePriceGross ? grossBasePrice : undefined);
   }
 
-  // Brand mapping → discovery + cart + checkout overrides (name, images, category, description, packSize/unit).
-  // Orders and invoices intentionally render raw `name` (not displayName / brandOverride) for GST traceability.
+  // Brand mapping enriches brand badge / gaps — it must NOT replace the sellable
+  // vendor SKU identity. Customers (PDP, cart, checkout) always see the distributor
+  // product name/images/pack when present. Orders/invoices use raw `name` too.
+  // Brand-store surfaces that want the master SKU read brandMasterProduct directly.
   const rawName = (p.name as string) || '';
   const brandMappings = p.brandMappings as Array<Record<string, unknown>> | undefined;
   const activeMapping = brandMappings?.[0];
   const masterProduct = activeMapping?.brandMasterProduct as Record<string, unknown> | undefined;
   const masterBrand = masterProduct?.brand as Record<string, unknown> | undefined;
-  const masterCategory = masterProduct?.categoryRel as Record<string, unknown> | undefined;
   const brandName = (masterBrand?.name as string) || undefined;
   const brandSlug = (masterBrand?.slug as string) || undefined;
   const overrideFields: string[] = [];
 
-  const masterName = typeof masterProduct?.name === 'string' ? masterProduct.name.trim() : '';
-  const displayName = masterName || rawName;
-  if (masterName) overrideFields.push('name');
+  // Sellable product title = vendor Product.name (never brand-master name).
+  const displayName = resolveSellableDisplayName(rawName, masterProduct);
 
   let description = (p.description as string) || '';
-  const masterDescription =
-    typeof masterProduct?.description === 'string' ? masterProduct.description.trim() : '';
-  if (masterDescription) {
-    description = masterDescription;
-    overrideFields.push('description');
+  if (!description.trim()) {
+    const masterDescription =
+      typeof masterProduct?.description === 'string' ? masterProduct.description.trim() : '';
+    if (masterDescription) {
+      description = masterDescription;
+      overrideFields.push('description');
+    }
   }
 
   const supplierImages: string[] = Array.isArray(p.images) && (p.images as string[]).length > 0
@@ -187,23 +193,8 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
     : p.imageUrl
       ? [p.imageUrl as string]
       : [];
-  const masterImageList = Array.isArray(masterProduct?.images)
-    ? (masterProduct.images as string[]).filter((u): u is string => typeof u === 'string' && u.length > 0)
-    : [];
-  const masterImageUrl =
-    typeof masterProduct?.imageUrl === 'string' && masterProduct.imageUrl.trim()
-      ? masterProduct.imageUrl.trim()
-      : '';
-  const brandImages = masterImageList.length > 0
-    ? masterImageList
-    : masterImageUrl
-      ? [masterImageUrl]
-      : [];
-  let images = supplierImages;
-  if (brandImages.length > 0) {
-    images = brandImages;
-    overrideFields.push('images');
-  }
+  const { images, usedBrandFallback } = resolveSellableImages(supplierImages, masterProduct);
+  if (usedBrandFallback) overrideFields.push('images');
 
   let category =
     (p.categoryName as string) ||
@@ -213,28 +204,20 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
     (p.categoryId as string) ||
     ((p.category as Record<string, unknown>)?.id as string) ||
     undefined;
-  const masterCategoryName =
-    typeof masterCategory?.name === 'string' ? masterCategory.name.trim() : '';
-  if (masterCategoryName) {
-    category = masterCategoryName;
-    if (typeof masterCategory?.id === 'string' && masterCategory.id) {
-      categoryId = masterCategory.id;
-    }
-    overrideFields.push('category');
-  }
 
   // packSize and unit are stored separately in the DB (e.g. packSize='500', unit='ml').
   // For display, combine them: '500 ml'. If packSize already contains the unit
   // (e.g. legacy data like '500ml'), leave it as-is to avoid '500ml ml'.
+  // Prefer vendor SKU packaging; fill gaps from brand master only when blank.
   let rawPackSize = ((p.packSize as string) || '').trim();
   let rawUnit = ((p.unit as string) || '').trim();
   const masterPackSize =
     typeof masterProduct?.packSize === 'string' ? masterProduct.packSize.trim() : '';
   const masterUnit =
     typeof masterProduct?.unit === 'string' ? masterProduct.unit.trim() : '';
-  if (masterPackSize || masterUnit) {
-    if (masterPackSize) rawPackSize = masterPackSize;
-    if (masterUnit) rawUnit = masterUnit;
+  if ((!rawPackSize && masterPackSize) || (!rawUnit && masterUnit)) {
+    if (!rawPackSize && masterPackSize) rawPackSize = masterPackSize;
+    if (!rawUnit && masterUnit) rawUnit = masterUnit;
     overrideFields.push('packSize');
   }
   let packSizeDisplay: string;

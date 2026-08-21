@@ -1324,7 +1324,10 @@ export default function VendorProductsPage() {
                 toast.success(`Using existing brand "${json.data.name}"`);
                 updateField('brand', json.data.name);
             } else {
-                toast.success(`Sent "${trimmed}" to admin for brand approval`);
+                toast.success(
+                    `Requested "${trimmed}" as a new brand. Admin must approve it before products using this brand can go live.`,
+                    { duration: 6000 },
+                );
                 updateField('brand', trimmed);
             }
         } catch (e: unknown) {

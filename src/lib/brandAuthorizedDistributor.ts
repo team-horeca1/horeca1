@@ -275,8 +275,8 @@ export async function rejectDistributorAuth(
 /**
  * Prisma include fragment for customer-facing brand overrides on Product.
  * Loads the active verified/auto_mapped mapping plus the master fields the DAL
- * needs to override name, images, category, description, packSize/unit,
- * logistics, and packaging.
+ * may use to fill media/packaging gaps and brand badge. Marketplace title/identity
+ * always stays the distributor Product.name (see productDisplayIdentity.ts).
  */
 export const productBrandMappingsInclude = {
   where: { status: { in: ['verified' as const, 'auto_mapped' as const] } },

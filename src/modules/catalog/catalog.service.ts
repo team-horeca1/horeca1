@@ -1538,15 +1538,10 @@ export class CatalogService {
       await assertVendorPosSkuUnique(vendorId, resolvedVendorSku);
     }
 
-    // Vendor single-add loophole: a brand typed freely (not picked from the
-    // approved list) must still become a tracked record so it reaches the
-    // approvals queue — mirrors what product import does. Only for genuinely new
-    // submissions; the master / brand-canonical paths already carry an approved
-    // brand. Lazy import avoids a static import cycle with the brand module.
-    if (!isDraft && approvalStatus === 'pending' && productData.brand) {
-      const { findOrCreateBrandByName } = await import('@/modules/brand/brand.service');
-      await findOrCreateBrandByName({ name: productData.brand, autoApprove: false });
-    }
+    // Do NOT silently create Brand rows from a free-text product.brand string.
+    // That auto-pending Brand blocked product approval (QA-04). New brands must
+    // go through explicit POST /api/v1/vendor/brands/suggest ("Request brand").
+    // Legacy text-only brands with no Brand row still do not block approval.
 
     const draftBasePrice =
       productData.basePrice != null && productData.basePrice > 0 ? productData.basePrice : 0.01;
