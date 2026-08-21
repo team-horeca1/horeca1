@@ -1,5 +1,4 @@
-// POST /api/v1/admin/credit/assign — assign / update a customer's credit line
-// (H1 wallet when vendorId is null, else a vendor credit line). Admin only.
+// POST /api/v1/admin/credit/bulk — admin bulk credit assign
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { adminOnly } from '@/middleware/rbac';
@@ -20,35 +19,24 @@ const overrides = z.object({
 }).partial();
 
 const schema = z.object({
-  userId: z.string().uuid(),
   vendorId: z.string().uuid().nullable().optional(),
-  creditLimit: z.number().min(0).max(50000000),
-  overrides: overrides.optional(),
-  remark: z.string().max(500).optional(),
-  creditSource: z.enum(['SUPPLIER_CREDIT', 'HORECA1_CREDIT', 'NBFC_CREDIT', 'BANK_CREDIT']).optional(),
-  validFrom: z.string().datetime().nullable().optional(),
-  validUntil: z.string().datetime().nullable().optional(),
+  rows: z.array(z.object({
+    userId: z.string().uuid(),
+    creditLimit: z.number().min(0).max(50_000_000),
+    overrides: overrides.optional(),
+  })).min(1).max(500),
 });
 
 export const POST = adminOnly(async (req: NextRequest, ctx) => {
   try {
     requirePermission(ctx, 'payments.create');
     const body = schema.parse(await req.json());
-    const wallet = await creditWalletService.assignCredit(
-      body.userId,
+    const result = await creditWalletService.bulkAssignCredit(
+      body.rows,
       body.vendorId ?? null,
-      body.creditLimit,
-      body.overrides ?? {},
       ctx.userId,
-      body.remark ?? 'Credit assigned by admin',
-      {},
-      {
-        creditSource: body.creditSource,
-        validFrom: body.validFrom ? new Date(body.validFrom) : body.validFrom === null ? null : undefined,
-        validUntil: body.validUntil ? new Date(body.validUntil) : body.validUntil === null ? null : undefined,
-      },
     );
-    return NextResponse.json({ success: true, data: wallet }, { status: 201 });
+    return NextResponse.json({ success: true, data: result });
   } catch (error) {
     return errorResponse(error);
   }

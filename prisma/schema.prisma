@@ -243,6 +243,7 @@ model Vendor {
   payments                Payment[]
   creditAccounts          CreditAccount[]
   creditWallets           CreditWallet[]
+  vendorCreditConfig      VendorCreditConfig?
   creditTxns              CreditTransaction[]
   customerVendors         CustomerVendor[]
   collectionProducts      CollectionProduct[]
@@ -1224,14 +1225,35 @@ enum WalletTxnType {
 enum CreditWalletStatus {
   ACTIVE
   BLOCKED
+  /// Manual temporary hold by supplier/admin (orders blocked; history kept).
+  SUSPENDED
+  /// Overdue freeze / temporary lock (synonym path to BLOCKED for auto-overdue).
+  FROZEN
+  /// Credit validity window ended.
+  EXPIRED
+  /// Line cancelled — terminal; financial history retained.
+  CANCELLED
   BLACKLISTED
 
   @@map("credit_wallet_status")
 }
 
+/// Explicit credit provider. V1 exposes SUPPLIER_CREDIT + HORECA1_CREDIT;
+/// NBFC/BANK reserved for future platform partners without model replacement.
+enum CreditSource {
+  SUPPLIER_CREDIT
+  HORECA1_CREDIT
+  NBFC_CREDIT
+  BANK_CREDIT
+
+  @@map("credit_source")
+}
+
 enum CreditWalletTxnType {
   CREDIT_ASSIGN
   ORDER_DEBIT
+  /// Reserved credit converted to outstanding on delivery.
+  DELIVERY_CONVERT
   REPAYMENT
   PENALTY
   REVERSAL
@@ -1270,9 +1292,10 @@ enum CreditWorkflowStatus {
   @@map("credit_workflow_status")
 }
 
-// Singleton global defaults. Every parameter is overridable per wallet (see
-// CreditWallet.override*). interest/penalty frequency are in DAYS so "1% per 2 days"
-// is expressible. unlockCreditAmount powers "buy X times -> unlock up to ₹Y".
+// Singleton global defaults. Every parameter is overridable per vendor default
+// (VendorCreditConfig) then per wallet (CreditWallet.override*). interest/penalty
+// frequency are in DAYS so "1% per 2 days" is expressible. unlockCreditAmount
+// powers "buy X times -> unlock up to ₹Y" for H1 wallets.
 model GlobalCreditConfig {
   id                    String              @id @default(uuid()) @db.Uuid
   repaymentMode         CreditRepaymentMode @default(REPAY_BEFORE_NEXT_USE)
@@ -1292,20 +1315,50 @@ model GlobalCreditConfig {
   @@map("global_credit_configs")
 }
 
-// One credit line. vendorId = null -> H1 platform wallet; non-null -> vendor credit.
-// Same config engine for both (V1). Uniqueness: one wallet per (user, vendor) and one
-// H1 wallet per user — enforced by partial unique indexes in the migration (a Prisma
-// @@unique on a nullable column does NOT stop duplicate NULLs in Postgres).
+/// Supplier (Online Store) defaults — sits between GlobalCreditConfig and
+/// per-customer CreditWallet overrides. vendorId is the Online Store id.
+model VendorCreditConfig {
+  id                       String               @id @default(uuid()) @db.Uuid
+  vendorId                 String               @unique @map("vendor_id") @db.Uuid
+  repaymentMode            CreditRepaymentMode? @map("repayment_mode")
+  billingModel             BillingModelType?    @map("billing_model")
+  defaultCreditLimit       Decimal?             @map("default_credit_limit") @db.Decimal(12, 2)
+  creditTenureDays         Int?                 @map("credit_tenure_days")
+  gracePeriodDays          Int?                 @map("grace_period_days")
+  blacklistDays            Int?                 @map("blacklist_days")
+  interestRatePct          Decimal?             @map("interest_rate_pct") @db.Decimal(6, 3)
+  interestFrequencyDays    Int?                 @map("interest_frequency_days")
+  penaltyAmount            Decimal?             @map("penalty_amount") @db.Decimal(12, 2)
+  penaltyFrequencyDays     Int?                 @map("penalty_frequency_days")
+  creditEnabled            Boolean              @default(true) @map("credit_enabled")
+  updatedAt                DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("vendor_credit_configs")
+}
+
+// One credit line. vendorId = null -> H1 platform wallet; non-null -> vendor
+// (Online Store) credit. Same config engine for both (V1). Uniqueness: one wallet
+// per (user, vendor) and one H1 wallet per user — enforced by partial unique
+// indexes in the migration (a Prisma @@unique on a nullable column does NOT stop
+// duplicate NULLs in Postgres).
 model CreditWallet {
   id       String             @id @default(uuid()) @db.Uuid
   userId   String             @map("user_id") @db.Uuid
+  /// Online Store id when supplier-backed; null for platform H1 wallet.
   vendorId String?            @map("vendor_id") @db.Uuid
   status   CreditWalletStatus @default(ACTIVE)
+  creditSource CreditSource   @default(SUPPLIER_CREDIT) @map("credit_source")
 
   creditLimit       Decimal @map("credit_limit") @db.Decimal(12, 2)
   availableCredit   Decimal @map("available_credit") @db.Decimal(12, 2)
   usedCredit        Decimal @default(0) @map("used_credit") @db.Decimal(12, 2)
+  /// Held for open credit orders (checkout → before delivery).
+  reservedAmount    Decimal @default(0) @map("reserved_amount") @db.Decimal(12, 2)
   outstandingAmount Decimal @default(0) @map("outstanding_amount") @db.Decimal(12, 2)
+  validFrom         DateTime? @map("valid_from") @db.Timestamptz
+  validUntil        DateTime? @map("valid_until") @db.Timestamptz
 
   // Principal captured when the wallet first goes overdue — compound interest is
   // computed on (this + accrued interest), NOT on the live outstanding (which would

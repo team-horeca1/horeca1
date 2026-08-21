@@ -78,6 +78,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
                 usedCredit: Number(w.usedCredit),
                 availableCredit: Number(w.availableCredit),
                 outstandingAmount: Number(w.outstandingAmount),
+                reservedAmount: Number(w.reservedAmount),
+                creditSource: w.creditSource,
                 status: w.status,
                 workflowStatus: w.workflowStatus,
                 assignedOwnerId: w.assignedOwnerId,

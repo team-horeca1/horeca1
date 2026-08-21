@@ -1,4 +1,4 @@
-// PATCH /api/v1/vendor/credit/[walletId] — inline grid row update (limit + CRM fields)
+// PATCH /api/v1/vendor/credit/[walletId] — inline grid row update (limit + CRM + status)
 // PROTECTED: Vendor only + creditLine.approve
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,6 +19,8 @@ const patchSchema = z.object({
   workflowStatus: z.enum(['SANCTIONED', 'IN_PROGRESS', 'COMPLETED']).optional(),
   assignedOwnerId: z.string().uuid().nullable().optional(),
   vendorNotes: z.string().max(2000).nullable().optional(),
+  status: z.enum(['ACTIVE', 'SUSPENDED', 'FROZEN', 'CANCELLED', 'EXPIRED']).optional(),
+  statusReason: z.string().min(3).max(500).optional(),
 });
 
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
@@ -27,6 +29,24 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     const vendorId = await resolveVendorId(ctx, req);
     const walletId = extractWalletId(req);
     const body = patchSchema.parse(await req.json());
+
+    if (body.status) {
+      const updated = await creditWalletService.setWalletStatus(
+        walletId,
+        body.status,
+        ctx.userId,
+        body.statusReason ?? `Status set to ${body.status} by vendor`,
+        vendorId,
+      );
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: updated.id,
+          status: updated.status,
+          displayStatus: resolveCreditDisplayStatus(updated.status, updated.workflowStatus),
+        },
+      });
+    }
 
     const updated = await creditWalletService.updateVendorCreditRow(
       walletId,
@@ -43,7 +63,9 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
         usedCredit: Number(updated.usedCredit),
         availableCredit: Number(updated.availableCredit),
         outstandingAmount: Number(updated.outstandingAmount),
+        reservedAmount: Number(updated.reservedAmount),
         status: updated.status,
+        creditSource: updated.creditSource,
         workflowStatus: updated.workflowStatus,
         assignedOwnerId: updated.assignedOwnerId,
         vendorNotes: updated.vendorNotes,

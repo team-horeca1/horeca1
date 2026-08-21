@@ -1,9 +1,17 @@
-import { Prisma, CreditRepaymentMode, BillingModelType, CreditWalletStatus, CreditWorkflowStatus } from '@prisma/client';
+import { Prisma, CreditRepaymentMode, BillingModelType, CreditWalletStatus, CreditWorkflowStatus, CreditSource } from '@prisma/client';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
 import { SMS_TEMPLATES } from '@/lib/providers/smsTemplates';
 import type { NotificationService } from '@/modules/notification/notification.service';
+import {
+  compoundInterestTarget,
+  computeAvailable,
+  interestPeriods,
+  isCreditUsageBlocked,
+  round2,
+  validateLimitChange,
+} from '@/modules/credit/creditMath';
 
 let notificationsPromise: Promise<NotificationService> | null = null;
 async function getNotifications(): Promise<NotificationService> {
@@ -17,7 +25,7 @@ async function getNotifications(): Promise<NotificationService> {
 
 type Tx = Prisma.TransactionClient;
 
-/** Resolved (global ⊕ override) config for a wallet. */
+/** Resolved (global ⊕ vendor ⊕ override) config for a wallet. */
 export interface CreditConfig {
   repaymentMode: CreditRepaymentMode;
   billingModel: BillingModelType;
@@ -33,9 +41,44 @@ export interface CreditConfig {
   unlockCreditAmount: number;
 }
 
+/** Which layer supplied each term — for admin/vendor UI provenance. */
+export type ConfigLayer = 'global' | 'supplier' | 'customer';
+
+export interface CreditConfigProvenance {
+  repaymentMode: ConfigLayer;
+  billingModel: ConfigLayer;
+  creditTenureDays: ConfigLayer;
+  gracePeriodDays: ConfigLayer;
+  blacklistDays: ConfigLayer;
+  interestRatePct: ConfigLayer;
+  interestFrequencyDays: ConfigLayer;
+  penaltyAmount: ConfigLayer;
+  penaltyFrequencyDays: ConfigLayer;
+}
+
 const D = (n: Prisma.Decimal.Value) => new Prisma.Decimal(n);
-const round2 = (n: number) => Math.round(n * 100) / 100;
 const num = (d: Prisma.Decimal | number) => Number(d);
+
+/** Row-lock a wallet inside an open transaction (Postgres FOR UPDATE). */
+async function lockWallet(tx: Tx, walletId: string) {
+  await tx.$queryRaw`SELECT id FROM credit_wallets WHERE id = ${walletId}::uuid FOR UPDATE`;
+  return tx.creditWallet.findUnique({ where: { id: walletId } });
+}
+
+async function lockWalletByUserVendor(tx: Tx, userId: string, vendorId: string | null) {
+  if (vendorId) {
+    await tx.$queryRaw`
+      SELECT id FROM credit_wallets
+      WHERE user_id = ${userId}::uuid AND vendor_id = ${vendorId}::uuid
+      FOR UPDATE`;
+  } else {
+    await tx.$queryRaw`
+      SELECT id FROM credit_wallets
+      WHERE user_id = ${userId}::uuid AND vendor_id IS NULL
+      FOR UPDATE`;
+  }
+  return tx.creditWallet.findFirst({ where: { userId, vendorId } });
+}
 
 /** Vendor CRM fields editable on the credit grid (workflow status is vendor-owned). */
 export interface VendorCreditRowFields {
@@ -48,6 +91,10 @@ export interface VendorCreditRowFields {
 export type CreditDisplayStatus =
   | 'BLACKLISTED'
   | 'BLOCKED'
+  | 'SUSPENDED'
+  | 'FROZEN'
+  | 'EXPIRED'
+  | 'CANCELLED'
   | 'SANCTIONED'
   | 'IN_PROGRESS'
   | 'COMPLETED';
@@ -57,6 +104,10 @@ export function resolveCreditDisplayStatus(
   workflowStatus: CreditWorkflowStatus,
 ): CreditDisplayStatus {
   if (runtimeStatus === 'BLACKLISTED') return 'BLACKLISTED';
+  if (runtimeStatus === 'CANCELLED') return 'CANCELLED';
+  if (runtimeStatus === 'EXPIRED') return 'EXPIRED';
+  if (runtimeStatus === 'SUSPENDED') return 'SUSPENDED';
+  if (runtimeStatus === 'FROZEN') return 'FROZEN';
   if (runtimeStatus === 'BLOCKED') return 'BLOCKED';
   return workflowStatus;
 }
@@ -72,6 +123,17 @@ export interface CreditOverrides {
   interestFrequencyDays?: number;
   penaltyAmount?: number;
   penaltyFrequencyDays?: number;
+}
+
+export interface AssignCreditOptions {
+  overrides?: CreditOverrides;
+  adminUserId?: string;
+  remark?: string;
+  vendorFields?: VendorCreditRowFields;
+  creditSource?: CreditSource;
+  validFrom?: Date | null;
+  validUntil?: Date | null;
+  allowReduceBelowCommitted?: boolean;
 }
 
 export class CreditWalletService {
@@ -99,27 +161,161 @@ export class CreditWalletService {
     };
   }
 
-  /** Overlay a wallet's per-customer overrides on top of the global config. */
-  async resolveWalletConfig(walletId: string, db: Tx | typeof prisma = prisma): Promise<CreditConfig> {
+  async getVendorConfig(vendorId: string, db: Tx | typeof prisma = prisma) {
+    return db.vendorCreditConfig.findUnique({ where: { vendorId } });
+  }
+
+  async upsertVendorConfig(
+    vendorId: string,
+    patch: {
+      repaymentMode?: CreditRepaymentMode | null;
+      billingModel?: BillingModelType | null;
+      defaultCreditLimit?: number | null;
+      creditTenureDays?: number | null;
+      gracePeriodDays?: number | null;
+      blacklistDays?: number | null;
+      interestRatePct?: number | null;
+      interestFrequencyDays?: number | null;
+      penaltyAmount?: number | null;
+      penaltyFrequencyDays?: number | null;
+      creditEnabled?: boolean;
+    },
+    actorUserId: string,
+  ) {
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { id: true } });
+    if (!vendor) throw Errors.notFound('Vendor');
+
+    const data = {
+      repaymentMode: patch.repaymentMode === undefined ? undefined : patch.repaymentMode,
+      billingModel: patch.billingModel === undefined ? undefined : patch.billingModel,
+      defaultCreditLimit:
+        patch.defaultCreditLimit === undefined
+          ? undefined
+          : patch.defaultCreditLimit == null
+            ? null
+            : D(patch.defaultCreditLimit),
+      creditTenureDays: patch.creditTenureDays === undefined ? undefined : patch.creditTenureDays,
+      gracePeriodDays: patch.gracePeriodDays === undefined ? undefined : patch.gracePeriodDays,
+      blacklistDays: patch.blacklistDays === undefined ? undefined : patch.blacklistDays,
+      interestRatePct:
+        patch.interestRatePct === undefined
+          ? undefined
+          : patch.interestRatePct == null
+            ? null
+            : D(patch.interestRatePct),
+      interestFrequencyDays:
+        patch.interestFrequencyDays === undefined ? undefined : patch.interestFrequencyDays,
+      penaltyAmount:
+        patch.penaltyAmount === undefined
+          ? undefined
+          : patch.penaltyAmount == null
+            ? null
+            : D(patch.penaltyAmount),
+      penaltyFrequencyDays:
+        patch.penaltyFrequencyDays === undefined ? undefined : patch.penaltyFrequencyDays,
+      creditEnabled: patch.creditEnabled,
+    };
+
+    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
+    const row = await prisma.vendorCreditConfig.upsert({
+      where: { vendorId },
+      create: { vendorId, ...clean },
+      update: clean,
+    });
+
+    // Best-effort: attach config change to an existing customer line's audit trail.
+    const sample = await prisma.creditWallet.findFirst({ where: { vendorId }, select: { id: true } });
+    if (sample) {
+      await prisma.creditWalletAuditLog.create({
+        data: {
+          walletId: sample.id,
+          action: 'VENDOR_CONFIG_UPDATE',
+          performedBy: actorUserId,
+          previousValue: null,
+          newValue: JSON.stringify(patch),
+          remarks: 'Supplier credit defaults updated',
+        },
+      });
+    }
+
+    return row;
+  }
+
+  /**
+   * Overlay hierarchy: Global → Supplier default → Customer override.
+   * Wallet.creditLimit is authoritative once assigned.
+   */
+  async resolveWalletConfig(
+    walletId: string,
+    db: Tx | typeof prisma = prisma,
+  ): Promise<CreditConfig & { provenance: CreditConfigProvenance }> {
     const wallet = await db.creditWallet.findUnique({ where: { id: walletId } });
     if (!wallet) throw Errors.notFound('Credit wallet');
     const g = await this.getGlobalConfig(db);
-    const pick = <T>(override: T | null | undefined, fallback: T): T => (override ?? fallback);
+    const vendorCfg = wallet.vendorId
+      ? await db.vendorCreditConfig.findUnique({ where: { vendorId: wallet.vendorId } })
+      : null;
+
+    const layer = <T>(
+      customer: T | null | undefined,
+      supplier: T | null | undefined,
+      global: T,
+    ): { value: T; layer: ConfigLayer } => {
+      if (customer != null) return { value: customer, layer: 'customer' };
+      if (supplier != null) return { value: supplier, layer: 'supplier' };
+      return { value: global, layer: 'global' };
+    };
+
+    const repaymentMode = layer(wallet.overrideRepaymentMode, vendorCfg?.repaymentMode, g.repaymentMode);
+    const billingModel = layer(wallet.overrideBillingModel, vendorCfg?.billingModel, g.billingModel);
+    const creditTenureDays = layer(wallet.overrideCreditTenure, vendorCfg?.creditTenureDays, g.creditTenureDays);
+    const gracePeriodDays = layer(wallet.overrideGracePeriod, vendorCfg?.gracePeriodDays, g.gracePeriodDays);
+    const blacklistDays = layer(wallet.overrideBlacklistDays, vendorCfg?.blacklistDays, g.blacklistDays);
+    const interestRatePct = layer(
+      wallet.overrideInterestRate != null ? num(wallet.overrideInterestRate) : null,
+      vendorCfg?.interestRatePct != null ? num(vendorCfg.interestRatePct) : null,
+      g.interestRatePct,
+    );
+    const interestFrequencyDays = layer(
+      wallet.overrideInterestFreqDays,
+      vendorCfg?.interestFrequencyDays,
+      g.interestFrequencyDays,
+    );
+    const penaltyAmount = layer(
+      wallet.overridePenaltyAmount != null ? num(wallet.overridePenaltyAmount) : null,
+      vendorCfg?.penaltyAmount != null ? num(vendorCfg.penaltyAmount) : null,
+      g.penaltyAmount,
+    );
+    const penaltyFrequencyDays = layer(
+      wallet.overridePenaltyFreqDays,
+      vendorCfg?.penaltyFrequencyDays,
+      g.penaltyFrequencyDays,
+    );
+
     return {
-      repaymentMode: pick(wallet.overrideRepaymentMode, g.repaymentMode),
-      billingModel: pick(wallet.overrideBillingModel, g.billingModel),
-      // The wallet's own creditLimit is authoritative (set at assignment); the
-      // global creditLimit is only a default for new wallets.
+      repaymentMode: repaymentMode.value,
+      billingModel: billingModel.value,
       creditLimit: num(wallet.creditLimit),
-      creditTenureDays: pick(wallet.overrideCreditTenure, g.creditTenureDays),
-      gracePeriodDays: pick(wallet.overrideGracePeriod, g.gracePeriodDays),
-      blacklistDays: pick(wallet.overrideBlacklistDays, g.blacklistDays),
-      interestRatePct: wallet.overrideInterestRate != null ? num(wallet.overrideInterestRate) : g.interestRatePct,
-      interestFrequencyDays: pick(wallet.overrideInterestFreqDays, g.interestFrequencyDays),
-      penaltyAmount: wallet.overridePenaltyAmount != null ? num(wallet.overridePenaltyAmount) : g.penaltyAmount,
-      penaltyFrequencyDays: pick(wallet.overridePenaltyFreqDays, g.penaltyFrequencyDays),
+      creditTenureDays: creditTenureDays.value,
+      gracePeriodDays: gracePeriodDays.value,
+      blacklistDays: blacklistDays.value,
+      interestRatePct: interestRatePct.value,
+      interestFrequencyDays: interestFrequencyDays.value,
+      penaltyAmount: penaltyAmount.value,
+      penaltyFrequencyDays: penaltyFrequencyDays.value,
       eligiblePurchaseCount: g.eligiblePurchaseCount,
       unlockCreditAmount: g.unlockCreditAmount,
+      provenance: {
+        repaymentMode: repaymentMode.layer,
+        billingModel: billingModel.layer,
+        creditTenureDays: creditTenureDays.layer,
+        gracePeriodDays: gracePeriodDays.layer,
+        blacklistDays: blacklistDays.layer,
+        interestRatePct: interestRatePct.layer,
+        interestFrequencyDays: interestFrequencyDays.layer,
+        penaltyAmount: penaltyAmount.layer,
+        penaltyFrequencyDays: penaltyFrequencyDays.layer,
+      },
     };
   }
 
@@ -159,6 +355,7 @@ export class CreditWalletService {
     adminUserId = 'SYSTEM',
     remark = 'Credit assigned',
     vendorFields: VendorCreditRowFields = {},
+    options: Omit<AssignCreditOptions, 'overrides' | 'adminUserId' | 'remark' | 'vendorFields'> = {},
   ) {
     // Validate + smart-resolve referenced records up front, so a wrong ID returns
     // a clean 404 (or auto-corrects) instead of a raw FK-violation 500 from the DB.
@@ -179,8 +376,14 @@ export class CreditWalletService {
       }
     }
 
+    const creditSource: CreditSource =
+      options.creditSource
+      ?? (resolvedVendorId ? 'SUPPLIER_CREDIT' : 'HORECA1_CREDIT');
+
     return prisma.$transaction(async (tx) => {
       const existing = await tx.creditWallet.findFirst({ where: { userId, vendorId: resolvedVendorId } });
+      if (existing) await lockWallet(tx, existing.id);
+
       const limit = D(creditLimit);
       const ov = {
         overrideRepaymentMode: overrides.repaymentMode ?? null,
@@ -200,42 +403,159 @@ export class CreditWalletService {
         ...(vendorFields.vendorNotes !== undefined ? { vendorNotes: vendorFields.vendorNotes } : {}),
       };
 
+      const validity = {
+        ...(options.validFrom !== undefined ? { validFrom: options.validFrom } : {}),
+        ...(options.validUntil !== undefined ? { validUntil: options.validUntil } : {}),
+      };
+
       let wallet;
       if (!existing) {
         wallet = await tx.creditWallet.create({
           data: {
-            userId, vendorId: resolvedVendorId, status: 'ACTIVE',
+            userId,
+            vendorId: resolvedVendorId,
+            status: 'ACTIVE',
+            creditSource,
             creditLimit: limit,
-            // available = limit − used (used is 0 for a fresh wallet)
             availableCredit: limit,
-            usedCredit: D(0), outstandingAmount: D(0),
+            usedCredit: D(0),
+            reservedAmount: D(0),
+            outstandingAmount: D(0),
             workflowStatus: creditLimit > 0 ? 'SANCTIONED' : 'IN_PROGRESS',
             ...ov,
             ...crmFields,
+            ...validity,
           },
         });
-        await this.audit(tx, wallet.id, 'CREDIT_ASSIGN', adminUserId, null, { creditLimit, overrides }, remark);
+        await this.audit(tx, wallet.id, 'CREDIT_ASSIGN', adminUserId, null, { creditLimit, overrides, creditSource }, remark);
         await tx.creditWalletTxn.create({
-          data: { walletId: wallet.id, type: 'CREDIT_ASSIGN', amount: limit, balanceAfterTxn: wallet.availableCredit, note: `Credit line of ₹${creditLimit} assigned` },
+          data: {
+            walletId: wallet.id,
+            type: 'CREDIT_ASSIGN',
+            amount: limit,
+            balanceAfterTxn: wallet.availableCredit,
+            note: `Credit line of ₹${creditLimit} assigned (${creditSource})`,
+          },
         });
       } else {
-        // Changing the limit must NOT alter the outstanding balance. Recompute
-        // available = newLimit − currentUsed (can go negative if limit dropped
-        // below used → no further credit until repaid).
-        const newAvailable = limit.minus(existing.usedCredit);
+        const check = validateLimitChange(
+          creditLimit,
+          num(existing.outstandingAmount),
+          num(existing.reservedAmount),
+        );
+        if (!check.ok && !options.allowReduceBelowCommitted) {
+          throw Errors.badRequest(check.reason);
+        }
+        const used = num(existing.usedCredit);
+        const newAvailable = D(computeAvailable(creditLimit, used));
         const workflowUpdate =
           creditLimit > 0 && existing.workflowStatus === 'IN_PROGRESS'
             ? { workflowStatus: 'SANCTIONED' as const }
             : {};
+        const statusRestore =
+          existing.status === 'CANCELLED' || existing.status === 'EXPIRED'
+            ? { status: 'ACTIVE' as const }
+            : {};
         wallet = await tx.creditWallet.update({
           where: { id: existing.id },
-          data: { creditLimit: limit, availableCredit: newAvailable, ...ov, ...crmFields, ...workflowUpdate },
+          data: {
+            creditLimit: limit,
+            availableCredit: newAvailable,
+            creditSource,
+            ...ov,
+            ...crmFields,
+            ...workflowUpdate,
+            ...statusRestore,
+            ...validity,
+          },
         });
-        await this.audit(tx, wallet.id, 'LIMIT_UPDATE', adminUserId,
+        const action = creditLimit > num(existing.creditLimit) ? 'LIMIT_INCREASE' : 'LIMIT_UPDATE';
+        await this.audit(
+          tx,
+          wallet.id,
+          action,
+          adminUserId,
           { creditLimit: num(existing.creditLimit) },
-          { creditLimit, overrides }, remark);
+          { creditLimit, overrides, creditSource },
+          remark,
+        );
       }
       return wallet;
+    });
+  }
+
+  /**
+   * Bulk assign/update — per-row isolation so one bad row cannot corrupt the rest.
+   * Returns per-row success/failure; does not wrap the whole batch in one TX.
+   */
+  async bulkAssignCredit(
+    rows: Array<{
+      userId: string;
+      creditLimit: number;
+      overrides?: CreditOverrides;
+      validFrom?: Date | null;
+      validUntil?: Date | null;
+    }>,
+    vendorId: string | null,
+    actorUserId: string,
+  ): Promise<{ succeeded: number; failed: Array<{ userId: string; error: string }> }> {
+    const seen = new Set<string>();
+    const failed: Array<{ userId: string; error: string }> = [];
+    let succeeded = 0;
+
+    for (const row of rows) {
+      if (seen.has(row.userId)) {
+        failed.push({ userId: row.userId, error: 'Duplicate customer in bulk payload' });
+        continue;
+      }
+      seen.add(row.userId);
+      try {
+        await this.assignCredit(
+          row.userId,
+          vendorId,
+          row.creditLimit,
+          row.overrides ?? {},
+          actorUserId,
+          'Bulk credit assignment',
+          {},
+          { validFrom: row.validFrom, validUntil: row.validUntil },
+        );
+        succeeded++;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Unknown error';
+        failed.push({ userId: row.userId, error: message });
+      }
+    }
+    return { succeeded, failed };
+  }
+
+  async setWalletStatus(
+    walletId: string,
+    status: CreditWalletStatus,
+    actorUserId: string,
+    reason: string,
+    scopeVendorId?: string | null,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const wallet = await lockWallet(tx, walletId);
+      if (!wallet) throw Errors.notFound('Credit wallet');
+      if (scopeVendorId !== undefined && wallet.vendorId !== scopeVendorId) {
+        throw Errors.forbidden('Credit wallet belongs to another supplier');
+      }
+      if (wallet.status === status) return wallet;
+
+      const updated = await tx.creditWallet.update({
+        where: { id: walletId },
+        data: {
+          status,
+          ...(status === 'ACTIVE'
+            ? { blacklistExempt: true, reactivatedAt: new Date(), blacklistedAt: null, overdueDays: 0 }
+            : {}),
+          ...(status === 'BLACKLISTED' ? { blacklistedAt: new Date() } : {}),
+        },
+      });
+      await this.audit(tx, walletId, `STATUS_${status}`, actorUserId, wallet.status, status, reason);
+      return updated;
     });
   }
 
@@ -264,8 +584,8 @@ export class CreditWalletService {
       if (!owner) throw Errors.badRequest('Owner must be a member of your team');
     }
 
-    if (patch.workflowStatus != null && (wallet.status === 'BLOCKED' || wallet.status === 'BLACKLISTED')) {
-      throw Errors.badRequest('Cannot change workflow status while wallet is system-blocked or blacklisted');
+    if (patch.workflowStatus != null && isCreditUsageBlocked(wallet.status)) {
+      throw Errors.badRequest('Cannot change workflow status while wallet is system-blocked');
     }
 
     if (patch.creditLimit != null) {
@@ -338,15 +658,27 @@ export class CreditWalletService {
     return due;
   }
 
-  // ── Utilization (order debit) ───────────────────────────────────────────────
+  // ── Utilization (order reserve → delivery convert → cancel release) ─────────
 
-  /** Debit credit at checkout. Enforces status, repayment mode, and limit. */
+  /**
+   * Reserve credit at checkout. Increases reserved + used; does NOT increase
+   * outstanding until delivery (`convertReservedToOutstanding`). Enforces status,
+   * repayment mode, validity window, and available limit under row lock.
+   */
   async debitWallet(userId: string, vendorId: string | null, amount: number, orderId: string, db?: Tx) {
     const run = async (tx: Tx) => {
-      const wallet = await tx.creditWallet.findFirst({ where: { userId, vendorId } });
+      const wallet = await lockWalletByUserVendor(tx, userId, vendorId);
       if (!wallet) throw Errors.badRequest('No credit wallet for this customer/vendor');
-      if (wallet.status === 'BLOCKED') throw Errors.badRequest('Credit wallet is blocked');
-      if (wallet.status === 'BLACKLISTED') throw Errors.badRequest('Credit wallet is blacklisted — clear dues and ask admin to reactivate');
+      if (isCreditUsageBlocked(wallet.status)) {
+        throw Errors.badRequest(`Credit wallet is ${wallet.status.toLowerCase()} — cannot use credit`);
+      }
+      if (wallet.validFrom && wallet.validFrom > new Date()) {
+        throw Errors.badRequest('Credit line is not yet valid');
+      }
+      if (wallet.validUntil && wallet.validUntil < new Date()) {
+        await tx.creditWallet.update({ where: { id: wallet.id }, data: { status: 'EXPIRED' } });
+        throw Errors.badRequest('Credit line has expired');
+      }
 
       const config = await this.resolveWalletConfig(wallet.id, tx);
 
@@ -365,48 +697,155 @@ export class CreditWalletService {
         throw Errors.badRequest(`Insufficient credit (need ₹${amount}, available ₹${num(wallet.availableCredit)})`);
       }
 
+      // Idempotent: same order must not double-reserve.
+      const prior = await tx.creditWalletTxn.findFirst({
+        where: { walletId: wallet.id, type: 'ORDER_DEBIT', referenceId: orderId },
+      });
+      if (prior) return wallet;
+
       const newUsed = wallet.usedCredit.plus(debit);
-      const newOutstanding = wallet.outstandingAmount.plus(debit);
-      const newAvailable = wallet.creditLimit.minus(newUsed);
-      const dueDate = wallet.currentDueDate ?? this.calculateDueDate(new Date(), config.billingModel, config.creditTenureDays);
+      const newReserved = wallet.reservedAmount.plus(debit);
+      const newAvailable = D(computeAvailable(num(wallet.creditLimit), num(newUsed)));
 
       const updated = await tx.creditWallet.update({
         where: { id: wallet.id },
-        data: { usedCredit: newUsed, outstandingAmount: newOutstanding, availableCredit: newAvailable, lastUtilizationDate: new Date(), currentDueDate: dueDate },
+        data: {
+          usedCredit: newUsed,
+          reservedAmount: newReserved,
+          availableCredit: newAvailable,
+          lastUtilizationDate: new Date(),
+          // Due date starts on delivery conversion, not at reserve.
+        },
       });
       await tx.creditWalletTxn.create({
-        data: { walletId: wallet.id, type: 'ORDER_DEBIT', amount: debit, balanceAfterTxn: newAvailable, referenceId: orderId, note: `Order ${orderId} paid via credit: ₹${amount}` },
+        data: {
+          walletId: wallet.id,
+          type: 'ORDER_DEBIT',
+          amount: debit,
+          balanceAfterTxn: newAvailable,
+          referenceId: orderId,
+          note: `Order ${orderId} credit reserved: ₹${amount}`,
+        },
       });
       return updated;
     };
     return db ? run(db) : prisma.$transaction(run);
   }
 
-  /** Release an order's credit debit when the order is cancelled. Idempotent
-   *  (no-ops if there was no debit or it's already been reversed). Runs in the
-   *  caller's transaction. */
-  async reverseOrderDebit(orderId: string, userId: string, vendorId: string | null, db: Tx): Promise<void> {
-    const wallet = await db.creditWallet.findFirst({ where: { userId, vendorId } });
+  /**
+   * On delivery: move reserved → outstanding and set/extend due date.
+   * Idempotent via DELIVERY_CONVERT txn per order.
+   */
+  async convertReservedToOutstanding(
+    orderId: string,
+    userId: string,
+    vendorId: string | null,
+    db: Tx,
+  ): Promise<void> {
+    const wallet = await lockWalletByUserVendor(db, userId, vendorId);
     if (!wallet) return;
-    const debit = await db.creditWalletTxn.findFirst({ where: { walletId: wallet.id, type: 'ORDER_DEBIT', referenceId: orderId } });
+
+    const debit = await db.creditWalletTxn.findFirst({
+      where: { walletId: wallet.id, type: 'ORDER_DEBIT', referenceId: orderId },
+    });
     if (!debit) return;
-    const already = await db.creditWalletTxn.findFirst({ where: { walletId: wallet.id, type: 'REVERSAL', referenceId: orderId } });
+
+    const already = await db.creditWalletTxn.findFirst({
+      where: { walletId: wallet.id, type: 'DELIVERY_CONVERT', referenceId: orderId },
+    });
+    if (already) return;
+
+    const reversed = await db.creditWalletTxn.findFirst({
+      where: { walletId: wallet.id, type: 'REVERSAL', referenceId: orderId },
+    });
+    if (reversed) return;
+
+    const amount = debit.amount;
+    const newReserved = Prisma.Decimal.max(D(0), wallet.reservedAmount.minus(amount));
+    const newOutstanding = wallet.outstandingAmount.plus(amount);
+    const config = await this.resolveWalletConfig(wallet.id, db);
+    const dueDate =
+      wallet.currentDueDate
+      ?? this.calculateDueDate(new Date(), config.billingModel, config.creditTenureDays);
+
+    const updated = await db.creditWallet.update({
+      where: { id: wallet.id },
+      data: {
+        reservedAmount: newReserved,
+        outstandingAmount: newOutstanding,
+        currentDueDate: dueDate,
+      },
+    });
+    await db.creditWalletTxn.create({
+      data: {
+        walletId: wallet.id,
+        type: 'DELIVERY_CONVERT',
+        amount,
+        balanceAfterTxn: updated.availableCredit,
+        referenceId: orderId,
+        note: `Order ${orderId} delivered — reserved credit → outstanding ₹${num(amount)}`,
+      },
+    });
+  }
+
+  /** Release an order's credit when cancelled. Releases reserved if not yet
+   *  converted; otherwise reduces outstanding. Idempotent. */
+  async reverseOrderDebit(orderId: string, userId: string, vendorId: string | null, db: Tx): Promise<void> {
+    const wallet = await lockWalletByUserVendor(db, userId, vendorId);
+    if (!wallet) return;
+    const debit = await db.creditWalletTxn.findFirst({
+      where: { walletId: wallet.id, type: 'ORDER_DEBIT', referenceId: orderId },
+    });
+    if (!debit) return;
+    const already = await db.creditWalletTxn.findFirst({
+      where: { walletId: wallet.id, type: 'REVERSAL', referenceId: orderId },
+    });
     if (already) return;
 
     const amount = debit.amount;
+    const converted = await db.creditWalletTxn.findFirst({
+      where: { walletId: wallet.id, type: 'DELIVERY_CONVERT', referenceId: orderId },
+    });
+
+    let newReserved = wallet.reservedAmount;
+    let newOutstanding = wallet.outstandingAmount;
+    if (converted) {
+      newOutstanding = Prisma.Decimal.max(D(0), wallet.outstandingAmount.minus(amount));
+    } else if (wallet.reservedAmount.greaterThanOrEqualTo(amount)) {
+      // Modern path: still reserved (not delivered).
+      newReserved = wallet.reservedAmount.minus(amount);
+    } else {
+      // Legacy path (pre-reservation): ORDER_DEBIT booked outstanding at checkout.
+      const fromReserved = wallet.reservedAmount;
+      newReserved = D(0);
+      const remainder = amount.minus(fromReserved);
+      newOutstanding = Prisma.Decimal.max(D(0), wallet.outstandingAmount.minus(remainder));
+    }
     const newUsed = Prisma.Decimal.max(D(0), wallet.usedCredit.minus(amount));
-    const newOutstanding = Prisma.Decimal.max(D(0), wallet.outstandingAmount.minus(amount));
-    const newAvailable = wallet.creditLimit.minus(newUsed);
+    const newAvailable = D(computeAvailable(num(wallet.creditLimit), num(newUsed)));
     const cleared = newOutstanding.equals(0);
+
     await db.creditWallet.update({
       where: { id: wallet.id },
       data: {
-        usedCredit: newUsed, outstandingAmount: newOutstanding, availableCredit: newAvailable,
+        usedCredit: newUsed,
+        reservedAmount: newReserved,
+        outstandingAmount: newOutstanding,
+        availableCredit: newAvailable,
         ...(cleared ? { currentDueDate: null, overdueDays: 0, overdueBaseAmount: null } : {}),
       },
     });
     await db.creditWalletTxn.create({
-      data: { walletId: wallet.id, type: 'REVERSAL', amount, balanceAfterTxn: newAvailable, referenceId: orderId, note: `Order ${orderId} cancelled — credit released` },
+      data: {
+        walletId: wallet.id,
+        type: 'REVERSAL',
+        amount,
+        balanceAfterTxn: newAvailable,
+        referenceId: orderId,
+        note: converted
+          ? `Order ${orderId} cancelled — outstanding credit released`
+          : `Order ${orderId} cancelled — reserved credit released`,
+      },
     });
   }
 
@@ -420,7 +859,7 @@ export class CreditWalletService {
         const dup = await tx.creditWalletRepayment.findUnique({ where: { razorpayPaymentId } });
         if (dup) return tx.creditWallet.findUnique({ where: { id: walletId } });
       }
-      const wallet = await tx.creditWallet.findUnique({ where: { id: walletId } });
+      const wallet = await lockWallet(tx, walletId);
       if (!wallet) throw Errors.notFound('Credit wallet');
 
       const pay = D(amount);
@@ -431,10 +870,12 @@ export class CreditWalletService {
 
       const newOutstanding = wallet.outstandingAmount.minus(pay);
       const newUsed = Prisma.Decimal.max(D(0), wallet.usedCredit.minus(pay));
-      const newAvailable = wallet.creditLimit.minus(newUsed);
+      const newAvailable = D(computeAvailable(num(wallet.creditLimit), num(newUsed)));
       const cleared = newOutstanding.equals(0);
       const statusAfterRepay =
-        cleared && wallet.status === 'BLOCKED' ? 'ACTIVE' : wallet.status;
+        cleared && (wallet.status === 'BLOCKED' || wallet.status === 'FROZEN' || wallet.status === 'SUSPENDED')
+          ? 'ACTIVE'
+          : wallet.status;
 
       // Finalize the existing PENDING record (Razorpay flow) instead of leaving an
       // orphan; else create one (cash/manual flow).
@@ -562,14 +1003,14 @@ export class CreditWalletService {
     // Capture the principal the first time this wallet goes overdue.
     const base = wallet.overdueBaseAmount ?? wallet.outstandingAmount;
     const statusUpdate =
-      wallet.status === 'ACTIVE' && overdueDays > 0 ? { status: 'BLOCKED' as const } : {};
+      wallet.status === 'ACTIVE' && overdueDays > 0 ? { status: 'FROZEN' as const } : {};
     await tx.creditWallet.update({
       where: { id: walletId },
       data: { overdueDays, overdueBaseAmount: wallet.overdueBaseAmount ?? base, ...statusUpdate },
     });
 
-    if (statusUpdate.status === 'BLOCKED') {
-      await this.audit(tx, walletId, 'BLOCK', 'SYSTEM', wallet.status, 'BLOCKED', `Auto-blocked: ${overdueDays} overdue day(s)`);
+    if (statusUpdate.status === 'FROZEN') {
+      await this.audit(tx, walletId, 'FREEZE', 'SYSTEM', wallet.status, 'FROZEN', `Auto-frozen: ${overdueDays} overdue day(s)`);
     }
 
     // Blacklist (unless manually reactivated → exempt).
@@ -584,10 +1025,9 @@ export class CreditWalletService {
 
     // Compound interest: target = base · ((1+r)^periods − 1); apply the increment
     // over what's already been accrued. Idempotent via unique(wallet,INTEREST,date).
-    const periods = Math.floor(taxableDays / config.interestFrequencyDays);
+    const periods = interestPeriods(taxableDays, config.interestFrequencyDays);
     if (periods >= 1 && config.interestRatePct > 0) {
-      const r = config.interestRatePct / 100;
-      const target = round2(num(base) * (Math.pow(1 + r, periods) - 1));
+      const target = compoundInterestTarget(num(base), config.interestRatePct, periods);
       const prior = await tx.creditWalletPenalty.aggregate({ where: { walletId, type: 'INTEREST' }, _sum: { amount: true } });
       const increment = round2(target - num(prior._sum.amount ?? 0));
       if (increment > 0) {
@@ -670,11 +1110,30 @@ export class CreditWalletService {
     return { sent };
   }
 
-  /** Daily scheduler entrypoint: accrue interest/penalties + blacklist, then remind. */
-  async runDailyCreditTasks(): Promise<{ accruals: number; reminders: number }> {
+  /** Expire wallets past validUntil; run with daily accruals. */
+  async processExpiredWallets(): Promise<{ expired: number }> {
+    const due = await prisma.creditWallet.findMany({
+      where: {
+        validUntil: { lt: new Date() },
+        status: { in: ['ACTIVE', 'SUSPENDED', 'BLOCKED', 'FROZEN'] },
+      },
+      select: { id: true },
+    });
+    let expired = 0;
+    for (const { id } of due) {
+      await this.setWalletStatus(id, 'EXPIRED', 'SYSTEM', 'Credit validity window ended').then(() => {
+        expired++;
+      }).catch((e) => console.error(`[credit] expire failed for ${id}:`, e));
+    }
+    return { expired };
+  }
+
+  /** Daily scheduler entrypoint: expire → accrue interest/penalties + blacklist → remind. */
+  async runDailyCreditTasks(): Promise<{ accruals: number; reminders: number; expired: number }> {
+    const exp = await this.processExpiredWallets();
     const accr = await this.processOverdueAccounts();
     const rem = await this.sendDueReminders();
-    return { accruals: accr.processed, reminders: rem.sent };
+    return { accruals: accr.processed, reminders: rem.sent, expired: exp.expired };
   }
 
   // ── Manual reactivation ─────────────────────────────────────────────────────

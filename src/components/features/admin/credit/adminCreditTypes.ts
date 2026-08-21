@@ -1,17 +1,31 @@
-export type WalletStatus = 'ACTIVE' | 'BLOCKED' | 'BLACKLISTED';
+export type WalletStatus =
+  | 'ACTIVE'
+  | 'BLOCKED'
+  | 'SUSPENDED'
+  | 'FROZEN'
+  | 'EXPIRED'
+  | 'CANCELLED'
+  | 'BLACKLISTED';
 
 export type AdminCreditTabKey = 'lines' | 'reports' | 'statement' | 'config';
 
-export type StatusFilterKey = '' | WalletStatus | 'OVERDUE';
+export type StatusFilterKey =
+  | ''
+  | WalletStatus
+  | 'OVERDUE'
+  | 'FULLY_UTILIZED'
+  | 'HIGH_RISK';
 
 export interface CreditWalletRow {
   id: string;
   userId: string;
   vendorId: string | null;
   status: WalletStatus;
+  creditSource?: string;
   creditLimit: string | number;
   availableCredit: string | number;
   usedCredit: string | number;
+  reservedAmount?: string | number;
   outstandingAmount: string | number;
   currentDueDate: string | null;
   overdueDays: number;
@@ -106,20 +120,31 @@ export interface GlobalConfig {
 export const STATUS_STYLE: Record<WalletStatus, string> = {
   ACTIVE: 'bg-[#EEF8F1] text-[#299E60]',
   BLOCKED: 'bg-[#FFF4E5] text-[#976538]',
+  SUSPENDED: 'bg-slate-100 text-slate-700',
+  FROZEN: 'bg-cyan-50 text-cyan-800',
+  EXPIRED: 'bg-stone-100 text-stone-600',
+  CANCELLED: 'bg-zinc-100 text-zinc-600',
   BLACKLISTED: 'bg-[#FFF0F0] text-[#E74C3C]',
 };
 
 export const STATUS_FILTER_OPTIONS: { key: StatusFilterKey; label: string }[] = [
   { key: '', label: 'All' },
   { key: 'ACTIVE', label: 'Active' },
+  { key: 'SUSPENDED', label: 'Suspended' },
+  { key: 'FROZEN', label: 'Frozen' },
   { key: 'BLOCKED', label: 'Blocked' },
+  { key: 'EXPIRED', label: 'Expired' },
+  { key: 'CANCELLED', label: 'Cancelled' },
   { key: 'BLACKLISTED', label: 'Blacklisted' },
+  { key: 'FULLY_UTILIZED', label: 'Fully utilized' },
   { key: 'OVERDUE', label: 'Overdue' },
+  { key: 'HIGH_RISK', label: 'High risk' },
 ];
 
 export const TXN_LABEL: Record<string, string> = {
   CREDIT_ASSIGN: 'Credit assigned',
-  ORDER_DEBIT: 'Order — spent on credit',
+  ORDER_DEBIT: 'Order — credit reserved',
+  DELIVERY_CONVERT: 'Delivery — reserved → outstanding',
   REPAYMENT: 'Repayment received',
   PENALTY: 'Interest / late fee',
   REVERSAL: 'Reversal — order cancelled',
@@ -185,6 +210,15 @@ export function filterWalletsByStatus(wallets: CreditWalletRow[], filter: Status
   if (filter === 'OVERDUE') {
     return wallets.filter((w) => w.overdueDays > 0 && Number(w.outstandingAmount) > 0);
   }
+  if (filter === 'FULLY_UTILIZED') {
+    return wallets.filter((w) => w.status === 'ACTIVE' && Number(w.creditLimit) > 0 && Number(w.availableCredit) <= 0);
+  }
+  if (filter === 'HIGH_RISK') {
+    return wallets.filter((w) => w.status === 'BLACKLISTED' || w.overdueDays > 60);
+  }
+  if (filter === 'FROZEN') {
+    return wallets.filter((w) => w.status === 'FROZEN' || w.status === 'BLOCKED');
+  }
   return wallets.filter((w) => w.status === filter);
 }
 
@@ -204,6 +238,10 @@ const REPAYMENT_LABELS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Active',
   BLOCKED: 'Blocked',
+  SUSPENDED: 'Suspended',
+  FROZEN: 'Frozen',
+  EXPIRED: 'Expired',
+  CANCELLED: 'Cancelled',
   BLACKLISTED: 'Blacklisted',
   SANCTIONED: 'Sanctioned',
   IN_PROGRESS: 'In progress',

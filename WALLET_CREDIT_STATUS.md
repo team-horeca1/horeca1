@@ -1,9 +1,34 @@
 # Wallet & Vendor Credit (DiSCCO Basic) — Build Status
 
-**Branch:** `feat/wallet-credit` (NOT merged — prod untouched; CI/deploy only fire on `master`).
-**Decisions:** unify on `CreditWallet` (retire `CreditAccount`); money-core first. Interest = compound. Same config engine for H1 wallet + vendor credit. Verified `tsc` 0 / `lint` 0 on all committed code.
+**Updated:** 2026-08-21 — Section 6 live QA + vendor defaults UI.
 
-> The prior pass was a non-functional skeleton (`new PrismaClient()` with no Prisma-7 adapter → would throw on first call; wrong compound-interest base; unauthenticated routes; broken H1 uniqueness; hallucinated code). It was rebuilt.
+## ✅ Section 6 complete for production readiness (local)
+
+- Migration `20260821120000_discco_credit_section6` **applied** (local DB)
+- Vendor **Credit defaults** UI (`/vendor/credit` → Credit defaults tab) wired to `GET|PATCH /api/v1/vendor/credit/config`
+- Live headed Playwright + financial script verified:
+  - new ₹37,500 credit line (custom tenure/grace/interest/penalty/repayment mode)
+  - multi-supplier isolation (Daily Fresh vs Golden Grains)
+  - reserve → convert → repay → cancel release
+  - limit exposure reject, suspend block, cross-supplier status reject
+  - concurrent ₹700+₹700 vs ₹1000 → one OK / one reject
+  - customer `/wallet` shows separate supplier lines + ledger
+  - RBAC: customer/vendor denied admin; unauth 401
+- Unit tests: `src/modules/credit/__tests__` **11/11 PASS**
+- `tsc --noEmit` **PASS**
+
+### Local QA note
+`.env.local` may override `DATABASE_URL` to tunnel `:5434`. For local QA start with:
+`DATABASE_URL` from `.env` (`:5432`) — e.g. set in the shell before `npm run dev:turbo`.
+
+## Prior waves (still valid)
+
+See history below for engine, checkout debit, Razorpay repayment, cron, admin/vendor/customer UIs.
+
+---
+
+**Branch history:** originally `feat/wallet-credit`. Money-core uses `CreditWallet` (legacy `CreditAccount` retired for writes).
+
 
 ## ✅ Done (committed on the branch)
 

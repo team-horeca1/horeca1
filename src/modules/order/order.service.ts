@@ -614,11 +614,10 @@ export class OrderService {
         // Reserve inventory (drafts reserve nothing until submitted)
         if (!isDraft) await this.inventoryService.reserveStock(p.stockItems, p.fulfillmentOutletId, tx);
 
-        // Debit the credit wallet for credit orders. debitWallet validates the
-        // wallet (active, not blacklisted), repayment-mode reuse rules, and
+        // Reserve credit for credit orders (outstanding converts on delivery).
+        // debitWallet validates wallet status, repayment-mode reuse rules, and
         // available limit — all inside this tx, so any failure rolls back the
-        // whole order. Outstanding is created now (per the wallet brief).
-        // Skipped when discounts + wallet cover the full amount (nothing owed).
+        // whole order. Skipped when discounts + wallet cover the full amount.
         if (!isDraft && isCreditPayment(input.paymentMethod) && totalAmount > 0) {
           const creditVendorId = (input.paymentMethod === 'h1_wallet' || input.paymentMethod === 'wallet') ? null : vo.vendorId;
           await creditWalletService.debitWallet(userId, creditVendorId, totalAmount, order.id, tx);
@@ -2088,12 +2087,15 @@ export class OrderService {
         await ensureFulfilmentForOrder(orderId, { actorId: actorId ?? null, tx });
       }
 
-      // Credit side-effect — the wallet was already debited at order create, so the
-      // only ledger move on a status change is RELEASING that debit when the order
-      // is cancelled (idempotent — reverseOrderDebit no-ops if already reversed).
-      if (isCreditPayment(order.paymentMethod) && status === 'cancelled') {
+      // Credit side-effect — reserved at order create; convert to outstanding on
+      // delivery; release reserved/outstanding on cancel (idempotent).
+      if (isCreditPayment(order.paymentMethod)) {
         const creditVendorId = (order.paymentMethod === 'h1_wallet' || order.paymentMethod === 'wallet') ? null : vendorId;
-        await creditWalletService.reverseOrderDebit(orderId, order.userId, creditVendorId, tx);
+        if (status === 'cancelled') {
+          await creditWalletService.reverseOrderDebit(orderId, order.userId, creditVendorId, tx);
+        } else if (status === 'delivered') {
+          await creditWalletService.convertReservedToOutstanding(orderId, order.userId, creditVendorId, tx);
+        }
       }
 
       // Promo Engine Phase 1 side-effects — all idempotent, all inside this tx:

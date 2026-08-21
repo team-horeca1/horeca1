@@ -13,9 +13,22 @@ export type CreditDisplayStatus =
   | 'IN_PROGRESS'
   | 'COMPLETED'
   | 'BLOCKED'
+  | 'SUSPENDED'
+  | 'FROZEN'
+  | 'EXPIRED'
+  | 'CANCELLED'
   | 'BLACKLISTED';
 
 export type WorkflowStatus = 'SANCTIONED' | 'IN_PROGRESS' | 'COMPLETED';
+
+export type RuntimeWalletStatus =
+  | 'ACTIVE'
+  | 'BLOCKED'
+  | 'SUSPENDED'
+  | 'FROZEN'
+  | 'EXPIRED'
+  | 'CANCELLED'
+  | 'BLACKLISTED';
 
 export interface CreditGridRow {
   userId: string;
@@ -26,13 +39,18 @@ export interface CreditGridRow {
     id: string;
     creditLimit: number;
     outstandingAmount: number;
-    status: 'ACTIVE' | 'BLOCKED' | 'BLACKLISTED';
+    reservedAmount?: number;
+    availableCredit?: number;
+    usedCredit?: number;
+    creditSource?: string;
+    status: RuntimeWalletStatus;
     workflowStatus: WorkflowStatus;
     assignedOwnerId: string | null;
     ownerName: string | null;
     vendorNotes: string | null;
     displayStatus: CreditDisplayStatus;
     currentDueDate: string | null;
+    overdueDays?: number;
   } | null;
   displayStatus: CreditDisplayStatus;
 }
@@ -49,6 +67,10 @@ const DISPLAY_STATUS: Record<CreditDisplayStatus, { label: string; cls: string }
   IN_PROGRESS: { label: 'In progress', cls: 'bg-amber-50 text-amber-800 border border-amber-100' },
   COMPLETED: { label: 'Completed', cls: 'bg-[#EEF8F1] text-[#299E60] border border-[#299E60]/20' },
   BLOCKED: { label: 'Blocked', cls: 'bg-orange-50 text-orange-700 border border-orange-100' },
+  SUSPENDED: { label: 'Suspended', cls: 'bg-slate-100 text-slate-700 border border-slate-200' },
+  FROZEN: { label: 'Frozen', cls: 'bg-cyan-50 text-cyan-800 border border-cyan-100' },
+  EXPIRED: { label: 'Expired', cls: 'bg-stone-100 text-stone-600 border border-stone-200' },
+  CANCELLED: { label: 'Cancelled', cls: 'bg-zinc-100 text-zinc-600 border border-zinc-200' },
   BLACKLISTED: { label: 'Blacklisted', cls: 'bg-red-50 text-red-600 border border-red-100' },
 };
 
@@ -70,7 +92,8 @@ function draftFromRow(row: CreditGridRow): RowDraft {
 }
 
 function isSystemLocked(row: CreditGridRow): boolean {
-  return row.wallet?.status === 'BLOCKED' || row.wallet?.status === 'BLACKLISTED';
+  const s = row.wallet?.status;
+  return s === 'BLOCKED' || s === 'BLACKLISTED' || s === 'FROZEN' || s === 'SUSPENDED' || s === 'EXPIRED' || s === 'CANCELLED';
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -102,11 +125,15 @@ function ownerOptionsForRow(
   return opts;
 }
 
+import { matchesCreditFilter, type CreditFilterKey } from '@/modules/credit/creditMath';
+
+export type CreditStatusFilter = CreditDisplayStatus | CreditFilterKey;
+
 interface CreditCustomerGridProps {
   rows: CreditGridRow[];
   teamMembers: TeamMemberOption[];
   canEdit: boolean;
-  statusFilter: CreditDisplayStatus | 'ALL';
+  statusFilter: CreditStatusFilter;
   onRefresh: () => void;
   onAdvancedTerms: (row: CreditGridRow) => void;
 }
@@ -128,6 +155,20 @@ export function CreditCustomerGrid({
 
   const filtered = useMemo(() => {
     if (statusFilter === 'ALL') return rows;
+    const special: CreditFilterKey[] = [
+      'FULLY_UTILIZED', 'NO_CREDIT', 'OVERDUE', 'HIGH_RISK',
+      'ACTIVE', 'SUSPENDED', 'FROZEN', 'EXPIRED', 'CANCELLED', 'BLACKLISTED', 'BLOCKED',
+    ];
+    if (special.includes(statusFilter as CreditFilterKey)) {
+      return rows.filter((r) => matchesCreditFilter({
+        hasWallet: !!r.wallet && r.wallet.creditLimit > 0,
+        status: r.wallet?.status,
+        creditLimit: r.wallet?.creditLimit,
+        availableCredit: r.wallet?.availableCredit,
+        outstandingAmount: r.wallet?.outstandingAmount,
+        overdueDays: r.wallet?.overdueDays,
+      }, statusFilter as CreditFilterKey));
+    }
     return rows.filter((r) => (r.wallet?.displayStatus ?? r.displayStatus) === statusFilter);
   }, [rows, statusFilter]);
 
@@ -458,11 +499,19 @@ export function CreditCustomerGrid({
   );
 }
 
-export const STATUS_FILTER_OPTIONS: Array<{ key: CreditDisplayStatus | 'ALL'; label: string }> = [
+export const STATUS_FILTER_OPTIONS: Array<{ key: CreditDisplayStatus | 'ALL' | 'FULLY_UTILIZED' | 'NO_CREDIT' | 'OVERDUE' | 'HIGH_RISK'; label: string }> = [
   { key: 'ALL', label: 'All' },
-  { key: 'SANCTIONED', label: 'Sanctioned' },
+  { key: 'SANCTIONED', label: 'Active / Sanctioned' },
   { key: 'IN_PROGRESS', label: 'In progress' },
-  { key: 'COMPLETED', label: 'Completed' },
+  { key: 'SUSPENDED', label: 'Suspended' },
+  { key: 'FROZEN', label: 'Frozen' },
   { key: 'BLOCKED', label: 'Blocked' },
+  { key: 'EXPIRED', label: 'Expired' },
+  { key: 'CANCELLED', label: 'Cancelled' },
   { key: 'BLACKLISTED', label: 'Blacklisted' },
+  { key: 'FULLY_UTILIZED', label: 'Fully utilized' },
+  { key: 'NO_CREDIT', label: 'No credit assigned' },
+  { key: 'OVERDUE', label: 'Overdue' },
+  { key: 'HIGH_RISK', label: 'High risk' },
+  { key: 'COMPLETED', label: 'Completed' },
 ];

@@ -13,6 +13,8 @@ import {
   AlertTriangle, ShieldOff,
 } from 'lucide-react';
 import { CreditCollectionsPanel } from '@/components/features/vendor/CreditCollectionsPanel';
+import { BulkAssignCreditModal } from '@/components/features/vendor/BulkAssignCreditModal';
+import { VendorCreditDefaultsPanel } from '@/components/features/vendor/VendorCreditDefaultsPanel';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -32,7 +34,9 @@ interface WalletInfo {
   usedCredit: number;
   availableCredit: number;
   outstandingAmount: number;
-  status: 'ACTIVE' | 'BLOCKED' | 'BLACKLISTED';
+  reservedAmount?: number;
+  creditSource?: string;
+  status: 'ACTIVE' | 'BLOCKED' | 'SUSPENDED' | 'FROZEN' | 'EXPIRED' | 'CANCELLED' | 'BLACKLISTED';
   workflowStatus: 'SANCTIONED' | 'IN_PROGRESS' | 'COMPLETED';
   assignedOwnerId: string | null;
   ownerName: string | null;
@@ -245,8 +249,14 @@ export default function VendorCreditPageWrapper() {
 
 function VendorCreditPage() {
   const searchParams = useSearchParams();
-  const pageTab = searchParams.get('tab') === 'collections' ? 'collections' : 'customers';
-  const [mainTab, setMainTab] = useState<'customers' | 'collections'>(pageTab);
+  const tabParam = searchParams.get('tab');
+  const pageTab =
+    tabParam === 'collections'
+      ? 'collections'
+      : tabParam === 'defaults'
+        ? 'defaults'
+        : 'customers';
+  const [mainTab, setMainTab] = useState<'customers' | 'collections' | 'defaults'>(pageTab);
 
   useEffect(() => {
     setMainTab(pageTab);
@@ -261,8 +271,9 @@ function VendorCreditPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMemberOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<CreditDisplayStatus | 'ALL'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<CreditDisplayStatus | 'ALL' | 'FULLY_UTILIZED' | 'NO_CREDIT' | 'OVERDUE' | 'HIGH_RISK'>('ALL');
   const [advancedRow, setAdvancedRow] = useState<CustomerRow | null>(null);
+  const [showBulk, setShowBulk] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -308,6 +319,10 @@ function VendorCreditPage() {
             id: r.wallet.id,
             creditLimit: r.wallet.creditLimit,
             outstandingAmount: r.wallet.outstandingAmount,
+            reservedAmount: r.wallet.reservedAmount,
+            availableCredit: r.wallet.availableCredit,
+            usedCredit: r.wallet.usedCredit,
+            creditSource: r.wallet.creditSource,
             status: r.wallet.status,
             workflowStatus: r.wallet.workflowStatus,
             assignedOwnerId: r.wallet.assignedOwnerId,
@@ -315,6 +330,7 @@ function VendorCreditPage() {
             vendorNotes: r.wallet.vendorNotes,
             displayStatus: r.wallet.displayStatus,
             currentDueDate: r.wallet.currentDueDate,
+            overdueDays: r.wallet.overdueDays,
           }
         : null,
     })),
@@ -340,12 +356,22 @@ function VendorCreditPage() {
           <h1 className="text-[24px] font-bold text-[#181725]">Credit &amp; Collections</h1>
           <p className="text-[12px] text-[#AEAEAE]">Assign credit lines, track outstanding balances, and manage recovery</p>
         </div>
+        {canApprove && mainTab === 'customers' && (
+          <button
+            type="button"
+            onClick={() => setShowBulk(true)}
+            className="h-[38px] px-4 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold"
+          >
+            Bulk assign credit
+          </button>
+        )}
       </div>
 
-      <div className="flex bg-[#F5F5F5] rounded-[10px] p-0.5 gap-0.5 w-fit">
+      <div className="flex bg-[#F5F5F5] rounded-[10px] p-0.5 gap-0.5 w-fit flex-wrap">
         {([
           { id: 'customers' as const, label: 'Customers' },
           { id: 'collections' as const, label: 'Collections & Recovery' },
+          { id: 'defaults' as const, label: 'Credit defaults' },
         ]).map((t) => (
           <button
             key={t.id}
@@ -363,6 +389,8 @@ function VendorCreditPage() {
 
       {mainTab === 'collections' ? (
         <CreditCollectionsPanel />
+      ) : mainTab === 'defaults' ? (
+        <VendorCreditDefaultsPanel canEdit={canApprove} />
       ) : (
         <>
 
@@ -446,6 +474,13 @@ function VendorCreditPage() {
           row={advancedRow}
           onClose={() => setAdvancedRow(null)}
           onSaved={load}
+        />
+      )}
+      {showBulk && (
+        <BulkAssignCreditModal
+          customers={rows}
+          onClose={() => setShowBulk(false)}
+          onDone={load}
         />
       )}
         </>
