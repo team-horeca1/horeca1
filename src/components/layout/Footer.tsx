@@ -15,38 +15,35 @@ import {
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
-const FOOTER_LINKS = {
+/** Only ship links that resolve to real storefront routes (no dead /under-construction stubs). */
+const FOOTER_LINKS: Record<string, Array<{ label: string; href: string }>> = {
     information: [
-        'Become a Supplier',
-        'Affiliate Program',
-        'Privacy Policy',
-        'Our Suppliers',
-        'Extended Plan',
-        'Community'
+        { label: 'Become a Supplier', href: '/vendor/register' },
+        { label: 'Our Suppliers', href: '/vendors' },
+        { label: 'Brands', href: '/brands' },
+        { label: 'Deals', href: '/deals' },
+        { label: 'Collections', href: '/collections' },
     ],
     support: [
-        'Help Center',
-        'Contact Us',
-        'Report Abuse',
-        'Submit and Dispute',
-        'Policies & Rules',
-        'Online Shopping'
+        { label: 'Help Center', href: 'mailto:sales@horeca1.com' },
+        { label: 'Contact Us', href: 'mailto:sales@horeca1.com' },
+        { label: 'Order Lists', href: '/order-lists' },
     ],
     account: [
-        'My Account',
-        'Order History',
-        'Shopping Cart',
-        'Compare',
-        'Help Ticket',
+        { label: 'My Account', href: '/profile' },
+        { label: 'Order History', href: '/orders' },
+        { label: 'Shopping Cart', href: '/cart' },
+        { label: 'Wallet', href: '/rewards' },
+        { label: 'DiSCCO Credit', href: '/wallet' },
     ],
     groceries: [
-        'Dairy & Eggs',
-        'Meat & Seafood',
-        'Breakfast Food',
-        'Household Supplies',
-        'Bread & Bakery',
-        'Pantry Staples'
-    ]
+        { label: 'Fresh Produce', href: '/category/fresh-produce' },
+        { label: 'Dairy & Eggs', href: '/category/dairy-cheese-eggs' },
+        { label: 'Pantry Staples', href: '/category/pantry-staples' },
+        { label: 'Meat & Seafood', href: '/category/meat-poultry-seafood' },
+        { label: 'Beverages', href: '/category/beverages-drinks' },
+        { label: 'Bakery & Frozen', href: '/category/bakery-frozen' },
+    ],
 };
 
 const SOCIAL_LINKS = [
@@ -112,9 +109,9 @@ export function Footer() {
                             <h4 className="text-[16px] md:text-[18px] font-bold text-[#181725] mb-5">Information</h4>
                             <ul className="space-y-4">
                                 {FOOTER_LINKS.information.map((link) => (
-                                    <li key={link}>
-                                        <Link href="/under-construction" className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
-                                            {link}
+                                    <li key={link.href + link.label}>
+                                        <Link href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
+                                            {link.label}
                                         </Link>
                                     </li>
                                 ))}
@@ -134,10 +131,16 @@ export function Footer() {
                                     </a>
                                 </li>
                                 {FOOTER_LINKS.support.map((link) => (
-                                    <li key={link}>
-                                        <Link href="/under-construction" className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
-                                            {link}
-                                        </Link>
+                                    <li key={link.href + link.label}>
+                                        {link.href.startsWith('mailto:') ? (
+                                            <a href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
+                                                {link.label}
+                                            </a>
+                                        ) : (
+                                            <Link href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
+                                                {link.label}
+                                            </Link>
+                                        )}
                                     </li>
                                 ))}
                             </ul>
@@ -147,9 +150,9 @@ export function Footer() {
                             <h4 className="text-[16px] md:text-[18px] font-bold text-[#181725] mb-5">My Account</h4>
                             <ul className="space-y-4">
                                 {FOOTER_LINKS.account.map((link) => (
-                                    <li key={link}>
-                                        <Link href="/under-construction" className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
-                                            {link}
+                                    <li key={link.href + link.label}>
+                                        <Link href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
+                                            {link.label}
                                         </Link>
                                     </li>
                                 ))}
@@ -160,9 +163,9 @@ export function Footer() {
                             <h4 className="text-[16px] md:text-[18px] font-bold text-[#181725] mb-5">Daily Groceries</h4>
                             <ul className="space-y-4">
                                 {FOOTER_LINKS.groceries.map((link) => (
-                                    <li key={link}>
-                                        <Link href="/under-construction" className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
-                                            {link}
+                                    <li key={link.href + link.label}>
+                                        <Link href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
+                                            {link.label}
                                         </Link>
                                     </li>
                                 ))}

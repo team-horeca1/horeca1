@@ -1100,6 +1100,9 @@ export class CatalogService {
             product: {
               include: { brandMappings: productBrandMappingsInclude },
             },
+            vendor: {
+              select: { id: true, businessName: true, logoUrl: true },
+            },
           },
           orderBy: { sortOrder: 'asc' },
           take: 10,

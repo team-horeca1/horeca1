@@ -112,6 +112,7 @@ export default function OrderDetailPage() {
 
     const [order, setOrder] = React.useState<ApiOrder | null>(null);
     const [loading, setLoading] = React.useState(true);
+    const [loadFailed, setLoadFailed] = React.useState(false);
     const [allProducts, setAllProducts] = React.useState<VendorProduct[]>([]);
 
     // Rating state
@@ -135,6 +136,7 @@ export default function OrderDetailPage() {
         if (sessionStatus === 'unauthenticated') { router.push('/'); return; }
         if (sessionStatus !== 'authenticated') return;
         setLoading(true);
+        setLoadFailed(false);
         dal.orders.getById(orderId)
             .then(async (result: unknown) => {
                 const r = result as { data?: ApiOrder } & ApiOrder;
@@ -153,9 +155,12 @@ export default function OrderDetailPage() {
                 }
                 setOrder(loaded);
             })
-            .catch(() => { toast.error('Order not found'); router.push('/orders'); })
+            .catch(() => {
+                setOrder(null);
+                setLoadFailed(true);
+            })
             .finally(() => setLoading(false));
-    }, [orderId, sessionStatus]);
+    }, [orderId, sessionStatus, router]);
 
     React.useEffect(() => {
         if (sessionStatus !== 'authenticated') return;
@@ -240,7 +245,33 @@ export default function OrderDetailPage() {
         );
     }
 
-    if (!order) return null;
+    if (!order) {
+        return (
+            <div className="min-h-screen bg-[#F2F3F2] flex flex-col items-center justify-center px-6 text-center">
+                <Package size={40} className="text-gray-300 mb-4" />
+                <h1 className="text-[20px] font-extrabold text-[#181725] mb-2">
+                    {loadFailed ? 'Order not found' : 'Order unavailable'}
+                </h1>
+                <p className="text-[14px] text-gray-500 mb-6 max-w-sm">
+                    This order may not exist, or you may not have access to view it with this account.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                    <Link
+                        href="/orders"
+                        className="px-5 py-2.5 rounded-xl bg-[#299e60] text-white text-[13px] font-bold hover:bg-[#238a52] transition-colors"
+                    >
+                        My Orders
+                    </Link>
+                    <Link
+                        href="/"
+                        className="px-5 py-2.5 rounded-xl bg-white border border-gray-200 text-[13px] font-bold text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                        Home
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     const statusCfg = STATUS_CONFIG[order.status] ?? { label: order.status, textColor: 'text-gray-600', bgColor: 'bg-gray-50', borderColor: 'border-gray-200', icon: null };
     const paymentCfg = PAYMENT_STATUS[order.paymentStatus] ?? { label: order.paymentStatus, color: 'text-gray-500', bg: 'bg-gray-50' };

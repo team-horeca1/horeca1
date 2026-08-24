@@ -331,13 +331,17 @@ export function TopRatedVendors() {
             <div className="max-w-[var(--container-max)] mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6 px-6 md:px-[var(--container-padding)]">
-                    <h2 className="text-[18px] md:text-[22px] lg:text-[24px] font-[900] text-[#181725] tracking-tight flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#53B175] to-[#299e60] flex items-center justify-center shadow-md shadow-green-200/50">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
-                                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
-                            </svg>
+                    <h2
+                        aria-label="Top Rated"
+                        className="text-[18px] md:text-[22px] lg:text-[24px] font-black text-[#181725] tracking-tight flex items-center gap-2.5"
+                    >
+                        <div
+                            aria-hidden
+                            className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#53B175] to-[#299e60] flex items-center justify-center shadow-md shadow-green-200/50"
+                        >
+                            <Star size={16} fill="white" className="text-white" />
                         </div>
-                        Top Rated
+                        <span>Top Rated</span>
                     </h2>
                     <Link href="/vendors?sort=rating" className="flex items-center gap-1 text-[#53B175] font-black text-sm hover:gap-2 transition-all cursor-pointer group">
                         See All
