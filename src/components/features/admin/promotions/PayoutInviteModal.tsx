@@ -32,6 +32,7 @@ export function PayoutInviteModal({ onClose, onSaved }: { onClose: () => void; o
     const [expiresInDays, setExpiresInDays] = useState('7');
     const [saving, setSaving] = useState(false);
     const [claimUrl, setClaimUrl] = useState<string | null>(null);
+    const [trackingKey, setTrackingKey] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
     const search = async () => {
@@ -71,6 +72,7 @@ export function PayoutInviteModal({ onClose, onSaved }: { onClose: () => void; o
             const path = typeof json?.data?.claimUrl === 'string' ? json.data.claimUrl : `/payout/${json?.data?.token ?? ''}`;
             const url = path.startsWith('http') ? path : `${window.location.origin}${path.startsWith('/') ? path : `/${path}`}`;
             setClaimUrl(url);
+            setTrackingKey(typeof json?.data?.trackingKey === 'string' ? json.data.trackingKey : null);
             onSaved();
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Could not create payout link');
@@ -110,6 +112,28 @@ export function PayoutInviteModal({ onClose, onSaved }: { onClose: () => void; o
                                 {copied ? <Check size={14} /> : <Copy size={14} />}
                             </button>
                         </div>
+                        {trackingKey && (
+                            <div className="mt-3 flex items-center justify-between rounded-xl bg-gray-50 border border-gray-100 px-3 py-2.5">
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Tracking ID</p>
+                                    <p className="font-mono text-[13px] font-bold text-[#181725]">{trackingKey}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        try {
+                                            await navigator.clipboard.writeText(trackingKey);
+                                            toast.success('Tracking ID copied');
+                                        } catch {
+                                            toast.error('Could not copy');
+                                        }
+                                    }}
+                                    className="shrink-0 px-3 py-1.5 rounded-lg border border-gray-200 text-[11px] font-bold text-[#181725] hover:bg-white cursor-pointer"
+                                >
+                                    Copy
+                                </button>
+                            </div>
+                        )}
                         <p className="mt-3 text-[11px] text-gray-400">After they claim, the entry appears in this payouts table — Mark Paid + UTR as usual.</p>
                         <button onClick={onClose} className="mt-5 w-full py-2.5 rounded-xl bg-[#53B175] text-white text-[13px] font-bold hover:bg-[#48a068] cursor-pointer">
                             Done

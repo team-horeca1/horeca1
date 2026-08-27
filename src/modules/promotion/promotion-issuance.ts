@@ -9,6 +9,7 @@ import { Prisma, type CashbackEntrySource, type ProgramRewardType, type Referral
 import { prisma } from '@/lib/prisma';
 import { Errors } from '@/middleware/errorHandler';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
+import { uniquePayoutTrackingKey } from '@/lib/payoutTrackingKey';
 
 interface DraftForMov {
   subtotal: number;
@@ -217,6 +218,7 @@ async function issueProgramReward(
       destination: 'wallet',
       status: 'credited',
       notes: args.notes,
+      trackingKey: await uniquePayoutTrackingKey(db),
       creditedAt: new Date(),
     },
   });
@@ -922,6 +924,7 @@ export async function createPayoutInvite(args: {
           token,
           amount,
           notes: args.notes ?? null,
+          trackingKey: await uniquePayoutTrackingKey(prisma),
           expiresAt,
           userId: args.userId ?? null,
           createdById: args.createdById,
@@ -948,6 +951,7 @@ export async function getPayoutInvitePublic(token: string) {
       status: true,
       expiresAt: true,
       claimedAt: true,
+      trackingKey: true,
     },
   });
   if (!invite) throw Errors.notFound('Payout invite');
@@ -955,6 +959,7 @@ export async function getPayoutInvitePublic(token: string) {
     amount: Number(invite.amount),
     status: invite.status,
     expiresAt: invite.expiresAt,
+    trackingKey: invite.trackingKey,
     claimed: invite.status === 'claimed' || invite.claimedAt != null,
     expired: invite.status === 'pending' && invite.expiresAt.getTime() < Date.now(),
   };
@@ -980,12 +985,7 @@ export async function claimPayoutInvite(args: {
 
     const userId = invite.userId ?? args.sessionUserId ?? invite.createdById;
     const amount = r2(Number(invite.amount));
-    const notes = [
-      `Payout invite claimed by ${args.name.trim()}`,
-      invite.notes ? invite.notes : null,
-    ]
-      .filter(Boolean)
-      .join(' — ');
+    const trackingKey = invite.trackingKey ?? (await uniquePayoutTrackingKey(tx));
 
     const entry = await tx.cashbackEntry.create({
       data: {
@@ -995,7 +995,8 @@ export async function claimPayoutInvite(args: {
         destination: 'upi',
         status: 'approved',
         upiId: args.upiId,
-        notes,
+        notes: invite.notes ?? null,
+        trackingKey,
         createdById: invite.createdById,
       },
     });
@@ -1008,6 +1009,7 @@ export async function claimPayoutInvite(args: {
         claimedName: args.name.trim(),
         claimedUpiId: args.upiId,
         cashbackEntryId: entry.id,
+        trackingKey,
       },
     });
 

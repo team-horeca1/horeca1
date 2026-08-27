@@ -9,6 +9,7 @@ type Preview = {
   expired: boolean;
   status: string;
   expiresAt: string;
+  trackingKey: string | null;
 };
 
 type View = 'loading' | 'form' | 'done' | 'error';
@@ -87,6 +88,10 @@ export default function PayoutClaimClient({ token }: { token: string }) {
         setSubmitting(false);
         return;
       }
+      const claimedKey = (payload as { data?: { trackingKey?: string | null } }).data?.trackingKey;
+      if (claimedKey) {
+        setPreview((prev) => (prev ? { ...prev, trackingKey: claimedKey } : prev));
+      }
       setView('done');
     } catch {
       setMessage('Could not submit this claim. Please try again.');
@@ -120,6 +125,11 @@ export default function PayoutClaimClient({ token }: { token: string }) {
             <p className="text-[#7C7C7C]">
               We will transfer ₹{preview ? preview.amount.toLocaleString('en-IN') : ''} to your UPI ID after confirmation.
             </p>
+            {preview?.trackingKey ? (
+              <p className="rounded-xl bg-gray-50 px-4 py-2 font-mono text-sm font-bold text-[#181725]">
+                Tracking ID: {preview.trackingKey}
+              </p>
+            ) : null}
           </div>
         )}
 

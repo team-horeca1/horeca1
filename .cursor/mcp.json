@@ -2,13 +2,11 @@
   "mcpServers": {
     "code-review-graph": {
       "command": "code-review-graph",
-      "args": ["serve"],
-      "type": "stdio"
+      "args": ["serve"]
     },
     "playwright": {
       "command": "npx.cmd",
-      "args": ["-y", "@playwright/mcp@latest", "--browser", "msedge"],
-      "type": "stdio"
+      "args": ["-y", "@playwright/mcp@latest", "--browser", "msedge"]
     }
   }
 }

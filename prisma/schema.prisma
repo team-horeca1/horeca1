@@ -3350,6 +3350,8 @@ model CashbackEntry {
   walletTxnId   String? @unique @map("wallet_txn_id") @db.Uuid // ledger link when credited
   paidReference String? @map("paid_reference") @db.VarChar(100) // UTR / payout ref for UPI
   notes         String? @db.Text
+  /// Human-readable payment key (H1P-XXXXXX). Set on grant / invite / cashback create.
+  trackingKey   String? @unique @map("tracking_key") @db.VarChar(16)
   createdById   String? @map("created_by_id") @db.Uuid // admin who granted (direct grants)
 
   creditedAt  DateTime? @map("credited_at") @db.Timestamptz
@@ -3576,6 +3578,8 @@ model PayoutInvite {
   token           String             @unique @db.VarChar(64)
   amount          Decimal            @db.Decimal(10, 2)
   notes           String?            @db.Text
+  /// Same H1P-XXXXXX key copied onto CashbackEntry at claim.
+  trackingKey     String?            @unique @map("tracking_key") @db.VarChar(16)
   expiresAt       DateTime           @map("expires_at") @db.Timestamptz
   userId          String?            @map("user_id") @db.Uuid
   createdById     String             @map("created_by_id") @db.Uuid

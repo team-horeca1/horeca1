@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({
       success: true,
-      data: { claimed: true, amount: Number(result.invite.amount) },
+      data: { claimed: true, amount: Number(result.invite.amount), trackingKey: result.entry.trackingKey ?? result.invite.trackingKey },
     });
   } catch (error) {
     return errorResponse(error);

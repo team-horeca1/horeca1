@@ -28,6 +28,7 @@ import {
   type CustomerContext,
 } from '@/modules/pricing/pricing.service';
 import { getDeliveryGeo } from '@/lib/deliveryLocation';
+import { uniquePayoutTrackingKey } from '@/lib/payoutTrackingKey';
 
 type Db = Prisma.TransactionClient;
 
@@ -1289,6 +1290,7 @@ export const promotionService = {
         cashbackValue: best.campaign.cashbackValue,
         maxCashback: best.campaign.maxCashback,
         minOrderValue: best.campaign.minOrderValue,
+        trackingKey: await uniquePayoutTrackingKey(tx),
       },
     });
     await tx.cashbackCampaign.update({
@@ -2005,6 +2007,7 @@ export const promotionService = {
           destination: args.destination,
           status: args.destination === 'wallet' ? 'credited' : 'approved',
           notes: args.notes ?? null,
+          trackingKey: await uniquePayoutTrackingKey(tx),
           createdById: args.adminId,
           creditedAt: args.destination === 'wallet' ? new Date() : null,
         },
@@ -2053,7 +2056,7 @@ export const promotionService = {
   },
 
   /** Admin records a completed UPI transfer (UTR reference) for an approved entry. */
-  async markEntryPaid(entryId: string, adminId: string, paidReference: string): Promise<CashbackEntry> {
+  async markEntryPaid(entryId: string, _adminId: string, paidReference: string): Promise<CashbackEntry> {
     return prisma.$transaction(async (tx) => {
       const entry = await tx.cashbackEntry.findUnique({ where: { id: entryId } });
       if (!entry) throw Errors.notFound('Cashback entry');
@@ -2066,7 +2069,6 @@ export const promotionService = {
           status: 'paid',
           paidReference,
           paidAt: new Date(),
-          notes: entry.notes ? `${entry.notes} | paid by ${adminId}` : `paid by ${adminId}`,
         },
       });
       await notifyInApp(

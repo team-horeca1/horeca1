@@ -153,6 +153,7 @@ export const listEntriesQuerySchema = z.object({
   status: z.enum(['pending', 'approved', 'credited', 'paid', 'cancelled']).optional(),
   destination: destinationSchema.optional(),
   userId: z.string().uuid().optional(),
+  search: z.string().trim().max(80).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().uuid().optional(),
 });
