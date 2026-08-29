@@ -263,6 +263,7 @@ model Vendor {
   commissionAccruals      CommissionAccrual[]
   coupons                 Coupon[]
   cashbackCampaigns       CashbackCampaign[]
+  payoutInvites           PayoutInvite[]
   customerGroups          CustomerGroup[]
   combos                  ProductCombo[]
   brandAuthorizations     BrandAuthorizedDistributor[]
@@ -3577,27 +3578,33 @@ model PayoutInvite {
   id              String             @id @default(uuid()) @db.Uuid
   token           String             @unique @db.VarChar(64)
   amount          Decimal            @db.Decimal(10, 2)
-  notes           String?            @db.Text
+  notes                 String?            @db.Text
   /// Same H1P-XXXXXX key copied onto CashbackEntry at claim.
-  trackingKey     String?            @unique @map("tracking_key") @db.VarChar(16)
-  expiresAt       DateTime           @map("expires_at") @db.Timestamptz
-  userId          String?            @map("user_id") @db.Uuid
-  createdById     String             @map("created_by_id") @db.Uuid
-  status          PayoutInviteStatus @default(pending)
-  claimedAt       DateTime?          @map("claimed_at") @db.Timestamptz
-  claimedName     String?            @map("claimed_name") @db.VarChar(255)
-  claimedUpiId    String?            @map("claimed_upi_id") @db.VarChar(100)
-  cashbackEntryId String?            @unique @map("cashback_entry_id") @db.Uuid
-  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  trackingKey           String?            @unique @map("tracking_key") @db.VarChar(16)
+  referenceNumber       String?            @map("reference_number") @db.VarChar(80)
+  expiresAt             DateTime?          @map("expires_at") @db.Timestamptz
+  userId                String?            @map("user_id") @db.Uuid
+  vendorId              String?            @map("vendor_id") @db.Uuid
+  createdById           String             @map("created_by_id") @db.Uuid
+  status                PayoutInviteStatus @default(pending)
+  claimedAt             DateTime?          @map("claimed_at") @db.Timestamptz
+  claimedName           String?            @map("claimed_name") @db.VarChar(255)
+  claimedBusinessName   String?            @map("claimed_business_name") @db.VarChar(255)
+  claimedUpiId          String?            @map("claimed_upi_id") @db.VarChar(100)
+  cashbackEntryId       String?            @unique @map("cashback_entry_id") @db.Uuid
+  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   user          User?          @relation("PayoutInviteUser", fields: [userId], references: [id], onDelete: SetNull)
   createdBy     User           @relation("PayoutInviteCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  vendor        Vendor?        @relation(fields: [vendorId], references: [id], onDelete: SetNull)
   cashbackEntry CashbackEntry? @relation(fields: [cashbackEntryId], references: [id], onDelete: SetNull)
 
   @@index([status, expiresAt])
   @@index([createdById])
   @@index([userId])
+  @@index([vendorId])
+  @@index([referenceNumber])
   @@map("payout_invites")
 }
 

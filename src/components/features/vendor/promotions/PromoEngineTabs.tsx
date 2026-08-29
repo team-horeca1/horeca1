@@ -389,7 +389,7 @@ export function VendorCashbackTab() {
         <div className="space-y-4">
             <div className="flex items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-[16px] font-bold text-[#181725]">Cashback Campaigns</h2>
+                    <h2 className="text-[16px] font-bold text-[#181725]">Cashback Wallet</h2>
                     <p className="text-[12px] text-[#AEAEAE]">Reward repeat orders — e.g. “Buy from my store, get ₹300 back”. Credited after delivery.</p>
                 </div>
                 <button

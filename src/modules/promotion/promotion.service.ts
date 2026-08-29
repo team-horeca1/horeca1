@@ -2145,6 +2145,9 @@ export const promotionService = {
   createPayoutInvite(args: Parameters<typeof programs.createPayoutInvite>[0]) {
     return programs.createPayoutInvite(args);
   },
+  listPayoutInvites(args: Parameters<typeof programs.listPayoutInvites>[0]) {
+    return programs.listPayoutInvites(args);
+  },
   getPayoutInvitePublic(token: string) {
     return programs.getPayoutInvitePublic(token);
   },

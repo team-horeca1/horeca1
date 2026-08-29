@@ -52,7 +52,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
             user: { select: { id: true, fullName: true, phone: true, email: true, businessName: true } },
             campaign: { select: { id: true, name: true } },
             order: { select: { id: true, orderNumber: true } },
-            payoutInvite: { select: { id: true, token: true, status: true, expiresAt: true, claimedName: true, claimedUpiId: true } },
+            payoutInvite: { select: { id: true, token: true, status: true, expiresAt: true, claimedName: true, claimedBusinessName: true, claimedUpiId: true } },
           },
         })
       : await prisma.cashbackEntry.findUnique({
@@ -61,20 +61,21 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
             user: { select: { id: true, fullName: true, phone: true, email: true, businessName: true } },
             campaign: { select: { id: true, name: true } },
             order: { select: { id: true, orderNumber: true } },
-            payoutInvite: { select: { id: true, token: true, status: true, expiresAt: true, claimedName: true, claimedUpiId: true } },
+            payoutInvite: { select: { id: true, token: true, status: true, expiresAt: true, claimedName: true, claimedBusinessName: true, claimedUpiId: true } },
           },
         });
 
     if (!invite && !entry) throw Errors.notFound('Payout');
 
     const now = Date.now();
-    const invitePending = invite?.status === 'pending' && invite.expiresAt.getTime() > now;
+    const expiresMs = invite?.expiresAt?.getTime() ?? null;
+    const invitePending = invite?.status === 'pending' && (expiresMs == null || expiresMs > now);
     const token = invite?.token ?? entry?.payoutInvite?.token ?? null;
 
     const amount = invite ? Number(invite.amount) : Number(entry?.amount ?? 0);
     const status = invitePending
       ? 'awaiting_claim'
-      : entry?.status ?? (invite && invite.expiresAt.getTime() <= now ? 'expired' : invite?.status);
+      : entry?.status ?? (invite && expiresMs != null && expiresMs <= now ? 'expired' : invite?.status);
 
     return NextResponse.json({
       success: true,
@@ -86,6 +87,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         entryId: entry?.id ?? invite?.cashbackEntryId ?? null,
         amount,
         notes: entry?.notes ?? invite?.notes ?? null,
+        referenceNumber: invite?.referenceNumber ?? null,
         destination: entry?.destination ?? 'upi',
         source: entry?.source ?? 'payout_invite',
         status,
@@ -97,6 +99,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         expiresAt: invite?.expiresAt ?? entry?.payoutInvite?.expiresAt ?? null,
         claimedAt: invite?.claimedAt ?? null,
         claimedName: invite?.claimedName ?? entry?.payoutInvite?.claimedName ?? null,
+        claimedBusinessName: invite?.claimedBusinessName ?? entry?.payoutInvite?.claimedBusinessName ?? null,
         user: entry?.user ?? invite?.user ?? null,
         campaign: entry?.campaign ?? null,
         order: entry?.order ?? null,

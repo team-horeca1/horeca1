@@ -5,10 +5,11 @@ import { CheckCircle2, IndianRupee, Loader2, XCircle } from 'lucide-react';
 
 type Preview = {
   amount: number;
+  notes: string | null;
   claimed: boolean;
   expired: boolean;
   status: string;
-  expiresAt: string;
+  expiresAt: string | null;
   trackingKey: string | null;
 };
 
@@ -30,6 +31,7 @@ export default function PayoutClaimClient({ token }: { token: string }) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [message, setMessage] = useState('');
   const [name, setName] = useState('');
+  const [businessName, setBusinessName] = useState('');
   const [upiId, setUpiId] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -80,7 +82,11 @@ export default function PayoutClaimClient({ token }: { token: string }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ name: name.trim(), upiId: upiId.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          businessName: businessName.trim(),
+          upiId: upiId.trim(),
+        }),
       });
       const payload: unknown = await res.json();
       if (!res.ok) {
@@ -101,8 +107,8 @@ export default function PayoutClaimClient({ token }: { token: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-md px-[clamp(1rem,3vw,2rem)] py-[clamp(2rem,8vw,5rem)]">
-      <div className="rounded-2xl bg-white p-[clamp(1.25rem,4vw,2rem)] shadow-sm ring-1 ring-gray-100">
+    <div className="mx-auto max-w-md px-[clamp(0.75rem,4vw,1.25rem)] py-[clamp(1rem,5vw,2.5rem)]">
+      <div className="rounded-2xl bg-white p-[clamp(1rem,3vw,1.5rem)] shadow-sm ring-1 ring-gray-100">
         {view === 'loading' && (
           <div className="flex flex-col items-center gap-3 py-10 text-[#7C7C7C]">
             <Loader2 className="h-8 w-8 animate-spin text-[#53B175]" />
@@ -134,28 +140,41 @@ export default function PayoutClaimClient({ token }: { token: string }) {
         )}
 
         {view === 'form' && preview && (
-          <form onSubmit={onSubmit} className="space-y-5">
+          <form onSubmit={onSubmit} className="space-y-4">
+            {preview.notes ? (
+              <p className="rounded-xl bg-amber-50 px-4 py-3 text-[13px] font-medium text-amber-900">{preview.notes}</p>
+            ) : null}
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-50">
                 <IndianRupee className="h-6 w-6 text-amber-600" />
               </div>
               <div>
-                <p className="text-sm text-[#7C7C7C]">You are claiming</p>
+                <p className="text-sm text-[#7C7C7C]">Amount</p>
                 <p className="text-[clamp(1.5rem,4vw,2rem)] font-semibold text-[#181725]">
                   ₹{preview.amount.toLocaleString('en-IN')}
                 </p>
               </div>
             </div>
-            <p className="text-sm text-[#7C7C7C]">Enter your name and UPI ID. The amount cannot be changed.</p>
             <label className="block text-left">
-              <span className="mb-1.5 block text-sm font-medium text-[#181725]">Name</span>
+              <span className="mb-1.5 block text-sm font-medium text-[#181725]">First name</span>
               <input
                 required
                 maxLength={255}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-[#53B175]"
-                autoComplete="name"
+                autoComplete="given-name"
+              />
+            </label>
+            <label className="block text-left">
+              <span className="mb-1.5 block text-sm font-medium text-[#181725]">Business name</span>
+              <input
+                required
+                maxLength={255}
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-[#53B175]"
+                autoComplete="organization"
               />
             </label>
             <label className="block text-left">

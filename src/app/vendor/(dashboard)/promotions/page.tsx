@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Loader2, Plus, Trash2, ToggleLeft, ToggleRight, Tag,
-  Percent, IndianRupee, Gift, Calendar, X, Search,
+  Percent, IndianRupee, Gift, Calendar, X, Search, Ticket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { VendorCouponsTab, VendorCashbackTab } from '@/components/features/vendor/promotions/PromoEngineTabs';
+import { CashbackUpiPanel } from '@/components/features/promo/CashbackUpiPanel';
 import {
   buildPromotionPayload,
   promotionPublishSuccessMessage,
@@ -411,7 +413,7 @@ function PromotionModal({
 
 // ─── Store Offers tab (legacy auto-applied store promotions + BXGY) ───────────
 
-function StoreOffersTab() {
+export function StoreOffersTab() {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -640,39 +642,59 @@ function StoreOffersTab() {
   );
 }
 
-// ─── Main Page (Promo Engine Phase 1) ─────────────────────────────────────────
-// Three tools side by side: auto-applied Store Offers (legacy), Coupons
-// (code-based, customer applies at checkout) and Cashback campaigns
-// (earned on delivery → Rewards Wallet).
+// ─── Main Page ────────────────────────────────────────────────────────────────
+// Coupon · Cashback Wallet · Cashback UPI. Store Offers stays in this file
+// but is hidden from the tab bar.
+
+type VendorPromoTab = 'coupons' | 'cashback' | 'payouts';
 
 export default function PromotionsPage() {
-  const [tab, setTab] = useState<'offers' | 'coupons' | 'cashback'>('offers');
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const [tab, setTab] = useState<VendorPromoTab>(
+    tabFromUrl === 'payouts' || tabFromUrl === 'cashback' || tabFromUrl === 'coupons'
+      ? tabFromUrl
+      : 'coupons',
+  );
+
+  const TABS: Array<{ id: VendorPromoTab; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = [
+    { id: 'coupons', label: 'Coupon', icon: Ticket },
+    { id: 'cashback', label: 'Cashback Wallet', icon: Gift },
+    { id: 'payouts', label: 'Cashback UPI', icon: IndianRupee },
+  ];
 
   return (
-    <div className="space-y-5 pb-10 max-w-5xl">
+    <div className="w-full min-w-0 space-y-5 pb-10">
       <div>
         <h1 className="text-[22px] font-bold text-[#181725]">Promotions</h1>
-        <p className="text-[12px] text-[#AEAEAE]">Discounts, coupons and cashback to grow repeat orders</p>
+        <p className="text-[12px] text-[#AEAEAE]">Coupons, wallet cashback, and UPI payout links</p>
       </div>
 
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-        {([['offers', 'Store Offers'], ['coupons', 'Coupons'], ['cashback', 'Cashback']] as const).map(([id, label]) => (
+        {TABS.map((t) => (
           <button
-            key={id}
-            onClick={() => setTab(id)}
+            key={t.id}
+            onClick={() => setTab(t.id)}
             className={cn(
-              'px-4 py-2 rounded-lg text-[12px] font-bold transition-colors cursor-pointer',
-              tab === id ? 'bg-white text-[#181725] shadow-sm' : 'text-gray-500 hover:text-gray-700',
+              'inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-bold transition-colors cursor-pointer',
+              tab === t.id ? 'bg-white text-[#181725] shadow-sm' : 'text-gray-500 hover:text-gray-700',
             )}
           >
-            {label}
+            <t.icon size={14} /> {t.label}
           </button>
         ))}
       </div>
 
-      {tab === 'offers' && <StoreOffersTab />}
       {tab === 'coupons' && <VendorCouponsTab />}
       {tab === 'cashback' && <VendorCashbackTab />}
+      {tab === 'payouts' && (
+        <CashbackUpiPanel
+          listUrl="/api/v1/vendor/promotions/payout-invites"
+          createUrl="/api/v1/vendor/promotions/payout-invites"
+          detailHref={(key) => `/vendor/promotions/payouts/${encodeURIComponent(key)}`}
+          markPaidUrl={(row) => `/api/v1/vendor/promotions/payout-invites/${row.id}`}
+        />
+      )}
     </div>
   );
 }

@@ -1,19 +1,15 @@
 'use client';
 
-// /admin/promotions — Promo Engine Phase 1 admin console.
-// Tabs: Coupons, Cashback campaigns, Programs (welcome / first-order / referral),
-// and Payouts (UPI magic links + optional instant H1 Wallet grants).
+// /admin/promotions — Coupon, Cashback Wallet, Cashback UPI.
+// Programs stay in code but are hidden from the tab bar.
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import Link from 'next/link';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Loader2, Plus, Pencil, Trash2, Gift, Ticket, IndianRupee, Search, X, Sparkles, Eye } from 'lucide-react';
+import { Loader2, Plus, Pencil, Trash2, Gift, Ticket, IndianRupee, X, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { ProgramsTab } from '@/components/features/admin/promotions/ProgramsTab';
-import { PayoutInviteModal } from '@/components/features/admin/promotions/PayoutInviteModal';
-import { MarkPaidModal } from '@/components/features/admin/promotions/MarkPaidModal';
 import { AudienceUserPicker, CouponScopeFields } from '@/components/features/promo/CouponScopePickers';
+import { CashbackUpiPanel } from '@/components/features/promo/CashbackUpiPanel';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -65,22 +61,6 @@ interface CampaignRow {
     _count?: { entries: number };
 }
 
-interface EntryRow {
-    id: string;
-    amount: string | number;
-    destination: 'wallet' | 'upi';
-    status: 'pending' | 'approved' | 'credited' | 'paid' | 'cancelled' | 'awaiting_claim';
-    source: 'order' | 'direct_grant' | 'welcome' | 'first_order' | 'referral' | 'payout_invite';
-    upiId: string | null;
-    paidReference: string | null;
-    notes: string | null;
-    trackingKey: string | null;
-    createdAt: string;
-    rowKind?: 'entry' | 'invite';
-    user: { id: string; fullName: string; phone: string | null; email: string | null; businessName: string | null };
-    campaign: { id: string; name: string } | null;
-    order: { id: string; orderNumber: string } | null;
-}
 
 interface UserHit {
     id: string;
@@ -90,7 +70,7 @@ interface UserHit {
     businessName: string | null;
 }
 
-type Tab = 'coupons' | 'cashback' | 'programs' | 'payouts';
+type Tab = 'coupons' | 'cashback' | 'payouts';
 
 const inr = (v: string | number | null | undefined) => `₹${Number(v ?? 0).toLocaleString('en-IN')}`;
 const fmtDate = (v: string | null) => (v ? new Date(v).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
@@ -106,30 +86,6 @@ const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px]
 const labelCls = 'block text-[11px] font-bold text-gray-500 mb-1';
 const thCls = 'px-3 py-2.5 text-left text-[10px] uppercase tracking-wider font-bold text-gray-400';
 const tdCls = 'px-3 py-2.5 text-[12px] font-medium text-gray-700';
-
-function payoutRowMatches(e: EntryRow, q: string): boolean {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return true;
-    const hay = [
-        e.trackingKey,
-        e.notes,
-        e.upiId,
-        e.paidReference,
-        e.user.fullName,
-        e.user.phone,
-        e.user.email,
-        e.user.businessName,
-        e.status,
-        e.source,
-    ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-    if (hay.includes(needle) || hay.replace(/[\s-]/g, '').includes(needle.replace(/[\s-]/g, ''))) return true;
-    const qDigits = q.replace(/\D/g, '');
-    const phoneDigits = (e.user.phone ?? '').replace(/\D/g, '');
-    return qDigits.length >= 4 && phoneDigits.includes(qDigits);
-}
 
 // ─── Coupon form modal ──────────────────────────────────────────────────────
 
@@ -590,81 +546,47 @@ export default function AdminPromotionsPage() {
     const searchParams = useSearchParams();
     const tabFromUrl = searchParams.get('tab');
     const [tab, setTab] = useState<Tab>(
-        tabFromUrl === 'payouts' || tabFromUrl === 'cashback' || tabFromUrl === 'programs' || tabFromUrl === 'coupons'
+        tabFromUrl === 'payouts' || tabFromUrl === 'cashback' || tabFromUrl === 'coupons'
             ? tabFromUrl
             : 'coupons',
     );
     const [loading, setLoading] = useState(true);
     const [coupons, setCoupons] = useState<CouponRow[]>([]);
     const [campaigns, setCampaigns] = useState<CampaignRow[]>([]);
-    const [entries, setEntries] = useState<EntryRow[]>([]);
-    const [entryStatusFilter, setEntryStatusFilter] = useState<string>('approved');
-    const [payoutSearch, setPayoutSearch] = useState('');
-    const [payoutQuery, setPayoutQuery] = useState('');
     const [couponModal, setCouponModal] = useState<{ open: boolean; editing: CouponRow | null }>({ open: false, editing: null });
     const [campaignModal, setCampaignModal] = useState<{ open: boolean; editing: CampaignRow | null }>({ open: false, editing: null });
     const [grantOpen, setGrantOpen] = useState(false);
-    const [inviteOpen, setInviteOpen] = useState(false);
-    const [payoutsRefreshing, setPayoutsRefreshing] = useState(false);
-    const [payTarget, setPayTarget] = useState<EntryRow | null>(null);
-    const [paying, setPaying] = useState(false);
 
-    const load = useCallback(async (which: Tab, statusFilter: string, search = '') => {
-        if (which === 'programs') {
+    const load = useCallback(async (which: Tab) => {
+        if (which === 'payouts') {
             setLoading(false);
             return;
         }
-        const isPayouts = which === 'payouts';
-        if (isPayouts) setPayoutsRefreshing(true);
-        else setLoading(true);
+        setLoading(true);
         try {
             if (which === 'coupons') {
                 const res = await fetch('/api/v1/admin/promotions/coupons');
                 const json = await res.json();
                 if (json?.success) setCoupons(json.data ?? []);
                 else toast.error(json?.error?.message || 'Failed to load coupons');
-            } else if (which === 'cashback') {
+            } else {
                 const res = await fetch('/api/v1/admin/promotions/cashback');
                 const json = await res.json();
                 if (json?.success) setCampaigns(json.data ?? []);
                 else toast.error(json?.error?.message || 'Failed to load campaigns');
-            } else {
-                const params = new URLSearchParams();
-                if (!search && statusFilter) params.set('status', statusFilter);
-                if (search) params.set('search', search);
-                const qs = params.toString() ? `?${params.toString()}` : '';
-                const res = await fetch(`/api/v1/admin/promotions/entries${qs}`);
-                const json = await res.json();
-                if (json?.success) setEntries(json.data?.entries ?? []);
-                else toast.error(json?.error?.message || 'Failed to load payouts');
             }
         } catch {
             toast.error('Failed to load promotions data');
         } finally {
             setLoading(false);
-            setPayoutsRefreshing(false);
         }
     }, []);
 
     useEffect(() => {
-        const t = window.setTimeout(() => {
-            Promise.resolve().then(() => setPayoutQuery(payoutSearch.trim()));
-        }, 300);
-        return () => window.clearTimeout(t);
-    }, [payoutSearch]);
+        load(tab);
+    }, [tab, load]);
 
-    useEffect(() => {
-        load(tab, entryStatusFilter, tab === 'payouts' ? payoutQuery : '');
-    }, [tab, entryStatusFilter, payoutQuery, load]);
-
-    const visibleEntries = useMemo(() => {
-        const q = payoutSearch.trim();
-        if (!q) return entries;
-        if (q === payoutQuery) return entries;
-        return entries.filter((e) => payoutRowMatches(e, q));
-    }, [entries, payoutSearch, payoutQuery]);
-
-    const refresh = () => load(tab, entryStatusFilter, tab === 'payouts' ? payoutQuery : '');
+    const refresh = () => load(tab);
 
     const deleteCoupon = async (c: CouponRow) => {
         if (!confirm(`Delete coupon ${c.code}? Used coupons are deactivated instead.`)) return;
@@ -690,35 +612,10 @@ export default function AdminPromotionsPage() {
         }
     };
 
-    const confirmMarkPaid = async (ref: string) => {
-        if (!payTarget) return;
-        setPaying(true);
-        try {
-            const res = await fetch(`/api/v1/admin/promotions/entries/${payTarget.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ paidReference: ref }),
-            });
-            const json = await res.json();
-            if (res.ok) {
-                toast.success('Marked as paid');
-                setPayTarget(null);
-                refresh();
-            } else {
-                toast.error(json?.error?.message || 'Failed to mark paid');
-            }
-        } catch {
-            toast.error('Failed to mark paid');
-        } finally {
-            setPaying(false);
-        }
-    };
-
     const TABS: Array<{ id: Tab; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }> = [
-        { id: 'coupons', label: 'Coupons', icon: Ticket },
-        { id: 'cashback', label: 'Cashback Campaigns', icon: Gift },
-        { id: 'programs', label: 'Programs', icon: Sparkles },
-        { id: 'payouts', label: 'Payouts & Grants', icon: IndianRupee },
+        { id: 'coupons', label: 'Coupon', icon: Ticket },
+        { id: 'cashback', label: 'Cashback Wallet', icon: Gift },
+        { id: 'payouts', label: 'Cashback UPI', icon: IndianRupee },
     ];
 
     return (
@@ -726,7 +623,7 @@ export default function AdminPromotionsPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                 <div>
                     <h1 className="text-[clamp(1.2rem,1.5vw+0.6rem,1.6rem)] font-bold text-[#181725]">Promotions</h1>
-                    <p className="text-[12px] text-gray-400 font-medium">Coupons, cashback, growth programs, and UPI payout links.</p>
+                    <p className="text-[12px] text-gray-400 font-medium">Coupons, wallet cashback, and UPI payout links.</p>
                 </div>
                 <div className="flex gap-2">
                     {tab === 'coupons' && (
@@ -735,17 +632,12 @@ export default function AdminPromotionsPage() {
                         </button>
                     )}
                     {tab === 'cashback' && (
-                        <button onClick={() => setCampaignModal({ open: true, editing: null })} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold hover:bg-[#48a068] transition-colors cursor-pointer">
-                            <Plus size={14} /> New Campaign
-                        </button>
-                    )}
-                    {tab === 'payouts' && (
                         <>
                             <button onClick={() => setGrantOpen(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-[#181725] text-[12px] font-bold hover:bg-gray-50 transition-colors cursor-pointer">
                                 Instant H1 Wallet grant
                             </button>
-                            <button onClick={() => setInviteOpen(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold hover:bg-[#48a068] transition-colors cursor-pointer">
-                                <Plus size={14} /> Create payout link
+                            <button onClick={() => setCampaignModal({ open: true, editing: null })} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold hover:bg-[#48a068] transition-colors cursor-pointer">
+                                <Plus size={14} /> New Campaign
                             </button>
                         </>
                     )}
@@ -767,161 +659,13 @@ export default function AdminPromotionsPage() {
                 ))}
             </div>
 
-            {tab === 'programs' ? (
-                <ProgramsTab />
-            ) : tab === 'payouts' ? (
-                <>
-                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                        <div className="flex items-center gap-2 flex-wrap">
-                        {['approved', 'pending', 'credited', 'paid', 'cancelled', ''].map((s) => (
-                            <button
-                                key={s || 'all'}
-                                onClick={() => {
-                                    setPayoutSearch('');
-                                    Promise.resolve().then(() => setPayoutQuery(''));
-                                    setEntryStatusFilter(s);
-                                }}
-                                className={cn(
-                                    'px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors cursor-pointer',
-                                    !payoutSearch.trim() && entryStatusFilter === s ? 'bg-[#181725] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200',
-                                )}
-                            >
-                                {s === '' ? 'All' : s === 'approved' ? 'To Pay (UPI)' : s.charAt(0).toUpperCase() + s.slice(1)}
-                            </button>
-                        ))}
-                        </div>
-                        <div className="relative w-full sm:max-w-md sm:min-w-[280px]">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                            <input
-                                value={payoutSearch}
-                                onChange={(e) => setPayoutSearch(e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') Promise.resolve().then(() => setPayoutQuery(payoutSearch.trim()));
-                                }}
-                                placeholder="Search tracking ID, notes, user, UPI…"
-                                aria-label="Search payouts"
-                                className="w-full pl-9 pr-9 py-2 rounded-xl border border-gray-200 text-[13px] font-medium focus:outline-none focus:border-[#53B175]"
-                            />
-                            {payoutsRefreshing ? (
-                                <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#53B175] animate-spin" />
-                            ) : payoutSearch ? (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setPayoutSearch('');
-                                        Promise.resolve().then(() => setPayoutQuery(''));
-                                    }}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
-                                    aria-label="Clear search"
-                                >
-                                    <X size={14} />
-                                </button>
-                            ) : null}
-                        </div>
-                    </div>
-                    {payoutSearch.trim() ? (
-                        <p className="text-[11px] text-gray-400 font-medium mb-3">
-                            Searching across all statuses for “{payoutSearch.trim()}”
-                        </p>
-                    ) : null}
-                    <div className="bg-white rounded-2xl border border-gray-100 overflow-x-auto">
-                        <table className="w-full min-w-[1080px]">
-                            <thead className="bg-gray-50/70 border-b border-gray-100">
-                                <tr>
-                                    <th className={thCls}>Tracking ID</th>
-                                    <th className={thCls}>User</th>
-                                    <th className={thCls}>Amount</th>
-                                    <th className={thCls}>Notes</th>
-                                    <th className={thCls}>Source</th>
-                                    <th className={thCls}>Destination</th>
-                                    <th className={thCls}>UPI ID</th>
-                                    <th className={thCls}>Status</th>
-                                    <th className={thCls}>Date</th>
-                                    <th className={cn(thCls, 'sticky right-0 bg-gray-50 z-[1] text-right pr-4 shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.12)]')}>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                { (payoutsRefreshing || loading) && visibleEntries.length === 0 && (
-                                    <tr><td colSpan={10} className="px-3 py-16 text-center"><Loader2 size={28} className="text-[#53B175] animate-spin mx-auto" /></td></tr>
-                                )}
-                                {!payoutsRefreshing && !loading && visibleEntries.length === 0 && (
-                                    <tr>
-                                        <td colSpan={10} className="px-3 py-10 text-center text-[13px] text-gray-400">
-                                            {payoutSearch.trim() && payoutSearch.trim() !== payoutQuery
-                                                ? 'Searching…'
-                                                : payoutSearch.trim()
-                                                    ? 'No payouts match that search.'
-                                                    : 'Nothing here for this filter.'}
-                                        </td>
-                                    </tr>
-                                )}
-                                {visibleEntries.map((e) => (
-                                    <tr key={e.id} className="group hover:bg-gray-50/50">
-                                        <td className={cn(tdCls, 'whitespace-nowrap')}>
-                                            {e.trackingKey ? (
-                                                <Link
-                                                    href={`/admin/promotions/payouts/${encodeURIComponent(e.trackingKey)}`}
-                                                    className="font-mono text-[11px] font-bold text-[#53B175] hover:underline"
-                                                >
-                                                    {e.trackingKey}
-                                                </Link>
-                                            ) : <span className="text-gray-300">—</span>}
-                                        </td>
-                                        <td className={cn(tdCls, 'min-w-[140px]')}>
-                                            <p className="font-bold text-[#181725]">{e.user.fullName || e.user.businessName || '—'}</p>
-                                            <p className="text-[10px] text-gray-400">{e.user.phone || e.user.email}</p>
-                                        </td>
-                                        <td className={cn(tdCls, 'font-bold whitespace-nowrap')}>{inr(e.amount)}</td>
-                                        <td className={cn(tdCls, 'max-w-[min(28vw,320px)]')}>
-                                            {e.notes ? (
-                                                <span className="block truncate" title={e.notes}>{e.notes}</span>
-                                            ) : <span className="text-gray-300">—</span>}
-                                        </td>
-                                        <td className={tdCls}>
-                                            {e.source === 'direct_grant' ? 'Direct incentive'
-                                                : e.source === 'payout_invite' ? 'Payout invite'
-                                                    : e.source === 'welcome' ? 'Welcome'
-                                                        : e.source === 'first_order' ? 'First order'
-                                                            : e.source === 'referral' ? 'Referral'
-                                                                : e.campaign?.name ?? 'Order cashback'}
-                                            {e.order?.orderNumber ? <span className="text-gray-400"> · {e.order.orderNumber}</span> : null}
-                                        </td>
-                                        <td className={cn(tdCls, 'whitespace-nowrap')}>{e.destination === 'wallet' ? 'H1 Wallet' : 'UPI'}</td>
-                                        <td className={tdCls}>{e.upiId ?? <span className="text-gray-300">not claimed</span>}</td>
-                                        <td className={tdCls}>
-                                            <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold',
-                                                e.status === 'credited' || e.status === 'paid' ? 'bg-green-50 text-[#53B175]'
-                                                    : e.status === 'cancelled' ? 'bg-gray-100 text-gray-400'
-                                                        : e.status === 'approved' ? 'bg-blue-50 text-blue-600'
-                                                            : e.status === 'awaiting_claim' ? 'bg-purple-50 text-purple-600'
-                                                                : 'bg-amber-50 text-amber-600')}>
-                                                {e.status === 'awaiting_claim' ? 'Awaiting claim' : e.status}
-                                            </span>
-                                            {e.paidReference && <p className="text-[10px] text-gray-400 mt-0.5">UTR: {e.paidReference}</p>}
-                                        </td>
-                                        <td className={cn(tdCls, 'whitespace-nowrap')}>{fmtDate(e.createdAt)}</td>
-                                        <td className={cn(tdCls, 'sticky right-0 bg-white group-hover:bg-gray-50 whitespace-nowrap text-right pr-4 shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.12)]')}>
-                                            {e.trackingKey && (
-                                                <Link
-                                                    href={`/admin/promotions/payouts/${encodeURIComponent(e.trackingKey)}`}
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-bold text-[#181725] hover:bg-gray-50 mr-1.5"
-                                                    title="Open detail"
-                                                >
-                                                    <Eye size={13} /> View
-                                                </Link>
-                                            )}
-                                            {e.status === 'approved' && e.destination === 'upi' && e.rowKind !== 'invite' && (
-                                                <button onClick={() => setPayTarget(e)} className="px-3 py-1.5 rounded-lg bg-[#53B175] text-white text-[11px] font-bold hover:bg-[#48a068] transition-colors cursor-pointer">
-                                                    Mark Paid
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </>
+            {tab === 'payouts' ? (
+                <CashbackUpiPanel
+                    listUrl="/api/v1/admin/promotions/payout-invites"
+                    createUrl="/api/v1/admin/promotions/payout-invites"
+                    detailHref={(key) => `/admin/promotions/payouts/${encodeURIComponent(key)}`}
+                    markPaidUrl={(row) => row.entryId ? `/api/v1/admin/promotions/entries/${row.entryId}` : null}
+                />
             ) : loading ? (
                 <div className="flex items-center justify-center py-20">
                     <Loader2 size={28} className="text-[#53B175] animate-spin" />
@@ -1031,19 +775,6 @@ export default function AdminPromotionsPage() {
             {couponModal.open && <CouponModal editing={couponModal.editing} onClose={() => setCouponModal({ open: false, editing: null })} onSaved={refresh} />}
             {campaignModal.open && <CampaignModal editing={campaignModal.editing} onClose={() => setCampaignModal({ open: false, editing: null })} onSaved={refresh} />}
             {grantOpen && <GrantModal onClose={() => setGrantOpen(false)} onSaved={refresh} />}
-            {inviteOpen && <PayoutInviteModal onClose={() => setInviteOpen(false)} onSaved={refresh} />}
-            {payTarget && (
-                <MarkPaidModal
-                    amountLabel={inr(payTarget.amount)}
-                    upiId={payTarget.upiId}
-                    trackingKey={payTarget.trackingKey}
-                    submitting={paying}
-                    onClose={() => {
-                        if (!paying) setPayTarget(null);
-                    }}
-                    onConfirm={(ref) => void confirmMarkPaid(ref)}
-                />
-            )}
         </div>
     );
 }

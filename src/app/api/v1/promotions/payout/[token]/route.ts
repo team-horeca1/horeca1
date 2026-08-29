@@ -1,5 +1,5 @@
 // GET  /api/v1/promotions/payout/[token] — Public payout-invite preview
-// POST /api/v1/promotions/payout/[token] — Claim with name + UPI only
+// POST /api/v1/promotions/payout/[token] — Claim with first name, business name, UPI
 // PUBLIC: rate-limited. Amount is never taken from the client.
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
     const result = await promotionService.claimPayoutInvite({
       token,
       name: body.name,
+      businessName: body.businessName,
       upiId: body.upiId,
       sessionUserId: session?.user?.id ?? null,
     });

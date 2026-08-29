@@ -10,23 +10,21 @@ import { MarkPaidModal } from '@/components/features/admin/promotions/MarkPaidMo
 
 type Detail = {
   trackingKey: string;
+  inviteId: string;
   entryId: string | null;
   amount: number;
   notes: string | null;
-  destination: 'wallet' | 'upi';
+  referenceNumber: string | null;
+  destination: 'upi';
   status: string;
   upiId: string | null;
   paidReference: string | null;
   paidAt: string | null;
-  creditedAt: string | null;
   createdAt: string;
   expiresAt: string | null;
   claimedAt: string | null;
   claimedName: string | null;
   claimedBusinessName: string | null;
-  referenceNumber: string | null;
-  campaign: { id: string; name: string } | null;
-  order: { id: string; orderNumber: string } | null;
   claimUrl: string | null;
   claimable: boolean;
 };
@@ -44,7 +42,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export default function AdminPayoutDetailPage() {
+export default function VendorPayoutDetailPage() {
   const params = useParams<{ key: string }>();
   const router = useRouter();
   const key = decodeURIComponent(params.key ?? '');
@@ -59,7 +57,7 @@ export default function AdminPayoutDetailPage() {
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/v1/admin/promotions/payouts/${encodeURIComponent(key)}`);
+        const res = await fetch(`/api/v1/vendor/promotions/payouts/${encodeURIComponent(key)}`);
         const json = await res.json();
         if (cancelled) return;
         if (!res.ok) {
@@ -91,10 +89,10 @@ export default function AdminPayoutDetailPage() {
   };
 
   const markPaid = async (ref: string) => {
-    if (!data?.entryId) return;
+    if (!data?.inviteId) return;
     setPaying(true);
     try {
-      const res = await fetch(`/api/v1/admin/promotions/entries/${data.entryId}`, {
+      const res = await fetch(`/api/v1/vendor/promotions/payout-invites/${data.inviteId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paidReference: ref }),
@@ -104,7 +102,7 @@ export default function AdminPayoutDetailPage() {
       toast.success('Marked as paid');
       setPayOpen(false);
       router.refresh();
-      const again = await fetch(`/api/v1/admin/promotions/payouts/${encodeURIComponent(key)}`);
+      const again = await fetch(`/api/v1/vendor/promotions/payouts/${encodeURIComponent(key)}`);
       const againJson = await again.json();
       if (again.ok) setData(againJson.data as Detail);
     } catch (err) {
@@ -117,7 +115,7 @@ export default function AdminPayoutDetailPage() {
   return (
     <div className="w-full min-w-0 max-w-xl">
       <Link
-        href="/admin/promotions?tab=payouts"
+        href="/vendor/promotions?tab=payouts"
         className="inline-flex items-center gap-1.5 text-[12px] font-bold text-gray-500 hover:text-[#181725] mb-4"
       >
         <ArrowLeft size={14} /> Back to Cashback UPI
@@ -141,11 +139,11 @@ export default function AdminPayoutDetailPage() {
               >
                 {data.trackingKey}
               </button>
-              <p className="text-[12px] text-gray-400">{inr(data.amount)} · {data.destination === 'wallet' ? 'H1 Wallet' : 'UPI'}</p>
+              <p className="text-[12px] text-gray-400">{inr(data.amount)} · UPI</p>
             </div>
             <span className={cn(
               'shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold',
-              data.status === 'credited' || data.status === 'paid' ? 'bg-green-50 text-[#53B175]'
+              data.status === 'paid' ? 'bg-green-50 text-[#53B175]'
                 : data.status === 'cancelled' || data.status === 'expired' ? 'bg-gray-100 text-gray-400'
                   : data.status === 'approved' ? 'bg-blue-50 text-blue-600'
                     : data.status === 'awaiting_claim' ? 'bg-purple-50 text-purple-600'
@@ -177,17 +175,13 @@ export default function AdminPayoutDetailPage() {
           <Row label="Business">{data.claimedBusinessName || '—'}</Row>
           <Row label="Message">{data.notes || '—'}</Row>
           <Row label="UPI ID">{data.upiId || 'not claimed'}</Row>
-          {data.order?.orderNumber || data.campaign?.name ? (
-            <Row label="From">{[data.order?.orderNumber, data.campaign?.name].filter(Boolean).join(' · ')}</Row>
-          ) : null}
           <Row label="UTR">{data.paidReference || '—'}</Row>
           <Row label="Created">{fmt(data.createdAt)}</Row>
           {data.expiresAt ? <Row label="Expires">{fmt(data.expiresAt)}</Row> : null}
           {data.claimedAt ? <Row label="Claimed">{fmt(data.claimedAt)}</Row> : null}
           {data.paidAt ? <Row label="Paid">{fmt(data.paidAt)}</Row> : null}
-          {data.creditedAt ? <Row label="Credited">{fmt(data.creditedAt)}</Row> : null}
 
-          {data.status === 'approved' && data.destination === 'upi' && data.entryId && (
+          {data.status === 'approved' && data.entryId && (
             <button
               type="button"
               disabled={paying}

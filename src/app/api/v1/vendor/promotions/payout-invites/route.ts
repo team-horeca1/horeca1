@@ -1,21 +1,24 @@
-// GET  /api/v1/admin/promotions/payout-invites — Invite-first Cashback UPI list
-// POST /api/v1/admin/promotions/payout-invites — Create a UPI payout magic link
-// PROTECTED: Admin only
+// GET  /api/v1/vendor/promotions/payout-invites — Vendor-scoped Cashback UPI list
+// POST /api/v1/vendor/promotions/payout-invites — Create a vendor UPI payout link
+// PROTECTED: Vendor only
 
 import { NextRequest, NextResponse } from 'next/server';
-import { adminOnly } from '@/middleware/rbac';
+import { vendorOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
+import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { promotionService } from '@/modules/promotion/promotion.service';
 import { createPayoutInviteSchema, listPayoutInvitesQuerySchema } from '@/modules/promotion/promotion.validator';
 
-export const GET = adminOnly(async (req: NextRequest, ctx) => {
+export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    const { vendorId } = await resolveVendorContext(ctx, req);
     requirePermission(ctx, 'promotions.view');
     const query = listPayoutInvitesQuerySchema.parse(Object.fromEntries(req.nextUrl.searchParams));
     const search = query.search?.trim() || undefined;
     const invites = await promotionService.listPayoutInvites({
+      vendorId,
       search,
       status: search ? undefined : query.status,
       limit: query.limit,
@@ -26,12 +29,14 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
   }
 });
 
-export const POST = adminOnly(async (req: NextRequest, ctx) => {
+export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    const { vendorId } = await resolveVendorContext(ctx, req);
     requirePermission(ctx, 'promotions.create');
     const body = createPayoutInviteSchema.parse(await req.json());
     const invite = await promotionService.createPayoutInvite({
       createdById: ctx.userId,
+      vendorId,
       amount: body.amount,
       notes: body.notes,
       referenceNumber: body.referenceNumber,
@@ -40,7 +45,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       action: AUDIT_ACTIONS.payoutInviteCreate,
       entity: 'payout_invite',
       entityId: invite.id,
-      after: { amount: Number(invite.amount), referenceNumber: invite.referenceNumber },
+      after: { amount: Number(invite.amount), vendorId, referenceNumber: invite.referenceNumber },
     });
     return NextResponse.json({ success: true, data: invite }, { status: 201 });
   } catch (error) {

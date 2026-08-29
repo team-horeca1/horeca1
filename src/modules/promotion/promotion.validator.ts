@@ -237,12 +237,18 @@ export const upsertReferralProgramSchema = z
 export const createPayoutInviteSchema = z.object({
   amount: z.number().positive().max(1_000_000),
   notes: z.string().max(500).optional().nullable(),
-  userId: z.string().uuid().optional().nullable(),
-  expiresInDays: z.number().int().min(1).max(90).optional(),
+  referenceNumber: z.string().trim().max(80).optional().nullable(),
+});
+
+export const listPayoutInvitesQuerySchema = z.object({
+  status: z.enum(['awaiting_claim', 'approved', 'paid', 'cancelled']).optional(),
+  search: z.string().trim().max(80).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
 export const claimPayoutInviteSchema = z.object({
   name: z.string().trim().min(1).max(255),
+  businessName: z.string().trim().min(1).max(255),
   upiId: z
     .string()
     .min(5)

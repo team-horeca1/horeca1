@@ -901,20 +901,33 @@ export async function onOrdersBecameSuccessful(orderIds: string[]): Promise<void
 
 // ── Payout magic links ───────────────────────────────────────────────────
 
+function payoutClaimUrl(token: string): string {
+  const base = appBaseUrl();
+  return base ? `${base}/payout/${token}` : `/payout/${token}`;
+}
+
+function inviteIsExpired(expiresAt: Date | null): boolean {
+  return expiresAt != null && expiresAt.getTime() < Date.now();
+}
+
+function inviteIsAwaitingClaim(status: string, expiresAt: Date | null): boolean {
+  return status === 'pending' && !inviteIsExpired(expiresAt);
+}
+
+export type PayoutInviteListStatus = 'awaiting_claim' | 'approved' | 'paid' | 'cancelled';
+
 export async function createPayoutInvite(args: {
   createdById: string;
   amount: number;
   notes?: string | null;
-  userId?: string | null;
-  expiresInDays?: number;
+  referenceNumber?: string | null;
+  vendorId?: string | null;
 }) {
   const amount = r2(args.amount);
-  if (args.userId) {
-    const user = await prisma.user.findUnique({ where: { id: args.userId }, select: { id: true } });
-    if (!user) throw Errors.notFound('User');
+  if (args.vendorId) {
+    const vendor = await prisma.vendor.findUnique({ where: { id: args.vendorId }, select: { id: true } });
+    if (!vendor) throw Errors.notFound('Vendor');
   }
-  const days = args.expiresInDays ?? 7;
-  const expiresAt = new Date(Date.now() + days * 86_400_000);
 
   for (let attempt = 0; attempt < 8; attempt++) {
     const token = newToken();
@@ -924,16 +937,16 @@ export async function createPayoutInvite(args: {
           token,
           amount,
           notes: args.notes ?? null,
+          referenceNumber: args.referenceNumber?.trim() || null,
           trackingKey: await uniquePayoutTrackingKey(prisma),
-          expiresAt,
-          userId: args.userId ?? null,
+          expiresAt: null,
+          vendorId: args.vendorId ?? null,
           createdById: args.createdById,
         },
       });
-      const base = appBaseUrl();
       return {
         ...invite,
-        claimUrl: base ? `${base}/payout/${invite.token}` : `/payout/${invite.token}`,
+        claimUrl: payoutClaimUrl(invite.token),
       };
     } catch (error) {
       if (isPrismaUniqueViolation(error)) continue;
@@ -943,11 +956,104 @@ export async function createPayoutInvite(args: {
   throw Errors.badRequest('Could not allocate a payout link. Please retry.');
 }
 
+export function mapPayoutInviteRow(invite: {
+  id: string;
+  token: string;
+  amount: Prisma.Decimal | number;
+  notes: string | null;
+  referenceNumber: string | null;
+  trackingKey: string | null;
+  status: string;
+  expiresAt: Date | null;
+  claimedAt: Date | null;
+  claimedName: string | null;
+  claimedBusinessName: string | null;
+  claimedUpiId: string | null;
+  createdAt: Date;
+  cashbackEntry: { id: string; status: string; paidReference: string | null; paidAt: Date | null; upiId: string | null } | null;
+}) {
+  const entry = invite.cashbackEntry;
+  const status: PayoutInviteListStatus | 'expired' =
+    invite.status === 'cancelled'
+      ? 'cancelled'
+      : inviteIsAwaitingClaim(invite.status, invite.expiresAt)
+        ? 'awaiting_claim'
+        : invite.status === 'pending' && inviteIsExpired(invite.expiresAt)
+          ? 'expired'
+          : entry?.status === 'paid'
+            ? 'paid'
+            : 'approved';
+
+  return {
+    id: invite.id,
+    trackingKey: invite.trackingKey,
+    referenceNumber: invite.referenceNumber,
+    amount: Number(invite.amount),
+    notes: invite.notes,
+    claimUrl: payoutClaimUrl(invite.token),
+    claimedName: invite.claimedName,
+    claimedBusinessName: invite.claimedBusinessName,
+    claimedUpiId: invite.claimedUpiId ?? entry?.upiId ?? null,
+    claimedAt: invite.claimedAt,
+    createdAt: invite.createdAt,
+    status,
+    entryId: entry?.id ?? null,
+    paidReference: entry?.paidReference ?? null,
+    paidAt: entry?.paidAt ?? null,
+  };
+}
+
+export async function listPayoutInvites(args: {
+  vendorId?: string;
+  search?: string;
+  status?: PayoutInviteListStatus;
+  limit?: number;
+}) {
+  const now = new Date();
+  const q = args.search?.trim();
+  const statusFilter = args.status;
+  const and: Prisma.PayoutInviteWhereInput[] = [];
+  if (args.vendorId) and.push({ vendorId: args.vendorId });
+  if (q) {
+    and.push({
+      OR: [
+        { referenceNumber: { contains: q, mode: 'insensitive' } },
+        { notes: { contains: q, mode: 'insensitive' } },
+        { claimedName: { contains: q, mode: 'insensitive' } },
+        { claimedBusinessName: { contains: q, mode: 'insensitive' } },
+        { claimedUpiId: { contains: q, mode: 'insensitive' } },
+        { trackingKey: { contains: q, mode: 'insensitive' } },
+      ],
+    });
+  }
+  if (statusFilter === 'cancelled') and.push({ status: 'cancelled' });
+  else if (statusFilter === 'awaiting_claim') {
+    and.push({ status: 'pending', OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] });
+  } else if (statusFilter === 'approved') {
+    and.push({ status: 'claimed', cashbackEntry: { status: 'approved' } });
+  } else if (statusFilter === 'paid') {
+    and.push({ status: 'claimed', cashbackEntry: { status: 'paid' } });
+  }
+  const where: Prisma.PayoutInviteWhereInput = and.length ? { AND: and } : {};
+
+  const invites = await prisma.payoutInvite.findMany({
+    where,
+    include: {
+      cashbackEntry: { select: { id: true, status: true, paidReference: true, paidAt: true, upiId: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: args.limit ?? 50,
+  });
+
+  return invites.map(mapPayoutInviteRow);
+}
+
 export async function getPayoutInvitePublic(token: string) {
   const invite = await prisma.payoutInvite.findUnique({
     where: { token },
     select: {
       amount: true,
+      notes: true,
       status: true,
       expiresAt: true,
       claimedAt: true,
@@ -957,17 +1063,19 @@ export async function getPayoutInvitePublic(token: string) {
   if (!invite) throw Errors.notFound('Payout invite');
   return {
     amount: Number(invite.amount),
+    notes: invite.notes,
     status: invite.status,
     expiresAt: invite.expiresAt,
     trackingKey: invite.trackingKey,
     claimed: invite.status === 'claimed' || invite.claimedAt != null,
-    expired: invite.status === 'pending' && invite.expiresAt.getTime() < Date.now(),
+    expired: invite.status === 'pending' && inviteIsExpired(invite.expiresAt),
   };
 }
 
 export async function claimPayoutInvite(args: {
   token: string;
   name: string;
+  businessName: string;
   upiId: string;
   sessionUserId?: string | null;
 }) {
@@ -979,11 +1087,14 @@ export async function claimPayoutInvite(args: {
     if (invite.status === 'claimed' || invite.claimedAt) {
       throw Errors.badRequest('This payout has already been claimed');
     }
-    if (invite.expiresAt.getTime() < Date.now()) {
+    if (inviteIsExpired(invite.expiresAt)) {
       throw Errors.badRequest('This payout link has expired');
     }
 
-    const userId = invite.userId ?? args.sessionUserId ?? invite.createdById;
+    // Ledger user is the pre-attached recipient, or the creator if the link is open.
+    // Never use the browser session — an admin opening the public form would otherwise
+    // stamp their own name and phone onto the claim.
+    const userId = invite.userId ?? invite.createdById;
     const amount = r2(Number(invite.amount));
     const trackingKey = invite.trackingKey ?? (await uniquePayoutTrackingKey(tx));
 
@@ -1007,6 +1118,7 @@ export async function claimPayoutInvite(args: {
         status: 'claimed',
         claimedAt: new Date(),
         claimedName: args.name.trim(),
+        claimedBusinessName: args.businessName.trim(),
         claimedUpiId: args.upiId,
         cashbackEntryId: entry.id,
         trackingKey,
