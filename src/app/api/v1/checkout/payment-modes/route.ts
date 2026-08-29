@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const DEFAULT_MODES = ['cod', 'prepaid', 'credit', 'cheque', 'online'];
 
@@ -17,7 +18,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
     }
 
     const mappings = await prisma.vendorCustomer.findMany({
-      where: { userId: ctx.userId, vendorId: { in: vendorIds } },
+      where: { userId: effectiveCustomerUserId(ctx), vendorId: { in: vendorIds } },
       select: { vendorId: true, allowedPaymentModes: true },
     });
 

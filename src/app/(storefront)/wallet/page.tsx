@@ -194,6 +194,7 @@ export default function DisccoCreditPage() {
       <div className="space-y-3">
         {lines.map((w) => {
           const outstanding = Number(w.outstandingAmount);
+          const reserved = Number(w.reservedAmount ?? 0);
           const due = dueLabel(w.currentDueDate, outstanding);
           const dueClass =
             due.tone === 'overdue' ? 'text-rose-600'
@@ -215,10 +216,14 @@ export default function DisccoCreditPage() {
                   <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
                     {outstanding > 0 ? (
                       <span className="font-semibold text-rose-600">{inr(outstanding)} outstanding</span>
+                    ) : reserved > 0 ? (
+                      <span className="font-semibold text-amber-700">{inr(reserved)} on open orders</span>
                     ) : (
                       <span className="text-gray-500">No outstanding</span>
                     )}
-                    <span className={`font-medium ${dueClass}`}>{due.text}</span>
+                    <span className={`font-medium ${dueClass}`}>
+                      {outstanding > 0 ? due.text : reserved > 0 ? 'Repay after delivery' : due.text}
+                    </span>
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">

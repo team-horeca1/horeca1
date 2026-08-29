@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const schema = z.object({
   razorpay_order_id: z.string().min(1, 'razorpay_order_id is required'),
@@ -20,7 +21,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = schema.parse(await req.json());
     const result = await creditWalletService.verifyRepayment(
-      ctx.userId,
+      effectiveCustomerUserId(ctx),
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,

@@ -788,6 +788,74 @@ export class CreditWalletService {
     });
   }
 
+  /**
+   * Fix reserved that never converted because delivery went through shipLines
+   * (or a same-status delivered PATCH) instead of updateStatus.
+   */
+  async healReservedCreditForUser(userId: string): Promise<void> {
+    const wallets = await prisma.creditWallet.findMany({
+      where: { userId, reservedAmount: { gt: 0 } },
+      select: { id: true, vendorId: true },
+    });
+    if (wallets.length === 0) return;
+
+    const walletIds = wallets.map((w) => w.id);
+    const vendorByWallet = new Map(wallets.map((w) => [w.id, w.vendorId]));
+    const debits = await prisma.creditWalletTxn.findMany({
+      where: { walletId: { in: walletIds }, type: 'ORDER_DEBIT' },
+      select: { walletId: true, referenceId: true },
+    });
+    const refs = [...new Set(debits.map((d) => d.referenceId).filter((id): id is string => Boolean(id)))];
+    if (refs.length === 0) return;
+
+    const [converts, reversals, orders] = await Promise.all([
+      prisma.creditWalletTxn.findMany({
+        where: { walletId: { in: walletIds }, type: 'DELIVERY_CONVERT', referenceId: { in: refs } },
+        select: { walletId: true, referenceId: true },
+      }),
+      prisma.creditWalletTxn.findMany({
+        where: { walletId: { in: walletIds }, type: 'REVERSAL', referenceId: { in: refs } },
+        select: { walletId: true, referenceId: true },
+      }),
+      prisma.order.findMany({
+        where: { id: { in: refs } },
+        select: { id: true, status: true },
+      }),
+    ]);
+
+    const settled = new Set(
+      [...converts, ...reversals].map((t) => `${t.walletId}:${t.referenceId}`),
+    );
+    const orderStatus = new Map(orders.map((o) => [o.id, o.status]));
+
+    for (const debit of debits) {
+      if (!debit.referenceId || settled.has(`${debit.walletId}:${debit.referenceId}`)) continue;
+      const status = orderStatus.get(debit.referenceId);
+      if (status !== 'delivered' && status !== 'cancelled' && status !== 'returned') continue;
+      const vendorId = vendorByWallet.get(debit.walletId) ?? null;
+      const orderId = debit.referenceId;
+      await prisma.$transaction(async (tx) => {
+        if (status === 'delivered') {
+          await this.convertReservedToOutstanding(orderId, userId, vendorId, tx);
+        } else {
+          await this.reverseOrderDebit(orderId, userId, vendorId, tx);
+        }
+      });
+    }
+  }
+
+  /** Heal every wallet still holding reserved credit (admin/vendor list views). */
+  async healAllStuckReservedCredit(): Promise<void> {
+    const stuck = await prisma.creditWallet.findMany({
+      where: { reservedAmount: { gt: 0 } },
+      select: { userId: true },
+      distinct: ['userId'],
+    });
+    for (const row of stuck) {
+      await this.healReservedCreditForUser(row.userId);
+    }
+  }
+
   /** Release an order's credit when cancelled. Releases reserved if not yet
    *  converted; otherwise reduces outstanding. Idempotent. */
   async reverseOrderDebit(orderId: string, userId: string, vendorId: string | null, db: Tx): Promise<void> {

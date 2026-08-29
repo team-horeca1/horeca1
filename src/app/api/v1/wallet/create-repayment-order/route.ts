@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/middleware/auth';
 import { getRazorpay } from '@/lib/razorpay';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const schema = z.object({
   walletId: z.string().uuid(),
@@ -18,7 +19,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const { walletId, amount } = schema.parse(await req.json());
 
     const wallet = await prisma.creditWallet.findUnique({ where: { id: walletId } });
-    if (!wallet || wallet.userId !== ctx.userId) throw Errors.notFound('Credit wallet');
+    if (!wallet || wallet.userId !== effectiveCustomerUserId(ctx)) throw Errors.notFound('Credit wallet');
 
     if (amount > Number(wallet.outstandingAmount)) {
       throw Errors.badRequest(`Repayment ₹${amount} exceeds outstanding ₹${Number(wallet.outstandingAmount)}`);

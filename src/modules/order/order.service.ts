@@ -37,6 +37,28 @@ import {
 const CREDIT_PAYMENTS = ['credit', 'vendor_credit', 'h1_wallet', 'wallet', 'discco'];
 const isCreditPayment = (m: string | null | undefined): boolean => !!m && CREDIT_PAYMENTS.includes(m);
 
+function creditVendorIdForOrder(
+  paymentMethod: string | null | undefined,
+  vendorId: string,
+): string | null {
+  return paymentMethod === 'h1_wallet' || paymentMethod === 'wallet' ? null : vendorId;
+}
+
+/** Reserve→outstanding on deliver; release on cancel. Idempotent. */
+async function applyCreditLedgerForStatus(
+  tx: Prisma.TransactionClient,
+  order: { id: string; userId: string; vendorId: string; paymentMethod: string | null },
+  status: string,
+) {
+  if (!isCreditPayment(order.paymentMethod)) return;
+  const creditVendorId = creditVendorIdForOrder(order.paymentMethod, order.vendorId);
+  if (status === 'cancelled') {
+    await creditWalletService.reverseOrderDebit(order.id, order.userId, creditVendorId, tx);
+  } else if (status === 'delivered') {
+    await creditWalletService.convertReservedToOutstanding(order.id, order.userId, creditVendorId, tx);
+  }
+}
+
 // VendorCustomer.status values that stop the customer from placing orders with
 // that vendor. Scoped per relationship — other vendors are unaffected.
 const BLOCKED_CUSTOMER_STATUSES = ['blocked', 'suspended'];
@@ -1780,6 +1802,8 @@ export class OrderService {
         });
       }
 
+      await applyCreditLedgerForStatus(tx, order, toStatus);
+
       return updated;
     });
 
@@ -1887,6 +1911,8 @@ export class OrderService {
         })),
       );
 
+      await applyCreditLedgerForStatus(tx, order, toStatus);
+
       return updated;
     });
 
@@ -1964,6 +1990,11 @@ export class OrderService {
       // re-deliver / re-confirm does not 400 and can stay idempotent for
       // cashback settle + program issuance callers).
       if (order.status === status) {
+        // shipLines can already set delivered without running the credit
+        // ledger. Re-deliver must still convert reserved → outstanding.
+        if (status === 'delivered' || status === 'cancelled') {
+          await applyCreditLedgerForStatus(tx, order, status);
+        }
         return order;
       }
 
@@ -2089,14 +2120,7 @@ export class OrderService {
 
       // Credit side-effect — reserved at order create; convert to outstanding on
       // delivery; release reserved/outstanding on cancel (idempotent).
-      if (isCreditPayment(order.paymentMethod)) {
-        const creditVendorId = (order.paymentMethod === 'h1_wallet' || order.paymentMethod === 'wallet') ? null : vendorId;
-        if (status === 'cancelled') {
-          await creditWalletService.reverseOrderDebit(orderId, order.userId, creditVendorId, tx);
-        } else if (status === 'delivered') {
-          await creditWalletService.convertReservedToOutstanding(orderId, order.userId, creditVendorId, tx);
-        }
-      }
+      await applyCreditLedgerForStatus(tx, order, status);
 
       // Promo Engine Phase 1 side-effects — all idempotent, all inside this tx:
       //   cancelled → reverse the coupon use, refund the Rewards Wallet amount,

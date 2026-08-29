@@ -31,6 +31,7 @@ export function AdminCreditWalletCard({
 }: AdminCreditWalletCardProps) {
   const pct = utilizationPct(w);
   const outstanding = Number(w.outstandingAmount);
+  const reserved = Number(w.reservedAmount ?? 0);
   const isH1 = !w.vendorId;
 
   return (
@@ -59,6 +60,11 @@ export function AdminCreditWalletCard({
         >
           {isH1 ? 'H1 Platform Wallet' : w.vendor?.businessName ?? 'Vendor'}
         </span>
+        {reserved > 0 && (
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+            {fmtMoney(reserved)} reserved
+          </span>
+        )}
         {w.overdueDays > 0 && outstanding > 0 && (
           <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600">
             {w.overdueDays}d overdue

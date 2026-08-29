@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/middleware/auth';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 function extractWalletId(req: NextRequest): string {
   const segments = new URL(req.url).pathname.split('/').filter(Boolean);
@@ -16,6 +17,14 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
     const walletId = extractWalletId(req);
     if (!walletId) throw Errors.badRequest('walletId required');
 
+    const ownerId = effectiveCustomerUserId(ctx);
+    const existing = await prisma.creditWallet.findUnique({
+      where: { id: walletId },
+      select: { userId: true },
+    });
+    if (!existing || existing.userId !== ownerId) throw Errors.notFound('Credit line');
+    await creditWalletService.healReservedCreditForUser(ownerId);
+
     const wallet = await prisma.creditWallet.findUnique({
       where: { id: walletId },
       include: {
@@ -25,8 +34,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
         penalties: { orderBy: { createdAt: 'desc' }, take: 20 },
       },
     });
-
-    if (!wallet || wallet.userId !== ctx.userId) throw Errors.notFound('Credit line');
+    if (!wallet) throw Errors.notFound('Credit line');
 
     const terms = await creditWalletService.resolveWalletConfig(wallet.id);
 

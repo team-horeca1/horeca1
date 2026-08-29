@@ -27,6 +27,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
     requirePermission(ctx, 'customers.view');
     const id = extractId(req);
+    await creditWalletService.healReservedCreditForUser(id);
 
     const user = await prisma.user.findUnique({
       where: { id },

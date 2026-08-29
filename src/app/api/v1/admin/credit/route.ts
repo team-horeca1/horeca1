@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
+import { creditWalletService } from '@/modules/credit/creditWallet.service';
 
 export const GET = adminOnly(async (req: NextRequest, ctx) => {
   requirePermission(ctx, 'payments.view');
@@ -29,6 +30,8 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         ],
       };
     }
+
+    await creditWalletService.healAllStuckReservedCredit();
 
     const wallets = await prisma.creditWallet.findMany({
       where,

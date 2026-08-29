@@ -265,6 +265,16 @@ export default function DisccoCreditDetailPage() {
         </div>
       )}
 
+      {outstanding <= 0 && Number(wallet.reservedAmount ?? 0) > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5">
+          <h2 className="text-[15px] font-bold text-[#181725]">Pay after delivery</h2>
+          <p className="text-[13px] text-gray-600 mt-1">
+            {inr(wallet.reservedAmount ?? 0)} is reserved on orders that are not delivered yet.
+            The Pay now button appears once those orders convert to outstanding.
+          </p>
+        </div>
+      )}
+
       {outstanding > 0 && (
         <div className="rounded-2xl border border-[#53B175]/25 bg-[#53B175]/5 p-5 space-y-3">
           <h2 className="text-[15px] font-bold text-[#181725]">Repay</h2>

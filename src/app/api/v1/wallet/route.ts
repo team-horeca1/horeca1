@@ -6,11 +6,14 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
   try {
+    const userId = effectiveCustomerUserId(ctx);
+    await creditWalletService.healReservedCreditForUser(userId);
     const wallets = await prisma.creditWallet.findMany({
-      where: { userId: ctx.userId },
+      where: { userId },
       orderBy: { createdAt: 'asc' },
       include: {
         vendor: { select: { id: true, businessName: true } },
