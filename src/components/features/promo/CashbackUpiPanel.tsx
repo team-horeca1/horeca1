@@ -208,31 +208,19 @@ export function CashbackUpiPanel({
             ) : null}
 
             <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
-                <table className="w-full min-w-[760px] table-fixed">
-                    <colgroup>
-                        <col className="w-[88px]" />
-                        <col className="w-[72px]" />
-                        <col />
-                        <col className="w-[72px]" />
-                        <col className="w-[132px]" />
-                        <col className="w-[120px]" />
-                        <col className="w-[72px]" />
-                        <col className="w-[72px]" />
-                        <col className="w-[76px]" />
-                        <col className="w-[148px]" />
-                    </colgroup>
+                <table className="w-full">
                     <thead className="bg-gray-50/80 border-b border-gray-100">
                         <tr>
                             <th className={thCls}>Reference</th>
                             <th className={thCls}>Amount</th>
-                            <th className={thCls}>Message</th>
-                            <th className={thCls}>Link</th>
+                            <th className={cn(thCls, 'w-[1%] max-w-[10rem]')}>Message</th>
+                            <th className={cn(thCls, 'w-[1%]')}>Link</th>
                             <th className={thCls}>Name / business</th>
                             <th className={thCls}>UPI ID</th>
                             <th className={thCls}>Filled</th>
                             <th className={thCls}>Created</th>
                             <th className={thCls}>Status</th>
-                            <th className={cn(thCls, 'sticky right-0 bg-gray-50 z-[1] text-right pr-3 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.08)]')}>Actions</th>
+                            <th className={cn(thCls, 'w-[1%] sticky right-0 bg-gray-50 z-[1] text-right pr-3 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.08)]')}>Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -256,14 +244,14 @@ export function CashbackUpiPanel({
                                     {e.referenceNumber || '—'}
                                 </td>
                                 <td className={cn(tdCls, 'font-bold text-[#181725] tabular-nums')}>{inr(e.amount)}</td>
-                                <td className={tdCls}>
-                                    {e.notes ? <span className="block truncate" title={e.notes}>{e.notes}</span> : <span className="text-gray-300">—</span>}
+                                <td className={cn(tdCls, 'max-w-[10rem]')}>
+                                    {e.notes ? <span className="block max-w-[10rem] truncate" title={e.notes}>{e.notes}</span> : <span className="text-gray-300">—</span>}
                                 </td>
-                                <td className={tdCls}>
+                                <td className={cn(tdCls, 'px-1.5')}>
                                     <button
                                         type="button"
                                         onClick={() => void copyLink(e.claimUrl)}
-                                        className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-[11px] font-bold text-[#181725] hover:border-[#53B175] hover:text-[#53B175] cursor-pointer"
+                                        className="inline-flex items-center gap-0.5 rounded-md border border-gray-200 bg-white px-1.5 py-1 text-[11px] font-bold text-[#181725] hover:border-[#53B175] hover:text-[#53B175] cursor-pointer"
                                         title={e.claimUrl}
                                     >
                                         <Copy size={11} /> Copy
@@ -294,17 +282,20 @@ export function CashbackUpiPanel({
                                     </span>
                                 </td>
                                 <td className={cn(tdCls, 'sticky right-0 bg-white group-hover:bg-gray-50 text-right pr-3 shadow-[-6px_0_8px_-6px_rgba(0,0,0,0.08)]')}>
-                                    <div className="inline-flex items-center justify-end gap-1.5">
+                                    <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
                                         {e.trackingKey && (
                                             <Link
                                                 href={detailHref(e.trackingKey)}
-                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 text-[11px] font-bold text-[#181725] hover:bg-gray-50"
+                                                className="inline-flex shrink-0 items-center gap-1 px-2 py-1 rounded-md border border-gray-200 text-[11px] font-bold text-[#181725] hover:bg-gray-50"
                                             >
                                                 <Eye size={12} /> View
                                             </Link>
                                         )}
                                         {e.status === 'approved' && e.entryId && markPaidUrl(e) && (
-                                            <button onClick={() => setPayTarget(e)} className="px-2 py-1 rounded-md bg-[#53B175] text-white text-[11px] font-bold hover:bg-[#48a068] cursor-pointer">
+                                            <button
+                                                onClick={() => setPayTarget(e)}
+                                                className="shrink-0 whitespace-nowrap px-2.5 py-1 rounded-md bg-[#53B175] text-white text-[11px] font-bold hover:bg-[#48a068] cursor-pointer"
+                                            >
                                                 Mark Paid
                                             </button>
                                         )}
