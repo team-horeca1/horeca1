@@ -232,7 +232,7 @@ const EMPTY_FORM: ProductForm = {
     countryOfOrigin: '',
     taxPercent: '0',
     minOrderQty: '1',
-    creditEligible: false,
+    creditEligible: true,
     isFeatured: false,
     fssaiRef: '',
     substituteIds: [],
@@ -1460,7 +1460,7 @@ export default function VendorProductsPage() {
             unit: form.unit || undefined,
             description: form.description || undefined,
             imageUrl: form.imageUrl || undefined,
-            creditEligible: form.creditEligible,
+            creditEligible: true,
             isFeatured: form.isFeatured,
             sku: form.sku || undefined,
             hsn: form.hsn || undefined,
@@ -3971,12 +3971,14 @@ export default function VendorProductsPage() {
                                                         <span className="text-[13px] font-bold text-[#181725]">Featured</span>
                                                     </div>
                                                 </label>
-                                                <label className="flex items-center gap-3 cursor-pointer">
+                                                <label className="flex items-center gap-3 cursor-default">
                                                     <input
                                                         type="checkbox"
-                                                        checked={form.creditEligible}
-                                                        onChange={(e) => updateField('creditEligible', e.target.checked)}
-                                                        className="w-5 h-5 accent-[#7B1FA2]"
+                                                        checked
+                                                        disabled
+                                                        readOnly
+                                                        aria-readonly="true"
+                                                        className="w-5 h-5 accent-[#7B1FA2] disabled:opacity-100"
                                                     />
                                                     <div>
                                                         <span className="text-[13px] font-bold text-[#181725]">DiSCCO credit</span>

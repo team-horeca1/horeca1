@@ -245,7 +245,7 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
       }
       return out;
     }
-    if (action === 'credit') return { creditEligible: cfg.credit.value === 'yes' };
+    if (action === 'credit') return { creditEligible: true };
     if (action === 'featured') return { isFeatured: cfg.featured.value === 'yes' };
     if (action === 'offer') {
       if (!cfg.offer.mode) return null;
@@ -781,10 +781,10 @@ function ConfigPanel({ action, cfg, setCfg, config, priceLists, targetProducts }
   if (action === 'credit') {
     return (
       <Field label="Credit (DiSCCO) eligibility">
-        <div className="grid grid-cols-2 gap-2">
-          <Chip active={cfg.credit.value === 'yes'} onClick={() => setCfg((p) => ({ ...p, credit: { value: 'yes' } }))} label="Eligible" />
-          <Chip active={cfg.credit.value === 'no'} onClick={() => setCfg((p) => ({ ...p, credit: { value: 'no' } }))} label="Not eligible" />
-        </div>
+        <span className="inline-flex items-center h-[36px] px-3 rounded-[9px] text-[12px] font-bold bg-[#299E60] text-white">
+          Eligible
+        </span>
+        <p className="text-[11px] text-[#AEAEAE] font-medium mt-2">DiSCCO credit stays on for all products.</p>
       </Field>
     );
   }

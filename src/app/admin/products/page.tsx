@@ -225,7 +225,7 @@ const EMPTY_FORM: ProductFormData = {
     taxPercent: '0',
     unit: 'piece',
     minOrderQty: '1',
-    creditEligible: false,
+    creditEligible: true,
     imageUrl: '',
     priceSlabs: [],
     packSize: '',
@@ -712,7 +712,7 @@ export default function ProductsPage() {
                         hsn: m.hsn ?? null,
                         taxPercent: Number(m.taxPercent) || 0,
                         minOrderQty: 1,
-                        creditEligible: false,
+                        creditEligible: true,
                         description: null,
                         isActive: m.isActive,
                         approvalStatus: m.approvalStatus,
@@ -1266,7 +1266,7 @@ export default function ProductsPage() {
             isActive: !opts.isDraft,
             taxPercent: Number(formData.taxPercent) || 0,
             minOrderQty: Number(formData.minOrderQty) || 1,
-            creditEligible: formData.creditEligible,
+            creditEligible: true,
             metadata,
         };
         if (opts.isDraft) {
@@ -2950,8 +2950,8 @@ export default function ProductsPage() {
                                                 <input type="checkbox" checked={formData.isFeatured} onChange={(e) => updateField('isFeatured', e.target.checked)} className="w-5 h-5 accent-[#F59E0B]" />
                                                 <span className="text-[13px] font-bold text-[#181725]">Featured</span>
                                             </label>
-                                            <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.creditEligible} onChange={(e) => updateField('creditEligible', e.target.checked)} className="w-5 h-5 accent-[#7B1FA2]" />
+                                            <label className="flex items-center gap-3 cursor-default">
+                                                <input type="checkbox" checked disabled readOnly aria-readonly="true" className="w-5 h-5 accent-[#7B1FA2] disabled:opacity-100" />
                                                 <span>
                                                     <span className="block text-[13px] font-bold text-[#181725]">DiSCCO credit</span>
                                                     <span className="block text-[11px] text-[#AEAEAE] font-medium">Pay later on credit line</span>

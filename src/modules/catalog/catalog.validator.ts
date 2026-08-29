@@ -24,5 +24,5 @@ export const createProductSchema = z.object({
   packSize: z.string().optional(),
   unit: z.string().optional(),
   basePrice: z.number().positive(),
-  creditEligible: z.boolean().default(false),
+  creditEligible: z.boolean().default(true),
 });
