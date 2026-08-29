@@ -1,18 +1,13 @@
 'use client';
 
-import { Loader2, RefreshCw, Save } from 'lucide-react';
+import { Loader2, Pencil, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fmtDate, fmtMoney, STATUS_STYLE, type CreditWalletRow } from './adminCreditTypes';
 
 interface AdminCreditWalletCardProps {
   wallet: CreditWalletRow;
-  editing: boolean;
-  editValue: string;
   busy: boolean;
-  onStartEdit: () => void;
-  onEditValueChange: (v: string) => void;
-  onSaveEdit: () => void;
-  onCancelEdit: () => void;
+  onEdit: () => void;
   onReactivate: () => void;
 }
 
@@ -30,13 +25,8 @@ function barColor(pct: number): string {
 
 export function AdminCreditWalletCard({
   wallet: w,
-  editing,
-  editValue,
   busy,
-  onStartEdit,
-  onEditValueChange,
-  onSaveEdit,
-  onCancelEdit,
+  onEdit,
   onReactivate,
 }: AdminCreditWalletCardProps) {
   const pct = utilizationPct(w);
@@ -89,38 +79,7 @@ export function AdminCreditWalletCard({
       <div className="grid grid-cols-3 gap-2 text-center">
         <div>
           <p className="text-[10px] text-[#AEAEAE] uppercase tracking-wide">Limit</p>
-          {editing ? (
-            <div className="flex items-center justify-center gap-1 mt-0.5">
-              <input
-                type="number"
-                min="0"
-                autoFocus
-                value={editValue}
-                onChange={(e) => onEditValueChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') onSaveEdit();
-                  if (e.key === 'Escape') onCancelEdit();
-                }}
-                className="h-[30px] w-[80px] border border-[#EEEEEE] rounded-[8px] px-1 text-[12px] text-center outline-none focus:border-[#299E60]/40"
-              />
-              <button
-                type="button"
-                onClick={onSaveEdit}
-                disabled={busy}
-                className="h-[28px] w-[28px] flex items-center justify-center rounded-[8px] bg-[#299E60] text-white disabled:opacity-50"
-              >
-                <Save size={12} />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={onStartEdit}
-              className="text-[13px] font-bold text-[#181725] hover:text-[#299E60] hover:underline decoration-dotted mt-0.5"
-            >
-              {fmtMoney(w.creditLimit)}
-            </button>
-          )}
+          <p className="text-[13px] font-bold text-[#181725] mt-0.5">{fmtMoney(w.creditLimit)}</p>
         </div>
         <div>
           <p className="text-[10px] text-[#AEAEAE] uppercase tracking-wide">Available</p>
@@ -134,21 +93,29 @@ export function AdminCreditWalletCard({
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-1 border-t border-[#F5F5F5]">
+      <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#F5F5F5]">
         <span className="text-[11px] text-[#AEAEAE]">Due {fmtDate(w.currentDueDate)}</span>
-        {w.status === 'BLACKLISTED' ? (
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={onReactivate}
-            disabled={busy}
-            className="inline-flex items-center gap-1.5 h-[32px] px-3 rounded-[8px] bg-[#EEF8F1] text-[#299E60] text-[12px] font-bold hover:bg-[#299E60] hover:text-white disabled:opacity-50 transition-colors"
+            onClick={onEdit}
+            className="inline-flex items-center gap-1 h-[32px] px-3 rounded-[8px] border border-[#EEEEEE] text-[#181725] text-[12px] font-bold hover:border-[#299E60] hover:text-[#299E60] transition-colors"
           >
-            {busy ? <Loader2 className="animate-spin" size={13} /> : <RefreshCw size={13} />}
-            Reactivate
+            <Pencil size={12} />
+            Edit
           </button>
-        ) : (
-          <span className="text-[11px] text-[#AEAEAE]">—</span>
-        )}
+          {w.status === 'BLACKLISTED' && (
+            <button
+              type="button"
+              onClick={onReactivate}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 h-[32px] px-3 rounded-[8px] bg-[#EEF8F1] text-[#299E60] text-[12px] font-bold hover:bg-[#299E60] hover:text-white disabled:opacity-50 transition-colors"
+            >
+              {busy ? <Loader2 className="animate-spin" size={13} /> : <RefreshCw size={13} />}
+              Reactivate
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

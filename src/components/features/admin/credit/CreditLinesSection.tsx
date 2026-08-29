@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CreditCard, Loader2, Plus, Search } from 'lucide-react';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AdminAssignCreditModal } from './AdminAssignCreditModal';
 import { AdminCreditExplainer } from './AdminCreditExplainer';
@@ -22,10 +21,8 @@ export function CreditLinesSection() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilterKey>('');
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
   const [showAssign, setShowAssign] = useState(false);
+  const [editingWallet, setEditingWallet] = useState<CreditWalletRow | null>(null);
   const [reactivateTarget, setReactivateTarget] = useState<CreditWalletRow | null>(null);
 
   const loadWallets = useCallback(() => {
@@ -50,37 +47,9 @@ export function CreditLinesSection() {
   const filtered = useMemo(() => filterWalletsByStatus(wallets, statusFilter), [wallets, statusFilter]);
   const stats = useMemo(() => computeWalletStats(wallets), [wallets]);
 
-  const saveEdit = async (w: CreditWalletRow) => {
-    const newLimit = Number(editValue);
-    if (!Number.isFinite(newLimit) || newLimit < 0) {
-      toast.error('Enter a valid credit limit');
-      return;
-    }
-    const prevLimit = w.creditLimit;
-    setBusyId(w.id);
-    setWallets((ws) => ws.map((x) => (x.id === w.id ? { ...x, creditLimit: newLimit } : x)));
-    setEditingId(null);
-    try {
-      const res = await fetch('/api/v1/admin/credit/assign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: w.userId,
-          vendorId: w.vendorId,
-          creditLimit: newLimit,
-          remark: 'Credit limit updated by admin',
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error?.message || json.message || 'Failed to update credit limit');
-      toast.success('Credit limit updated');
-      loadWallets();
-    } catch (err) {
-      setWallets((ws) => ws.map((x) => (x.id === w.id ? { ...x, creditLimit: prevLimit } : x)));
-      toast.error(err instanceof Error ? err.message : 'Failed to update credit limit');
-    } finally {
-      setBusyId(null);
-    }
+  const closeAssign = () => {
+    setShowAssign(false);
+    setEditingWallet(null);
   };
 
   return (
@@ -124,7 +93,10 @@ export function CreditLinesSection() {
         </div>
         <button
           type="button"
-          onClick={() => setShowAssign(true)}
+          onClick={() => {
+            setEditingWallet(null);
+            setShowAssign(true);
+          }}
           className="ml-auto h-[38px] px-4 rounded-[10px] bg-[#299E60] text-white text-[12px] font-bold flex items-center gap-2 hover:bg-[#238a54] transition-colors shadow-sm"
         >
           <Plus size={14} />
@@ -142,7 +114,10 @@ export function CreditLinesSection() {
           <p className="text-[14px] font-bold text-[#AEAEAE]">No credit lines match</p>
           <button
             type="button"
-            onClick={() => setShowAssign(true)}
+            onClick={() => {
+              setEditingWallet(null);
+              setShowAssign(true);
+            }}
             className="mt-3 text-[13px] font-semibold text-[#299E60] hover:underline"
           >
             Assign the first credit line
@@ -154,24 +129,23 @@ export function CreditLinesSection() {
             <AdminCreditWalletCard
               key={w.id}
               wallet={w}
-              editing={editingId === w.id}
-              editValue={editValue}
-              busy={busyId === w.id}
-              onStartEdit={() => {
-                setEditingId(w.id);
-                setEditValue(String(w.creditLimit));
+              busy={false}
+              onEdit={() => {
+                setShowAssign(false);
+                setEditingWallet(w);
               }}
-              onEditValueChange={setEditValue}
-              onSaveEdit={() => void saveEdit(w)}
-              onCancelEdit={() => setEditingId(null)}
               onReactivate={() => setReactivateTarget(w)}
             />
           ))}
         </div>
       )}
 
-      {showAssign && (
-        <AdminAssignCreditModal onClose={() => setShowAssign(false)} onSuccess={loadWallets} />
+      {(showAssign || editingWallet) && (
+        <AdminAssignCreditModal
+          editing={editingWallet}
+          onClose={closeAssign}
+          onSuccess={loadWallets}
+        />
       )}
 
       {reactivateTarget && (

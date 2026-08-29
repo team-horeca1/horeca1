@@ -32,6 +32,12 @@ export interface CreditWalletRow {
   createdAt: string;
   user: { id: string; fullName: string; phone: string | null; email: string | null };
   vendor: { businessName: string } | null;
+  overrideRepaymentMode?: string | null;
+  overrideBillingModel?: string | null;
+  overrideCreditTenure?: number | null;
+  overrideGracePeriod?: number | null;
+  overrideInterestRate?: string | number | null;
+  overridePenaltyAmount?: string | number | null;
 }
 
 export interface PickOption {

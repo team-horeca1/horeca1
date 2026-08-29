@@ -1,34 +1,59 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { IndianRupee, Loader2, Plus, X } from 'lucide-react';
+import { IndianRupee, Loader2, Pencil, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { EntityPicker } from './EntityPicker';
-import { INPUT_CLS, type PickOption } from './adminCreditTypes';
+import { INPUT_CLS, type CreditWalletRow, type PickOption } from './adminCreditTypes';
 
 type RepaymentMode = '' | 'REPAY_BEFORE_NEXT_USE' | 'ALLOW_USAGE_TILL_DUE';
 type BillingModel = 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY';
 
 const LIMIT_CHIPS = [10_000, 50_000, 100_000];
 
+function termsFromWallet(wallet: CreditWalletRow): RepaymentMode {
+  const mode = wallet.overrideRepaymentMode;
+  if (mode === 'REPAY_BEFORE_NEXT_USE' || mode === 'ALLOW_USAGE_TILL_DUE') return mode;
+  return '';
+}
+
+function cycleFromWallet(wallet: CreditWalletRow): BillingModel {
+  const model = wallet.overrideBillingModel;
+  if (model === 'WEEKLY' || model === 'FORTNIGHTLY' || model === 'MONTHLY') return model;
+  return 'MONTHLY';
+}
+
+function textOrEmpty(value: string | number | null | undefined): string {
+  if (value == null || value === '') return '';
+  return String(value);
+}
+
 interface AdminAssignCreditModalProps {
+  editing?: CreditWalletRow | null;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function AdminAssignCreditModal({ onClose, onSuccess }: AdminAssignCreditModalProps) {
-  const [formUserId, setFormUserId] = useState('');
-  const [formVendorId, setFormVendorId] = useState('');
-  const [formCreditLimit, setFormCreditLimit] = useState('');
+export function AdminAssignCreditModal({ editing = null, onClose, onSuccess }: AdminAssignCreditModalProps) {
+  const isEdit = Boolean(editing);
+  const [formUserId, setFormUserId] = useState(editing?.userId ?? '');
+  const [formVendorId, setFormVendorId] = useState(editing?.vendorId ?? '');
+  const [formCreditLimit, setFormCreditLimit] = useState(editing ? String(Number(editing.creditLimit)) : '');
   const [formRemark, setFormRemark] = useState('');
-  const [terms, setTerms] = useState<RepaymentMode>('');
-  const [formCreditTenureDays, setFormCreditTenureDays] = useState('');
-  const [cycle, setCycle] = useState<BillingModel>('MONTHLY');
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [formInterestRatePct, setFormInterestRatePct] = useState('');
-  const [formGracePeriodDays, setFormGracePeriodDays] = useState('');
-  const [formPenaltyAmount, setFormPenaltyAmount] = useState('');
+  const [terms, setTerms] = useState<RepaymentMode>(editing ? termsFromWallet(editing) : '');
+  const [formCreditTenureDays, setFormCreditTenureDays] = useState(
+    editing?.overrideCreditTenure != null ? String(editing.overrideCreditTenure) : '',
+  );
+  const [cycle, setCycle] = useState<BillingModel>(editing ? cycleFromWallet(editing) : 'MONTHLY');
+  const [showAdvanced, setShowAdvanced] = useState(
+    Boolean(editing?.overrideGracePeriod != null || editing?.overrideInterestRate != null || editing?.overridePenaltyAmount != null),
+  );
+  const [formInterestRatePct, setFormInterestRatePct] = useState(textOrEmpty(editing?.overrideInterestRate));
+  const [formGracePeriodDays, setFormGracePeriodDays] = useState(
+    editing?.overrideGracePeriod != null ? String(editing.overrideGracePeriod) : '',
+  );
+  const [formPenaltyAmount, setFormPenaltyAmount] = useState(textOrEmpty(editing?.overridePenaltyAmount));
   const [submitting, setSubmitting] = useState(false);
   const [resetKey, setResetKey] = useState(0);
 
@@ -99,17 +124,17 @@ export function AdminAssignCreditModal({ onClose, onSuccess }: AdminAssignCredit
           vendorId: formVendorId.trim() ? formVendorId.trim() : null,
           creditLimit: Number(formCreditLimit),
           ...(Object.keys(overrides).length > 0 && { overrides }),
-          ...(formRemark.trim() && { remark: formRemark.trim() }),
+          remark: formRemark.trim() || (isEdit ? 'Credit line updated by admin' : 'Credit assigned by admin'),
         }),
       });
       const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error?.message || json.message || 'Failed to assign credit');
-      toast.success('Credit line assigned');
+      if (!res.ok || !json.success) throw new Error(json.error?.message || json.message || 'Failed to save credit line');
+      toast.success(isEdit ? 'Credit line updated' : 'Credit line assigned');
       setResetKey((k) => k + 1);
       onSuccess();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to assign credit');
+      toast.error(err instanceof Error ? err.message : 'Failed to save credit line');
     } finally {
       setSubmitting(false);
     }
@@ -123,8 +148,12 @@ export function AdminAssignCreditModal({ onClose, onSuccess }: AdminAssignCredit
       <div className="bg-white rounded-[16px] w-full max-w-[520px] shadow-2xl my-8">
         <div className="px-6 py-4 border-b border-[#EEEEEE] flex items-center justify-between">
           <div>
-            <h2 className="text-[16px] font-bold text-[#181725]">Assign credit</h2>
-            <p className="text-[12px] text-[#AEAEAE]">Give a customer a new credit line or update their limit</p>
+            <h2 className="text-[16px] font-bold text-[#181725]">{isEdit ? 'Edit credit' : 'Assign credit'}</h2>
+            <p className="text-[12px] text-[#AEAEAE]">
+              {isEdit
+                ? 'Update limit, payment terms, or interest overrides for this line'
+                : 'Give a customer a new credit line or update their limit'}
+            </p>
           </div>
           <button type="button" onClick={onClose} className="p-1 rounded-[6px] hover:bg-[#F5F5F5]">
             <X size={16} className="text-[#AEAEAE]" />
@@ -136,25 +165,38 @@ export function AdminAssignCreditModal({ onClose, onSuccess }: AdminAssignCredit
             <label className={labelCls}>
               Customer <span className="text-[#E74C3C]">*</span>
             </label>
-            <EntityPicker
-              key={`user-${resetKey}`}
-              value={formUserId}
-              onPick={setFormUserId}
-              search={searchUsers}
-              placeholder="Search by name / phone / email / HCID"
-            />
+            {isEdit && editing ? (
+              <div className="rounded-[10px] border border-[#EEEEEE] bg-[#F8F8F8] px-3 py-2.5">
+                <p className="text-[13px] font-bold text-[#181725]">{editing.user.fullName}</p>
+                <p className="text-[11px] text-[#AEAEAE]">{editing.user.phone || editing.user.email || '—'}</p>
+              </div>
+            ) : (
+              <EntityPicker
+                key={`user-${resetKey}`}
+                value={formUserId}
+                onPick={setFormUserId}
+                search={searchUsers}
+                placeholder="Search by name / phone / email / HCID"
+              />
+            )}
           </div>
 
           <div>
             <label className={labelCls}>Wallet type</label>
-            <EntityPicker
-              key={`vendor-${resetKey}`}
-              value={formVendorId}
-              onPick={setFormVendorId}
-              search={searchVendors}
-              placeholder="Search vendor by business name"
-              nullOption="H1 Platform Wallet (no vendor)"
-            />
+            {isEdit && editing ? (
+              <div className="rounded-[10px] border border-[#EEEEEE] bg-[#F8F8F8] px-3 py-2.5 text-[13px] font-semibold text-[#181725]">
+                {editing.vendorId ? (editing.vendor?.businessName ?? 'Vendor wallet') : 'H1 Platform Wallet'}
+              </div>
+            ) : (
+              <EntityPicker
+                key={`vendor-${resetKey}`}
+                value={formVendorId}
+                onPick={setFormVendorId}
+                search={searchVendors}
+                placeholder="Search vendor by business name"
+                nullOption="H1 Platform Wallet (no vendor)"
+              />
+            )}
           </div>
 
           <div>
@@ -285,8 +327,8 @@ export function AdminAssignCreditModal({ onClose, onSuccess }: AdminAssignCredit
             disabled={submitting}
             className="px-5 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold disabled:opacity-50 flex items-center gap-2"
           >
-            {submitting ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-            Assign / Update
+            {submitting ? <Loader2 size={13} className="animate-spin" /> : isEdit ? <Pencil size={13} /> : <Plus size={13} />}
+            {isEdit ? 'Save changes' : 'Assign / Update'}
           </button>
         </div>
       </div>
