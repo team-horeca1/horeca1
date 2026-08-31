@@ -28,7 +28,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     // Customers (legacy role or active customer account) and admins are unrestricted.
     requireStorefrontAccess(ctx, 'storefront.pay');
     // Rate limit: 10 payment initiations per user per minute
-    const { allowed } = await checkRateLimit(`payment:${ctx.userId}`, 10, 60000);
+    const { allowed } = await checkRateLimit(`payment:${ctx.userId}`, 10, 60000); // eslint-disable-line no-restricted-syntax -- rate-limit the real admin
     if (!allowed) {
       return NextResponse.json(
         { success: false, error: { code: 'RATE_LIMITED', message: 'Too many requests. Please wait.' } },

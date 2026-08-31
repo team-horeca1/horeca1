@@ -26,10 +26,10 @@ export const DELETE = withAuth(async (req: NextRequest, ctx) => {
   try {
     const body = await req.json();
 
-    if (ctx.impersonatedCustomer) {
+    if (ctx.impersonatedBuyer) {
       requirePermission(ctx, 'users.delete');
-      const targetUserId = ctx.impersonatedCustomer.userId;
-      if (targetUserId === ctx.userId) {
+      const targetUserId = ctx.impersonatedBuyer.userId;
+      if (targetUserId === ctx.userId) { // eslint-disable-line no-restricted-syntax -- compare against the real admin
         throw Errors.badRequest('You cannot delete your own account');
       }
       deleteMeConfirmSchema.parse(body);
@@ -43,7 +43,7 @@ export const DELETE = withAuth(async (req: NextRequest, ctx) => {
     const { password } = deleteMeSelfSchema.parse(body);
 
     const user = await prisma.user.findUnique({
-      where: { id: ctx.userId },
+      where: { id: ctx.userId }, // eslint-disable-line no-restricted-syntax -- self-delete uses the real session user
       select: { id: true, password: true },
     });
     if (!user) throw Errors.notFound('User');
@@ -54,7 +54,7 @@ export const DELETE = withAuth(async (req: NextRequest, ctx) => {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw Errors.badRequest('Incorrect password');
 
-    await hardDeleteUserById(ctx.userId);
+    await hardDeleteUserById(ctx.userId); // eslint-disable-line no-restricted-syntax -- self-delete uses the real session user
 
     return NextResponse.json({ success: true });
   } catch (error) {

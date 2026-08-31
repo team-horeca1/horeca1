@@ -24,6 +24,9 @@ const Body = z.object({
 
 export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
+    if (ctx.impersonatedBuyer) {
+      throw Errors.forbidden('Not available in Admin View. Exit Admin View first.');
+    }
     const json = await req.json().catch(() => ({}));
     const { businessAccountId, outletId } = Body.parse(json);
 

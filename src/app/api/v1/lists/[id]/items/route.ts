@@ -9,6 +9,7 @@ import { ListService } from '@/modules/list/list.service';
 import { addListItemSchema } from '@/modules/list/list.validator';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const listService = new ListService();
 
@@ -23,7 +24,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const body = await req.json();
     const { productId, vendorId, defaultQty } = addListItemSchema.parse(body);
 
-    const item = await listService.addItem(listId, ctx.userId, productId, vendorId, defaultQty);
+    const item = await listService.addItem(listId, effectiveCustomerUserId(ctx), productId, vendorId, defaultQty);
     return NextResponse.json({ success: true, data: item }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
@@ -45,7 +46,7 @@ export const DELETE = withAuth(async (req: NextRequest, ctx) => {
       );
     }
 
-    await listService.removeItem(listId, ctx.userId, itemId);
+    await listService.removeItem(listId, effectiveCustomerUserId(ctx), itemId);
     return NextResponse.json({ success: true, message: 'Item removed' });
   } catch (error) {
     return errorResponse(error);

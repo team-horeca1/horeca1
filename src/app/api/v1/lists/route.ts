@@ -11,13 +11,14 @@ import { ListService } from '@/modules/list/list.service';
 import { createListSchema } from '@/modules/list/list.validator';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerBusinessAccountId, effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const listService = new ListService();
 
 // GET — all lists with item counts
 export const GET = withAuth(async (_req, ctx) => {
   try {
-    const lists = await listService.getAll(ctx.userId);
+    const lists = await listService.getAll(effectiveCustomerUserId(ctx));
     return NextResponse.json({ success: true, data: lists });
   } catch (error) {
     return errorResponse(error);
@@ -30,13 +31,14 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const body = await req.json();
     const data = createListSchema.parse(body);
 
-    if (!ctx.activeBusinessAccountId) {
+    const businessAccountId = effectiveCustomerBusinessAccountId(ctx);
+    if (!businessAccountId) {
       return NextResponse.json(
         { success: false, error: { code: 'NO_ACTIVE_ACCOUNT', message: 'Pick an account before creating lists.' } },
         { status: 400 },
       );
     }
-    const list = await listService.create(ctx.userId, ctx.activeBusinessAccountId, data);
+    const list = await listService.create(effectiveCustomerUserId(ctx), businessAccountId, data);
     return NextResponse.json({ success: true, data: list }, { status: 201 });
   } catch (error) {
     return errorResponse(error);

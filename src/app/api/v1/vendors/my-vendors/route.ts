@@ -6,10 +6,11 @@
 import { NextResponse } from 'next/server';
 import { VendorService } from '@/modules/vendor/vendor.service';
 import { withAuth } from '@/middleware/auth';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const vendorService = new VendorService();
 
 export const GET = withAuth(async (_req, ctx) => {
-  const vendors = await vendorService.getMyVendors(ctx.userId);
+  const vendors = await vendorService.getMyVendors(effectiveCustomerUserId(ctx));
   return NextResponse.json({ success: true, data: vendors });
 });

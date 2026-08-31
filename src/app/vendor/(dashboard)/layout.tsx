@@ -578,18 +578,22 @@ export default function VendorLayout({
                             ))}
                         </nav>
 
-                        {/* View Storefront */}
+                        {/* Shop as this supplier (admin) / View Storefront */}
                         <div className="px-4 pb-3">
                             <Link
                                 href="/"
-                                title={isCollapsed ? 'View Storefront' : ''}
+                                title={isCollapsed ? (isAdmin ? 'Shop as this supplier' : 'View Storefront') : ''}
                                 className={cn(
                                     'flex items-center rounded-[10px] transition-all text-[14px] overflow-hidden leading-none text-[#299E60] hover:bg-[#E8F7EF] font-semibold',
                                     isCollapsed ? 'justify-center h-[48px] px-0' : 'gap-3.5 px-5 py-3.5'
                                 )}
                             >
                                 <Home size={22} className="shrink-0" />
-                                {!isCollapsed && <span className="whitespace-nowrap">View Storefront</span>}
+                                {!isCollapsed && (
+                                    <span className="whitespace-nowrap">
+                                        {isAdmin ? 'Shop as this supplier' : 'View Storefront'}
+                                    </span>
+                                )}
                             </Link>
                         </div>
 

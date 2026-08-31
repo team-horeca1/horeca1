@@ -11,10 +11,12 @@ import { requirePermission } from '@/lib/permissions/engine';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import {
   clearAllImpersonationCookies,
+  setBuyerImpersonationCookies,
   VENDOR_ID_COOKIE,
   VENDOR_NAME_COOKIE,
   VENDOR_OUTLET_COOKIE,
 } from '@/lib/adminImpersonationCookies';
+import { resolveBuyerScope } from '@/lib/resolveBuyerScope';
 
 const COOKIE_MAX_AGE = 60 * 60 * 4; // 4 hours
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -81,6 +83,24 @@ function storeLabel(v: {
   return (v.displayName ?? v.businessName).trim() || v.businessName;
 }
 
+async function stampVendorBuyerCookies(
+  res: NextResponse,
+  vendor: { userId: string; businessAccountId: string },
+  name: string,
+): Promise<void> {
+  const scope = await resolveBuyerScope({
+    userId: vendor.userId,
+    preferredBusinessAccountId: vendor.businessAccountId,
+  });
+  if (!scope) return;
+  setBuyerImpersonationCookies(res, {
+    userId: scope.userId,
+    businessAccountId: scope.businessAccountId,
+    name,
+    mode: 'vendor',
+  });
+}
+
 export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
     requirePermission(ctx, 'vendors.edit');
@@ -101,7 +121,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         isActive: true,
         defaultOutletId: true,
         businessAccount: {
-          select: { primaryOutletId: true, displayName: true, legalName: true },
+          select: { primaryOutletId: true, displayName: true, legalName: true, isCustomer: true },
         },
         user: {
           select: { id: true, email: true, phone: true, fullName: true, hcidDisplay: true },
@@ -124,6 +144,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
             legalName: true,
             displayName: true,
             status: true,
+            isCustomer: true,
             primaryOutletId: true,
             vendors: {
               orderBy: [{ isPrimaryStore: 'desc' }, { createdAt: 'asc' }],
@@ -148,12 +169,14 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       displayName: m.businessAccount.displayName,
       status: m.businessAccount.status,
       isPrimary: m.isPrimary,
+      isCustomer: m.businessAccount.isCustomer,
       stores: m.businessAccount.vendors.map((s) => ({
         id: s.id,
         displayName: storeLabel(s),
         businessAccountId: s.businessAccountId,
         isActive: s.isActive,
         isPrimaryStore: s.isPrimaryStore,
+        isCustomer: m.businessAccount.isCustomer,
       })),
     }));
 
@@ -229,12 +252,23 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
 
     let vendor: {
       id: string;
+      userId: string;
       businessName: string;
       businessAccountId: string;
       defaultOutletId: string | null;
       displayName: string | null;
       user: { fullName: string | null; email: string | null } | null;
     } | null = null;
+
+    const vendorSelect = {
+      id: true,
+      userId: true,
+      businessName: true,
+      displayName: true,
+      businessAccountId: true,
+      defaultOutletId: true,
+      user: { select: { fullName: true, email: true } },
+    } as const;
 
     if (supplierUserId) {
       // Impersonate Supplier → land on primary/active Online Store cookie, UI → overview
@@ -244,41 +278,20 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           OR: [{ isActive: true }, { isPrimaryStore: true }],
         },
         orderBy: [{ isPrimaryStore: 'desc' }, { isActive: 'desc' }, { createdAt: 'asc' }],
-        select: {
-          id: true,
-          businessName: true,
-          displayName: true,
-          businessAccountId: true,
-          defaultOutletId: true,
-          user: { select: { fullName: true, email: true } },
-        },
+        select: vendorSelect,
       });
       if (!vendor) {
         vendor = await prisma.vendor.findFirst({
           where: { userId: supplierUserId },
           orderBy: [{ isPrimaryStore: 'desc' }, { createdAt: 'asc' }],
-          select: {
-            id: true,
-            businessName: true,
-            displayName: true,
-            businessAccountId: true,
-            defaultOutletId: true,
-            user: { select: { fullName: true, email: true } },
-          },
+          select: vendorSelect,
         });
       }
       if (!vendor) throw Errors.notFound('Supplier has no Online Stores');
     } else {
       vendor = await prisma.vendor.findUnique({
         where: { id: vendorId! },
-        select: {
-          id: true,
-          businessName: true,
-          displayName: true,
-          businessAccountId: true,
-          defaultOutletId: true,
-          user: { select: { fullName: true, email: true } },
-        },
+        select: vendorSelect,
       });
       if (!vendor) throw Errors.notFound('Online Store not found');
     }
@@ -303,6 +316,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     });
     clearAllImpersonationCookies(res);
     setVendorImpersonationCookies(res, { id: vendor.id, businessName: label }, outletId);
+    await stampVendorBuyerCookies(res, vendor, label);
     return res;
   } catch (error) {
     return errorResponse(error);
@@ -332,6 +346,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
           id: true,
           userId: true,
           businessName: true,
+          displayName: true,
           businessAccountId: true,
           defaultOutletId: true,
         },
@@ -355,6 +370,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         },
       });
       setVendorImpersonationCookies(res, target, outletId);
+      await stampVendorBuyerCookies(res, target, storeLabel(target));
       return res;
     }
 

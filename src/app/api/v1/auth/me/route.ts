@@ -16,12 +16,12 @@ const authService = new AuthService();
 export const GET = withAuth(async (_req, ctx) => {
   const userId = effectiveCustomerUserId(ctx);
   const profile = await authService.getProfile(userId);
-  const impersonating = ctx.impersonatedCustomer
+  const impersonating = ctx.impersonatedBuyer
     ? {
-        type: 'customer' as const,
-        userId: ctx.impersonatedCustomer.userId,
-        businessAccountId: ctx.impersonatedCustomer.businessAccountId,
-        name: ctx.impersonatedCustomer.name,
+        type: ctx.impersonatedBuyer.mode,
+        userId: ctx.impersonatedBuyer.userId,
+        businessAccountId: ctx.impersonatedBuyer.businessAccountId,
+        name: ctx.impersonatedBuyer.name,
       }
     : null;
   return NextResponse.json({

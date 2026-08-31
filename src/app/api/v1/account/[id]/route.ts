@@ -82,7 +82,7 @@ const DeleteBody = z.object({
 
 export const DELETE = withAuth(async (req: NextRequest, ctx) => {
   try {
-    if (ctx.impersonatedCustomer) {
+    if (ctx.impersonatedBuyer) {
       return NextResponse.json(
         { success: false, error: { message: 'Cannot delete account while in admin view mode' } },
         { status: 403 },

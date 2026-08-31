@@ -7,14 +7,10 @@ import { adminOnly } from '@/middleware/rbac';
 import { requirePermission } from '@/lib/permissions/engine';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import {
-  CUSTOMER_BA_COOKIE,
-  CUSTOMER_NAME_COOKIE,
-  CUSTOMER_USER_COOKIE,
-} from '@/lib/resolveCustomerImpersonation';
-import { clearAllImpersonationCookies } from '@/lib/adminImpersonationCookies';
-
-const COOKIE_MAX_AGE = 60 * 60 * 4;
-const IS_PROD = process.env.NODE_ENV === 'production';
+  clearAllImpersonationCookies,
+  setBuyerImpersonationCookies,
+} from '@/lib/adminImpersonationCookies';
+import { resolveBuyerScope } from '@/lib/resolveBuyerScope';
 
 export const POST = adminOnly(async (req: NextRequest, ctx) => {
   try {
@@ -28,53 +24,33 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       select: {
         id: true,
         fullName: true,
-        accountMemberships: {
-          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-          take: 1,
-          select: {
-            businessAccountId: true,
-            businessAccount: { select: { isCustomer: true, displayName: true, legalName: true } },
-          },
-        },
       },
     });
     if (!user) throw Errors.notFound('User not found');
 
-    const membership = user.accountMemberships[0];
-    if (!membership?.businessAccountId) {
-      throw Errors.badRequest('This user has no business account to view as customer');
+    const scope = await resolveBuyerScope({ userId: user.id });
+    if (!scope) {
+      throw Errors.badRequest('This user has no customer account to view as buyer');
     }
+
+    const ba = await prisma.businessAccount.findUnique({
+      where: { id: scope.businessAccountId },
+      select: { displayName: true, legalName: true },
+    });
 
     const displayName =
       user.fullName
-      || membership.businessAccount.displayName
-      || membership.businessAccount.legalName
+      || ba?.displayName
+      || ba?.legalName
       || 'Customer';
 
     const res = NextResponse.json({ success: true });
     clearAllImpersonationCookies(res);
-    res.cookies.set(CUSTOMER_USER_COOKIE, user.id, {
-      httpOnly: true,
-      secure: IS_PROD,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: COOKIE_MAX_AGE,
-    });
-    res.cookies.set(CUSTOMER_BA_COOKIE, membership.businessAccountId, {
-      httpOnly: true,
-      secure: IS_PROD,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: COOKIE_MAX_AGE,
-    });
-    // Store raw display name (same as vendor/brand name cookies). Encoding here
-    // double-encodes when browsers/%-decode document.cookie readers once.
-    res.cookies.set(CUSTOMER_NAME_COOKIE, displayName, {
-      httpOnly: false,
-      secure: IS_PROD,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: COOKIE_MAX_AGE,
+    setBuyerImpersonationCookies(res, {
+      userId: scope.userId,
+      businessAccountId: scope.businessAccountId,
+      name: displayName,
+      mode: 'customer',
     });
     return res;
   } catch (error) {

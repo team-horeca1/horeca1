@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const num = (d: { toString(): string } | number | null) => (d == null ? 0 : Number(d));
 
@@ -20,7 +21,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
 
     const wallets = await prisma.creditWallet.findMany({
       where: {
-        userId: ctx.userId,
+        userId: effectiveCustomerUserId(ctx),
         // ?vendorId=h1 (or omitted) → caller's H1 platform wallet (vendorId null);
         // ?vendorId=<id> → that vendor's credit line.
         ...(vendorId ? (vendorId === 'h1' ? { vendorId: null } : { vendorId }) : {}),

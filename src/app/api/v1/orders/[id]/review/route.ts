@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const reviewSchema = z.object({
   rating: z.number().int().min(1).max(5),
@@ -34,7 +35,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     });
 
     if (!order) throw Errors.notFound('Order');
-    if (order.userId !== ctx.userId) throw Errors.forbidden('This order does not belong to you');
+    if (order.userId !== effectiveCustomerUserId(ctx)) throw Errors.forbidden('This order does not belong to you');
     if (order.status !== 'delivered') {
       throw Errors.conflict('You can only review a delivered order');
     }
@@ -47,7 +48,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const review = await prisma.review.create({
       data: {
         orderId,
-        userId: ctx.userId,
+        userId: effectiveCustomerUserId(ctx),
         vendorId: order.vendorId,
         rating,
         comment,
@@ -83,7 +84,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
       select: { userId: true },
     });
     if (!order) throw Errors.notFound('Order');
-    if (order.userId !== ctx.userId) throw Errors.forbidden('This order does not belong to you');
+    if (order.userId !== effectiveCustomerUserId(ctx)) throw Errors.forbidden('This order does not belong to you');
 
     const review = await prisma.review.findUnique({ where: { orderId } });
     return NextResponse.json({ success: true, data: review ?? null });

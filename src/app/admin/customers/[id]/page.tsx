@@ -326,7 +326,7 @@ export default function CustomerDetailsPage() {
                 ]}
                 actions={
                     <>
-                        {user.role === 'customer' && (
+                        {user.role !== 'admin' && (
                             <AdminImpersonateButton
                                 target="customer"
                                 entityId={user.id}

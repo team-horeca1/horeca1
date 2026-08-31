@@ -180,7 +180,7 @@ export async function resolveStorefrontContext(ctx: AuthContext): Promise<Storef
     return { userId, businessAccountId, outletId };
   }
 
-  const jwtOutletId = ctx.impersonatedCustomer ? null : ctx.activeOutletId;
+  const jwtOutletId = ctx.impersonatedBuyer ? null : ctx.activeOutletId;
   if (jwtOutletId) {
     const ok = await prisma.outlet.findFirst({
       where: { id: jwtOutletId, businessAccountId },

@@ -11,10 +11,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 export const POST = withAuth(async (_req: NextRequest, ctx) => {
   try {
-    const { eligible, orderCount, threshold } = await creditWalletService.checkEligibility(ctx.userId);
+    const { eligible, orderCount, threshold } = await creditWalletService.checkEligibility(effectiveCustomerUserId(ctx));
 
     return NextResponse.json({
       success: true,

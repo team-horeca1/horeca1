@@ -30,7 +30,7 @@ import { NotificationBell } from '../features/NotificationBell';
 import { dalClient as dal } from '@/lib/dalClient';
 import type { Category } from '@/types';
 import { NavDeliverySelector } from './NavDeliverySelector';
-import { isAdminCustomerImpersonationActive, isAnyAdminImpersonationActive } from '@/lib/clearImpersonation';
+import { isAdminCustomerImpersonationActive, isAnyAdminImpersonationActive, readImpersonationMode, type ImpersonationMode } from '@/lib/clearImpersonation';
 
 const CATEGORY_STYLE: Record<string, { image: string; bgColor: string }> = {
     'vegetables': { image: '/images/category/vegitable.png', bgColor: '#e8f9e9' },
@@ -187,11 +187,13 @@ export function Navbar() {
     const [apiCategories, setApiCategories] = React.useState<NavStyledCategory[]>([]);
     const [isAdminImpersonating, setIsAdminImpersonating] = React.useState(false);
     const [isCustomerImpersonating, setIsCustomerImpersonating] = React.useState(false);
+    const [impersonationMode, setImpersonationMode] = React.useState<ImpersonationMode | null>(null);
     const [vendorAppApproved, setVendorAppApproved] = React.useState(false);
 
     React.useEffect(() => {
         setIsAdminImpersonating(isAnyAdminImpersonationActive());
         setIsCustomerImpersonating(isAdminCustomerImpersonationActive());
+        setImpersonationMode(readImpersonationMode());
     }, [pathname, sessionStatus]);
 
     React.useEffect(() => {
@@ -259,6 +261,12 @@ export function Navbar() {
     // reserve matching slots while status === 'loading' and avoid a layout jump.
     const portalNavItem = React.useMemo(() => {
         if (!sessionReady || !isLoggedIn) return null;
+        if (userRole === 'admin' && impersonationMode === 'vendor') {
+            return { name: 'Supplier Portal', href: '/vendor/overview', Icon: LayoutDashboard };
+        }
+        if (userRole === 'admin' && impersonationMode === 'brand') {
+            return { name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard };
+        }
         if (userRole === 'admin' && !isCustomerImpersonating) {
             return { name: 'Dashboard', href: '/admin/dashboard', Icon: LayoutDashboard };
         }
@@ -269,7 +277,7 @@ export function Navbar() {
             return { name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard };
         }
         return null;
-    }, [sessionReady, isLoggedIn, hasVendorAccount, hasBrandAccount, vendorAppApproved, userRole, isAdminImpersonating, isCustomerImpersonating]);
+    }, [sessionReady, isLoggedIn, hasVendorAccount, hasBrandAccount, vendorAppApproved, userRole, isAdminImpersonating, isCustomerImpersonating, impersonationMode]);
 
     const showRewardsLink = sessionReady && isLoggedIn;
     const reservePortalSlot = !sessionReady;

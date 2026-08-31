@@ -556,7 +556,7 @@ export default function CustomersPage() {
 
                             {/* Action Buttons */}
                             <div className="p-4 border-t border-[#D1D5DB] bg-white flex flex-col gap-2 rounded-b-[16px]">
-                                {canEditCustomers && user.role === 'customer' && (
+                                {canEditCustomers && user.role !== 'admin' && (
                                     <button
                                         type="button"
                                         disabled={impersonateLoading}
@@ -668,7 +668,7 @@ export default function CustomersPage() {
                                         detailsHref={`/admin/customers/${user.id}`}
                                         onDetailsClick={(e) => e.stopPropagation()}
                                         impersonateButton={
-                                            canEditCustomers && user.role === 'customer' ? (
+                                            canEditCustomers && user.role !== 'admin' ? (
                                                 <button
                                                     type="button"
                                                     disabled={impersonateLoading}

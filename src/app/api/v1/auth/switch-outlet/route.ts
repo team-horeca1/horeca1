@@ -16,6 +16,9 @@ const Body = z.object({ outletId: z.string().uuid() });
 
 export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
+    if (ctx.impersonatedBuyer) {
+      throw Errors.forbidden('Not available in Admin View. Exit Admin View first.');
+    }
     if (!ctx.activeBusinessAccountId) throw Errors.forbidden('No active business account on the session');
     const { outletId } = Body.parse(await req.json().catch(() => ({})));
 

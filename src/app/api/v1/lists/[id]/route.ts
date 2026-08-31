@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ListService } from '@/modules/list/list.service';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const listService = new ListService();
 
@@ -18,7 +19,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
     const segments = url.pathname.split('/');
     const listId = segments[segments.length - 1];
 
-    const list = await listService.getById(listId, ctx.userId);
+    const list = await listService.getById(listId, effectiveCustomerUserId(ctx));
     return NextResponse.json({ success: true, data: list });
   } catch (error) {
     return errorResponse(error);
@@ -32,7 +33,7 @@ export const DELETE = withAuth(async (req: NextRequest, ctx) => {
     const segments = url.pathname.split('/');
     const listId = segments[segments.length - 1];
 
-    await listService.delete(listId, ctx.userId);
+    await listService.delete(listId, effectiveCustomerUserId(ctx));
     return NextResponse.json({ success: true, message: 'List deleted' });
   } catch (error) {
     return errorResponse(error);

@@ -65,8 +65,9 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
 });
 
 export const POST = withAuth(async (_req: NextRequest, ctx) => {
+  const userId = effectiveCustomerUserId(ctx);
   const existing = await prisma.user.findUnique({
-    where: { id: ctx.userId },
+    where: { id: userId },
     select: { profileCompletedAt: true },
   });
 
@@ -78,7 +79,7 @@ export const POST = withAuth(async (_req: NextRequest, ctx) => {
   }
 
   const updated = await prisma.user.update({
-    where: { id: ctx.userId },
+    where: { id: userId },
     data: { profileCompletedAt: new Date() },
     select: { profileCompletedAt: true },
   });

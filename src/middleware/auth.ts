@@ -6,8 +6,8 @@ import { Errors, errorResponse } from './errorHandler';
 import type { Role, TeamRole } from '@prisma/client';
 import type { PermissionKey } from '@/lib/permissions/registry';
 import {
-  readCustomerImpersonationFromRequest,
-  type CustomerImpersonation,
+  readImpersonatedBuyerFromRequest,
+  type ImpersonatedBuyer,
 } from '@/lib/resolveCustomerImpersonation';
 
 // Authenticated user context injected into API handlers.
@@ -28,8 +28,8 @@ export interface AuthContext {
   activeBrandId: string | null;
   activeVendorTeamRole: TeamRole | 'owner' | null;
   activeBrandTeamRole: TeamRole | 'owner' | null;
-  /** Set when an admin is viewing the storefront/profile as a customer. */
-  impersonatedCustomer: CustomerImpersonation | null;
+  /** Set when an admin is viewing the storefront as a buyer (customer / supplier / brand). */
+  impersonatedBuyer: ImpersonatedBuyer | null;
 }
 
 // Validate session and extract user context
@@ -61,8 +61,8 @@ export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
   const permissions = (u.permissions as PermissionKey[]) ?? [];
   const role = (u.role as Role) ?? 'customer';
 
-  const impersonatedCustomer =
-    role === 'admin' ? readCustomerImpersonationFromRequest(req) : null;
+  const impersonatedBuyer =
+    role === 'admin' ? readImpersonatedBuyerFromRequest(req) : null;
 
   return {
     userId,
@@ -82,7 +82,7 @@ export async function getAuthContext(req: NextRequest): Promise<AuthContext> {
     activeBrandId: (u.activeBrandId as string) ?? null,
     activeVendorTeamRole: (u.activeVendorTeamRole as TeamRole | 'owner') ?? null,
     activeBrandTeamRole: (u.activeBrandTeamRole as TeamRole | 'owner') ?? null,
-    impersonatedCustomer,
+    impersonatedBuyer,
   };
 }
 

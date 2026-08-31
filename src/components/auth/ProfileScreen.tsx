@@ -28,7 +28,7 @@ import {
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { clearAllAdminImpersonation, isAdminCustomerImpersonationActive } from '@/lib/clearImpersonation';
+import { clearAllAdminImpersonation, isAdminBuyerImpersonationActive } from '@/lib/clearImpersonation';
 import { clientLogout } from '@/lib/clientLogout';
 import { ACCOUNTS_REFRESH_EVENT } from '@/lib/addressUsability';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -108,6 +108,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const {
         activeBusinessAccountId: switcherAccountId,
         customerImpersonating,
+        buyerImpersonating,
         signOut: switcherSignOut,
     } = useBusinessAccountSwitcher();
 
@@ -162,12 +163,14 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const sessionEmail = session?.user?.email ?? '';
 
     // Seed from session immediately so we never flash "Hi there" / empty email
-    // while /auth/me is in flight.
+    // while /auth/me is in flight. Skip while Admin View is active — the JWT
+    // stays the admin, and seeding would leak their name/email onto the buyer.
     useEffect(() => {
         if (!sessionUserId) {
             Promise.resolve().then(() => setProfileReady(false));
             return;
         }
+        if (isAdminBuyerImpersonationActive()) return;
         Promise.resolve().then(() => {
             setUserData(prev => ({
                 ...prev,
@@ -223,12 +226,17 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                 const addresses = addrJson?.success ? addrJson.data : [];
                 const defaultAddr = addresses?.find((a: { isDefault?: boolean }) => a.isDefault) ?? addresses?.[0];
                 setPrimaryAddressId(defaultAddr?.id ?? null);
+                const viewingAsBuyer = isAdminBuyerImpersonationActive();
                 setUserData(prev => ({
                     ...prev,
-                    fullName: p?.fullName || prev.fullName || sessionName || '',
+                    fullName: viewingAsBuyer
+                        ? (p?.fullName || '')
+                        : (p?.fullName || prev.fullName || sessionName || ''),
                     phone: p?.phone || '',
                     businessName: p?.businessName || '',
-                    email: p?.email || prev.email || sessionEmail || '',
+                    email: viewingAsBuyer
+                        ? (p?.email || '')
+                        : (p?.email || prev.email || sessionEmail || ''),
                     pincode: p?.pincode || defaultAddr?.pincode || '',
                     image: p?.image || '',
                     address: defaultAddr?.fullAddress || defaultAddr?.shortAddress || '',
@@ -254,7 +262,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     // GET /auth/me returns the impersonated customer's role.
     useEffect(() => {
         if (!sessionUserId || !sessionRole) return;
-        if (isAdminCustomerImpersonationActive()) return;
+        if (isAdminBuyerImpersonationActive()) return;
 
         let cancelled = false;
         fetch('/api/v1/auth/me', { credentials: 'include' })
@@ -276,7 +284,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                     .finally(() => {
                         window.setTimeout(() => {
                             if (cancelled || hardReloadDoneRef.current) return;
-                            if (isAdminCustomerImpersonationActive()) return;
+                            if (isAdminBuyerImpersonationActive()) return;
                             const reloadGuardKey = `horeca_role_reload_${sessionUserId}`;
                             try {
                                 if (sessionStorage.getItem(reloadGuardKey)) return;
@@ -286,7 +294,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 .then(r => r.ok ? r.json() : null)
                                 .then((latest) => {
                                     if (cancelled || hardReloadDoneRef.current) return;
-                                    if (isAdminCustomerImpersonationActive()) return;
+                                    if (isAdminBuyerImpersonationActive()) return;
                                     const freshDbRole = latest?.success ? latest.data?.role : null;
                                     if (freshDbRole && freshDbRole !== sessionRole) {
                                         hardReloadDoneRef.current = true;
@@ -328,8 +336,9 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
 
     // Prefer switcher BA (impersonation-aware). Never fall back to the admin JWT
     // BA while viewing as a customer — that was loading admin outlets.
+    const viewingAsBuyer = customerImpersonating || buyerImpersonating;
     const jwtAccountId = (session?.user as { activeBusinessAccountId?: string } | undefined)?.activeBusinessAccountId;
-    const activeAccountIdForLinks = customerImpersonating
+    const activeAccountIdForLinks = viewingAsBuyer
       ? (switcherAccountId ?? undefined)
       : (switcherAccountId ?? jwtAccountId);
 
@@ -376,10 +385,10 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const canSeeOutlets = has('outlets.view');
     const canSeeTeam = hasAny('users.view', 'users.create', 'users.edit', 'users.delete');
     const canSeeOverview = has('settings.view');
-    const hideBusinessAccountForAdmin = sessionRole === 'admin' && !customerImpersonating;
+    const hideBusinessAccountForAdmin = sessionRole === 'admin' && !viewingAsBuyer;
     const businessAccountItems = (!hideBusinessAccountForAdmin && activeAccountIdForLinks) ? [
         ...(canSeeOutlets ? [{ id: 'outlets', label: 'Outlets & Delivery', desc: 'Branches and where orders are delivered', icon: MapPin, onClick: () => setIsOutletsOpen(true) }] : []),
-        ...(!customerImpersonating && canSeeTeam ? [{ id: 'team-members', label: 'Team Members', desc: 'Invite users, manage roles & access', icon: Users, onClick: () => router.push('/profile/team') }] : []),
+        ...(!viewingAsBuyer && canSeeTeam ? [{ id: 'team-members', label: 'Team Members', desc: 'Invite users, manage roles & access', icon: Users, onClick: () => router.push('/profile/team') }] : []),
         ...(canSeeOverview ? [{ id: 'account-overview', label: 'Account Overview', desc: 'GST, business type, members', icon: Building2, onClick: () => setIsOverviewOpen(true) }] : []),
     ] : [];
 
@@ -398,7 +407,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         availableAccounts?: Array<{ isVendor?: boolean; isBrand?: boolean }>;
     } | undefined);
     const showVendorDashboardCta =
-        !customerImpersonating
+        !viewingAsBuyer
         && !hideBusinessAccountForAdmin
         && vendorAppApproved
         && (

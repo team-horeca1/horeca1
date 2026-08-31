@@ -12,6 +12,7 @@ import {
 } from '@/modules/return/return.service';
 import { mapLegacyReturnStatus } from '@/modules/return/return.types';
 import { customerCreateReturnSchema } from '@/modules/return/return.validator';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 function getOrderId(req: NextRequest): string {
   const segments = req.nextUrl.pathname.split('/');
@@ -41,7 +42,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
     const orderId = getOrderId(req);
     const order = await prisma.order.findFirst({
-      where: { id: orderId, userId: ctx.userId },
+      where: { id: orderId, userId: effectiveCustomerUserId(ctx) },
       select: {
         id: true,
         items: { select: { id: true, quantity: true, cancelledQty: true } },
@@ -95,7 +96,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const orderId = getOrderId(req);
     const body = customerCreateReturnSchema.parse(await req.json());
 
-    const returnRequest = await returnService.createForOrder(orderId, ctx.userId, body);
+    const returnRequest = await returnService.createForOrder(orderId, effectiveCustomerUserId(ctx), body);
 
     return NextResponse.json({ success: true, data: returnRequest }, { status: 201 });
   } catch (error) {

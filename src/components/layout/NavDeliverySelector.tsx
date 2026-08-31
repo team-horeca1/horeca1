@@ -100,7 +100,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
     switchOutlet,
     switching,
     accessibleOutletIds,
-    customerImpersonating,
+    buyerImpersonating,
   } = useBusinessAccountSwitcher();
   const { savedAddresses, setSelectedAddress, updateAddress } = useAddress();
   const [outletOpen, setOutletOpen] = useState(false);
@@ -233,7 +233,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
         <div className="relative">
           <button
             onClick={() => {
-              if (customerImpersonating) {
+              if (buyerImpersonating) {
                 onFallbackClick();
                 return;
               }
@@ -249,7 +249,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
             </span>
             <ChevronDown size={13} className="text-gray-400 shrink-0" />
           </button>
-          {outletOpen && !customerImpersonating && (
+          {outletOpen && !buyerImpersonating && (
             <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-xl z-[10500] w-[200px] p-1.5 max-h-[min(60vh,320px)] overflow-y-auto">
               <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1 sticky top-0 bg-white">Select Outlet</p>
               {visibleOutlets.map((o) => (
@@ -289,7 +289,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
       <div className="relative">
         <button
           onClick={() => {
-            if (customerImpersonating) {
+            if (buyerImpersonating) {
               onFallbackClick();
               return;
             }
@@ -308,7 +308,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
           </div>
           <ChevronDown size={12} className="text-gray-400 shrink-0" />
         </button>
-        {outletOpen && !customerImpersonating && (
+        {outletOpen && !buyerImpersonating && (
           <div className="absolute top-full mt-2 left-0 bg-white border border-gray-200 rounded-xl shadow-2xl z-[10500] w-[240px] p-2 max-h-[min(60vh,360px)] overflow-y-auto">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1 sticky top-0 bg-white">Select Outlet</p>
             {visibleOutlets.map((o) => (

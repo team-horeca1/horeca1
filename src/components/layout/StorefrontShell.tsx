@@ -7,7 +7,7 @@ import { CartProvider } from '@/context/CartContext';
 import { AddressProvider } from '@/context/AddressContext';
 import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 import { VendorApplicationBanner } from '@/components/features/homepage/VendorApplicationBanner';
-import { AdminCustomerImpersonationBanner } from '@/components/features/admin/AdminCustomerImpersonationBanner';
+import { AdminImpersonationBanner } from '@/components/features/admin/AdminCustomerImpersonationBanner';
 
 const MandatoryAddressGate = dynamic(
   () => import('@/components/auth/MandatoryAddressGate').then((m) => m.MandatoryAddressGate),
@@ -29,7 +29,7 @@ export function StorefrontShell({ children }: { children: React.ReactNode }) {
         <CartProvider>
           <Navbar />
           <div className="px-[clamp(1rem,3vw,2rem)] pt-2">
-            <AdminCustomerImpersonationBanner />
+            <AdminImpersonationBanner />
           </div>
           <OutletCompletionBanner />
           <VendorApplicationBanner />

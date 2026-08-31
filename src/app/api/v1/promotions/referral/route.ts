@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
 import { promotionService } from '@/modules/promotion/promotion.service';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 function requestOrigin(req: NextRequest): string | null {
   const xfHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
@@ -17,7 +18,7 @@ function requestOrigin(req: NextRequest): string | null {
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
-    const data = await promotionService.getMyReferral(ctx.userId, {
+    const data = await promotionService.getMyReferral(effectiveCustomerUserId(ctx), {
       originOverride: requestOrigin(req),
     });
     return NextResponse.json({ success: true, data });

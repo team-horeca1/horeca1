@@ -22,7 +22,8 @@ import { z } from 'zod';
 import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
-import { assertAccountPermission } from '@/lib/accountAccess';
+import { assertCanMutateAccount } from '@/lib/accountAccess';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const Body = z.object({
   businessName: z.string().min(2).max(255),
@@ -47,8 +48,9 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const segments = new URL(req.url).pathname.split('/').filter(Boolean);
     // .../account/<id>/become-vendor
     const accountId = segments[segments.length - 2];
+    const ownerUserId = effectiveCustomerUserId(ctx);
 
-    await assertAccountPermission(ctx.userId, accountId, 'settings.edit', ctx.activeOutletId);
+    await assertCanMutateAccount(ctx, accountId, 'settings.edit', ctx.activeOutletId);
 
     const body = Body.parse(await req.json());
     const legalName = body.businessName.trim();
@@ -65,7 +67,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     }
 
     // Confirm slug is free (extremely unlikely collision, but cheap to check).
-    const slug = slugify(storeName, ctx.userId);
+    const slug = slugify(storeName, ownerUserId);
     const slugTaken = await prisma.vendor.findUnique({ where: { slug }, select: { id: true } });
     if (slugTaken) {
       throw Errors.fieldError('storeName', 'An Online Store with this name already exists. Try a different store name.', 409);
@@ -109,7 +111,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       // 2. Create the Vendor (Online Store) row — naming matches createOnlineStore.
       const vendor = await tx.vendor.create({
         data: {
-          userId: ctx.userId,
+          userId: ownerUserId,
           businessAccountId: accountId,
           businessName: storeName,
           displayName: storeName,
@@ -138,7 +140,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       // 3. Grant the caller the Vendor Admin role (additive — they keep their existing Owner role too).
       const existingRole = await tx.userRole.findFirst({
         where: {
-          userId: ctx.userId,
+          userId: ownerUserId,
           businessAccountId: accountId,
           outletId: null,
           vendorId: null,
@@ -149,7 +151,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       if (!existingRole) {
         await tx.userRole.create({
           data: {
-            userId: ctx.userId,
+            userId: ownerUserId,
             businessAccountId: accountId,
             outletId: null,
             vendorId: null,
@@ -160,7 +162,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
 
       // 4. Update legacy User.role so the existing 49 routes that gate on `role === 'vendor'` start working.
       await tx.user.update({
-        where: { id: ctx.userId },
+        where: { id: ownerUserId },
         data: { role: 'vendor' },
       });
 

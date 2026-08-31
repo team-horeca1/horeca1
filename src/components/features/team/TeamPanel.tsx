@@ -22,7 +22,7 @@ import {
   type TeamPanelScope,
 } from '@/components/features/team/teamPanelConfig';
 import {
-  isAdminCustomerImpersonationActive,
+  isAdminBuyerImpersonationActive,
   isAdminVendorImpersonationActive,
 } from '@/lib/clearImpersonation';
 import { toast } from 'sonner';
@@ -104,7 +104,7 @@ export function TeamPanel({
       setAccountId(urlAccountId);
       return;
     }
-    if (isAdminCustomerImpersonationActive()) {
+    if (isAdminBuyerImpersonationActive()) {
       let cancelled = false;
       fetch('/api/v1/account')
         .then((r) => r.json())

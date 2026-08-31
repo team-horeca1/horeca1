@@ -14,6 +14,7 @@ import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { checkRateLimit } from '@/lib/rateLimit';
 import { resolveStorefrontContext } from '@/lib/resolveStorefrontContext';
 import { promotionService } from '@/modules/promotion/promotion.service';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const previewSchema = z.object({
   items: z
@@ -31,7 +32,7 @@ const previewSchema = z.object({
 
 export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
-    const { allowed } = await checkRateLimit(`promo-preview:${ctx.userId}`, 30, 60000);
+    const { allowed } = await checkRateLimit(`promo-preview:${ctx.userId}`, 30, 60000); // eslint-disable-line no-restricted-syntax -- rate-limit the real admin
     if (!allowed) {
       return NextResponse.json(
         { success: false, error: { code: 'RATE_LIMITED', message: 'Too many attempts. Please wait a minute.' } },
@@ -43,7 +44,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
 
     const body = previewSchema.parse(await req.json());
     const result = await promotionService.previewPromotions({
-      userId: ctx.userId,
+      userId: effectiveCustomerUserId(ctx),
       businessAccountId: storefrontCtx.businessAccountId,
       outletId: storefrontCtx.outletId,
       items: body.items,

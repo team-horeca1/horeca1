@@ -6,7 +6,7 @@ import type { VendorProduct, CartItem, VendorCartGroup, BulkPriceTier, VendorPro
 import { dalClient as dal } from '@/lib/dalClient';
 import { cartStorageKey, migrateLegacyKey } from '@/lib/userScopedStorage';
 import {
-    isAdminCustomerImpersonationActive,
+    isAdminBuyerImpersonationActive,
     IMPERSONATION_CHANGED_EVENT,
 } from '@/lib/clearImpersonation';
 import { subscribeAuthTabEvents } from '@/lib/authTabSync';
@@ -287,7 +287,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const [cart, setCart] = useState<CartItemWithId[]>([]);
     const [apiGroupMeta, setApiGroupMeta] = useState<Record<string, ApiGroupMeta>>({});
     const [isInitialized, setIsInitialized] = useState(false);
-    const [customerImpersonating, setCustomerImpersonating] = useState(false);
+    const [buyerImpersonating, setBuyerImpersonating] = useState(false);
     // Last identity we finished loading for — session blips reuse this for silent revalidate.
     const lastContextKeyRef = useRef<string | null>(null);
 
@@ -295,7 +295,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // (vendor JWT shopping on a customer BA must use server cart, not fragile local-only).
     const shouldUseServerCart =
         !isLoggedIn ||
-        customerImpersonating ||
+        buyerImpersonating ||
         userRole === 'customer' ||
         activeBAType?.isCustomer === true;
 
@@ -308,7 +308,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Admin View: JWT stays admin while cookies switch the API to the customer.
     // Reload cart when impersonation starts/stops (same pattern as AddressContext).
     useEffect(() => {
-        const sync = () => setCustomerImpersonating(isAdminCustomerImpersonationActive());
+        const sync = () => setBuyerImpersonating(isAdminBuyerImpersonationActive());
         sync();
         const onSameTab = () => sync();
         window.addEventListener(IMPERSONATION_CHANGED_EVENT, onSameTab);
@@ -332,7 +332,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         if (sessionStatus === 'loading') return;
 
         let alive = true;
-        const contextKey = `${userId ?? ''}|${activeBAId ?? ''}|${activeOutletId ?? ''}|${customerImpersonating}`;
+        const contextKey = `${userId ?? ''}|${activeBAId ?? ''}|${activeOutletId ?? ''}|${buyerImpersonating}`;
         const silent = lastContextKeyRef.current === contextKey;
 
         if (!silent) {
@@ -362,7 +362,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         if (isLoggedIn) {
             // Never merge guest/admin local lines into an impersonated customer cart.
             // Skip merge on silent revalidate — already done on the initial login load.
-            const guestItems = (silent || customerImpersonating) ? [] : loadLocalCart(null);
+            const guestItems = (silent || buyerImpersonating) ? [] : loadLocalCart(null);
             const mergePayload = guestItems
                 .map(it => ({
                     productId: it.productId,
@@ -399,7 +399,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                         isLoggedIn &&
                         (msg.toLowerCase().includes('delivery address') ||
                             msg.toLowerCase().includes('no active outlet'));
-                    if (noDelivery || customerImpersonating) {
+                    if (noDelivery || buyerImpersonating) {
                         // Impersonation must not fall back to the admin's local cart.
                         setCart([]);
                         return;
@@ -421,14 +421,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
         return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sessionStatus, userId, activeBAId, activeOutletId, customerImpersonating, shouldUseServerCart]);
+    }, [sessionStatus, userId, activeBAId, activeOutletId, buyerImpersonating, shouldUseServerCart]);
 
     // Persist to localStorage for both guest and logged-in users so guest session preserves it on logout.
     // Skip while Admin View is on — otherwise the customer's cart overwrites the admin mirror key.
     useEffect(() => {
-        if (!isInitialized || customerImpersonating) return;
+        if (!isInitialized || buyerImpersonating) return;
         saveLocalCart(cart, isLoggedIn ? userId : null, activeBAId, activeOutletId);
-    }, [cart, isInitialized, isLoggedIn, userId, activeBAId, activeOutletId, customerImpersonating]);
+    }, [cart, isInitialized, isLoggedIn, userId, activeBAId, activeOutletId, buyerImpersonating]);
 
     const addToCart = useCallback((product: VendorProduct, quantity: number = 1) => {
         // Cap to fulfillment-aware stock when known (stock > 0). stock === 0 means OOS.

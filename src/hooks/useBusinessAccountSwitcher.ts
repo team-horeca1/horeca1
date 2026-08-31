@@ -9,6 +9,7 @@ import { redirectIfPortalMismatch } from '@/lib/portalRouting';
 import { ACCOUNTS_REFRESH_EVENT } from '@/lib/addressUsability';
 import {
   clearAllAdminImpersonation,
+  isAdminBuyerImpersonationActive,
   isAdminCustomerImpersonationActive,
   isAdminVendorImpersonationActive,
   IMPERSONATION_CHANGED_EVENT,
@@ -84,6 +85,7 @@ export function useBusinessAccountSwitcher() {
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState(false);
   const [customerImpersonating, setCustomerImpersonating] = useState(false);
+  const [buyerImpersonating, setBuyerImpersonating] = useState(false);
   const [vendorImpersonating, setVendorImpersonating] = useState(false);
   const [vendorImpersonationAccounts, setVendorImpersonationAccounts] = useState<AccountSummary[]>([]);
   const [vendorImpersonationAccount, setVendorImpersonationAccount] = useState<AccountSummary | null>(null);
@@ -122,6 +124,7 @@ export function useBusinessAccountSwitcher() {
 
   const syncImpersonationFlags = useCallback(() => {
     setCustomerImpersonating(isAdminCustomerImpersonationActive());
+    setBuyerImpersonating(isAdminBuyerImpersonationActive());
     setVendorImpersonating(isAdminVendorImpersonationActive());
   }, []);
 
@@ -211,7 +214,9 @@ export function useBusinessAccountSwitcher() {
           businessAccountId: string;
           isActive: boolean;
           isPrimaryStore: boolean;
+          isCustomer?: boolean;
         }>;
+        isCustomer?: boolean;
       };
 
       const businesses = (impJson.data.businesses as ImpBiz[] | undefined) ?? [];
@@ -220,7 +225,7 @@ export function useBusinessAccountSwitcher() {
         id: b.id,
         legalName: b.legalName,
         displayName: b.displayName,
-        isCustomer: false,
+        isCustomer: b.isCustomer === true,
         isVendor: true,
         isBrand: false,
         status: (b.status as AccountSummary['status']) || 'active',
@@ -733,19 +738,20 @@ export function useBusinessAccountSwitcher() {
       : accounts,
     currentAccount,
     currentOutlet,
-    activeBusinessAccountId: (vendorImpersonating || customerImpersonating)
+    activeBusinessAccountId: (vendorImpersonating || customerImpersonating || buyerImpersonating)
       ? (currentAccount?.id ?? null)
       : activeBusinessAccountId,
     activeOutletId: effectiveActiveOutletId,
     activeVendorId: effectiveActiveVendorId,
     availableStores: effectiveAvailableStores,
     isStoreScopedOnly: vendorImpersonating ? false : isStoreScopedOnly,
-    accessibleOutletIds: (vendorImpersonating || customerImpersonating) ? [] : accessibleOutletIds,
+    accessibleOutletIds: (vendorImpersonating || customerImpersonating || buyerImpersonating) ? [] : accessibleOutletIds,
     totalAccountCount: vendorImpersonating
       ? vendorImpersonationAccounts.length
       : totalAccountCount,
     availableAccountsTruncated,
     customerImpersonating,
+    buyerImpersonating,
     vendorImpersonating,
     switchAccount,
     switchOutlet,

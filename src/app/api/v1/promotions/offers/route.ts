@@ -13,6 +13,7 @@ import { checkRateLimit } from '@/lib/rateLimit';
 import { getDeliveryGeo } from '@/lib/deliveryLocation';
 import { resolveStorefrontContext } from '@/lib/resolveStorefrontContext';
 import { promotionService } from '@/modules/promotion/promotion.service';
+import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const querySchema = z.object({
   vendorId: z.string().uuid().optional(),
@@ -35,7 +36,7 @@ async function resolvePincode(userId: string, ctx: Parameters<typeof resolveStor
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
-    const { allowed } = await checkRateLimit(`promo-offers:${ctx.userId}`, 60, 60_000);
+    const { allowed } = await checkRateLimit(`promo-offers:${ctx.userId}`, 60, 60_000); // eslint-disable-line no-restricted-syntax -- rate-limit the real admin
     if (!allowed) {
       return NextResponse.json(
         { success: false, error: { code: 'RATE_LIMITED', message: 'Too many attempts. Please wait a minute.' } },
@@ -46,9 +47,9 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
     const parsed = querySchema.parse({
       vendorId: req.nextUrl.searchParams.get('vendorId') || undefined,
     });
-    const pincode = await resolvePincode(ctx.userId, ctx);
+    const pincode = await resolvePincode(effectiveCustomerUserId(ctx), ctx);
     const data = await promotionService.listPublicOffers({
-      userId: ctx.userId,
+      userId: effectiveCustomerUserId(ctx),
       vendorId: parsed.vendorId ?? null,
       pincode,
     });

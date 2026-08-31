@@ -11,7 +11,7 @@ import {
     migrateLegacyKey,
 } from '@/lib/userScopedStorage';
 import {
-    isAdminCustomerImpersonationActive,
+    isAdminBuyerImpersonationActive,
     IMPERSONATION_CHANGED_EVENT,
 } from '@/lib/clearImpersonation';
 import { subscribeAuthTabEvents } from '@/lib/authTabSync';
@@ -68,7 +68,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
     const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
     const [isDetectingLocation, setIsDetectingLocation] = useState(false);
     const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
-    const [customerImpersonating, setCustomerImpersonating] = useState(false);
+    const [buyerImpersonating, setBuyerImpersonating] = useState(false);
     const impersonatingRef = useRef(false);
 
     // ─── DB Sync Helpers ─────────────────────────────────────────────────
@@ -102,9 +102,9 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const sync = () => {
-            const active = isAdminCustomerImpersonationActive();
+            const active = isAdminBuyerImpersonationActive();
             impersonatingRef.current = active;
-            setCustomerImpersonating(active);
+            setBuyerImpersonating(active);
         };
         sync();
         const onSameTab = () => sync();
@@ -127,7 +127,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
         migrateLegacyKey('horeca1_selected_address', addressSelectedKey(null));
         migrateLegacyKey('horeca1_saved_addresses', addressSavedKey(null));
 
-        const impersonating = customerImpersonating || isAdminCustomerImpersonationActive();
+        const impersonating = buyerImpersonating || isAdminBuyerImpersonationActive();
 
         // While viewing as a customer, never hydrate the admin's localStorage
         // selection — it mixes with the customer address list from the API.
@@ -177,7 +177,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                 else Promise.resolve().then(() => setSavedAddresses([]));
             } catch { /* ignore */ }
         }
-    }, [status, userId, fetchAddressesFromDB, customerImpersonating]);
+    }, [status, userId, fetchAddressesFromDB, buyerImpersonating]);
 
     // ─── Sync the selected delivery address into a cookie ────────────────
     // The server reads `h1_addr` (a SavedAddress id) to drive location-based

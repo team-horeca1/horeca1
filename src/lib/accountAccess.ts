@@ -39,6 +39,8 @@ export async function isAdminActingAsBusinessAccount(
   if (ctx.role !== 'admin') return false;
   if (isImpersonatingBusinessAccount(ctx, businessAccountId)) return true;
 
+  // Portal Admin View: vendor/brand cookies may point at a BA that is not the
+  // storefront buyer BA (e.g. brand accounts are isCustomer: false).
   const jar = await cookies();
   const vendorId = jar.get(VENDOR_ID_COOKIE)?.value;
   if (vendorId) {

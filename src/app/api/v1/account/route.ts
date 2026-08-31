@@ -28,7 +28,7 @@ import { businessFacingName, storeDisplayName } from '@/modules/supplier/foundat
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
   try {
     const targetUserId = effectiveCustomerUserId(ctx);
-    const impersonatedBaId = ctx.impersonatedCustomer?.businessAccountId;
+    const impersonatedBaId = ctx.impersonatedBuyer?.businessAccountId;
 
     const membershipWhere = {
       userId: targetUserId,

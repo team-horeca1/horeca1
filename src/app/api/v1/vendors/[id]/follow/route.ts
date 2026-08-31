@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { VendorService } from '@/modules/vendor/vendor.service';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
+import { effectiveCustomerBusinessAccountId, effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
 const vendorService = new VendorService();
 
@@ -22,13 +23,14 @@ export const POST = withAuth(async (
     // URL: /api/v1/vendors/{id}/follow → segments[4] is the vendor ID
     const vendorId = segments[4];
 
-    if (!ctx.activeBusinessAccountId) {
+    const businessAccountId = effectiveCustomerBusinessAccountId(ctx);
+    if (!businessAccountId) {
       return NextResponse.json(
         { success: false, error: { code: 'NO_ACTIVE_ACCOUNT', message: 'Pick an account before following vendors.' } },
         { status: 400 },
       );
     }
-    await vendorService.follow(ctx.userId, ctx.activeBusinessAccountId, vendorId);
+    await vendorService.follow(effectiveCustomerUserId(ctx), businessAccountId, vendorId);
     return NextResponse.json({ success: true, message: 'Vendor followed' });
   } catch (error) {
     return errorResponse(error);
@@ -44,13 +46,14 @@ export const DELETE = withAuth(async (
     const segments = url.pathname.split('/');
     const vendorId = segments[4];
 
-    if (!ctx.activeBusinessAccountId) {
+    const businessAccountId = effectiveCustomerBusinessAccountId(ctx);
+    if (!businessAccountId) {
       return NextResponse.json(
         { success: false, error: { code: 'NO_ACTIVE_ACCOUNT', message: 'Pick an account before unfollowing vendors.' } },
         { status: 400 },
       );
     }
-    await vendorService.unfollow(ctx.activeBusinessAccountId, vendorId);
+    await vendorService.unfollow(businessAccountId, vendorId);
     return NextResponse.json({ success: true, message: 'Vendor unfollowed' });
   } catch (error) {
     return errorResponse(error);
