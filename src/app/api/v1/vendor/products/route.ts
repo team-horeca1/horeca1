@@ -58,7 +58,7 @@ const createProductSchema = z.object({
     .string()
     .refine((v) => v.startsWith('/') || /^https?:\/\//i.test(v), { message: 'Invalid image URL' })
     .optional(),
-  creditEligible: z.boolean().optional(),
+  creditEligible: z.boolean().optional().transform(() => true),
   basedOnProductId: z.string().uuid().optional(),
   basedOnBrandMasterProductId: z.string().uuid().optional(),
   priceSlabs: z.array(z.object({

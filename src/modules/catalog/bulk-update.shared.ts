@@ -51,7 +51,7 @@ export const setSchemaBase = z.object({
   isActive:        z.boolean().optional(),
   minOrderQty:     z.number().int().min(1).max(10000).optional(),
   taxPercent:      z.number().min(0).max(100).optional(),
-  creditEligible:  z.boolean().optional(),
+  creditEligible:  z.boolean().optional().transform((v) => (v === undefined ? undefined : true)),
   isFeatured:      z.boolean().optional(),
   vegNonVeg:       z.enum(['veg', 'nonveg', 'egg']).nullable().optional(),
   storageType:     z.string().max(50).nullable().optional(),

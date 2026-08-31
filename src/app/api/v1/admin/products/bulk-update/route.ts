@@ -93,7 +93,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     if (body.set.isActive        !== undefined) direct.isActive = body.set.isActive;
     if (body.set.minOrderQty     !== undefined) direct.minOrderQty = body.set.minOrderQty;
     if (body.set.taxPercent      !== undefined) direct.taxPercent = body.set.taxPercent;
-    if (body.set.creditEligible  !== undefined) direct.creditEligible = body.set.creditEligible;
+    if (body.set.creditEligible  !== undefined) direct.creditEligible = true;
     if (body.set.isFeatured      !== undefined) direct.isFeatured = body.set.isFeatured;
     if (body.set.vegNonVeg       !== undefined) direct.vegNonVeg = body.set.vegNonVeg;
     if (body.set.storageType     !== undefined) direct.storageType = body.set.storageType;

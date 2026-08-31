@@ -25,6 +25,7 @@ import {
   type PendingEditPayload,
 } from '@/lib/product-edit-policy';
 import { auditProductDiff, logProductFieldChanges } from '@/lib/product-audit';
+import { PRODUCT_CREDIT_ELIGIBLE } from '@/lib/productCreditEligible';
 import { canTransitionApproval } from '@/modules/catalog/approval-state';
 import { transitionProductApproval } from '@/modules/catalog/approval-state.service';
 
@@ -1559,6 +1560,7 @@ export class CatalogService {
           : {}),
         vendorSku: resolvedVendorSku,
         vendorId,
+        creditEligible: PRODUCT_CREDIT_ELIGIBLE,
         basePrice: isDraft ? draftBasePrice : productData.basePrice,
         approvalStatus,
         listingStatus: isDraft ? 'draft' : 'submitted',
@@ -1993,6 +1995,7 @@ export class CatalogService {
     // Not Product columns — Zod may pass them through; strip before Prisma update.
     delete data.basedOnProductId;
     delete data.basedOnBrandMasterProductId;
+    data.creditEligible = PRODUCT_CREDIT_ELIGIBLE;
 
     // Enforce the approval state machine for any in-flow status change
     // (material edit → pending_edit, resubmit/publish → pending|approved). Initial

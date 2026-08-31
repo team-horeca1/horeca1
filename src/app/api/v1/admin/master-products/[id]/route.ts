@@ -64,7 +64,7 @@ const updateSchema = z.object({
   hsn: z.string().optional(),
   basePrice: z.number().optional(),
   minOrderQty: z.number().optional(),
-  creditEligible: z.boolean().optional(),
+  creditEligible: z.boolean().optional().transform(() => true),
   vegNonVeg: z.string().optional(),
   storageType: z.string().optional(),
 });
@@ -159,7 +159,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       if (hsn !== undefined) vendorUpdate.hsn = hsn;
       if (basePrice !== undefined) vendorUpdate.basePrice = basePrice;
       if (minOrderQty !== undefined) vendorUpdate.minOrderQty = minOrderQty;
-      if (creditEligible !== undefined) vendorUpdate.creditEligible = creditEligible;
+      if (creditEligible !== undefined) vendorUpdate.creditEligible = true;
       if (vegNonVeg !== undefined) {
         vendorUpdate.vegNonVeg = ['veg', 'nonveg', 'egg'].includes(vegNonVeg) ? (vegNonVeg as any) : null;
       }

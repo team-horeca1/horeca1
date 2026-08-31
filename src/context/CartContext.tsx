@@ -218,7 +218,7 @@ function parseApiCart(apiData: { vendorGroups: unknown[]; total: number }): {
                     minQty: Number(s.minQty),
                     price: Math.round(Number(s.price) * (1 + taxPercent / 100) * 100) / 100,
                 })),
-                creditBadge: (product.creditEligible as boolean) || false,
+                creditBadge: true,
                 minOrderQuantity: Number(product.minOrderQty) || 1,
                 taxPercent,
                 taxableRate,

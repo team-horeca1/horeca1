@@ -296,7 +296,7 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
         originalPrice: promo != null && promo < regular ? regular : undefined,
       };
     }),
-    creditBadge: (p.creditEligible as boolean) || false,
+    creditBadge: true,
     minOrderQuantity: Number(p.minOrderQty) || 1,
     frequentlyOrdered: false,
     storePromotion: p.storePromotion as VendorProduct['storePromotion'],

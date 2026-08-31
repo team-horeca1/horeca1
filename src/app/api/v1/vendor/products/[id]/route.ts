@@ -46,7 +46,7 @@ const updateProductSchema = z.object({
   promoEndTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
   minOrderQty: z.number().int().min(1).optional(),
   isActive: z.boolean().optional(),
-  creditEligible: z.boolean().optional(),
+  creditEligible: z.boolean().optional().transform(() => true),
   isFeatured: z.boolean().optional(),
   vegNonVeg: z.enum(['veg', 'nonveg', 'egg']).optional(),
   storageType: z.string().max(50).optional(),

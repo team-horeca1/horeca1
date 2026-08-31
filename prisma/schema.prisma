@@ -477,7 +477,7 @@ model Product {
   vegNonVeg          VegType?       @map("veg_non_veg")
   storageType        String?        @map("storage_type") @db.VarChar(50)
   substituteIds      String[]       @default([]) @map("substitute_ids") @db.Uuid
-  creditEligible     Boolean        @default(false) @map("credit_eligible")
+  creditEligible     Boolean        @default(true) @map("credit_eligible")
   isFeatured         Boolean        @default(false) @map("is_featured")
   isActive           Boolean        @default(true) @map("is_active")
   listingStatus      ListingStatus  @default(submitted) @map("listing_status")

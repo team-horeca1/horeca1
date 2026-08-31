@@ -43,7 +43,7 @@ const updateProductSchema = z.object({
   minOrderQty: z.number().int().min(1).optional(),
   description: z.string().optional(),
   imageUrl: z.string().url().optional(),
-  creditEligible: z.boolean().optional(),
+  creditEligible: z.boolean().optional().transform(() => true),
   isActive: z.boolean().optional(),
   fssaiRef: z.string().max(50).optional(),
   aliasNames: z.array(z.string()).optional(),
@@ -117,7 +117,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       reqListingStatus === 'submitted' && existing.listingStatus === 'draft';
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updatePayload: any = { ...productData };
+    const updatePayload: any = { ...productData, creditEligible: true };
 
     if (isDraftSave) {
       updatePayload.isActive = false;

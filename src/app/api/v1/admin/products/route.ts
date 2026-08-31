@@ -43,7 +43,7 @@ const createProductSchema = z.object({
   minOrderQty: z.number().int().min(1).optional(),
   description: z.string().optional(),
   imageUrl: z.string().optional(),
-  creditEligible: z.boolean().optional(),
+  creditEligible: z.boolean().optional().transform(() => true),
   fssaiRef: z.string().max(50).optional(),
   aliasNames: z.array(z.string()).optional(),
   vegNonVeg: z.enum(['veg', 'nonveg', 'egg']).optional(),

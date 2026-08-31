@@ -411,7 +411,7 @@ export default function VendorBulkGrid({
       }
       if (e.minOrderQty !== undefined) body.minOrderQty = parseInt(String(e.minOrderQty), 10) || 1;
       if (e.isActive !== undefined) body.isActive = Boolean(e.isActive);
-      if (e.creditEligible !== undefined) body.creditEligible = Boolean(e.creditEligible);
+      if (e.creditEligible !== undefined) body.creditEligible = true;
       if (e.unit !== undefined) body.unit = e.unit;
       if (e.packSize !== undefined) body.packSize = e.packSize;
       if (e.description !== undefined) body.description = e.description;

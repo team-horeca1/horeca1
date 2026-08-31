@@ -367,9 +367,7 @@ export class OrderService {
           });
           if (!product) throw Errors.notFound('Product');
 
-          if (!isDraft && isCreditPayment(input.paymentMethod) && !product.creditEligible) {
-            throw Errors.badRequest(`"${product.name}" is not available on credit — remove it or pay another way`);
-          }
+          // DiSCCO is locked on for every SKU. Do not block checkout on creditEligible.
 
           if (isPromoFreeLine) {
             itemDetails.push({

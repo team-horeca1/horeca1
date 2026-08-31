@@ -1377,7 +1377,7 @@ export default function VendorProductsPage() {
             tags: Array.isArray(s.tags) ? s.tags : [],
             taxPercent: s.taxPercent != null ? String(s.taxPercent) : '0',
             minOrderQty: s.minOrderQty != null ? String(s.minOrderQty) : '1',
-            creditEligible: !!s.creditEligible,
+            creditEligible: true,
         }));
     };
 
@@ -1633,7 +1633,7 @@ export default function VendorProductsPage() {
             isActive: false,
             isFeatured: p.isFeatured ?? false,
             description: p.description ?? null,
-            creditEligible: p.creditEligible ?? false,
+            creditEligible: true,
             categoryName: cat?.name ?? '',
             categorySlug: cat?.slug ?? '',
             in_stock: false,
@@ -1958,7 +1958,7 @@ export default function VendorProductsPage() {
                         p.minOrderQty != null
                             ? String(p.minOrderQty)
                             : listLogistics.minOrderQty,
-                    creditEligible: !!p.creditEligible,
+                    creditEligible: true,
                     isFeatured: !!p.isFeatured,
                     priceSlabs: Array.isArray(p.priceSlabs)
                         ? p.priceSlabs.map((s: { minQty: number; price: number }) => ({
@@ -2061,7 +2061,7 @@ export default function VendorProductsPage() {
                     countryOfOrigin: listLogistics.countryOfOrigin,
                     taxPercent: product.taxPercent != null ? String(product.taxPercent) : '0',
                     minOrderQty: listLogistics.minOrderQty,
-                    creditEligible: product.creditEligible,
+                    creditEligible: true,
                     isFeatured: product.isFeatured,
                     substituteIds: product.substituteIds ?? [],
                     priceSlabs: product.priceSlabs
@@ -2128,7 +2128,7 @@ export default function VendorProductsPage() {
                     isActive: p.isActive,
                     isFeatured: p.isFeatured,
                     description: p.description,
-                    creditEligible: p.creditEligible,
+                    creditEligible: true,
                     categoryName: p.category?.name ?? '',
                     categorySlug: p.category?.slug ?? '',
                     in_stock: false,
@@ -2398,7 +2398,7 @@ export default function VendorProductsPage() {
                     imageUrl: p.imageUrl ?? null,
                     isActive: p.isActive ?? existing.isActive,
                     description: p.description ?? null,
-                    creditEligible: p.creditEligible ?? existing.creditEligible,
+                    creditEligible: true,
                     isFeatured: p.isFeatured ?? existing.isFeatured,
                     categoryName: cat?.name ?? existing.categoryName,
                     categorySlug: cat?.slug ?? existing.categorySlug,
@@ -2448,7 +2448,7 @@ export default function VendorProductsPage() {
                     isActive: p.isActive ?? true,
                     isFeatured: p.isFeatured ?? false,
                     description: p.description ?? null,
-                    creditEligible: p.creditEligible ?? false,
+                    creditEligible: true,
                     categoryName: cat?.name ?? '',
                     categorySlug: cat?.slug ?? '',
                     in_stock: false,

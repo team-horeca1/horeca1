@@ -591,11 +591,7 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
         const n = Number(mrp);
         return Number.isFinite(n) && n > 0 ? n : undefined;
       })(),
-      creditEligible: (() => {
-        const v = String(r['Credit Eligible'] ?? '').toLowerCase();
-        if (!v) return undefined;
-        return v === 'yes' || v === 'true' || v === '1';
-      })(),
+      creditEligible: true,
       isActive: (() => {
         const v = String(r['Item Status'] ?? r['Active on Online Store'] ?? '').toLowerCase();
         if (!v) return undefined;
