@@ -8,6 +8,7 @@ import { AddressProvider } from '@/context/AddressContext';
 import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 import { VendorApplicationBanner } from '@/components/features/homepage/VendorApplicationBanner';
 import { AdminImpersonationBanner } from '@/components/features/admin/AdminCustomerImpersonationBanner';
+import type { InitialNav } from '@/lib/navChrome';
 
 const MandatoryAddressGate = dynamic(
   () => import('@/components/auth/MandatoryAddressGate').then((m) => m.MandatoryAddressGate),
@@ -22,12 +23,18 @@ const OutletCompletionBanner = dynamic(
  * Marketplace chrome + cart/address/maps. Mounted only under `(storefront)`
  * so admin/vendor/brand portals do not pay this client graph.
  */
-export function StorefrontShell({ children }: { children: React.ReactNode }) {
+export function StorefrontShell({
+  children,
+  initialNav,
+}: {
+  children: React.ReactNode;
+  initialNav: InitialNav;
+}) {
   return (
     <GoogleMapsProvider>
       <AddressProvider>
         <CartProvider>
-          <Navbar />
+          <Navbar initialNav={initialNav} />
           <div className="px-[clamp(1rem,3vw,2rem)] pt-2">
             <AdminImpersonationBanner />
           </div>

@@ -24,6 +24,7 @@ import {
     BadgeCheck,
     Mail,
     LayoutDashboard,
+    Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -85,6 +86,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const [isTeamOpen, setIsTeamOpen] = useState(false);
     const [isRolesOpen, setIsRolesOpen] = useState(false);
     const [isOverviewOpen, setIsOverviewOpen] = useState(false);
+    const [signingOut, setSigningOut] = useState(false);
     const [hasVendorApplication, setHasVendorApplication] = useState<boolean | null>(null);
     const [vendorAppApproved, setVendorAppApproved] = useState(false);
     const [creditSummary, setCreditSummary] = useState<{
@@ -109,7 +111,6 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         activeBusinessAccountId: switcherAccountId,
         customerImpersonating,
         buyerImpersonating,
-        signOut: switcherSignOut,
     } = useBusinessAccountSwitcher();
 
     useEffect(() => {
@@ -314,15 +315,21 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     if (!isOpen) return null;
 
     const handleLogout = async () => {
+        if (signingOut) return;
+        setSigningOut(true);
         toast.success('Logged out successfully');
         try {
             localStorage.removeItem('horeca_order_lists_all');
             localStorage.removeItem('horeca_orders');
             localStorage.removeItem('horeca_recently_viewed');
         } catch { /* ignore */ }
-        // Cookie clear first — do not await impersonation DELETEs (can delay/hang).
-        void clearAllAdminImpersonation();
-        await clientLogout('/');
+        try {
+            // Cookie clear first — do not await impersonation DELETEs (can delay/hang).
+            void clearAllAdminImpersonation();
+            await clientLogout('/');
+        } catch {
+            setSigningOut(false);
+        }
     };
 
     // Four primary actions for B2B procurement landing — uniform brand styling
@@ -726,9 +733,13 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                             </div>
 
                             {/* Logout - Mobile */}
-                            <button onClick={handleLogout} className="w-full bg-white border border-gray-100 rounded-2xl py-3.5 text-red-500 font-[700] text-[15px] active:bg-red-50/30 transition-colors flex items-center justify-center gap-2 shadow-sm mb-12 cursor-pointer">
-                                <LogOut size={16} />
-                                Logout
+                            <button
+                                onClick={handleLogout}
+                                disabled={signingOut}
+                                className="w-full bg-white border border-gray-100 rounded-2xl py-3.5 text-red-500 font-[700] text-[15px] active:bg-red-50/30 transition-colors flex items-center justify-center gap-2 shadow-sm mb-12 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                {signingOut ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
+                                {signingOut ? 'Signing out...' : 'Logout'}
                             </button>
                         </div>
 
@@ -887,10 +898,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 {/* Logout */}
                                 <button
                                     onClick={handleLogout}
-                                    className="w-full bg-white border border-gray-100 rounded-2xl py-3 text-red-500 font-[700] text-[13px] hover:bg-red-50/40 transition-colors flex items-center justify-center gap-2 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)] cursor-pointer"
+                                    disabled={signingOut}
+                                    className="w-full bg-white border border-gray-100 rounded-2xl py-3 text-red-500 font-[700] text-[13px] hover:bg-red-50/40 transition-colors flex items-center justify-center gap-2 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
-                                    <LogOut size={15} />
-                                    Logout
+                                    {signingOut ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />}
+                                    {signingOut ? 'Signing out...' : 'Logout'}
                                 </button>
                             </aside>
 

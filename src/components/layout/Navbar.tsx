@@ -21,7 +21,7 @@ import { isVendorPortalPath } from '@/lib/vendorPortalPaths';
 import { MobileBottomNav } from './MobileBottomNav';
 import { MobileSearchOverlay } from './MobileSearchOverlay';
 import { LocationSelectionOverlay } from './LocationSelectionOverlay';
-import { useSession } from 'next-auth/react';
+import { useStableSession } from '@/hooks/useStableSession';
 import { useCart } from '@/context/CartContext';
 import { useAddress } from '@/context/AddressContext';
 import { InitialPincodeOverlay } from './InitialPincodeOverlay';
@@ -31,6 +31,7 @@ import { dalClient as dal } from '@/lib/dalClient';
 import type { Category } from '@/types';
 import { NavDeliverySelector } from './NavDeliverySelector';
 import { isAdminCustomerImpersonationActive, isAnyAdminImpersonationActive, readImpersonationMode, type ImpersonationMode } from '@/lib/clearImpersonation';
+import { resolvePortalNav, type InitialNav } from '@/lib/navChrome';
 
 const CATEGORY_STYLE: Record<string, { image: string; bgColor: string }> = {
     'vegetables': { image: '/images/category/vegitable.png', bgColor: '#e8f9e9' },
@@ -94,21 +95,15 @@ function styleCategories(cats: Category[]): NavStyledCategory[] {
     }));
 }
 
-/** Invisible placeholder matching a desktop icon+label nav item — reserves layout while session settles. */
-function DesktopNavSlotPlaceholder({
-    label,
-    Icon = LayoutDashboard,
-}: {
-    label: string;
-    Icon?: typeof LayoutDashboard;
-}) {
+/** Shimmer placeholder matching a desktop icon+label nav item — used only while session is unresolved. */
+function DesktopNavSlotPlaceholder() {
     return (
         <div
-            className="flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl shrink-0 invisible pointer-events-none"
+            className="flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl shrink-0 animate-pulse"
             aria-hidden
         >
-            <Icon size={21} strokeWidth={1.5} />
-            <span className="text-[10px] font-medium leading-none">{label}</span>
+            <div className="w-[21px] h-[21px] rounded-md bg-gray-200" />
+            <div className="h-[10px] w-10 rounded bg-gray-200" />
         </div>
     );
 }
@@ -150,20 +145,17 @@ const NavbarSearchBar = React.memo(function NavbarSearchBar({
     );
 });
 
-export function Navbar() {
+export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
     const router = useRouter();
     const pathname = usePathname();
     const [isCategoriesSidebarOpen, setIsCategoriesSidebarOpen] = React.useState(false);
     const [isCategoriesExpanded, setIsCategoriesExpanded] = React.useState(false);
     const [isSearchOverlayOpen, setIsSearchOverlayOpen] = React.useState(false);
     const [isLocationOverlayOpen, setIsLocationOverlayOpen] = React.useState(false);
-    const { data: session, status: sessionStatus } = useSession();
-    const sessionReady = sessionStatus !== 'loading';
-    const isLoggedIn = sessionStatus === 'authenticated';
-    const userRole = (session?.user as { role?: string })?.role;
-    const activeAccountType = (session?.user as {
-        activeBusinessAccountType?: { isVendor: boolean; isBrand: boolean };
-    } | undefined)?.activeBusinessAccountType;
+    const { session, isAuthenticated, isResolved } = useStableSession();
+    const isLoggedIn = isAuthenticated;
+    const userRole = session?.user?.role;
+    const activeAccountType = session?.user?.activeBusinessAccountType;
 
     const [isScrolled, setIsScrolled] = React.useState(false);
 
@@ -185,20 +177,28 @@ export function Navbar() {
     const { selectedAddress, setSelectedAddress } = useAddress();
 
     const [apiCategories, setApiCategories] = React.useState<NavStyledCategory[]>([]);
-    const [isAdminImpersonating, setIsAdminImpersonating] = React.useState(false);
-    const [isCustomerImpersonating, setIsCustomerImpersonating] = React.useState(false);
-    const [impersonationMode, setImpersonationMode] = React.useState<ImpersonationMode | null>(null);
-    const [vendorAppApproved, setVendorAppApproved] = React.useState(false);
+    const [isAdminImpersonating, setIsAdminImpersonating] = React.useState(
+        () => initialNav?.isAdminImpersonating ?? false,
+    );
+    const [isCustomerImpersonating, setIsCustomerImpersonating] = React.useState(
+        () => initialNav?.isCustomerImpersonating ?? false,
+    );
+    const [impersonationMode, setImpersonationMode] = React.useState<ImpersonationMode | null>(
+        () => initialNav?.impersonationMode ?? null,
+    );
+    const [vendorAppApproved, setVendorAppApproved] = React.useState(
+        () => initialNav?.vendorAppApproved ?? false,
+    );
 
     React.useEffect(() => {
         setIsAdminImpersonating(isAnyAdminImpersonationActive());
         setIsCustomerImpersonating(isAdminCustomerImpersonationActive());
         setImpersonationMode(readImpersonationMode());
-    }, [pathname, sessionStatus]);
+    }, [pathname, isLoggedIn]);
 
     React.useEffect(() => {
-        if (sessionStatus !== 'authenticated') {
-            setVendorAppApproved(false);
+        if (!isLoggedIn) {
+            if (!initialNav?.vendorAppApproved) setVendorAppApproved(false);
             return;
         }
         let cancelled = false;
@@ -212,7 +212,7 @@ export function Navbar() {
                 if (!cancelled) setVendorAppApproved(false);
             });
         return () => { cancelled = true; };
-    }, [sessionStatus, pathname]);
+    }, [isLoggedIn, pathname, initialNav?.vendorAppApproved]);
 
     React.useEffect(() => {
         // Seed from cache; still refresh in background so style/slug changes land.
@@ -245,9 +245,7 @@ export function Navbar() {
     const isReturnPickupLink = pathname?.startsWith('/r/');
     const isPayoutLink = pathname?.startsWith('/payout/');
 
-    const availableAccounts = (session?.user as {
-        availableAccounts?: Array<{ isVendor?: boolean; isBrand?: boolean }>;
-    } | undefined)?.availableAccounts;
+    const availableAccounts = session?.user?.availableAccounts;
     const hasVendorAccount =
         activeAccountType?.isVendor === true
         || userRole === 'vendor'
@@ -257,32 +255,24 @@ export function Navbar() {
         || userRole === 'brand'
         || (availableAccounts?.some((a) => a.isBrand === true) ?? false);
 
-    // Portal + Rewards may appear after sessionReady; compute them separately so we can
-    // reserve matching slots while status === 'loading' and avoid a layout jump.
-    const portalNavItem = React.useMemo(() => {
-        if (!sessionReady || !isLoggedIn) return null;
-        if (userRole === 'admin' && impersonationMode === 'vendor') {
-            return { name: 'Supplier Portal', href: '/vendor/overview', Icon: LayoutDashboard };
-        }
-        if (userRole === 'admin' && impersonationMode === 'brand') {
-            return { name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard };
-        }
-        if (userRole === 'admin' && !isCustomerImpersonating) {
-            return { name: 'Dashboard', href: '/admin/dashboard', Icon: LayoutDashboard };
-        }
-        if (!isAdminImpersonating && hasVendorAccount && vendorAppApproved) {
-            return { name: 'Dashboard', href: '/vendor/dashboard', Icon: LayoutDashboard };
-        }
-        if (!isAdminImpersonating && hasBrandAccount) {
-            return { name: 'Brand Portal', href: '/brand/portal', Icon: LayoutDashboard };
-        }
-        return null;
-    }, [sessionReady, isLoggedIn, hasVendorAccount, hasBrandAccount, vendorAppApproved, userRole, isAdminImpersonating, isCustomerImpersonating, impersonationMode]);
+    const livePortalItem = React.useMemo(
+        () => resolvePortalNav({
+            isLoggedIn,
+            userRole,
+            impersonationMode,
+            isCustomerImpersonating,
+            isAdminImpersonating,
+            hasVendorAccount,
+            vendorAppApproved,
+            hasBrandAccount,
+        }),
+        [isLoggedIn, hasVendorAccount, hasBrandAccount, vendorAppApproved, userRole, isAdminImpersonating, isCustomerImpersonating, impersonationMode],
+    );
 
-    const showRewardsLink = sessionReady && isLoggedIn;
-    const reservePortalSlot = !sessionReady;
-    const reserveRewardsSlot = !sessionReady;
-    const PortalIcon = portalNavItem?.Icon;
+    const seededFallback = !isResolved && Boolean(initialNav);
+    const portalNavItem = seededFallback ? (initialNav?.portal ?? null) : livePortalItem;
+    const showRewardsLink = seededFallback ? Boolean(initialNav?.showWallet) : isLoggedIn;
+    const reserveAuthSlots = !isResolved && !initialNav;
 
     if (
         isAdminPage ||
@@ -339,8 +329,21 @@ export function Navbar() {
                         />
 
                         <div className="flex items-center gap-2">
-                            {isLoggedIn && <NotificationBell accentColor="#53B175" />}
-                            <PushBell />
+                            {(isLoggedIn || reserveAuthSlots) && (
+                                <div className="flex items-center justify-end shrink-0 h-10 min-w-[84px] gap-1">
+                                    {isLoggedIn ? (
+                                        <>
+                                            <NotificationBell accentColor="#53B175" />
+                                            <PushBell />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse" aria-hidden />
+                                            <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse" aria-hidden />
+                                        </>
+                                    )}
+                                </div>
+                            )}
                             <Link href="/cart" className="relative p-1 cursor-pointer">
                                 <ShoppingCart size={20} className="text-[#181725]" />
                                 {badgeCount > 0 && (
@@ -420,11 +423,11 @@ export function Navbar() {
                             <div className="h-9 w-px bg-gray-200 shrink-0" />
 
                             {/* Iconized nav — shrink-0 so Dashboard never clips; search yields space.
-                                Reserve portal + Rewards slots while session is settling to avoid layout jump. */}
+                                Reserve portal + Rewards slots only when session is unresolved and SSR seed is missing. */}
                             <div className="flex items-center gap-1 shrink-0">
-                                {reservePortalSlot ? (
-                                    <DesktopNavSlotPlaceholder label="Brand Portal" />
-                                ) : portalNavItem && PortalIcon ? (
+                                {reserveAuthSlots ? (
+                                    <DesktopNavSlotPlaceholder />
+                                ) : portalNavItem ? (
                                     <Link
                                         href={portalNavItem.href}
                                         className={cn(
@@ -432,7 +435,7 @@ export function Navbar() {
                                             pathname === portalNavItem.href ? "text-primary bg-primary/5" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
                                         )}
                                     >
-                                        <PortalIcon size={21} strokeWidth={pathname === portalNavItem.href ? 2 : 1.5} />
+                                        <LayoutDashboard size={21} strokeWidth={pathname === portalNavItem.href ? 2 : 1.5} />
                                         <span className="text-[10px] font-medium leading-none">{portalNavItem.name}</span>
                                     </Link>
                                 ) : null}
@@ -452,8 +455,11 @@ export function Navbar() {
                                         </Link>
                                     );
                                 })}
-                                {reserveRewardsSlot ? (
-                                    <DesktopNavSlotPlaceholder label="Wallet" Icon={Wallet} />
+                                {reserveAuthSlots ? (
+                                    <>
+                                        <DesktopNavSlotPlaceholder />
+                                        <DesktopNavSlotPlaceholder />
+                                    </>
                                 ) : showRewardsLink ? (
                                     <>
                                         <Link
@@ -485,7 +491,15 @@ export function Navbar() {
 
                             {/* Cart + User */}
                             <div className="flex items-center gap-1 shrink-0">
-                                {isLoggedIn && <NotificationBell accentColor="#53B175" />}
+                                {(isLoggedIn || reserveAuthSlots) && (
+                                    <div className="flex items-center justify-center shrink-0 w-10 h-10">
+                                        {isLoggedIn ? (
+                                            <NotificationBell accentColor="#53B175" />
+                                        ) : (
+                                            <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse" aria-hidden />
+                                        )}
+                                    </div>
+                                )}
                                 <Link href="/cart" className="p-2.5 hover:bg-gray-50 rounded-full transition-all relative group cursor-pointer">
                                     <ShoppingCart size={22} strokeWidth={1.5} className="text-text group-hover:text-primary transition-colors" />
                                     {badgeCount > 0 && (

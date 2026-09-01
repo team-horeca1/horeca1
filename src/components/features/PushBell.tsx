@@ -2,14 +2,14 @@
 
 import { Bell, BellOff, Loader2 } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { useSession } from 'next-auth/react';
+import { useStableSession } from '@/hooks/useStableSession';
 
 export function PushBell() {
-  const { data: session } = useSession();
+  const { isAuthenticated } = useStableSession();
   const { permission, subscribed, loading, subscribe, unsubscribe } = usePushNotifications();
 
   // Only show for logged-in users on supported browsers
-  if (!session || permission === 'unsupported') return null;
+  if (!isAuthenticated || permission === 'unsupported') return null;
 
   if (loading) {
     return (

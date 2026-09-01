@@ -1,11 +1,11 @@
 import { broadcastAuthEvent } from '@/lib/authTabSync';
 
 /** Readable (non-httpOnly) cookies — the only ones JS can see. */
-const VENDOR_NAME_COOKIE = 'admin_impersonate_vendor_name';
-const BRAND_NAME_COOKIE = 'admin_impersonate_brand_name';
-const CUSTOMER_NAME_COOKIE = 'admin_impersonate_customer_name';
-const BUYER_NAME_COOKIE = 'admin_impersonate_buyer_name';
-const BUYER_MODE_COOKIE = 'admin_impersonate_buyer_mode';
+export const VENDOR_NAME_COOKIE = 'admin_impersonate_vendor_name';
+export const BRAND_NAME_COOKIE = 'admin_impersonate_brand_name';
+export const CUSTOMER_NAME_COOKIE = 'admin_impersonate_customer_name';
+export const BUYER_NAME_COOKIE = 'admin_impersonate_buyer_name';
+export const BUYER_MODE_COOKIE = 'admin_impersonate_buyer_mode';
 
 export type ImpersonationMode = 'customer' | 'vendor' | 'brand';
 

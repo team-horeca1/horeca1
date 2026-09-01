@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import type { Metadata } from 'next';
 import './globals.css';
 import { Inter } from 'next/font/google';
+import { auth } from '@/auth';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { Toaster } from 'sonner';
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
@@ -29,15 +30,16 @@ export const metadata: Metadata = {
  * Minimal root: auth + confirm + toaster only.
  * Marketplace chrome lives in `(storefront)/layout` so portals skip Maps/Cart/Navbar.
  */
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
   return (
     <html lang="en" className={`${inter.variable}`}>
       <body className="font-sans antialiased bg-background">
-        <AuthProvider>
+        <AuthProvider session={session}>
           <ConfirmProvider>
             <Suspense fallback={null}>
               <ScrollRestoration />

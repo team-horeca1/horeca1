@@ -8,8 +8,9 @@
  * Team panels promise "within 60 seconds — no re-login". We poll under that
  * ceiling via a 45s interval that always calls session.update() so Auth.js
  * re-runs the jwt callback (role permissions via markSessionStale → updatedAt).
- * Tab focus only probes /session-stale and calls update() when stale/invalid,
- * so routine focus events do not flip useSession status to loading.
+ * Mount and tab-focus only probe /session-stale and call update() when stale
+ * or invalid, so a server-seeded session does not immediately flip
+ * useSession status to loading.
  */
 import { useEffect, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
@@ -72,7 +73,9 @@ export function SessionPermissionRefresh() {
       }
     };
 
-    void refreshSession(true);
+    // Seeded SessionProvider already has the JWT — probe only on mount so we
+    // do not flip status to loading and collapse storefront chrome.
+    void refreshSession(false);
     const onFocus = () => {
       void refreshSession(false);
     };

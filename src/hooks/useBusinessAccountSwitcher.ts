@@ -84,6 +84,7 @@ export function useBusinessAccountSwitcher() {
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [customerImpersonating, setCustomerImpersonating] = useState(false);
   const [buyerImpersonating, setBuyerImpersonating] = useState(false);
   const [vendorImpersonating, setVendorImpersonating] = useState(false);
@@ -699,15 +700,21 @@ export function useBusinessAccountSwitcher() {
   ]);
 
   const handleSignOut = useCallback(async () => {
-    clearCart?.();
-    clearForcePickerCookie();
-    clearDismissFlag();
-    clearUserClientStores(userId);
-    markSigningOut();
-    broadcastAuthEvent('signed-out', { userId });
-    void clearAllAdminImpersonation();
-    await clientLogout('/');
-  }, [clearCart, userId]);
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      clearCart?.();
+      clearForcePickerCookie();
+      clearDismissFlag();
+      clearUserClientStores(userId);
+      markSigningOut();
+      broadcastAuthEvent('signed-out', { userId });
+      void clearAllAdminImpersonation();
+      await clientLogout('/');
+    } catch {
+      setSigningOut(false);
+    }
+  }, [clearCart, userId, signingOut]);
 
   const refresh = useCallback(async () => {
     if (vendorImpersonating) await fetchVendorImpersonationContext();
@@ -753,6 +760,7 @@ export function useBusinessAccountSwitcher() {
     customerImpersonating,
     buyerImpersonating,
     vendorImpersonating,
+    signingOut,
     switchAccount,
     switchOutlet,
     switchOnlineStore,
