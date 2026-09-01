@@ -51,29 +51,30 @@ export default function AdminLayout({
     const [pendingApprovals, setPendingApprovals] = useState(0);
 
     const { can, hasAny } = usePermissions();
+    const canSeeApprovals = hasAny('vendors.approve', 'brands.approve', 'products.approve');
     const userRole = (session?.user as { role?: string })?.role;
     const firstAllowedRoute = getFirstAllowedRoute('admin', can);
     const visibleGroups = ADMIN_NAV_GROUPS.map((g) => ({
         ...g,
         links: filterNavLinks(g.links, can, 'admin'),
     })).filter((g) => g.links.length > 0);
+    const allowedHrefs = visibleGroups.flatMap((g) => g.links.map((l) => l.href)).join('|');
 
     useEffect(() => {
         if (status !== 'authenticated' || userRole !== 'admin') return;
-        if (visibleGroups.length === 0) return;
-        if (!firstAllowedRoute) return;
-        const allHrefs = visibleGroups.flatMap((g) => g.links.map((l) => l.href));
-        if (!allHrefs.some((h) => pathname === h || pathname.startsWith(`${h}/`))) {
+        if (!allowedHrefs || !firstAllowedRoute) return;
+        const hrefs = allowedHrefs.split('|');
+        if (!hrefs.some((h) => pathname === h || pathname.startsWith(`${h}/`))) {
             router.replace(firstAllowedRoute);
         }
-    }, [status, userRole, visibleGroups, firstAllowedRoute, pathname, router]);
+    }, [status, userRole, allowedHrefs, firstAllowedRoute, pathname, router]);
 
     // Poll the pending-approvals count
     // without a full page reload. 60s cadence is friendly to the DB and good
     // enough for admins — the Approvals page itself shows live numbers.
     useEffect(() => {
         if (status !== 'authenticated') return;
-        if (!hasAny('vendors.approve', 'brands.approve', 'products.approve')) return;
+        if (!canSeeApprovals) return;
         let cancelled = false;
         const fetchCount = () => {
             fetch('/api/v1/admin/approvals/summary', { credentials: 'include' })
@@ -88,7 +89,7 @@ export default function AdminLayout({
         fetchCount();
         const id = setInterval(fetchCount, 60_000);
         return () => { cancelled = true; clearInterval(id); };
-    }, [status, pathname, hasAny]);
+    }, [status, pathname, canSeeApprovals]);
 
     // Show loading only on the genuine initial load (no session yet). A
     // background session revalidation (window-focus refetch) briefly flips
