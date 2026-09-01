@@ -66,34 +66,65 @@ async function main() {
       `available=${num(w0.availableCredit)} limit=${num(w0.creditLimit)} used=${num(w0.usedCredit)}`,
     );
 
-    // (b) debitWallet reduces available + sets outstanding ─────────────────────
+    // (b) debitWallet reserves credit (available ↓, reserved ↑; outstanding stays 0 until delivery)
     const orderId1 = `verify-order-1-${ts}`;
     const DEBIT1 = 400;
     await creditWalletService.debitWallet(userId, null, DEBIT1, orderId1);
     let w = await prisma.creditWallet.findUniqueOrThrow({ where: { id: walletId } });
     check(
-      '(b) debitWallet reduces available + sets outstanding',
-      num(w.availableCredit) === LIMIT - DEBIT1 && num(w.outstandingAmount) === DEBIT1 && num(w.usedCredit) === DEBIT1,
-      `available=${num(w.availableCredit)} outstanding=${num(w.outstandingAmount)}`,
+      '(b) debitWallet reserves credit (available ↓, reserved ↑, outstanding 0)',
+      num(w.availableCredit) === LIMIT - DEBIT1
+        && num(w.reservedAmount) === DEBIT1
+        && num(w.outstandingAmount) === 0
+        && num(w.usedCredit) === DEBIT1,
+      `available=${num(w.availableCredit)} reserved=${num(w.reservedAmount)} outstanding=${num(w.outstandingAmount)}`,
     );
 
-    // (c) under REPAY_BEFORE_NEXT_USE a 2nd debit throws while outstanding>0 ────
-    // Only meaningful when the resolved mode is REPAY_BEFORE_NEXT_USE.
     const mode = (await creditWalletService.resolveWalletConfig(walletId)).repaymentMode;
+
+    // (c) REPAY_BEFORE_NEXT_USE: 2nd debit allowed while only reserved (not yet outstanding)
+    if (mode === 'REPAY_BEFORE_NEXT_USE') {
+      let secondReserveOk = false;
+      try {
+        await creditWalletService.debitWallet(userId, null, 100, `verify-order-2-${ts}`);
+        secondReserveOk = true;
+      } catch {
+        secondReserveOk = false;
+      }
+      check(
+        '(c1) 2nd debit allowed while first order is only reserved (not outstanding yet)',
+        secondReserveOk,
+        secondReserveOk ? 'reserved second order OK' : 'unexpected block on reserve-only',
+      );
+      // Release the second reservation so later steps stay isolated.
+      await prisma.$transaction(async (tx) => {
+        await creditWalletService.reverseOrderDebit(`verify-order-2-${ts}`, userId, null, tx);
+      });
+    } else {
+      check('(c1) skipped — repayment mode is ' + mode, true);
+    }
+
+    // Convert first order → outstanding (simulates delivery)
+    await prisma.$transaction(async (tx) => {
+      await creditWalletService.convertReservedToOutstanding(orderId1, userId, null, tx);
+    });
+    w = await prisma.creditWallet.findUniqueOrThrow({ where: { id: walletId } });
+    check(
+      '(c2) delivery converts reserved → outstanding',
+      num(w.outstandingAmount) === DEBIT1 && num(w.reservedAmount) === 0,
+      `outstanding=${num(w.outstandingAmount)} reserved=${num(w.reservedAmount)}`,
+    );
+
     if (mode === 'REPAY_BEFORE_NEXT_USE') {
       let threw = false;
       try {
-        await creditWalletService.debitWallet(userId, null, 100, `verify-order-2-${ts}`);
+        await creditWalletService.debitWallet(userId, null, 100, `verify-order-3-${ts}`);
       } catch {
         threw = true;
       }
-      check('(c) 2nd debit blocked while outstanding>0 (REPAY_BEFORE_NEXT_USE)', threw);
+      check('(c3) 2nd debit blocked while outstanding>0 (REPAY_BEFORE_NEXT_USE)', threw);
     } else {
-      check(
-        '(c) repayment mode is REPAY_BEFORE_NEXT_USE (skipped — mode is ' + mode + ')',
-        true,
-        'skipped: not in REPAY_BEFORE_NEXT_USE',
-      );
+      check('(c3) skipped — repayment mode is ' + mode, true);
     }
 
     // (d) partial applyRepayment lowers outstanding but stays blocked ──────────
@@ -127,9 +158,11 @@ async function main() {
     );
 
     // (f) duplicate razorpayPaymentId is idempotent (no double credit) ─────────
-    // First create some outstanding to repay against.
     const orderIdF = `verify-order-f-${ts}`;
     await creditWalletService.debitWallet(userId, null, 200, orderIdF);
+    await prisma.$transaction(async (tx) => {
+      await creditWalletService.convertReservedToOutstanding(orderIdF, userId, null, tx);
+    });
     const dupPaymentId = `pay_verify_${ts}`;
     await creditWalletService.applyRepayment(walletId, 50, 'razorpay', `order_verify_${ts}`, dupPaymentId);
     const afterFirst = await prisma.creditWallet.findUniqueOrThrow({ where: { id: walletId } });
