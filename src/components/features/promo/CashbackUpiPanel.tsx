@@ -62,11 +62,13 @@ export function CashbackUpiPanel({
     createUrl,
     detailHref,
     markPaidUrl,
+    enableCustomerSearch = false,
 }: {
     listUrl: string;
     createUrl: string;
     detailHref: (trackingKey: string) => string;
     markPaidUrl: (row: PayoutInviteRow) => string | null;
+    enableCustomerSearch?: boolean;
 }) {
     const [rows, setRows] = useState<PayoutInviteRow[]>([]);
     const [statusFilter, setStatusFilter] = useState<string>('');
@@ -310,6 +312,7 @@ export function CashbackUpiPanel({
             {inviteOpen && (
                 <PayoutInviteModal
                     createUrl={createUrl}
+                    enableCustomerSearch={enableCustomerSearch}
                     onClose={() => setInviteOpen(false)}
                     onSaved={() => void load(statusFilter, query)}
                 />

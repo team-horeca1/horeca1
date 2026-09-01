@@ -8,6 +8,15 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MarkPaidModal } from '@/components/features/admin/promotions/MarkPaidModal';
 
+type LinkedUser = {
+  id: string;
+  fullName: string | null;
+  phone: string | null;
+  email: string | null;
+  businessName: string | null;
+  hcidDisplay?: string | null;
+};
+
 type Detail = {
   trackingKey: string;
   entryId: string | null;
@@ -25,6 +34,7 @@ type Detail = {
   claimedName: string | null;
   claimedBusinessName: string | null;
   referenceNumber: string | null;
+  user: LinkedUser | null;
   campaign: { id: string; name: string } | null;
   order: { id: string; orderNumber: string } | null;
   claimUrl: string | null;
@@ -173,8 +183,23 @@ export default function AdminPayoutDetailPage() {
           )}
 
           <Row label="Reference">{data.referenceNumber || '—'}</Row>
-          <Row label="Name">{data.claimedName || '—'}</Row>
-          <Row label="Business">{data.claimedBusinessName || '—'}</Row>
+          {data.user ? (
+            <>
+              <Row label="Customer">
+                {data.user.fullName || data.user.businessName || '—'}
+              </Row>
+              {data.user.businessName && data.user.fullName ? (
+                <Row label="Biz">{data.user.businessName}</Row>
+              ) : null}
+              <Row label="Phone">{data.user.phone || '—'}</Row>
+              <Row label="Email">{data.user.email || '—'}</Row>
+              {data.user.hcidDisplay ? <Row label="HCID">{data.user.hcidDisplay}</Row> : null}
+            </>
+          ) : (
+            <Row label="Customer">Not linked</Row>
+          )}
+          <Row label="Claim name">{data.claimedName || '—'}</Row>
+          <Row label="Claim biz">{data.claimedBusinessName || '—'}</Row>
           <Row label="Message">{data.notes || '—'}</Row>
           <Row label="UPI ID">{data.upiId || 'not claimed'}</Row>
           {data.order?.orderNumber || data.campaign?.name ? (

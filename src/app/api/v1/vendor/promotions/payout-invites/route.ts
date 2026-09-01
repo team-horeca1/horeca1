@@ -40,6 +40,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       amount: body.amount,
       notes: body.notes,
       referenceNumber: body.referenceNumber,
+      userId: body.userId,
     });
     logAction(ctx, req, {
       action: AUDIT_ACTIONS.payoutInviteCreate,

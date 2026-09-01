@@ -30,6 +30,16 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     const invite = await prisma.payoutInvite.findFirst({
       where: { trackingKey, vendorId },
       include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            phone: true,
+            email: true,
+            businessName: true,
+            hcidDisplay: true,
+          },
+        },
         cashbackEntry: {
           select: { id: true, status: true, upiId: true, paidReference: true, paidAt: true },
         },
@@ -68,6 +78,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         claimedAt: invite.claimedAt,
         claimedName: invite.claimedName,
         claimedBusinessName: invite.claimedBusinessName,
+        user: invite.user,
         claimUrl: claimUrlForToken(invite.token),
         claimable: awaiting,
       },

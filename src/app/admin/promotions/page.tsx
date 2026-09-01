@@ -665,6 +665,7 @@ export default function AdminPromotionsPage() {
                     createUrl="/api/v1/admin/promotions/payout-invites"
                     detailHref={(key) => `/admin/promotions/payouts/${encodeURIComponent(key)}`}
                     markPaidUrl={(row) => row.entryId ? `/api/v1/admin/promotions/entries/${row.entryId}` : null}
+                    enableCustomerSearch
                 />
             ) : loading ? (
                 <div className="flex items-center justify-center py-20">

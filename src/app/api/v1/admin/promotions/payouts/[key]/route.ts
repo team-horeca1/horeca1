@@ -29,7 +29,16 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
     const invite = await prisma.payoutInvite.findUnique({
       where: { trackingKey },
       include: {
-        user: { select: { id: true, fullName: true, phone: true, email: true, businessName: true } },
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            phone: true,
+            email: true,
+            businessName: true,
+            hcidDisplay: true,
+          },
+        },
         cashbackEntry: {
           select: {
             id: true,
@@ -45,11 +54,20 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       },
     });
 
+    const userSelect = {
+      id: true,
+      fullName: true,
+      phone: true,
+      email: true,
+      businessName: true,
+      hcidDisplay: true,
+    } as const;
+
     const entry = invite?.cashbackEntryId
       ? await prisma.cashbackEntry.findUnique({
           where: { id: invite.cashbackEntryId },
           include: {
-            user: { select: { id: true, fullName: true, phone: true, email: true, businessName: true } },
+            user: { select: userSelect },
             campaign: { select: { id: true, name: true } },
             order: { select: { id: true, orderNumber: true } },
             payoutInvite: { select: { id: true, token: true, status: true, expiresAt: true, claimedName: true, claimedBusinessName: true, claimedUpiId: true } },
@@ -58,7 +76,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       : await prisma.cashbackEntry.findUnique({
           where: { trackingKey },
           include: {
-            user: { select: { id: true, fullName: true, phone: true, email: true, businessName: true } },
+            user: { select: userSelect },
             campaign: { select: { id: true, name: true } },
             order: { select: { id: true, orderNumber: true } },
             payoutInvite: { select: { id: true, token: true, status: true, expiresAt: true, claimedName: true, claimedBusinessName: true, claimedUpiId: true } },
@@ -100,7 +118,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         claimedAt: invite?.claimedAt ?? null,
         claimedName: invite?.claimedName ?? entry?.payoutInvite?.claimedName ?? null,
         claimedBusinessName: invite?.claimedBusinessName ?? entry?.payoutInvite?.claimedBusinessName ?? null,
-        user: entry?.user ?? invite?.user ?? null,
+        user: invite?.user ?? entry?.user ?? null,
         campaign: entry?.campaign ?? null,
         order: entry?.order ?? null,
         claimUrl: token ? claimUrlForToken(token) : null,

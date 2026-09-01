@@ -238,6 +238,7 @@ export const createPayoutInviteSchema = z.object({
   amount: z.number().positive().max(1_000_000),
   notes: z.string().max(500).optional().nullable(),
   referenceNumber: z.string().trim().max(80).optional().nullable(),
+  userId: z.string().uuid().optional().nullable(),
 });
 
 export const listPayoutInvitesQuerySchema = z.object({

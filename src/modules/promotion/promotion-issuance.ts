@@ -922,11 +922,19 @@ export async function createPayoutInvite(args: {
   notes?: string | null;
   referenceNumber?: string | null;
   vendorId?: string | null;
+  userId?: string | null;
 }) {
   const amount = r2(args.amount);
   if (args.vendorId) {
     const vendor = await prisma.vendor.findUnique({ where: { id: args.vendorId }, select: { id: true } });
     if (!vendor) throw Errors.notFound('Vendor');
+  }
+  if (args.userId) {
+    const recipient = await prisma.user.findUnique({
+      where: { id: args.userId },
+      select: { id: true, isActive: true },
+    });
+    if (!recipient || !recipient.isActive) throw Errors.notFound('User');
   }
 
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -941,6 +949,7 @@ export async function createPayoutInvite(args: {
           trackingKey: await uniquePayoutTrackingKey(prisma),
           expiresAt: null,
           vendorId: args.vendorId ?? null,
+          userId: args.userId ?? null,
           createdById: args.createdById,
         },
       });
