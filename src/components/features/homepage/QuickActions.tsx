@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { RotateCcw, ListOrdered, Store, BadgePercent } from 'lucide-react';
-import { useSession } from 'next-auth/react';
+import { useStableSession } from '@/hooks/useStableSession';
 import { cn } from '@/lib/utils';
 
 export function QuickActions() {
-    const { status } = useSession();
-    const isLoggedIn = status === 'authenticated';
+    const { isAuthenticated } = useStableSession();
+    const isLoggedIn = isAuthenticated;
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {

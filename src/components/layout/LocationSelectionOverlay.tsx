@@ -12,7 +12,7 @@ import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 import { AddNewAddressOverlay } from './AddNewAddressOverlay';
 import { EditAddressOverlay } from './EditAddressOverlay';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { useSession } from 'next-auth/react';
+import { useStableSession } from '@/hooks/useStableSession';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { syncAddressToOutlet, prepareAccountForOutletSync } from '@/lib/syncAddressToOutlet';
 import { toast } from 'sonner';
@@ -37,7 +37,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
         isDetectingLocation,
     } = useAddress();
 
-    const { status } = useSession();
+    const { isAuthenticated } = useStableSession();
     const {
         currentAccount,
         accounts,
@@ -70,7 +70,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
             }
         }
 
-        if (status === 'authenticated') {
+        if (isAuthenticated) {
             try {
                 const accountId = await prepareAccountForOutletSync(
                     accounts,

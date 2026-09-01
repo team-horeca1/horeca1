@@ -5,7 +5,7 @@ import { Star, MapPin, Phone, Share2, ChevronLeft, Image as ImageIcon, Navigatio
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
-import { useSession } from 'next-auth/react';
+import { useStableSession } from '@/hooks/useStableSession';
 import { cn } from '@/lib/utils';
 import type { Vendor, StorePromotion } from '@/types';
 import { VENDOR_COVERS } from '@/components/features/homepage/VendorCardShared';
@@ -21,8 +21,8 @@ interface VendorStoreHeaderProps {
 
 export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos = [] }: VendorStoreHeaderProps) {
     const router = useRouter();
-    const { status } = useSession();
-    const isLoggedIn = status === 'authenticated';
+    const { isAuthenticated } = useStableSession();
+    const isLoggedIn = isAuthenticated;
     const [dealsOpen, setDealsOpen] = useState(false);
     const coverIndex = Math.abs(vendor.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % VENDOR_COVERS.length;
     const coverImage = vendor.coverImage || VENDOR_COVERS[coverIndex];

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, Star, Home, Package, LogIn, X, Loader2, Store, Clock, CheckCircle2, XCircle, Truck, Trash2, RotateCcw, ListPlus } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useSession } from 'next-auth/react';
+import { useStableSession } from '@/hooks/useStableSession';
 import { toast } from 'sonner';
 import { dal } from '@/lib/dal';
 import { cn } from '@/lib/utils';
@@ -102,11 +102,9 @@ function OrdersPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const statusParam = searchParams.get('status') || undefined;
-    const { data: session, status: sessionStatus } = useSession();
-    const isLoggedIn = sessionStatus === 'authenticated';
-    // !session so a background session revalidation doesn't re-flash the
-    // skeleton or refetch the list while the user is mid-action.
-    const isLoading = sessionStatus === 'loading' && !session;
+    const { isAuthenticated, isResolved } = useStableSession();
+    const isLoggedIn = isAuthenticated;
+    const isLoading = !isResolved;
     const [orders, setOrders] = React.useState<ApiOrder[]>([]);
     const [ordersLoading, setOrdersLoading] = React.useState(true);
     const [ratingModal, setRatingModal] = React.useState<{ orderId: string } | null>(null);

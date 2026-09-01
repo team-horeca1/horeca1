@@ -17,7 +17,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import { useStableSession } from '@/hooks/useStableSession';
 import { useAddress, type Address } from '@/context/AddressContext';
 import { AddNewAddressOverlay } from '@/components/layout/AddNewAddressOverlay';
 import {
@@ -32,7 +32,7 @@ import { isAdminBuyerImpersonationActive } from '@/lib/clearImpersonation';
 const EXCLUDED_PREFIXES = ['/login', '/register', '/admin', '/vendor', '/brand', '/d', '/r'];
 
 export function MandatoryAddressGate() {
-  const { data: session, status, update } = useSession();
+  const { session, isAuthenticated, update } = useStableSession();
   const { savedAddresses, isLoadingAddresses, addAddress, setSelectedAddress } = useAddress();
   const pathname = usePathname() ?? '';
   const [open, setOpen] = useState(false);
@@ -65,7 +65,7 @@ export function MandatoryAddressGate() {
 
   useEffect(() => {
     const eligible =
-      status === 'authenticated' &&
+      isAuthenticated &&
       isCustomerContext &&
       !onExcludedRoute &&
       !skipped &&
@@ -79,7 +79,7 @@ export function MandatoryAddressGate() {
 
     const shouldOpen = !hasUsableAddress;
     Promise.resolve().then(() => setOpen(shouldOpen));
-  }, [status, isCustomerContext, onExcludedRoute, isLoadingAddresses, hasUsableAddress, skipped, userId, savedAddresses.length]);
+  }, [isAuthenticated, isCustomerContext, onExcludedRoute, isLoadingAddresses, hasUsableAddress, skipped, userId, savedAddresses.length]);
 
   if (!open) return null;
 

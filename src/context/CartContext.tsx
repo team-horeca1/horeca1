@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useSession } from 'next-auth/react';
 import type { VendorProduct, CartItem, VendorCartGroup, BulkPriceTier, VendorPromoSummary } from '@/types';
 import { dalClient as dal } from '@/lib/dalClient';
 import { cartStorageKey, migrateLegacyKey } from '@/lib/userScopedStorage';
@@ -10,6 +9,7 @@ import {
     IMPERSONATION_CHANGED_EVENT,
 } from '@/lib/clearImpersonation';
 import { subscribeAuthTabEvents } from '@/lib/authTabSync';
+import { useStableSession } from '@/hooks/useStableSession';
 import {
     resolveSellableDisplayName,
     resolveSellableImages,
@@ -274,8 +274,8 @@ function saveLocalCart(
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-    const { data: session, status: sessionStatus } = useSession();
-    const isLoggedIn = sessionStatus === 'authenticated';
+    const { session, isAuthenticated, isResolved } = useStableSession();
+    const isLoggedIn = isAuthenticated;
     const sessionUser = (session?.user ?? {}) as Record<string, unknown>;
     const userId = (session?.user?.id as string | undefined) ?? null;
     const userRole = (session?.user as { role?: string } | undefined)?.role;
@@ -329,7 +329,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Session refresh blips (same user/BA/outlet) do a silent background revalidate
     // without setCart([]) so the badge and line items never flash to zero.
     useEffect(() => {
-        if (sessionStatus === 'loading') return;
+        if (!isResolved) return;
 
         let alive = true;
         const contextKey = `${userId ?? ''}|${activeBAId ?? ''}|${activeOutletId ?? ''}|${buyerImpersonating}`;
@@ -421,7 +421,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
         return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sessionStatus, userId, activeBAId, activeOutletId, buyerImpersonating, shouldUseServerCart]);
+    }, [isResolved, userId, activeBAId, activeOutletId, buyerImpersonating, shouldUseServerCart]);
 
     // Persist to localStorage for both guest and logged-in users so guest session preserves it on logout.
     // Skip while Admin View is on — otherwise the customer's cart overwrites the admin mirror key.

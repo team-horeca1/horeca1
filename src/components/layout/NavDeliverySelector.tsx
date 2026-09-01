@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { MapPin, ChevronDown, Check, Loader2, AlertCircle } from 'lucide-react';
-import { useSession } from 'next-auth/react';
+import { useStableSession } from '@/hooks/useStableSession';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { useAddress } from '@/context/AddressContext';
 
@@ -17,6 +17,37 @@ type StickyDeliverTo = {
   label: string;
   needsAddress?: boolean;
 };
+
+const DELIVER_TO_SS_PREFIX = 'h1_deliver_to:';
+
+function readCachedDeliverTo(userId: string | null): StickyDeliverTo | null {
+  if (!userId || typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(`${DELIVER_TO_SS_PREFIX}${userId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StickyDeliverTo;
+    if (
+      parsed
+      && (parsed.mode === 'outlet' || parsed.mode === 'fallback')
+      && typeof parsed.label === 'string'
+      && parsed.label.length > 0
+    ) {
+      return parsed;
+    }
+  } catch {
+    /* ignore corrupt cache */
+  }
+  return null;
+}
+
+function writeCachedDeliverTo(userId: string | null, sticky: StickyDeliverTo) {
+  if (!userId || typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(`${DELIVER_TO_SS_PREFIX}${userId}`, JSON.stringify(sticky));
+  } catch {
+    /* quota / private mode */
+  }
+}
 
 function DeliverToSkeleton({ variant }: { variant: 'desktop' | 'mobile' }) {
   if (variant === 'mobile') {
@@ -92,7 +123,8 @@ function StickyDeliverToChip({
 }
 
 export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }: Props) {
-  const { status } = useSession();
+  const { session, isResolved, isAuthenticated } = useStableSession();
+  const userId = session?.user?.id ?? null;
   const {
     currentAccount,
     currentOutlet,
@@ -106,7 +138,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
   const [outletOpen, setOutletOpen] = useState(false);
   const [pickingId, setPickingId] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const [lastGood, setLastGood] = useState<StickyDeliverTo | null>(null);
+  const [lastGood, setLastGood] = useState<StickyDeliverTo | null>(() => readCachedDeliverTo(userId));
 
   const visibleOutlets = (currentAccount?.outlets ?? []).filter(
     (o) => accessibleOutletIds.length === 0 || accessibleOutletIds.includes(o.id),
@@ -124,14 +156,16 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
 
   // Session still resolving or account list still loading — hold a fixed skeleton
   // so Deliver to does not jump between fallback and real values.
-  const settling = status === 'loading' || (status === 'authenticated' && loading);
+  // Auth.js `update()` flips status to loading while data stays populated; isResolved
+  // stays true in that case so this chip does not collapse every 45s.
+  const settling = !isResolved || (isAuthenticated && loading);
 
   // Remember the last resolved label so session blips keep showing it instead of a skeleton.
   // Must run in an effect — setState during render causes an extra paint / chip flicker.
   useEffect(() => {
     if (settling) return;
     const nextGood: StickyDeliverTo =
-      status === 'authenticated' && currentAccount && currentOutlet
+      isAuthenticated && currentAccount && currentOutlet
         ? {
             mode: 'outlet',
             label: currentOutlet.requiresAddressUpdate
@@ -145,21 +179,23 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
           };
     setLastGood((prev) => {
       if (
-        prev &&
-        prev.mode === nextGood.mode &&
-        prev.label === nextGood.label &&
-        prev.needsAddress === nextGood.needsAddress
+        prev
+        && prev.mode === nextGood.mode
+        && prev.label === nextGood.label
+        && prev.needsAddress === nextGood.needsAddress
       ) {
         return prev;
       }
       return nextGood;
     });
+    writeCachedDeliverTo(userId, nextGood);
   }, [
     settling,
-    status,
+    isAuthenticated,
     currentAccount,
     currentOutlet,
     fallbackLabel,
+    userId,
   ]);
 
   if (settling) {
@@ -170,7 +206,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
   }
 
   // Guest — fallback button
-  if (status !== 'authenticated' || !currentAccount || !currentOutlet) {
+  if (!isAuthenticated || !currentAccount || !currentOutlet) {
     if (variant === 'mobile') {
       return (
         <button

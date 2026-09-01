@@ -22,7 +22,6 @@ import {
 import type { Prisma } from '@prisma/client';
 import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
-import { softDeactivateDuplicateActiveOutlets } from '@/lib/outletWrites';
 import { businessFacingName, storeDisplayName } from '@/modules/supplier/foundation.service';
 
 export const GET = withAuth(async (_req: NextRequest, ctx) => {
@@ -34,17 +33,6 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
       userId: targetUserId,
       ...(impersonatedBaId ? { businessAccountId: impersonatedBaId } : {}),
     };
-
-    // Collapse multi-click same-location clones before listing so the navbar
-    // "Select Outlet" dropdown never floods with soft-deleted / duplicate rows.
-    const baIds = await prisma.businessAccountMember.findMany({
-      where: membershipWhere,
-      select: { businessAccountId: true },
-      distinct: ['businessAccountId'],
-    });
-    await Promise.all(
-      baIds.map((m) => softDeactivateDuplicateActiveOutlets(m.businessAccountId).catch(() => 0)),
-    );
 
     const memberships = await prisma.businessAccountMember.findMany({
       where: membershipWhere,

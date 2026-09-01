@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Search, MapPin, Navigation, Loader2, Store, X, CheckCircle } from 'lucide-react';
-import { useSession } from 'next-auth/react';
+import { useStableSession } from '@/hooks/useStableSession';
 import { cn } from '@/lib/utils';
 import { useAddress } from '@/context/AddressContext';
 import { useGooglePlacesAutocomplete } from '@/hooks/useGooglePlacesAutocomplete';
@@ -20,8 +20,8 @@ let hasBeenShownInSession = false;
 type Tab = 'business' | 'pincode';
 
 export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps) {
-    const { data: session, status: sessionStatus } = useSession();
-    const activeOutletId = (session?.user as { activeOutletId?: string } | undefined)?.activeOutletId ?? null;
+    const { session, isAuthenticated, isResolved } = useStableSession();
+    const activeOutletId = session?.user?.activeOutletId ?? null;
     const [isVisible, setIsVisible] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
     const [tab, setTab] = useState<Tab>('business');
@@ -52,13 +52,11 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
     useEffect(() => {
         if (hasBeenShownInSession) return;
 
-        // Wait until the session resolves so we don't flash the overlay for an
-        // authenticated customer whose active outlet already provides a pincode.
-        if (sessionStatus === 'loading') return;
+        if (!isResolved) return;
 
         // V2.2: logged-in users with an active outlet — pincode comes from the
         // outlet, not from this overlay. Skip showing the legacy chooser entirely.
-        if (sessionStatus === 'authenticated' && activeOutletId) {
+        if (isAuthenticated && activeOutletId) {
             hasBeenShownInSession = true;
             return;
         }
@@ -73,7 +71,7 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
 
         setIsVisible(true);
         hasBeenShownInSession = true;
-    }, [sessionStatus, activeOutletId]);
+    }, [isResolved, isAuthenticated, activeOutletId]);
 
     if (!isMounted || !isVisible) return null;
 
@@ -90,7 +88,7 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
         longitude: number;
         placeId?: string;
     }) => {
-        if (sessionStatus !== 'authenticated') return;
+        if (!isAuthenticated) return;
         try {
             const accountId = await prepareAccountForOutletSync(
                 accounts,

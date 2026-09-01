@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ClipboardList, Clock, ChevronRight, ChevronLeft, AlertCircle, ShoppingCart, Package, Eye } from 'lucide-react';
-import { useSession } from 'next-auth/react';
+import { useStableSession } from '@/hooks/useStableSession';
 import { dal } from '@/lib/dal';
 import type { Vendor } from '@/types';
 import { useCart } from '@/context/CartContext';
@@ -202,8 +202,8 @@ interface ContinueCard {
 }
 
 export function ContinueOrdering() {
-    const { status } = useSession();
-    const isLoggedIn = status === 'authenticated';
+    const { isAuthenticated } = useStableSession();
+    const isLoggedIn = isAuthenticated;
     const [isMounted, setIsMounted] = useState(false);
     const [cards, setCards] = useState<ContinueCard[]>([]);
     const [vendors, setVendors] = useState<Vendor[]>([]);

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useSession } from 'next-auth/react';
 import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 import { toast } from 'sonner';
 import { notifyAccountsRefresh } from '@/lib/addressUsability';
@@ -15,6 +14,7 @@ import {
     IMPERSONATION_CHANGED_EVENT,
 } from '@/lib/clearImpersonation';
 import { subscribeAuthTabEvents } from '@/lib/authTabSync';
+import { useStableSession } from '@/hooks/useStableSession';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,14 +62,15 @@ function pickDefaultAddress(addresses: Address[]): Address | null {
 
 export function AddressProvider({ children }: { children: React.ReactNode }) {
     const { isLoaded, google } = useGoogleMaps();
-    const { data: session, status } = useSession();
-    const userId = status === 'authenticated' ? (session?.user?.id ?? null) : null;
+    const { session, isAuthenticated, isResolved } = useStableSession();
+    const userId = session?.user?.id ?? null;
     const [selectedAddress, setSelectedAddressState] = useState<Address | null>(null);
     const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
     const [isDetectingLocation, setIsDetectingLocation] = useState(false);
     const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
     const [buyerImpersonating, setBuyerImpersonating] = useState(false);
     const impersonatingRef = useRef(false);
+    const lastLoadKeyRef = useRef<string | null>(null);
 
     // ─── DB Sync Helpers ─────────────────────────────────────────────────
 
@@ -120,14 +121,18 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    // ─── Load addresses on mount / session / impersonation change ────────
+    // ─── Load addresses on mount / identity / impersonation change ───────
+    // Do not refetch when Auth.js flips status to loading during update().
 
     useEffect(() => {
-        if (status === 'loading') return;
+        if (!isResolved) return;
         migrateLegacyKey('horeca1_selected_address', addressSelectedKey(null));
         migrateLegacyKey('horeca1_saved_addresses', addressSavedKey(null));
 
         const impersonating = buyerImpersonating || isAdminBuyerImpersonationActive();
+        const loadKey = `${userId ?? 'guest'}|${impersonating ? '1' : '0'}|${isAuthenticated ? '1' : '0'}`;
+        if (lastLoadKeyRef.current === loadKey) return;
+        lastLoadKeyRef.current = loadKey;
 
         // While viewing as a customer, never hydrate the admin's localStorage
         // selection — it mixes with the customer address list from the API.
@@ -144,7 +149,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             Promise.resolve().then(() => setSelectedAddressState(null));
         }
 
-        if (status === 'authenticated') {
+        if (isAuthenticated) {
             Promise.resolve().then(() => setIsLoadingAddresses(true));
             fetchAddressesFromDB().then((addresses) => {
                 setSavedAddresses(addresses);
@@ -170,14 +175,14 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                     });
                 }
             });
-        } else if (status === 'unauthenticated') {
+        } else {
             try {
                 const savedList = localStorage.getItem(addressSavedKey(null));
                 if (savedList) Promise.resolve().then(() => setSavedAddresses(JSON.parse(savedList)));
                 else Promise.resolve().then(() => setSavedAddresses([]));
             } catch { /* ignore */ }
         }
-    }, [status, userId, fetchAddressesFromDB, buyerImpersonating]);
+    }, [isResolved, isAuthenticated, userId, fetchAddressesFromDB, buyerImpersonating]);
 
     // ─── Sync the selected delivery address into a cookie ────────────────
     // The server reads `h1_addr` (a SavedAddress id) to drive location-based
@@ -196,7 +201,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
     // ─── refreshAddresses ────────────────────────────────────────────────
 
     const refreshAddresses = useCallback(async () => {
-        if (status !== 'authenticated') return;
+        if (!isAuthenticated) return;
         const addresses = await fetchAddressesFromDB();
         setSavedAddresses(addresses);
         const defaultAddr = pickDefaultAddress(addresses);
@@ -213,7 +218,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             }
             return next;
         });
-    }, [status, fetchAddressesFromDB, userId]);
+    }, [isAuthenticated, fetchAddressesFromDB, userId]);
 
     // ─── setSelectedAddress ──────────────────────────────────────────────
 
@@ -233,7 +238,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
     // ─── addAddress ──────────────────────────────────────────────────────
 
     const addAddress = useCallback(async (address: Omit<Address, 'id'>): Promise<Address | null> => {
-        if (status === 'authenticated') {
+        if (isAuthenticated) {
             try {
                 const res = await fetch('/api/v1/addresses', {
                     method: 'POST',
@@ -300,12 +305,12 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             });
             return newAddr;
         }
-    }, [status]);
+    }, [isAuthenticated]);
 
     // ─── removeAddress ───────────────────────────────────────────────────
 
     const removeAddress = useCallback(async (id: string): Promise<void> => {
-        if (status === 'authenticated') {
+        if (isAuthenticated) {
             const res = await fetch(`/api/v1/addresses/${id}`, { method: 'DELETE' });
             if (!res.ok) {
                 const json = await res.json().catch(() => ({}));
@@ -319,7 +324,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             if (remaining.length > 0 && !remaining.some(a => a.isDefault)) {
                 remaining = remaining.map((a, i) => ({ ...a, isDefault: i === 0 }));
             }
-            if (status !== 'authenticated') {
+            if (!isAuthenticated) {
                 try { localStorage.setItem(addressSavedKey(null), JSON.stringify(remaining)); } catch { /* ignore */ }
             }
             // If the removed address was selected, fall back to remaining default / first.
@@ -342,12 +347,12 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             return remaining;
         });
         notifyAccountsRefresh();
-    }, [status, userId]);
+    }, [isAuthenticated, userId]);
 
     // ─── updateAddress ───────────────────────────────────────────────────
 
     const updateAddress = useCallback(async (id: string, updates: Partial<Address>): Promise<void> => {
-        if (status === 'authenticated') {
+        if (isAuthenticated) {
             const res = await fetch(`/api/v1/addresses/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -365,7 +370,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                 ? prev.map((a) => (a.id === id ? a : { ...a, isDefault: false }))
                 : prev;
             const updated = cleared.map((a) => (a.id === id ? { ...a, ...updates } : a));
-            if (status !== 'authenticated') {
+            if (!isAuthenticated) {
                 try { localStorage.setItem(addressSavedKey(null), JSON.stringify(updated)); } catch { /* ignore */ }
             }
             return updated;
@@ -380,7 +385,7 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             return merged;
         });
         notifyAccountsRefresh();
-    }, [status, userId]);
+    }, [isAuthenticated, userId]);
 
     // ─── Reverse Geocode ─────────────────────────────────────────────────
 

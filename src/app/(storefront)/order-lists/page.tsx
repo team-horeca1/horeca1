@@ -9,15 +9,15 @@ import type { Vendor, VendorProduct, OrderList } from '@/types';
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
 import { useCart } from '@/context/CartContext';
 import { toast } from 'sonner';
-import { useSession } from 'next-auth/react';
+import { useStableSession } from '@/hooks/useStableSession';
 import { CreateListOverlay } from '@/components/features/order-lists/CreateListOverlay';
 
 export default function OrderListsPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const vendorFilterId = searchParams.get('vendorId');
-    const { data: session, status: sessionStatus } = useSession();
-    const isLoggedIn = sessionStatus === 'authenticated';
+    const { session, isAuthenticated, isResolved } = useStableSession();
+    const isLoggedIn = isAuthenticated;
     const { totalItems, addToCart } = useCart();
     const [allLists, setAllLists] = React.useState<OrderList[]>([]);
     const [isCreateOverlayOpen, setIsCreateOverlayOpen] = React.useState(false);
@@ -245,8 +245,12 @@ export default function OrderListsPage() {
         return vendorsList.find(v => v.id === vendorFilterId)?.name ?? null;
     }, [vendorFilterId, vendorsList]);
 
+    if (!isResolved) {
+        return null;
+    }
+
     // Guest users cannot have order lists — lists are tied to User.id
-    if (sessionStatus === 'unauthenticated') {
+    if (!isAuthenticated) {
         return (
             <div className="min-h-screen bg-gray-50/50 flex flex-col items-center justify-center px-6 text-center">
                 <div className="w-16 h-16 rounded-full bg-[#53B175]/10 flex items-center justify-center mb-5">
