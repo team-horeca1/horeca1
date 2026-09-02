@@ -32,7 +32,7 @@ import {
     AdminRegistryFilterBar,
 } from '@/components/features/admin/entity';
 
-const cellInput = 'bg-transparent border border-transparent hover:border-[#D1D5DB] focus:border-[#299E60] focus:bg-white focus:ring-1 focus:ring-[#299E60]/20 px-1.5 py-1 rounded-[4px] outline-none w-full text-[12.5px] tabular-nums transition-colors';
+const cellInput = 'bg-transparent border border-transparent hover:border-[#D1D5DB] focus:border-[#6B1D2E] focus:bg-white focus:ring-1 focus:ring-[#6B1D2E]/20 px-1.5 py-1 rounded-[4px] outline-none w-full text-[12.5px] tabular-nums transition-colors';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -587,7 +587,7 @@ export default function CategoriesPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <Loader2 className="w-10 h-10 animate-spin text-[#299E60]" />
+                <Loader2 className="w-10 h-10 animate-spin text-[#6B1D2E]" />
             </div>
         );
     }
@@ -605,7 +605,7 @@ export default function CategoriesPage() {
                         {/* Import */}
                         <button
                             onClick={openImportModal}
-                            className="h-[44px] px-5 flex items-center gap-2 bg-white border border-[#D1D5DB] rounded-[12px] text-[14px] font-bold text-[#181725] hover:border-[#299E60]/40 hover:shadow-sm transition-all"
+                            className="h-[44px] px-5 flex items-center gap-2 bg-white border border-[#D1D5DB] rounded-[12px] text-[14px] font-bold text-[#181725] hover:border-[#6B1D2E]/40 hover:shadow-sm transition-all"
                         >
                             <Upload size={16} />
                             Import
@@ -613,7 +613,7 @@ export default function CategoriesPage() {
 
                         {/* Export dropdown */}
                         <div className="relative group">
-                            <button className="h-[44px] px-5 flex items-center gap-2 bg-white border border-[#D1D5DB] rounded-[12px] text-[14px] font-bold text-[#181725] hover:border-[#299E60]/40 hover:shadow-sm transition-all">
+                            <button className="h-[44px] px-5 flex items-center gap-2 bg-white border border-[#D1D5DB] rounded-[12px] text-[14px] font-bold text-[#181725] hover:border-[#6B1D2E]/40 hover:shadow-sm transition-all">
                                 <Download size={16} />
                                 Export
                                 <ChevronDown size={14} className="text-[#AEAEAE]" />
@@ -623,14 +623,14 @@ export default function CategoriesPage() {
                                     onClick={() => handleExport('csv')}
                                     className="w-full px-4 py-2.5 text-left text-[14px] font-medium text-[#181725] hover:bg-[#F8F9FB] flex items-center gap-2.5 transition-colors"
                                 >
-                                    <FileText size={16} className="text-[#299E60]" />
+                                    <FileText size={16} className="text-[#6B1D2E]" />
                                     Export CSV
                                 </button>
                                 <button
                                     onClick={() => handleExport('xlsx')}
                                     className="w-full px-4 py-2.5 text-left text-[14px] font-medium text-[#181725] hover:bg-[#F8F9FB] flex items-center gap-2.5 transition-colors"
                                 >
-                                    <FileSpreadsheet size={16} className="text-[#299E60]" />
+                                    <FileSpreadsheet size={16} className="text-[#6B1D2E]" />
                                     Export Excel
                                 </button>
                             </div>
@@ -640,7 +640,7 @@ export default function CategoriesPage() {
                         {canWriteProducts && (
                             <button
                                 onClick={openCreateModal}
-                                className="h-[44px] px-6 flex items-center gap-2 bg-[#299E60] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#238a54] shadow-sm shadow-[#299E60]/20 transition-all active:scale-[0.98] shrink-0"
+                                className="h-[44px] px-6 flex items-center gap-2 bg-[#6B1D2E] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#5A1926] shadow-sm shadow-[#6B1D2E]/20 transition-all active:scale-[0.98] shrink-0"
                             >
                                 <Plus size={18} strokeWidth={2.5} />
                                 Add Category
@@ -666,8 +666,8 @@ export default function CategoriesPage() {
                         label: 'Active',
                         value: stats.active,
                         icon: CheckCircle,
-                        color: '#299E60',
-                        bgColor: '#EEF8F1',
+                        color: '#6B1D2E',
+                        bgColor: '#F8E8EC',
                     },
                     {
                         label: 'Pending Approval',
@@ -888,7 +888,7 @@ export default function CategoriesPage() {
                                 value={formData.name}
                                 onChange={(e) => handleNameChange(e.target.value)}
                                 placeholder="e.g. Dairy & Milk Products"
-                                className="w-full h-[46px] bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] font-medium outline-none transition-all placeholder:text-[#AEAEAE] focus:border-[#299E60]/40 focus:bg-white focus:shadow-sm"
+                                className="w-full h-[46px] bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] font-medium outline-none transition-all placeholder:text-[#AEAEAE] focus:border-[#6B1D2E]/40 focus:bg-white focus:shadow-sm"
                                 autoFocus
                             />
                         </div>
@@ -903,7 +903,7 @@ export default function CategoriesPage() {
                                 value={formData.slug}
                                 onChange={(e) => handleSlugChange(e.target.value)}
                                 placeholder="auto-generated-from-name"
-                                className="w-full h-[46px] bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] font-mono font-medium outline-none transition-all placeholder:text-[#AEAEAE] focus:border-[#299E60]/40 focus:bg-white focus:shadow-sm"
+                                className="w-full h-[46px] bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] font-mono font-medium outline-none transition-all placeholder:text-[#AEAEAE] focus:border-[#6B1D2E]/40 focus:bg-white focus:shadow-sm"
                             />
                             <p className="text-[11px] text-[#AEAEAE] mt-1.5 font-medium">
                                 Auto-generated from name. Edit manually if needed.
@@ -929,7 +929,7 @@ export default function CategoriesPage() {
                                             : [],
                                     }));
                                 }}
-                                className="w-full h-[46px] bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] font-medium outline-none transition-all focus:border-[#299E60]/40 focus:bg-white focus:shadow-sm appearance-none cursor-pointer"
+                                className="w-full h-[46px] bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] font-medium outline-none transition-all focus:border-[#6B1D2E]/40 focus:bg-white focus:shadow-sm appearance-none cursor-pointer"
                             >
                                 <option value="">None (Top-level category)</option>
                                 {parentOptions.map((cat) => (
@@ -974,7 +974,7 @@ export default function CategoriesPage() {
                                                             };
                                                         });
                                                     }}
-                                                    className="rounded border-gray-300 text-[#299E60] focus:ring-[#299E60]/30"
+                                                    className="rounded border-gray-300 text-[#6B1D2E] focus:ring-[#6B1D2E]/30"
                                                 />
                                                 {cat.name}
                                             </label>
@@ -1016,7 +1016,7 @@ export default function CategoriesPage() {
                                             sortOrder: parseInt(e.target.value, 10) || 0,
                                         }))
                                     }
-                                    className="w-full h-[46px] bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] font-medium outline-none transition-all focus:border-[#299E60]/40 focus:bg-white focus:shadow-sm"
+                                    className="w-full h-[46px] bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] font-medium outline-none transition-all focus:border-[#6B1D2E]/40 focus:bg-white focus:shadow-sm"
                                 />
                             </div>
                             <div className="flex items-end pb-1">
@@ -1033,7 +1033,7 @@ export default function CategoriesPage() {
                                     <div
                                         className={cn(
                                             'relative w-[44px] h-[24px] rounded-full transition-colors',
-                                            formData.isActive ? 'bg-[#299E60]' : 'bg-[#EEEEEE]'
+                                            formData.isActive ? 'bg-[#6B1D2E]' : 'bg-[#EEEEEE]'
                                         )}
                                     >
                                         <div
@@ -1068,7 +1068,7 @@ export default function CategoriesPage() {
                             handleSubmit(e);
                         }}
                         disabled={formLoading}
-                        className="flex-1 h-[48px] bg-[#299E60] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#238a54] shadow-sm shadow-[#299E60]/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="flex-1 h-[48px] bg-[#6B1D2E] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#5A1926] shadow-sm shadow-[#6B1D2E]/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         {formLoading && <Loader2 size={16} className="animate-spin" />}
                         {editingCategory ? 'Update Category' : 'Create Category'}
@@ -1170,8 +1170,8 @@ export default function CategoriesPage() {
                                 className={cn(
                                     'border-2 border-dashed rounded-[12px] p-8 text-center cursor-pointer transition-all',
                                     importFile
-                                        ? 'border-[#299E60] bg-[#EEF8F1]'
-                                        : 'border-[#EEEEEE] hover:border-[#299E60]/40 hover:bg-[#F8F9FB]'
+                                        ? 'border-[#6B1D2E] bg-[#F8E8EC]'
+                                        : 'border-[#EEEEEE] hover:border-[#6B1D2E]/40 hover:bg-[#F8F9FB]'
                                 )}
                             >
                                 <input
@@ -1188,7 +1188,7 @@ export default function CategoriesPage() {
                                     <div className="flex flex-col items-center gap-2">
                                         <FileSpreadsheet
                                             size={32}
-                                            className="text-[#299E60]"
+                                            className="text-[#6B1D2E]"
                                         />
                                         <p className="text-[14px] font-bold text-[#181725]">
                                             {importFile.name}
@@ -1214,12 +1214,12 @@ export default function CategoriesPage() {
                             {importResult && (
                                 <div className="space-y-3">
                                     {importResult.created > 0 && (
-                                        <div className="bg-[#EEF8F1] border border-[#299E60]/10 rounded-[10px] p-4 flex items-center gap-3">
+                                        <div className="bg-[#F8E8EC] border border-[#6B1D2E]/10 rounded-[10px] p-4 flex items-center gap-3">
                                             <CheckCircle
                                                 size={20}
-                                                className="text-[#299E60] shrink-0"
+                                                className="text-[#6B1D2E] shrink-0"
                                             />
-                                            <p className="text-[14px] font-bold text-[#299E60]">
+                                            <p className="text-[14px] font-bold text-[#6B1D2E]">
                                                 Successfully created {importResult.created}{' '}
                                                 categor{importResult.created !== 1 ? 'ies' : 'y'}
                                             </p>
@@ -1257,7 +1257,7 @@ export default function CategoriesPage() {
                                     <button
                                         onClick={handleImport}
                                         disabled={!importFile || importLoading}
-                                        className="flex-1 h-[46px] bg-[#299E60] text-white rounded-[10px] text-[14px] font-bold hover:bg-[#238a54] shadow-sm shadow-[#299E60]/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        className="flex-1 h-[46px] bg-[#6B1D2E] text-white rounded-[10px] text-[14px] font-bold hover:bg-[#5A1926] shadow-sm shadow-[#6B1D2E]/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
                                         {importLoading && (
                                             <Loader2 size={16} className="animate-spin" />
@@ -1416,13 +1416,13 @@ const CategoryRow = ({
                         handleInlineEdit(cat.id, 'approvalStatus', val, originalCat?.approvalStatus);
                     }}
                     className={cn(cellInput, "font-semibold appearance-none py-1 px-1.5 cursor-pointer max-w-[110px]", 
-                        cat.approvalStatus === 'approved' && "text-[#299E60]",
+                        cat.approvalStatus === 'approved' && "text-[#6B1D2E]",
                         cat.approvalStatus === 'pending' && "text-[#F59E0B]",
                         cat.approvalStatus === 'rejected' && "text-[#E74C3C]"
                     )}
                 >
                     <option value="pending" className="text-[#F59E0B] font-semibold">Pending</option>
-                    <option value="approved" className="text-[#299E60] font-semibold">Approved</option>
+                    <option value="approved" className="text-[#6B1D2E] font-semibold">Approved</option>
                     <option value="rejected" className="text-[#E74C3C] font-semibold">Rejected</option>
                 </select>
             </td>
@@ -1445,7 +1445,7 @@ const CategoryRow = ({
                     ) : (
                         <div
                             className="relative inline-flex h-[18px] w-[32px] shrink-0 items-center rounded-full transition-colors duration-200"
-                            style={{ backgroundColor: cat.isActive ? '#299E60' : '#D1D5DB' }}
+                            style={{ backgroundColor: cat.isActive ? '#6B1D2E' : '#D1D5DB' }}
                         >
                             <span className="inline-block h-[12px] w-[12px] rounded-full bg-white shadow-sm transition-transform duration-200" style={{ transform: cat.isActive ? 'translateX(17px)' : 'translateX(3px)' }} />
                         </div>
@@ -1453,7 +1453,7 @@ const CategoryRow = ({
                     <span
                         className={cn(
                             'text-[12.5px] font-bold',
-                            cat.isActive ? 'text-[#299E60]' : 'text-[#AEAEAE]'
+                            cat.isActive ? 'text-[#6B1D2E]' : 'text-[#AEAEAE]'
                         )}
                     >
                         {cat.isActive ? 'Active' : 'Inactive'}
@@ -1465,7 +1465,7 @@ const CategoryRow = ({
             <td className="pl-4 pr-8 py-3 sticky right-0 bg-white group-hover:bg-[#F9FAFB] z-10 border-l border-[#D1D5DB] text-right align-middle">
                 <div className="flex items-center justify-end gap-2">
                     {savingRows.has(cat.id) ? (
-                        <Loader2 size={16} className="animate-spin text-[#299E60] mx-auto mr-4" />
+                        <Loader2 size={16} className="animate-spin text-[#6B1D2E] mx-auto mr-4" />
                     ) : (
                         <>
                             {canWriteProducts && (
@@ -1476,7 +1476,7 @@ const CategoryRow = ({
                                         e.stopPropagation();
                                         openEditModal(cat);
                                     }}
-                                    className="w-[32px] h-[32px] flex items-center justify-center rounded-[8px] bg-[#F1F4F9] text-[#7C7C7C] hover:bg-[#EEF8F1] hover:text-[#299E60] transition-all"
+                                    className="w-[32px] h-[32px] flex items-center justify-center rounded-[8px] bg-[#F1F4F9] text-[#7C7C7C] hover:bg-[#F8E8EC] hover:text-[#6B1D2E] transition-all"
                                     title="Edit category"
                                 >
                                     <Edit2 size={14} />

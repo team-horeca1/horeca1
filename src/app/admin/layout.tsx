@@ -7,37 +7,115 @@ import { useSession } from 'next-auth/react';
 import {
     LayoutDashboard,
     ShoppingBag,
-    Users,
-    Store,
     CheckSquare,
-    Wallet,
-    BarChart3,
-    Settings,
     Search,
     Menu,
     ChevronLeft,
     ChevronRight,
     Loader2,
     ShieldAlert,
-    Package,
-    Tag,
     Home,
-    Sparkles,
-    BookOpen,
-    RotateCcw,
-    CreditCard,
-    Gift,
-    FileWarning,
+    X,
+    Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
 import { NotificationBell } from '@/components/features/NotificationBell';
 import { usePermissions } from '@/hooks/usePermissions';
-import { ADMIN_NAV_GROUPS, filterNavLinks } from '@/lib/permissions/portalNav';
+import { ADMIN_NAV_GROUPS, filterNavLinks, type PortalNavGroup, type PortalNavLink } from '@/lib/permissions/portalNav';
 import { getFirstAllowedRoute } from '@/lib/permissions/routePermissions';
 import { PortalPageGuard } from '@/components/auth/PortalPageGuard';
 import { PortalNoAccess } from '@/components/auth/PortalNoAccess';
 import { Suspense } from 'react';
+
+function isNavActive(pathname: string, href: string): boolean {
+    if (pathname === href) return true;
+    if (href === '/admin/dashboard') return false;
+    return pathname.startsWith(`${href}/`);
+}
+
+function findNavLink(groups: PortalNavGroup[], href: string): PortalNavLink | undefined {
+    for (const group of groups) {
+        const found = group.links.find((l) => l.href === href);
+        if (found) return found;
+    }
+    return undefined;
+}
+
+function AdminNavLinks({
+    groups,
+    pathname,
+    pendingApprovals,
+    collapsed,
+    onNavigate,
+}: {
+    groups: PortalNavGroup[];
+    pathname: string;
+    pendingApprovals: number;
+    collapsed: boolean;
+    onNavigate?: () => void;
+}) {
+    return (
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+            {groups.map((group) => (
+                <div key={group.label} className="mb-4">
+                    {!collapsed && (
+                        <p className="px-3 mb-2 text-[11px] font-semibold uppercase text-[#6B7280]">
+                            {group.label}
+                        </p>
+                    )}
+                    <div className="space-y-1">
+                        {group.links.map((link) => {
+                            const isActive = isNavActive(pathname, link.href);
+                            const badge = link.name === 'Approvals' ? pendingApprovals : 0;
+                            const badgeLabel = badge > 99 ? '99+' : String(badge);
+                            return (
+                                <Link
+                                    key={link.name}
+                                    href={link.href}
+                                    onClick={onNavigate}
+                                    title={collapsed ? (badge > 0 ? `${link.name} (${badgeLabel} pending)` : link.name) : undefined}
+                                    className={cn(
+                                        'relative flex items-center rounded-[12px] text-[14px] font-semibold overflow-hidden leading-none min-h-12',
+                                        collapsed ? 'justify-center px-0' : 'gap-3 px-4',
+                                        isActive
+                                            ? 'bg-primary text-white shadow-sm'
+                                            : 'text-[#1C1C1C] hover:bg-primary-light active:bg-primary-light',
+                                    )}
+                                >
+                                    <span className="relative shrink-0">
+                                        <link.icon
+                                            size={22}
+                                            className={cn(isActive ? 'text-white' : 'text-[#1C1C1C]')}
+                                        />
+                                        {collapsed && badge > 0 && (
+                                            <span className="absolute -top-1 -right-1 size-2.5 rounded-full bg-error border-2 border-white" />
+                                        )}
+                                    </span>
+                                    {!collapsed && (
+                                        <>
+                                            <span className="whitespace-nowrap flex-1">{link.name}</span>
+                                            {badge > 0 && (
+                                                <span
+                                                    className={cn(
+                                                        'inline-flex min-w-[22px] h-[22px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold',
+                                                        isActive ? 'bg-white text-error' : 'bg-error text-white',
+                                                    )}
+                                                >
+                                                    {badgeLabel}
+                                                </span>
+                                            )}
+                                        </>
+                                    )}
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </div>
+            ))}
+        </nav>
+    );
+}
 
 export default function AdminLayout({
     children,
@@ -48,6 +126,7 @@ export default function AdminLayout({
     const router = useRouter();
     const { data: session, status } = useSession();
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [mobileOpen, setMobileOpen] = useState(false);
     const [pendingApprovals, setPendingApprovals] = useState(0);
 
     const { can, hasAny } = usePermissions();
@@ -69,9 +148,6 @@ export default function AdminLayout({
         }
     }, [status, userRole, allowedHrefs, firstAllowedRoute, pathname, router]);
 
-    // Poll the pending-approvals count
-    // without a full page reload. 60s cadence is friendly to the DB and good
-    // enough for admins — the Approvals page itself shows live numbers.
     useEffect(() => {
         if (status !== 'authenticated') return;
         if (!canSeeApprovals) return;
@@ -91,28 +167,50 @@ export default function AdminLayout({
         return () => { cancelled = true; clearInterval(id); };
     }, [status, pathname, canSeeApprovals]);
 
-    // Show loading only on the genuine initial load (no session yet). A
-    // background session revalidation (window-focus refetch) briefly flips
-    // `status` to 'loading' while `session` stays populated; gating on bare
-    // 'loading' would unmount this subtree and close any open modal mid-edit.
+    useEffect(() => {
+        setMobileOpen(false);
+    }, [pathname]);
+
+    useEffect(() => {
+        if (!mobileOpen) return;
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setMobileOpen(false);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => {
+            document.body.style.overflow = prev;
+            window.removeEventListener('keydown', onKey);
+        };
+    }, [mobileOpen]);
+
+    const dockLinks = [
+        findNavLink(visibleGroups, '/admin/dashboard'),
+        findNavLink(visibleGroups, '/admin/orders'),
+        findNavLink(visibleGroups, '/admin/approvals')
+            ?? findNavLink(visibleGroups, '/admin/customers')
+            ?? findNavLink(visibleGroups, '/admin/vendors'),
+    ].filter((link): link is PortalNavLink => Boolean(link));
+
     if (status === 'loading' && !session) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-[#F8F9FB]">
-                <Loader2 className="animate-spin text-[#299E60]" size={40} />
+            <div className="flex items-center justify-center min-h-dvh bg-background">
+                <Loader2 className="animate-spin text-primary" size={40} />
             </div>
         );
     }
 
-    // Block non-admin users
     if (status === 'unauthenticated' || userRole !== 'admin') {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-[#F8F9FB] gap-4">
-                <ShieldAlert size={48} className="text-[#E74C3C]" />
-                <h1 className="text-[24px] font-bold text-[#181725]">Access Denied</h1>
-                <p className="text-[14px] text-[#7C7C7C]">You need admin privileges to access this area.</p>
+            <div className="flex flex-col items-center justify-center min-h-dvh bg-background gap-4 px-6">
+                <ShieldAlert size={48} className="text-error" />
+                <h1 className="text-[clamp(1.25rem,4vw,1.5rem)] font-bold text-[#111827] text-balance">Access Denied</h1>
+                <p className="text-[14px] text-[#667085] text-pretty text-center">You need admin privileges to access this area.</p>
                 <button
+                    type="button"
                     onClick={() => router.push('/')}
-                    className="mt-4 px-6 py-3 bg-[#299E60] text-white rounded-[10px] font-bold hover:bg-[#238a54] transition-colors"
+                    className="mt-2 min-h-12 px-6 bg-primary text-white rounded-[12px] font-semibold hover:bg-primary-dark active:bg-primary-pressed active:scale-[0.97] transition-transform"
                 >
                     Go to Homepage
                 </button>
@@ -122,170 +220,219 @@ export default function AdminLayout({
 
     if (visibleGroups.length === 0) {
         return (
-            <div className="flex flex-col min-h-screen bg-[#F8F9FB]">
+            <div className="flex flex-col min-h-dvh bg-background">
                 <PortalNoAccess />
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col min-h-screen bg-[#F8F9FB]">
-            {/* Full-width Top Header */}
-            <header className="h-[80px] bg-white border-b border-[#EEEEEE] flex items-center px-8 sticky top-0 z-50 shrink-0">
-                {/* Logo Section - same width as sidebar */}
-                <div className={cn(
-                    "shrink-0 flex items-center gap-3 transition-all duration-300 ease-in-out",
-                    isCollapsed ? "w-[60px]" : "w-[220px]"
-                )}>
-                    <Link href={firstAllowedRoute ?? '/admin/dashboard'} className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-[42px] h-[42px] shrink-0">
+        <div className="flex flex-col min-h-dvh bg-background">
+            <header className="sticky top-0 z-50 shrink-0 bg-white border-b border-divider pt-[env(safe-area-inset-top)]">
+                <div className="h-14 lg:h-20 flex items-center gap-2 px-3 lg:px-8">
+                    <button
+                        type="button"
+                        onClick={() => setMobileOpen(true)}
+                        className="lg:hidden size-12 flex items-center justify-center rounded-[12px] text-[#1C1C1C] hover:bg-ivory active:scale-[0.97] transition-transform"
+                        aria-label="Open admin menu"
+                    >
+                        <Menu size={22} />
+                    </button>
+
+                    <Link
+                        href={firstAllowedRoute ?? '/admin/dashboard'}
+                        className="flex items-center gap-2.5 min-w-0"
+                    >
+                        <div className="size-9 lg:size-[42px] shrink-0">
                             <img src="/images/admin/Ellipse 2.svg" alt="" className="w-full h-full object-contain" />
                         </div>
-                        {!isCollapsed && (
-                            <div className="whitespace-nowrap">
-                                <h1 className="text-[22px] font-extrabold leading-tight">
-                                    <span className="text-[#E74C3C]">Horeca</span><span className="text-[#299E60]">1</span>
-                                </h1>
-                                <p className="text-[10px] text-[#AEAEAE] font-semibold uppercase tracking-[0.15em] -mt-0.5">Admin Panel</p>
-                            </div>
-                        )}
+                        <div className="min-w-0">
+                            <h1 className="text-[18px] lg:text-[22px] font-extrabold leading-tight text-primary truncate">
+                                Horeca1
+                            </h1>
+                            <p className="hidden sm:block text-[10px] text-[#6B7280] font-semibold uppercase -mt-0.5">
+                                Admin
+                            </p>
+                        </div>
                     </Link>
-                </div>
 
-                {/* Sidebar Toggle Button */}
-                <button
-                    onClick={() => setIsCollapsed(!isCollapsed)}
-                    className="ml-4 p-2 hover:bg-gray-100 rounded-lg transition-colors text-[#181725]"
-                >
-                    <Menu size={22} />
-                </button>
+                    <button
+                        type="button"
+                        onClick={() => setIsCollapsed(!isCollapsed)}
+                        className="hidden lg:flex ml-2 size-11 items-center justify-center hover:bg-ivory rounded-[12px] text-[#1C1C1C] active:scale-[0.97] transition-transform"
+                        aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                    >
+                        <Menu size={22} />
+                    </button>
 
-                {/* Search Bar - centered */}
-                <div className="flex-1 flex justify-center px-10">
-                    <div className="relative group w-full max-w-[520px]">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#AEAEAE]" size={18} />
-                        <input
-                            type="text"
-                            placeholder="search"
-                            className="w-full bg-[#F5F5F5] border border-[#EEEEEE] rounded-[14px] py-3 pl-11 pr-4 text-[14px] outline-none transition-all placeholder:text-[#AEAEAE] font-medium focus:border-[#299E60]/40 focus:bg-white focus:shadow-sm"
-                        />
+                    <div className="hidden lg:flex flex-1 justify-center px-10">
+                        <div className="relative w-full max-w-[520px]">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={18} />
+                            <input
+                                type="search"
+                                placeholder="Search"
+                                aria-label="Search admin"
+                                className="w-full bg-ivory border border-divider rounded-[12px] py-3 pl-11 pr-4 text-[14px] outline-none placeholder:text-[#9CA3AF] font-medium focus:border-primary focus:bg-white"
+                            />
+                        </div>
                     </div>
-                </div>
 
-                {/* Right Side - Bell + Admin */}
-                <div className="flex items-center gap-5 shrink-0">
-                    <NotificationBell />
-
-                    <BusinessAccountSwitcherDropdown isAdminMode={true} />
+                    <div className="ml-auto flex items-center gap-1 lg:gap-4 shrink-0">
+                        <NotificationBell accentColor="#6B1D2E" />
+                        <BusinessAccountSwitcherDropdown isAdminMode={true} />
+                    </div>
                 </div>
             </header>
 
-            {/* Body: Sidebar + Content */}
-            <div className="flex flex-1">
-                {/* Sidebar Column Spacer (maintains width in flex flow) */}
-                <aside className={cn(
-                    "shrink-0 transition-all duration-300 ease-in-out",
-                    isCollapsed ? "w-[80px]" : "w-[240px]"
-                )}>
-                    {/* Sticky Sidebar Container */}
-                    <div className={cn(
-                        "bg-white border-r border-[#EEEEEE] flex flex-col sticky top-[80px] h-[calc(100vh-80px)] overflow-y-auto z-40 transition-all duration-300 ease-in-out",
-                        isCollapsed ? "w-[80px]" : "w-[240px]"
-                    )}>
-                        <nav className="flex-1 px-4 py-6 space-y-2">
-                            {visibleGroups.map((group) => (
-                                <div key={group.label} className="mb-4">
-                                    {!isCollapsed && (
-                                        <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-[#AEAEAE]">{group.label}</p>
-                                    )}
-                                    <div className="space-y-1">
-                                        {group.links.map((link) => {
-                                            const isActive = pathname === link.href;
-                                            const badge = link.name === 'Approvals' ? pendingApprovals : 0;
-                                            const badgeLabel = badge > 99 ? '99+' : String(badge);
-                                            return (
-                                                <Link
-                                                    key={link.name}
-                                                    href={link.href}
-                                                    title={isCollapsed ? (badge > 0 ? `${link.name} (${badgeLabel} pending)` : link.name) : ''}
-                                                    className={cn(
-                                                        'relative flex items-center rounded-[10px] transition-all group text-[14px] overflow-hidden leading-none',
-                                                        isCollapsed ? 'justify-center h-[48px] px-0' : 'gap-3.5 px-5 py-3.5',
-                                                        isActive
-                                                            ? 'bg-[#299E60] text-white shadow-md shadow-[#299E60]/20'
-                                                            : 'text-[#191919] hover:bg-[#F8F9FB]',
-                                                    )}
-                                                >
-                                                    <span className="relative shrink-0">
-                                                        <link.icon size={22} className={cn(
-                                                            'transition-colors',
-                                                            isActive ? 'text-white' : 'text-[#000000] group-hover:text-[#000000]',
-                                                        )} />
-                                                        {isCollapsed && badge > 0 && (
-                                                            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                                                                <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 animate-ping" />
-                                                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500 border border-white" />
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                    {!isCollapsed && (
-                                                        <>
-                                                            <span className="font-semibold whitespace-nowrap flex-1">{link.name}</span>
-                                                            {badge > 0 && (
-                                                                <span className="relative inline-flex items-center justify-center">
-                                                                    <span className="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60 animate-ping" />
-                                                                    <span className={cn(
-                                                                        'relative inline-flex min-w-[22px] h-[22px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold border',
-                                                                        isActive ? 'bg-white text-red-600 border-white' : 'bg-red-500 text-white border-white',
-                                                                    )}>
-                                                                        {badgeLabel}
-                                                                    </span>
-                                                                </span>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </Link>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                        </nav>
-
-                        {/* View Storefront */}
-                        <div className="px-4 pb-3">
+            {mobileOpen && (
+                <div className="lg:hidden fixed inset-0 z-[60]">
+                    <button
+                        type="button"
+                        className="absolute inset-0 bg-black/45"
+                        aria-label="Close admin menu"
+                        onClick={() => setMobileOpen(false)}
+                    />
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Admin navigation"
+                        className="absolute inset-y-0 left-0 w-[min(86vw,20rem)] bg-white shadow-[0_12px_24px_rgba(31,34,51,0.12)] flex flex-col pt-[env(safe-area-inset-top)]"
+                    >
+                        <div className="flex items-center justify-between px-4 h-14 border-b border-divider">
+                            <p className="text-[16px] font-bold text-primary">Menu</p>
+                            <button
+                                type="button"
+                                onClick={() => setMobileOpen(false)}
+                                className="size-12 flex items-center justify-center rounded-[12px] text-[#667085] hover:bg-ivory active:scale-[0.97] transition-transform"
+                                aria-label="Close menu"
+                            >
+                                <X size={22} />
+                            </button>
+                        </div>
+                        <AdminNavLinks
+                            groups={visibleGroups}
+                            pathname={pathname}
+                            pendingApprovals={pendingApprovals}
+                            collapsed={false}
+                            onNavigate={() => setMobileOpen(false)}
+                        />
+                        <div className="px-3 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-divider pt-3">
                             <Link
                                 href="/"
-                                title={isCollapsed ? 'View Storefront' : ''}
+                                onClick={() => setMobileOpen(false)}
+                                className="flex items-center gap-3 min-h-12 px-4 rounded-[12px] text-primary font-semibold hover:bg-primary-light"
+                            >
+                                <Home size={22} />
+                                View Storefront
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="flex flex-1 min-h-0">
+                <aside
+                    className={cn(
+                        'hidden lg:block shrink-0',
+                        isCollapsed ? 'w-20' : 'w-[240px]',
+                    )}
+                >
+                    <div
+                        className={cn(
+                            'bg-white border-r border-divider flex flex-col sticky top-20 h-[calc(100dvh-5rem)] overflow-hidden z-40',
+                            isCollapsed ? 'w-20' : 'w-[240px]',
+                        )}
+                    >
+                        <AdminNavLinks
+                            groups={visibleGroups}
+                            pathname={pathname}
+                            pendingApprovals={pendingApprovals}
+                            collapsed={isCollapsed}
+                        />
+                        <div className="px-3 pb-2">
+                            <Link
+                                href="/"
+                                title={isCollapsed ? 'View Storefront' : undefined}
                                 className={cn(
-                                    'flex items-center rounded-[10px] transition-all text-[14px] overflow-hidden leading-none text-[#299E60] hover:bg-[#E8F7EF] font-semibold',
-                                    isCollapsed ? 'justify-center h-[48px] px-0' : 'gap-3.5 px-5 py-3.5'
+                                    'flex items-center rounded-[12px] text-[14px] text-primary hover:bg-primary-light font-semibold min-h-12',
+                                    isCollapsed ? 'justify-center px-0' : 'gap-3 px-4',
                                 )}
                             >
                                 <Home size={22} className="shrink-0" />
                                 {!isCollapsed && <span className="whitespace-nowrap">View Storefront</span>}
                             </Link>
                         </div>
-
-                        {/* Collapse Toggle Footer (Optional extra toggle) */}
-                        <div className="p-4 border-t border-[#EEEEEE] flex justify-center">
+                        <div className="p-3 border-t border-divider">
                             <button
+                                type="button"
                                 onClick={() => setIsCollapsed(!isCollapsed)}
-                                className="w-full flex items-center justify-center p-2 hover:bg-gray-50 rounded-lg transition-colors text-[#AEAEAE] hover:text-[#181725]"
+                                className="w-full flex items-center justify-center min-h-12 hover:bg-ivory rounded-[12px] text-[#6B7280] hover:text-[#1C1C1C] active:scale-[0.97] transition-transform"
                             >
-                                {isCollapsed ? <ChevronRight size={20} /> : <div className="flex items-center gap-2"><ChevronLeft size={20} /><span className="text-[13px] font-medium">Collapse Menu</span></div>}
+                                {isCollapsed ? (
+                                    <ChevronRight size={20} />
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <ChevronLeft size={20} />
+                                        <span className="text-[13px] font-medium">Collapse</span>
+                                    </div>
+                                )}
                             </button>
                         </div>
                     </div>
                 </aside>
 
-                {/* Main Content */}
-                <main className="flex-1 px-8 py-8 min-w-0">
-                    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#299E60]" size={32} /></div>}>
+                <main className="flex-1 px-4 py-4 lg:px-8 lg:py-8 min-w-0 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-8">
+                    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary" size={32} /></div>}>
                         <PortalPageGuard scope="admin">{children}</PortalPageGuard>
                     </Suspense>
                 </main>
             </div>
+
+            <nav
+                className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-divider pb-[env(safe-area-inset-bottom)]"
+                aria-label="Admin shortcuts"
+            >
+                <div className="grid grid-cols-4 h-16">
+                    {dockLinks.slice(0, 3).map((link) => {
+                        const Icon =
+                            link.href === '/admin/dashboard' ? LayoutDashboard
+                            : link.href === '/admin/orders' ? ShoppingBag
+                            : link.href === '/admin/approvals' ? CheckSquare
+                            : link.href === '/admin/customers' ? Users
+                            : link.icon;
+                        const active = isNavActive(pathname, link.href);
+                        const badge = link.name === 'Approvals' ? pendingApprovals : 0;
+                        return (
+                            <Link
+                                key={link.href}
+                                href={link.href}
+                                className={cn(
+                                    'relative flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold',
+                                    active ? 'text-primary' : 'text-[#6B7280]',
+                                )}
+                            >
+                                <span className="relative">
+                                    <Icon size={22} />
+                                    {badge > 0 && (
+                                        <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-error text-white text-[9px] font-bold flex items-center justify-center">
+                                            {badge > 99 ? '99+' : badge}
+                                        </span>
+                                    )}
+                                </span>
+                                <span className="truncate max-w-[4.5rem]">{link.name}</span>
+                            </Link>
+                        );
+                    })}
+                    <button
+                        type="button"
+                        onClick={() => setMobileOpen(true)}
+                        className="flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold text-[#6B7280] active:scale-[0.97] transition-transform"
+                    >
+                        <Menu size={22} />
+                        Menu
+                    </button>
+                </div>
+            </nav>
         </div>
     );
 }

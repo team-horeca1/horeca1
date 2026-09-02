@@ -72,7 +72,7 @@ const SIDE_TYPES: Array<{ id: SideReward; label: string }> = WELCOME_TYPES.filte
     (t): t is { id: SideReward; label: string } => t.id !== 'free_delivery',
 );
 
-const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-medium focus:outline-none focus:border-[#53B175]';
+const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-medium focus:outline-none focus:border-[#6B1D2E]';
 const labelCls = 'block text-[11px] font-bold text-gray-500 mb-1';
 
 const num = (v: string): number | undefined => {
@@ -272,7 +272,7 @@ export function ProgramsTab() {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-20">
-                <Loader2 size={28} className="text-[#53B175] animate-spin" />
+                <Loader2 size={28} className="text-[#6B1D2E] animate-spin" />
             </div>
         );
     }
@@ -286,7 +286,7 @@ export function ProgramsTab() {
                         <p className="text-[12px] text-gray-400 font-medium">Issued once at registration — not after profile completion.</p>
                     </div>
                     <label className="flex items-center gap-2 text-[12px] font-bold text-gray-600 cursor-pointer shrink-0">
-                        <input type="checkbox" className="accent-[#53B175]" checked={welcome.isActive} onChange={(e) => setWelcome((f) => ({ ...f, isActive: e.target.checked }))} />
+                        <input type="checkbox" className="accent-[#6B1D2E]" checked={welcome.isActive} onChange={(e) => setWelcome((f) => ({ ...f, isActive: e.target.checked }))} />
                         Active
                     </label>
                 </div>
@@ -301,7 +301,7 @@ export function ProgramsTab() {
                 <button
                     onClick={saveWelcome}
                     disabled={saving === 'welcome'}
-                    className="mt-4 px-4 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold hover:bg-[#48a068] disabled:opacity-50 cursor-pointer"
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#6B1D2E] text-white text-[12px] font-bold hover:bg-[#48a068] disabled:opacity-50 cursor-pointer"
                 >
                     {saving === 'welcome' ? <Loader2 size={14} className="animate-spin" /> : 'Save welcome offer'}
                 </button>
@@ -314,7 +314,7 @@ export function ProgramsTab() {
                         <p className="text-[12px] text-gray-400 font-medium">Eligible when the customer has zero prior successful orders (paid, or COD confirmed+).</p>
                     </div>
                     <label className="flex items-center gap-2 text-[12px] font-bold text-gray-600 cursor-pointer shrink-0">
-                        <input type="checkbox" className="accent-[#53B175]" checked={first.isActive} onChange={(e) => setFirst((f) => ({ ...f, isActive: e.target.checked }))} />
+                        <input type="checkbox" className="accent-[#6B1D2E]" checked={first.isActive} onChange={(e) => setFirst((f) => ({ ...f, isActive: e.target.checked }))} />
                         Active
                     </label>
                 </div>
@@ -329,7 +329,7 @@ export function ProgramsTab() {
                 <button
                     onClick={saveFirst}
                     disabled={saving === 'first-order'}
-                    className="mt-4 px-4 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold hover:bg-[#48a068] disabled:opacity-50 cursor-pointer"
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#6B1D2E] text-white text-[12px] font-bold hover:bg-[#48a068] disabled:opacity-50 cursor-pointer"
                 >
                     {saving === 'first-order' ? <Loader2 size={14} className="animate-spin" /> : 'Save first order offer'}
                 </button>
@@ -342,7 +342,7 @@ export function ProgramsTab() {
                         <p className="text-[12px] text-gray-400 font-medium">Unique <span className="font-mono">/invite/</span> links. <span className="font-mono">/r/</span> stays return pickup.</p>
                     </div>
                     <label className="flex items-center gap-2 text-[12px] font-bold text-gray-600 cursor-pointer shrink-0">
-                        <input type="checkbox" className="accent-[#53B175]" checked={referral.isActive} onChange={(e) => setReferral((f) => ({ ...f, isActive: e.target.checked }))} />
+                        <input type="checkbox" className="accent-[#6B1D2E]" checked={referral.isActive} onChange={(e) => setReferral((f) => ({ ...f, isActive: e.target.checked }))} />
                         Active
                     </label>
                 </div>
@@ -407,7 +407,7 @@ export function ProgramsTab() {
                 <button
                     onClick={saveReferral}
                     disabled={saving === 'referral'}
-                    className="mt-4 px-4 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold hover:bg-[#48a068] disabled:opacity-50 cursor-pointer"
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#6B1D2E] text-white text-[12px] font-bold hover:bg-[#48a068] disabled:opacity-50 cursor-pointer"
                 >
                     {saving === 'referral' ? <Loader2 size={14} className="animate-spin" /> : 'Save referral program'}
                 </button>

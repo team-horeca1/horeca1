@@ -16,8 +16,6 @@ import {
     Upload,
     UserCircle,
     ArrowUpRight,
-    LayoutGrid,
-    List,
     Mail,
     Phone,
     Building2,
@@ -43,6 +41,8 @@ import {
     AdminRegistryRowActions,
     AdminRegistryOverflowMenu,
     AdminRegistryOverflowMenuItem,
+    AdminRegistryViewToggle,
+    useAdminDesktop,
 } from '@/components/features/admin/entity';
 
 interface AdminUser {
@@ -72,6 +72,8 @@ export default function CustomersPage() {
 
     // View Mode switcher
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+    const isDesktop = useAdminDesktop();
+    const effectiveView = isDesktop ? viewMode : 'grid';
 
     // Filters state
     const [showFilters, setShowFilters] = useState(false);
@@ -164,7 +166,7 @@ export default function CustomersPage() {
     const inactiveUsers = users.filter(u => !u.isActive).length;
 
     const registryStats = [
-        { label: 'Total Customers', value: totalCustomers, icon: UserCheck, iconBg: 'bg-[#EEF8F1]', iconColor: 'text-[#299E60]' },
+        { label: 'Total Customers', value: totalCustomers, icon: UserCheck, iconBg: 'bg-[#F8E8EC]', iconColor: 'text-[#6B1D2E]' },
         { label: 'Active Customers', value: activeCustomers, icon: Users, iconBg: 'bg-[#EFF6FF]', iconColor: 'text-[#3B82F6]' },
         { label: 'Inactive Users', value: inactiveUsers, icon: UserX, iconBg: 'bg-[#FDF2F2]', iconColor: 'text-[#EF4444]' },
         { label: 'All Users', value: users.length, icon: Package, iconBg: 'bg-[#FFF8EB]', iconColor: 'text-[#D97706]' },
@@ -341,7 +343,7 @@ export default function CustomersPage() {
                         </button>
                         <button
                             onClick={() => setShowAddModal(true)}
-                            className="h-[44px] px-5 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] active:scale-95 transition-all shadow-md shadow-[#299E60]/10 flex items-center gap-2 shrink-0"
+                            className="h-[44px] px-5 bg-[#6B1D2E] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#5A1926] active:scale-95 transition-all shadow-md shadow-[#6B1D2E]/10 flex items-center gap-2 shrink-0"
                         >
                             <Plus size={16} /> Add Customer
                         </button>
@@ -380,9 +382,9 @@ export default function CustomersPage() {
                             type="button"
                             onClick={() => setShowFilters(!showFilters)}
                             className={cn(
-                                'h-[34px] px-3 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-all border ml-1',
+                                'min-h-12 lg:min-h-[34px] lg:h-[34px] px-3 rounded-[12px] lg:rounded-[8px] text-[13px] lg:text-[12px] font-semibold flex items-center gap-1.5 transition-all border ml-1',
                                 showFilters
-                                    ? 'bg-[#299E60] text-white border-[#299E60]'
+                                    ? 'bg-[#6B1D2E] text-white border-[#6B1D2E]'
                                     : 'bg-[#F9FAFB] text-[#6B7280] border-[#D1D5DB] hover:text-[#111827] hover:bg-[#F3F4F6]',
                             )}
                         >
@@ -391,31 +393,7 @@ export default function CustomersPage() {
                     </div>
                 }
                 trailingSlot={
-                    <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
-                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase mr-1 hidden md:inline">View:</span>
-                        <div className="flex items-center bg-[#F3F4F6] border border-[#D1D5DB] rounded-[10px] p-1">
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={cn(
-                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
-                                    viewMode === 'grid' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
-                                )}
-                            >
-                                <LayoutGrid size={15} />
-                                <span className="hidden sm:inline">Cards</span>
-                            </button>
-                            <button
-                                onClick={() => setViewMode('table')}
-                                className={cn(
-                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
-                                    viewMode === 'table' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
-                                )}
-                            >
-                                <List size={15} />
-                                <span className="hidden sm:inline">Table</span>
-                            </button>
-                        </div>
-                    </div>
+                    <AdminRegistryViewToggle viewMode={viewMode} onChange={setViewMode} />
                 }
             />
 
@@ -428,7 +406,7 @@ export default function CustomersPage() {
                             placeholder="e.g. 560001"
                             value={filterPincode}
                             onChange={(e) => setFilterPincode(e.target.value)}
-                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#6B1D2E]/50"
                         />
                     </div>
                     <div>
@@ -436,7 +414,7 @@ export default function CustomersPage() {
                         <select
                             value={filterSalespersonId}
                             onChange={(e) => setFilterSalespersonId(e.target.value)}
-                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#6B1D2E]/50"
                         >
                             <option value="">All salespersons</option>
                             {salespersons.map((sp) => (
@@ -451,7 +429,7 @@ export default function CustomersPage() {
                         <select
                             value={filterCreditStatus}
                             onChange={(e) => setFilterCreditStatus(e.target.value)}
-                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#6B1D2E]/50"
                         >
                             <option value="">All Statuses</option>
                             <option value="active">Active</option>
@@ -466,7 +444,7 @@ export default function CustomersPage() {
                             placeholder="e.g. Bangalore"
                             value={filterArea}
                             onChange={(e) => setFilterArea(e.target.value)}
-                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#6B1D2E]/50"
                         />
                     </div>
                     <div>
@@ -476,7 +454,7 @@ export default function CustomersPage() {
                             placeholder="e.g. VIP"
                             value={filterTag}
                             onChange={(e) => setFilterTag(e.target.value)}
-                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#299E60]/50"
+                            className="h-[42px] w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-[10px] px-3 text-[13px] outline-none font-medium focus:border-[#6B1D2E]/50"
                         />
                     </div>
                 </div>
@@ -488,12 +466,12 @@ export default function CustomersPage() {
                     title={searchQuery || filterRole !== 'all' ? 'No matched results' : 'No customers registered yet'}
                     subtitle="Try adjusting your filters or add a new customer."
                 />
-            ) : viewMode === 'grid' ? (
+            ) : effectiveView === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredUsers.map((user) => (
                         <div
                             key={user.id}
-                            className="bg-white rounded-[16px] border border-[#D1D5DB] shadow-sm overflow-hidden flex flex-col h-full hover:shadow-md hover:border-[#299E60]/30 hover:-translate-y-0.5 transition-all w-full relative"
+                            className="bg-white rounded-[16px] border border-[#D1D5DB] shadow-sm overflow-hidden flex flex-col h-full hover:shadow-md hover:border-[#6B1D2E]/30 hover:-translate-y-0.5 transition-all w-full relative"
                         >
                             {/* Checkbox at top left */}
                             <div className="absolute top-4 left-4 z-10" onClick={(e) => e.stopPropagation()}>
@@ -501,7 +479,7 @@ export default function CustomersPage() {
                                     type="checkbox"
                                     checked={selectedIds.has(user.id)}
                                     onChange={(e) => handleSelectRow(user.id, e.target.checked)}
-                                    className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
+                                    className="w-4 h-4 rounded border-gray-300 text-[#6B1D2E] focus:ring-[#6B1D2E] cursor-pointer"
                                 />
                             </div>
 
@@ -517,8 +495,8 @@ export default function CustomersPage() {
                                         className="absolute top-2.5 right-2.5 shadow-sm normal-case text-[10px]"
                                     />
 
-                                    <div className="w-[60px] h-[60px] rounded-full bg-[#299E60]/10 flex items-center justify-center border border-[#299E60]/20">
-                                        <span className="text-[22px] font-black text-[#299E60]">
+                                    <div className="w-[60px] h-[60px] rounded-full bg-[#6B1D2E]/10 flex items-center justify-center border border-[#6B1D2E]/20">
+                                        <span className="text-[22px] font-black text-[#6B1D2E]">
                                             {(user.fullName || 'U').charAt(0).toUpperCase()}
                                         </span>
                                     </div>
@@ -526,12 +504,12 @@ export default function CustomersPage() {
 
                                 {/* Name & Role */}
                                 <div className="mb-3">
-                                    <h3 className="text-[16px] font-extrabold text-[#111827] line-clamp-1 group-hover:text-[#299E60]">{user.fullName}</h3>
+                                    <h3 className="text-[16px] font-extrabold text-[#111827] line-clamp-1 group-hover:text-[#6B1D2E]">{user.fullName}</h3>
                                     <span className={cn(
                                         'inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold capitalize mt-1.5',
                                         user.role === 'admin' ? 'bg-purple-50 text-purple-600' :
                                         user.role === 'vendor' ? 'bg-blue-50 text-blue-600' :
-                                        'bg-[#EEF8F1] text-[#299E60]',
+                                        'bg-[#F8E8EC] text-[#6B1D2E]',
                                     )}>
                                         {user.role}
                                     </span>
@@ -564,7 +542,7 @@ export default function CustomersPage() {
                                             e.stopPropagation();
                                             void startCustomerView(user.id);
                                         }}
-                                        className="w-full h-[38px] bg-[#299E60] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#238a54] active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-[#299E60]/10 disabled:opacity-60"
+                                        className="w-full min-h-12 bg-[#6B1D2E] text-white rounded-[12px] text-[13px] font-semibold hover:bg-[#5A1926] active:scale-98 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-[#6B1D2E]/10 disabled:opacity-60"
                                     >
                                         <UserCircle size={13} />
                                         Impersonate
@@ -573,7 +551,7 @@ export default function CustomersPage() {
                                 <div className="flex items-center gap-2">
                                     <Link
                                         href={`/admin/customers/${user.id}`}
-                                        className="flex-1 h-[36px] bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB] rounded-[10px] text-[12px] font-bold transition-all flex items-center justify-center border border-[#E5E7EB]"
+                                        className="flex-1 min-h-12 bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB] rounded-[12px] text-[13px] font-semibold transition-all flex items-center justify-center border border-[#E5E7EB]"
                                     >
                                         Details
                                     </Link>
@@ -581,10 +559,10 @@ export default function CustomersPage() {
                                         <button
                                             onClick={(e) => { e.stopPropagation(); toggleUserActive(user.id, user.isActive); }}
                                             className={cn(
-                                                "h-[36px] px-3 rounded-[10px] text-[12px] font-bold transition-all border",
+                                                "min-h-12 px-3 rounded-[12px] text-[13px] font-semibold transition-all border",
                                                 user.isActive
-                                                    ? "bg-[#FFF0F0] border-transparent text-[#E74C3C] hover:bg-red-100"
-                                                    : "bg-[#EEF8F1] border-transparent text-[#299E60] hover:bg-green-100"
+                                                    ? "bg-[#FFF0F0] border-transparent text-[#DC2626] hover:bg-red-100"
+                                                    : "bg-[#F8E8EC] border-transparent text-[#6B1D2E] hover:bg-[#F8E8EC]"
                                             )}
                                         >
                                             {user.isActive ? 'Deactivate' : 'Activate'}
@@ -604,7 +582,7 @@ export default function CustomersPage() {
                                 checked={filteredUsers.length > 0 && selectedIds.size === filteredUsers.length}
                                 onChange={handleSelectAll}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
+                                className="w-4 h-4 rounded border-gray-300 text-[#6B1D2E] focus:ring-[#6B1D2E] cursor-pointer"
                             />
                         </th>
                         <th className="px-6 py-3.5 font-bold min-w-[240px] border-r border-[#D1D5DB]">Customer</th>
@@ -627,18 +605,18 @@ export default function CustomersPage() {
                                         type="checkbox"
                                         checked={selectedIds.has(user.id)}
                                         onChange={(e) => handleSelectRow(user.id, e.target.checked)}
-                                        className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
+                                        className="w-4 h-4 rounded border-gray-300 text-[#6B1D2E] focus:ring-[#6B1D2E] cursor-pointer"
                                     />
                                 </td>
                                 <td className="px-6 py-3 align-middle border-r border-[#D1D5DB]">
                                     <div className="flex items-center gap-3">
                                         <div className="w-[42px] h-[42px] rounded-[10px] bg-[#F3F4F6] overflow-hidden shrink-0 border border-[#E5E7EB] flex items-center justify-center">
-                                            <span className="text-[15px] font-black text-[#299E60]">
+                                            <span className="text-[15px] font-black text-[#6B1D2E]">
                                                 {(user.fullName || 'U').charAt(0).toUpperCase()}
                                             </span>
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="text-[14px] font-bold text-[#111827] truncate group-hover:text-[#299E60] transition-colors">
+                                            <p className="text-[14px] font-bold text-[#111827] truncate group-hover:text-[#6B1D2E] transition-colors">
                                                 {user.fullName}
                                             </p>
                                             <div className="flex items-center gap-2 mt-0.5">
@@ -646,7 +624,7 @@ export default function CustomersPage() {
                                                     'inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold capitalize',
                                                     user.role === 'admin' ? 'bg-purple-50 text-purple-600' :
                                                     user.role === 'vendor' ? 'bg-blue-50 text-blue-600' :
-                                                    'bg-[#EEF8F1] text-[#299E60]',
+                                                    'bg-[#F8E8EC] text-[#6B1D2E]',
                                                 )}>
                                                     {user.role}
                                                 </span>
@@ -676,7 +654,7 @@ export default function CustomersPage() {
                                                         e.stopPropagation();
                                                         void startCustomerView(user.id);
                                                     }}
-                                                    className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60"
+                                                    className="h-[34px] px-3 bg-[#6B1D2E] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#5A1926] transition-all flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60"
                                                 >
                                                     <UserCircle size={12} />
                                                     Impersonate
@@ -709,7 +687,7 @@ export default function CustomersPage() {
             {selectedIds.size > 0 && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white border border-[#D1D5DB] shadow-lg rounded-[16px] px-6 py-4 flex flex-wrap items-center gap-4 z-[9999] max-w-[92%] animate-in slide-in-from-bottom-8 duration-200">
                     <div className="flex items-center gap-2 border-r pr-4 border-[#F3F4F6] shrink-0">
-                        <span className="bg-[#EEF8F1] text-[#299E60] font-black text-[12px] px-2.5 py-1 rounded-full">
+                        <span className="bg-[#F8E8EC] text-[#6B1D2E] font-black text-[12px] px-2.5 py-1 rounded-full">
                             {selectedIds.size} Selected
                         </span>
                     </div>
@@ -717,13 +695,13 @@ export default function CustomersPage() {
                     <div className="flex items-center gap-2 shrink-0">
                         <button
                             onClick={() => handleBulkActiveToggle(true)}
-                            className="h-[36px] px-4 bg-[#299E60] hover:bg-[#238a54] text-white font-bold rounded-[10px] text-[12px] transition-colors"
+                            className="min-h-12 px-4 bg-[#6B1D2E] hover:bg-[#5A1926] text-white font-semibold rounded-[12px] text-[13px] transition-colors"
                         >
                             Activate
                         </button>
                         <button
                             onClick={() => handleBulkActiveToggle(false)}
-                            className="h-[36px] px-4 bg-white border border-[#E5E7EB] hover:bg-[#F9FAFB] text-[#374151] font-bold rounded-[10px] text-[12px] transition-colors"
+                            className="min-h-12 px-4 bg-white border border-[#E5E7EB] hover:bg-[#F9FAFB] text-[#374151] font-semibold rounded-[12px] text-[13px] transition-colors"
                         >
                             Deactivate
                         </button>
@@ -735,7 +713,7 @@ export default function CustomersPage() {
                         <select
                             value={bulkVendorId}
                             onChange={(e) => setBulkVendorId(e.target.value)}
-                            className="h-[36px] px-3 bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] text-[12px] font-bold outline-none cursor-pointer focus:border-[#299E60]/50"
+                            className="h-[36px] px-3 bg-[#F9FAFB] border border-[#E5E7EB] rounded-[10px] text-[12px] font-bold outline-none cursor-pointer focus:border-[#6B1D2E]/50"
                         >
                             <option value="">Vendor Mappings</option>
                             {vendors.map(v => (
@@ -750,14 +728,14 @@ export default function CustomersPage() {
                                     placeholder="Sales Exec"
                                     value={bulkSalesExecutive}
                                     onChange={(e) => setBulkSalesExecutive(e.target.value)}
-                                    className="h-[36px] px-3 bg-white border border-[#E5E7EB] rounded-[10px] text-[12px] outline-none w-28 focus:border-[#299E60]/50"
+                                    className="h-[36px] px-3 bg-white border border-[#E5E7EB] rounded-[10px] text-[12px] outline-none w-28 focus:border-[#6B1D2E]/50"
                                 />
                                 <input
                                     type="text"
                                     placeholder="Territory"
                                     value={bulkTerritory}
                                     onChange={(e) => setBulkTerritory(e.target.value)}
-                                    className="h-[36px] px-3 bg-white border border-[#E5E7EB] rounded-[10px] text-[12px] outline-none w-28 focus:border-[#299E60]/50"
+                                    className="h-[36px] px-3 bg-white border border-[#E5E7EB] rounded-[10px] text-[12px] outline-none w-28 focus:border-[#6B1D2E]/50"
                                 />
                                 <div className="flex items-center border border-[#E5E7EB] rounded-[10px] bg-white overflow-hidden h-[36px]">
                                     <select
@@ -779,7 +757,7 @@ export default function CustomersPage() {
                                 </div>
                                 <button
                                     onClick={handleBulkSubmit}
-                                    className="h-[36px] px-4 bg-[#299E60] hover:bg-[#238a53] text-white font-bold rounded-[10px] text-[12px] transition-colors"
+                                    className="min-h-12 px-4 bg-[#6B1D2E] hover:bg-[#5A1926] text-white font-semibold rounded-[12px] text-[13px] transition-colors"
                                 >
                                     Apply
                                 </button>
@@ -948,7 +926,7 @@ function ImportCustomersModal({ onClose, onImported }: { onClose: () => void; on
                             value={vendorId}
                             onChange={(e) => setVendorId(e.target.value)}
                             disabled={!!preview}
-                            className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-[14px] outline-none focus:border-[#299E60] disabled:bg-gray-50"
+                            className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-[14px] outline-none focus:border-[#6B1D2E] disabled:bg-gray-50"
                         >
                             <option value="">Do not map (Platform catalog import)</option>
                             {vendors.map(v => (
@@ -966,7 +944,7 @@ function ImportCustomersModal({ onClose, onImported }: { onClose: () => void; on
                             id="import-file-input"
                         />
                         <label htmlFor="import-file-input" className="cursor-pointer space-y-2 block">
-                            <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#299E60]/10 text-[#299E60] mb-2">
+                            <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#6B1D2E]/10 text-[#6B1D2E] mb-2">
                                 <Users size={24} />
                             </span>
                             <div className="text-[14px] font-bold text-gray-700">
@@ -982,7 +960,7 @@ function ImportCustomersModal({ onClose, onImported }: { onClose: () => void; on
                         <button
                             onClick={handlePreview}
                             disabled={loading}
-                            className="w-full h-[44px] bg-[#299E60] hover:bg-[#238a53] text-white rounded-lg text-[13px] font-bold flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
+                            className="w-full h-[44px] bg-[#6B1D2E] hover:bg-[#5A1926] text-white rounded-lg text-[13px] font-bold flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
                         >
                             {loading && <Loader2 size={16} className="animate-spin" />}
                             Generate Preview & Check Errors
@@ -1060,7 +1038,7 @@ function ImportCustomersModal({ onClose, onImported }: { onClose: () => void; on
                             <button
                                 onClick={handleCommit}
                                 disabled={loading}
-                                className="w-full h-[44px] bg-[#299E60] hover:bg-[#238a53] text-white rounded-lg text-[13px] font-bold flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
+                                className="w-full h-[44px] bg-[#6B1D2E] hover:bg-[#5A1926] text-white rounded-lg text-[13px] font-bold flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
                             >
                                 {loading && <Loader2 size={16} className="animate-spin" />}
                                 Commit import (Write to DB)

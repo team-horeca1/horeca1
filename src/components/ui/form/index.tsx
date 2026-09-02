@@ -13,31 +13,28 @@
  * Tokens:
  *   height   44px        radius   10px
  *   bg       #FAFAFA → white on focus
- *   border   #EEEEEE     focus    #299E60 (ring + border)
- *   error    red-400 / red-500
- *   label    11px / bold / #AEAEAE / uppercase / tracking-wider
- *   accent   #299E60   gradient from #53B175 → #299E60
+ *   border   #E9E3DD     focus    #6B1D2E (ring + border)
+ *   label    13px / medium / #667085 / sentence case
+ *   accent   #6B1D2E
  */
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { PasswordToggleButton } from './PasswordField';
 
-// ─── Design tokens ──────────────────────────────────────────────────────────
 export const FORM = {
-  green: '#299E60',
-  greenLight: '#53B175',
-  /** Tailwind class for the primary gradient action button. */
+  brand: '#6B1D2E',
+  brandHover: '#5A1926',
   primaryBtn:
-    'bg-gradient-to-r from-[#53B175] to-[#299E60] hover:from-[#48a068] hover:to-[#238a54] text-white font-bold rounded-xl shadow-md shadow-green-100 hover:shadow-lg active:scale-[0.98] transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2',
+    'bg-primary hover:bg-primary-dark text-white font-semibold rounded-xl shadow-cdl-1 active:scale-[0.97] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[48px] px-6',
 } as const;
 
 const CONTROL_BASE =
-  'w-full bg-[#FAFAFA] focus:bg-white border rounded-[10px] text-[13px] text-gray-700 placeholder:text-gray-400 outline-none transition-all';
+  'w-full bg-white focus:bg-white border rounded-xl text-[15px] text-text placeholder:text-text-muted outline-none transition-all duration-150';
 const CONTROL_OK =
-  'border-[#EEEEEE] focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10';
+  'border-divider focus:border-primary focus:ring-2 focus:ring-primary/10';
 const CONTROL_ERR =
-  'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/10';
+  'border-error focus:border-error focus:ring-2 focus:ring-error/10';
 const CONTROL_DISABLED = 'disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed';
 
 /** Input/select height + padding. */
@@ -53,7 +50,7 @@ export function textareaClass(hasError?: boolean, extra?: string) {
   return cn(CONTROL_BASE, 'px-3.5 py-2.5 resize-none leading-relaxed', hasError ? CONTROL_ERR : CONTROL_OK, CONTROL_DISABLED, extra);
 }
 
-export const LABEL_CLASS = 'block text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider mb-1.5';
+export const LABEL_CLASS = 'block text-[13px] font-medium text-text-secondary mb-1.5';
 
 // ─── Label ──────────────────────────────────────────────────────────────────
 export function FormLabel({
@@ -116,7 +113,7 @@ export function FormInput({
   return (
     <div className="relative group">
       {Icon && (
-        <Icon size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#AEAEAE] group-focus-within:text-[#299E60] transition-colors pointer-events-none z-10" />
+        <Icon size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-primary transition-colors pointer-events-none z-10" />
       )}
       <input
         value={value}
@@ -192,7 +189,7 @@ export function PhoneInput({
 } & NativeInput) {
   return (
     <div className="relative flex items-center group">
-      <span className="absolute left-4 text-[13px] font-bold text-[#AEAEAE] group-focus-within:text-[#299E60] transition-colors select-none z-10">+91</span>
+      <span className="absolute left-4 text-[13px] font-semibold text-text-muted group-focus-within:text-primary transition-colors select-none z-10">+91</span>
       <input
         type="tel"
         inputMode="numeric"
@@ -209,7 +206,7 @@ export function PhoneInput({
 
 // ─── Section / group heading ────────────────────────────────────────────────
 export function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <p className={cn('text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider', className)}>{children}</p>;
+  return <p className={cn('text-[13px] font-semibold text-text-secondary', className)}>{children}</p>;
 }
 
 export { PasswordField, PasswordToggleButton } from './PasswordField';

@@ -37,7 +37,7 @@ export function ReportsSection() {
   if (loading) {
     return (
       <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm flex items-center justify-center py-20">
-        <Loader2 className="animate-spin text-[#299E60]" size={32} />
+        <Loader2 className="animate-spin text-[#6B1D2E]" size={32} />
       </div>
     );
   }
@@ -53,7 +53,7 @@ export function ReportsSection() {
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
           <KpiStatCard label="Credit issued" value={fmtMoney(u.totalCreditIssued)} Icon={IndianRupee} tint="text-blue-600 bg-blue-50" />
           <KpiStatCard label="Credit utilized" value={fmtMoney(u.totalCreditUtilized)} Icon={TrendingUp} tint="text-amber-600 bg-amber-50" />
-          <KpiStatCard label="Repayments" value={fmtMoney(u.totalRepayments)} Icon={IndianRupee} tint="text-[#299E60] bg-[#EEF8F1]" />
+          <KpiStatCard label="Repayments" value={fmtMoney(u.totalRepayments)} Icon={IndianRupee} tint="text-[#6B1D2E] bg-[#F8E8EC]" />
           <KpiStatCard label="Outstanding" value={fmtMoney(u.outstandingAmount)} Icon={AlertTriangle} tint="text-red-500 bg-red-50" />
           <KpiStatCard label="Active customers" value={u.activeCustomers} Icon={Users} tint="text-indigo-600 bg-indigo-50" />
           <KpiStatCard label="Blacklisted" value={u.blacklistedCustomers} Icon={ShieldOff} tint="text-orange-600 bg-orange-50" />

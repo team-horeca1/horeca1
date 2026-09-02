@@ -39,14 +39,14 @@ export function ShopByStore() {
                     {/* Mobile toggle */}
                     <button
                         onClick={() => setIsMobileExpanded(!isMobileExpanded)}
-                        className="text-[13px] font-semibold text-[#53B175] hover:opacity-80 transition-opacity md:hidden cursor-pointer"
+                        className="text-[13px] font-semibold text-primary hover:opacity-80 transition-opacity md:hidden cursor-pointer"
                     >
                         {isMobileExpanded ? "Show Less" : "See All"}
                     </button>
                     {/* Desktop toggle */}
                     <button
                         onClick={() => setIsDesktopExpanded(!isDesktopExpanded)}
-                        className="hidden md:block text-[15px] font-semibold text-[#53B175] hover:opacity-80 transition-opacity cursor-pointer"
+                        className="hidden md:block text-[15px] font-semibold text-primary hover:opacity-80 transition-opacity cursor-pointer"
                     >
                         {isDesktopExpanded ? "Show Less" : "See All"}
                     </button>
@@ -128,7 +128,7 @@ const StoreCard = ({ vendor }: { vendor: Vendor }) => {
                     )}
                 />
                 <div className="text-center w-full px-0.5">
-                    <h3 className="text-[14px] md:text-[16px] font-bold text-[#181725] mb-0.5 leading-tight line-clamp-1 group-hover:text-[#53B175] transition-colors">
+                    <h3 className="text-[14px] md:text-[16px] font-bold text-[#181725] mb-0.5 leading-tight line-clamp-1 group-hover:text-primary transition-colors">
                         {vendor.name}
                     </h3>
                     <p className="text-[10px] md:text-[11px] text-[#7C7C7C] font-medium leading-tight line-clamp-2">

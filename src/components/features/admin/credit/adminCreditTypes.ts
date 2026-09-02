@@ -124,7 +124,7 @@ export interface GlobalConfig {
 }
 
 export const STATUS_STYLE: Record<WalletStatus, string> = {
-  ACTIVE: 'bg-[#EEF8F1] text-[#299E60]',
+  ACTIVE: 'bg-[#DCFCE7] text-[#16A34A]',
   BLOCKED: 'bg-[#FFF4E5] text-[#976538]',
   SUSPENDED: 'bg-slate-100 text-slate-700',
   FROZEN: 'bg-cyan-50 text-cyan-800',
@@ -158,12 +158,12 @@ export const TXN_LABEL: Record<string, string> = {
 
 export const DIR_STYLE: Record<StatementRow['direction'], string> = {
   debit: 'bg-[#FFF0F0] text-[#E74C3C]',
-  credit: 'bg-[#EEF8F1] text-[#299E60]',
+  credit: 'bg-[#DCFCE7] text-[#16A34A]',
   info: 'bg-[#F0F4FF] text-[#3B5BDB]',
 };
 
 export const INPUT_CLS =
-  'w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40 transition-colors bg-white';
+  'w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#6B1D2E]/40 transition-colors bg-white';
 
 export const inr = (v: number | string) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(Number(v));

@@ -71,7 +71,7 @@ export function CreditLinesSection() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search customer, phone, email…"
-            className="w-full h-[38px] pl-8 pr-3 rounded-[10px] border border-[#EEEEEE] text-[12.5px] outline-none focus:border-[#299E60]/40 bg-white"
+            className="w-full h-12 pl-8 pr-3 rounded-[12px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#6B1D2E]/40 bg-white"
           />
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -81,10 +81,10 @@ export function CreditLinesSection() {
               type="button"
               onClick={() => setStatusFilter(f.key)}
               className={cn(
-                'px-3 h-[32px] rounded-full text-[12px] font-semibold transition-colors',
+                'min-h-12 lg:h-[32px] lg:min-h-0 px-3.5 rounded-full text-[13px] lg:text-[12px] font-semibold transition-colors',
                 statusFilter === f.key
-                  ? 'bg-[#4F46E5] text-white'
-                  : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:border-[#4F46E5]/40',
+                  ? 'bg-primary text-white'
+                  : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:border-primary/40',
               )}
             >
               {f.label}
@@ -97,7 +97,7 @@ export function CreditLinesSection() {
             setEditingWallet(null);
             setShowAssign(true);
           }}
-          className="ml-auto h-[38px] px-4 rounded-[10px] bg-[#299E60] text-white text-[12px] font-bold flex items-center gap-2 hover:bg-[#238a54] transition-colors shadow-sm"
+          className="w-full sm:w-auto sm:ml-auto min-h-12 px-4 rounded-[12px] bg-[#6B1D2E] text-white text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-[#5A1926] transition-colors shadow-sm"
         >
           <Plus size={14} />
           Assign Credit
@@ -106,7 +106,7 @@ export function CreditLinesSection() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="animate-spin text-[#299E60]" size={28} />
+          <Loader2 className="animate-spin text-[#6B1D2E]" size={28} />
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-[14px] border border-[#EEEEEE] py-16 text-center shadow-sm">
@@ -118,7 +118,7 @@ export function CreditLinesSection() {
               setEditingWallet(null);
               setShowAssign(true);
             }}
-            className="mt-3 text-[13px] font-semibold text-[#299E60] hover:underline"
+            className="mt-3 text-[13px] font-semibold text-[#6B1D2E] hover:underline"
           >
             Assign the first credit line
           </button>

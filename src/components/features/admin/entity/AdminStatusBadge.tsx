@@ -6,11 +6,11 @@ import { cn } from '@/lib/utils';
 export type AdminStatusVariant = 'verified' | 'pending' | 'active' | 'inactive' | 'rejected';
 
 const STYLES: Record<AdminStatusVariant, string> = {
-  verified: 'bg-[#EEF8F1] border-[#299E60]/10 text-[#299E60]',
-  pending: 'bg-[#FFF8EB] border-[#D97706]/10 text-[#D97706]',
-  active: 'bg-[#EEF8F1] border-[#299E60]/10 text-[#299E60]',
-  inactive: 'bg-[#FDF2F2] border-[#EF4444]/10 text-[#EF4444]',
-  rejected: 'bg-[#FDF2F2] border-[#EF4444]/10 text-[#EF4444]',
+  verified: 'bg-[#DCFCE7] border-success/15 text-success',
+  pending: 'bg-[#FEF3C7] border-warning/20 text-[#B45309]',
+  active: 'bg-[#DCFCE7] border-success/15 text-success',
+  inactive: 'bg-[#FEE2E2] border-error/15 text-error',
+  rejected: 'bg-[#FEE2E2] border-error/15 text-error',
 };
 
 const LABELS: Record<AdminStatusVariant, string> = {

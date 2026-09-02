@@ -5,8 +5,6 @@ import {
     Wallet,
     TrendingUp,
     Coins,
-    ArrowUpRight,
-    ArrowDownRight,
     Search,
     Clock,
     CreditCard,
@@ -83,7 +81,7 @@ export default function FinancePage() {
     const trendPositive = parseFloat(data?.stats.monthTrend || '0') >= 0;
 
     return (
-        <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500 pb-12 text-[#181725] p-[clamp(1rem,2.5vw,2rem)]">
+        <div className="max-w-[1600px] mx-auto space-y-6 lg:space-y-8 animate-in fade-in duration-500 pb-4 text-[#181725]">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -93,7 +91,7 @@ export default function FinancePage() {
                 <div className="flex items-center gap-3">
                     <Link
                         href="/admin/ledger"
-                        className="h-[44px] px-6 bg-[#299E60] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#238a54] transition-all flex items-center gap-2 shadow-sm shadow-[#299E60]/20"
+                        className="min-h-12 w-full md:w-auto justify-center px-6 bg-[#6B1D2E] text-white rounded-[12px] text-[14px] font-semibold hover:bg-[#5A1926] transition-all flex items-center gap-2 shadow-sm shadow-[#6B1D2E]/20"
                     >
                         <Download size={18} />
                         Open Platform Ledger
@@ -103,12 +101,12 @@ export default function FinancePage() {
 
             {loading ? (
                 <div className="flex items-center justify-center py-20">
-                    <Loader2 className="animate-spin text-[#299E60]" size={32} />
+                    <Loader2 className="animate-spin text-[#6B1D2E]" size={32} />
                 </div>
             ) : (
             <>
             {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 lg:gap-6">
                 {[
                     {
                         label: 'Total Revenue',
@@ -116,8 +114,8 @@ export default function FinancePage() {
                         trend: `${trendPositive ? '+' : ''}${data?.stats.monthTrend || '0'}% this month`,
                         isPositive: trendPositive,
                         icon: Wallet,
-                        color: '#299E60',
-                        bgColor: '#EEF8F1',
+                        color: '#6B1D2E',
+                        bgColor: '#F8E8EC',
                     },
                     {
                         label: 'This Month Revenue',
@@ -140,26 +138,23 @@ export default function FinancePage() {
                 ].map((stat, idx) => (
                     <div
                         key={idx}
-                        className="bg-white p-6 rounded-[24px] border border-[#EEEEEE] shadow-sm flex items-center gap-6"
+                        className="bg-white p-3 lg:p-6 rounded-[16px] lg:rounded-[24px] border border-[#EEEEEE] shadow-sm flex items-center gap-3 lg:gap-6 min-w-0 overflow-hidden"
                     >
                         <div
-                            className="w-[68px] h-[68px] rounded-[20px] flex items-center justify-center shrink-0"
+                            className="size-11 lg:size-[68px] rounded-[14px] lg:rounded-[20px] flex items-center justify-center shrink-0"
                             style={{ backgroundColor: stat.bgColor, color: stat.color }}
                         >
-                            <stat.icon size={34} strokeWidth={2.5} />
+                            <stat.icon size={24} strokeWidth={2.5} />
                         </div>
-                        <div className="flex-1">
-                            <p className="text-[13px] font-bold text-[#AEAEAE] mb-1 uppercase tracking-wider">{stat.label}</p>
-                            <div className="flex items-end justify-between">
-                                <h3 className="text-[24px] font-[900] text-[#181725] leading-none">{stat.value}</h3>
-                                <div className={cn(
-                                    "flex items-center gap-0.5 text-[12px] font-extrabold px-2 py-1 rounded-full",
-                                    stat.isPositive ? "bg-[#EEF8F1] text-[#299E60]" : "bg-[#FFF2F0] text-[#E74C3C]"
-                                )}>
-                                    {stat.isPositive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                                    {stat.trend}
-                                </div>
-                            </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[10px] lg:text-[13px] font-semibold text-[#AEAEAE] mb-1 uppercase tracking-wider truncate">{stat.label}</p>
+                            <h3 className="text-[16px] lg:text-[24px] font-bold text-[#181725] leading-none tabular-nums truncate">{stat.value}</h3>
+                            <p className={cn(
+                                'mt-1.5 text-[11px] font-semibold truncate',
+                                stat.isPositive ? 'text-[#16A34A]' : 'text-[#DC2626]',
+                            )}>
+                                {stat.trend}
+                            </p>
                         </div>
                     </div>
                 ))}
@@ -172,15 +167,15 @@ export default function FinancePage() {
             )}
 
             {/* Revenue Chart */}
-            <div className="bg-white p-8 rounded-[32px] border border-[#EEEEEE] shadow-sm">
-                <div className="flex items-center justify-between mb-8">
+            <div className="bg-white p-4 lg:p-8 rounded-[20px] lg:rounded-[32px] border border-[#EEEEEE] shadow-sm overflow-hidden min-w-0">
+                <div className="flex items-center justify-between mb-4 lg:mb-8">
                     <div>
-                        <h2 className="text-[20px] font-[900] text-[#181725]">Monthly Revenue</h2>
-                        <p className="text-[14px] text-[#AEAEAE] font-medium">Past 8 months of confirmed order revenue</p>
+                        <h2 className="text-[18px] lg:text-[20px] font-semibold text-[#181725]">Monthly Revenue</h2>
+                        <p className="text-[13px] lg:text-[14px] text-[#AEAEAE] font-medium">Past 8 months of confirmed order revenue</p>
                     </div>
                 </div>
 
-                <div className="h-[360px] w-full mt-4">
+                <div className="h-[220px] lg:h-[360px] w-full min-w-0 mt-2">
                     {(!data?.monthlyData || data.monthlyData.length === 0) ? (
                         <div className="h-full flex flex-col items-center justify-center text-gray-400">
                             <TrendingUp size={40} className="mb-3 opacity-30" />
@@ -188,11 +183,11 @@ export default function FinancePage() {
                         </div>
                     ) : isMounted && (
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={data.monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
+                            <AreaChart data={data.monthlyData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
                                 <defs>
                                     <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#299E60" stopOpacity={0.15} />
-                                        <stop offset="95%" stopColor="#299E60" stopOpacity={0} />
+                                        <stop offset="5%" stopColor="#6B1D2E" stopOpacity={0.15} />
+                                        <stop offset="95%" stopColor="#6B1D2E" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F0F0F0" />
@@ -221,7 +216,7 @@ export default function FinancePage() {
                                 <Area
                                     type="monotone"
                                     dataKey="total"
-                                    stroke="#299E60"
+                                    stroke="#6B1D2E"
                                     strokeWidth={4}
                                     fillOpacity={1}
                                     fill="url(#colorTotal)"
@@ -234,14 +229,14 @@ export default function FinancePage() {
 
             {/* Payment Records */}
             <div className="bg-white rounded-[28px] border border-[#EEEEEE] shadow-sm overflow-hidden">
-                <div className="p-8 border-b border-[#EEEEEE]">
+                <div className="p-4 lg:p-8 border-b border-[#EEEEEE]">
                     <div className="flex flex-col gap-8">
                         {/* Tab Switcher */}
-                        <div className="flex items-center gap-2 bg-[#F8F9FB] p-1.5 rounded-[16px] w-fit">
+                        <div className="grid grid-cols-2 gap-1 bg-[#F8F9FB] p-1.5 rounded-[16px] w-full lg:w-fit lg:flex lg:items-center">
                             <button
                                 onClick={() => setActivePayoutTab('pending')}
                                 className={cn(
-                                    "flex items-center gap-2 px-6 py-2.5 rounded-[12px] text-[14px] font-bold transition-all",
+                                    "flex items-center justify-center gap-2 min-h-12 px-3 lg:px-6 rounded-[12px] text-[13px] lg:text-[14px] font-semibold transition-all",
                                     activePayoutTab === 'pending'
                                         ? "bg-white text-[#181725] shadow-sm"
                                         : "text-[#AEAEAE] hover:text-[#7C7C7C]"
@@ -251,13 +246,13 @@ export default function FinancePage() {
                                 Pending
                                 <span className={cn(
                                     "px-2 py-0.5 rounded-[6px] text-[11px] font-[900]",
-                                    activePayoutTab === 'pending' ? "bg-[#299E60] text-white" : "bg-[#EEEEEE] text-[#AEAEAE]"
+                                    activePayoutTab === 'pending' ? "bg-[#6B1D2E] text-white" : "bg-[#EEEEEE] text-[#AEAEAE]"
                                 )}>{pendingCount}</span>
                             </button>
                             <button
                                 onClick={() => setActivePayoutTab('completed')}
                                 className={cn(
-                                    "flex items-center gap-2 px-6 py-2.5 rounded-[12px] text-[14px] font-bold transition-all",
+                                    "flex items-center justify-center gap-2 min-h-12 px-3 lg:px-6 rounded-[12px] text-[13px] lg:text-[14px] font-semibold transition-all",
                                     activePayoutTab === 'completed'
                                         ? "bg-white text-[#181725] shadow-sm"
                                         : "text-[#AEAEAE] hover:text-[#7C7C7C]"
@@ -267,14 +262,14 @@ export default function FinancePage() {
                                 Completed
                                 <span className={cn(
                                     "px-2 py-0.5 rounded-[6px] text-[11px] font-[900]",
-                                    activePayoutTab === 'completed' ? "bg-[#299E60] text-white" : "bg-[#EEEEEE] text-[#AEAEAE]"
+                                    activePayoutTab === 'completed' ? "bg-[#6B1D2E] text-white" : "bg-[#EEEEEE] text-[#AEAEAE]"
                                 )}>{completedCount}</span>
                             </button>
                         </div>
 
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                             <div className="flex items-center gap-3">
-                                <div className="w-[48px] h-[48px] bg-[#EEF8F1] rounded-[14px] flex items-center justify-center text-[#299E60]">
+                                <div className="w-[48px] h-[48px] bg-[#F8E8EC] rounded-[14px] flex items-center justify-center text-[#6B1D2E]">
                                     {activePayoutTab === 'pending' ? <CreditCard size={24} /> : <CheckCircle size={24} />}
                                 </div>
                                 <div>
@@ -294,14 +289,33 @@ export default function FinancePage() {
                                     placeholder="Search vendor..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-[260px] bg-[#F8F9FB] border border-[#EEEEEE] rounded-[14px] py-2.5 pl-11 pr-4 text-[14px] outline-none transition-all placeholder:text-[#AEAEAE] font-medium focus:border-[#299E60]/40 focus:bg-white"
+                                    className="w-full lg:w-[260px] h-12 bg-[#F8F9FB] border border-[#EEEEEE] rounded-[14px] py-2.5 pl-11 pr-4 text-[14px] outline-none transition-all placeholder:text-[#AEAEAE] font-medium focus:border-[#6B1D2E]/40 focus:bg-white"
                                 />
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="overflow-x-auto min-h-[300px]">
+                <div className="lg:hidden p-4">
+                    {filteredPayments.length > 0 ? (
+                        <div className="space-y-3">
+                            {filteredPayments.map((p) => (
+                                <Link
+                                    key={p.id}
+                                    href={`/admin/vendors/${p.vendorId}`}
+                                    className="block rounded-[16px] border border-divider bg-ivory p-4"
+                                >
+                                    <p className="font-semibold text-[#181725]">{p.vendor}</p>
+                                    <p className="text-[18px] font-bold tabular-nums text-[#181725] mt-1">{formatINR(p.amount)}</p>
+                                    <p className="text-[12px] text-[#6B7280] mt-1 capitalize">{p.method} · {new Date(p.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} · {p.status}</p>
+                                </Link>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="py-12 text-center text-[#AEAEAE] font-semibold text-[13px]">No {activePayoutTab} payments found</p>
+                    )}
+                </div>
+                <div className="hidden lg:block overflow-x-auto min-h-[300px]">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-[#F8F9FB]">
@@ -317,8 +331,8 @@ export default function FinancePage() {
                                 <tr key={p.id} className="hover:bg-[#F8F9FB] transition-colors">
                                     <td className="px-8 py-5">
                                         <Link href={`/admin/vendors/${p.vendorId}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                                            <div className="w-9 h-9 rounded-[10px] bg-[#EEF8F1] flex items-center justify-center shrink-0">
-                                                <Building2 size={16} className="text-[#299E60]" />
+                                            <div className="w-9 h-9 rounded-[10px] bg-[#F8E8EC] flex items-center justify-center shrink-0">
+                                                <Building2 size={16} className="text-[#6B1D2E]" />
                                             </div>
                                             <span className="text-[15px] font-extrabold text-[#181725]">{p.vendor}</span>
                                         </Link>
@@ -338,14 +352,14 @@ export default function FinancePage() {
                                         <span className={cn(
                                             "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[11px] font-[900] uppercase tracking-wider border capitalize",
                                             p.status === 'captured' || p.status === 'settled'
-                                                ? "bg-[#EEF8F1] text-[#299E60] border-[#299E60]/10"
+                                                ? "bg-[#DCFCE7] text-[#16A34A] border-[#16A34A]/15"
                                                 : p.status === 'created'
                                                 ? "bg-[#FFF7E6] text-[#F59E0B] border-[#F59E0B]/10"
                                                 : "bg-[#EFF6FF] text-[#3B82F6] border-[#3B82F6]/10"
                                         )}>
                                             <span className={cn(
                                                 "w-1.5 h-1.5 rounded-full",
-                                                p.status === 'captured' || p.status === 'settled' ? "bg-[#299E60]" :
+                                                p.status === 'captured' || p.status === 'settled' ? "bg-[#16A34A]" :
                                                 p.status === 'created' ? "bg-[#F59E0B] animate-pulse" : "bg-[#3B82F6]"
                                             )} />
                                             {p.status}
@@ -420,21 +434,22 @@ function VendorSettlementsPanel() {
 
     return (
         <div className="bg-white rounded-[24px] border border-[#EEEEEE] shadow-sm overflow-hidden mt-8">
-            <div className="px-8 py-6 border-b border-[#EEEEEE] flex flex-wrap items-center justify-between gap-3">
+            <div className="px-4 lg:px-8 py-5 lg:py-6 border-b border-[#EEEEEE] flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 className="text-[clamp(1rem,2vw+0.5rem,1.25rem)] font-[900] text-[#181725]">Bank payout batches</h2>
                     <p className="text-[13px] text-[#7C7C7C] mt-1">Pending UTR transfers to vendor bank accounts</p>
                 </div>
-                <Link href="/admin/ledger" className="text-[12px] font-bold text-[#299E60] hover:underline">
+                <Link href="/admin/ledger" className="min-h-12 inline-flex items-center text-[13px] font-semibold text-[#6B1D2E] hover:underline">
                     View all in Platform Ledger →
                 </Link>
             </div>
             {loading ? (
-                <div className="p-12 flex justify-center"><Loader2 className="animate-spin text-[#299E60]" /></div>
+                <div className="p-12 flex justify-center"><Loader2 className="animate-spin text-[#6B1D2E]" /></div>
             ) : settlements.length === 0 ? (
                 <p className="p-8 text-center text-[#AEAEAE] text-sm font-bold">No pending settlement batches</p>
             ) : (
-                <table className="w-full text-left">
+                <div className="overflow-x-auto max-w-full">
+                <table className="w-full text-left min-w-[640px]">
                     <thead>
                         <tr className="bg-[#F8F9FB]">
                             <th className="px-8 py-4 text-[12px] font-bold text-[#7C7C7C] uppercase">Vendor</th>
@@ -457,7 +472,7 @@ function VendorSettlementsPanel() {
                                     <button
                                         type="button"
                                         onClick={() => markTransferred(s.id)}
-                                        className="px-4 py-2 bg-[#299E60] text-white text-xs font-bold rounded-lg hover:bg-[#238c54]"
+                                        className="min-h-12 px-4 bg-[#6B1D2E] text-white text-[13px] font-semibold rounded-[12px] hover:bg-[#5A1926]"
                                     >
                                         Mark Transferred
                                     </button>
@@ -466,6 +481,7 @@ function VendorSettlementsPanel() {
                         ))}
                     </tbody>
                 </table>
+                </div>
             )}
         </div>
     );

@@ -23,7 +23,7 @@ interface Props {
   accent?: string;
 }
 
-export function AdminAccountTeamPanel({ businessAccountId, accent = '#299E60' }: Props) {
+export function AdminAccountTeamPanel({ businessAccountId, accent = '#6B1D2E' }: Props) {
   const { data: session } = useSession();
   const perms = (session?.user as { permissions?: string[] } | undefined)?.permissions;
   const canView = !!perms?.includes('customers.view');
@@ -53,13 +53,13 @@ export function AdminAccountTeamPanel({ businessAccountId, accent = '#299E60' }:
   return (
     <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-[#EEEEEE] flex items-center gap-2">
-        <Users size={18} className="text-[#299E60]" />
+        <Users size={18} className="text-[#6B1D2E]" />
         <h3 className="font-[800] text-[16px] text-[#181725]">Account Team</h3>
         <span className="text-[13px] text-[#AEAEAE]">({members.length})</span>
       </div>
       {loading ? (
         <div className="p-8 flex justify-center">
-          <Loader2 size={28} className="animate-spin text-[#299E60]" />
+          <Loader2 size={28} className="animate-spin text-[#6B1D2E]" />
         </div>
       ) : members.length === 0 ? (
         <p className="p-6 text-[13px] text-[#AEAEAE] text-center">No team members on this account.</p>

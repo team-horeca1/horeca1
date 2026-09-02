@@ -204,7 +204,7 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
           {TABS.map(t => (
             <button key={t.k} onClick={() => setTab(t.k)}
               className={cn('px-4 py-3 text-[13.5px] font-bold whitespace-nowrap border-b-2 -mb-px transition-all duration-200',
-                tab === t.k ? 'border-[#299E60] text-[#299E60] font-extrabold' : 'border-transparent text-gray-400 hover:text-[#181725]')}>
+                tab === t.k ? 'border-[#6B1D2E] text-[#6B1D2E] font-extrabold' : 'border-transparent text-gray-400 hover:text-[#181725]')}>
               {t.label}
             </button>
           ))}

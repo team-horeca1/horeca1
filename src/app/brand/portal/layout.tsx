@@ -148,7 +148,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
     if ((status === 'loading' && !session) || (status === 'authenticated' && isActiveBrand && !isAdmin && checkingApplication)) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-[#F8F9FB]">
-                <Loader2 className="animate-spin text-[#53B175]" size={40} />
+                <Loader2 className="animate-spin text-primary" size={40} />
             </div>
         );
     }
@@ -161,7 +161,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                 <p className="text-[14px] text-[#7C7C7C]">You need to sign in to access the brand portal.</p>
                 <button
                     onClick={() => router.push('/login')}
-                    className="mt-4 px-6 py-3 bg-[#53B175] text-white rounded-[10px] font-bold hover:bg-[#3d9e41] transition-colors"
+                    className="mt-4 px-6 py-3 bg-primary text-white rounded-[10px] font-bold hover:bg-primary-dark transition-colors"
                 >
                     Sign In
                 </button>
@@ -172,7 +172,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
     if (!isAdmin && !isActiveBrand) {
         return (
             <div className="flex items-center justify-center min-h-[50vh] bg-[#F8F9FB]">
-                <Loader2 className="animate-spin text-[#53B175]" size={36} />
+                <Loader2 className="animate-spin text-primary" size={36} />
             </div>
         );
     }
@@ -183,7 +183,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
             <div className="flex flex-col min-h-screen bg-[#F8F9FB]">
                 <header className="h-[70px] bg-white border-b border-[#EEEEEE] flex items-center px-6 shrink-0 justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-[#53B175] rounded-[10px] flex items-center justify-center shrink-0">
+                        <div className="w-9 h-9 bg-primary rounded-[10px] flex items-center justify-center shrink-0">
                             <Package size={18} className="text-white" />
                         </div>
                         <div>
@@ -218,7 +218,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                                 <>
                                     Thank you for partnering with <span className="font-semibold text-[#181725]">Horeca1</span>.
                                     Your brand application for{' '}
-                                    <span className="font-semibold text-[#53B175]">
+                                    <span className="font-semibold text-primary">
                                         {applicationBrandName || 'your brand'}
                                     </span>{' '}
                                     is currently being verified by our onboarding team.
@@ -257,7 +257,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                         <div className="flex flex-col sm:flex-row gap-3 justify-center">
                             <button
                                 onClick={() => router.push('/')}
-                                className="px-6 py-3 bg-[#53B175] hover:bg-[#3d9e41] text-white font-bold text-[14px] rounded-[12px] transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#53B175]/10"
+                                className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-bold text-[14px] rounded-[12px] transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/10"
                             >
                                 <Home size={18} />
                                 Go to Homepage
@@ -294,7 +294,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                     isCollapsed ? 'w-[52px]' : 'w-[210px]'
                 )}>
                     <Link href={firstAllowedRoute ?? '/brand/portal'} className="flex items-center gap-2.5 overflow-hidden">
-                        <div className="w-9 h-9 bg-[#53B175] rounded-[10px] flex items-center justify-center shrink-0">
+                        <div className="w-9 h-9 bg-primary rounded-[10px] flex items-center justify-center shrink-0">
                             <Package size={18} className="text-white" />
                         </div>
                         {!isCollapsed && (
@@ -316,7 +316,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                 <div className="flex-1" />
 
                 <div className="flex items-center gap-3 shrink-0">
-                    <NotificationBell accentColor="#53B175" />
+                    <NotificationBell accentColor="#6B1D2E" />
                     <BusinessAccountSwitcherDropdown />
                 </div>
             </header>
@@ -367,7 +367,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                                         'flex items-center rounded-[10px] transition-all text-[14px] overflow-hidden leading-none',
                                         isCollapsed ? 'justify-center h-[46px] px-0' : 'gap-3 px-4 py-3',
                                         isActive
-                                            ? 'bg-[#53B175] text-white shadow-md shadow-[#53B175]/20'
+                                            ? 'bg-primary text-white shadow-md shadow-primary/20'
                                             : 'text-[#191919] hover:bg-[#F8F9FB]'
                                     )}
                                 >
@@ -383,7 +383,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                             href="/"
                             title={isCollapsed ? 'View Storefront' : ''}
                             className={cn(
-                                'flex items-center rounded-[10px] transition-all text-[14px] overflow-hidden leading-none text-[#53B175] hover:bg-[#EEF8F1] font-semibold',
+                                'flex items-center rounded-[10px] transition-all text-[14px] overflow-hidden leading-none text-primary hover:bg-primary-light font-semibold',
                                 isCollapsed ? 'justify-center h-[46px] px-0' : 'gap-3 px-4 py-3'
                             )}
                         >
@@ -417,7 +417,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                 </aside>
 
                 <main className="flex-1 min-w-0 p-6">
-                    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#299E60]" size={32} /></div>}>
+                    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary" size={32} /></div>}>
                         <PortalPageGuard scope="brand">{children}</PortalPageGuard>
                     </Suspense>
                 </main>

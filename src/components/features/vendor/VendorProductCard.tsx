@@ -9,6 +9,7 @@ import { useSession } from 'next-auth/react';
 import { cn, formatPackSize } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
 import { useCart } from '@/context/CartContext';
+import { BulkSlabJourney } from '@/components/features/vendor/BulkSlabJourney';
 
 interface VendorProductCardProps {
     product: VendorProduct;
@@ -235,8 +236,8 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 isOutOfStock
                     ? "bg-gray-50 border-gray-100 text-gray-300"
                     : isActive
-                        ? "bg-[#E2F3E9] border-[#53B175] text-[#1B5E20] shadow-sm font-black"
-                        : "bg-[#EFF8F2] border-[#D8ECDF] hover:border-[#53B175]/40 text-[#1B5E20]"
+                        ? "bg-primary-light border-primary text-primary shadow-sm font-black"
+                        : "bg-primary-light/70 border-primary/20 hover:border-primary/40 text-primary"
             )}>
                 <span className="text-[13px] tracking-tight whitespace-nowrap flex-1 min-w-0">
                     ₹{tier.price} <span className="opacity-70 text-[11px] font-medium">({tier.minQty}+ pcs)</span>
@@ -250,7 +251,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         }}
                         className={cn(
                             "text-[11px] font-bold transition-colors shrink-0",
-                            isActive ? "text-[#1B5E20] hover:text-[#0f3d13] underline underline-offset-2" : "text-[#53B175] hover:text-[#2c7a2c]"
+                            isActive ? "text-primary hover:text-primary-dark underline underline-offset-2" : "text-primary hover:text-primary-dark"
                         )}
                     >
                         {isActive ? 'Added' : '+ Add'}
@@ -271,7 +272,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 <button
                     onClick={fetchAlternates}
                     className={cn(
-                        "w-full rounded-xl font-bold flex items-center justify-center gap-1 transition-all duration-300 active:scale-[0.98] border bg-white text-[#53B175] border-[#53B175] hover:bg-[#f7fbf8] cursor-pointer",
+                        "w-full rounded-xl font-bold flex items-center justify-center gap-1 transition-all duration-300 active:scale-[0.98] border bg-white text-primary border-primary hover:bg-[#f7fbf8] cursor-pointer",
                         compact ? "text-[10px] py-2 px-1.5" : "text-[11px] py-2.5 px-2"
                     )}
                 >
@@ -284,7 +285,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 <button
                     onClick={(e) => handleAdd(e, 1)}
                     className={cn(
-                        "w-full rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all duration-300 active:scale-[0.98] border bg-gradient-to-r from-[#53B175] to-[#4AA56B] text-white border-[#53B175] shadow-[0_6px_18px_-6px_rgba(83,177,117,0.45)] hover:shadow-[0_10px_24px_-6px_rgba(83,177,117,0.55)]",
+                        "w-full rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all duration-300 active:scale-[0.98] border bg-gradient-to-r from-primary to-primary-dark text-white border-primary shadow-[0_6px_18px_-6px_rgba(107,29,46,0.45)] hover:shadow-[0_10px_24px_-6px_rgba(107,29,46,0.55)]",
                         compact ? "text-[12px] py-2" : "text-[13px] py-3 rounded-2xl"
                     )}
                 >
@@ -297,14 +298,14 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         return (
             <div className={cn("w-full flex items-stretch gap-2", compact ? "h-9" : "h-[44px]")}>
                 <div className={cn(
-                    "flex-1 bg-[#53B175] flex items-stretch overflow-hidden shadow-[0_6px_18px_-6px_rgba(83,177,117,0.35)]",
+                    "flex-1 bg-primary flex items-stretch overflow-hidden shadow-[0_6px_18px_-6px_rgba(107,29,46,0.35)]",
                     compact ? "rounded-xl" : "rounded-2xl"
                 )}>
                     <button
                         onClick={handleDecrement}
                         aria-label={currentQty === 1 ? 'Remove from cart' : 'Decrease quantity'}
                         className={cn(
-                            "flex items-center justify-center text-white hover:bg-[#489d67] active:scale-95 transition-all shrink-0",
+                            "flex items-center justify-center text-white hover:bg-primary-dark active:scale-95 transition-all shrink-0",
                             compact ? "w-8" : "w-12"
                         )}
                     >
@@ -329,7 +330,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         onClick={(e) => handleAdd(e, 1)}
                         aria-label="Increase quantity"
                         className={cn(
-                            "flex items-center justify-center text-white hover:bg-[#489d67] active:scale-95 transition-all shrink-0",
+                            "flex items-center justify-center text-white hover:bg-primary-dark active:scale-95 transition-all shrink-0",
                             compact ? "w-8" : "w-12"
                         )}
                     >
@@ -362,18 +363,18 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 <button
                     onClick={(e) => handleAdd(e, 1)}
                     aria-label="Add to cart"
-                    className="absolute top-2 right-2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white border-2 border-[#53B175] text-[#53B175] flex items-center justify-center shadow-[0_4px_12px_rgba(83,177,117,0.25)] hover:bg-[#53B175] hover:text-white active:scale-90 transition-all"
+                    className="absolute top-2 right-2 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white border-2 border-primary text-primary flex items-center justify-center shadow-[0_4px_12px_rgba(107,29,46,0.25)] hover:bg-primary hover:text-white active:scale-90 transition-all"
                 >
                     <Plus size={16} strokeWidth={3} />
                 </button>
             );
         }
         return (
-            <div className="absolute top-2 right-2 z-20 flex items-stretch h-8 sm:h-9 bg-[#53B175] rounded-full shadow-[0_4px_14px_rgba(83,177,117,0.35)] overflow-hidden">
+            <div className="absolute top-2 right-2 z-20 flex items-stretch h-8 sm:h-9 bg-primary rounded-full shadow-[0_4px_14px_rgba(107,29,46,0.35)] overflow-hidden">
                 <button
                     onClick={handleDecrement}
                     aria-label={currentQty === 1 ? 'Remove from cart' : 'Decrease quantity'}
-                    className="w-7 sm:w-8 flex items-center justify-center text-white hover:bg-[#489d67] active:scale-95 transition-colors"
+                    className="w-7 sm:w-8 flex items-center justify-center text-white hover:bg-primary-dark active:scale-95 transition-colors"
                 >
                     {currentQty === 1 ? <Trash2 size={12} strokeWidth={2.5} /> : <Minus size={13} strokeWidth={3} />}
                 </button>
@@ -391,7 +392,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 <button
                     onClick={(e) => handleAdd(e, 1)}
                     aria-label="Increase quantity"
-                    className="w-7 sm:w-8 flex items-center justify-center text-white hover:bg-[#489d67] active:scale-95 transition-colors"
+                    className="w-7 sm:w-8 flex items-center justify-center text-white hover:bg-primary-dark active:scale-95 transition-colors"
                 >
                     <Plus size={13} strokeWidth={3} />
                 </button>
@@ -418,7 +419,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 ) : (
                     <>
                         {product.customerPriceApplied ? (
-                            <span className="bg-gradient-to-r from-[#299E60] to-[#53B175] text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-green-500/20 tracking-wide">
+                            <span className="bg-gradient-to-r from-primary to-primary-dark text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-primary/20 tracking-wide">
                                 Your price
                             </span>
                         ) : product.storePromotion ? (
@@ -471,7 +472,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
 
     const shareButton = (
         <button
-            className="p-2 rounded-full backdrop-blur-md bg-white/80 border border-white/60 shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:bg-[#53B175]/10 hover:text-[#53B175] transition-all"
+            className="p-2 rounded-full backdrop-blur-md bg-white/80 border border-white/60 shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:bg-primary/10 hover:text-primary transition-all"
             onClick={handleShare}
         >
             <Share2 size={14} className="text-gray-500" strokeWidth={2} />
@@ -496,7 +497,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
             <div
                 className={cn(
                     "bg-white rounded-2xl border border-gray-100 overflow-hidden transition-all duration-300 group p-3 sm:p-4 relative flex flex-col gap-3",
-                    isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_12px_30px_-12px_rgba(83,177,117,0.18)] hover:border-[#53B175]/30"
+                    isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_12px_30px_-12px_rgba(107,29,46,0.18)] hover:border-primary/30"
                 )}
             >
                 {/* TOP — content (left) + bulk tiers / details (middle) + image+CTA (right) */}
@@ -516,7 +517,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     <Link
                                         href={`/brand/${product.brandSlug}`}
                                         onClick={(e) => e.stopPropagation()}
-                                        className="relative z-20 text-[11px] font-semibold text-[#53B175] hover:underline shrink-0"
+                                        className="relative z-20 text-[11px] font-semibold text-primary hover:underline shrink-0"
                                     >
                                         by {product.brandName}
                                     </Link>
@@ -579,7 +580,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     <button
                                         type="button"
                                         onClick={onDistributorClick}
-                                        className="text-[11px] font-extrabold text-[#53B175] hover:underline text-left mt-1"
+                                        className="text-[11px] font-extrabold text-primary hover:underline text-left mt-1"
                                     >
                                         Available from {distributorCount} distributors ➔
                                     </button>
@@ -601,8 +602,8 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     {bulkTiers.map((tier, i) => {
                                         const pricePerUnit = tier.price.toFixed(2);
                                         return (
-                                            <div key={i} className="flex items-center justify-between py-1 px-3 rounded-xl bg-[#EFF8F2] border border-[#D8ECDF] hover:border-[#53B175]/40 transition-all">
-                                                <span className="text-[12px] font-semibold text-[#1B5E20]">
+                                            <div key={i} className="flex items-center justify-between py-1 px-3 rounded-xl bg-primary-light border border-primary/15 hover:border-primary/40 transition-all">
+                                                <span className="text-[12px] font-semibold text-primary">
                                                     <span className="font-extrabold">₹{pricePerUnit}</span>
                                                     <span className="opacity-80 text-[11px]"> ({tier.minQty}+ pcs)</span>
                                                 </span>
@@ -613,7 +614,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                                         e.stopPropagation();
                                                         handleTierSelect(e, tier.minQty);
                                                     }}
-                                                    className="text-[11px] font-black text-[#53B175] hover:text-[#2c7a2c] active:scale-95 transition-all shrink-0 ml-3 bg-white px-2.5 py-1 rounded-lg border border-[#D8ECDF]/50 shadow-sm"
+                                                    className="text-[11px] font-black text-primary hover:text-primary-dark active:scale-95 transition-all shrink-0 ml-3 bg-white px-2.5 py-1 rounded-lg border border-primary/15 shadow-sm"
                                                 >
                                                     Add {tier.minQty}
                                                 </button>
@@ -625,7 +626,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         ) : (
                             <div className="flex flex-col gap-2">
                                 <div className="flex items-center gap-2 text-gray-600">
-                                    <div className="w-5 h-5 rounded-full bg-green-50 flex items-center justify-center text-[#53B175] shrink-0">
+                                    <div className="w-5 h-5 rounded-full bg-green-50 flex items-center justify-center text-primary shrink-0">
                                         <CheckCircle size={12} strokeWidth={3} />
                                     </div>
                                     <span className="text-[12px] font-bold">100% Quality Assured</span>
@@ -648,7 +649,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
  
                     {/* Right: Image & CTA */}
                     <div className="shrink-0 flex flex-col items-center gap-2 self-center w-[104px] sm:w-[120px] md:w-[140px]">
-                        <div className="relative w-[104px] h-[104px] sm:w-[120px] sm:h-[120px] rounded-xl overflow-hidden bg-gradient-to-br from-[#F7FBF8] via-white to-[#F0F7F2] flex items-center justify-center">
+                        <div className="relative w-[104px] h-[104px] sm:w-[120px] sm:h-[120px] rounded-xl overflow-hidden bg-gradient-to-br from-ivory via-white to-cream flex items-center justify-center">
                             <div className="relative w-[85%] h-[85%]">
                                 <Image
                                     src={product.images[0] || '/images/recom-product/product-img10.png'}
@@ -685,7 +686,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                             e.stopPropagation();
                                             handleTierSelect(e, tier.minQty);
                                         }}
-                                        className="text-[12px] font-bold text-[#53B175] hover:text-[#2c7a2c] active:scale-95 transition-all shrink-0 ml-3"
+                                        className="text-[12px] font-bold text-primary hover:text-primary-dark active:scale-95 transition-all shrink-0 ml-3"
                                     >
                                         Add {tier.minQty}
                                     </button>
@@ -705,11 +706,11 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 <div
                     className={cn(
                         "sm:hidden bg-white rounded-2xl border border-gray-100 overflow-hidden transition-all duration-300 group p-0 relative flex flex-col h-full",
-                        isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_12px_30px_-12px_rgba(83,177,117,0.18)] hover:-translate-y-0.5 hover:border-[#53B175]/30"
+                        isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_12px_30px_-12px_rgba(107,29,46,0.18)] hover:-translate-y-0.5 hover:border-primary/30"
                     )}
                 >
                     {/* Full-width Image Container */}
-                    <div className="relative w-full aspect-square bg-gradient-to-br from-[#F7FBF8] via-white to-[#F0F7F2] overflow-hidden">
+                    <div className="relative w-full aspect-square bg-gradient-to-br from-ivory via-white to-cream overflow-hidden">
                         {/* Image wrapper centered in the top area (excluding the bottom 30px bar) */}
                         <div className="absolute top-0 left-0 right-0 bottom-[30px] flex items-center justify-center p-3">
                             <div className="relative w-full h-full">
@@ -737,7 +738,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     e.stopPropagation();
                                     onDistributorClick(e);
                                 }}
-                                className="absolute bottom-0 left-0 right-0 h-[30px] bg-[#EFF8F2] border-t border-[#D8ECDF] text-[#1B5E20] flex items-center justify-center gap-1 hover:bg-[#e2f3e8] transition-colors z-20"
+                                className="absolute bottom-0 left-0 right-0 h-[30px] bg-primary-light border-t border-primary/15 text-primary flex items-center justify-center gap-1 hover:bg-[#F0D4DC] transition-colors z-20"
                                 aria-label="Show distributors list"
                             >
                                 <span className="text-[10px] font-black truncate">
@@ -753,7 +754,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     e.stopPropagation();
                                     setShowBulkSheet(true);
                                 }}
-                                className="absolute bottom-0 left-0 right-0 h-[30px] bg-[#EFF8F2] border-t border-[#D8ECDF] text-[#1B5E20] flex items-center justify-center gap-1 hover:bg-[#e2f3e8] transition-colors z-20"
+                                className="absolute bottom-0 left-0 right-0 h-[30px] bg-primary-light border-t border-primary/15 text-primary flex items-center justify-center gap-1 hover:bg-[#F0D4DC] transition-colors z-20"
                                 aria-label="Show bulk price tiers"
                             >
                                 <span className="text-[10px] font-black truncate">
@@ -787,7 +788,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     <Link
                                         href={`/brand/${product.brandSlug}`}
                                         onClick={(e) => e.stopPropagation()}
-                                        className="relative z-20 text-[10px] font-semibold text-[#53B175] hover:underline shrink-0"
+                                        className="relative z-20 text-[10px] font-semibold text-primary hover:underline shrink-0"
                                     >
                                         by {product.brandName}
                                     </Link>
@@ -803,8 +804,8 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         <div className="mt-2">
                             <div className="flex items-baseline gap-1.5 flex-wrap mb-2">
                                 <span className={cn(
-                                    "text-[16px] font-extrabold tracking-tight leading-none",
-                                    isOutOfStock ? "text-gray-300" : "text-[#181725]"
+                                    "text-[16px] font-extrabold tracking-tight leading-none tabular-nums",
+                                    isOutOfStock ? "text-gray-300" : "text-primary"
                                 )}>
                                     ₹{product.price}
                                 </span>
@@ -826,12 +827,12 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 <div
                     className={cn(
                         "hidden sm:flex bg-white rounded-[22px] border border-gray-100 overflow-hidden transition-all duration-500 group p-4 md:p-5 relative flex-col gap-3 h-full",
-                        isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_18px_45px_-12px_rgba(83,177,117,0.18)] hover:-translate-y-1 hover:border-[#53B175]/30"
+                        isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_18px_45px_-12px_rgba(107,29,46,0.18)] hover:-translate-y-1 hover:border-primary/30"
                     )}
                 >
                     <div className="absolute top-4 right-4 z-20">{shareButton}</div>
 
-                    <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-[#F7FBF8] via-white to-[#F0F7F2] flex items-center justify-center">
+                    <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-ivory via-white to-cream flex items-center justify-center">
                         <div className="relative w-[85%] h-[85%]">
                             <Image
                                 src={product.images[0] || '/images/recom-product/product-img10.png'}
@@ -859,7 +860,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                 <Link
                                     href={`/brand/${product.brandSlug}`}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="relative z-20 text-[11px] font-semibold text-[#53B175] hover:underline shrink-0"
+                                    className="relative z-20 text-[11px] font-semibold text-primary hover:underline shrink-0"
                                 >
                                     by {product.brandName}
                                 </Link>
@@ -873,7 +874,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                 <button
                                     type="button"
                                     onClick={onDistributorClick}
-                                    className="text-[11px] font-extrabold text-[#53B175] hover:underline ml-auto shrink-0 relative z-20"
+                                    className="text-[11px] font-extrabold text-primary hover:underline ml-auto shrink-0 relative z-20"
                                 >
                                     {distributorCount} dist.
                                 </button>
@@ -887,8 +888,8 @@ export const VendorProductCard = React.memo(function VendorProductCard({
 
                         <div className="flex items-baseline gap-1.5 mt-1">
                             <span className={cn(
-                                "text-[22px] md:text-[24px] font-extrabold tracking-tight leading-none",
-                                isOutOfStock ? "text-gray-300" : "text-[#181725]"
+                                "text-[22px] md:text-[24px] font-extrabold tracking-tight leading-none tabular-nums",
+                                isOutOfStock ? "text-gray-300" : "text-primary"
                             )}>
                                 ₹{product.price}
                             </span>
@@ -898,6 +899,14 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             <span className="text-[12px] font-medium text-gray-500">/ unit</span>
                         </div>
                     </div>
+
+                    {bulkTiers.length > 0 && !isOutOfStock && (
+                        <BulkSlabJourney
+                            tiers={bulkTiers}
+                            currentQty={currentQty}
+                            unitLabel={product.packSize?.split(' ').pop() ?? 'Pc'}
+                        />
+                    )}
 
                     {bulkTiers.length > 0 && (
                         <div className="flex flex-col gap-1.5 mt-0.5 relative z-20">
@@ -956,18 +965,20 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             return (
                                 <div
                                     key={i}
-                                    className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 hover:border-[#53B175]/30 hover:bg-[#f7fbf8] transition-all"
+                                    className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 hover:border-primary/30 hover:bg-primary-light/40 transition-all"
                                 >
-                                    <div className="relative w-14 h-14 rounded-xl bg-gray-50 shrink-0 overflow-hidden">
-                                        <Image
-                                            src={product.images[0] || '/images/recom-product/product-img10.png'}
-                                            alt=""
-                                            fill
-                                            sizes="56px"
-                                            className="object-contain p-1"
-                                        />
+                                    <div className="relative w-14 h-14 shrink-0">
+                                        <div className="absolute inset-0 rounded-xl bg-gray-50 overflow-hidden">
+                                            <Image
+                                                src={product.images[0] || '/images/recom-product/product-img10.png'}
+                                                alt=""
+                                                fill
+                                                sizes="56px"
+                                                className="object-contain p-1"
+                                            />
+                                        </div>
                                         {savings > 0 && (
-                                            <span className="absolute top-0 left-0 bg-gradient-to-br from-[#53B175] to-[#469E66] text-white text-[9px] font-black px-1 py-0.5 rounded-br-lg">
+                                            <span className="absolute top-0 left-0 z-10 bg-primary text-white text-[9px] font-bold leading-none px-1.5 py-1 rounded-tl-xl rounded-br-md whitespace-nowrap">
                                                 {savings}% OFF
                                             </span>
                                         )}
@@ -980,14 +991,14 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                         <p className="text-[11px] font-bold text-gray-500 mt-0.5">For {tier.minQty}+ pcs</p>
                                     </div>
                                     {activeTierIdx === i ? (
-                                        <div className="flex items-stretch h-9 bg-[#53B175] rounded-xl overflow-hidden shrink-0 w-28 shadow-[0_4px_14px_-4px_rgba(83,177,117,0.5)]">
+                                        <div className="flex items-stretch h-9 bg-primary rounded-xl overflow-hidden shrink-0 w-28 shadow-[0_4px_14px_-4px_rgba(107,29,46,0.5)]">
                                             <button
                                                 onClick={(e) => {
                                                     e.preventDefault();
                                                     e.stopPropagation();
                                                     handleDecrement(e);
                                                 }}
-                                                className="w-8 flex items-center justify-center text-white hover:bg-[#489d67] active:scale-95 transition-all"
+                                                className="w-8 flex items-center justify-center text-white hover:bg-primary-dark active:scale-95 transition-all"
                                             >
                                                 {currentQty === 1 ? <Trash2 size={12} strokeWidth={2.5} /> : <Minus size={13} strokeWidth={3} />}
                                             </button>
@@ -1007,7 +1018,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                                     e.stopPropagation();
                                                     handleAdd(e, 1);
                                                 }}
-                                                className="w-8 flex items-center justify-center text-white hover:bg-[#489d67] active:scale-95 transition-all"
+                                                className="w-8 flex items-center justify-center text-white hover:bg-primary-dark active:scale-95 transition-all"
                                             >
                                                 <Plus size={13} strokeWidth={3} />
                                             </button>
@@ -1015,7 +1026,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     ) : (
                                         <button
                                             onClick={(e) => handleTierSelect(e, tier.minQty)}
-                                            className="px-4 py-2.5 rounded-xl bg-[#53B175] text-white text-[12px] font-black shadow-[0_4px_14px_-4px_rgba(83,177,117,0.5)] hover:bg-[#489d67] active:scale-95 transition-all shrink-0"
+                                            className="px-4 py-2.5 rounded-xl bg-primary text-white text-[12px] font-black shadow-[0_4px_14px_-4px_rgba(107,29,46,0.5)] hover:bg-primary-dark active:scale-95 transition-all shrink-0"
                                         >
                                             Add {tier.minQty}
                                         </button>
@@ -1051,7 +1062,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                     </p>
                     {alternatesLoading ? (
                         <div className="flex items-center justify-center py-10">
-                            <Loader2 size={24} className="animate-spin text-[#53B175]" strokeWidth={3} />
+                            <Loader2 size={24} className="animate-spin text-primary" strokeWidth={3} />
                         </div>
                     ) : alternateVendors.length === 0 ? (
                         <div className="text-center py-8 text-gray-400 font-bold text-[14px]">
@@ -1064,7 +1075,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                 const altImg = alt.images?.[0] || alt.imageUrl || alt.vendor.logoUrl || null;
                                 return (
                                     <a key={alt.id} href={`/vendor/${alt.vendor.id}`}
-                                        className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-[#53B175]/30 hover:bg-[#f7fbf8] transition-all group"
+                                        className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-primary/30 hover:bg-[#f7fbf8] transition-all group"
                                         onClick={(e) => e.stopPropagation()}>
                                         <div className="w-14 h-14 rounded-xl bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden relative">
                                             {altImg ? (
@@ -1075,7 +1086,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-[14px] font-black text-[#181725] truncate">{alt.name}</p>
-                                            <p className="text-[12px] font-bold text-[#53B175] truncate">
+                                            <p className="text-[12px] font-bold text-primary truncate">
                                                 {alt.vendor.businessName}
                                             </p>
                                             <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap mt-0.5">
@@ -1095,7 +1106,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                                 )}
                                             </div>
                                         </div>
-                                        <Navigation size={16} className="text-gray-300 group-hover:text-[#53B175] shrink-0 transition-colors -rotate-45" strokeWidth={2.5} />
+                                        <Navigation size={16} className="text-gray-300 group-hover:text-primary shrink-0 transition-colors -rotate-45" strokeWidth={2.5} />
                                     </a>
                                 );
                             })}

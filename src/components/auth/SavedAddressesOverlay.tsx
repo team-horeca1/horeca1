@@ -171,14 +171,14 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
                                             className="bg-white md:bg-gray-50/80 border border-gray-100 rounded-[12px] md:rounded-2xl p-4 md:p-5 shadow-sm relative"
                                         >
                                             <div className="flex items-start gap-3 md:gap-4">
-                                                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#E8F5E9] flex items-center justify-center shrink-0 mt-0.5">
-                                                    <Icon size={18} className="text-[#53B175] md:w-5 md:h-5" />
+                                                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-primary-light flex items-center justify-center shrink-0 mt-0.5">
+                                                    <Icon size={18} className="text-primary md:w-5 md:h-5" />
                                                 </div>
                                                 <div className="flex-1 min-w-0 pr-8">
                                                     <div className="flex flex-wrap items-center gap-2 mb-1">
                                                         <span className="text-[14px] md:text-[16px] font-[700] text-[#181725]">{displayName(addr)}</span>
                                                         {addr.isDefault && (
-                                                            <span className="text-[9px] md:text-[10px] font-[700] text-[#53B175] bg-[#E8F5E9] px-2 py-0.5 rounded-full uppercase tracking-wide">Default</span>
+                                                            <span className="text-[9px] md:text-[10px] font-[700] text-primary bg-primary-light px-2 py-0.5 rounded-full uppercase tracking-wide">Default</span>
                                                         )}
                                                     </div>
                                                     {addr.businessName && addr.label && addr.label !== addr.businessName && (
@@ -204,7 +204,7 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
                                                             onClick={() => void handleSetDefault(addr)}
                                                             className="w-full flex items-center gap-2.5 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-50"
                                                         >
-                                                            <MapPin size={14} className="text-[#53B175]" />
+                                                            <MapPin size={14} className="text-primary" />
                                                             <span className="text-[12px] md:text-[13px] font-[600] text-[#181725]">Set as default</span>
                                                         </button>
                                                     )}
@@ -239,7 +239,7 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
                             type="button"
                             onClick={() => setIsCreateBusinessOpen(true)}
                             className={cn(
-                                'w-full mt-4 flex items-center gap-3 p-4 rounded-[12px] border border-[#EEEEEE] bg-white hover:border-[#53B175]/30 hover:bg-[#F8FFF9] transition-colors text-left',
+                                'w-full mt-4 flex items-center gap-3 p-4 rounded-[12px] border border-[#EEEEEE] bg-white hover:border-primary/30 hover:bg-primary-light/40 transition-colors text-left',
                             )}
                         >
                             <div className="w-10 h-10 rounded-full bg-[#EEF2FF] flex items-center justify-center shrink-0">
@@ -256,7 +256,7 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
                         <button
                             type="button"
                             onClick={() => setIsAddNewOpen(true)}
-                            className="w-full bg-[#53B175] hover:bg-[#48a068] text-white font-bold py-3.5 md:py-4 rounded-xl md:rounded-2xl active:scale-[0.98] transition-all text-[14px] md:text-[15px] flex items-center justify-center gap-2 shadow-lg shadow-green-100"
+                            className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3.5 md:py-4 rounded-xl md:rounded-2xl active:scale-[0.98] transition-all text-[14px] md:text-[15px] flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
                         >
                             <Plus size={18} />
                             Add delivery address

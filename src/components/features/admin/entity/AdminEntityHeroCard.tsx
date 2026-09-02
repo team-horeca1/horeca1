@@ -26,7 +26,7 @@ export function AdminEntityHeroCard({
   sidebarTitle,
 }: AdminEntityHeroCardProps) {
   return (
-    <div className="bg-white rounded-[20px] border border-[#D1D5DB] shadow-sm overflow-hidden p-6 md:p-8 flex flex-col lg:flex-row items-center lg:items-stretch gap-6 md:gap-8 animate-in fade-in duration-300">
+    <div className="bg-white rounded-[16px] lg:rounded-[20px] border border-divider shadow-sm overflow-hidden p-4 md:p-8 flex flex-col lg:flex-row items-center lg:items-stretch gap-4 md:gap-8">
       <div className="flex flex-col items-center justify-center shrink-0 w-[180px]">
         {avatar}
         {avatarFooter && <div className="mt-3.5">{avatarFooter}</div>}

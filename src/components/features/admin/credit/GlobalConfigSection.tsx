@@ -84,7 +84,7 @@ export function GlobalConfigSection() {
   if (loading) {
     return (
       <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm flex items-center justify-center py-20">
-        <Loader2 className="animate-spin text-[#299E60]" size={32} />
+        <Loader2 className="animate-spin text-[#6B1D2E]" size={32} />
       </div>
     );
   }
@@ -102,8 +102,8 @@ export function GlobalConfigSection() {
 
   return (
     <div className="space-y-5">
-      <div className="bg-[#EEF8F1] border border-[#299E60]/20 rounded-[14px] px-4 py-3 flex gap-3 items-start">
-        <Info size={18} className="text-[#299E60] shrink-0 mt-0.5" />
+      <div className="bg-[#F8E8EC] border border-[#6B1D2E]/20 rounded-[14px] px-4 py-3 flex gap-3 items-start">
+        <Info size={18} className="text-[#6B1D2E] shrink-0 mt-0.5" />
         <div>
           <p className="text-[13px] font-bold text-[#181725]">Current policy summary</p>
           <p className="text-[12px] text-[#7C7C7C] mt-1 leading-relaxed">{buildPolicySummary(config)}</p>
@@ -190,7 +190,7 @@ export function GlobalConfigSection() {
         <button
           type="submit"
           disabled={saving}
-          className="h-[40px] px-6 bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold hover:bg-[#238a54] disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm"
+          className="h-[40px] px-6 bg-[#6B1D2E] text-white rounded-[10px] text-[13px] font-bold hover:bg-[#5A1926] disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm"
         >
           {saving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
           Save changes

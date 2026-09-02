@@ -21,7 +21,10 @@ export interface Vendor {
     catalog?: Record<string, unknown>[];          // Full category & product structure
     address?: Address;
     isActive: boolean;
+    isVerified?: boolean;
     description?: string;
+    createdAt?: string;
+    productCount?: number;
 }
 
 export interface VendorSummary {

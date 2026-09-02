@@ -291,7 +291,7 @@ export default function VendorLayout({
     if ((status === 'loading' && !session) || (status === 'authenticated' && isActiveVendor && !isAdmin && checkingApplication)) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-[#F8F9FB]">
-                <Loader2 className="animate-spin text-[#299E60]" size={40} />
+                <Loader2 className="animate-spin text-primary" size={40} />
             </div>
         );
     }
@@ -305,7 +305,7 @@ export default function VendorLayout({
                 <p className="text-[14px] text-[#7C7C7C]">You need to sign in to access the vendor portal.</p>
                 <button
                     onClick={() => router.push('/login')}
-                    className="mt-4 px-6 py-3 bg-[#299E60] text-white rounded-[10px] font-bold hover:bg-[#238a54] transition-colors"
+                    className="mt-4 px-6 py-3 bg-primary text-white rounded-[10px] font-bold hover:bg-primary-dark transition-colors"
                 >
                     Sign In
                 </button>
@@ -317,7 +317,7 @@ export default function VendorLayout({
         // Redirect is handled in the useEffect above — never call router during render.
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh] bg-[#F8F9FB] gap-4">
-                <Loader2 className="animate-spin text-[#299E60]" size={36} />
+                <Loader2 className="animate-spin text-primary" size={36} />
                 <p className="text-[14px] text-[#7C7C7C]">Redirecting…</p>
             </div>
         );
@@ -341,7 +341,7 @@ export default function VendorLayout({
                 <div className="flex flex-wrap items-center justify-center gap-3">
                     <Link
                         href="/"
-                        className="inline-flex items-center gap-2 h-[42px] px-5 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] transition-colors"
+                        className="inline-flex items-center gap-2 h-[42px] px-5 rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark transition-colors"
                     >
                         <Home size={16} />
                         Back to marketplace
@@ -388,7 +388,7 @@ export default function VendorLayout({
                         {!isCollapsed && (
                             <div className="whitespace-nowrap">
                                 <h1 className="text-[22px] font-extrabold leading-tight">
-                                    <span className="text-[#E74C3C]">Horeca</span><span className="text-[#299E60]">1</span>
+                                    <span className="text-[#E74C3C]">Horeca</span><span className="text-primary">1</span>
                                 </h1>
                                 <p className="text-[10px] text-[#AEAEAE] font-semibold uppercase tracking-[0.15em] -mt-0.5">
                                     {showStoreNav ? 'Store Ops' : 'Supplier Panel'}
@@ -421,7 +421,7 @@ export default function VendorLayout({
 
             {/* Hierarchy breadcrumbs + context */}
             <div className="w-full bg-emerald-50/70 border-b border-emerald-100 px-[clamp(1rem,2.5vw,2rem)] py-2.5 flex items-center gap-3 text-[13px]">
-                <Building2 size={14} className="text-[#299E60] shrink-0" />
+                <Building2 size={14} className="text-primary shrink-0" />
                 <nav className="flex items-center gap-1.5 min-w-0 flex-wrap" aria-label="Portal level">
                     <>
                         {!allowStorePicker && (
@@ -431,7 +431,7 @@ export default function VendorLayout({
                                   'font-semibold shrink-0',
                                   portalLevel === 'supplier' && !supplierPersonName
                                     ? 'text-[#181725]'
-                                    : 'text-[#299E60] hover:text-[#238a54]',
+                                    : 'text-primary hover:text-primary-dark',
                               )}
                           >
                               Supplier
@@ -446,7 +446,7 @@ export default function VendorLayout({
                                         'font-semibold truncate max-w-[180px]',
                                         onBusinessesList || (!showStoreNav && allowStorePicker)
                                           ? 'text-[#181725]'
-                                          : 'text-[#299E60] hover:text-[#238a54]',
+                                          : 'text-primary hover:text-primary-dark',
                                     )}
                                     title={supplierPersonName ?? 'Businesses'}
                                 >
@@ -463,7 +463,7 @@ export default function VendorLayout({
                                       : '/vendor/businesses'}
                                     className={cn(
                                         'font-semibold truncate max-w-[160px]',
-                                        portalLevel === 'business' ? 'text-[#181725]' : 'text-[#299E60] hover:text-[#238a54]',
+                                        portalLevel === 'business' ? 'text-[#181725]' : 'text-primary hover:text-primary-dark',
                                     )}
                                     title={activeBusinessName ?? 'Business'}
                                 >
@@ -485,7 +485,7 @@ export default function VendorLayout({
                     <Link
                         href={allowStorePicker ? '/vendor/businesses' : '/vendor/overview'}
                         onClick={() => setEnteredStore(false)}
-                        className="ml-auto text-[12px] font-bold text-[#299E60] hover:text-[#238a54] shrink-0"
+                        className="ml-auto text-[12px] font-bold text-primary hover:text-primary-dark shrink-0"
                     >
                         {allowStorePicker ? 'Switch store' : 'Back to Supplier'}
                     </Link>
@@ -493,7 +493,7 @@ export default function VendorLayout({
                 {!showStoreNav && (
                     <Link
                         href="/vendor/businesses"
-                        className="ml-auto text-[12px] font-bold text-[#299E60] hover:text-[#238a54] shrink-0"
+                        className="ml-auto text-[12px] font-bold text-primary hover:text-primary-dark shrink-0"
                     >
                         View businesses
                     </Link>
@@ -559,7 +559,7 @@ export default function VendorLayout({
                                             "flex items-center rounded-[10px] transition-all group text-[14px] overflow-hidden leading-none",
                                             isCollapsed ? "justify-center h-[48px] px-0" : "gap-3.5 px-5 py-3.5",
                                             isActive
-                                                ? "bg-[#299E60] text-white shadow-md shadow-[#299E60]/20"
+                                                ? "bg-primary text-white shadow-md shadow-primary/20"
                                                 : "text-[#191919] hover:bg-[#F8F9FB]"
                                         )}
                                     >
@@ -584,7 +584,7 @@ export default function VendorLayout({
                                 href="/"
                                 title={isCollapsed ? (isAdmin ? 'Shop as this supplier' : 'View Storefront') : ''}
                                 className={cn(
-                                    'flex items-center rounded-[10px] transition-all text-[14px] overflow-hidden leading-none text-[#299E60] hover:bg-[#E8F7EF] font-semibold',
+                                    'flex items-center rounded-[10px] transition-all text-[14px] overflow-hidden leading-none text-primary hover:bg-primary-light font-semibold',
                                     isCollapsed ? 'justify-center h-[48px] px-0' : 'gap-3.5 px-5 py-3.5'
                                 )}
                             >
@@ -611,7 +611,7 @@ export default function VendorLayout({
 
                 {/* Main Content */}
                 <main className="flex-1 px-8 py-8 min-w-0">
-                    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#299E60]" size={32} /></div>}>
+                    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary" size={32} /></div>}>
                         <PortalPageGuard scope="vendor">{children}</PortalPageGuard>
                     </Suspense>
                 </main>

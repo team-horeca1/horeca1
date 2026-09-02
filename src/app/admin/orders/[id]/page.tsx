@@ -110,7 +110,7 @@ function getStatusBadgeClasses(status: string): string {
     switch (status) {
         case 'delivered':
         case 'confirmed':
-            return 'bg-[#EEF8F1] text-[#299E60] border-[#D1FAE5]';
+            return 'bg-[#F8E8EC] text-[#6B1D2E] border-[#F8E8EC]';
         case 'processing':
         case 'pending':
             return 'bg-[#FFF8EB] text-[#D97706] border-[#FEF3C7]';
@@ -126,7 +126,7 @@ function getStatusBadgeClasses(status: string): string {
 function getPaymentStatusBadgeClasses(status: string): string {
     switch (status) {
         case 'paid':
-            return 'bg-[#EEF8F1] text-[#299E60] border-[#D1FAE5]';
+            return 'bg-[#F8E8EC] text-[#6B1D2E] border-[#F8E8EC]';
         case 'pending':
             return 'bg-[#FFF8EB] text-[#D97706] border-[#FEF3C7]';
         case 'failed':
@@ -328,7 +328,7 @@ export default function OrderDetailsPage() {
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-[#299E60]" />
+                <Loader2 className="w-8 h-8 animate-spin text-[#6B1D2E]" />
                 <span className="text-[13px] font-bold text-[#6B7280]">Loading order details...</span>
             </div>
         );
@@ -341,7 +341,7 @@ export default function OrderDetailsPage() {
                 <p className="text-[15px] font-medium text-[#4B4B4B]">{error || 'Order not found'}</p>
                 <button
                     onClick={() => router.back()}
-                    className="text-[14px] font-medium text-[#299E60] hover:underline"
+                    className="text-[14px] font-medium text-[#6B1D2E] hover:underline"
                 >
                     Go back
                 </button>
@@ -387,7 +387,7 @@ export default function OrderDetailsPage() {
                         {/* Customer */}
                         <div className="bg-white rounded-[14px] border border-[#EEEEEE] p-5 shadow-sm flex flex-col justify-between">
                             <div className="flex items-start gap-3">
-                                <div className="w-9 h-9 rounded-[10px] bg-[#EEF8F1] flex items-center justify-center text-[#299E60] shrink-0 border border-[#D1FAE5]">
+                                <div className="w-9 h-9 rounded-[10px] bg-[#F8E8EC] flex items-center justify-center text-[#6B1D2E] shrink-0 border border-[#F8E8EC]">
                                     <User size={16} />
                                 </div>
                                 <div className="min-w-0">
@@ -465,7 +465,7 @@ export default function OrderDetailsPage() {
                             {order.vendor && (
                                 <div className="mt-3 pt-2 border-t border-[#F3F4F6] text-[12px] text-[#4B5563]">
                                     <span className="text-[10px] uppercase font-bold text-[#9CA3AF] block mb-1">Assigned Vendor:</span>
-                                    <span className="font-bold text-[#299E60] block truncate">{order.vendor.businessName}</span>
+                                    <span className="font-bold text-[#6B1D2E] block truncate">{order.vendor.businessName}</span>
                                     {(() => {
                                         const vendorAddress = [
                                             order.vendor.addressLine,
@@ -490,7 +490,7 @@ export default function OrderDetailsPage() {
                     <div className="bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm overflow-hidden">
                         <div className="px-5 py-4 border-b border-[#EEEEEE] bg-[#FAFAFA]">
                             <h3 className="text-[14px] font-black text-[#111827] flex items-center gap-1.5">
-                                <Package size={16} className="text-[#299E60]" />
+                                <Package size={16} className="text-[#6B1D2E]" />
                                 Products Sub-items List ({order.items.length})
                             </h3>
                         </div>
@@ -531,7 +531,7 @@ export default function OrderDetailsPage() {
                                                                 ...prev, 
                                                                 [item.id]: Math.max(0, parseInt(e.target.value, 10) || 0) 
                                                             }))}
-                                                            className="w-16 h-[30px] text-center border border-[#D1D5DB] rounded-[6px] text-[13px] font-bold outline-none focus:border-[#299E60]"
+                                                            className="w-16 h-[30px] text-center border border-[#D1D5DB] rounded-[6px] text-[13px] font-bold outline-none focus:border-[#6B1D2E]"
                                                         />
                                                     </div>
                                                 ) : (
@@ -559,7 +559,7 @@ export default function OrderDetailsPage() {
                                 <button 
                                     onClick={handleSaveQuantities} 
                                     disabled={savingQty} 
-                                    className="h-[34px] px-4 bg-[#299E60] hover:bg-[#238a54] text-white text-[12px] font-bold rounded-[8px] disabled:opacity-50 shrink-0 shadow-sm active:scale-97 transition-all flex items-center gap-1.5"
+                                    className="h-[34px] px-4 bg-[#6B1D2E] hover:bg-[#5A1926] text-white text-[12px] font-bold rounded-[8px] disabled:opacity-50 shrink-0 shadow-sm active:scale-97 transition-all flex items-center gap-1.5"
                                 >
                                     {savingQty && <Loader2 size={12} className="animate-spin" />}
                                     Save Quantities
@@ -598,7 +598,7 @@ export default function OrderDetailsPage() {
                                                             ...p, 
                                                             [i.id]: Math.max(0, Math.min(i.quantity, parseInt(e.target.value, 10) || 0)) 
                                                         }))}
-                                                        className="w-14 h-[26px] text-center border border-[#D1D5DB] rounded-[4px] text-[11px] font-bold outline-none focus:border-[#299E60]" 
+                                                        className="w-14 h-[26px] text-center border border-[#D1D5DB] rounded-[4px] text-[11px] font-bold outline-none focus:border-[#6B1D2E]" 
                                                     />
                                                 </div>
                                             </div>
@@ -631,7 +631,7 @@ export default function OrderDetailsPage() {
                                         <select 
                                             value={reassignTo} 
                                             onChange={(e) => setReassignTo(e.target.value)} 
-                                            className="w-full h-[38px] border border-[#D1D5DB] bg-white rounded-[8px] px-3 text-[12px] font-semibold outline-none focus:border-[#299E60]"
+                                            className="w-full h-[38px] border border-[#D1D5DB] bg-white rounded-[8px] px-3 text-[12px] font-semibold outline-none focus:border-[#6B1D2E]"
                                         >
                                             <option value="">Choose partner...</option>
                                             {vendorOptions.filter((v) => v.id !== order.vendor?.id).map((v) => (
@@ -659,7 +659,7 @@ export default function OrderDetailsPage() {
                     <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-5 shadow-sm space-y-4">
                         <div className="border-b border-[#F3F4F6] pb-2">
                             <h4 className="text-[14px] font-black text-[#111827] flex items-center gap-1.5">
-                                <CheckCircle2 size={15} className="text-[#299E60]" />
+                                <CheckCircle2 size={15} className="text-[#6B1D2E]" />
                                 Administrative Status Control
                             </h4>
                         </div>
@@ -671,7 +671,7 @@ export default function OrderDetailsPage() {
                                     value={selectedStatus}
                                     onChange={(e) => setSelectedStatus(e.target.value)}
                                     disabled={updatingStatus}
-                                    className="w-full h-[38px] px-3 bg-white border border-[#D1D5DB] rounded-[8px] text-[13px] font-bold text-[#374151] outline-none focus:border-[#299E60] cursor-pointer"
+                                    className="w-full h-[38px] px-3 bg-white border border-[#D1D5DB] rounded-[8px] text-[13px] font-bold text-[#374151] outline-none focus:border-[#6B1D2E] cursor-pointer"
                                 >
                                     {ORDER_STATUSES.map((s) => (
                                         <option key={s} value={s}>
@@ -688,7 +688,7 @@ export default function OrderDetailsPage() {
                                     'w-full h-[38px] rounded-[8px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-1.5',
                                     selectedStatus === order.status
                                         ? 'bg-[#E5E7EB] text-[#9CA3AF] cursor-not-allowed border border-[#E5E7EB]'
-                                        : 'bg-[#299E60] text-white hover:bg-[#238A52] border border-[#299E60] cursor-pointer'
+                                        : 'bg-[#6B1D2E] text-white hover:bg-[#5A1926] border border-[#6B1D2E] cursor-pointer'
                                 )}
                             >
                                 {updatingStatus ? (
@@ -736,7 +736,7 @@ export default function OrderDetailsPage() {
                                 <a
                                     href={`/api/v1/admin/orders/${order.id}/invoice`}
                                     download
-                                    className="w-full h-[38px] rounded-[8px] text-[12px] font-bold border border-[#299E60]/40 text-[#299E60] hover:bg-[#EEF8F1] transition-colors flex items-center justify-center gap-1.5"
+                                    className="w-full h-[38px] rounded-[8px] text-[12px] font-bold border border-[#6B1D2E]/40 text-[#6B1D2E] hover:bg-[#F8E8EC] transition-colors flex items-center justify-center gap-1.5"
                                 >
                                     <FileDown size={14} />
                                     Download Invoice
@@ -761,7 +761,7 @@ export default function OrderDetailsPage() {
                                             setEmailingInvoice(false);
                                         }
                                     }}
-                                    className="w-full h-[38px] rounded-[8px] text-[12px] font-bold bg-[#299E60] text-white hover:bg-[#238A52] disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+                                    className="w-full min-h-12 rounded-[12px] text-[13px] font-semibold bg-[#6B1D2E] text-white hover:bg-[#5A1926] disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
                                 >
                                     {emailingInvoice ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
                                     {emailingInvoice ? 'Sending…' : 'Email to Customer'}
@@ -803,7 +803,7 @@ export default function OrderDetailsPage() {
                                             <span className={cn(
                                                 'inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase border tracking-wide',
                                                 txn.type === 'credit'
-                                                    ? 'bg-[#EEF8F1] border-[#299E60]/10 text-[#299E60]'
+                                                    ? 'bg-[#F8E8EC] border-[#6B1D2E]/10 text-[#6B1D2E]'
                                                     : 'bg-[#FDF2F2] border-[#EF4444]/10 text-[#EF4444]'
                                             )}>
                                                 {txn.type}

@@ -29,14 +29,14 @@ function hasPermission(perms: readonly string[] | undefined, key: PermissionKey)
 
 function accentBg(accent: string): string {
   if (accent === '#7C3AED') return '#EDE9FE';
-  return '#EEF8F1';
+  return '#F8E8EC';
 }
 
 export function AdminLoginCredentialsPanel({
   user,
   adminPassword: initialPassword = null,
   permission,
-  accent = '#299E60',
+  accent = '#6B1D2E',
   onPasswordUpdated,
   className = '',
 }: AdminLoginCredentialsPanelProps) {

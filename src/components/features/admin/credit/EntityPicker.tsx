@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { INPUT_CLS, type PickOption } from './adminCreditTypes';
 
 const pasteCls =
-  'w-full h-[38px] border border-[#EEEEEE] rounded-[10px] px-3 text-[12px] font-mono outline-none focus:border-[#299E60]/40 transition-colors bg-white placeholder:font-sans';
+  'w-full h-[38px] border border-[#EEEEEE] rounded-[10px] px-3 text-[12px] font-mono outline-none focus:border-[#6B1D2E]/40 transition-colors bg-white placeholder:font-sans';
 
 interface EntityPickerProps {
   value: string;
@@ -113,13 +113,13 @@ export function EntityPicker({ value, onPick, search, placeholder, nullOption }:
       </div>
 
       {value && chosenLabel && (
-        <p className="mt-1.5 text-[11px] font-semibold text-[#299E60]">✓ {chosenLabel}</p>
+        <p className="mt-1.5 text-[11px] font-semibold text-[#6B1D2E]">✓ {chosenLabel}</p>
       )}
 
       <button
         type="button"
         onClick={() => setShowPaste((s) => !s)}
-        className="mt-2 text-[11px] font-semibold text-[#7C7C7C] hover:text-[#299E60] transition-colors"
+        className="mt-2 text-[11px] font-semibold text-[#7C7C7C] hover:text-[#6B1D2E] transition-colors"
       >
         {showPaste ? 'Hide manual ID entry' : 'Paste ID manually'}
       </button>

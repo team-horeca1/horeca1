@@ -67,9 +67,9 @@ const CustomTooltip = ({
 export default function AdminDashboardCharts({ monthlyData }: { monthlyData: MonthRow[] }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-white p-10 rounded-[14px] border border-[#EEEEEE] shadow-sm min-h-[411px]">
-        <h3 className="text-[18px] font-bold text-[#181725] mb-6">Orders Overview</h3>
-        <div className="h-[340px] w-full">
+      <div className="bg-white p-4 lg:p-8 rounded-[16px] border border-divider shadow-sm">
+        <h3 className="text-[16px] lg:text-[18px] font-bold text-[#111827] mb-4 lg:mb-6">Orders Overview</h3>
+        <div className="h-[220px] lg:h-[340px] w-full">
           {monthlyData.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400">
               <TrendingUp size={40} className="mb-3 opacity-30" />
@@ -83,10 +83,8 @@ export default function AdminDashboardCharts({ monthlyData }: { monthlyData: Mon
               >
                 <defs>
                   <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#299E60" />
-                    <stop offset="30%" stopColor="#3DB876" />
-                    <stop offset="60%" stopColor="#7DD4A3" />
-                    <stop offset="85%" stopColor="#C2EDDA" />
+                    <stop offset="0%" stopColor="#6B1D2E" />
+                    <stop offset="55%" stopColor="#F8E8EC" />
                     <stop offset="100%" stopColor="#FFFFFF" />
                   </linearGradient>
                 </defs>
@@ -112,7 +110,7 @@ export default function AdminDashboardCharts({ monthlyData }: { monthlyData: Mon
                   strokeWidth={0}
                   fill="url(#salesGradient)"
                   dot={false}
-                  activeDot={{ r: 5, fill: '#fff', stroke: '#299E60', strokeWidth: 2 }}
+                  activeDot={{ r: 5, fill: '#fff', stroke: '#6B1D2E', strokeWidth: 2 }}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -120,9 +118,9 @@ export default function AdminDashboardCharts({ monthlyData }: { monthlyData: Mon
         </div>
       </div>
 
-      <div className="bg-white p-10 rounded-[14px] border border-[#EEEEEE] shadow-sm min-h-[411px]">
-        <h3 className="text-[18px] font-bold text-[#181725] mb-6">Monthly Revenue</h3>
-        <div className="h-[340px] w-full">
+      <div className="bg-white p-4 lg:p-8 rounded-[16px] border border-divider shadow-sm">
+        <h3 className="text-[16px] lg:text-[18px] font-bold text-[#111827] mb-4 lg:mb-6">Monthly Revenue</h3>
+        <div className="h-[220px] lg:h-[340px] w-full">
           {monthlyData.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400">
               <Wallet size={40} className="mb-3 opacity-30" />
@@ -136,8 +134,8 @@ export default function AdminDashboardCharts({ monthlyData }: { monthlyData: Mon
               >
                 <defs>
                   <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#55DB94" stopOpacity={1} />
-                    <stop offset="100%" stopColor="#004721" stopOpacity={1} />
+                    <stop offset="0%" stopColor="#6B1D2E" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#4A141F" stopOpacity={1} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="4 4" stroke="#C8C8C8" vertical={false} />

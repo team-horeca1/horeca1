@@ -117,23 +117,23 @@ function SearchPageContent() {
     const showProducts = tab === 'all' || tab === 'products';
 
     return (
-        <div className="min-h-screen bg-gray-50/50 pb-24">
+        <div className="min-h-screen bg-background pb-24">
             {/* Search Header */}
-            <div className="bg-white sticky top-0 z-40 shadow-sm">
-                <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] py-3">
+            <div className="bg-white/95 backdrop-blur-md sticky top-0 z-40 border-b border-divider shadow-cdl-1">
+                <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)] py-3">
                     <div className="flex items-center gap-3">
-                        <Link href="/" className="shrink-0">
-                            <ArrowLeft size={20} className="text-gray-600" />
+                        <Link href="/" className="shrink-0 p-1.5 hover:bg-ivory rounded-lg transition-colors">
+                            <ArrowLeft size={20} className="text-text" />
                         </Link>
                         <div className="relative flex-1">
-                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
                             <input
                                 type="text"
-                                placeholder="Search products, vendors, categories..."
+                                placeholder="Search wholesale products, vendors, categories..."
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 autoFocus
-                                className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-[13px] font-medium text-gray-700 placeholder:text-gray-400 focus:outline-none focus:border-[#299e60] focus:ring-1 focus:ring-[#299e60]/20 transition-all"
+                                className="w-full pl-9 pr-4 py-2.5 bg-ivory/50 border border-divider rounded-xl text-xs md:text-sm font-medium text-text placeholder:text-text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
                             />
                         </div>
                     </div>
@@ -141,11 +141,11 @@ function SearchPageContent() {
             </div>
 
             {query.trim() && hasResults && (
-                <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] pt-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)] pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                         {([
                             { key: 'all', label: `All (${displayVendors.length + displayProducts.length + results.categories.length})` },
-                            { key: 'vendors', label: `Vendors (${displayVendors.length})` },
+                            { key: 'vendors', label: `Suppliers (${displayVendors.length})` },
                             { key: 'products', label: `Products (${displayProducts.length})` },
                         ] as const).map(opt => (
                             <button
@@ -153,10 +153,10 @@ function SearchPageContent() {
                                 type="button"
                                 onClick={() => setTab(opt.key)}
                                 className={cn(
-                                    'shrink-0 px-3 py-1.5 rounded-full border text-[12px] font-bold transition-all',
+                                    'shrink-0 px-3.5 py-1.5 rounded-full border text-xs font-semibold transition-all',
                                     tab === opt.key
-                                        ? 'bg-[#53B175] border-[#53B175] text-white'
-                                        : 'bg-white border-gray-200 text-gray-600 hover:border-[#53B175]/40 hover:text-[#53B175]',
+                                        ? 'bg-primary border-primary text-white shadow-cdl-1'
+                                        : 'bg-white border-divider text-text-secondary hover:border-primary/40 hover:text-primary',
                                 )}
                             >
                                 {opt.label}
@@ -167,9 +167,9 @@ function SearchPageContent() {
                         <select
                             value={sort}
                             onChange={(e) => setSort(e.target.value as typeof sort)}
-                            className="shrink-0 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-[12px] font-bold text-gray-700 focus:outline-none focus:border-[#53B175]"
+                            className="shrink-0 px-3 py-1.5 rounded-full border border-divider bg-white text-xs font-semibold text-text focus:outline-none focus:border-primary cursor-pointer"
                         >
-                            <option value="relevance">Relevance</option>
+                            <option value="relevance">Sort: Relevance</option>
                             <option value="price_asc">Price: Low → High</option>
                             <option value="price_desc">Price: High → Low</option>
                         </select>
@@ -210,7 +210,7 @@ function SearchPageContent() {
                                             logoUrl={b.logoUrl ?? undefined}
                                             productImages={b.showcaseImages.length > 0 ? [b.showcaseImages[0]] : []}
                                             categories={b.categories}
-                                            bgColor={b.bgColor ?? '#f0faf4'}
+                                            bgColor={b.bgColor ?? '#6B1D2E'}
                                         />
                                     ))}
                                 </div>

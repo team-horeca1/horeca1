@@ -27,14 +27,14 @@ export default function AdminCreditPage() {
         </p>
       </div>
 
-      <div className="flex bg-[#F5F5F5] rounded-[10px] p-0.5 gap-0.5 w-fit flex-wrap">
+      <div className="grid grid-cols-2 lg:flex bg-[#F5F5F5] rounded-[12px] p-1 gap-1 w-full lg:w-fit">
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
             className={cn(
-              'h-[34px] px-5 rounded-[8px] text-[13px] font-semibold transition-all',
+              'min-h-12 lg:min-h-[34px] lg:h-[34px] px-3 lg:px-5 rounded-[10px] lg:rounded-[8px] text-[13px] font-semibold transition-all',
               tab === t.key ? 'bg-white text-[#181725] shadow-sm' : 'text-[#7C7C7C]',
             )}
           >

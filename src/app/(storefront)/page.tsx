@@ -30,6 +30,12 @@ const Collections = dynamic(
 const FeatureBar = dynamic(
   () => import('@/components/features/FeatureBar').then((m) => m.FeatureBar),
 );
+const HomeTicker = dynamic(
+  () => import('@/components/features/homepage/HomeTicker').then((m) => m.HomeTicker),
+);
+const VoicesSection = dynamic(
+  () => import('@/components/features/homepage/VoicesSection').then((m) => m.VoicesSection),
+);
 const NewsletterBanner = dynamic(
   () => import('@/components/features/NewsletterBanner').then((m) => m.NewsletterBanner),
 );
@@ -39,15 +45,17 @@ export default function Home() {
     <div className="flex flex-col w-full min-w-0 overflow-x-hidden">
       <Hero />
       <CompleteProfileBanner />
-      <QuickActions />
+      <HomeTicker />
       <ContinueOrdering />
+      <QuickActions />
+      <CategoryShowcase />
       <TopRatedVendors />
       <NearbyVendors />
       <FrequentlyOrderedVendors />
-      <FeaturedDeals />
-      <CategoryShowcase />
       <ShopByStorePromo />
+      <FeaturedDeals />
       <Collections />
+      <VoicesSection />
       <FeatureBar />
       <NewsletterBanner />
     </div>

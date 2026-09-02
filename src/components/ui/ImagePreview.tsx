@@ -12,9 +12,9 @@ import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
 // after upload, no jarring crops at the wrong aspect ratio.
 
 export type ImagePreviewVariant =
-    | 'brand-logo'        // The circular logo bubble on BrandStoreCard (76x76)
+    | 'brand-logo'        // Top-left rounded-square logo on BrandStoreCard (40x40)
     | 'brand-banner'      // The wide hero banner on the brand storefront
-    | 'brand-card-top'    // The colored top section of BrandStoreCard (full card)
+    | 'brand-card-top'    // Full-bleed brand store card cover (150x225)
     | 'product-square'    // Generic square product card image
     | 'vendor-cover';     // Wide vendor cover/cards
 
@@ -29,9 +29,9 @@ interface VariantConfig {
 }
 
 const VARIANTS: Record<ImagePreviewVariant, VariantConfig> = {
-    'brand-logo':       { label: 'Logo on brand card',     width: 76,  height: 76,  shape: 'circle',       bg: '#fff',     border: true,  fit: 'contain' },
-    'brand-banner':     { label: 'Storefront hero (4:1)',  width: 320, height: 80,  shape: 'rounded',      bg: '#22844f',                  fit: 'cover'   },
-    'brand-card-top':   { label: 'Brand card top section', width: 220, height: 160, shape: 'rounded-top',  bg: '#f0faf4',                  fit: 'cover'   },
+    'brand-logo':       { label: 'Logo on brand card',     width: 40,  height: 40,  shape: 'rounded',      bg: '#fff',     border: true,  fit: 'contain' },
+    'brand-banner':     { label: 'Storefront hero (4:1)',  width: 320, height: 80,  shape: 'rounded',      bg: '#6B1D2E',                  fit: 'cover'   },
+    'brand-card-top':   { label: 'Brand store card',       width: 150, height: 225, shape: 'rounded',      bg: '#6B1D2E',                  fit: 'cover'   },
     'product-square':   { label: 'Product card image',     width: 200, height: 200, shape: 'rounded',      bg: '#fff',                     fit: 'contain' },
     'vendor-cover':     { label: 'Vendor card cover',      width: 280, height: 160, shape: 'rounded',      bg: '#fafafa',                  fit: 'cover'   },
 };

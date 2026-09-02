@@ -20,7 +20,7 @@ function utilizationPct(wallet: CreditWalletRow): number {
 function barColor(pct: number): string {
   if (pct >= 80) return 'bg-[#E74C3C]';
   if (pct >= 50) return 'bg-amber-500';
-  return 'bg-[#299E60]';
+  return 'bg-[#6B1D2E]';
 }
 
 export function AdminCreditWalletCard({
@@ -35,7 +35,7 @@ export function AdminCreditWalletCard({
   const isH1 = !w.vendorId;
 
   return (
-    <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm p-4 flex flex-col gap-3 hover:border-[#299E60]/30 transition-colors">
+    <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm p-4 flex flex-col gap-3 hover:border-[#6B1D2E]/30 transition-colors">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[14px] font-bold text-[#181725] truncate">{w.user.fullName}</p>
@@ -55,7 +55,7 @@ export function AdminCreditWalletCard({
         <span
           className={cn(
             'text-[11px] font-bold px-2.5 py-1 rounded-full',
-            isH1 ? 'bg-[#EEF8F1] text-[#299E60]' : 'bg-[#F5F5F5] text-[#7C7C7C]',
+            isH1 ? 'bg-[#F8E8EC] text-[#6B1D2E]' : 'bg-[#F5F5F5] text-[#7C7C7C]',
           )}
         >
           {isH1 ? 'H1 Platform Wallet' : w.vendor?.businessName ?? 'Vendor'}
@@ -89,7 +89,7 @@ export function AdminCreditWalletCard({
         </div>
         <div>
           <p className="text-[10px] text-[#AEAEAE] uppercase tracking-wide">Available</p>
-          <p className="text-[13px] font-bold text-[#299E60] mt-0.5">{fmtMoney(w.availableCredit)}</p>
+          <p className="text-[13px] font-bold text-[#6B1D2E] mt-0.5">{fmtMoney(w.availableCredit)}</p>
         </div>
         <div>
           <p className="text-[10px] text-[#AEAEAE] uppercase tracking-wide">Outstanding</p>
@@ -105,7 +105,7 @@ export function AdminCreditWalletCard({
           <button
             type="button"
             onClick={onEdit}
-            className="inline-flex items-center gap-1 h-[32px] px-3 rounded-[8px] border border-[#EEEEEE] text-[#181725] text-[12px] font-bold hover:border-[#299E60] hover:text-[#299E60] transition-colors"
+            className="inline-flex items-center gap-1 h-[32px] px-3 rounded-[8px] border border-[#EEEEEE] text-[#181725] text-[12px] font-bold hover:border-[#6B1D2E] hover:text-[#6B1D2E] transition-colors"
           >
             <Pencil size={12} />
             Edit
@@ -115,7 +115,7 @@ export function AdminCreditWalletCard({
               type="button"
               onClick={onReactivate}
               disabled={busy}
-              className="inline-flex items-center gap-1.5 h-[32px] px-3 rounded-[8px] bg-[#EEF8F1] text-[#299E60] text-[12px] font-bold hover:bg-[#299E60] hover:text-white disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-1.5 h-[32px] px-3 rounded-[8px] bg-[#F8E8EC] text-[#6B1D2E] text-[12px] font-bold hover:bg-[#6B1D2E] hover:text-white disabled:opacity-50 transition-colors"
             >
               {busy ? <Loader2 className="animate-spin" size={13} /> : <RefreshCw size={13} />}
               Reactivate

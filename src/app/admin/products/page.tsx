@@ -28,8 +28,6 @@ import {
     Settings as SettingsIcon,
     BarChart3,
     Wand2,
-    LayoutGrid,
-    List,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -62,6 +60,8 @@ import {
     AdminRegistryPageHeader,
     AdminRegistryFilterBar,
     registryFilterPillClass,
+    AdminRegistryViewToggle,
+    useAdminDesktop,
 } from '@/components/features/admin/entity';
 
 // Types
@@ -277,7 +277,7 @@ const EMPTY_FORM: ProductFormData = {
 const inputCls = productFormInputCls;
 const selectCls = productFormSelectCls;
 const textareaCls = productFormTextareaCls;
-const cellInput = 'bg-transparent border border-transparent hover:border-[#D1D5DB] focus:border-[#299E60] focus:bg-white focus:ring-1 focus:ring-[#299E60]/20 px-1 py-0.5 rounded-[4px] outline-none w-full text-[11.5px] xl:text-[12.5px] tabular-nums transition-colors';
+const cellInput = 'bg-transparent border border-transparent hover:border-[#D1D5DB] focus:border-[#6B1D2E] focus:bg-white focus:ring-1 focus:ring-[#6B1D2E]/20 px-1 py-0.5 rounded-[4px] outline-none w-full text-[11.5px] xl:text-[12.5px] tabular-nums transition-colors';
 
 function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
     const [input, setInput] = useState('');
@@ -302,7 +302,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[
         <div>
             <div className="flex flex-wrap gap-2 mb-2">
                 {tags.map(tag => (
-                    <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#EEF8F1] text-[#299E60] text-[12px] font-bold rounded-[8px]">
+                    <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#F8E8EC] text-[#6B1D2E] text-[12px] font-bold rounded-[8px]">
                         {tag}
                         <button type="button" onClick={() => removeTag(tag)} className="hover:text-[#E74C3C] transition-colors">
                             <X size={12} />
@@ -376,7 +376,7 @@ function SubstituteProductPicker({
                             key={p.id}
                             type="button"
                             onClick={() => add(p.id)}
-                            className="w-full text-left px-4 py-2 text-[13px] font-medium hover:bg-[#EEF8F1] transition-colors border-b border-[#EEEEEE] last:border-0"
+                            className="w-full text-left px-4 py-2 text-[13px] font-medium hover:bg-[#F8E8EC] transition-colors border-b border-[#EEEEEE] last:border-0"
                         >
                             {p.name}
                         </button>
@@ -866,10 +866,12 @@ export default function ProductsPage() {
 
     // View Mode State
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+    const isDesktop = useAdminDesktop();
+    const effectiveView = isDesktop ? viewMode : 'grid';
 
     const statCards = [
         { label: 'Total Products', value: stats.total, icon: Package, color: '#3B82F6', bgColor: '#EFF6FF' },
-        { label: 'Approved', value: stats.approved, icon: CheckCircle, color: '#299E60', bgColor: '#EEF8F1' },
+        { label: 'Approved', value: stats.approved, icon: CheckCircle, color: '#16A34A', bgColor: '#DCFCE7' },
         { label: 'Pending', value: stats.pending, icon: Clock, color: '#F59E0B', bgColor: '#FFF7E6' },
         { label: 'Rejected', value: stats.rejected, icon: XCircle, color: '#E74C3C', bgColor: '#FFF0F0' },
     ];
@@ -1707,7 +1709,7 @@ export default function ProductsPage() {
                         {canWriteProducts && (
                             <button
                                 onClick={openCreate}
-                                className="h-[44px] px-6 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] transition-all flex items-center gap-2 shadow-sm shadow-[#299E60]/20 shrink-0"
+                                className="h-[44px] px-6 bg-[#6B1D2E] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#5A1926] transition-all flex items-center gap-2 shadow-sm shadow-[#6B1D2E]/20 shrink-0"
                             >
                                 <Plus size={16} strokeWidth={3} />
                                 Add Product
@@ -1790,7 +1792,7 @@ export default function ProductsPage() {
                         <select
                             value={filterCategory}
                             onChange={e => setFilterCategory(e.target.value)}
-                            className="h-[34px] bg-[#F9FAFB] border border-[#D1D5DB] rounded-[8px] px-3.5 text-[12px] font-bold text-[#6B7280] outline-none focus:border-[#299E60]/50 transition-all min-w-[150px] cursor-pointer ml-1"
+                            className="min-h-12 lg:h-[34px] bg-[#F9FAFB] border border-[#D1D5DB] rounded-[12px] lg:rounded-[8px] px-3.5 text-[13px] lg:text-[12px] font-semibold text-[#6B7280] outline-none focus:border-[#6B1D2E]/50 transition-all w-full lg:min-w-[150px] lg:w-auto cursor-pointer"
                         >
                             <option value="">All Categories</option>
                             {categories.map(c => (
@@ -1802,31 +1804,7 @@ export default function ProductsPage() {
                     </div>
                 }
                 trailingSlot={
-                    <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
-                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase mr-1 hidden md:inline">View:</span>
-                        <div className="flex items-center bg-[#F3F4F6] border border-[#D1D5DB] rounded-[10px] p-1">
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={cn(
-                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
-                                    viewMode === 'grid' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
-                                )}
-                            >
-                                <LayoutGrid size={15} />
-                                <span className="hidden sm:inline">Cards</span>
-                            </button>
-                            <button
-                                onClick={() => setViewMode('table')}
-                                className={cn(
-                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
-                                    viewMode === 'table' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
-                                )}
-                            >
-                                <List size={15} />
-                                <span className="hidden sm:inline">Table</span>
-                            </button>
-                        </div>
-                    </div>
+                    <AdminRegistryViewToggle viewMode={viewMode} onChange={setViewMode} />
                 }
             />
 
@@ -1836,7 +1814,7 @@ export default function ProductsPage() {
             <div className="bg-white rounded-[14px] border border-[#D1D5DB] shadow-sm overflow-hidden">
                 {loading ? (
                     <div className="flex items-center justify-center py-24">
-                        <Loader2 className="animate-spin text-[#299E60]" size={32} />
+                        <Loader2 className="animate-spin text-[#6B1D2E]" size={32} />
                     </div>
                 ) : products.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 gap-3">
@@ -1851,14 +1829,14 @@ export default function ProductsPage() {
                     </div>
                 ) : (
                     <>
-                        {viewMode === 'grid' ? (
+                        {effectiveView === 'grid' ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6 bg-[#FDFDFD]">
                                 {products.map((product) => {
                                     const grossPrice = product.basePrice * (1 + (product.taxPercent || 0) / 100);
                                     return (
                                         <div
                                             key={product.id}
-                                            className="bg-white rounded-[16px] border border-[#D1D5DB] shadow-sm overflow-hidden flex flex-col h-full hover:shadow-md hover:border-[#299E60]/30 hover:-translate-y-0.5 transition-all w-full relative text-[12.5px]"
+                                            className="bg-white rounded-[16px] border border-[#D1D5DB] shadow-sm overflow-hidden flex flex-col h-full hover:shadow-md hover:border-[#6B1D2E]/30 hover:-translate-y-0.5 transition-all w-full relative text-[12.5px]"
                                         >
                                             {/* Checkbox at top left */}
                                             <div className="absolute top-4 left-4 z-10" onClick={(e) => e.stopPropagation()}>
@@ -1866,7 +1844,7 @@ export default function ProductsPage() {
                                                     type="checkbox"
                                                     checked={selectedIds.has(product.id)}
                                                     onChange={() => toggleSelect(product.id)}
-                                                    className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
+                                                    className="w-4 h-4 rounded border-gray-300 text-[#6B1D2E] focus:ring-[#6B1D2E] cursor-pointer"
                                                 />
                                             </div>
 
@@ -1880,7 +1858,7 @@ export default function ProductsPage() {
                                                     ) : (
                                                         <span className={cn(
                                                             "absolute top-2.5 right-2.5 text-[10px] font-extrabold px-2 py-0.5 rounded-[4px] uppercase tracking-wider shadow-sm",
-                                                            product.approvalStatus === 'approved' ? 'text-[#299E60] bg-[#EEF8F1]' :
+                                                            product.approvalStatus === 'approved' ? 'text-[#6B1D2E] bg-[#F8E8EC]' :
                                                             product.approvalStatus === 'rejected' ? 'text-[#E74C3C] bg-[#FFF0F0]' :
                                                             'text-[#F59E0B] bg-[#FFF7E6]'
                                                         )}>
@@ -1895,8 +1873,8 @@ export default function ProductsPage() {
                                                             className="w-[100px] h-[100px] object-cover rounded-lg"
                                                         />
                                                     ) : (
-                                                        <div className="w-[80px] h-[80px] rounded-full bg-[#299E60]/10 flex items-center justify-center border border-[#299E60]/20">
-                                                            <ImageIcon size={30} className="text-[#299E60]" />
+                                                        <div className="w-[80px] h-[80px] rounded-full bg-[#6B1D2E]/10 flex items-center justify-center border border-[#6B1D2E]/20">
+                                                            <ImageIcon size={30} className="text-[#6B1D2E]" />
                                                         </div>
                                                     )}
                                                 </div>
@@ -1909,7 +1887,7 @@ export default function ProductsPage() {
                                                         <span className="bg-gray-100 text-[#4B5563] text-[10px] font-bold px-2 py-0.5 rounded-[4px]">
                                                             {product.brand || 'No Brand'}
                                                         </span>
-                                                        <span className="bg-green-50 text-[#299E60] text-[10px] font-bold px-2 py-0.5 rounded-[4px]">
+                                                        <span className="bg-green-50 text-[#6B1D2E] text-[10px] font-bold px-2 py-0.5 rounded-[4px]">
                                                             {product.category?.name || 'Uncategorized'}
                                                         </span>
                                                     </div>
@@ -1925,7 +1903,7 @@ export default function ProductsPage() {
                                                         <span>GST Rate:</span>
                                                         <span>{product.taxPercent ?? 0}%</span>
                                                     </div>
-                                                    <div className="flex items-center justify-between text-[13px] font-bold border-t border-dashed border-[#F3F4F6] pt-1.5 text-[#299E60]">
+                                                    <div className="flex items-center justify-between text-[13px] font-bold border-t border-dashed border-[#F3F4F6] pt-1.5 text-[#6B1D2E]">
                                                         <span>Gross Price:</span>
                                                         <span>₹{grossPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
@@ -1950,7 +1928,7 @@ export default function ProductsPage() {
                                                     {canWriteProducts && (
                                                         <button
                                                             onClick={() => openEdit(product)}
-                                                            className="flex-1 h-[36px] bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB] rounded-[10px] text-[12px] font-bold transition-all flex items-center justify-center border border-[#E5E7EB] gap-1.5"
+                                                            className="flex-1 min-h-12 bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB] rounded-[12px] text-[13px] font-semibold transition-all flex items-center justify-center border border-[#E5E7EB] gap-1.5"
                                                         >
                                                             <Pencil size={12} /> Edit
                                                         </button>
@@ -1960,10 +1938,10 @@ export default function ProductsPage() {
                                                             onClick={() => toggleActive(product)}
                                                             disabled={actionLoading === product.id}
                                                             className={cn(
-                                                                "flex-1 h-[36px] rounded-[10px] text-[12px] font-bold transition-all border",
+                                                                "flex-1 min-h-12 rounded-[12px] text-[13px] font-semibold transition-all border",
                                                                 product.isActive
-                                                                    ? "bg-[#FFF0F0] border-transparent text-[#E74C3C] hover:bg-red-100"
-                                                                    : "bg-[#EEF8F1] border-transparent text-[#299E60] hover:bg-green-100"
+                                                                    ? "bg-[#FFF0F0] border-transparent text-[#DC2626] hover:bg-red-100"
+                                                                    : "bg-[#F8E8EC] border-transparent text-[#6B1D2E] hover:bg-[#F8E8EC]"
                                                             )}
                                                         >
                                                             {product.isActive ? 'Deactivate' : 'Activate'}
@@ -1988,7 +1966,7 @@ export default function ProductsPage() {
                                                 type="checkbox"
                                                 checked={products.length > 0 && products.every(p => selectedIds.has(p.id))}
                                                 onChange={() => toggleSelectAll(products.map(p => p.id), products.every(p => selectedIds.has(p.id)))}
-                                                className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
+                                                className="w-4 h-4 rounded border-gray-300 text-[#6B1D2E] focus:ring-[#6B1D2E] cursor-pointer"
                                                 title="Select all on this page"
                                             />
                                             Product
@@ -2009,7 +1987,7 @@ export default function ProductsPage() {
                                     <th className="px-3.5 py-2.5 min-w-[70px] xl:min-w-[75px] text-right border-r border-[#D1D5DB]">
                                         GST %
                                     </th>
-                                    <th className="px-3.5 py-2.5 min-w-[85px] xl:min-w-[95px] text-right text-[#299E60] border-r border-[#D1D5DB]">
+                                    <th className="px-3.5 py-2.5 min-w-[85px] xl:min-w-[95px] text-right text-[#6B1D2E] border-r border-[#D1D5DB]">
                                         Gross ₹
                                     </th>
                                     <th className="px-3.5 py-2.5 min-w-[110px] xl:min-w-[125px] border-r border-[#D1D5DB]">
@@ -2037,7 +2015,7 @@ export default function ProductsPage() {
                                                         type="checkbox"
                                                         checked={selectedIds.has(product.id)}
                                                         onChange={() => toggleSelect(product.id)}
-                                                        className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer shrink-0"
+                                                        className="w-4 h-4 rounded border-gray-300 text-[#6B1D2E] focus:ring-[#6B1D2E] cursor-pointer shrink-0"
                                                     />
                                                     {product.imageUrl ? (
                                                         <img
@@ -2156,8 +2134,8 @@ export default function ProductsPage() {
                                             </td>
 
                                             {/* Gross Price */}
-                                            <td className="px-3.5 py-2 text-right border-r border-[#D1D5DB] bg-[#299E60]/[0.02] align-middle font-semibold">
-                                                <span className="font-extrabold text-[#299E60] tabular-nums">
+                                            <td className="px-3.5 py-2 text-right border-r border-[#D1D5DB] bg-[#6B1D2E]/[0.02] align-middle font-semibold">
+                                                <span className="font-extrabold text-[#6B1D2E] tabular-nums">
                                                     ₹{(product.basePrice * (1 + (product.taxPercent || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </td>
@@ -2196,7 +2174,7 @@ export default function ProductsPage() {
                                                     }}
                                                     className={cn(
                                                         "text-[10px] font-extrabold px-2 py-1 rounded-[6px] uppercase tracking-wider border outline-none bg-transparent cursor-pointer",
-                                                        product.approvalStatus === 'approved' ? 'text-[#299E60] bg-[#EEF8F1] border-transparent' :
+                                                        product.approvalStatus === 'approved' ? 'text-[#6B1D2E] bg-[#F8E8EC] border-transparent' :
                                                         product.approvalStatus === 'rejected' ? 'text-[#E74C3C] bg-[#FFF0F0] border-transparent' :
                                                         'text-[#F59E0B] bg-[#FFF7E6] border-transparent'
                                                     )}
@@ -2236,7 +2214,7 @@ export default function ProductsPage() {
                                             <td className="px-3.5 py-2 sticky right-0 bg-white group-hover:bg-[#F8F9FB] z-10 border-l border-[#D1D5DB] align-middle">
                                                 <div className="flex items-center justify-end gap-1.5">
                                                     {savingRows[product.id] && Object.keys(savingRows[product.id]).length > 0 ? (
-                                                        <div className="w-[36px] h-[36px] flex items-center justify-center text-[#299E60]">
+                                                        <div className="w-[36px] h-[36px] flex items-center justify-center text-[#6B1D2E]">
                                                             <Loader2 className="animate-spin" size={16} />
                                                         </div>
                                                     ) : (
@@ -2246,7 +2224,7 @@ export default function ProductsPage() {
                                                                 <button
                                                                     onClick={() => openEdit(product)}
                                                                     title="Edit product"
-                                                                    className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center text-[#7C7C7C] hover:bg-[#EEF8F1] hover:text-[#299E60] transition-all"
+                                                                    className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center text-[#7C7C7C] hover:bg-[#F8E8EC] hover:text-[#6B1D2E] transition-all"
                                                                 >
                                                                     <Pencil size={15} />
                                                                 </button>
@@ -2261,7 +2239,7 @@ export default function ProductsPage() {
                                                                 className={cn(
                                                                     'w-[34px] h-[34px] rounded-[10px] flex items-center justify-center transition-all disabled:opacity-50',
                                                                     product.isActive
-                                                                        ? 'text-[#299E60] hover:bg-[#EEF8F1]'
+                                                                        ? 'text-[#6B1D2E] hover:bg-[#F8E8EC]'
                                                                         : 'text-[#AEAEAE] hover:bg-[#F8F9FB]',
                                                                 )}
                                                             >
@@ -2270,7 +2248,7 @@ export default function ProductsPage() {
                                                                 ) : (
                                                                     <div
                                                                         className="relative inline-flex h-[18px] w-[32px] shrink-0 items-center rounded-full transition-colors duration-200"
-                                                                        style={{ backgroundColor: product.isActive ? '#299E60' : '#D1D5DB' }}
+                                                                        style={{ backgroundColor: product.isActive ? '#6B1D2E' : '#D1D5DB' }}
                                                                     >
                                                                         <span className="inline-block h-[12px] w-[12px] rounded-full bg-white shadow-sm transition-transform duration-200" style={{ transform: product.isActive ? 'translateX(17px)' : 'translateX(3px)' }} />
                                                                     </div>
@@ -2321,7 +2299,7 @@ export default function ProductsPage() {
                                         setPageSize(val);
                                         setCurrentPage(1);
                                     }}
-                                    className="h-[28px] px-1.5 bg-white border border-[#D1D5DB] rounded-[6px] text-[12px] font-bold text-[#181725] outline-none cursor-pointer focus:border-[#299E60]/40"
+                                    className="h-[28px] px-1.5 bg-white border border-[#D1D5DB] rounded-[6px] text-[12px] font-bold text-[#181725] outline-none cursor-pointer focus:border-[#6B1D2E]/40"
                                 >
                                     <option value={20}>20</option>
                                     <option value={50}>50</option>
@@ -2354,7 +2332,7 @@ export default function ProductsPage() {
                                             className={cn(
                                                 'w-[34px] h-[34px] flex items-center justify-center rounded-[8px] text-[13px] font-bold transition-colors',
                                                 item === currentPage
-                                                    ? 'bg-[#299E60] text-white'
+                                                    ? 'bg-[#6B1D2E] text-white'
                                                     : 'border border-[#D1D5DB] text-[#7C7C7C] hover:bg-[#F5F5F5]'
                                             )}
                                         >
@@ -2438,7 +2416,7 @@ export default function ProductsPage() {
                     <div className="w-full space-y-8">
                         {loadingProduct ? (
                             <div className="flex items-center justify-center py-32">
-                                <Loader2 className="animate-spin text-[#299E60]" size={32} />
+                                <Loader2 className="animate-spin text-[#6B1D2E]" size={32} />
                             </div>
                         ) : (
                             <>
@@ -2589,7 +2567,7 @@ export default function ProductsPage() {
                                                         type="checkbox"
                                                         checked={formData.activeOnlineStore}
                                                         onChange={(e) => updateField('activeOnlineStore', e.target.checked)}
-                                                        className="w-5 h-5 accent-[#299E60]"
+                                                        className="w-5 h-5 accent-[#6B1D2E]"
                                                     />
                                                     <div>
                                                         <span className="text-[13.5px] font-bold text-[#181725]">Active on Online Store</span>
@@ -2709,7 +2687,7 @@ export default function ProductsPage() {
                                                         type="checkbox"
                                                         checked={formData.trackInventory}
                                                         onChange={(e) => updateField('trackInventory', e.target.checked)}
-                                                        className="w-5 h-5 accent-[#299E60]"
+                                                        className="w-5 h-5 accent-[#6B1D2E]"
                                                     />
                                                     <div>
                                                         <span className="text-[13.5px] font-bold text-[#181725]">Track Inventory</span>
@@ -2939,11 +2917,11 @@ export default function ProductsPage() {
 
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                             <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.sellable} onChange={(e) => updateField('sellable', e.target.checked)} className="w-5 h-5 accent-[#299E60]" />
+                                                <input type="checkbox" checked={formData.sellable} onChange={(e) => updateField('sellable', e.target.checked)} className="w-5 h-5 accent-[#6B1D2E]" />
                                                 <span className="text-[13px] font-bold text-[#181725]">Sellable</span>
                                             </label>
                                             <label className="flex items-center gap-3 cursor-pointer">
-                                                <input type="checkbox" checked={formData.purchasable} onChange={(e) => updateField('purchasable', e.target.checked)} className="w-5 h-5 accent-[#299E60]" />
+                                                <input type="checkbox" checked={formData.purchasable} onChange={(e) => updateField('purchasable', e.target.checked)} className="w-5 h-5 accent-[#6B1D2E]" />
                                                 <span className="text-[13px] font-bold text-[#181725]">Purchasable</span>
                                             </label>
                                             <label className="flex items-center gap-3 cursor-pointer">
@@ -2985,7 +2963,7 @@ export default function ProductsPage() {
                                                 <div key={index} className="rounded-[14px] border border-[#EEEEEE] overflow-hidden">
                                                     <div className="flex items-center justify-between px-5 py-3 bg-[#FAFAFA] border-b border-[#EEEEEE]">
                                                         <div className="flex items-center gap-2.5">
-                                                            <span className="w-[28px] h-[28px] rounded-full bg-[#299E60] text-white text-[12px] font-bold flex items-center justify-center">
+                                                            <span className="w-[28px] h-[28px] rounded-full bg-[#6B1D2E] text-white text-[12px] font-bold flex items-center justify-center">
                                                                 {index + 1}
                                                             </span>
                                                             <h4 className="text-[14px] font-bold text-[#181725]">Bulk Tier {index + 1}</h4>
@@ -3076,7 +3054,7 @@ export default function ProductsPage() {
                     <button
                         onClick={handleSave}
                         disabled={saving || draftSaving}
-                        className="flex-1 h-[48px] bg-[#299E60] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-2 shadow-sm shadow-[#299E60]/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="flex-1 h-[48px] bg-[#6B1D2E] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#5A1926] transition-all flex items-center justify-center gap-2 shadow-sm shadow-[#6B1D2E]/20 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         {saving && <Loader2 size={16} className="animate-spin" />}
                         {editingProduct?.listingStatus === 'draft'
@@ -3178,7 +3156,7 @@ export default function ProductsPage() {
                         <button
                             type="button"
                             onClick={() => setBulkOpen(true)}
-                            className="h-[36px] px-4 bg-[#299E60] hover:bg-[#238a54] rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 transition-colors"
+                            className="h-[36px] px-4 bg-[#6B1D2E] hover:bg-[#5A1926] rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 transition-colors"
                         >
                             <Wand2 size={14} /> Bulk edit
                         </button>

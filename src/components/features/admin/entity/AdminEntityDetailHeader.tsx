@@ -28,9 +28,9 @@ export function AdminEntityDetailHeader({
             <button
               type="button"
               onClick={onBack}
-              className="hover:text-[#299E60] flex items-center gap-1 transition-colors font-bold text-[12px] uppercase tracking-wider shrink-0"
+              className="hover:text-primary flex items-center gap-1 font-semibold text-[12px] uppercase shrink-0 min-h-12 px-1"
             >
-              <ChevronLeft size={14} />
+              <ChevronLeft size={16} />
               Back
             </button>
             <span className="text-gray-300">|</span>
@@ -42,7 +42,7 @@ export function AdminEntityDetailHeader({
             {crumb.href ? (
               <Link
                 href={crumb.href}
-                className="hover:text-[#299E60] transition-colors font-semibold truncate"
+                className="hover:text-primary transition-colors font-semibold truncate"
               >
                 {crumb.label}
               </Link>

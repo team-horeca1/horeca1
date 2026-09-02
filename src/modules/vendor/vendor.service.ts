@@ -44,6 +44,9 @@ export class VendorService {
         minOrderValue: true,
         creditEnabled: true,
         description: true,
+        isVerified: true,
+        createdAt: true,
+        _count: { select: { products: { where: { isActive: true } } } },
         products: {
           where: { isActive: true },
           select: { category: { select: { name: true } } },
@@ -56,8 +59,9 @@ export class VendorService {
     if (hasMore) vendors.pop();
 
     // Flatten products→category into a simple categories string array
-    const vendorsWithCategories = vendors.map(({ products, ...rest }) => ({
+    const vendorsWithCategories = vendors.map(({ products, _count, ...rest }) => ({
       ...rest,
+      productCount: _count.products,
       categories: [...new Set(products.map(p => p.category?.name).filter(Boolean))],
     }));
 

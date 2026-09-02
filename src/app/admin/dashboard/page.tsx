@@ -18,19 +18,17 @@ const AdminDashboardCharts = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[411px]">
-        <div className="bg-white rounded-[14px] border border-[#EEEEEE] animate-pulse" />
-        <div className="bg-white rounded-[14px] border border-[#EEEEEE] animate-pulse" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 min-h-[220px] lg:min-h-[411px]">
+        <div className="bg-white rounded-[16px] border border-divider animate-pulse" />
+        <div className="bg-white rounded-[16px] border border-divider animate-pulse" />
       </div>
     ),
   },
 );
 
-// Format Indian currency: 115000 → "₹ 1,15,000"
 function formatINR(val: number): string {
     return '₹ ' + val.toLocaleString('en-IN');
 }
-
 
 interface DashboardData {
     stats: {
@@ -67,44 +65,39 @@ export default function DashboardPage() {
     }, []);
 
     const statCards = data ? [
-        { label: 'Total Orders', value: data.stats.totalOrders.toLocaleString('en-IN'), icon: ShoppingCart, color: 'bg-blue-50 text-blue-600', trend: `+${data.stats.newUsersThisMonth} this month`, trendType: 'up' as const },
-        { label: 'Total Customers', value: data.stats.totalUsers.toLocaleString('en-IN'), icon: Users, color: 'bg-yellow-50 text-yellow-600', trend: `+${data.stats.newUsersThisMonth}`, trendType: 'up' as const },
-        { label: 'Total Vendors', value: data.stats.totalVendors.toLocaleString('en-IN'), icon: Store, color: 'bg-pink-50 text-pink-600', trend: '', trendType: 'up' as const },
-        { label: 'Total Revenue', value: formatINR(Number(data.stats.totalRevenue)), icon: Wallet, color: 'bg-green-50 text-green-600', trend: '', trendType: 'up' as const },
+        { label: 'Total Orders', value: data.stats.totalOrders.toLocaleString('en-IN'), icon: ShoppingCart, trend: `+${data.stats.newUsersThisMonth} this month` },
+        { label: 'Total Customers', value: data.stats.totalUsers.toLocaleString('en-IN'), icon: Users, trend: `+${data.stats.newUsersThisMonth}` },
+        { label: 'Total Vendors', value: data.stats.totalVendors.toLocaleString('en-IN'), icon: Store, trend: '' },
+        { label: 'Total Revenue', value: formatINR(Number(data.stats.totalRevenue)), icon: Wallet, trend: '' },
     ] : [];
 
     return (
-        <div className="space-y-8 pb-10">
-            {/* Page Header */}
+        <div className="space-y-5 lg:space-y-8">
             <div>
-                <h1 className="text-[26px] font-medium text-[#000000]">Dashboard</h1>
-                <p className="text-[#000000] text-[12px] font-light">Whole data about your business here</p>
+                <h1 className="text-[clamp(1.25rem,4vw,1.625rem)] font-semibold text-[#111827] text-balance">Dashboard</h1>
+                <p className="text-[#667085] text-[13px] lg:text-[14px] font-medium text-pretty">Whole data about your business here</p>
             </div>
 
             {loading ? (
                 <div className="flex items-center justify-center py-20">
-                    <Loader2 className="animate-spin text-[#299E60]" size={32} />
+                    <Loader2 className="animate-spin text-primary" size={32} />
                 </div>
             ) : (
             <>
-            {/* Stat Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {statCards.map((stat, idx) => (
-                    <div key={idx} className="bg-white p-6 rounded-[14px] border border-[#EEEEEE] shadow-sm hover:shadow-md transition-all h-[145px] flex flex-col justify-between cursor-default">
-                        <div className="flex items-center gap-3">
-                            <div className={cn("w-11 h-11 rounded-lg flex items-center justify-center shrink-0", stat.color)}>
-                                <stat.icon size={22} />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+                {statCards.map((stat) => (
+                    <div key={stat.label} className="bg-white p-4 lg:p-6 rounded-[16px] border border-divider shadow-sm flex flex-col justify-between min-h-[120px] lg:min-h-[145px]">
+                        <div className="flex items-center gap-2.5">
+                            <div className="size-9 lg:size-11 rounded-[12px] flex items-center justify-center shrink-0 bg-primary-light text-primary">
+                                <stat.icon size={20} />
                             </div>
-                            <span className="text-[15px] font-bold text-[#4B4B4B]">{stat.label}</span>
+                            <span className="text-[12px] lg:text-[15px] font-semibold text-[#4B5563] leading-tight">{stat.label}</span>
                         </div>
 
-                        <div className="flex items-center justify-between">
-                            <h4 className="text-[28px] font-[800] text-[#181725] leading-none">{stat.value}</h4>
+                        <div className="flex items-end justify-between gap-2 mt-3">
+                            <h4 className="text-[clamp(1.25rem,3vw,1.75rem)] font-bold text-[#111827] leading-none tabular-nums">{stat.value}</h4>
                             {stat.trend && (
-                            <div className={cn(
-                                "flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-bold",
-                                stat.trendType === 'up' ? "bg-[#EEF8F1] text-[#299E60]" : "bg-[#FFF0F0] text-[#E74C3C]"
-                            )}>
+                            <div className="hidden sm:flex items-center px-2 py-1 rounded-full text-[11px] font-semibold bg-primary-light text-primary">
                                 {stat.trend}
                             </div>
                             )}
@@ -113,39 +106,36 @@ export default function DashboardPage() {
                 ))}
             </div>
 
-            {/* Charts Section — recharts loaded in a deferred chunk */}
             <AdminDashboardCharts monthlyData={data?.monthlyData ?? []} />
 
-            {/* Order Status Breakdown & Recent Vendors */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Order Status Breakdown */}
-                <div className="bg-white p-6 rounded-[14px] border border-[#EEEEEE] shadow-sm h-fit">
-                    <div className="flex items-center justify-between mb-8">
-                        <h3 className="text-[18px] font-bold text-[#000000]">Orders by Status</h3>
-                        <Link href="/admin/orders" className="text-[#299E60] text-[12px] font-bold hover:underline">See All</Link>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                <div className="bg-white p-4 lg:p-6 rounded-[16px] border border-divider shadow-sm h-fit">
+                    <div className="flex items-center justify-between mb-5 lg:mb-8">
+                        <h3 className="text-[16px] lg:text-[18px] font-bold text-[#111827]">Orders by Status</h3>
+                        <Link href="/admin/orders" className="text-primary text-[12px] font-semibold">See all</Link>
                     </div>
                     {Object.keys(data?.ordersByStatus || {}).length === 0 ? (
-                        <div className="py-10 text-center text-gray-400 text-[14px]">No orders yet</div>
+                        <div className="py-10 text-center text-[#6B7280] text-[14px]">No orders yet</div>
                     ) : (
                     <div className="space-y-3">
                         {Object.entries(data?.ordersByStatus || {}).map(([status, count]) => {
                             const total = Object.values(data?.ordersByStatus || {}).reduce((a, b) => a + b, 0);
                             const pct = total > 0 ? Math.round((count / total) * 100) : 0;
                             const colorMap: Record<string, string> = {
-                                pending: 'bg-yellow-400',
-                                confirmed: 'bg-blue-400',
-                                processing: 'bg-purple-400',
-                                out_for_delivery: 'bg-orange-400',
-                                delivered: 'bg-[#299E60]',
-                                cancelled: 'bg-red-400',
+                                pending: 'bg-warning',
+                                confirmed: 'bg-info',
+                                processing: 'bg-primary',
+                                out_for_delivery: 'bg-warning',
+                                delivered: 'bg-success',
+                                cancelled: 'bg-error',
                             };
                             return (
                                 <div key={status} className="flex items-center gap-3">
-                                    <span className="text-[13px] font-medium text-[#7C7C7C] w-[140px] capitalize shrink-0">{status.replace(/_/g, ' ')}</span>
-                                    <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-                                        <div className={`h-full rounded-full ${colorMap[status] || 'bg-gray-400'}`} style={{ width: `${pct}%` }} />
+                                    <span className="text-[12px] lg:text-[13px] font-medium text-[#667085] w-[7.5rem] capitalize shrink-0">{status.replace(/_/g, ' ')}</span>
+                                    <div className="flex-1 bg-ivory rounded-full h-2 overflow-hidden">
+                                        <div className={`h-full rounded-full ${colorMap[status] || 'bg-[#9CA3AF]'}`} style={{ width: `${pct}%` }} />
                                     </div>
-                                    <span className="text-[13px] font-bold text-[#181725] w-[40px] text-right shrink-0">{count}</span>
+                                    <span className="text-[13px] font-bold text-[#111827] w-8 text-right shrink-0 tabular-nums">{count}</span>
                                 </div>
                             );
                         })}
@@ -153,25 +143,24 @@ export default function DashboardPage() {
                     )}
                 </div>
 
-                {/* Active Vendors from recent orders */}
-                <div className="bg-white p-6 rounded-[14px] border border-[#EEEEEE] shadow-sm h-fit">
-                    <div className="flex items-center justify-between mb-8">
-                        <h3 className="text-[18px] font-bold text-[#000000]">Active Vendors</h3>
-                        <Link href="/admin/vendors" className="text-[#299E60] text-[12px] font-bold hover:underline">See All</Link>
+                <div className="bg-white p-4 lg:p-6 rounded-[16px] border border-divider shadow-sm h-fit">
+                    <div className="flex items-center justify-between mb-5 lg:mb-8">
+                        <h3 className="text-[16px] lg:text-[18px] font-bold text-[#111827]">Active Vendors</h3>
+                        <Link href="/admin/vendors" className="text-primary text-[12px] font-semibold">See all</Link>
                     </div>
                     {(!data?.recentOrders || data.recentOrders.length === 0) ? (
-                        <div className="py-10 text-center text-gray-400 text-[14px]">No vendor activity yet</div>
+                        <div className="py-10 text-center text-[#6B7280] text-[14px]">No vendor activity yet</div>
                     ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                         {Array.from(new Map(data.recentOrders.map(o => [o.vendor.id, o.vendor])).values()).slice(0, 6).map((vendor) => (
-                            <div key={vendor.id} className="flex items-center justify-between px-4 h-[56px] border border-[#EEEEEE] rounded-[10px] hover:shadow-sm transition-all bg-white">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-lg bg-[#53B175]/10 flex items-center justify-center shrink-0">
-                                        <Store size={16} className="text-[#299E60]" />
+                            <div key={vendor.id} className="flex items-center justify-between px-3 min-h-14 border border-divider rounded-[12px] bg-white">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="size-9 rounded-[10px] bg-primary-light flex items-center justify-center shrink-0">
+                                        <Store size={16} className="text-primary" />
                                     </div>
-                                    <p className="text-[14px] font-bold text-[#181725]">{vendor.businessName}</p>
+                                    <p className="text-[14px] font-semibold text-[#111827] truncate">{vendor.businessName}</p>
                                 </div>
-                                <Link href={`/admin/vendors/${vendor.id}`} className="text-[12px] font-bold text-[#299E60] hover:underline">
+                                <Link href={`/admin/vendors/${vendor.id}`} className="text-[12px] font-semibold text-primary shrink-0 min-h-12 px-3 flex items-center">
                                     View
                                 </Link>
                             </div>
@@ -181,50 +170,79 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Recent Activity Table */}
-            <div className="bg-white p-10 rounded-[10px] border border-[#DCDCDC] shadow-sm max-w-[1360px]">
-                <h3 className="text-[18px] font-bold text-[#000000] mb-8">Recent Activity</h3>
-                <div className="overflow-x-auto">
+            <div className="bg-white p-4 lg:p-8 rounded-[16px] border border-divider shadow-sm">
+                <h3 className="text-[16px] lg:text-[18px] font-bold text-[#111827] mb-4 lg:mb-8">Recent Activity</h3>
+
+                <div className="md:hidden space-y-3">
+                    {(data?.recentOrders || []).length === 0 ? (
+                        <p className="py-8 text-center text-[14px] text-[#667085]">No orders yet</p>
+                    ) : (
+                        data?.recentOrders.map((row) => (
+                            <Link
+                                key={row.id}
+                                href={`/admin/orders/${row.id}`}
+                                className="block rounded-[12px] border border-divider p-4 active:scale-[0.99] transition-transform"
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="text-[14px] font-bold text-[#111827] tabular-nums">{row.orderNumber}</p>
+                                        <p className="text-[13px] text-[#667085] truncate mt-0.5">{row.user.fullName}</p>
+                                        <p className="text-[12px] text-[#6B7280] truncate">{row.vendor.businessName}</p>
+                                    </div>
+                                    <span className={cn(
+                                        'shrink-0 inline-flex items-center capitalize rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                                        row.status === 'delivered' ? 'bg-[#DCFCE7] text-success'
+                                        : row.status === 'cancelled' ? 'bg-[#FEE2E2] text-error'
+                                        : 'bg-[#FEF3C7] text-[#B45309]',
+                                    )}>
+                                        {row.status.replace(/_/g, ' ')}
+                                    </span>
+                                </div>
+                                <p className="text-[12px] text-[#6B7280] mt-2">
+                                    {new Date(row.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </p>
+                            </Link>
+                        ))
+                    )}
+                </div>
+
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full border-separate border-spacing-0">
                         <thead>
-                            <tr className="bg-[#EFEFEF] h-[47px]">
-                                <th className="px-6 text-center text-[13px] font-bold text-[#4B4B4B] first:rounded-l-[10px]">Order ID</th>
-                                <th className="px-6 text-center text-[13px] font-bold text-[#4B4B4B]">Customer</th>
-                                <th className="px-6 text-center text-[13px] font-bold text-[#4B4B4B]">Vendor</th>
-                                <th className="px-6 text-center text-[13px] font-bold text-[#4B4B4B]">Status</th>
-                                <th className="px-6 text-center text-[13px] font-bold text-[#4B4B4B]">Date</th>
-                                <th className="px-6 text-center text-[13px] font-bold text-[#4B4B4B] last:rounded-r-[10px]">Action</th>
+                            <tr className="bg-ivory h-12">
+                                <th className="px-4 text-left text-[12px] font-semibold text-[#4B5563] first:rounded-l-[10px]">Order ID</th>
+                                <th className="px-4 text-left text-[12px] font-semibold text-[#4B5563]">Customer</th>
+                                <th className="px-4 text-left text-[12px] font-semibold text-[#4B5563]">Vendor</th>
+                                <th className="px-4 text-left text-[12px] font-semibold text-[#4B5563]">Status</th>
+                                <th className="px-4 text-left text-[12px] font-semibold text-[#4B5563]">Date</th>
+                                <th className="px-4 text-right text-[12px] font-semibold text-[#4B5563] last:rounded-r-[10px]">Action</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#EEEEEE]">
+                        <tbody>
                             {(data?.recentOrders || []).length === 0 ? (
-                                <tr><td colSpan={6} className="py-10 text-center text-[14px] text-[#7C7C7C]">No orders yet</td></tr>
+                                <tr><td colSpan={6} className="py-10 text-center text-[14px] text-[#667085]">No orders yet</td></tr>
                             ) : (
                             data?.recentOrders.map((row) => {
                                 const statusStyle = row.status === 'delivered'
-                                    ? "bg-[#EEF8F1] text-[#299E60] px-6 py-1.5"
+                                    ? "bg-[#DCFCE7] text-success"
                                     : row.status === 'cancelled'
-                                    ? "bg-[#FFF0F0] text-[#E74C3C] px-6 py-1.5"
-                                    : "bg-[#FFF4E5] text-[#976538] px-6 py-1.5";
+                                    ? "bg-[#FEE2E2] text-error"
+                                    : "bg-[#FEF3C7] text-[#B45309]";
                                 return (
-                                <tr key={row.id} className="hover:bg-gray-50/50 transition-colors">
-                                    <td className="py-5 px-6 text-center font-bold text-[14px] text-[#181725]">{row.orderNumber}</td>
-                                    <td className="py-5 px-6 text-center text-[14px] text-[#181725] font-medium">{row.user.fullName}</td>
-                                    <td className="py-5 px-6 text-center text-[14px] text-[#181725] font-medium">{row.vendor.businessName}</td>
-                                    <td className="py-5 px-6 text-center">
-                                        <div className="flex justify-center">
-                                            <span className={cn("inline-flex items-center justify-center rounded-[10px] text-[14px] font-medium capitalize", statusStyle)}>
-                                                {row.status}
-                                            </span>
-                                        </div>
+                                <tr key={row.id} className="border-b border-divider">
+                                    <td className="py-4 px-4 font-semibold text-[14px] text-[#111827] tabular-nums">{row.orderNumber}</td>
+                                    <td className="py-4 px-4 text-[14px] text-[#111827] font-medium">{row.user.fullName}</td>
+                                    <td className="py-4 px-4 text-[14px] text-[#111827] font-medium">{row.vendor.businessName}</td>
+                                    <td className="py-4 px-4">
+                                        <span className={cn("inline-flex items-center rounded-full text-[12px] font-semibold capitalize px-2.5 py-1", statusStyle)}>
+                                            {row.status.replace(/_/g, ' ')}
+                                        </span>
                                     </td>
-                                    <td className="py-5 px-6 text-center text-[14px] text-[#181725] font-medium">{new Date(row.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                                    <td className="py-5 px-6 text-center">
-                                        <div className="flex justify-center">
-                                            <Link href={`/admin/orders/${row.id}`} className="bg-[#299E60] hover:bg-[#238b54] text-white text-[12px] font-bold h-[28px] px-4 rounded-[5px] transition-colors cursor-pointer flex items-center justify-center">
-                                                View Details
-                                            </Link>
-                                        </div>
+                                    <td className="py-4 px-4 text-[14px] text-[#111827] font-medium">{new Date(row.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                    <td className="py-4 px-4 text-right">
+                                        <Link href={`/admin/orders/${row.id}`} className="inline-flex items-center justify-center bg-primary hover:bg-primary-dark text-white text-[12px] font-semibold min-h-10 px-4 rounded-[8px] active:scale-[0.97] transition-transform">
+                                            View details
+                                        </Link>
                                     </td>
                                 </tr>
                                 );
@@ -233,9 +251,9 @@ export default function DashboardPage() {
                         </tbody>
                     </table>
                 </div>
-                <div className="mt-8 flex justify-center">
-                    <Link href="/admin/orders" className="flex items-center justify-center gap-[3px] w-[149px] h-[41px] border border-[#299E60] rounded-[5px] text-[14px] font-bold text-[#299E60] hover:bg-[#EEF8F1] transition-all cursor-pointer">
-                        <span>View all</span> <ChevronRight size={14} className="text-[#299E60]" />
+                <div className="mt-6 flex justify-center">
+                    <Link href="/admin/orders" className="inline-flex items-center justify-center gap-1 min-h-12 px-5 border border-primary rounded-[12px] text-[14px] font-semibold text-primary hover:bg-primary-light active:scale-[0.97] transition-transform">
+                        <span>View all</span> <ChevronRight size={14} />
                     </Link>
                 </div>
             </div>

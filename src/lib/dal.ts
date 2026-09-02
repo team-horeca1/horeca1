@@ -89,7 +89,10 @@ function toVendor(v: Record<string, unknown>): Vendor {
     creditEnabled: (v.creditEnabled as boolean) || false,
     categories: Array.isArray(v.categories) ? (v.categories as string[]) : [],
     isActive: true,
+    isVerified: (v.isVerified as boolean) ?? false,
     description: (v.description as string) || '',
+    createdAt: v.createdAt ? String(v.createdAt) : undefined,
+    productCount: typeof v.productCount === 'number' ? v.productCount : undefined,
   };
 }
 

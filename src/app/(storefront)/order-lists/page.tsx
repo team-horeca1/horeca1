@@ -253,8 +253,8 @@ export default function OrderListsPage() {
     if (!isAuthenticated) {
         return (
             <div className="min-h-screen bg-gray-50/50 flex flex-col items-center justify-center px-6 text-center">
-                <div className="w-16 h-16 rounded-full bg-[#53B175]/10 flex items-center justify-center mb-5">
-                    <ClipboardList size={28} className="text-[#53B175]" strokeWidth={2.5} />
+                <div className="w-16 h-16 rounded-full bg-primary-light flex items-center justify-center mb-5">
+                    <ClipboardList size={28} className="text-primary" strokeWidth={2.5} />
                 </div>
                 <h1 className="text-[22px] md:text-[26px] font-[900] text-[#181725] tracking-tight mb-2">
                     Log in to see your order lists
@@ -271,7 +271,7 @@ export default function OrderListsPage() {
                     </Link>
                     <Link
                         href="/login?redirect=/order-lists"
-                        className="px-6 py-3 rounded-2xl bg-[#53B175] text-white font-black text-[14px] shadow-md hover:bg-[#469E66] transition-colors cursor-pointer"
+                        className="px-6 py-3 rounded-2xl bg-primary text-white font-black text-[14px] shadow-md shadow-primary/20 hover:bg-primary-dark transition-colors cursor-pointer"
                     >
                         Log in
                     </Link>
@@ -300,7 +300,7 @@ export default function OrderListsPage() {
                         </h1>
                         <button 
                             onClick={() => setIsCreateOverlayOpen(true)}
-                            className="flex items-center justify-center bg-[#299e60] text-white px-6 py-3 rounded-xl text-[14px] font-bold shadow-md shadow-green-100/50 hover:bg-[#22844f] transition-all cursor-pointer"
+                            className="flex items-center justify-center bg-primary text-white px-6 py-3 rounded-xl text-[14px] font-bold shadow-md shadow-primary/20 hover:bg-primary-dark transition-all cursor-pointer"
                         >
                             <Plus size={20} />
                             <span className="ml-2">New List</span>
@@ -330,7 +330,7 @@ export default function OrderListsPage() {
                         <div className="flex items-center gap-2 shrink-0">
                             <button 
                                 onClick={() => setIsCreateOverlayOpen(true)}
-                                className="flex items-center justify-center bg-[#299e60] text-white w-9 h-9 min-[340px]:w-10 min-[340px]:h-10 sm:w-auto sm:px-4 sm:py-2 rounded-full sm:rounded-xl text-[12px] font-bold shadow-md shadow-green-100/50 hover:bg-[#22844f] transition-all cursor-pointer"
+                                className="flex items-center justify-center bg-primary text-white w-9 h-9 min-[340px]:w-10 min-[340px]:h-10 sm:w-auto sm:px-4 sm:py-2 rounded-full sm:rounded-xl text-[12px] font-bold shadow-md shadow-primary/20 hover:bg-primary-dark transition-all cursor-pointer"
                             >
                                 <Plus size={18} />
                                 <span className="hidden sm:inline ml-1.5">New List</span>
@@ -353,16 +353,16 @@ export default function OrderListsPage() {
             {/* Lists */}
             <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] py-4">
                 {vendorFilterId && (
-                    <div className="mb-3 flex items-center justify-between gap-3 bg-[#EEF8F1] border border-[#299e60]/20 rounded-xl px-4 py-2.5">
-                        <p className="text-[13px] font-bold text-[#1B5E20] truncate">
+                    <div className="mb-3 flex items-center justify-between gap-3 bg-primary-light border border-primary/20 rounded-xl px-4 py-2.5">
+                        <p className="text-[13px] font-bold text-primary truncate">
                             Showing lists for {filteredVendorName ?? 'this vendor'}
-                            <span className="text-[11px] font-semibold text-[#299e60] ml-2">
+                            <span className="text-[11px] font-semibold text-primary/80 ml-2">
                                 ({displayedLists.length} of {allLists.length})
                             </span>
                         </p>
                         <Link
                             href="/order-lists"
-                            className="flex items-center gap-1 shrink-0 text-[12px] font-bold text-[#299e60] hover:text-[#1B5E20] transition-colors"
+                            className="flex items-center gap-1 shrink-0 text-[12px] font-bold text-primary hover:text-primary-dark transition-colors"
                         >
                             <XIcon size={14} /> Clear
                         </Link>
@@ -430,7 +430,7 @@ export default function OrderListsPage() {
                                         <div className="flex items-center gap-2">
                                             <p className="text-[14px] min-[340px]:text-[16px] md:text-[18px] font-bold text-[#181725] line-clamp-1">{list.name}</p>
                                         </div>
-                                        <p className="text-[10px] min-[340px]:text-[12px] md:text-[14px] text-[#299e60] font-bold mt-0.5 truncate">
+                                        <p className="text-[10px] min-[340px]:text-[12px] md:text-[14px] text-primary font-bold mt-0.5 truncate">
                                             {(() => {
                                                 const itemsVendorIds = Array.from(new Set((list.items ?? []).map(i => i.product?.vendorId || list.vendorId)));
                                                 const firstVendor = vendorsList.find(v => v.id === itemsVendorIds[0]) || { name: list.vendorName };
@@ -444,7 +444,7 @@ export default function OrderListsPage() {
                                                 {(list.items ?? []).length} items
                                             </span>
                                             {list.lastUsed ? (
-                                                <span className="flex items-center gap-0.5 text-[10px] min-[340px]:text-[12px] md:text-[13px] text-[#299e60] font-bold whitespace-nowrap">
+                                                <span className="flex items-center gap-0.5 text-[10px] min-[340px]:text-[12px] md:text-[13px] text-primary font-bold whitespace-nowrap">
                                                     <Clock size={10} className="md:w-3.5 md:h-3.5" />
                                                     <span>
                                                         Used {new Date(list.lastUsed).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
@@ -477,17 +477,17 @@ export default function OrderListsPage() {
                                                 
                                                 toast.success(`Quick Ordered: ${list.name}`, {
                                                     description: "Items added to cart and list moved to 'Continue Ordering'!",
-                                                    icon: <ShoppingCart className="text-white bg-[#299e60] p-1 rounded-full" size={18} />
+                                                    icon: <ShoppingCart className="text-white bg-primary p-1 rounded-full" size={18} />
                                                 });
                                             }}
-                                            className="p-1.5 min-[340px]:p-2 md:p-3 hover:bg-[#299e60]/10 rounded-xl text-gray-400 hover:text-[#299e60] transition-all active:scale-95 cursor-pointer group/order"
+                                            className="p-1.5 min-[340px]:p-2 md:p-3 hover:bg-primary-light rounded-xl text-gray-400 hover:text-primary transition-all active:scale-95 cursor-pointer group/order"
                                             title="Quick Order"
                                         >
                                             <ShoppingCart size={15} className="md:w-5 md:h-5" />
                                         </button>
                                         <button 
                                             onClick={(e) => handleEditClick(list, e)}
-                                            className="p-1.5 min-[340px]:p-2 md:p-3 hover:bg-gray-100 rounded-xl text-gray-400 hover:text-[#53B175] transition-all active:scale-95 cursor-pointer"
+                                            className="p-1.5 min-[340px]:p-2 md:p-3 hover:bg-gray-100 rounded-xl text-gray-400 hover:text-primary transition-all active:scale-95 cursor-pointer"
                                         >
                                             <Edit2 size={15} className="md:w-5 md:h-5" />
                                         </button>
@@ -509,7 +509,7 @@ export default function OrderListsPage() {
                         <p className="text-[13px] text-gray-400 mt-1">Create your first list for fast repeat ordering</p>
                         <button 
                             onClick={() => setIsCreateOverlayOpen(true)}
-                            className="mt-4 bg-[#299e60] text-white px-6 py-2.5 rounded-xl text-[13px] font-bold shadow-md shadow-green-200/50 hover:bg-[#22844f] transition-all"
+                            className="mt-4 bg-primary text-white px-6 py-2.5 rounded-xl text-[13px] font-bold shadow-md shadow-primary/20 hover:bg-primary-dark transition-all cursor-pointer"
                         >
                             Create Order List
                         </button>

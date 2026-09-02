@@ -91,7 +91,7 @@ export function MarkPaidModal({
           maxLength={100}
           placeholder="e.g. 123456789012"
           disabled={submitting}
-          className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-[13px] font-medium focus:outline-none focus:border-[#53B175] disabled:bg-gray-50"
+          className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-[13px] font-medium focus:outline-none focus:border-[#6B1D2E] disabled:bg-gray-50"
         />
         <p className="mt-2 text-[11px] text-gray-400">
           Paste the bank or UPI transaction reference after you send the money.
@@ -110,7 +110,7 @@ export function MarkPaidModal({
             type="button"
             onClick={submit}
             disabled={submitting || !trimmed}
-            className="inline-flex items-center justify-center min-w-[110px] px-4 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold hover:bg-[#48a068] cursor-pointer disabled:opacity-50"
+            className="inline-flex items-center justify-center min-w-[110px] px-4 py-2 rounded-xl bg-[#6B1D2E] text-white text-[12px] font-bold hover:bg-[#48a068] cursor-pointer disabled:opacity-50"
           >
             {submitting ? <Loader2 size={14} className="animate-spin" /> : 'Confirm paid'}
           </button>

@@ -148,7 +148,7 @@ interface ParentCategoryOption {
 }
 
 const inputCls =
-    'w-full h-[42px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40 font-medium';
+    'w-full h-[42px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#6B1D2E]/40 font-medium';
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
     return (
@@ -789,7 +789,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
         if (loading) {
             return (
                 <div className="flex items-center justify-center py-24">
-                    <Loader2 className="w-8 h-8 animate-spin text-[#299E60]" />
+                    <Loader2 className="w-8 h-8 animate-spin text-[#6B1D2E]" />
                 </div>
             );
         }
@@ -824,7 +824,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                         {vendor.logoUrl ? (
                             <img src={vendor.logoUrl} alt="" className="w-16 h-16 rounded-full object-cover border" />
                         ) : (
-                            <div className="w-16 h-16 rounded-full bg-[#EEF8F1] flex items-center justify-center text-[#299E60] font-bold text-lg">
+                            <div className="w-16 h-16 rounded-full bg-[#F8E8EC] flex items-center justify-center text-[#6B1D2E] font-bold text-lg">
                                 {vendor.businessName.slice(0, 2).toUpperCase()}
                             </div>
                         )}
@@ -852,12 +852,12 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                                             <span className="text-[13px] font-semibold text-[#181725] truncate">{doc.fileName || doc.type}</span>
                                             <span className={cn(
                                                 'text-[10px] font-bold uppercase px-2 py-0.5 rounded',
-                                                doc.status === 'verified' ? 'bg-[#EEF8F1] text-[#299E60]' : 'bg-[#FFF7E6] text-[#F59E0B]',
+                                                doc.status === 'verified' ? 'bg-[#F8E8EC] text-[#6B1D2E]' : 'bg-[#FFF7E6] text-[#F59E0B]',
                                             )}>
                                                 {doc.status}
                                             </span>
                                         </div>
-                                        <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="text-[#299E60] shrink-0 ml-2">
+                                        <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="text-[#6B1D2E] shrink-0 ml-2">
                                             <ExternalLink size={14} />
                                         </a>
                                     </li>
@@ -987,7 +987,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                             <div className="flex flex-wrap items-center gap-2">
                                 <h3 className="text-[18px] font-[900] text-[#181725]">{vendorProduct.name}</h3>
                                 {vendorProduct.brandMappings && vendorProduct.brandMappings.length > 0 && (
-                                    <span className="text-[10px] font-[900] px-2 py-0.5 rounded-[6px] uppercase bg-[#EEF8F1] text-[#299E60]">
+                                    <span className="text-[10px] font-[900] px-2 py-0.5 rounded-[6px] uppercase bg-[#F8E8EC] text-[#6B1D2E]">
                                         Brand mapped
                                     </span>
                                 )}
@@ -999,7 +999,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                             </div>
                             {vendorProduct.sku && <p className="text-[12px] text-[#AEAEAE]">SKU: {vendorProduct.sku}</p>}
                             {vendorProduct.brandMappings?.[0]?.brandMasterProduct?.brand?.name && (
-                                <p className="text-[12px] text-[#299E60] font-semibold mt-0.5">
+                                <p className="text-[12px] text-[#6B1D2E] font-semibold mt-0.5">
                                     {vendorProduct.brandMappings[0].brandMasterProduct.brand.name}
                                     {vendorProduct.brandMappings[0].brandMasterProduct.name
                                         ? ` · ${vendorProduct.brandMappings[0].brandMasterProduct.name}`
@@ -1130,7 +1130,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                                                     <img
                                                         src={url}
                                                         alt=""
-                                                        className="w-16 h-16 rounded-[8px] object-cover border border-[#EEEEEE] hover:border-[#299E60]/50"
+                                                        className="w-16 h-16 rounded-[8px] object-cover border border-[#EEEEEE] hover:border-[#6B1D2E]/50"
                                                     />
                                                 </a>
                                             ))}
@@ -1277,7 +1277,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                                     </p>
                                 )}
                                 {catalogSkuLookup.status === 'new' && (
-                                    <p className="text-[11px] text-[#299E60] font-bold mt-2">
+                                    <p className="text-[11px] text-[#6B1D2E] font-bold mt-2">
                                         Creates new master catalog item for this listing.
                                     </p>
                                 )}
@@ -1425,14 +1425,18 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
 
             <div
                 className={cn(
-                    'fixed top-0 right-0 h-full w-full max-w-[560px] bg-white z-[70] shadow-2xl transition-transform duration-300 ease-in-out flex flex-col',
-                    open ? 'translate-x-0' : 'translate-x-full',
+                    'fixed z-[70] bg-white shadow-2xl transition-transform duration-300 ease-in-out flex flex-col',
+                    'inset-x-0 bottom-0 top-auto h-[min(92dvh,100dvh)] rounded-t-[20px] pb-[env(safe-area-inset-bottom)]',
+                    'lg:inset-y-0 lg:right-0 lg:left-auto lg:h-full lg:w-full lg:max-w-[560px] lg:rounded-none',
+                    open
+                        ? 'translate-y-0 lg:translate-x-0'
+                        : 'translate-y-full lg:translate-y-0 lg:translate-x-full',
                 )}
             >
-                <div className="flex items-center justify-between px-6 py-5 border-b border-[#EEEEEE] shrink-0">
+                <div className="flex items-center justify-between px-4 lg:px-6 py-4 lg:py-5 border-b border-[#EEEEEE] shrink-0">
                     <div className="flex items-center gap-3 min-w-0">
                         {target && (
-                            <div className="w-10 h-10 rounded-[10px] bg-[#F8F9FB] flex items-center justify-center text-[#299E60] shrink-0">
+                            <div className="w-10 h-10 rounded-[10px] bg-[#F8F9FB] flex items-center justify-center text-[#6B1D2E] shrink-0">
                                 <Icon size={20} />
                             </div>
                         )}
@@ -1446,7 +1450,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                             <span className={cn(
                                 'shrink-0 text-[10px] font-[900] px-2.5 py-1 rounded-[6px] uppercase',
                                 isApproved
-                                    ? 'bg-[#EEF8F1] text-[#299E60]'
+                                    ? 'bg-[#DCFCE7] text-[#16A34A]'
                                     : statusLabel === 'Edit Pending' || vendorProduct?.approvalStatus === 'pending_edit'
                                         ? 'bg-[#FFF8E1] text-[#8B6914]'
                                         : 'bg-[#FFF7E6] text-[#F59E0B]',
@@ -1457,7 +1461,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                     </div>
                     <button
                         onClick={onClose}
-                        className="w-[40px] h-[40px] rounded-[12px] flex items-center justify-center hover:bg-[#F8F9FB] text-[#7C7C7C] transition-all shrink-0"
+                        className="size-12 rounded-[12px] flex items-center justify-center hover:bg-[#F8F9FB] text-[#7C7C7C] transition-all shrink-0"
                     >
                         <X size={20} />
                     </button>
@@ -1466,19 +1470,19 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                 <div className="flex-1 overflow-y-auto">{renderBody()}</div>
 
                 {!loading && target && (
-                    <div className="px-6 py-5 border-t border-[#EEEEEE] shrink-0 flex flex-wrap items-center gap-2">
+                    <div className="px-4 lg:px-6 py-4 lg:py-5 border-t border-[#EEEEEE] shrink-0 flex flex-wrap items-center gap-2">
                         {isEditing ? (
                             <>
                                 <button
                                     onClick={() => { setIsEditing(false); if (target) void loadEntity(target); }}
-                                    className="flex-1 min-w-[100px] h-[44px] bg-[#F8F9FB] border border-[#EEEEEE] text-[#181725] rounded-[10px] text-[13px] font-bold hover:bg-[#EEEEEE]"
+                                    className="flex-1 min-w-[100px] min-h-12 bg-[#F8F9FB] border border-[#EEEEEE] text-[#181725] rounded-[12px] text-[13px] font-semibold hover:bg-[#EEEEEE]"
                                 >
                                     Cancel Edit
                                 </button>
                                 <button
                                     onClick={() => void handleSave()}
                                     disabled={saving}
-                                    className="flex-1 min-w-[100px] h-[44px] bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                    className="flex-1 min-w-[100px] min-h-12 bg-[#6B1D2E] text-white rounded-[12px] text-[13px] font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5"
                                 >
                                     {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                                     Save
@@ -1487,7 +1491,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                         ) : (
                             <button
                                 onClick={() => setIsEditing(true)}
-                                className="h-[44px] px-4 bg-[#F8F9FB] border border-[#EEEEEE] text-[#181725] rounded-[10px] text-[13px] font-bold hover:bg-[#EEF8F1] hover:border-[#299E60]/40 flex items-center gap-1.5"
+                                className="min-h-12 px-4 bg-[#F8F9FB] border border-[#EEEEEE] text-[#181725] rounded-[12px] text-[13px] font-semibold hover:bg-[#F8E8EC] hover:border-[#6B1D2E]/40 flex items-center gap-1.5"
                             >
                                 <Pencil size={14} /> Edit
                             </button>
@@ -1499,7 +1503,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                                     <button
                                         onClick={() => void handleRevoke()}
                                         disabled={actionLoading}
-                                        className="h-[44px] px-4 bg-amber-500 text-white rounded-[10px] text-[13px] font-bold disabled:opacity-50 flex items-center gap-1.5"
+                                        className="min-h-12 px-4 bg-amber-500 text-white rounded-[12px] text-[13px] font-semibold disabled:opacity-50 flex items-center gap-1.5"
                                     >
                                         {actionLoading ? <Loader2 size={14} className="animate-spin" /> : null}
                                         Revoke
@@ -1509,7 +1513,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                                     <button
                                         onClick={() => void handleAccept()}
                                         disabled={actionLoading}
-                                        className="flex-1 min-w-[100px] h-[44px] bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                        className="flex-1 min-w-[100px] min-h-12 bg-[#6B1D2E] text-white rounded-[12px] text-[13px] font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5"
                                     >
                                         {actionLoading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                                         Accept
@@ -1519,7 +1523,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                                     <button
                                         onClick={() => setShowRejectModal(true)}
                                         disabled={actionLoading}
-                                        className="h-[44px] px-4 bg-[#E74C3C] text-white rounded-[10px] text-[13px] font-bold disabled:opacity-50"
+                                        className="min-h-12 px-4 bg-[#DC2626] text-white rounded-[12px] text-[13px] font-semibold disabled:opacity-50"
                                     >
                                         Reject
                                     </button>

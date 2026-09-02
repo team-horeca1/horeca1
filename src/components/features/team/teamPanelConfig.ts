@@ -180,8 +180,8 @@ export const TEAM_PANEL_PRESETS: Record<TeamPanelScope, TeamPanelPresetConfig> =
   },
   account: {
     scope: 'account',
-    accent: '#53B175',
-    accentHover: '#469E66',
+    accent: '#6B1D2E',
+    accentHover: '#5A1926',
     title: 'Account Team',
     subtitle: 'Manage who can view orders, place repeat orders, settle invoices and act on behalf of your business.',
     addLabel: 'Invite Member',
@@ -193,7 +193,7 @@ export const TEAM_PANEL_PRESETS: Record<TeamPanelScope, TeamPanelPresetConfig> =
       'You need at least one of users.view, users.create, users.edit, or users.delete to manage the account team. Ask the account owner for access.',
     filterVisibleRoles: (roles) => roles.filter((r) => r.isTemplate && r.scope === 'account'),
     roleLook: ACCOUNT_ROLE_LOOK,
-    defaultRoleLook: { color: '#53B175', bg: '#E8F4EC', Icon: Shield },
+    defaultRoleLook: { color: '#6B1D2E', bg: '#F8E8EC', Icon: Shield },
     deleteUsesUserId: true,
     editUsesUserId: true,
     passwordEndpoint: (member, _impersonating, accountId) =>
@@ -201,10 +201,10 @@ export const TEAM_PANEL_PRESETS: Record<TeamPanelScope, TeamPanelPresetConfig> =
     infoBanner: {
       title: 'How team access works',
       body: 'Each role grants a specific set of permissions (e.g. orders.edit, users.create). Use Manage Roles to create custom roles tailored to your business.',
-      className: 'bg-[#E8F4EC] border border-[#53B175]/20',
-      iconClassName: 'text-[#53B175]',
-      titleClassName: 'text-[#1F6A3E]',
-      bodyClassName: 'text-[#2E7D52]',
+      className: 'bg-[#F8E8EC] border border-[#6B1D2E]/20',
+      iconClassName: 'text-[#6B1D2E]',
+      titleClassName: 'text-[#5A1926]',
+      bodyClassName: 'text-[#6B1D2E]',
     },
   },
 };

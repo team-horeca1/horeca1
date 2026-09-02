@@ -65,12 +65,12 @@ export default function AdminReturnsPage() {
         r.customer.email.toLowerCase().includes(search.toLowerCase())
     );
 
-    const inputCls = 'w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#299E60]/40';
+    const inputCls = 'w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#6B1D2E]/40';
 
     return (
         <div className="space-y-6 pb-10">
             <div>
-                <h1 className="text-[28px] font-bold text-[#181725]">Return Requests</h1>
+                <h1 className="text-[clamp(1.25rem,4vw,1.75rem)] font-semibold text-[#181725]">Return Requests</h1>
                 <p className="text-[13px] text-[#7C7C7C] mt-1">Review and process customer return requests</p>
             </div>
 
@@ -82,14 +82,14 @@ export default function AdminReturnsPage() {
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="Search by customer or order..."
-                        className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] pl-9 pr-3 text-[13px] outline-none focus:border-[#299E60]/40"
+                        className="w-full h-12 border border-[#EEEEEE] rounded-[12px] pl-9 pr-3 text-[13px] outline-none focus:border-[#6B1D2E]/40"
                     />
                 </div>
                 <div className="relative">
                     <select
                         value={statusFilter}
                         onChange={e => setStatusFilter(e.target.value)}
-                        className="h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 pr-8 text-[13px] outline-none focus:border-[#299E60]/40 bg-white appearance-none"
+                        className="h-12 border border-[#EEEEEE] rounded-[12px] px-3 pr-8 text-[13px] outline-none focus:border-[#6B1D2E]/40 bg-white appearance-none"
                     >
                         <option value="">All statuses</option>
                         <option value="pending">Pending</option>
@@ -107,7 +107,7 @@ export default function AdminReturnsPage() {
                 {/* List */}
                 <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
                     {loading ? (
-                        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-[#299E60]" /></div>
+                        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-[#6B1D2E]" /></div>
                     ) : filtered.length === 0 ? (
                         <div className="py-16 text-center text-[14px] text-[#AEAEAE]">No return requests found</div>
                     ) : (
@@ -116,7 +116,7 @@ export default function AdminReturnsPage() {
                                 <button
                                     key={r.id}
                                     onClick={() => { setSelectedId(r.id); setActionForm({ status: r.status, adminNote: r.adminNote ?? '', refundAmount: r.refundAmount ? String(r.refundAmount) : '' }); }}
-                                    className={cn('w-full text-left px-5 py-4 hover:bg-[#F9F9F9] transition-colors', selectedId === r.id && 'bg-[#F1FBF4]')}
+                                    className={cn('w-full text-left px-5 py-4 hover:bg-[#F9F9F9] transition-colors min-h-12', selectedId === r.id && 'bg-[#F8E8EC]')}
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1 min-w-0">
@@ -153,7 +153,7 @@ export default function AdminReturnsPage() {
                             <p className="text-[12px] text-[#7C7C7C]">Total: {fmt(selected.order.totalAmount)}</p>
                             <p className="text-[12px] text-[#7C7C7C]">Payment: {selected.order.paymentMethod ?? '—'} · {selected.order.paymentStatus}</p>
                             {selected.status === 'approved' && (selected.resolutionType ?? 'refund') === 'refund' && (
-                                <p className="text-[12px] font-bold text-[#299E60] mt-1">
+                                <p className="text-[12px] font-bold text-[#6B1D2E] mt-1">
                                     Amount due to customer: {fmt(selected.refundAmount ?? selected.order.totalAmount)}
                                 </p>
                             )}
@@ -189,7 +189,7 @@ export default function AdminReturnsPage() {
                                         <textarea value={actionForm.adminNote}
                                             onChange={e => setActionForm(f => ({ ...f, adminNote: e.target.value }))}
                                             rows={3} placeholder="Internal note for this refund"
-                                            className="w-full border border-[#EEEEEE] rounded-[10px] px-3 py-2 text-[13px] outline-none focus:border-[#299E60]/40 resize-none" />
+                                            className="w-full border border-[#EEEEEE] rounded-[10px] px-3 py-2 text-[13px] outline-none focus:border-[#6B1D2E]/40 resize-none" />
                                     </div>
                                 </>
                             )}
@@ -224,7 +224,7 @@ export default function AdminReturnsPage() {
                                             }
                                         }}
                                         disabled={saving}
-                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#299E60] text-white text-[13px] font-bold rounded-[10px] disabled:opacity-50"
+                                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#6B1D2E] text-white text-[13px] font-bold rounded-[10px] disabled:opacity-50"
                                     >
                                         {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                                         Process refund

@@ -62,7 +62,7 @@ export function ReactivateWalletModal({ customerName, walletId, onClose, onSucce
               onChange={(e) => setReason(e.target.value)}
               rows={3}
               placeholder="e.g. Customer cleared outstanding dues"
-              className="w-full border border-[#EEEEEE] rounded-[10px] px-3 py-2 text-[13px] outline-none focus:border-[#299E60]/40 resize-none bg-white"
+              className="w-full border border-[#EEEEEE] rounded-[10px] px-3 py-2 text-[13px] outline-none focus:border-[#6B1D2E]/40 resize-none bg-white"
             />
           </div>
         </div>
@@ -79,7 +79,7 @@ export function ReactivateWalletModal({ customerName, walletId, onClose, onSucce
             type="button"
             onClick={submit}
             disabled={submitting}
-            className="px-5 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold disabled:opacity-50 flex items-center gap-2"
+            className="px-5 h-[38px] rounded-[10px] bg-[#6B1D2E] text-white text-[13px] font-bold disabled:opacity-50 flex items-center gap-2"
           >
             {submitting && <Loader2 size={13} className="animate-spin" />}
             Confirm reactivate

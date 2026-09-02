@@ -16,8 +16,6 @@ import {
     ClipboardList,
     ExternalLink,
     ShieldCheck,
-    LayoutGrid,
-    List,
     Mail,
     Phone,
     Building2,
@@ -43,6 +41,8 @@ import {
     AdminRegistryRowActions,
     AdminRegistryOverflowMenu,
     AdminRegistryOverflowMenuItem,
+    AdminRegistryViewToggle,
+    useAdminDesktop,
 } from '@/components/features/admin/entity';
 
 interface Brand {
@@ -97,6 +97,8 @@ export default function AdminBrandsPage() {
 
     // View Mode switcher
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+    const isDesktop = useAdminDesktop();
+    const effectiveView = isDesktop ? viewMode : 'grid';
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -217,7 +219,7 @@ export default function AdminBrandsPage() {
     const registryStats = [
         { label: 'Total Brands', value: brands.length, icon: Store, iconBg: 'bg-[#EFF6FF]', iconColor: 'text-[#3B82F6]' },
         { label: 'Pending Approval', value: pendingBrandsCount, icon: Clock, iconBg: 'bg-[#FFF8EB]', iconColor: 'text-[#D97706]' },
-        { label: 'Approved Brands', value: approvedCount, icon: CheckCircle, iconBg: 'bg-[#EEF8F1]', iconColor: 'text-[#299E60]' },
+        { label: 'Approved Brands', value: approvedCount, icon: CheckCircle, iconBg: 'bg-[#F8E8EC]', iconColor: 'text-[#6B1D2E]' },
         { label: 'Master Products', value: totalProducts, icon: Boxes, iconBg: 'bg-[#FDF2F2]', iconColor: 'text-[#8B5CF6]' },
     ];
 
@@ -230,7 +232,7 @@ export default function AdminBrandsPage() {
                     canCreateBrand ? (
                             <button
                                 onClick={() => setShowCreate(true)}
-                                className="h-[44px] px-5 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] active:scale-95 transition-all shadow-md shadow-[#299E60]/10 flex items-center gap-2 shrink-0"
+                                className="h-[44px] px-5 bg-[#6B1D2E] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#5A1926] active:scale-95 transition-all shadow-md shadow-[#6B1D2E]/10 flex items-center gap-2 shrink-0"
                             >
                                 <Plus size={16} />
                                 Add Brand
@@ -267,31 +269,7 @@ export default function AdminBrandsPage() {
                     </>
                 }
                 trailingSlot={
-                    <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
-                        <span className="text-[12px] font-bold text-[#9CA3AF] uppercase mr-1 hidden md:inline">View:</span>
-                        <div className="flex items-center bg-[#F3F4F6] border border-[#D1D5DB] rounded-[10px] p-1">
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={cn(
-                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
-                                    viewMode === 'grid' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
-                                )}
-                            >
-                                <LayoutGrid size={15} />
-                                <span className="hidden sm:inline">Cards</span>
-                            </button>
-                            <button
-                                onClick={() => setViewMode('table')}
-                                className={cn(
-                                    'p-2 rounded-[8px] transition-all flex items-center gap-1.5 text-[12px] font-bold',
-                                    viewMode === 'table' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6B7280] hover:text-[#111827]',
-                                )}
-                            >
-                                <List size={15} />
-                                <span className="hidden sm:inline">Table</span>
-                            </button>
-                        </div>
-                    </div>
+                    <AdminRegistryViewToggle viewMode={viewMode} onChange={setViewMode} />
                 }
             />
 
@@ -305,7 +283,7 @@ export default function AdminBrandsPage() {
                             : 'Click "Add Brand" to register your first brand partner.'
                     }
                 />
-            ) : viewMode === 'grid' ? (
+            ) : effectiveView === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredBrands.map((brand) => {
                         const needsStorefront = brand.user?.email?.includes('brand.internal.horeca1') || !brand.user;
@@ -313,7 +291,7 @@ export default function AdminBrandsPage() {
                         return (
                             <div
                                 key={brand.id}
-                                className="bg-white rounded-[16px] border border-[#D1D5DB] shadow-sm overflow-hidden flex flex-col h-full hover:shadow-md hover:border-[#299E60]/30 hover:-translate-y-0.5 transition-all w-full relative"
+                                className="bg-white rounded-[16px] border border-[#D1D5DB] shadow-sm overflow-hidden flex flex-col h-full hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 transition-all w-full relative"
                             >
                                 {/* Upper Section — click to view details */}
                                 <div
@@ -338,8 +316,8 @@ export default function AdminBrandsPage() {
                                                 className="w-[80px] h-[80px] object-contain rounded-lg"
                                             />
                                         ) : (
-                                            <div className="w-[70px] h-[70px] rounded-full bg-[#7C3AED]/10 flex items-center justify-center border border-[#7C3AED]/20">
-                                                <span className="text-[26px] font-black text-[#7C3AED]">
+                                            <div className="w-[70px] h-[70px] rounded-full bg-primary-light flex items-center justify-center border border-primary/20">
+                                                <span className="text-[26px] font-black text-primary">
                                                     {getInitials(brand.name)}
                                                 </span>
                                             </div>
@@ -348,12 +326,12 @@ export default function AdminBrandsPage() {
 
                                     {/* Name & Slug */}
                                     <div className="mb-3">
-                                        <h3 className="text-[16px] font-extrabold text-[#111827] line-clamp-1 group-hover:text-[#299E60]">{brand.name}</h3>
+                                        <h3 className="text-[16px] font-extrabold text-[#111827] line-clamp-1 group-hover:text-primary">{brand.name}</h3>
                                         <Link
                                             href={`/brand/${brand.slug}`}
                                             target="_blank"
                                             onClick={(e) => e.stopPropagation()}
-                                            className="text-[11px] text-[#299E60] hover:underline flex items-center gap-0.5 mt-1"
+                                            className="text-[11px] text-primary hover:underline flex items-center gap-0.5 mt-1"
                                         >
                                             /{brand.slug} <ExternalLink size={10} />
                                         </Link>
@@ -363,20 +341,22 @@ export default function AdminBrandsPage() {
                                     <div className="space-y-2 mt-auto pt-2 border-t border-[#F3F4F6]">
                                         <div className="flex items-center justify-between text-[12px] font-semibold">
                                             <span className="text-[#9CA3AF]">Owner:</span>
-                                            {needsStorefront ? (
-                                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200/50 px-1.5 py-0.5 rounded-[4px]">Admin Managed</span>
-                                            ) : (
-                                                <span className="text-[#374151] truncate max-w-[120px]">{brand.user?.fullName ?? '—'}</span>
-                                            )}
+                                            <span className="text-[#111827] truncate max-w-[150px]">
+                                                {needsStorefront ? (
+                                                    <span className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200/50 px-2 py-0.5 rounded-[6px]">Admin Managed</span>
+                                                ) : (
+                                                    brand.user?.fullName ?? '—'
+                                                )}
+                                            </span>
                                         </div>
                                         {!needsStorefront && brand.user?.email && (
-                                            <div className="flex items-center gap-2 min-w-0">
+                                            <div className="flex items-center gap-1.5 text-[#6B7280]">
                                                 <Mail size={13} className="text-[#9CA3AF] shrink-0" />
-                                                <span className="text-[12px] font-semibold text-[#4B5563] truncate">{brand.user.email}</span>
+                                                <span className="text-[12px] font-medium text-[#4B5563] truncate">{brand.user.email}</span>
                                             </div>
                                         )}
                                         {brand.user?.phone && (
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1.5 text-[#6B7280]">
                                                 <Phone size={13} className="text-[#9CA3AF] shrink-0" />
                                                 <span className="text-[12px] font-semibold text-[#4B5563]">{brand.user.phone}</span>
                                             </div>
@@ -404,7 +384,7 @@ export default function AdminBrandsPage() {
                                             <button
                                                 type="button"
                                                 onClick={() => setStorefrontTarget({ id: brand.id, name: brand.name })}
-                                                className="w-full h-[38px] px-3 bg-[#299E60] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                                                className="w-full min-h-12 px-3 bg-primary text-white rounded-[12px] text-[13px] font-semibold hover:bg-primary-dark transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-primary/20"
                                             >
                                                 <Store size={14} />
                                                 Create Storefront
@@ -415,7 +395,7 @@ export default function AdminBrandsPage() {
                                                 entityId={brand.id}
                                                 label="Impersonate"
                                                 variant="primary"
-                                                className="w-full h-[38px] text-[12px] font-bold"
+                                                className="w-full min-h-12 text-[13px] font-semibold"
                                             />
                                         )}
                                     </div>
@@ -423,7 +403,7 @@ export default function AdminBrandsPage() {
                                         <Link
                                             href={`/admin/brands/${brand.id}`}
                                             className={cn(
-                                                "h-[36px] bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB] rounded-[10px] text-[12px] font-bold transition-all flex items-center justify-center border border-[#E5E7EB]",
+                                                "min-h-12 bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB] rounded-[12px] text-[13px] font-semibold transition-all flex items-center justify-center border border-[#E5E7EB]",
                                                 brand.approvalStatus !== 'approved' && canEditBrands ? "flex-1" : "w-full"
                                             )}
                                         >
@@ -434,7 +414,7 @@ export default function AdminBrandsPage() {
                                                 type="button"
                                                 disabled={actionLoading === brand.id}
                                                 onClick={(e) => { e.stopPropagation(); void handleApproveBrand(brand, e); }}
-                                                className="flex-1 h-[36px] bg-[#299E60] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 disabled:opacity-60"
+                                                className="flex-1 min-h-12 bg-primary text-white rounded-[12px] text-[13px] font-semibold hover:bg-primary-dark transition-all flex items-center justify-center gap-1.5 disabled:opacity-60 shadow-sm shadow-primary/20"
                                             >
                                                 {actionLoading === brand.id ? (
                                                     <Loader2 size={12} className="animate-spin" />
@@ -482,10 +462,10 @@ export default function AdminBrandsPage() {
                                                     )}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="text-[14px] font-bold text-[#111827] truncate group-hover:text-[#299E60] transition-colors">{brand.name}</p>
+                                                    <p className="text-[14px] font-bold text-[#111827] truncate group-hover:text-[#6B1D2E] transition-colors">{brand.name}</p>
                                                     <div className="flex items-center gap-2 mt-0.5">
                                                         <Link href={`/brand/${brand.slug}`} target="_blank" onClick={(e) => e.stopPropagation()}
-                                                            className="text-[11px] text-[#299E60] hover:underline flex items-center gap-0.5">
+                                                            className="text-[11px] text-[#6B1D2E] hover:underline flex items-center gap-0.5">
                                                             /{brand.slug} <ExternalLink size={10} />
                                                         </Link>
                                                         <span className="w-1.5 h-1.5 rounded-full bg-[#E5E7EB]" />
@@ -530,7 +510,7 @@ export default function AdminBrandsPage() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setStorefrontTarget({ id: brand.id, name: brand.name })}
-                                                                className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm"
+                                                                className="h-[34px] px-3 bg-primary text-white rounded-[8px] text-[12px] font-bold hover:bg-primary-dark transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shadow-sm shadow-primary/20"
                                                             >
                                                                 <Store size={13} />
                                                                 Create Storefront
@@ -552,7 +532,7 @@ export default function AdminBrandsPage() {
                                                             type="button"
                                                             disabled={actionLoading === brand.id}
                                                             onClick={(e) => void handleApproveBrand(brand, e)}
-                                                            className="h-[34px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60"
+                                                            className="h-[34px] px-3 bg-primary text-white rounded-[8px] text-[12px] font-bold hover:bg-primary-dark transition-all flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-60 shadow-sm shadow-primary/20"
                                                         >
                                                             {actionLoading === brand.id ? (
                                                                 <Loader2 size={12} className="animate-spin" />
@@ -596,7 +576,7 @@ export default function AdminBrandsPage() {
                                         setActiveMenu(null);
                                         void startBrandImpersonate(b.id);
                                     }}
-                                    icon={<Building2 size={14} className="text-[#299E60]" />}
+                                    icon={<Building2 size={14} className="text-[#6B1D2E]" />}
                                     label="Impersonate (placeholder)"
                                 />
                             )}

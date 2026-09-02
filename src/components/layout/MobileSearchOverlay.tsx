@@ -146,9 +146,9 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                         <div className="flex-1 relative">
                             <div className={cn(
                                 "flex items-center gap-3 px-4 py-3 bg-[#F7F7F7] border rounded-2xl shadow-sm transition-all duration-300",
-                                searchQuery ? "border-[#53B175] bg-white ring-1 ring-[#53B175]/10" : "border-gray-100"
+                                searchQuery ? "border-primary bg-white ring-1 ring-primary/10" : "border-gray-100"
                             )}>
-                                <Search size={22} className={cn("transition-colors", searchQuery ? "text-[#53B175]" : "text-gray-400")} />
+                                <Search size={22} className={cn("transition-colors", searchQuery ? "text-primary" : "text-gray-400")} />
                                 <input
                                     type="text"
                                     autoFocus
@@ -169,7 +169,7 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                         <Link href="/cart" onClick={onClose} className="relative p-1">
                             <ShoppingCart size={20} className="text-[#181725]" />
                             {totalItems > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-[#53B175] text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full font-bold border border-white">
+                                <span className="absolute -top-1 -right-1 bg-primary text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full font-bold border border-white">
                                     {totalItems}
                                 </span>
                             )}
@@ -215,16 +215,16 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                             key={vendor.id}
                             href={buildVendorTarget(vendor)}
                             onClick={onClose}
-                            className="flex items-center gap-4 p-5 md:p-6 bg-white rounded-[24px] border border-[#EEEEEE] active:scale-[0.98] transition-all hover:border-[#53B175]/30 hover:shadow-lg hover:shadow-gray-100 group"
+                            className="flex items-center gap-4 p-5 md:p-6 bg-white rounded-[24px] border border-[#EEEEEE] active:scale-[0.98] transition-all hover:border-primary/30 hover:shadow-lg hover:shadow-gray-100 group"
                         >
                             <div className="w-[60px] h-[60px] md:w-[70px] md:h-[70px] min-w-[60px] md:min-w-[70px] rounded-[18px] border border-[#F2F2F2] flex items-center justify-center p-2.5 bg-white overflow-hidden relative shadow-sm">
                                 <img src={vendor.logo} alt={vendor.name} className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform" />
                             </div>
                             <div className="flex-1 min-w-0">
-                                <h3 className="text-[16px] md:text-[18px] font-bold text-[#181725] leading-tight mb-1 group-hover:text-[#53B175] transition-colors">{vendor.name}</h3>
+                                <h3 className="text-[16px] md:text-[18px] font-bold text-[#181725] leading-tight mb-1 group-hover:text-primary transition-colors">{vendor.name}</h3>
                                 <p className="text-[13px] md:text-[14px] text-[#7C7C7C] font-medium truncate">{vendor.categories.join(', ')}</p>
                             </div>
-                            <div className="flex items-center gap-1.5 bg-[#53B175] text-white px-3 py-1.5 rounded-full shrink-0 shadow-sm shadow-green-100">
+                            <div className="flex items-center gap-1.5 bg-primary text-white px-3 py-1.5 rounded-full shrink-0 shadow-sm shadow-primary/20">
                                 <Star size={14} className="fill-white text-white" />
                                 <span className="text-[14px] font-bold">{vendor.rating}</span>
                             </div>
@@ -271,12 +271,12 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                                                 key={cat.id}
                                                 href={`/category/${cat.slug}`}
                                                 onClick={onClose}
-                                                className="flex flex-col items-center gap-2 min-w-[90px] p-3 border border-[#EEEEEE] rounded-[16px] hover:border-[#53B175]/30 hover:bg-gray-50/50 transition-all active:scale-[0.97] group"
+                                                className="flex flex-col items-center gap-2 min-w-[90px] p-3 border border-[#EEEEEE] rounded-[16px] hover:border-primary/30 hover:bg-gray-50/50 transition-all active:scale-[0.97] group"
                                             >
                                                 <div className="w-[56px] h-[56px] rounded-full bg-[#F7FBF8] flex items-center justify-center overflow-hidden border border-[#EEEEEE]">
                                                     <img src={cat.image || '/images/category/vegitable.png'} alt={cat.name} className="w-[70%] h-[70%] object-contain" />
                                                 </div>
-                                                <span className="text-[12px] font-bold text-[#181725] text-center leading-tight line-clamp-2 group-hover:text-[#53B175] transition-colors">
+                                                <span className="text-[12px] font-bold text-[#181725] text-center leading-tight line-clamp-2 group-hover:text-primary transition-colors">
                                                     {cat.name}
                                                 </span>
                                             </Link>
@@ -298,7 +298,7 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                                                 logoUrl={b.logoUrl ?? undefined}
                                                 productImages={b.showcaseImages.length > 0 ? [b.showcaseImages[0]] : []}
                                                 categories={b.categories}
-                                                bgColor={b.bgColor ?? '#f0faf4'}
+                                                bgColor={b.bgColor ?? '#6B1D2E'}
                                             />
                                         ))}
                                     </div>
@@ -312,26 +312,22 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {filteredItems.slice(0, 6).map((item) => {
                                             const label = item.displayName || item.name;
-                                            // Per UI/UX Notes #5: Search-based journey always ends at a Vendor Store.
-                                            // Clicking a product opens its vendor's store with the product name
-                                            // pre-filled in the in-store search, so user lands at "Select Vendor →
-                                            // Vendor → Add Items" — never on a standalone product page.
                                             return (
                                             <Link
                                                 key={item.id}
                                                 href={`/vendor/${item.vendorId}?q=${encodeURIComponent(label)}`}
                                                 onClick={onClose}
-                                                className="flex items-center gap-4 p-4 border border-[#EEEEEE] rounded-[20px] active:scale-[0.98] transition-all hover:border-[#53B175]/30 hover:bg-gray-50/50 group w-full text-left"
+                                                className="flex items-center gap-4 p-4 border border-[#EEEEEE] rounded-[20px] active:scale-[0.98] transition-all hover:border-primary/30 hover:bg-gray-50/50 group w-full text-left"
                                             >
                                                 <div className="w-[50px] h-[60px] flex items-center justify-center p-1 shrink-0 overflow-hidden bg-white rounded-lg">
                                                     <img src={item.images[0]} alt={label} className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="text-[15px] font-bold text-[#181725] leading-tight group-hover:text-[#53B175] transition-colors line-clamp-1">
+                                                    <div className="text-[15px] font-bold text-[#181725] leading-tight group-hover:text-primary transition-colors line-clamp-1">
                                                         {label}
                                                     </div>
                                                     <div className="text-[12px] text-gray-400 mt-1 font-medium truncate flex items-center gap-1">
-                                                        <span className="text-[#53B175]">from</span>
+                                                        <span className="text-primary font-bold">from</span>
                                                         <span className="truncate">{item.vendorName || item.category}</span>
                                                     </div>
                                                 </div>
@@ -343,7 +339,7 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                                         <Link
                                             href={`/search?q=${encodeURIComponent(searchQuery)}`}
                                             onClick={onClose}
-                                            className="mt-4 block text-center text-[13px] font-bold text-[#53B175] hover:underline"
+                                            className="mt-4 block text-center text-[13px] font-bold text-primary hover:underline"
                                         >
                                             View all {filteredItems.length} products →
                                         </Link>

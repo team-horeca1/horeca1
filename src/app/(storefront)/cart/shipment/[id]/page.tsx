@@ -91,11 +91,11 @@ export default function ShipmentDetailPage() {
     if (shipment.items.length === 0) {
         return (
             <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">
-                <div className="w-full h-[12px] bg-[#53B175] fixed top-0" />
+                <div className="w-full h-[12px] bg-primary fixed top-0" />
                 <img src="/images/empty-cart.png" alt="Empty Cart" className="w-[180px] mb-8 opacity-20" />
                 <h2 className="text-[20px] font-bold text-[#181725] mb-2">No items in this shipment</h2>
                 <p className="text-[#7C7C7C] text-center mb-8">This vendor&apos;s shipment is empty. Start adding some products!</p>
-                <button onClick={() => router.push('/')} className="bg-[#53B175] text-white px-12 py-4 rounded-xl font-bold hover:bg-[#48a068] transition-colors">
+                <button onClick={() => router.push('/')} className="bg-primary text-white px-12 py-4 rounded-xl font-bold hover:bg-primary-dark transition-colors">
                     Start Shopping
                 </button>
             </div>
@@ -105,7 +105,7 @@ export default function ShipmentDetailPage() {
     return (
         <div className="min-h-screen bg-[#F9F9F9] flex flex-col pb-28 md:pb-16 font-sans">
             {/* Top Branding Bar */}
-            <div className="w-full h-[12px] bg-[#53B175] sticky top-0 z-[110] md:hidden" />
+            <div className="w-full h-[12px] bg-primary sticky top-0 z-[110] md:hidden" />
 
             {/* Mobile Header */}
             <header className="md:hidden flex items-center justify-between px-4 h-[60px] bg-white border-b border-[#EEEEEE] sticky top-[12px] z-[100]">
@@ -165,7 +165,7 @@ export default function ShipmentDetailPage() {
                                                 <div className="min-w-0 flex-1">
                                                     <h4 className="text-[16px] font-bold text-[#181725] leading-tight">{item.name}</h4>
                                                     <p className="text-[12px] text-[#7C7C7C] font-medium mt-1">{item.size} * {item.pcs} pc</p>
-                                                    <p className="text-[11px] text-[#53B175] font-bold mt-1">From {shipment.vendor}</p>
+                                                    <p className="text-[11px] text-primary font-bold mt-1">From {shipment.vendor}</p>
                                                 </div>
                                                 <div className="text-right pl-2 shrink-0">
                                                     <span className="text-[15px] font-bold text-[#181725]">₹{item.price}/pc</span>
@@ -175,7 +175,7 @@ export default function ShipmentDetailPage() {
                                                 <div className="flex items-center border border-[#E2E2E2] rounded-full px-2 py-0.5 bg-white scale-90 origin-right">
                                                     <button
                                                         onClick={() => handleQuantityChange(item.id, item.vendorId, -1, item.pcs)}
-                                                        className="w-[28px] h-[28px] flex items-center justify-center text-[#53B175] active:scale-75 transition-transform"
+                                                        className="w-[28px] h-[28px] flex items-center justify-center text-primary active:scale-75 transition-transform"
                                                     >
                                                         <Minus size={16} strokeWidth={3} />
                                                     </button>
@@ -184,7 +184,7 @@ export default function ShipmentDetailPage() {
                                                     </div>
                                                     <button
                                                         onClick={() => handleQuantityChange(item.id, item.vendorId, 1, item.pcs)}
-                                                        className="w-[28px] h-[28px] flex items-center justify-center text-[#53B175] active:scale-75 transition-transform"
+                                                        className="w-[28px] h-[28px] flex items-center justify-center text-primary active:scale-75 transition-transform"
                                                     >
                                                         <Plus size={16} strokeWidth={3} />
                                                     </button>
@@ -198,15 +198,19 @@ export default function ShipmentDetailPage() {
 
                         {/* Desktop Items - Full Width Inline Layout */}
                         <div className="hidden lg:block bg-white rounded-2xl border border-[#E2E2E2] overflow-hidden shadow-sm">
+                            <div className="p-6 bg-white border-b border-[#F0F0F0] flex items-center justify-between">
+                                <h3 className="text-[18px] font-bold text-[#181725]">Items from {shipment.vendor}</h3>
+                                <span className="text-[14px] font-semibold text-gray-500">{shipment.items.length} Product{shipment.items.length > 1 ? 's' : ''}</span>
+                            </div>
                             <div className="divide-y divide-[#F5F5F5]">
                                 {shipment.items.map((item) => (
-                                    <div key={item.id} className="px-7 py-5 flex items-center gap-5 hover:bg-gray-50/40 transition-colors group">
-                                        {/* Product Image */}
-                                        <div className="w-[72px] h-[72px] rounded-2xl bg-[#F7F8F7] flex items-center justify-center shrink-0 border border-gray-100 p-2 group-hover:border-primary/10 transition-colors">
+                                    <div key={item.id} className="p-6 flex items-center gap-6 hover:bg-gray-50/50 transition-colors">
+                                        {/* Image */}
+                                        <div className="w-20 h-20 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center p-2 shrink-0">
                                             <img src={item.image} alt={item.name} className="max-w-full max-h-full object-contain" />
                                         </div>
 
-                                        {/* Product Info */}
+                                        {/* Info */}
                                         <div className="flex-1 min-w-0">
                                             <h4 className="text-[15px] font-bold text-[#181725] leading-snug line-clamp-1">{item.name}</h4>
                                             <p className="text-[13px] text-gray-400 font-medium mt-0.5">{item.size} · {item.pcs} pc</p>
@@ -217,7 +221,7 @@ export default function ShipmentDetailPage() {
                                         <div className="flex items-center gap-0 border border-gray-200 rounded-xl overflow-hidden shrink-0">
                                             <button
                                                 onClick={() => handleQuantityChange(item.id, item.vendorId, -1, item.pcs)}
-                                                className="w-10 h-10 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
+                                                className="w-10 h-10 flex items-center justify-center text-primary hover:bg-red-50 transition-colors"
                                             >
                                                 <Minus size={16} strokeWidth={2.5} />
                                             </button>
@@ -226,7 +230,7 @@ export default function ShipmentDetailPage() {
                                             </div>
                                             <button
                                                 onClick={() => handleQuantityChange(item.id, item.vendorId, 1, item.pcs)}
-                                                className="w-10 h-10 flex items-center justify-center text-primary hover:bg-green-50 transition-colors"
+                                                className="w-10 h-10 flex items-center justify-center text-primary hover:bg-primary-light transition-colors"
                                             >
                                                 <Plus size={16} strokeWidth={2.5} />
                                             </button>
@@ -253,7 +257,7 @@ export default function ShipmentDetailPage() {
                     {/* Right Column - Bill Summary (Desktop) */}
                     <div className="hidden lg:block sticky top-[80px] space-y-5">
                         <div className="bg-white rounded-2xl border border-[#E2E2E2] overflow-hidden shadow-sm">
-                            <div className="px-7 py-5 flex items-center gap-3 border-b border-[#F0F0F0]">
+                            <div className="px-7 py-5 flex items-center gap-3 border-b border-[#F0F0F0] lg:hidden">
                                 <div className="w-[38px] h-[38px] rounded-xl border border-[#E2E2E2] flex items-center justify-center shrink-0 bg-gray-50">
                                     <FileText size={18} className="text-[#181725]" />
                                 </div>
@@ -280,7 +284,7 @@ export default function ShipmentDetailPage() {
 
                         <button
                             onClick={handleProceedToPay}
-                            className="w-full bg-[#53B175] text-white py-5 rounded-2xl font-bold text-[18px] transition-all hover:bg-[#48a068] active:scale-[0.98] shadow-lg shadow-[#53B175]/20 flex items-center justify-center gap-2"
+                            className="w-full bg-primary text-white py-5 rounded-2xl font-bold text-[18px] transition-all hover:bg-primary-dark active:scale-[0.98] shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
                         >
                             Proceed to pay · ₹{totalPay.toFixed(0)}
                         </button>
@@ -325,7 +329,7 @@ export default function ShipmentDetailPage() {
             <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-[#F2F3F2] z-[100]">
                 <button
                     onClick={handleProceedToPay}
-                    className="w-full bg-[#53B175] text-white py-[18px] rounded-[18px] font-bold text-[18px] transition-all active:scale-[0.98] shadow-lg shadow-[#53B175]/20"
+                    className="w-full bg-primary text-white py-[18px] rounded-[18px] font-bold text-[18px] transition-all active:scale-[0.98] shadow-lg shadow-primary/20 hover:bg-primary-dark"
                 >
                     Proceed to pay · ₹{totalPay.toFixed(0)}
                 </button>

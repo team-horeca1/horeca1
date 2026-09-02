@@ -18,20 +18,20 @@ interface AdminRegistryStatsGridProps {
 
 export function AdminRegistryStatsGrid({ stats }: AdminRegistryStatsGridProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
       {stats.map((stat) => {
         const Icon = stat.icon;
         return (
           <div
             key={stat.label}
-            className="bg-white rounded-[16px] border border-[#EEEEEE] p-5 shadow-sm hover:shadow-md transition-all flex items-center gap-4"
+            className="bg-white rounded-[16px] border border-divider p-3 lg:p-5 shadow-sm flex items-center gap-3 lg:gap-4"
           >
-            <div className={`w-12 h-12 rounded-[12px] ${stat.iconBg} flex items-center justify-center ${stat.iconColor}`}>
-              <Icon size={22} />
+            <div className={`size-10 lg:size-12 rounded-[12px] ${stat.iconBg} flex items-center justify-center ${stat.iconColor} shrink-0`}>
+              <Icon size={20} />
             </div>
-            <div>
-              <span className="text-[12px] font-bold text-[#9CA3AF] uppercase tracking-wider block">{stat.label}</span>
-              <span className="text-[22px] font-black text-[#1F2937] leading-none mt-1 inline-block">{stat.value}</span>
+            <div className="min-w-0">
+              <span className="text-[10px] lg:text-[12px] font-semibold text-[#6B7280] uppercase block truncate">{stat.label}</span>
+              <span className="text-[18px] lg:text-[22px] font-bold text-[#111827] leading-none mt-1 inline-block tabular-nums">{stat.value}</span>
             </div>
           </div>
         );

@@ -77,7 +77,7 @@ export function RolesPermissionsOverlay({ isOpen, onClose, accountId }: RolesPer
             </div>
 
             {loading ? (
-              <div className="py-6 flex justify-center"><Loader2 className="animate-spin text-[#53B175]" /></div>
+              <div className="py-6 flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
             ) : customRoles.length === 0 ? (
               <p className="text-[12px] text-[#AEAEAE] py-6 text-center">
                 No custom roles yet. Duplicate a template below to start.
@@ -96,7 +96,7 @@ export function RolesPermissionsOverlay({ isOpen, onClose, accountId }: RolesPer
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => setEditingRole(r)}
-                        className="px-2.5 py-1.5 text-[12px] font-bold text-[#53B175] hover:bg-[#EEF8F1] rounded-lg transition-colors"
+                        className="px-2.5 py-1.5 text-[12px] font-bold text-primary hover:bg-primary-light rounded-lg transition-colors"
                       >
                         Edit
                       </button>
@@ -126,7 +126,7 @@ export function RolesPermissionsOverlay({ isOpen, onClose, accountId }: RolesPer
               Duplicate a template into your account, then edit freely.
             </p>
             {loading ? (
-              <div className="py-6 flex justify-center"><Loader2 className="animate-spin text-[#53B175]" /></div>
+              <div className="py-6 flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
             ) : (
               <ul className="divide-y divide-gray-100">
                 {templates.map((t) => (
@@ -233,7 +233,7 @@ function RoleEditorModal({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1.5 w-full px-3.5 py-2.5 text-[13px] border border-[#EEEEEE] rounded-xl outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 text-gray-700 bg-[#FAFAFA] focus:bg-white transition-all"
+                className="mt-1.5 w-full px-3.5 py-2.5 text-[13px] border border-[#EEEEEE] rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-gray-700 bg-[#FAFAFA] focus:bg-white transition-all"
               />
             </label>
             <label className="block">
@@ -242,7 +242,7 @@ function RoleEditorModal({
                 value={roleScope}
                 onChange={(e) => setRoleScope(e.target.value)}
                 disabled={!!existing}
-                className="mt-1.5 w-full px-3.5 py-2.5 text-[13px] border border-[#EEEEEE] rounded-xl outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 text-gray-700 bg-white disabled:bg-gray-50 transition-all"
+                className="mt-1.5 w-full px-3.5 py-2.5 text-[13px] border border-[#EEEEEE] rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-gray-700 bg-white disabled:bg-gray-50 transition-all"
               >
                 <option value="account">Account</option>
                 <option value="vendor">Vendor</option>
@@ -258,7 +258,7 @@ function RoleEditorModal({
                 value={description ?? ''}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="What does this role do?"
-                className="mt-1.5 w-full px-3.5 py-2.5 text-[13px] border border-[#EEEEEE] rounded-xl outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 text-gray-700 bg-[#FAFAFA] focus:bg-white transition-all"
+                className="mt-1.5 w-full px-3.5 py-2.5 text-[13px] border border-[#EEEEEE] rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-gray-700 bg-[#FAFAFA] focus:bg-white transition-all"
               />
             </label>
           </div>
@@ -268,7 +268,7 @@ function RoleEditorModal({
             scope={matrixScope}
             permissions={permissions}
             onChange={setPermissions}
-            accent="#53B175"
+            accent="#6B1D2E"
           />
         </div>
 
@@ -284,7 +284,7 @@ function RoleEditorModal({
             <button
               onClick={submit}
               disabled={submitting || !name}
-              className="px-4 py-2 bg-[#53B175] text-white text-[13px] font-bold rounded-xl hover:bg-[#48a068] disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 bg-primary text-white text-[13px] font-bold rounded-xl hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2 shadow-sm shadow-primary/20"
             >
               {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
               {existing ? 'Save changes' : 'Create role'}

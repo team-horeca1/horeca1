@@ -84,7 +84,7 @@ export function StatementSection() {
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <KpiStatCard label="Total spent (debit)" value={fmtMoney(totals.debit)} Icon={IndianRupee} tint="text-red-500 bg-red-50" />
-        <KpiStatCard label="Total repaid (credit)" value={fmtMoney(totals.credit)} Icon={IndianRupee} tint="text-[#299E60] bg-[#EEF8F1]" />
+        <KpiStatCard label="Total repaid (credit)" value={fmtMoney(totals.credit)} Icon={IndianRupee} tint="text-[#6B1D2E] bg-[#F8E8EC]" />
         <KpiStatCard label="Entries" value={filtered.length} Icon={FileText} tint="text-blue-600 bg-blue-50" />
       </div>
 
@@ -104,13 +104,13 @@ export function StatementSection() {
                 placeholder="Search customer / wallet / note"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-[38px] w-full border border-[#EEEEEE] rounded-[10px] pl-9 pr-3 text-[12.5px] outline-none focus:border-[#299E60]/40 bg-white"
+                className="h-[38px] w-full border border-[#EEEEEE] rounded-[10px] pl-9 pr-3 text-[12.5px] outline-none focus:border-[#6B1D2E]/40 bg-white"
               />
             </div>
             <select
               value={dir}
               onChange={(e) => setDir(e.target.value as '' | 'debit' | 'credit')}
-              className="h-[38px] border border-[#EEEEEE] rounded-[10px] px-3 text-[12.5px] font-semibold outline-none focus:border-[#299E60]/40 cursor-pointer bg-white"
+              className="h-[38px] border border-[#EEEEEE] rounded-[10px] px-3 text-[12.5px] font-semibold outline-none focus:border-[#6B1D2E]/40 cursor-pointer bg-white"
             >
               <option value="">All entries</option>
               <option value="debit">Debit (spends / fees)</option>
@@ -122,7 +122,7 @@ export function StatementSection() {
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="animate-spin text-[#299E60]" size={32} />
+            <Loader2 className="animate-spin text-[#6B1D2E]" size={32} />
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center">
@@ -169,7 +169,7 @@ export function StatementSection() {
                     <td className="py-3 px-4 text-right text-[13px] font-bold text-[#E74C3C] whitespace-nowrap">
                       {r.debit != null ? fmtMoney(r.debit) : '—'}
                     </td>
-                    <td className="py-3 px-4 text-right text-[13px] font-bold text-[#299E60] whitespace-nowrap">
+                    <td className="py-3 px-4 text-right text-[13px] font-bold text-[#6B1D2E] whitespace-nowrap">
                       {r.credit != null ? fmtMoney(r.credit) : '—'}
                     </td>
                     <td className="py-3 px-4 text-right text-[13px] font-semibold text-[#181725] whitespace-nowrap">

@@ -193,24 +193,23 @@ export default function ApprovalsPage() {
         : pendingBrands;
 
     const reviewBtnCls =
-        'flex items-center gap-1.5 h-[34px] px-4 bg-[#181725] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#2d2d3d] transition-colors';
+        'flex items-center justify-center gap-1.5 min-h-12 lg:min-h-[38px] px-4 bg-primary text-white rounded-[12px] text-[13px] font-semibold hover:bg-primary-dark transition-colors w-full lg:w-auto';
 
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <Loader2 className="w-10 h-10 animate-spin text-[#299E60]" />
+                <Loader2 className="w-10 h-10 animate-spin text-primary" />
             </div>
         );
     }
 
     return (
         <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500">
-            <h1 className="text-[clamp(1.25rem,2vw+0.5rem,1.75rem)] font-bold text-[#181725]">
+            <h1 className="text-[clamp(1.25rem,4vw,1.75rem)] font-semibold text-[#181725]">
                 Approvals
             </h1>
-            {/* Centered section tabs */}
-            <div className="flex justify-center">
-                <nav className="inline-flex items-center gap-0.5 border-b border-[#EEEEEE]">
+            <div className="-mx-4 px-4 overflow-x-auto">
+                <nav className="inline-flex min-w-full lg:min-w-0 items-center gap-0.5 border-b border-[#EEEEEE]">
                     {([
                         { key: 'Vendors' as SectionTab, icon: Store, count: summary.pendingVendors },
                         { key: 'Products' as SectionTab, icon: Package, count: summary.pendingProducts },
@@ -221,18 +220,19 @@ export default function ApprovalsPage() {
                         return (
                         <button
                             key={key}
+                            type="button"
                             onClick={() => { setSectionTab(key); setSearchQuery(''); }}
                             className={cn(
-                                'flex items-center gap-2 px-6 py-3 text-[14px] font-bold transition-all border-b-2 -mb-px',
+                                'flex items-center gap-2 min-h-12 px-4 lg:px-6 text-[13px] lg:text-[14px] font-semibold transition-all border-b-2 -mb-px whitespace-nowrap',
                                 isActive
-                                    ? 'border-[#299E60] text-[#299E60] bg-[#EEF8F1]/60'
-                                    : 'border-transparent text-[#181725] hover:text-[#299E60] hover:bg-[#F8F9FB]',
+                                    ? 'border-primary text-primary bg-primary-light/60'
+                                    : 'border-transparent text-[#181725] hover:text-primary hover:bg-[#F8F9FB]',
                             )}
                         >
                             <Icon
                                 size={18}
                                 strokeWidth={2.5}
-                                className={cn(isActive ? 'text-[#299E60]' : 'text-[#181725]')}
+                                className={cn(isActive ? 'text-primary' : 'text-[#181725]')}
                             />
                             {key}
                             {count > 0 && (
@@ -252,32 +252,33 @@ export default function ApprovalsPage() {
             {/* Main Content Card */}
             <div className="bg-white rounded-[24px] border border-[#EEEEEE] shadow-sm overflow-hidden">
                 {/* Search */}
-                <div className="p-6 border-b border-[#EEEEEE] flex items-center justify-between gap-4">
-                    <h2 className="text-[18px] font-[900] text-[#181725]">
+                <div className="p-4 lg:p-6 border-b border-[#EEEEEE] flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <h2 className="text-[16px] lg:text-[18px] font-semibold text-[#181725]">
                         {sectionTab === 'Vendors' ? `${vendorTab} Vendors` : `Pending ${sectionTab}`}
                     </h2>
-                    <div className="relative min-w-[280px]">
+                    <div className="relative w-full lg:min-w-[280px] lg:w-auto">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#AEAEAE]" size={16} />
                         <input
                             type="text"
                             placeholder={`Search ${sectionTab.toLowerCase()}...`}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[12px] py-2.5 pl-10 pr-4 text-[13px] outline-none placeholder:text-[#AEAEAE] font-medium focus:border-[#299E60]/40 focus:bg-white"
+                            className="w-full h-12 bg-[#F8F9FB] border border-[#EEEEEE] rounded-[12px] py-2.5 pl-10 pr-4 text-[13px] outline-none placeholder:text-[#AEAEAE] font-medium focus:border-primary/40 focus:bg-white"
                         />
                     </div>
                 </div>
 
                 {/* Vendor sub-tabs */}
                 {sectionTab === 'Vendors' && (
-                    <div className="px-6 pt-4 flex gap-2">
+                    <div className="px-4 lg:px-6 pt-4 flex gap-2 overflow-x-auto">
                         {(['Pending', 'Approved', 'All'] as const).map(tab => (
                             <button
                                 key={tab}
+                                type="button"
                                 onClick={() => setVendorTab(tab)}
                                 className={cn(
-                                    'px-4 py-1.5 rounded-[8px] text-[13px] font-bold transition-all',
-                                    vendorTab === tab ? 'bg-[#299E60] text-white' : 'bg-[#F8F9FB] text-[#AEAEAE] hover:text-[#7C7C7C]',
+                                    'min-h-12 lg:min-h-0 lg:px-4 lg:py-1.5 px-4 rounded-[12px] lg:rounded-[8px] text-[13px] font-semibold transition-all whitespace-nowrap',
+                                    vendorTab === tab ? 'bg-primary text-white shadow-sm shadow-primary/20' : 'bg-[#F8F9FB] text-[#6B7280] hover:text-[#1C1C1C]',
                                 )}
                             >
                                 {tab}
@@ -288,7 +289,47 @@ export default function ApprovalsPage() {
 
                 {/* ── VENDORS TABLE ── */}
                 {sectionTab === 'Vendors' && (
-                    <div className="overflow-x-auto">
+                    <>
+                    <div className="lg:hidden p-4 space-y-3">
+                        {getDisplayVendors().map((vendor) => (
+                            <div key={vendor.id} className="rounded-[16px] border border-divider bg-ivory p-4 space-y-3">
+                                <div className="flex items-start gap-3">
+                                    {vendor.logoUrl ? (
+                                        <img src={vendor.logoUrl} alt="" className="size-11 rounded-full object-cover border" />
+                                    ) : (
+                                        <div className="size-11 rounded-full flex items-center justify-center text-[12px] font-bold bg-primary-light text-primary">
+                                            {getInitials(vendor.businessName)}
+                                        </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[15px] font-semibold text-[#181725]">{vendor.businessName}</p>
+                                        <p className="text-[12px] text-[#6B7280]">{vendor.user.fullName}</p>
+                                        <p className="text-[12px] text-[#6B7280] mt-0.5">{vendor._count.products} products · {formatDate(vendor.createdAt)}</p>
+                                    </div>
+                                    <span className={cn(
+                                        'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase shrink-0',
+                                        vendor.isVerified ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FFF7E6] text-[#F59E0B]',
+                                    )}>
+                                        {vendor.isVerified ? 'Verified' : 'Pending'}
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setReviewTarget({ type: 'vendor', id: vendor.id })}
+                                    className={reviewBtnCls}
+                                >
+                                    <Eye size={14} /> Review
+                                </button>
+                            </div>
+                        ))}
+                        {getDisplayVendors().length === 0 && (
+                            <div className="py-12 text-center">
+                                <ClipboardList size={36} className="mx-auto text-[#EEEEEE] mb-2" />
+                                <p className="text-[#AEAEAE] font-semibold text-[14px]">No {vendorTab.toLowerCase()} vendors</p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="hidden lg:block overflow-x-auto">
                         <table className="w-full text-left">
                             <thead>
                                 <tr className="bg-[#F8F9FB]">
@@ -308,7 +349,7 @@ export default function ApprovalsPage() {
                                                 {vendor.logoUrl ? (
                                                     <img src={vendor.logoUrl} alt="" className="w-9 h-9 rounded-full object-cover border" />
                                                 ) : (
-                                                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold bg-[#EEF8F1] text-[#299E60]">
+                                                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-bold bg-primary-light text-primary">
                                                         {getInitials(vendor.businessName)}
                                                     </div>
                                                 )}
@@ -321,7 +362,7 @@ export default function ApprovalsPage() {
                                         <td className="px-6 py-4">
                                             <span className={cn(
                                                 'text-[11px] font-[900] px-2.5 py-1 rounded-[6px] uppercase',
-                                                vendor.isVerified ? 'bg-[#EEF8F1] text-[#299E60]' : 'bg-[#FFF7E6] text-[#F59E0B]',
+                                                vendor.isVerified ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FFF7E6] text-[#F59E0B]',
                                             )}>
                                                 {vendor.isVerified ? 'Verified' : 'Pending'}
                                             </span>
@@ -345,11 +386,65 @@ export default function ApprovalsPage() {
                             </tbody>
                         </table>
                     </div>
+                    </>
                 )}
 
                 {/* ── PRODUCTS TABLE ── */}
                 {sectionTab === 'Products' && (
-                    <div className="overflow-x-auto">
+                    <>
+                    <div className="lg:hidden p-4 space-y-3">
+                        {filteredProducts.map((product) => {
+                            const isEditPending = product.approvalStatus === 'pending_edit';
+                            const typeLabel = product.kind === 'master'
+                                ? 'Master Catalog'
+                                : isEditPending
+                                    ? 'Edit Pending'
+                                    : 'New Submission';
+                            return (
+                                <div key={`${product.kind ?? 'vendor'}-${product.id}`} className="rounded-[16px] border border-divider bg-ivory p-4 space-y-3">
+                                    <div className="flex items-start gap-3">
+                                        {product.imageUrl ? (
+                                            <img src={product.imageUrl} alt="" className="size-11 rounded-[8px] object-cover border" />
+                                        ) : (
+                                            <div className="size-11 rounded-[8px] bg-[#F8F9FB] flex items-center justify-center text-[#AEAEAE]">
+                                                <Package size={16} />
+                                            </div>
+                                        )}
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-[15px] font-semibold text-[#181725]">{product.name}</p>
+                                            <p className="text-[12px] text-[#6B7280]">
+                                                {product.kind === 'master' ? 'Master Catalog' : product.vendor.businessName}
+                                            </p>
+                                            <p className="text-[12px] text-[#6B7280] mt-0.5">
+                                                {product.category?.name || '—'} · {product.kind === 'master' ? '—' : formatINR(Number(product.basePrice))}
+                                            </p>
+                                        </div>
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase bg-[#FFF7E6] text-[#F59E0B] shrink-0">
+                                            {typeLabel}
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setReviewTarget({
+                                            type: 'product',
+                                            id: product.id,
+                                            kind: product.kind ?? 'vendor',
+                                        })}
+                                        className={reviewBtnCls}
+                                    >
+                                        <Eye size={14} /> Review
+                                    </button>
+                                </div>
+                            );
+                        })}
+                        {filteredProducts.length === 0 && (
+                            <div className="py-12 text-center">
+                                <Package size={36} className="mx-auto text-[#EEEEEE] mb-2" />
+                                <p className="text-[#AEAEAE] font-semibold text-[14px]">No pending products</p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="hidden lg:block overflow-x-auto">
                         <table className="w-full text-left">
                             <thead>
                                 <tr className="bg-[#F8F9FB]">
@@ -371,7 +466,7 @@ export default function ApprovalsPage() {
                                             ? 'Edit Pending'
                                             : 'New Submission';
                                     const typeCls = product.kind === 'master'
-                                        ? 'bg-[#EEF8F1] text-[#299E60]'
+                                        ? 'bg-[#F8E8EC] text-[#6B1D2E]'
                                         : isEditPending
                                             ? 'bg-[#FFF8E1] text-[#8B6914]'
                                             : 'bg-[#FFF7E6] text-[#F59E0B]';
@@ -397,7 +492,7 @@ export default function ApprovalsPage() {
                                         <td className="px-6 py-4">
                                             <span className={cn(
                                                 'text-[13px] font-semibold',
-                                                product.kind === 'master' ? 'text-[#299E60]' : 'text-[#181725]',
+                                                product.kind === 'master' ? 'text-[#6B1D2E]' : 'text-[#181725]',
                                             )}>
                                                 {product.kind === 'master' ? 'Master Catalog' : product.vendor.businessName}
                                             </span>
@@ -442,11 +537,41 @@ export default function ApprovalsPage() {
                             </tbody>
                         </table>
                     </div>
+                    </>
                 )}
 
                 {/* ── CATEGORIES TABLE ── */}
                 {sectionTab === 'Categories' && (
-                    <div className="overflow-x-auto">
+                    <>
+                    <div className="lg:hidden p-4 space-y-3">
+                        {filteredCategories.map((cat) => (
+                            <div key={cat.id} className="rounded-[16px] border border-divider bg-ivory p-4 space-y-3">
+                                <div className="flex items-start gap-3">
+                                    <div className="size-11 rounded-[8px] bg-primary-light flex items-center justify-center text-primary">
+                                        <Tag size={16} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[15px] font-semibold text-[#181725]">{cat.name}</p>
+                                        <p className="text-[12px] text-[#6B7280]">{cat.parent?.name || 'Top-level'} · {formatDate(cat.createdAt)}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setReviewTarget({ type: 'category', id: cat.id })}
+                                    className={reviewBtnCls}
+                                >
+                                    <Eye size={14} /> Review
+                                </button>
+                            </div>
+                        ))}
+                        {filteredCategories.length === 0 && (
+                            <div className="py-12 text-center">
+                                <Tag size={36} className="mx-auto text-[#EEEEEE] mb-2" />
+                                <p className="text-[#AEAEAE] font-semibold text-[14px]">No pending categories</p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="hidden lg:block overflow-x-auto">
                         <table className="w-full text-left">
                             <thead>
                                 <tr className="bg-[#F8F9FB]">
@@ -488,11 +613,46 @@ export default function ApprovalsPage() {
                             </tbody>
                         </table>
                     </div>
+                    </>
                 )}
 
                 {/* ── BRANDS TABLE ── */}
                 {sectionTab === 'Brands' && (
-                    <div className="overflow-x-auto">
+                    <>
+                    <div className="lg:hidden p-4 space-y-3">
+                        {filteredBrands.map((brand) => (
+                            <div key={brand.id} className="rounded-[16px] border border-divider bg-ivory p-4 space-y-3">
+                                <div className="flex items-start gap-3">
+                                    {brand.logoUrl ? (
+                                        <img src={brand.logoUrl} alt="" className="size-11 rounded-full object-cover border" />
+                                    ) : (
+                                        <div className="size-11 rounded-full flex items-center justify-center text-[12px] font-bold bg-primary-light text-primary">
+                                            {getInitials(brand.name)}
+                                        </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[15px] font-semibold text-[#181725]">{brand.name}</p>
+                                        <p className="text-[12px] text-[#6B7280]">{brand.user?.fullName ?? '—'}</p>
+                                        <p className="text-[12px] text-[#6B7280] truncate">{brand.user?.email ?? 'Label-only brand'}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setReviewTarget({ type: 'brand', id: brand.id })}
+                                    className={reviewBtnCls}
+                                >
+                                    <Eye size={14} /> Review
+                                </button>
+                            </div>
+                        ))}
+                        {filteredBrands.length === 0 && (
+                            <div className="py-12 text-center">
+                                <Sparkles size={36} className="mx-auto text-[#EEEEEE] mb-2" />
+                                <p className="text-[#AEAEAE] font-semibold text-[14px]">No pending brands</p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="hidden lg:block overflow-x-auto">
                         <table className="w-full text-left">
                             <thead>
                                 <tr className="bg-[#F8F9FB]">
@@ -540,6 +700,7 @@ export default function ApprovalsPage() {
                             </tbody>
                         </table>
                     </div>
+                    </>
                 )}
 
                 {/* Footer */}

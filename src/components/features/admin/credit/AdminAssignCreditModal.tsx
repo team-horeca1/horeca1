@@ -141,7 +141,7 @@ export function AdminAssignCreditModal({ editing = null, onClose, onSuccess }: A
   };
 
   const labelCls = 'block text-[12px] font-semibold text-[#7C7C7C] mb-1';
-  const inputSm = 'w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white';
+  const inputSm = 'w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#6B1D2E]/50 bg-white';
 
   return (
     <div className="fixed inset-0 z-[10001] bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
@@ -221,7 +221,7 @@ export function AdminAssignCreditModal({ editing = null, onClose, onSuccess }: A
                   key={amt}
                   type="button"
                   onClick={() => setFormCreditLimit(String(amt))}
-                  className="px-3 h-[30px] rounded-full text-[12px] font-semibold border border-[#EEEEEE] text-[#7C7C7C] hover:border-[#299E60] hover:text-[#299E60] transition-colors"
+                  className="px-3 h-[30px] rounded-full text-[12px] font-semibold border border-[#EEEEEE] text-[#7C7C7C] hover:border-[#6B1D2E] hover:text-[#6B1D2E] transition-colors"
                 >
                   ₹{amt.toLocaleString('en-IN')}
                 </button>
@@ -243,7 +243,7 @@ export function AdminAssignCreditModal({ editing = null, onClose, onSuccess }: A
                   key={opt.v || 'default'}
                   className={cn(
                     'flex items-start gap-3 p-3 rounded-[12px] border cursor-pointer transition-colors',
-                    terms === opt.v ? 'border-[#299E60] bg-[#EEF8F1]/50' : 'border-[#EEEEEE] hover:border-[#299E60]/40',
+                    terms === opt.v ? 'border-[#6B1D2E] bg-[#F8E8EC]/50' : 'border-[#EEEEEE] hover:border-[#6B1D2E]/40',
                   )}
                 >
                   <input
@@ -251,7 +251,7 @@ export function AdminAssignCreditModal({ editing = null, onClose, onSuccess }: A
                     name="admin-terms"
                     checked={terms === opt.v}
                     onChange={() => setTerms(opt.v)}
-                    className="mt-0.5 accent-[#299E60]"
+                    className="mt-0.5 accent-[#6B1D2E]"
                   />
                   <span>
                     <span className="block text-[13px] font-semibold text-[#181725]">{opt.title}</span>
@@ -289,7 +289,7 @@ export function AdminAssignCreditModal({ editing = null, onClose, onSuccess }: A
             <button
               type="button"
               onClick={() => setShowAdvanced((s) => !s)}
-              className="text-[12.5px] font-semibold text-[#299E60] hover:underline"
+              className="text-[12.5px] font-semibold text-[#6B1D2E] hover:underline"
             >
               {showAdvanced ? 'Hide' : 'Show'} interest, penalty &amp; grace overrides
             </button>
@@ -325,7 +325,7 @@ export function AdminAssignCreditModal({ editing = null, onClose, onSuccess }: A
             type="button"
             onClick={submit}
             disabled={submitting}
-            className="px-5 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold disabled:opacity-50 flex items-center gap-2"
+            className="px-5 h-[38px] rounded-[10px] bg-[#6B1D2E] text-white text-[13px] font-bold disabled:opacity-50 flex items-center gap-2"
           >
             {submitting ? <Loader2 size={13} className="animate-spin" /> : isEdit ? <Pencil size={13} /> : <Plus size={13} />}
             {isEdit ? 'Save changes' : 'Assign / Update'}

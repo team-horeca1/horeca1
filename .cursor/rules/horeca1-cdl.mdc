@@ -1,0 +1,42 @@
+---
+description: Horeca1 Commerce Design Language (CDL) — canonical tokens, IA, and UI rules
+alwaysApply: true
+---
+
+# Horeca1 CDL (Frozen v1)
+
+## Brand tokens
+
+- Primary burgundy: `#6B1D2E` · hover `#5A1926` · pressed `#4A141F` · tint `#F8E8EC`
+- Page bg: `#FAF7F2` · ivory `#FFF7F0` · cream `#FAF5EC` · card `#FFFFFF` · divider `#E9E3DD`
+- Text ink: `#1C1C1C` · secondary `#667085` · muted `#6B7280`
+- Semantic only (never brand CTAs): success `#16A34A` · warning `#F59E0B` · error `#DC2626` · info `#2563EB`
+- Font: Inter 400/500/600/700/800. Body 400. Headings 600–700. Prices use `tabular-nums`.
+- Radius: 4 / 8 / 12 / 16 / 20 / full. Mobile primary CTA min height 48px.
+- 80-15-5: neutrals / burgundy / accent semantics.
+
+## Do
+
+- One primary burgundy CTA per view.
+- Section headers: burgundy title + optional "View all →" (SH-01).
+- Product cards: price hero, max 3 badges, 12px radius, burgundy outline 0.5pt.
+- Green only for savings, verified, success states.
+- Reuse existing cart/pricing/credit APIs — UI composition only.
+
+## Don't
+
+- Grocery green (`#299E60`, `#53B175`) as primary brand color.
+- Rainbow gradient tiles on homepage quick actions.
+- Body font-weight 200 or ultra-thin type.
+- Fake stats — hide chips if data unavailable.
+- Second cart or forked pricing logic for slab UI.
+
+## Homepage IA
+
+Guest: logo + login · deliver-to strip · hero · quick actions · categories · suppliers · brands · discovery · voices/editorial.
+
+Logged-in: alerts/cart/avatar · ordering-for strip · hero · task rail (cart resume, lists, credit, reorder) · same abundance below.
+
+## Bottom nav (mobile)
+
+Home · Search · Orders · Credit · Profile — burgundy active, context popups on Orders/Credit/Profile.

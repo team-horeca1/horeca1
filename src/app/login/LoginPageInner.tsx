@@ -196,7 +196,7 @@ export default function LoginPageInner() {
                 <button
                   type="button"
                   onClick={() => { setStep('form'); setOtp(['', '', '', '']); setApiError(''); }}
-                  className="inline-flex items-center gap-1 ml-2 align-baseline text-[12px] font-bold text-[#53B175] hover:underline"
+                  className="inline-flex items-center gap-1 ml-2 align-baseline text-[12px] font-bold text-primary hover:underline"
                 >
                   <Pencil size={12} /> Edit
                 </button>
@@ -216,8 +216,8 @@ export default function LoginPageInner() {
                     disabled={isLoading}
                     className={cn(
                       'w-[60px] h-[60px] text-center text-[24px] font-[800] border-2 rounded-xl outline-none transition-all',
-                      digit ? 'border-[#53B175] bg-green-50 text-[#53B175]' : 'border-gray-200 bg-white',
-                      'focus:border-[#53B175]',
+                      digit ? 'border-primary bg-primary-light text-primary' : 'border-gray-200 bg-white',
+                      'focus:border-primary',
                       isLoading && 'opacity-60 cursor-not-allowed',
                     )}
                   />
@@ -225,7 +225,7 @@ export default function LoginPageInner() {
               </div>
 
               <button onClick={() => handleVerifyOtp(otp.join(''))} disabled={isLoading || otp.join('').length !== 4}
-                className="w-full bg-[#53B175] hover:bg-[#48a068] text-white font-bold py-3 rounded-lg shadow-md shadow-green-100 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 rounded-lg shadow-md shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {isLoading && <Loader2 size={18} className="animate-spin" />}
                 Verify & Sign In
               </button>
@@ -234,7 +234,7 @@ export default function LoginPageInner() {
                 {resendTimer > 0 ? (
                   <p className="text-[13px] text-gray-400">Resend OTP in <span className="font-bold text-gray-600">{resendTimer}s</span></p>
                 ) : (
-                  <button onClick={handleSendOtp} disabled={isLoading} className="text-[13px] text-[#53B175] font-bold hover:underline disabled:opacity-50">
+                  <button onClick={handleSendOtp} disabled={isLoading} className="text-[13px] text-primary font-bold hover:underline disabled:opacity-50">
                     Resend OTP
                   </button>
                 )}
@@ -256,7 +256,7 @@ export default function LoginPageInner() {
                   <label className="text-[13px] font-semibold text-gray-500 ml-1">Mobile Number or Email</label>
                   <div className="relative flex items-center">
                     {isEmail ? (
-                      <Mail size={18} className="absolute left-4 text-[#53B175] pointer-events-none" />
+                      <Mail size={18} className="absolute left-4 text-primary pointer-events-none" />
                     ) : trimmedId.length > 0 ? (
                       <span className="absolute left-4 text-[14px] font-bold text-gray-500 select-none z-10">+91</span>
                     ) : (
@@ -268,7 +268,7 @@ export default function LoginPageInner() {
                       onKeyDown={e => e.key === 'Enter' && (usePassword ? handlePasswordLogin() : handleSendOtp())}
                       placeholder="Phone or email" autoFocus
                       className={cn(
-                        'w-full pr-4 py-3.5 bg-white border border-gray-200 rounded-lg text-sm font-bold outline-none focus:border-[#53B175] transition-colors',
+                        'w-full pr-4 py-3.5 bg-white border border-gray-200 rounded-lg text-sm font-bold outline-none focus:border-primary transition-colors',
                         isEmail || trimmedId.length > 0 ? 'pl-14' : 'pl-12',
                       )}
                     />
@@ -279,12 +279,12 @@ export default function LoginPageInner() {
                   <div className="space-y-1.5">
                     <label className="text-[13px] font-semibold text-gray-500 ml-1">Password</label>
                     <div className="relative">
-                      <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#53B175]" />
+                      <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-primary" />
                       <input type={showPassword ? 'text' : 'password'} value={password}
                         onChange={e => { setPassword(e.target.value); setApiError(''); }}
                         onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
                         placeholder="Enter password" autoComplete="current-password"
-                        className="w-full pl-12 pr-12 py-3.5 bg-white border border-gray-200 rounded-lg text-sm font-bold outline-none focus:border-[#53B175] transition-colors" />
+                        className="w-full pl-12 pr-12 py-3.5 bg-white border border-gray-200 rounded-lg text-sm font-bold outline-none focus:border-primary transition-colors" />
                       <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
@@ -296,7 +296,7 @@ export default function LoginPageInner() {
               <button
                 onClick={usePassword ? handlePasswordLogin : handleSendOtp}
                 disabled={isLoading}
-                className="w-full bg-[#53B175] hover:bg-[#48a068] text-white font-bold py-3.5 rounded-lg shadow-md shadow-green-100 mt-6 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3.5 rounded-lg shadow-md shadow-primary/20 mt-6 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                 {isLoading && <Loader2 size={18} className="animate-spin" />}
                 {usePassword ? 'Sign in' : 'Send OTP'}
               </button>
@@ -304,7 +304,7 @@ export default function LoginPageInner() {
               <button
                 type="button"
                 onClick={() => { setUsePassword(v => !v); setApiError(''); setPassword(''); }}
-                className="mt-4 text-[13px] text-[#53B175] font-bold hover:underline mx-auto block">
+                className="mt-4 text-[13px] text-primary font-bold hover:underline mx-auto block">
                 {usePassword ? 'Use OTP instead' : 'Have a password? Sign in with password'}
               </button>
 

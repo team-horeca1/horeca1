@@ -5,7 +5,7 @@ import { Copy, Check, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-medium focus:outline-none focus:border-[#53B175]';
+const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-medium focus:outline-none focus:border-[#6B1D2E]';
 const labelCls = 'block text-[11px] font-bold text-gray-500 mb-1';
 
 const num = (v: string): number | undefined => {
@@ -163,7 +163,7 @@ export function PayoutInviteModal({
                                 <p className="font-mono text-[13px] font-bold text-[#181725]">{trackingKey}</p>
                             </div>
                         )}
-                        <button onClick={onClose} className="mt-5 w-full py-2.5 rounded-xl bg-[#53B175] text-white text-[13px] font-bold hover:bg-[#48a068] cursor-pointer">
+                        <button onClick={onClose} className="mt-5 w-full py-2.5 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-[#48a068] cursor-pointer">
                             Done
                         </button>
                     </div>
@@ -266,7 +266,7 @@ export function PayoutInviteModal({
                         <button
                             onClick={submit}
                             disabled={saving}
-                            className="mt-5 w-full py-2.5 rounded-xl bg-[#53B175] text-white text-[13px] font-bold hover:bg-[#48a068] disabled:opacity-50 transition-colors cursor-pointer"
+                            className="mt-5 w-full py-2.5 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-[#48a068] disabled:opacity-50 transition-colors cursor-pointer"
                         >
                             {saving ? <Loader2 size={15} className="animate-spin mx-auto" /> : 'Create payout link'}
                         </button>

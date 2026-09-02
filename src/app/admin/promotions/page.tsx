@@ -82,7 +82,7 @@ const num = (v: string): number | undefined => {
 const toIsoStart = (d: string) => (d ? new Date(`${d}T00:00:00`).toISOString() : undefined);
 const toIsoEnd = (d: string) => (d ? new Date(`${d}T23:59:59`).toISOString() : undefined);
 
-const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-medium focus:outline-none focus:border-[#53B175]';
+const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-medium focus:outline-none focus:border-[#6B1D2E]';
 const labelCls = 'block text-[11px] font-bold text-gray-500 mb-1';
 const thCls = 'px-3 py-2.5 text-left text-[10px] uppercase tracking-wider font-bold text-gray-400';
 const tdCls = 'px-3 py-2.5 text-[12px] font-medium text-gray-700';
@@ -246,26 +246,26 @@ function CouponModal({ editing, onClose, onSaved }: { editing: CouponRow | null;
                 </div>
                 <div className="mt-4 space-y-2">
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#53B175]" checked={form.stacksWithVendorPromo} onChange={(e) => set({ stacksWithVendorPromo: e.target.checked })} />
+                        <input type="checkbox" className="accent-[#6B1D2E]" checked={form.stacksWithVendorPromo} onChange={(e) => set({ stacksWithVendorPromo: e.target.checked })} />
                         Can be clubbed with vendor store discounts
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#53B175]" checked={form.stacksWithCashback} onChange={(e) => set({ stacksWithCashback: e.target.checked })} />
+                        <input type="checkbox" className="accent-[#6B1D2E]" checked={form.stacksWithCashback} onChange={(e) => set({ stacksWithCashback: e.target.checked })} />
                         Can be clubbed with cashback offers
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#53B175]" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
+                        <input type="checkbox" className="accent-[#6B1D2E]" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
                         Can be clubbed with H1 Wallet
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#53B175]" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
+                        <input type="checkbox" className="accent-[#6B1D2E]" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
                         Active
                     </label>
                 </div>
                 <button
                     onClick={submit}
                     disabled={saving}
-                    className="mt-5 w-full py-2.5 rounded-xl bg-[#53B175] text-white text-[13px] font-bold hover:bg-[#48a068] disabled:opacity-50 transition-colors cursor-pointer"
+                    className="mt-5 w-full py-2.5 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-[#5A1926] disabled:opacity-50 transition-colors cursor-pointer"
                 >
                     {saving ? <Loader2 size={15} className="animate-spin mx-auto" /> : editing ? 'Save Changes' : 'Create Coupon'}
                 </button>
@@ -402,22 +402,22 @@ function CampaignModal({ editing, onClose, onSaved }: { editing: CampaignRow | n
                 <p className="mt-3 text-[11px] text-gray-400 font-medium">Credits the customer&apos;s H1 Wallet after delivery.</p>
                 <div className="mt-4 space-y-2">
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#53B175]" checked={form.stacksWithCoupon} onChange={(e) => set({ stacksWithCoupon: e.target.checked })} />
+                        <input type="checkbox" className="accent-[#6B1D2E]" checked={form.stacksWithCoupon} onChange={(e) => set({ stacksWithCoupon: e.target.checked })} />
                         Can be clubbed with coupons
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#53B175]" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
+                        <input type="checkbox" className="accent-[#6B1D2E]" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
                         Can be clubbed with H1 Wallet payment
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#53B175]" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
+                        <input type="checkbox" className="accent-[#6B1D2E]" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
                         Active
                     </label>
                 </div>
                 <button
                     onClick={submit}
                     disabled={saving}
-                    className="mt-5 w-full py-2.5 rounded-xl bg-[#53B175] text-white text-[13px] font-bold hover:bg-[#48a068] disabled:opacity-50 transition-colors cursor-pointer"
+                    className="mt-5 w-full py-2.5 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-[#5A1926] disabled:opacity-50 transition-colors cursor-pointer"
                 >
                     {saving ? <Loader2 size={15} className="animate-spin mx-auto" /> : editing ? 'Save Changes' : 'Create Campaign'}
                 </button>
@@ -531,7 +531,7 @@ function GrantModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
                 <button
                     onClick={submit}
                     disabled={saving || !selected}
-                    className="mt-5 w-full py-2.5 rounded-xl bg-[#53B175] text-white text-[13px] font-bold hover:bg-[#48a068] disabled:opacity-50 transition-colors cursor-pointer"
+                    className="mt-5 w-full py-2.5 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-[#5A1926] disabled:opacity-50 transition-colors cursor-pointer"
                 >
                     {saving ? <Loader2 size={15} className="animate-spin mx-auto" /> : 'Credit H1 Wallet'}
                 </button>
@@ -625,18 +625,18 @@ export default function AdminPromotionsPage() {
                     <h1 className="text-[clamp(1.2rem,1.5vw+0.6rem,1.6rem)] font-bold text-[#181725]">Promotions</h1>
                     <p className="text-[12px] text-gray-400 font-medium">Coupons, wallet cashback, and UPI payout links.</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                     {tab === 'coupons' && (
-                        <button onClick={() => setCouponModal({ open: true, editing: null })} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold hover:bg-[#48a068] transition-colors cursor-pointer">
+                        <button onClick={() => setCouponModal({ open: true, editing: null })} className="inline-flex items-center justify-center gap-1.5 min-h-12 px-4 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-semibold hover:bg-[#5A1926] transition-colors cursor-pointer">
                             <Plus size={14} /> New Coupon
                         </button>
                     )}
                     {tab === 'cashback' && (
                         <>
-                            <button onClick={() => setGrantOpen(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-[#181725] text-[12px] font-bold hover:bg-gray-50 transition-colors cursor-pointer">
+                            <button onClick={() => setGrantOpen(true)} className="inline-flex items-center justify-center gap-1.5 min-h-12 px-4 rounded-xl border border-gray-200 text-[#181725] text-[13px] font-semibold hover:bg-gray-50 transition-colors cursor-pointer">
                                 Instant H1 Wallet grant
                             </button>
-                            <button onClick={() => setCampaignModal({ open: true, editing: null })} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold hover:bg-[#48a068] transition-colors cursor-pointer">
+                            <button onClick={() => setCampaignModal({ open: true, editing: null })} className="inline-flex items-center justify-center gap-1.5 min-h-12 px-4 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-semibold hover:bg-[#5A1926] transition-colors cursor-pointer">
                                 <Plus size={14} /> New Campaign
                             </button>
                         </>
@@ -644,13 +644,13 @@ export default function AdminPromotionsPage() {
                 </div>
             </div>
 
-            <div className="flex gap-1 mb-5 bg-gray-100 rounded-xl p-1 w-fit">
+            <div className="grid grid-cols-3 gap-1 mb-5 bg-gray-100 rounded-xl p-1 w-full lg:w-fit">
                 {TABS.map((t) => (
                     <button
                         key={t.id}
                         onClick={() => setTab(t.id)}
                         className={cn(
-                            'inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-bold transition-colors cursor-pointer',
+                            'inline-flex items-center justify-center gap-1.5 min-h-12 px-2 lg:px-4 rounded-lg text-[12px] font-semibold transition-colors cursor-pointer',
                             tab === t.id ? 'bg-white text-[#181725] shadow-sm' : 'text-gray-500 hover:text-gray-700',
                         )}
                     >
@@ -669,7 +669,7 @@ export default function AdminPromotionsPage() {
                 />
             ) : loading ? (
                 <div className="flex items-center justify-center py-20">
-                    <Loader2 size={28} className="text-[#53B175] animate-spin" />
+                    <Loader2 size={28} className="text-[#6B1D2E] animate-spin" />
                 </div>
             ) : tab === 'coupons' ? (
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-x-auto">
@@ -696,7 +696,7 @@ export default function AdminPromotionsPage() {
                                 <tr key={c.id} className="hover:bg-gray-50/50">
                                     <td className={cn(tdCls, 'font-bold tracking-wide text-[#181725]')}>{c.code}</td>
                                     <td className={tdCls}>{c.name}</td>
-                                    <td className={tdCls}>{c.vendor?.businessName ?? <span className="text-[#53B175] font-bold">Platform</span>}</td>
+                                    <td className={tdCls}>{c.vendor?.businessName ?? <span className="text-[#6B1D2E] font-bold">Platform</span>}</td>
                                     <td className={tdCls}>
                                         {c.discountType === 'flat' ? inr(c.discountValue) : `${Number(c.discountValue)}%${c.maxDiscount ? ` (max ${inr(c.maxDiscount)})` : ''}`}
                                     </td>
@@ -704,19 +704,19 @@ export default function AdminPromotionsPage() {
                                     <td className={tdCls}>{fmtDate(c.startDate)} → {fmtDate(c.endDate)}</td>
                                     <td className={tdCls}>{c.usedCount}{c.usageLimit ? ` / ${c.usageLimit}` : ''}</td>
                                     <td className={tdCls}>
-                                        <span title="Clubs with vendor discounts" className={c.stacksWithVendorPromo ? 'text-[#53B175]' : 'text-gray-300'}>V</span>
+                                        <span title="Clubs with vendor discounts" className={c.stacksWithVendorPromo ? 'text-[#6B1D2E]' : 'text-gray-300'}>V</span>
                                         {' · '}
-                                        <span title="Clubs with cashback" className={c.stacksWithCashback ? 'text-[#53B175]' : 'text-gray-300'}>C</span>
+                                        <span title="Clubs with cashback" className={c.stacksWithCashback ? 'text-[#6B1D2E]' : 'text-gray-300'}>C</span>
                                         {' · '}
-                                        <span title="Clubs with H1 Wallet" className={c.stacksWithWallet ? 'text-[#53B175]' : 'text-gray-300'}>W</span>
+                                        <span title="Clubs with H1 Wallet" className={c.stacksWithWallet ? 'text-[#6B1D2E]' : 'text-gray-300'}>W</span>
                                     </td>
                                     <td className={tdCls}>
-                                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-green-50 text-[#53B175]' : 'bg-gray-100 text-gray-400')}>
+                                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-green-50 text-[#6B1D2E]' : 'bg-gray-100 text-gray-400')}>
                                             {c.isActive ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
                                     <td className={cn(tdCls, 'whitespace-nowrap')}>
-                                        <button onClick={() => setCouponModal({ open: true, editing: c })} className="p-1.5 text-gray-400 hover:text-[#53B175] cursor-pointer" title="Edit"><Pencil size={14} /></button>
+                                        <button onClick={() => setCouponModal({ open: true, editing: c })} className="p-1.5 text-gray-400 hover:text-[#6B1D2E] cursor-pointer" title="Edit"><Pencil size={14} /></button>
                                         <button onClick={() => deleteCoupon(c)} className="p-1.5 text-gray-400 hover:text-red-500 cursor-pointer" title="Delete"><Trash2 size={14} /></button>
                                     </td>
                                 </tr>
@@ -748,7 +748,7 @@ export default function AdminPromotionsPage() {
                             {campaigns.map((c) => (
                                 <tr key={c.id} className="hover:bg-gray-50/50">
                                     <td className={cn(tdCls, 'font-bold text-[#181725]')}>{c.name}</td>
-                                    <td className={tdCls}>{c.vendor?.businessName ?? <span className="text-[#53B175] font-bold">Platform</span>}</td>
+                                    <td className={tdCls}>{c.vendor?.businessName ?? <span className="text-[#6B1D2E] font-bold">Platform</span>}</td>
                                     <td className={tdCls}>
                                         {c.cashbackType === 'flat' ? inr(c.cashbackValue) : `${Number(c.cashbackValue)}%${c.maxCashback ? ` (max ${inr(c.maxCashback)})` : ''}`}
                                     </td>
@@ -758,12 +758,12 @@ export default function AdminPromotionsPage() {
                                     <td className={tdCls}>{fmtDate(c.startDate)} → {fmtDate(c.endDate)}</td>
                                     <td className={tdCls}>{c.usedCount}</td>
                                     <td className={tdCls}>
-                                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-green-50 text-[#53B175]' : 'bg-gray-100 text-gray-400')}>
+                                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-green-50 text-[#6B1D2E]' : 'bg-gray-100 text-gray-400')}>
                                             {c.isActive ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
                                     <td className={cn(tdCls, 'whitespace-nowrap')}>
-                                        <button onClick={() => setCampaignModal({ open: true, editing: c })} className="p-1.5 text-gray-400 hover:text-[#53B175] cursor-pointer" title="Edit"><Pencil size={14} /></button>
+                                        <button onClick={() => setCampaignModal({ open: true, editing: c })} className="p-1.5 text-gray-400 hover:text-[#6B1D2E] cursor-pointer" title="Edit"><Pencil size={14} /></button>
                                         <button onClick={() => deleteCampaign(c)} className="p-1.5 text-gray-400 hover:text-red-500 cursor-pointer" title="Delete"><Trash2 size={14} /></button>
                                     </td>
                                 </tr>

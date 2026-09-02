@@ -28,20 +28,20 @@ const FEATURES = [
 
 export function FeatureBar() {
     return (
-        <section className="w-full py-4 md:py-8 bg-white overflow-hidden">
-            <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 lg:gap-6">
+        <section className="w-full py-6 md:py-10 bg-background overflow-hidden">
+            <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-5">
                     {FEATURES.map((feature, idx) => (
                         <div
                             key={idx}
-                            className="flex items-center gap-4 md:gap-4 bg-[#e9f7ef] rounded-[18px] md:rounded-[20px] p-5 md:p-6 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
+                            className="flex items-center gap-4 bg-white border border-divider rounded-xl p-4 md:p-5 shadow-cdl-1 hover:shadow-cdl-2 hover:border-primary/20 transition-all duration-200"
                         >
-                            <div className="w-14 h-14 md:w-14 md:h-14 bg-[#239a5d] rounded-full flex items-center justify-center shrink-0 shadow-sm">
-                                <feature.icon className="w-7 h-7 md:w-7 md:h-7 text-white" />
+                            <div className="size-12 rounded-full bg-primary flex items-center justify-center shrink-0">
+                                <feature.icon className="size-5 text-white" strokeWidth={1.75} />
                             </div>
-                            <div className="flex flex-col">
-                                <h3 className="text-[17px] md:text-[16px] font-bold text-[#1c2e24] mb-0.5">{feature.title}</h3>
-                                <p className="text-[13px] md:text-[12px] text-text-muted font-medium">{feature.description}</p>
+                            <div className="flex flex-col min-w-0">
+                                <h3 className="text-[14px] md:text-[15px] font-bold text-text mb-0.5">{feature.title}</h3>
+                                <p className="text-[12px] text-text-secondary leading-snug">{feature.description}</p>
                             </div>
                         </div>
                     ))}

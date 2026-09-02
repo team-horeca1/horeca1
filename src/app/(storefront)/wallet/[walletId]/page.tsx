@@ -189,7 +189,7 @@ export default function DisccoCreditDetailPage() {
           }
         },
         modal: { ondismiss: () => setPaying(false) },
-        theme: { color: '#53B175' },
+        theme: { color: '#6B1D2E' },
       });
       rzp.open();
     } catch (e) {
@@ -202,7 +202,7 @@ export default function DisccoCreditDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="animate-spin text-[#53B175]" size={28} />
+        <Loader2 className="animate-spin text-primary" size={28} />
       </div>
     );
   }
@@ -212,7 +212,7 @@ export default function DisccoCreditDetailPage() {
       <div className="max-w-2xl mx-auto px-[clamp(1rem,3vw,2rem)] py-12 text-center space-y-3">
         <AlertCircle className="mx-auto text-rose-500" size={28} />
         <p className="text-[15px] font-semibold text-[#181725]">{error || 'Credit not found'}</p>
-        <Link href="/wallet" className="text-[13px] font-semibold text-[#53B175] hover:underline">Back to DiSCCO</Link>
+        <Link href="/wallet" className="text-[13px] font-semibold text-primary hover:underline">Back to DiSCCO</Link>
       </div>
     );
   }
@@ -228,7 +228,7 @@ export default function DisccoCreditDetailPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-[clamp(1rem,3vw,2rem)] py-[clamp(1.5rem,4vw,3rem)] space-y-6">
-      <Link href="/wallet" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-gray-500 hover:text-[#53B175]">
+      <Link href="/wallet" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-gray-500 hover:text-primary">
         <ArrowLeft size={14} /> DiSCCO
       </Link>
 
@@ -276,7 +276,7 @@ export default function DisccoCreditDetailPage() {
       )}
 
       {outstanding > 0 && (
-        <div className="rounded-2xl border border-[#53B175]/25 bg-[#53B175]/5 p-5 space-y-3">
+        <div className="rounded-2xl border border-primary/25 bg-primary/5 p-5 space-y-3">
           <h2 className="text-[15px] font-bold text-[#181725]">Repay</h2>
           <p className="text-[13px] text-gray-600">
             Outstanding {inr(outstanding)}
@@ -292,13 +292,13 @@ export default function DisccoCreditDetailPage() {
                 step="0.01"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[14px] font-semibold focus:outline-none focus:ring-2 focus:ring-[#53B175]/30"
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[14px] font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
             <button
               type="button"
               onClick={() => setAmount(String(outstanding))}
-              className="text-[12px] font-bold text-[#53B175] px-2 py-2.5 hover:underline"
+              className="text-[12px] font-bold text-primary px-2 py-2.5 hover:underline"
             >
               Pay full
             </button>
@@ -306,7 +306,7 @@ export default function DisccoCreditDetailPage() {
               type="button"
               onClick={() => void repay()}
               disabled={paying}
-              className="bg-[#53B175] text-white text-[13px] font-bold px-5 py-2.5 rounded-xl disabled:opacity-40 hover:bg-[#469E66]"
+              className="bg-primary text-white text-[13px] font-bold px-5 py-2.5 rounded-xl disabled:opacity-40 hover:bg-primary-dark shadow-sm shadow-primary/20"
             >
               {paying ? 'Opening…' : 'Pay now'}
             </button>

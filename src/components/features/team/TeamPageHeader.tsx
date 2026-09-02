@@ -25,13 +25,13 @@ export function TeamPageHeader({
   return (
     <div className="flex items-center justify-between gap-4 flex-wrap">
       <div className="min-w-0">
-        <h1 className="text-[28px] font-bold text-[#181725] leading-none mb-1">{title}</h1>
+        <h1 className="text-[clamp(1.25rem,4vw,1.75rem)] font-semibold text-[#181725] leading-none mb-1">{title}</h1>
         <p className="text-[#7C7C7C] text-[14px] font-medium">{subtitle}</p>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
         {canEdit && (
           <button onClick={onManageRolesClick}
-            className="h-[44px] px-4 bg-white border border-[#EEEEEE] text-[#181725] rounded-[12px] text-[14px] font-bold hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm">
+            className="min-h-12 flex-1 sm:flex-none px-4 bg-white border border-[#EEEEEE] text-[#181725] rounded-[12px] text-[14px] font-semibold hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 shadow-sm">
             <Settings2 size={16} /> Manage Roles
           </button>
         )}
@@ -39,7 +39,7 @@ export function TeamPageHeader({
           <button onClick={onAddMemberClick} style={{ backgroundColor: accent }}
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = accentHover; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = accent; }}
-            className="h-[44px] px-5 text-white rounded-[12px] text-[14px] font-bold transition-colors flex items-center gap-2 shadow-sm">
+            className="min-h-12 flex-1 sm:flex-none px-5 text-white rounded-[12px] text-[14px] font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm">
             <Plus size={16} /> {addLabel}
           </button>
         )}

@@ -318,7 +318,7 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
         {/* Header */}
         <div className="flex items-center justify-between px-7 py-5 border-b border-[#EEEEEE] shrink-0 bg-[#FAFAFA] rounded-t-[20px]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#53B175] to-[#299E60] rounded-[10px] flex items-center justify-center shadow-md shadow-green-100">
+            <div className="w-10 h-10 bg-gradient-to-br from-[#6B1D2E] to-[#6B1D2E] rounded-[10px] flex items-center justify-center shadow-md shadow-green-100">
               <UserPlus size={18} className="text-white" />
             </div>
             <div>
@@ -549,7 +549,7 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
                       key={t} type="button"
                       onClick={() => setBankAccountType(t)}
                       className={`flex-1 h-[40px] rounded-[10px] text-[12.5px] font-bold border-2 capitalize transition-all
-                        ${bankAccountType === t ? 'border-[#299E60] bg-[#ECFDF5] text-[#299E60]' : 'border-[#EEEEEE] bg-white text-[#7C7C7C]'}`}
+                        ${bankAccountType === t ? 'border-[#6B1D2E] bg-[#ECFDF5] text-[#6B1D2E]' : 'border-[#EEEEEE] bg-white text-[#7C7C7C]'}`}
                     >
                       {t}
                     </button>
@@ -653,7 +653,7 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
                     className={`flex-1 h-[40px] border rounded-[10px] px-3 text-[13px] outline-none bg-[#FAFAFA] focus:bg-white transition-all ${
                       fieldErrors.serviceablePincodes
                         ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/10'
-                        : 'border-[#EEEEEE] focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10'
+                        : 'border-[#EEEEEE] focus:border-[#6B1D2E]/40 focus:ring-2 focus:ring-[#6B1D2E]/10'
                     }`}
                   />
                   <button
@@ -662,7 +662,7 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
                       setFieldErrors(prev => ({ ...prev, serviceablePincodes: '' }));
                     }}
                     disabled={!PINCODE_RE.test(pincodeInput)}
-                    className="h-[40px] px-3 bg-[#299E60] hover:bg-[#238a54] disabled:bg-gray-300 text-white rounded-[10px] text-[12.5px] font-bold flex items-center gap-1"
+                    className="h-[40px] px-3 bg-[#6B1D2E] hover:bg-[#5A1926] disabled:bg-gray-300 text-white rounded-[10px] text-[12.5px] font-bold flex items-center gap-1"
                   >
                     <Plus size={13} /> Add
                   </button>
@@ -671,7 +671,7 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
                   {pincodes.length === 0 ? (
                     <p className="text-[11.5px] text-[#AEAEAE] italic">No pincodes added yet</p>
                   ) : pincodes.map((p) => (
-                    <span key={p} className="inline-flex items-center gap-1.5 text-[11.5px] font-mono font-bold bg-[#ECFDF5] text-[#299E60] px-2 py-1 rounded-full">
+                    <span key={p} className="inline-flex items-center gap-1.5 text-[11.5px] font-mono font-bold bg-[#ECFDF5] text-[#6B1D2E] px-2 py-1 rounded-full">
                       {p}
                       <button type="button" onClick={() => handleRemovePincode(p)} className="hover:text-[#181725]">
                         <X size={11} />
@@ -692,7 +692,7 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
                       }}
                       className={`p-3 rounded-[10px] text-[12px] font-bold border-2 text-left transition-all
                         ${deliveryCapability === d
-                          ? 'border-[#299E60] bg-[#ECFDF5] text-[#299E60]'
+                          ? 'border-[#6B1D2E] bg-[#ECFDF5] text-[#6B1D2E]'
                           : fieldErrors.deliveryCapability
                             ? 'border-red-400 bg-white text-[#7C7C7C]'
                             : 'border-[#EEEEEE] bg-white text-[#7C7C7C]'}`}
@@ -783,8 +783,8 @@ function Step({ num, label, current, showConnector }: { num: 1 | 2 | 3; label: s
       <div className="flex items-center gap-2">
         <div
           className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-300 shrink-0 ${
-            isCompleted ? 'bg-gradient-to-r from-[#53B175] to-[#299E60] text-white shadow-md shadow-green-100' :
-            isActive    ? 'bg-gradient-to-r from-[#53B175] to-[#299E60] text-white ring-4 ring-[#299E60]/10 shadow-md shadow-green-100' :
+            isCompleted ? 'bg-gradient-to-r from-[#6B1D2E] to-[#6B1D2E] text-white shadow-md shadow-green-100' :
+            isActive    ? 'bg-gradient-to-r from-[#6B1D2E] to-[#6B1D2E] text-white ring-4 ring-[#6B1D2E]/10 shadow-md shadow-green-100' :
                           'bg-[#FAFAFA] border border-[#EEEEEE] text-gray-400'
           }`}
         >
@@ -798,7 +798,7 @@ function Step({ num, label, current, showConnector }: { num: 1 | 2 | 3; label: s
       </div>
       {showConnector && (
         <div className="flex-1 mx-3 flex items-center">
-          <div className={`w-full h-[2px] rounded transition-colors duration-300 ${isCompleted ? 'bg-[#299E60]' : 'bg-[#EEEEEE]'}`} />
+          <div className={`w-full h-[2px] rounded transition-colors duration-300 ${isCompleted ? 'bg-[#6B1D2E]' : 'bg-[#EEEEEE]'}`} />
         </div>
       )}
     </>

@@ -3,11 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ClipboardList, Clock, ChevronRight, ChevronLeft, AlertCircle, ShoppingCart, Package, Eye } from 'lucide-react';
+import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { useStableSession } from '@/hooks/useStableSession';
 import { dal } from '@/lib/dal';
 import type { Vendor } from '@/types';
 import { useCart } from '@/context/CartContext';
+import { SectionHeader } from '@/components/ui/SectionHeader';
 
 /* ====================================================================
    OLD_CODE_START — Previous implementation (Quick Order Lists only)
@@ -68,7 +69,7 @@ export function ContinueOrdering() {
             <div className="max-w-[var(--container-max)] mx-auto overflow-hidden">
                 <div className="flex items-center justify-between mb-4 md:mb-6 px-6 md:px-[var(--container-padding)]">
                     <h2 className="text-[16px] md:text-[20px] lg:text-[22px] font-bold text-[#181725]">Continue Ordering</h2>
-                    <Link href="/order-lists" className="text-[13px] md:text-[15px] font-semibold text-[#53B175] hover:opacity-80 transition-opacity cursor-pointer">View all</Link>
+                    <Link href="/order-lists" className="text-[13px] md:text-[15px] font-semibold text-primary hover:opacity-80 transition-opacity cursor-pointer">View all</Link>
                 </div>
 
                 <div className="overflow-x-auto no-scrollbar scroll-smooth">
@@ -96,7 +97,7 @@ export function ContinueOrdering() {
                                 <Link
                                     key={vendorList.id}
                                     href={targetUrl}
-                                    className="flex items-center gap-3 md:gap-4 min-w-[260px] md:min-w-[320px] bg-white rounded-2xl p-3 md:p-4 border border-gray-200 shadow-sm hover:shadow-xl hover:shadow-gray-200/40 hover:border-[#53B175]/40 transition-all group shrink-0"
+                                    className="flex items-center gap-3 md:gap-4 min-w-[260px] md:min-w-[320px] bg-white rounded-2xl p-3 md:p-4 border border-gray-200 shadow-sm hover:shadow-xl hover:shadow-gray-200/40 hover:border-primary/40 transition-all group shrink-0"
                                 >
                                     <div className="w-12 h-12 md:w-16 md:h-16 shrink-0 relative flex items-center justify-center">
                                         {listLogos.length > 1 ? (
@@ -117,7 +118,7 @@ export function ContinueOrdering() {
                                                     </div>
                                                 ))}
                                                 {listLogos.length > 4 && (
-                                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 rounded-full bg-[#53B175] text-white text-[8px] md:text-[9px] font-bold flex items-center justify-center border border-white z-20">
+                                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 rounded-full bg-primary text-white text-[8px] md:text-[9px] font-bold flex items-center justify-center border border-white z-20">
                                                         +{listLogos.length - 4}
                                                     </div>
                                                 )}
@@ -130,7 +131,7 @@ export function ContinueOrdering() {
                                     </div>
 
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[14px] md:text-[16px] font-bold text-[#181725] line-clamp-1 transition-colors group-hover:text-[#53B175]">
+                                        <p className="text-[14px] md:text-[16px] font-bold text-[#181725] line-clamp-1 transition-colors group-hover:text-primary">
                                             {listTitle}
                                         </p>
                                         
@@ -164,7 +165,7 @@ export function ContinueOrdering() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="w-7 h-7 md:w-9 md:h-9 rounded-full bg-white flex items-center justify-center border border-gray-200 text-gray-400 group-hover:text-[#53B175] group-hover:border-[#53B175]/30 transition-all group-hover:translate-x-1 shadow-sm">
+                                    <div className="w-7 h-7 md:w-9 md:h-9 rounded-full bg-white flex items-center justify-center border border-gray-200 text-gray-400 group-hover:text-primary group-hover:border-primary/30 transition-all group-hover:translate-x-1 shadow-sm">
                                         <ChevronRight className="w-4 h-4 md:w-5 md:h-5 shrink-0" strokeWidth={2.5} />
                                     </div>
                                 </Link>
@@ -193,6 +194,7 @@ interface ContinueCard {
     vendorName: string;
     vendorLogo: string;
     vendorLogos?: string[]; // Multiple logos for multi-vendor lists
+    coverImage?: string;
     subtitle: string;
     subtitle2?: string; // Second line (for time/meta)
     subtitleIcon: 'cart' | 'order' | 'list' | 'viewed';
@@ -208,7 +210,7 @@ export function ContinueOrdering() {
     const [cards, setCards] = useState<ContinueCard[]>([]);
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [orderLists, setOrderLists] = useState<Record<string, unknown>[]>([]);
-    const { groups: cartGroups, totalItems: cartTotalItems } = useCart();
+    const { groups: cartGroups } = useCart();
     const pathname = usePathname(); // Re-runs buildCards on every route change
 
     const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -282,12 +284,14 @@ export function ContinueOrdering() {
                 const itemCount = group.items.reduce((sum, item) => sum + item.quantity, 0);
                 const total = group.subtotal;
 
+                const vendor = vendors.find(v => v.id === group.vendorId);
                 allCards.push({
                     id: `cart-${group.vendorId}`,
                     vendorId: group.vendorId,
                     vendorName: group.vendorName,
-                    vendorLogo: group.vendorLogo || vendors.find(v => v.id === group.vendorId)?.logo || '',
-                    subtitle: `${itemCount} items in cart • ₹${total.toLocaleString('en-IN')}`,
+                    vendorLogo: group.vendorLogo || vendor?.logo || '',
+                    coverImage: group.items[0]?.product?.images?.[0] || vendor?.coverImage,
+                    subtitle: `${itemCount} ${itemCount === 1 ? 'item' : 'items'} in cart • ₹${total.toLocaleString('en-IN')}`,
                     subtitleIcon: 'cart',
                     href: '/cart',
                     priority: 1,
@@ -316,6 +320,7 @@ export function ContinueOrdering() {
                                 vendorId,
                                 vendorName: order.vendorName || vendor?.name || 'Vendor',
                                 vendorLogo: order.vendorLogo || vendor?.logo || '',
+                                coverImage: vendor?.coverImage,
                                 subtitle: `Ordered`,
                                 subtitle2: getRelativeTime(new Date(order.createdAt).getTime()),
                                 subtitleIcon: 'order',
@@ -385,6 +390,7 @@ export function ContinueOrdering() {
                             vendorName: displayVendorName,
                             vendorLogo: list.vendorLogo || vendor?.logo || '',
                             vendorLogos: logos.length > 1 ? logos : undefined,
+                            coverImage: vendor?.coverImage,
                             subtitle: `${list.name} • ${list.items.length} items`,
                             subtitle2: `Used ${getRelativeTime(new Date(list.lastUsed!).getTime())}`,
                             subtitleIcon: 'list',
@@ -445,6 +451,7 @@ export function ContinueOrdering() {
                                 vendorId,
                                 vendorName: entry.vendorName || 'Vendor',
                                 vendorLogo: entry.vendorLogo || vendors.find(v => v.id === vendorId)?.logo || '',
+                                coverImage: vendors.find(v => v.id === vendorId)?.coverImage,
                                 subtitle: productLabel,
                                 subtitle2: finalSubtitle2,
                                 subtitleIcon: 'viewed',
@@ -485,50 +492,31 @@ export function ContinueOrdering() {
 
     if (!isMounted || !isLoggedIn || cards.length === 0) return null;
 
-    const getSubtitleIcon = (type: ContinueCard['subtitleIcon']) => {
-        switch (type) {
-            case 'cart':
-                return <ShoppingCart size={10} className="md:w-3 md:h-3" />;
-            case 'order':
-                return <Package size={10} className="md:w-3 md:h-3" />;
-            case 'list':
-                return <ClipboardList size={10} className="md:w-3 md:h-3" />;
-            case 'viewed':
-                return <Eye size={10} className="md:w-3 md:h-3" />;
-        }
-    };
-
-    const getSubtitleColor = (type: ContinueCard['subtitleIcon']) => {
-        switch (type) {
-            case 'cart':
-                return 'text-[#e67e22] font-bold';
-            case 'order':
-                return 'text-[#299e60] font-bold';
-            case 'list':
-                return 'text-[#3b82f6] font-bold';
-            case 'viewed':
-                return 'text-[#8b5cf6] font-bold';
-        }
+    const lineFor = (card: ContinueCard) => {
+        if (card.subtitleIcon === 'viewed' && card.subtitle2) return `Viewed · ${card.subtitle2}`;
+        if (card.subtitle2) return `${card.subtitle} · ${card.subtitle2}`;
+        return card.subtitle;
     };
 
     return (
-        <section className="w-full py-4 bg-white">
+        <section className="w-full py-4 bg-background">
             <div className="max-w-[var(--container-max)] mx-auto overflow-hidden">
-                <div className="flex items-center justify-between mb-6 px-6 md:px-[var(--container-padding)]">
-                    <h2 className="text-[18px] md:text-[22px] lg:text-[24px] font-[900] text-[#181725] tracking-tight">Continue Ordering</h2>
-                    <Link href="/continue-ordering" className="flex items-center gap-1 text-[#53B175] font-black text-sm hover:gap-2 transition-all cursor-pointer group">
-                        See All
-                        <ChevronRight size={14} strokeWidth={3} className="group-hover:translate-x-0.5 transition-transform" />
-                    </Link>
+                <div className="px-4 md:px-[var(--container-padding)]">
+                    <SectionHeader
+                        title="Continue Ordering"
+                        actionLabel="View all →"
+                        actionHref="/continue-ordering"
+                    />
                 </div>
 
-                <div className="relative w-full px-1">
+                <div className="relative w-full">
                     <button
+                        type="button"
                         onClick={() => scroll('left')}
                         disabled={!canScrollLeft}
-                        className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 bg-white rounded-full shadow-[0_10px_30px_-5px_rgba(0,0,0,0.15)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-gray-100 disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 size-12 bg-white rounded-full shadow-cdl-2 items-center justify-center hover:scale-105 active:scale-95 transition-all border border-divider disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
                     >
-                        <ChevronLeft size={24} className="text-[#181725]" strokeWidth={2.5} />
+                        <ChevronLeft size={22} className="text-[#1C1C1C]" strokeWidth={2.5} />
                     </button>
 
                     <div
@@ -536,83 +524,56 @@ export function ContinueOrdering() {
                         onScroll={checkScroll}
                         className="overflow-x-auto no-scrollbar scroll-smooth w-full"
                     >
-                        <div className="flex flex-nowrap gap-3 md:gap-5 py-4 px-6 md:px-[var(--container-padding)] w-max">
+                        <div className="flex flex-nowrap gap-2.5 md:gap-3 py-2 px-4 md:px-[var(--container-padding)] w-max">
                             {cards.map((card) => {
                                 const vendor = vendors.find(v => v.id === card.vendorId);
+                                const logo = card.vendorLogo || vendor?.logo || '';
 
                                 return (
                                     <Link
                                         key={card.id}
                                         href={card.href}
-                                        className="flex items-center gap-3 md:gap-4 min-w-[260px] md:min-w-[320px] bg-white rounded-2xl p-3 md:p-4 border border-gray-200 shadow-sm hover:shadow-2xl hover:shadow-gray-500/15 hover:border-[#53B175] hover:-translate-y-1.5 transition-all duration-300 group shrink-0"
+                                        className="flex items-center gap-3 shrink-0 min-w-[260px] md:min-w-[300px] bg-white border border-divider rounded-2xl px-3 py-3 shadow-cdl-1 hover:shadow-cdl-2 hover:border-primary/25 transition-all group"
                                     >
-                                        {/* Vendor Logo or Logo Stack */}
-                                        <div className="w-12 h-12 md:w-16 md:h-16 shrink-0 relative flex items-center justify-center">
+                                        <div className="size-12 md:size-14 rounded-[10px] bg-ivory border border-divider overflow-hidden shrink-0 flex items-center justify-center">
                                             {card.vendorLogos && card.vendorLogos.length > 1 ? (
                                                 <div className="relative w-full h-full">
                                                     {card.vendorLogos.slice(0, 4).map((logoUrl, i) => (
-                                                        <div 
-                                                            key={i} 
-                                                            className="absolute rounded-full overflow-hidden aspect-square bg-transparent"
-                                                            style={{ 
-                                                                width: '60%',
-                                                                height: '60%',
-                                                                left: (i === 1 || i === 3) ? '40%' : '0%',
-                                                                top: (i === 2 || i === 3) ? '40%' : '0%',
-                                                                zIndex: 4 - i 
-                                                            }}
-                                                        >
-                                                            <img src={logoUrl} alt="vendor" className="w-full h-full object-cover rounded-full border border-white" />
-                                                        </div>
-                                                    ))}
-                                                    {card.vendorLogos.length > 4 && (
-                                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 rounded-full bg-[#53B175] text-white text-[8px] md:text-[9px] font-bold flex items-center justify-center border border-white z-20">
-                                                            +{card.vendorLogos.length - 4}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-transparent overflow-hidden shrink-0 border border-gray-50">
-                                                    {(card.vendorLogo || vendor?.logo) ? (
                                                         <img
-                                                            src={card.vendorLogo || vendor?.logo}
-                                                            alt={card.vendorName}
-                                                            className="w-full h-full object-cover"
+                                                            key={i}
+                                                            src={logoUrl}
+                                                            alt=""
+                                                            className="absolute object-cover rounded-[4px] border border-white"
+                                                            style={{
+                                                                width: '52%',
+                                                                height: '52%',
+                                                                left: (i === 1 || i === 3) ? '42%' : '6%',
+                                                                top: (i === 2 || i === 3) ? '42%' : '6%',
+                                                                zIndex: 4 - i,
+                                                            }}
                                                         />
-                                                    ) : (
-                                                        <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs font-bold">
-                                                            {card.vendorName?.[0] || '?'}
-                                                        </div>
-                                                    )}
+                                                    ))}
                                                 </div>
+                                            ) : logo ? (
+                                                <img src={logo} alt="" className="w-full h-full object-contain p-1" />
+                                            ) : (
+                                                <span className="text-[15px] font-bold text-primary">
+                                                    {card.vendorName?.[0] || '?'}
+                                                </span>
                                             )}
                                         </div>
 
-                                        {/* Info */}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[14px] md:text-[16px] font-bold text-[#181725] line-clamp-1 transition-colors group-hover:text-[#53B175]">
+                                        <div className="flex-1 min-w-0 text-left">
+                                            <p className="text-[14px] md:text-[15px] font-bold text-[#1C1C1C] leading-tight line-clamp-1 group-hover:text-primary">
                                                 {card.vendorName}
                                             </p>
-
-                                            <div className="flex flex-col mt-0.5">
-                                                <div className="flex flex-col text-[10px] md:text-[12px] font-semibold whitespace-nowrap overflow-hidden">
-                                                    <div className={`flex items-center gap-0.5 ${getSubtitleColor(card.subtitleIcon)}`}>
-                                                        {getSubtitleIcon(card.subtitleIcon)}
-                                                        <span className="truncate">{card.subtitle}</span>
-                                                    </div>
-                                                    {card.subtitle2 && (
-                                                        <div className="flex items-center gap-1 mt-0.5 text-[9px] md:text-[11px] font-medium text-[#7C7C7C]">
-                                                            <Clock size={10} strokeWidth={2} />
-                                                            <span>{card.subtitle2}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
+                                            <p className="text-[12px] text-[#667085] mt-0.5 line-clamp-1">
+                                                {lineFor(card)}
+                                            </p>
                                         </div>
 
-                                        {/* Chevron */}
-                                        <div className="w-7 h-7 md:w-9 md:h-9 rounded-full bg-white flex items-center justify-center border border-gray-200 text-gray-400 group-hover:text-[#53B175] group-hover:border-[#53B175] transition-all group-hover:translate-x-1 shadow-sm">
-                                            <ChevronRight className="w-4 h-4 md:w-5 md:h-5 shrink-0" strokeWidth={2.5} />
+                                        <div className="size-10 rounded-full bg-primary-light text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-white transition-colors">
+                                            <ChevronRight size={18} strokeWidth={2.5} />
                                         </div>
                                     </Link>
                                 );
@@ -621,11 +582,12 @@ export function ContinueOrdering() {
                     </div>
 
                     <button
+                        type="button"
                         onClick={() => scroll('right')}
                         disabled={!canScrollRight}
-                        className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 bg-white rounded-full shadow-[0_10px_30px_-5px_rgba(0,0,0,0.15)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-gray-100 disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 size-12 bg-white rounded-full shadow-cdl-2 items-center justify-center hover:scale-105 active:scale-95 transition-all border border-divider disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
                     >
-                        <ChevronRight size={24} className="text-[#181725]" strokeWidth={2.5} />
+                        <ChevronRight size={22} className="text-[#1C1C1C]" strokeWidth={2.5} />
                     </button>
                 </div>
             </div>

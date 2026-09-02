@@ -116,7 +116,7 @@ const INR = (v: number | string) =>
 function getWalletStatusStyles(status: string) {
     switch (status) {
         case 'ACTIVE':
-            return 'bg-[#EEF8F1] text-[#299E60]';
+            return 'bg-[#F8E8EC] text-[#6B1D2E]';
         case 'BLOCKED':
             return 'bg-amber-50 text-amber-600';
         case 'BLACKLISTED':
@@ -146,7 +146,7 @@ function getRoleBadgeStyles(role: string) {
         case 'vendor':
             return 'bg-blue-50 text-blue-700';
         default:
-            return 'bg-[#EEF8F1] text-[#299E60]';
+            return 'bg-[#F8E8EC] text-[#6B1D2E]';
     }
 }
 
@@ -290,7 +290,7 @@ export default function CustomerDetailsPage() {
                 <p className="text-[16px] font-bold text-[#4B4B4B]">{error || 'User not found'}</p>
                 <button
                     onClick={() => router.back()}
-                    className="px-4 py-2 bg-[#299E60] text-white rounded-xl text-[14px] font-bold hover:bg-[#238a53] transition-colors"
+                    className="px-4 min-h-12 bg-[#6B1D2E] text-white rounded-xl text-[14px] font-semibold hover:bg-[#5A1926] transition-colors"
                 >
                     Go Back
                 </button>
@@ -303,7 +303,7 @@ export default function CustomerDetailsPage() {
     const creditWalletCount = user.creditWallets?.length ?? 0;
 
     const stats = [
-        { label: 'Total Orders', value: user._count.orders, icon: Package, color: '#299E60' },
+        { label: 'Total Orders', value: user._count.orders, icon: Package, color: '#6B1D2E' },
         { label: 'Order Lists', value: user._count.quickOrderLists, icon: ListOrdered, color: '#F59E0B' },
         { label: 'Credit Lines', value: creditWalletCount, icon: Wallet, color: '#3B82F6' },
         { label: 'Member Since', value: formatDateIndian(user.createdAt), icon: Calendar, color: '#8B5CF6' },
@@ -369,7 +369,7 @@ export default function CustomerDetailsPage() {
                             Cancel
                         </button>
                         <button type="button" onClick={handleSave} disabled={saving}
-                            className="px-4 py-1.5 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 disabled:opacity-50">
+                            className="px-4 py-1.5 bg-[#6B1D2E] text-white rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 disabled:opacity-50">
                             {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                             Save Changes
                         </button>
@@ -399,8 +399,8 @@ export default function CustomerDetailsPage() {
                 }
                 contact={
                     <AdminEntityContactGrid
-                        accent="#299E60"
-                        accentBg="#EEF8F1"
+                        accent="#6B1D2E"
+                        accentBg="#F8E8EC"
                         items={[
                             { icon: Mail, label: 'Email', value: user.email || '—' },
                             { icon: Phone, label: 'Phone', value: user.phone || '—' },
@@ -425,7 +425,7 @@ export default function CustomerDetailsPage() {
                                 <div className="space-y-6">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-[#F9FAFB] p-6 rounded-[14px] border border-[#F0F2F5]">
                                         <div className="flex items-center gap-4">
-                                            <div className="w-11 h-11 rounded-[10px] bg-[#EAF7EF] flex items-center justify-center text-[#299E60]">
+                                            <div className="w-11 h-11 rounded-[10px] bg-[#F8E8EC] flex items-center justify-center text-[#6B1D2E]">
                                                 <Calendar size={20} />
                                             </div>
                                             <div>
@@ -434,7 +434,7 @@ export default function CustomerDetailsPage() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-4">
-                                            <div className="w-11 h-11 rounded-[10px] bg-[#EAF7EF] flex items-center justify-center text-[#299E60]">
+                                            <div className="w-11 h-11 rounded-[10px] bg-[#F8E8EC] flex items-center justify-center text-[#6B1D2E]">
                                                 <FileText size={20} />
                                             </div>
                                             <div>
@@ -447,7 +447,7 @@ export default function CustomerDetailsPage() {
                                         <div className="rounded-[14px] border border-[#D1D5DB] p-5 bg-white">
                                             <div className="flex items-center justify-between mb-4">
                                                 <h3 className="font-bold text-[16px] flex items-center gap-2">
-                                                    <Building2 size={18} className="text-[#299E60]" />
+                                                    <Building2 size={18} className="text-[#6B1D2E]" />
                                                     Linked Vendor Profile
                                                 </h3>
                                                 <AdminStatusBadge variant={user.vendor.isVerified ? 'verified' : 'pending'} />
@@ -466,28 +466,28 @@ export default function CustomerDetailsPage() {
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <EditField label="Full Name">
                                                     <input value={draft.fullName} onChange={e => setDraft(d => ({ ...d, fullName: e.target.value }))}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
                                                 </EditField>
                                                 <EditField label="Email">
                                                     <input type="email" value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
                                                 </EditField>
                                                 <EditField label="Phone">
                                                     <input type="tel" inputMode="numeric" maxLength={10}
                                                         value={draft.phone} onChange={e => setDraft(d => ({ ...d, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
                                                 </EditField>
                                                 <EditField label="Pincode">
                                                     <input value={draft.pincode} onChange={e => setDraft(d => ({ ...d, pincode: e.target.value }))}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
                                                 </EditField>
                                                 <EditField label="Business name">
                                                     <input value={draft.businessName} onChange={e => setDraft(d => ({ ...d, businessName: e.target.value }))}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
                                                 </EditField>
                                                 <EditField label="GST number">
                                                     <input value={draft.gstNumber} onChange={e => setDraft(d => ({ ...d, gstNumber: e.target.value }))}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
                                                 </EditField>
                                                 {([
                                                     ['pan', 'PAN'], ['fssaiNumber', 'FSSAI'],
@@ -501,7 +501,7 @@ export default function CustomerDetailsPage() {
                                                 ] as [string, string][]).map(([key, label]) => (
                                                     <EditField key={key} label={label}>
                                                         <input value={draft.cp[key] ?? ''} onChange={e => setDraft(d => ({ ...d, cp: { ...d.cp, [key]: e.target.value } }))}
-                                                            className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
+                                                            className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#6B1D2E] font-semibold bg-[#F9FAFB] focus:bg-white transition-all" />
                                                     </EditField>
                                                 ))}
                                             </div>
@@ -511,7 +511,7 @@ export default function CustomerDetailsPage() {
                                             {/* Personal Info Grid */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <Users size={16} className="text-[#299E60]" />
+                                                    <Users size={16} className="text-[#6B1D2E]" />
                                                     Personal Information
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -526,7 +526,7 @@ export default function CustomerDetailsPage() {
                                             {/* Company Profile Info */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <Building2 size={16} className="text-[#299E60]" />
+                                                    <Building2 size={16} className="text-[#6B1D2E]" />
                                                     Company Registration Details
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -542,7 +542,7 @@ export default function CustomerDetailsPage() {
                                             {/* Billing & Address */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <MapPin size={16} className="text-[#299E60]" />
+                                                    <MapPin size={16} className="text-[#6B1D2E]" />
                                                     Billing Address & Location
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -558,7 +558,7 @@ export default function CustomerDetailsPage() {
                                             {/* Business Profile Details */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <SlidersHorizontal size={16} className="text-[#299E60]" />
+                                                    <SlidersHorizontal size={16} className="text-[#6B1D2E]" />
                                                     Business Profile Attributes
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -582,7 +582,7 @@ export default function CustomerDetailsPage() {
                                 <div className="space-y-6">
                                     <AdminEntityStatsRow
                                         stats={[
-                                            { label: 'Total Orders', value: user._count.orders, icon: Package, color: '#299E60' },
+                                            { label: 'Total Orders', value: user._count.orders, icon: Package, color: '#6B1D2E' },
                                             { label: 'Quick Order Lists', value: user._count.quickOrderLists, icon: ListOrdered, color: '#F59E0B' },
                                         ]}
                                     />
@@ -605,7 +605,7 @@ export default function CustomerDetailsPage() {
                                                         </div>
                                                         <div>
                                                             <p className="text-[12px] font-bold text-[#7C7C7C] mb-1">Available</p>
-                                                            <p className="text-[14px] font-bold text-[#299E60]">{INR(w.availableCredit)}</p>
+                                                            <p className="text-[14px] font-bold text-[#6B1D2E]">{INR(w.availableCredit)}</p>
                                                         </div>
                                                         <div>
                                                             <p className="text-[12px] font-bold text-[#7C7C7C] mb-1">Outstanding</p>
@@ -641,7 +641,7 @@ export default function CustomerDetailsPage() {
                         user={user}
                         adminPassword={ownerPassword}
                         permission="customers.edit"
-                        accent="#299E60"
+                        accent="#6B1D2E"
                         onPasswordUpdated={setOwnerPassword}
                     />
 
@@ -657,7 +657,7 @@ export default function CustomerDetailsPage() {
                                 'w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border',
                                 user.isActive
                                     ? 'bg-white border-red-200 text-red-600 hover:bg-red-50'
-                                    : 'bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54]',
+                                    : 'bg-[#6B1D2E] border-[#6B1D2E] text-white hover:bg-[#5A1926]',
                             )}
                         >
                             {toggling ? <Loader2 size={13} className="animate-spin" /> : <Power size={13} />}
@@ -706,11 +706,11 @@ function InfoCardField({ label, value, copyable }: { label: string; value: strin
                 {copyable && value && (
                     <button
                         onClick={handleCopy}
-                        className="p-1 rounded hover:bg-white hover:shadow-sm text-[#9CA3AF] hover:text-[#299E60] transition-all cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        className="p-1 rounded hover:bg-white hover:shadow-sm text-[#9CA3AF] hover:text-[#6B1D2E] transition-all cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
                         title={`Copy ${label}`}
                     >
                         {copied ? (
-                            <Check size={11} className="text-[#299E60]" />
+                            <Check size={11} className="text-[#6B1D2E]" />
                         ) : (
                             <Copy size={11} />
                         )}

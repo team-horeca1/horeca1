@@ -260,7 +260,7 @@ export default function BrandFormModal({ brand, onClose, onCreated }: Props) {
                 <button key={t.k} type="button" onClick={() => setTab(t.k)}
                   className={cn(
                     'px-4 py-2 text-[12px] font-bold rounded-t-lg whitespace-nowrap transition-colors',
-                    tab === t.k ? 'bg-[#EEF8F1] text-[#299E60]' : 'text-gray-400 hover:text-gray-600',
+                    tab === t.k ? 'bg-[#F8E8EC] text-[#6B1D2E]' : 'text-gray-400 hover:text-gray-600',
                   )}>
                   {t.label}
                 </button>

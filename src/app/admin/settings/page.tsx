@@ -87,14 +87,14 @@ export default function SettingsPage() {
         <div className="max-w-[960px] space-y-8 pb-12">
             {/* Page Header */}
             <div>
-                <h1 className="text-[26px] font-medium text-[#000000]">Settings</h1>
-                <p className="text-[#000000] text-[12px] font-light">Manage your platform configuration</p>
+                <h1 className="text-[clamp(1.25rem,4vw,1.625rem)] font-semibold text-[#000000]">Settings</h1>
+                <p className="text-[#667085] text-[13px] font-medium">Manage your platform configuration</p>
             </div>
 
             {/* General Settings */}
             <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm">
-                <div className="flex items-center gap-3 px-8 py-6 border-b border-[#EEEEEE]">
-                    <div className="w-11 h-11 rounded-lg bg-green-50 text-[#299E60] flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-3 px-4 lg:px-8 py-5 lg:py-6 border-b border-[#EEEEEE]">
+                    <div className="w-11 h-11 rounded-lg bg-[#F8E8EC] text-[#6B1D2E] flex items-center justify-center shrink-0">
                         <Settings size={22} />
                     </div>
                     <div>
@@ -103,14 +103,14 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                <div className="px-8 py-6 space-y-5">
+                <div className="px-4 lg:px-8 py-5 lg:py-6 space-y-5">
                     <div>
                         <label className="block text-[13px] font-bold text-[#4B4B4B] mb-1.5">Platform Name</label>
                         <input
                             type="text"
                             value={platformName}
                             onChange={(e) => setPlatformName(e.target.value)}
-                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#299E60]/40 focus:bg-white transition-all"
+                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#6B1D2E]/40 focus:bg-white transition-all"
                         />
                     </div>
                     <div>
@@ -119,7 +119,7 @@ export default function SettingsPage() {
                             type="email"
                             value={contactEmail}
                             onChange={(e) => setContactEmail(e.target.value)}
-                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#299E60]/40 focus:bg-white transition-all"
+                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#6B1D2E]/40 focus:bg-white transition-all"
                         />
                     </div>
                     <div>
@@ -128,15 +128,15 @@ export default function SettingsPage() {
                             type="tel"
                             value={supportPhone}
                             onChange={(e) => setSupportPhone(e.target.value)}
-                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#299E60]/40 focus:bg-white transition-all"
+                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#6B1D2E]/40 focus:bg-white transition-all"
                         />
                     </div>
                 </div>
 
-                <div className="px-8 py-5 border-t border-[#EEEEEE] flex justify-end">
+                <div className="px-4 lg:px-8 py-5 border-t border-[#EEEEEE] flex justify-end">
                     <button
                         onClick={handleSaveGeneral}
-                        className="flex items-center gap-2 h-[42px] px-6 bg-[#299E60] text-white rounded-[10px] text-[14px] font-bold hover:bg-[#238a54] transition-colors shadow-sm shadow-[#299E60]/20"
+                        className="flex items-center justify-center gap-2 min-h-12 w-full sm:w-auto px-6 bg-[#6B1D2E] text-white rounded-[12px] text-[14px] font-semibold hover:bg-[#5A1926] transition-colors shadow-sm shadow-[#6B1D2E]/20"
                     >
                         <Save size={16} />
                         Save Changes
@@ -146,7 +146,7 @@ export default function SettingsPage() {
 
             {/* Business Settings */}
             <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm">
-                <div className="flex items-center gap-3 px-8 py-6 border-b border-[#EEEEEE]">
+                <div className="flex items-center gap-3 px-4 lg:px-8 py-5 lg:py-6 border-b border-[#EEEEEE]">
                     <div className="w-11 h-11 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                         <Building2 size={22} />
                     </div>
@@ -156,7 +156,7 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                <div className="px-8 py-6 space-y-5">
+                <div className="px-4 lg:px-8 py-5 lg:py-6 space-y-5">
                     <div>
                         <label className="block text-[13px] font-bold text-[#4B4B4B] mb-1.5">Default Platform Fee (%)</label>
                         <input
@@ -166,7 +166,7 @@ export default function SettingsPage() {
                             step="0.5"
                             value={platformFeePct}
                             onChange={(e) => setPlatformFeePct(e.target.value)}
-                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#299E60]/40 focus:bg-white transition-all"
+                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#6B1D2E]/40 focus:bg-white transition-all"
                         />
                         <p className="text-[11px] text-[#AEAEAE] mt-1.5">
                             Deducted from vendor earnings on each delivered order. Override per vendor on their detail page.
@@ -180,7 +180,7 @@ export default function SettingsPage() {
                             min="0"
                             value={minOrderValue}
                             onChange={(e) => setMinOrderValue(e.target.value)}
-                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#299E60]/40 focus:bg-white transition-all"
+                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#6B1D2E]/40 focus:bg-white transition-all"
                         />
                     </div>
                     <div>
@@ -190,15 +190,15 @@ export default function SettingsPage() {
                             min="0"
                             value={freeDeliveryThreshold}
                             onChange={(e) => setFreeDeliveryThreshold(e.target.value)}
-                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#299E60]/40 focus:bg-white transition-all"
+                            className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#6B1D2E]/40 focus:bg-white transition-all"
                         />
                     </div>
                 </div>
 
-                <div className="px-8 py-5 border-t border-[#EEEEEE] flex justify-end">
+                <div className="px-4 lg:px-8 py-5 border-t border-[#EEEEEE] flex justify-end">
                     <button
                         onClick={handleSaveBusiness}
-                        className="flex items-center gap-2 h-[42px] px-6 bg-[#299E60] text-white rounded-[10px] text-[14px] font-bold hover:bg-[#238a54] transition-colors shadow-sm shadow-[#299E60]/20"
+                        className="flex items-center justify-center gap-2 min-h-12 w-full sm:w-auto px-6 bg-[#6B1D2E] text-white rounded-[12px] text-[14px] font-semibold hover:bg-[#5A1926] transition-colors shadow-sm shadow-[#6B1D2E]/20"
                     >
                         <Save size={16} />
                         Save Changes
@@ -208,7 +208,7 @@ export default function SettingsPage() {
 
             {/* Notification Preferences */}
             <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm">
-                <div className="flex items-center gap-3 px-8 py-6 border-b border-[#EEEEEE]">
+                <div className="flex items-center gap-3 px-4 lg:px-8 py-5 lg:py-6 border-b border-[#EEEEEE]">
                     <div className="w-11 h-11 rounded-lg bg-yellow-50 text-yellow-600 flex items-center justify-center shrink-0">
                         <Bell size={22} />
                     </div>
@@ -218,7 +218,7 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                <div className="px-8 py-6 space-y-4">
+                <div className="px-4 lg:px-8 py-5 lg:py-6 space-y-4">
                     {/* Email Notifications */}
                     <div className="flex items-center justify-between py-3 border-b border-[#F5F5F5] last:border-b-0">
                         <div>
@@ -229,7 +229,7 @@ export default function SettingsPage() {
                             onClick={() => setEmailNotifications(!emailNotifications)}
                             className={cn(
                                 "relative w-[52px] h-[28px] rounded-full transition-colors duration-200 shrink-0",
-                                emailNotifications ? "bg-[#299E60]" : "bg-[#D9D9D9]"
+                                emailNotifications ? "bg-[#6B1D2E]" : "bg-[#D9D9D9]"
                             )}
                         >
                             <span className={cn(
@@ -249,7 +249,7 @@ export default function SettingsPage() {
                             onClick={() => setSmsNotifications(!smsNotifications)}
                             className={cn(
                                 "relative w-[52px] h-[28px] rounded-full transition-colors duration-200 shrink-0",
-                                smsNotifications ? "bg-[#299E60]" : "bg-[#D9D9D9]"
+                                smsNotifications ? "bg-[#6B1D2E]" : "bg-[#D9D9D9]"
                             )}
                         >
                             <span className={cn(
@@ -269,7 +269,7 @@ export default function SettingsPage() {
                             onClick={() => setPushNotifications(!pushNotifications)}
                             className={cn(
                                 "relative w-[52px] h-[28px] rounded-full transition-colors duration-200 shrink-0",
-                                pushNotifications ? "bg-[#299E60]" : "bg-[#D9D9D9]"
+                                pushNotifications ? "bg-[#6B1D2E]" : "bg-[#D9D9D9]"
                             )}
                         >
                             <span className={cn(
@@ -280,10 +280,10 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                <div className="px-8 py-5 border-t border-[#EEEEEE] flex justify-end">
+                <div className="px-4 lg:px-8 py-5 border-t border-[#EEEEEE] flex justify-end">
                     <button
                         onClick={handleSaveNotifications}
-                        className="flex items-center gap-2 h-[42px] px-6 bg-[#299E60] text-white rounded-[10px] text-[14px] font-bold hover:bg-[#238a54] transition-colors shadow-sm shadow-[#299E60]/20"
+                        className="flex items-center justify-center gap-2 min-h-12 w-full sm:w-auto px-6 bg-[#6B1D2E] text-white rounded-[12px] text-[14px] font-semibold hover:bg-[#5A1926] transition-colors shadow-sm shadow-[#6B1D2E]/20"
                     >
                         <Save size={16} />
                         Save Changes
@@ -293,7 +293,7 @@ export default function SettingsPage() {
 
             {/* Account */}
             <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm">
-                <div className="flex items-center gap-3 px-8 py-6 border-b border-[#EEEEEE]">
+                <div className="flex items-center gap-3 px-4 lg:px-8 py-5 lg:py-6 border-b border-[#EEEEEE]">
                     <div className="w-11 h-11 rounded-lg bg-pink-50 text-pink-600 flex items-center justify-center shrink-0">
                         <User size={22} />
                     </div>
@@ -303,7 +303,7 @@ export default function SettingsPage() {
                     </div>
                 </div>
 
-                <div className="px-8 py-6 space-y-5">
+                <div className="px-4 lg:px-8 py-5 lg:py-6 space-y-5">
                     <div>
                         <label className="block text-[13px] font-bold text-[#4B4B4B] mb-1.5">Name</label>
                         <div className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725]">
@@ -329,7 +329,7 @@ export default function SettingsPage() {
             {toast && (
                 <div className="fixed bottom-10 right-10 z-[100] animate-in slide-in-from-bottom-5 duration-300">
                     <div className="bg-[#181725] text-white px-6 py-4 rounded-[16px] shadow-2xl flex items-center gap-3 border border-white/10">
-                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center", toast.type === 'error' ? "bg-red-500" : "bg-[#299E60]")}>
+                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center", toast.type === 'error' ? "bg-red-500" : "bg-[#6B1D2E]")}>
                             {toast.type === 'error' ? <AlertCircle size={18} className="text-white" /> : <Check size={18} className="text-white" />}
                         </div>
                         <p className="text-[14px] font-bold">{toast.message}</p>

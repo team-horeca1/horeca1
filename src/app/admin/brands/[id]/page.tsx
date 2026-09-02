@@ -332,8 +332,8 @@ export default function AdminBrandEditPage() {
     const stats = [
         { label: 'Master Products', value: brand._count.masterProducts, icon: Package, color: '#7C3AED' },
         { label: 'Mapped Products', value: brand._count.productMappings, icon: Building2, color: '#3B82F6' },
-        { label: 'Approval Status', value: brand.approvalStatus.toUpperCase(), icon: ShieldCheck, color: '#299E60' },
-        { label: 'Account', value: brand.isActive ? 'Active' : 'Inactive', icon: Users, color: brand.isActive ? '#299E60' : '#EF4444' },
+        { label: 'Approval Status', value: brand.approvalStatus.toUpperCase(), icon: ShieldCheck, color: '#6B1D2E' },
+        { label: 'Account', value: brand.isActive ? 'Active' : 'Inactive', icon: Users, color: brand.isActive ? '#6B1D2E' : '#EF4444' },
     ];
 
     const tabs = [
@@ -363,7 +363,7 @@ export default function AdminBrandEditPage() {
                             type="button"
                             onClick={() => void save()}
                             disabled={saving}
-                            className="h-[38px] px-4 rounded-[10px] text-[12px] font-bold border border-[#299E60] bg-[#299E60] text-white hover:bg-[#238a54] active:scale-97 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                            className="h-[38px] px-4 rounded-[10px] text-[12px] font-bold border border-[#6B1D2E] bg-[#6B1D2E] text-white hover:bg-[#5A1926] active:scale-97 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                         >
                             {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                             {isDraftStorefront ? 'Save Storefront' : 'Save Changes'}
@@ -379,7 +379,7 @@ export default function AdminBrandEditPage() {
                 </div>
             )}
             {isDraftStorefront && !fromApprovals && (
-                <div className="bg-[#EEF8F1] border border-[#299E60]/25 rounded-[12px] p-4 shadow-sm flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+                <div className="bg-[#F8E8EC] border border-[#6B1D2E]/25 rounded-[12px] p-4 shadow-sm flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
                     <div className="text-[13px] font-semibold text-[#1f6b41]">
                         This is an admin-managed brand with no owner application. Create a storefront to attach an owner login and full profile — or fill media on the Storefront tab and Save.
                     </div>
@@ -387,7 +387,7 @@ export default function AdminBrandEditPage() {
                         <button
                             type="button"
                             onClick={() => setShowStorefrontModal(true)}
-                            className="h-[38px] px-4 shrink-0 bg-[#299E60] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                            className="h-[38px] px-4 shrink-0 bg-[#6B1D2E] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#5A1926] transition-all flex items-center justify-center gap-1.5 shadow-sm"
                         >
                             <Store size={14} />
                             Create Storefront
@@ -531,7 +531,7 @@ export default function AdminBrandEditPage() {
                                                         value={(form as Record<string, unknown>)[f.key] as string}
                                                         onChange={(e) => setForm(p => ({ ...p, [f.key]: e.target.value }))}
                                                         placeholder={f.placeholder}
-                                                        className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#299E60]/30"
+                                                        className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#6B1D2E]/30"
                                                     />
                                                 </div>
                                             ))}
@@ -542,7 +542,7 @@ export default function AdminBrandEditPage() {
                                                     onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
                                                     rows={3}
                                                     placeholder="Short brand description…"
-                                                    className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#299E60]/30 resize-none"
+                                                    className="w-full text-[13px] border border-[#EEEEEE] rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#6B1D2E]/30 resize-none"
                                                 />
                                             </div>
                                         </div>
@@ -609,7 +609,7 @@ export default function AdminBrandEditPage() {
                                             <label className="flex items-center gap-2 text-[13px] font-semibold text-[#181725] pt-6">
                                                 <input type="checkbox" checked={form.creditSupport}
                                                     onChange={e => setForm(p => ({ ...p, creditSupport: e.target.checked }))}
-                                                    className="accent-[#299E60] w-4 h-4" />
+                                                    className="accent-[#6B1D2E] w-4 h-4" />
                                                 Credit support enabled
                                             </label>
                                         </div>
@@ -656,7 +656,7 @@ export default function AdminBrandEditPage() {
                                 <button
                                     onClick={() => void handleApprove()}
                                     disabled={approvalLoading}
-                                    className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54] disabled:opacity-50"
+                                    className="w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border bg-[#6B1D2E] border-[#6B1D2E] text-white hover:bg-[#5A1926] disabled:opacity-50"
                                 >
                                     {approvalLoading ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
                                     Approve & Verify

@@ -33,10 +33,10 @@ function accent(title: string | null, type: string): string {
   if (t.includes('reject') || t.includes('needs changes') || t.includes('not approved') || t.includes('failed')) {
     return 'bg-[#FFF0F0] text-[#E74C3C]';
   }
-  if (t.includes('approv')) return 'bg-[#EEF8F1] text-[#299E60]';
-  if (t.includes('pending') || t.includes('suggest')) return 'bg-[#FFF7E6] text-[#F59E0B]';
-  if (t.includes('order')) return 'bg-blue-50 text-blue-600';
-  if (t.includes('payment') || t.includes('credit')) return 'bg-[#EEF8F1] text-[#299E60]';
+  if (t.includes('approv')) return 'bg-[#DCFCE7] text-[#16A34A]';
+  if (t.includes('pending') || t.includes('suggest')) return 'bg-[#FEF3C7] text-[#B45309]';
+  if (t.includes('order')) return 'bg-[#EFF6FF] text-info';
+  if (t.includes('payment') || t.includes('credit')) return 'bg-[#DCFCE7] text-[#16A34A]';
   return 'bg-[#F5F5F5] text-[#7C7C7C]';
 }
 
@@ -50,7 +50,7 @@ function relativeTime(isoStr: string) {
   return new Date(isoStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
 }
 
-export function NotificationBell({ accentColor = '#299E60' }: { accentColor?: string }) {
+export function NotificationBell({ accentColor = '#6B1D2E' }: { accentColor?: string }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -131,7 +131,7 @@ export function NotificationBell({ accentColor = '#299E60' }: { accentColor?: st
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative hover:bg-gray-50 rounded-full p-2 transition-colors"
+        className="relative size-12 flex items-center justify-center hover:bg-ivory rounded-full active:scale-[0.97] transition-transform"
         aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
       >
         <Bell size={22} className="text-[#181725]" fill="#181725" />

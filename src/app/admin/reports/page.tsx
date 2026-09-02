@@ -43,7 +43,7 @@ export default function AdminReportsPage() {
   };
 
   return (
-    <div className="p-[clamp(1rem,2.5vw,2rem)] space-y-6 pb-12">
+    <div className="space-y-6 pb-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-[clamp(1.25rem,2vw+0.75rem,1.75rem)] font-bold text-[#181725]">Platform Reports</h1>
@@ -55,7 +55,7 @@ export default function AdminReportsPage() {
               key={p}
               type="button"
               onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 rounded-full text-[12px] font-bold ${period === p ? 'bg-[#181725] text-white' : 'bg-white border border-[#EEEEEE] text-[#7C7C7C]'}`}
+              className={`min-h-12 min-w-12 px-4 rounded-full text-[13px] font-semibold ${period === p ? 'bg-primary text-white' : 'bg-white border border-[#EEEEEE] text-[#7C7C7C]'}`}
             >
               {p}
             </button>
@@ -64,7 +64,7 @@ export default function AdminReportsPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#299E60]" size={32} /></div>
+        <div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#6B1D2E]" size={32} /></div>
       ) : data && (
         <>
           <FinanceSummaryStrip
@@ -99,10 +99,10 @@ export default function AdminReportsPage() {
                 key={card.type}
                 type="button"
                 onClick={() => exportCsv(card.type)}
-                className="text-left bg-white rounded-[14px] border border-[#EEEEEE] p-5 hover:border-[#299E60]/40 transition-colors"
+                className="text-left bg-white rounded-[14px] border border-[#EEEEEE] p-5 hover:border-[#6B1D2E]/40 transition-colors"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <BarChart3 size={20} className="text-[#299E60]" />
+                  <BarChart3 size={20} className="text-[#6B1D2E]" />
                   <Download size={16} className="text-[#7C7C7C]" />
                 </div>
                 <p className="text-[14px] font-bold text-[#181725]">{card.label}</p>
@@ -114,7 +114,7 @@ export default function AdminReportsPage() {
           {data.monthlyTrend.length > 0 ? (
             <div className="bg-white rounded-[14px] border border-[#EEEEEE] p-5">
               <div className="flex items-center gap-2 mb-4">
-                <TrendingUp size={18} className="text-[#299E60]" />
+                <TrendingUp size={18} className="text-[#6B1D2E]" />
                 <p className="text-[14px] font-bold">GMV & platform fees trend</p>
               </div>
               <ResponsiveContainer width="100%" height={260}>
@@ -123,7 +123,7 @@ export default function AdminReportsPage() {
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip formatter={(v) => inr(Number(v ?? 0))} />
-                  <Area type="monotone" dataKey="gmv" stroke="#299E60" fill="#EEF8F1" name="GMV" />
+                  <Area type="monotone" dataKey="gmv" stroke="#6B1D2E" fill="#F8E8EC" name="GMV" />
                   <Area type="monotone" dataKey="fees" stroke="#8B5CF6" fill="#F3E8FF" name="Platform fees" />
                 </AreaChart>
               </ResponsiveContainer>
@@ -161,7 +161,7 @@ export default function AdminReportsPage() {
                     <td className="px-4 py-3 font-semibold">{v.vendorName}</td>
                     <td className="px-4 py-3 text-right">{v.orderCount}</td>
                     <td className="px-4 py-3 text-right">{inr(v.gross)}</td>
-                    <td className="px-4 py-3 text-right text-[#299E60]">{inr(v.platformFee)}</td>
+                    <td className="px-4 py-3 text-right text-[#6B1D2E]">{inr(v.platformFee)}</td>
                     <td className="px-4 py-3 text-right">{inr(v.netVendor)}</td>
                   </tr>
                 ))}

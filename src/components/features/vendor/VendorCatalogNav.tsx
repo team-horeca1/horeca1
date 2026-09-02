@@ -33,75 +33,79 @@ export function VendorCatalogNav({
     const showToggle = !!onLayoutModeChange;
     const ToggleGroup = (
         showToggle ? (
-            <div className="flex items-center bg-white border border-gray-100 rounded-2xl p-0.5 shrink-0 shadow-sm">
+            <div className="flex items-center bg-white border border-divider rounded-xl p-0.5 shrink-0 shadow-cdl-1">
                 <button
+                    type="button"
                     onClick={() => onLayoutModeChange!('grid')}
                     aria-label="Grid view"
                     aria-pressed={layoutMode === 'grid'}
                     className={cn(
-                        'p-2 rounded-xl transition-all',
-                        layoutMode === 'grid' ? 'bg-[#53B175] text-white shadow-sm' : 'text-gray-400 hover:text-[#53B175]'
+                        'p-2 rounded-lg transition-all',
+                        layoutMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-primary'
                     )}
                 >
-                    <LayoutGrid size={16} strokeWidth={2.5} />
+                    <LayoutGrid size={16} strokeWidth={2} />
                 </button>
                 <button
+                    type="button"
                     onClick={() => onLayoutModeChange!('list')}
                     aria-label="List view"
                     aria-pressed={layoutMode === 'list'}
                     className={cn(
-                        'p-2 rounded-xl transition-all',
-                        layoutMode === 'list' ? 'bg-[#53B175] text-white shadow-sm' : 'text-gray-400 hover:text-[#53B175]'
+                        'p-2 rounded-lg transition-all',
+                        layoutMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-text-muted hover:text-primary'
                     )}
                 >
-                    <LayoutList size={16} strokeWidth={2.5} />
+                    <LayoutList size={16} strokeWidth={2} />
                 </button>
             </div>
         ) : null
     );
 
     return (
-        <div className="w-full bg-gray-50/50 backdrop-blur-2xl sticky top-0 z-[40] border-b border-gray-100 shadow-[0_1px_20px_rgba(0,0,0,0.02)]">
-            <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4">
+        <div className="w-full bg-white/95 backdrop-blur-md sticky top-0 z-[40] border-b border-divider shadow-cdl-1">
+            <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)]">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 py-3 md:py-4">
                     <div className="relative group flex-1 md:max-w-[450px] lg:max-w-[600px] flex items-center gap-2 md:gap-3">
                         <div className="relative flex-1">
                             <Search
-                                size={18}
-                                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#53B175] transition-colors"
-                                strokeWidth={3}
+                                size={17}
+                                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-primary transition-colors"
+                                strokeWidth={2}
                             />
                             <input
                                 type="text"
                                 placeholder="Search in this store..."
                                 value={searchQuery}
                                 onChange={(e) => onSearchChange(e.target.value)}
-                                className="w-full pl-12 pr-10 py-3 bg-white border border-gray-100 rounded-2xl text-[14px] font-bold text-gray-800 placeholder:text-gray-400 placeholder:font-bold focus:outline-none focus:border-[#53B175]/50 focus:bg-white focus:ring-8 focus:ring-[#53B175]/5 transition-all duration-500 shadow-sm"
+                                className="w-full pl-10 pr-9 py-2.5 bg-ivory/50 border border-divider rounded-xl text-xs md:text-sm font-semibold text-text placeholder:text-text-muted focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 transition-all shadow-sm"
                             />
                             {searchQuery && (
                                 <button
+                                    type="button"
                                     onClick={() => onSearchChange('')}
-                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1.5 rounded-xl bg-gray-100/50 text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-all active:scale-90"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg bg-gray-100 text-text-muted hover:text-text hover:bg-gray-200 transition-all active:scale-90"
                                 >
-                                    <X size={14} strokeWidth={3} />
+                                    <X size={13} strokeWidth={2.5} />
                                 </button>
                             )}
                         </div>
-                        <button className="p-3 rounded-2xl bg-white border border-gray-100 text-gray-400 hover:text-[#53B175] hover:border-[#53B175]/20 hover:shadow-lg transition-all shrink-0">
-                            <SlidersHorizontal size={18} strokeWidth={2.5} />
+                        <button type="button" className="p-2.5 rounded-xl bg-white border border-divider text-text-muted hover:text-primary hover:border-primary/30 transition-all shrink-0">
+                            <SlidersHorizontal size={17} strokeWidth={2} />
                         </button>
                         {ToggleGroup}
                     </div>
-                    <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar -mx-[calc(var(--container-padding)/2)] px-[calc(var(--container-padding)/2)] md:mx-0 md:px-0">
+                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
                         {TABS.map((tab) => (
                             <button
                                 key={tab.key}
+                                type="button"
                                 onClick={() => onTabChange(tab.key)}
                                 className={cn(
-                                    'px-5 py-2.5 rounded-2xl text-[12px] font-black whitespace-nowrap transition-all duration-300 border uppercase tracking-wider',
+                                    'px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 border',
                                     activeTab === tab.key
-                                        ? 'bg-[#53B175] text-white border-[#53B175] shadow-[0_8px_20px_rgba(83,177,117,0.25)]'
-                                        : 'bg-gray-50/50 text-gray-500 border-gray-100/80 hover:bg-white hover:text-gray-800 hover:border-[#53B175]/30 hover:shadow-lg hover:shadow-gray-100'
+                                        ? 'bg-primary text-white border-primary shadow-cdl-1'
+                                        : 'bg-white text-text-secondary border-divider hover:border-primary/40 hover:text-primary'
                                 )}
                             >
                                 {tab.label}

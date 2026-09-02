@@ -63,27 +63,34 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
 
     return (
         <div className="w-full bg-white md:bg-white md:pb-6 md:pt-4">
-            {/* ── MOBILE HEADER — compact light-green hero (matches homepage mobile) ── */}
+            {/* ── MOBILE HEADER — ivory / burgundy hero ── */}
             <div className="block md:hidden relative px-4 pt-4">
-                <div
-                    className="relative w-full rounded-[20px] overflow-hidden"
-                    style={{ backgroundColor: '#eff9f0' }}
-                >
+                <div className="relative w-full rounded-[20px] overflow-hidden bg-ivory border border-divider">
                     <button
                         onClick={() => router.back()}
-                        className="absolute top-3 left-3 z-20 p-2 bg-white/80 backdrop-blur-md rounded-full shadow-sm"
+                        className="absolute top-3 left-3 z-20 p-2 bg-white rounded-full shadow-sm border border-divider"
                         aria-label="Back"
                     >
                         <ChevronLeft size={18} strokeWidth={3} className="text-[#181725]" />
                     </button>
                     <div className="flex items-center px-5 py-6 pt-10">
                         <div className="flex-1 pr-2 min-w-0">
-                            <div className="flex items-center gap-1.5 mb-2">
-                                <span className="bg-[#1C8C44] text-white px-2 py-0.5 rounded-md flex items-center gap-1 text-[11px] font-black shadow-sm">
+                            <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                                <span className="bg-primary text-white px-2 py-0.5 rounded-md flex items-center gap-1 text-[11px] font-bold shadow-sm">
                                     {vendor.rating} <Star size={10} fill="white" className="text-white" />
                                 </span>
-                                {vendor.deliverySchedule ? <span className="text-[10px] text-[#1C8C44] font-black uppercase tracking-tighter"><Clock size={10} className="inline mr-0.5" />{vendor.deliverySchedule}</span> : <span className="text-[10px] text-[#1C8C44] font-black uppercase tracking-tighter">Open till 8PM</span>}
-                        {vendor.creditEnabled && <span className="bg-[#F3E5F5]/80 text-[#7B1FA2] text-[9px] font-black px-1.5 py-0.5 rounded-lg flex items-center gap-0.5"><CreditCard size={9} strokeWidth={2.5} />Credit</span>}
+                                {vendor.deliverySchedule ? (
+                                    <span className="text-[10px] text-primary font-bold uppercase tracking-tighter">
+                                        <Clock size={10} className="inline mr-0.5" />{vendor.deliverySchedule}
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] text-primary font-bold uppercase tracking-tighter">Open till 8PM</span>
+                                )}
+                                {vendor.creditEnabled && (
+                                    <span className="bg-primary-light text-primary text-[9px] font-bold px-1.5 py-0.5 rounded-lg flex items-center gap-0.5">
+                                        <CreditCard size={9} strokeWidth={2.5} />Credit
+                                    </span>
+                                )}
                             </div>
                             <h1 className="text-[20px] font-[900] text-[#0f172a] leading-[1.15] mb-1 line-clamp-2">
                                 {vendor.name}
@@ -111,33 +118,34 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                 </div>
 
                 {/* Operational Action Pills (below hero) */}
-                <div className="flex items-center gap-3 mt-4 overflow-x-auto no-scrollbar pb-1">
-                    <button className="shrink-0 bg-gray-50 border border-gray-100 px-4 py-2 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-black text-gray-800">
-                        <Navigation size={16} className="text-[#53B175]" strokeWidth={3} />
+                <div className="flex items-center gap-2.5 mt-4 overflow-x-auto no-scrollbar pb-1">
+                    <button type="button" className="shrink-0 bg-ivory border border-divider px-3.5 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-text hover:bg-white transition-colors">
+                        <Navigation size={15} className="text-primary" strokeWidth={2} />
                         Directions
                     </button>
-                    <button className="shrink-0 p-3 bg-gray-50 border border-gray-100 rounded-2xl text-gray-800">
-                        <Phone size={18} className="text-[#53B175]" strokeWidth={3} />
+                    <button type="button" className="shrink-0 p-2.5 bg-ivory border border-divider rounded-xl text-text hover:bg-white transition-colors" aria-label="Call">
+                        <Phone size={16} className="text-primary" strokeWidth={2} />
                     </button>
-                    <button onClick={handleShare} className="shrink-0 p-3 bg-gray-50 border border-gray-100 rounded-2xl text-gray-800">
-                        <Share2 size={18} className="text-[#53B175]" strokeWidth={3} />
+                    <button type="button" onClick={handleShare} className="shrink-0 p-2.5 bg-ivory border border-divider rounded-xl text-text hover:bg-white transition-colors" aria-label="Share">
+                        <Share2 size={16} className="text-primary" strokeWidth={2} />
                     </button>
                     <button
+                        type="button"
                         onClick={handleMyListsClick}
-                        className="shrink-0 bg-gray-50 border border-gray-100 px-4 py-2 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-black text-gray-800"
+                        className="shrink-0 bg-ivory border border-divider px-3.5 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-text hover:bg-white transition-colors"
                     >
-                        <ClipboardList size={16} className="text-[#53B175]" strokeWidth={3} />
+                        <ClipboardList size={15} className="text-primary" strokeWidth={2} />
                         My Lists
                     </button>
                     <button
                         type="button"
                         onClick={() => setDealsOpen(true)}
-                        className="shrink-0 bg-white border-2 border-[#181725]/10 px-4 py-2 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-black text-[#181725] shadow-sm"
+                        className="shrink-0 bg-white border border-divider px-3.5 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-text shadow-sm hover:border-primary/40 transition-colors"
                     >
-                        <Tag size={16} strokeWidth={2.5} className="text-[#53B175]" />
+                        <Tag size={15} strokeWidth={2} className="text-primary" />
                         Deals
                         {storePromos.length > 0 && (
-                            <span className="min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-[#53B175] text-white text-[10px] font-black flex items-center justify-center">
+                            <span className="min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
                                 {storePromos.length}
                             </span>
                         )}
@@ -149,9 +157,9 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                         {storePromos.map((p) => (
                             <div
                                 key={p.id}
-                                className="shrink-0 flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full text-[11px] font-bold"
+                                className="shrink-0 flex items-center gap-1.5 bg-primary-light border border-primary/20 text-primary px-3 py-1.5 rounded-full text-xs font-bold"
                             >
-                                <Megaphone size={12} className="text-emerald-600" />
+                                <Megaphone size={12} className="text-primary" />
                                 {p.badgeLabel}
                             </div>
                         ))}
@@ -159,7 +167,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                 )}
 
                 {/* Mobile Tabs */}
-                <div className="flex items-center gap-6 border-b border-gray-100 mt-3 overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-6 border-b border-divider mt-3 overflow-x-auto no-scrollbar">
                     {[
                         { key: 'all', label: 'Catalog' },
                         { key: 'deals', label: 'Deals' },
@@ -169,23 +177,24 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                     ].map((tab) => (
                         <button
                             key={tab.key}
+                            type="button"
                             onClick={() => onTabChange(tab.key)}
                             className={cn(
-                                "pb-3 pt-2 text-[14px] font-black transition-all relative shrink-0",
-                                activeTab === tab.key ? "text-[#53B175]" : "text-gray-400"
+                                "pb-3 pt-2 text-xs font-bold transition-all relative shrink-0",
+                                activeTab === tab.key ? "text-primary" : "text-text-muted hover:text-text"
                             )}
                         >
                             {tab.label}
-                            {activeTab === tab.key && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#53B175] rounded-full" />}
+                            {activeTab === tab.key && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
                         </button>
                     ))}
                 </div>
             </div>
 
-            {/* ── DESKTOP HEADER — compact green-gradient hero (matches homepage hero) ── */}
+            {/* ── DESKTOP HEADER — compact Burgundy hero (matches CDL brand) ── */}
             <div className="hidden md:block max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
-                <div className="relative w-full h-[180px] lg:h-[220px] rounded-[32px] md:rounded-[40px] overflow-hidden bg-gradient-to-r from-[#22844f] via-[#299e60] to-[#22c55e] flex items-center px-6 md:px-10 lg:px-16 shadow-lg">
-                    {/* Decorative circles (same as homepage hero) */}
+                <div className="relative w-full h-[180px] lg:h-[220px] rounded-2xl overflow-hidden bg-gradient-to-r from-[#4A141F] via-[#6B1D2E] to-[#8B2C3E] flex items-center px-6 md:px-10 lg:px-16 shadow-cdl-2">
+                    {/* Decorative circles */}
                     <div className="absolute left-0 top-0 w-full h-full opacity-10 pointer-events-none">
                         <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <circle cx="10%" cy="50%" r="150" stroke="white" strokeWidth="2" />
@@ -195,26 +204,19 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
 
                     {/* Back button */}
                     <button
+                        type="button"
                         onClick={() => router.back()}
                         className="absolute top-4 left-4 p-2 bg-white/20 backdrop-blur-md rounded-full text-white z-20 hover:bg-white/30 transition"
                         aria-label="Back"
                     >
-                        <ChevronLeft size={20} strokeWidth={3} />
+                        <ChevronLeft size={20} strokeWidth={2.5} />
                     </button>
-
-                    {/* Top-right: gallery badge */}
-                    <div className="absolute top-4 right-5 z-20">
-                        <div className="bg-white/20 backdrop-blur-md text-white px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-[12px] font-black border border-white/25">
-                            <ImageIcon size={13} />
-                            5/15
-                        </div>
-                    </div>
 
                     {/* Content */}
                     <div className="flex items-center w-full relative z-10">
                         {/* Vendor logo */}
-                        <div className="flex-shrink-0 mr-4 md:mr-8 lg:mr-12">
-                            <div className="relative w-[110px] h-[110px] md:w-[140px] md:h-[140px] lg:w-[170px] lg:h-[170px] rounded-[20px] md:rounded-[24px] bg-white border-2 border-white/30 overflow-hidden shadow-2xl">
+                        <div className="flex-shrink-0 mr-4 md:mr-8 lg:mr-10">
+                            <div className="relative w-[110px] h-[110px] md:w-[130px] md:h-[130px] rounded-xl bg-white border-2 border-white/40 overflow-hidden shadow-cdl-2">
                                 <Image src={heroImage} alt={vendor.name} fill className="object-contain p-2" style={heroImageStyle} priority />
                             </div>
                         </div>
@@ -222,23 +224,35 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                         {/* Title + badges */}
                         <div className="flex-grow flex flex-col items-start justify-center text-white min-w-0">
                             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                <span className="bg-white text-[#181725] px-2.5 py-1 rounded-lg flex items-center gap-1 text-[12px] font-black shadow-md">
-                                    {vendor.rating} <Star size={11} fill="#FBC02D" className="text-[#FBC02D]" />
+                                <span className="bg-white text-text px-2.5 py-0.5 rounded-md flex items-center gap-1 text-xs font-bold shadow-sm">
+                                    {vendor.rating} <Star size={11} className="fill-amber-400 text-amber-400" />
                                 </span>
-                                {vendor.deliverySchedule ? <span className="bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[10px] md:text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg">{vendor.deliverySchedule}</span> : <span className="bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[10px] md:text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg">Open till 8:00 PM</span>}
-                                {vendor.creditEnabled && <span className="bg-[#F3E5F5]/80 backdrop-blur-sm text-[#7B1FA2] text-[10px] md:text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg flex items-center gap-1"><CreditCard size={11} strokeWidth={2.5} />Credit Available</span>}
+                                {vendor.deliverySchedule ? (
+                                    <span className="bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[10px] md:text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md">
+                                        {vendor.deliverySchedule}
+                                    </span>
+                                ) : (
+                                    <span className="bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[10px] md:text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md">
+                                        Open till 8:00 PM
+                                    </span>
+                                )}
+                                {vendor.creditEnabled && (
+                                    <span className="bg-white/20 backdrop-blur-sm text-white border border-white/30 text-[10px] md:text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md flex items-center gap-1">
+                                        <CreditCard size={11} strokeWidth={2} /> DiSCCO Credit
+                                    </span>
+                                )}
                             </div>
-                            <h1 className="text-[1.6rem] md:text-[2rem] lg:text-[2.8rem] font-[900] leading-[1.05] tracking-tight drop-shadow-md line-clamp-1">
+                            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold leading-tight tracking-tight drop-shadow-sm line-clamp-1">
                                 {vendor.name}
                             </h1>
-                            <p className="text-[0.75rem] md:text-[0.85rem] lg:text-[0.95rem] font-medium opacity-90 mt-1 line-clamp-1">
+                            <p className="text-xs md:text-sm font-medium text-white/80 mt-1 line-clamp-1">
                                 {vendor.categories.slice(0, 3).join(' · ')}
                                 {vendor.minOrderValue ? <> <span className="opacity-60">|</span> Min ₹{vendor.minOrderValue}</> : null}
                             </p>
                         </div>
 
-                        {/* Right-side CTAs — primary order + secondary deals */}
-                        <div className="flex-shrink-0 ml-4 hidden lg:flex flex-col items-stretch justify-center gap-2.5 w-[min(100%,220px)]">
+                        {/* Right-side CTAs */}
+                        <div className="flex-shrink-0 ml-4 hidden lg:flex flex-col items-stretch justify-center gap-2 w-[min(100%,200px)]">
                             <button
                                 type="button"
                                 onClick={() => {
@@ -247,20 +261,19 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                                         window.scrollTo({ top: window.innerHeight * 0.45, behavior: 'smooth' });
                                     }, 50);
                                 }}
-                                className="w-full bg-white text-[#181725] px-[clamp(1rem,2vw,1.5rem)] py-[clamp(0.7rem,1.2vw,0.85rem)] rounded-2xl flex items-center justify-center gap-2 text-[clamp(0.9rem,1.2vw,1rem)] font-bold shadow-lg hover:bg-white/95 transition-colors"
+                                className="w-full bg-white text-primary px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-bold shadow-md hover:bg-ivory transition-colors active:scale-95"
                             >
-                                Start Ordering
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M9 18l6-6-6-6" /></svg>
+                                Start Ordering →
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setDealsOpen(true)}
-                                className="w-full bg-transparent text-white px-[clamp(1rem,2vw,1.5rem)] py-[clamp(0.65rem,1.1vw,0.8rem)] rounded-2xl flex items-center justify-center gap-2 text-[clamp(0.85rem,1.1vw,0.95rem)] font-bold border-2 border-white/50 hover:bg-white/10 hover:border-white transition-colors"
+                                className="w-full bg-white/15 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold border border-white/30 hover:bg-white/25 transition-colors"
                             >
-                                <Tag size={16} strokeWidth={2.5} aria-hidden />
-                                Deals & Coupons
+                                <Tag size={14} strokeWidth={2} />
+                                Deals &amp; Coupons
                                 {storePromos.length > 0 && (
-                                    <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-white text-[#22844f] text-[11px] font-black flex items-center justify-center">
+                                    <span className="min-w-[1.2rem] h-4 px-1 rounded-full bg-white text-primary text-[10px] font-bold flex items-center justify-center">
                                         {storePromos.length}
                                     </span>
                                 )}
@@ -269,31 +282,30 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                     </div>
                 </div>
 
-                {/* ── INFO BAR — address left, actions right ── */}
-                <div className="flex items-center justify-between px-1 pt-5 pb-4 border-b border-gray-100">
-                    {/* Left: address */}
+                {/* ── INFO BAR ── */}
+                <div className="flex items-center justify-between px-1 pt-4 pb-3 border-b border-divider">
                     <div className="flex items-center gap-2 min-w-0">
-                        <MapPin size={16} className="text-[#53B175] shrink-0" strokeWidth={2.5} />
-                        <span className="text-[14px] font-medium text-gray-500 truncate">
+                        <MapPin size={16} className="text-primary shrink-0" strokeWidth={2} />
+                        <span className="text-xs md:text-sm font-medium text-text-secondary truncate">
                             Plot No 114/3, Sector 5, Navi Mumbai
                         </span>
                     </div>
 
-                    {/* Right: action buttons */}
-                    <div className="flex items-center gap-2.5 shrink-0 ml-6">
-                        <button className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gray-50 border border-gray-100 text-[13px] font-black text-gray-700 hover:bg-[#53B175]/5 hover:border-[#53B175]/40 hover:text-[#53B175] transition-all duration-200">
-                            <Phone size={15} strokeWidth={2.5} />
+                    <div className="flex items-center gap-2 shrink-0 ml-4">
+                        <button type="button" className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-ivory border border-divider text-xs font-semibold text-text hover:bg-primary-light hover:border-primary/40 hover:text-primary transition-all">
+                            <Phone size={14} strokeWidth={2} />
                             Call Vendor
                         </button>
-                        <button onClick={handleShare} className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gray-50 border border-gray-100 text-[13px] font-black text-gray-700 hover:bg-[#53B175]/5 hover:border-[#53B175]/40 hover:text-[#53B175] transition-all duration-200">
-                            <Share2 size={15} strokeWidth={2.5} />
+                        <button type="button" onClick={handleShare} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-ivory border border-divider text-xs font-semibold text-text hover:bg-primary-light hover:border-primary/40 hover:text-primary transition-all">
+                            <Share2 size={14} strokeWidth={2} />
                             Share
                         </button>
                         <button
+                            type="button"
                             onClick={handleMyListsClick}
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gray-50 border border-gray-100 text-[13px] font-black text-gray-700 hover:bg-[#53B175]/5 hover:border-[#53B175]/40 hover:text-[#53B175] transition-all duration-200"
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-ivory border border-divider text-xs font-semibold text-text hover:bg-primary-light hover:border-primary/40 hover:text-primary transition-all"
                         >
-                            <ClipboardList size={15} strokeWidth={2.5} />
+                            <ClipboardList size={14} strokeWidth={2} />
                             My Lists
                         </button>
                     </div>
@@ -310,17 +322,18 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                     ].map((tab) => (
                         <button
                             key={tab.key}
+                            type="button"
                             onClick={() => onTabChange(tab.key)}
                             className={cn(
-                                "pb-3 pt-3 text-[15px] font-bold transition-all relative",
+                                "pb-3 pt-3 text-xs md:text-sm font-bold transition-all relative",
                                 activeTab === tab.key || (activeTab === 'all' && tab.key === 'all')
-                                    ? "text-[#53B175]"
-                                    : "text-gray-400 hover:text-gray-700"
+                                    ? "text-primary font-bold"
+                                    : "text-text-muted hover:text-text"
                             )}
                         >
                             {tab.label}
                             {(activeTab === tab.key || (activeTab === 'all' && tab.key === 'all')) && (
-                                <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#53B175] rounded-full" />
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
                             )}
                         </button>
                     ))}

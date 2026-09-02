@@ -28,7 +28,7 @@ export function AdminEntityStatsRow({ stats }: AdminEntityStatsRowProps) {
                 <p className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-wider">
                   {stat.label}
                 </p>
-                <p className="text-[22px] font-black text-[#111827] mt-1 leading-none">
+                <p className="text-[20px] lg:text-[22px] font-bold text-[#111827] mt-1 leading-none tabular-nums">
                   {stat.value}
                 </p>
               </div>

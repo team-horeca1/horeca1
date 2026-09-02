@@ -102,7 +102,7 @@ export function TeamMembersOverlay({ isOpen, onClose, accountId }: TeamMembersOv
             {canInvite && (
               <button
                 onClick={() => setShowInvite(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#53B175] text-white text-[12px] font-bold rounded-lg hover:bg-[#48a068] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-[12px] font-bold rounded-lg hover:bg-primary-dark transition-colors shadow-sm shadow-primary/20"
               >
                 <UserPlus size={14} />
                 Invite Member
@@ -111,14 +111,14 @@ export function TeamMembersOverlay({ isOpen, onClose, accountId }: TeamMembersOv
           </div>
 
           {loading ? (
-            <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-[#53B175]" /></div>
+            <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
           ) : members.length === 0 ? (
             <p className="text-[13px] text-[#666] py-12 text-center bg-white rounded-xl border border-gray-100">No members configured.</p>
           ) : (
             <ul className="space-y-3">
               {members.map((m) => (
                 <li key={m.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm flex items-start gap-3 relative">
-                  <div className="w-[36px] h-[36px] rounded-full bg-[#E8F5E9] flex items-center justify-center font-black text-[12px] text-[#53B175] shrink-0">
+                  <div className="w-[36px] h-[36px] rounded-full bg-primary-light flex items-center justify-center font-black text-[12px] text-primary shrink-0">
                     {(m.user.fullName || '?').slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0 pr-10">
@@ -173,7 +173,7 @@ export function TeamMembersOverlay({ isOpen, onClose, accountId }: TeamMembersOv
           config={{
             scope: 'account',
             accountId,
-            accent: '#53B175',
+            accent: '#6B1D2E',
             businessAccountLabel: 'Customer Account',
           }}
         />

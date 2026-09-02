@@ -94,7 +94,7 @@ function StickyDeliverToChip({
       >
         {sticky.needsAddress
           ? <AlertCircle size={13} className="text-amber-500 shrink-0" />
-          : <MapPin size={13} className="text-[#53B175] shrink-0" />}
+          : <MapPin size={13} className="text-primary shrink-0" />}
         <span className="text-[12px] font-bold text-gray-600 truncate max-w-[140px]">
           {sticky.label}
         </span>
@@ -110,7 +110,7 @@ function StickyDeliverToChip({
     >
       {sticky.needsAddress
         ? <AlertCircle size={15} className="text-amber-500 shrink-0" />
-        : <MapPin size={15} className="text-[#53B175] shrink-0" />}
+        : <MapPin size={15} className="text-primary shrink-0" />}
       <div className="flex flex-col items-start min-w-0 flex-1">
         <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider leading-none">Deliver to</span>
         <span className={`text-[12px] font-bold truncate leading-tight mt-0.5 w-full text-left ${sticky.needsAddress ? 'text-amber-600' : 'text-gray-800'}`}>
@@ -213,7 +213,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
           onClick={onFallbackClick}
           className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-100 rounded-full bg-[#F7F7F7] shadow-sm hover:bg-gray-100 transition-colors cursor-pointer w-full justify-center"
         >
-          <MapPin size={13} className="text-[#53B175] shrink-0" />
+          <MapPin size={13} className="text-primary shrink-0" />
           <span className="text-[12px] font-bold text-gray-600 truncate max-w-[140px]">
             {fallbackLabel}
           </span>
@@ -226,7 +226,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
         onClick={onFallbackClick}
         className="flex items-center gap-2.5 px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 hover:bg-gray-100 hover:border-gray-300 transition-all cursor-pointer shrink-0 w-[195px]"
       >
-        <MapPin size={15} className="text-[#53B175] shrink-0" />
+        <MapPin size={15} className="text-primary shrink-0" />
         <div className="flex flex-col items-start min-w-0 flex-1">
           <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider leading-none">Deliver to</span>
           <span className="text-[12px] font-bold text-gray-800 truncate leading-tight mt-0.5 w-full text-left">
@@ -279,7 +279,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
           >
             {needsAddress
               ? <AlertCircle size={13} className="text-amber-500 shrink-0" />
-              : <MapPin size={13} className="text-[#53B175] shrink-0" />}
+              : <MapPin size={13} className="text-primary shrink-0" />}
             <span className="text-[12px] font-bold text-gray-700 truncate max-w-[140px]">
               {needsAddress ? 'Add address' : (currentOutlet.pincode ?? outletName)}
             </span>
@@ -293,12 +293,12 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
                   disabled={switching || pickingId !== null}
                   className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 text-left disabled:opacity-60"
                 >
-                  {pickingId === o.id ? <Loader2 size={12} className="animate-spin text-[#53B175] shrink-0" /> : null}
+                  {pickingId === o.id ? <Loader2 size={12} className="animate-spin text-primary shrink-0" /> : null}
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-bold truncate">{o.name}</p>
                     <p className="text-[10px] text-gray-400">{o.pincode ?? '—'}</p>
                   </div>
-                  {o.id === currentOutlet.id && <Check size={12} className="text-[#53B175] shrink-0" />}
+                  {o.id === currentOutlet.id && <Check size={12} className="text-primary shrink-0" />}
                 </button>
               ))}
               <div className="border-t border-gray-100 mt-1 pt-1.5 px-0.5 sticky bottom-0 bg-white">
@@ -307,7 +307,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
                     setOutletOpen(false);
                     onFallbackClick();
                   }}
-                  className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-green-50 text-left text-primary font-bold text-[11px] transition-colors"
+                  className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-primary-light text-left text-primary font-bold text-[11px] transition-colors"
                 >
                   <MapPin size={11} className="shrink-0 text-primary" />
                   Add/Select Location
@@ -335,7 +335,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
         >
           {needsAddress
             ? <AlertCircle size={15} className="text-amber-500 shrink-0" />
-            : <MapPin size={15} className="text-[#53B175] shrink-0" />}
+            : <MapPin size={15} className="text-primary shrink-0" />}
           <div className="flex flex-col items-start min-w-0 flex-1">
             <span className="text-[9px] uppercase font-bold text-gray-400 tracking-wider leading-none">Deliver to</span>
             <span className={`text-[12px] font-bold truncate leading-tight mt-0.5 w-full text-left ${needsAddress ? 'text-amber-600' : 'text-gray-800'}`}>
@@ -353,16 +353,16 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
                 className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-gray-50 text-left disabled:opacity-60 transition-colors"
               >
                 {pickingId === o.id
-                  ? <Loader2 size={14} className="animate-spin text-[#53B175] shrink-0" />
-                  : <div className="w-[30px] h-[30px] rounded-full bg-green-50 flex items-center justify-center shrink-0">
-                      <MapPin size={13} className="text-[#53B175]" />
+                  ? <Loader2 size={14} className="animate-spin text-primary shrink-0" />
+                  : <div className="w-[30px] h-[30px] rounded-full bg-primary-light flex items-center justify-center shrink-0">
+                      <MapPin size={13} className="text-primary" />
                     </div>
                 }
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-bold truncate">{o.name}</p>
                   <p className="text-[10px] text-gray-400">{o.pincode ?? 'No pincode'}</p>
                 </div>
-                {o.id === currentOutlet.id && <Check size={14} className="text-[#53B175] shrink-0" />}
+                {o.id === currentOutlet.id && <Check size={14} className="text-primary shrink-0" />}
               </button>
             ))}
             <div className="border-t border-gray-100 mt-1.5 pt-1.5 px-1 sticky bottom-0 bg-white">
@@ -371,7 +371,7 @@ export function NavDeliverySelector({ fallbackLabel, onFallbackClick, variant }:
                   setOutletOpen(false);
                   onFallbackClick();
                 }}
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-green-50 text-left text-primary font-bold text-[12px] transition-colors"
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-primary-light text-left text-primary font-bold text-[12px] transition-colors"
               >
                 <MapPin size={13} className="shrink-0 text-primary" />
                 Add/Select Location

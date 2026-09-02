@@ -37,8 +37,8 @@ export function AdminImpersonateButton({
       className={cn(
         'h-[38px] px-4 rounded-[10px] text-[12px] font-bold active:scale-97 transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-60',
         variant === 'primary'
-          ? 'bg-[#299E60] border border-[#299E60] text-white hover:bg-[#238a54]'
-          : 'bg-[#EEF8F1] border border-[#299E60]/20 text-[#299E60] hover:bg-[#D1FAE5]',
+          ? 'bg-primary border border-primary text-white hover:bg-primary-dark shadow-sm shadow-primary/20'
+          : 'bg-primary-light border border-primary/20 text-primary hover:bg-primary hover:text-white',
         className,
       )}
     >

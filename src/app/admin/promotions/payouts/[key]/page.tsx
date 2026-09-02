@@ -135,7 +135,7 @@ export default function AdminPayoutDetailPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 size={28} className="text-[#53B175] animate-spin" />
+          <Loader2 size={28} className="text-[#6B1D2E] animate-spin" />
         </div>
       ) : !data ? (
         <p className="text-[13px] text-gray-400">No payout found for this tracking ID.</p>
@@ -147,7 +147,7 @@ export default function AdminPayoutDetailPage() {
               <button
                 type="button"
                 onClick={() => copy(data.trackingKey, 'id')}
-                className="font-mono text-[15px] font-bold text-[#181725] hover:text-[#53B175] cursor-pointer"
+                className="font-mono text-[15px] font-bold text-[#181725] hover:text-[#6B1D2E] cursor-pointer"
               >
                 {data.trackingKey}
               </button>
@@ -155,7 +155,7 @@ export default function AdminPayoutDetailPage() {
             </div>
             <span className={cn(
               'shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold',
-              data.status === 'credited' || data.status === 'paid' ? 'bg-green-50 text-[#53B175]'
+              data.status === 'credited' || data.status === 'paid' ? 'bg-green-50 text-[#6B1D2E]'
                 : data.status === 'cancelled' || data.status === 'expired' ? 'bg-gray-100 text-gray-400'
                   : data.status === 'approved' ? 'bg-blue-50 text-blue-600'
                     : data.status === 'awaiting_claim' ? 'bg-purple-50 text-purple-600'
@@ -173,7 +173,7 @@ export default function AdminPayoutDetailPage() {
               <button
                 type="button"
                 onClick={() => copy(data.claimUrl!, 'url')}
-                className="inline-flex items-center gap-1.5 min-w-0 rounded-md border border-gray-200 px-2 py-1 text-[11px] font-bold text-[#181725] hover:border-[#53B175] cursor-pointer"
+                className="inline-flex items-center gap-1.5 min-w-0 rounded-md border border-gray-200 px-2 py-1 text-[11px] font-bold text-[#181725] hover:border-[#6B1D2E] cursor-pointer"
                 title={data.claimUrl}
               >
                 {copied === 'url' ? <Check size={12} /> : <Copy size={12} />}
@@ -217,7 +217,7 @@ export default function AdminPayoutDetailPage() {
               type="button"
               disabled={paying}
               onClick={() => setPayOpen(true)}
-              className="mt-4 w-full py-2.5 rounded-xl bg-[#53B175] text-white text-[13px] font-bold hover:bg-[#48a068] disabled:opacity-50 cursor-pointer"
+              className="mt-4 w-full py-2.5 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-[#5A1926] disabled:opacity-50 cursor-pointer"
             >
               Mark Paid
             </button>

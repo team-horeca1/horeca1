@@ -76,7 +76,7 @@ export function Footer() {
                         </p>
                         <ul className="space-y-5 pt-2">
                             <li className="flex items-start gap-4">
-                                <div className="w-10 h-10 rounded-full bg-[#299E60] flex items-center justify-center shrink-0">
+                                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
                                     <MapPin size={18} className="text-white" />
                                 </div>
                                 <span className="text-[14px] text-[#181725] font-medium leading-[1.4] pt-1">
@@ -85,7 +85,7 @@ export function Footer() {
                                 </span>
                             </li>
                             <li className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-[#299E60] flex items-center justify-center shrink-0">
+                                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
                                     <Phone size={18} className="text-white" />
                                 </div>
                                 <span className="text-[14px] text-[#181725] font-medium">
@@ -93,7 +93,7 @@ export function Footer() {
                                 </span>
                             </li>
                             <li className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full bg-[#299E60] flex items-center justify-center shrink-0">
+                                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
                                     <Mail size={18} className="text-white" />
                                 </div>
                                 <span className="text-[14px] text-[#181725] font-medium">
@@ -110,7 +110,7 @@ export function Footer() {
                             <ul className="space-y-4">
                                 {FOOTER_LINKS.information.map((link) => (
                                     <li key={link.href + link.label}>
-                                        <Link href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
+                                        <Link href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-primary transition-colors">
                                             {link.label}
                                         </Link>
                                     </li>
@@ -124,7 +124,7 @@ export function Footer() {
                                 <li>
                                     <a
                                         href="tel:7710920002"
-                                        className="flex items-center gap-2 text-[14px] text-[#299E60] font-semibold hover:text-[#1e7a49] transition-colors"
+                                        className="flex items-center gap-2 text-[14px] text-primary font-semibold hover:text-primary-dark transition-colors"
                                     >
                                         <PhoneCall size={15} />
                                         7710920002
@@ -133,11 +133,11 @@ export function Footer() {
                                 {FOOTER_LINKS.support.map((link) => (
                                     <li key={link.href + link.label}>
                                         {link.href.startsWith('mailto:') ? (
-                                            <a href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
+                                            <a href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-primary transition-colors">
                                                 {link.label}
                                             </a>
                                         ) : (
-                                            <Link href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
+                                            <Link href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-primary transition-colors">
                                                 {link.label}
                                             </Link>
                                         )}
@@ -151,7 +151,7 @@ export function Footer() {
                             <ul className="space-y-4">
                                 {FOOTER_LINKS.account.map((link) => (
                                     <li key={link.href + link.label}>
-                                        <Link href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
+                                        <Link href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-primary transition-colors">
                                             {link.label}
                                         </Link>
                                     </li>
@@ -164,7 +164,7 @@ export function Footer() {
                             <ul className="space-y-4">
                                 {FOOTER_LINKS.groceries.map((link) => (
                                     <li key={link.href + link.label}>
-                                        <Link href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-[#299E60] transition-colors">
+                                        <Link href={link.href} className="text-[14px] text-[#7C7C7C] hover:text-primary transition-colors">
                                             {link.label}
                                         </Link>
                                     </li>
@@ -184,7 +184,7 @@ export function Footer() {
                             <Link
                                 key={idx}
                                 href={social.href}
-                                className="w-11 h-11 rounded-full bg-[#D3F2E0] text-[#299E60] flex items-center justify-center hover:bg-[#299E60] hover:text-white transition-all"
+                                className="size-11 rounded-full bg-primary-light text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all"
                             >
                                 <social.icon size={18} />
                             </Link>

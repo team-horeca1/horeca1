@@ -80,7 +80,7 @@ export function AdminCopyField({
           title={`Copy ${label}`}
           className="h-[38px] w-[38px] shrink-0 border border-[#E5E7EB] rounded-[8px] flex items-center justify-center hover:bg-gray-50 disabled:opacity-40 transition-colors"
         >
-          {copied ? <Check size={14} className="text-[#299E60]" /> : <Copy size={14} className="text-[#7C7C7C]" />}
+          {copied ? <Check size={14} className="text-[#6B1D2E]" /> : <Copy size={14} className="text-[#7C7C7C]" />}
         </button>
       </div>
     </div>

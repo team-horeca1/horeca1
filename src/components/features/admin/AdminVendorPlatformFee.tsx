@@ -64,7 +64,7 @@ export function AdminVendorPlatformFee({ vendorId, platformFeePct, globalDefault
             type="button"
             onClick={() => setUseCustom(false)}
             className={`flex-1 py-2.5 rounded-[10px] text-[12px] font-bold border transition-colors ${
-              !useCustom ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]' : 'border-[#D1D5DB] text-[#7C7C7C]'
+              !useCustom ? 'border-[#6B1D2E] bg-[#F8E8EC] text-[#6B1D2E]' : 'border-[#D1D5DB] text-[#7C7C7C]'
             }`}
           >
             Global default ({globalDefaultPct}%)
@@ -73,7 +73,7 @@ export function AdminVendorPlatformFee({ vendorId, platformFeePct, globalDefault
             type="button"
             onClick={() => setUseCustom(true)}
             className={`flex-1 py-2.5 rounded-[10px] text-[12px] font-bold border transition-colors ${
-              useCustom ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]' : 'border-[#D1D5DB] text-[#7C7C7C]'
+              useCustom ? 'border-[#6B1D2E] bg-[#F8E8EC] text-[#6B1D2E]' : 'border-[#D1D5DB] text-[#7C7C7C]'
             }`}
           >
             Custom rate
@@ -89,7 +89,7 @@ export function AdminVendorPlatformFee({ vendorId, platformFeePct, globalDefault
               step="0.5"
               value={customPct}
               onChange={(e) => setCustomPct(e.target.value)}
-              className="w-full h-[40px] px-3 rounded-[10px] border border-[#D1D5DB] text-[13px] outline-none focus:border-[#299E60]/50"
+              className="w-full h-[40px] px-3 rounded-[10px] border border-[#D1D5DB] text-[13px] outline-none focus:border-[#6B1D2E]/50"
             />
           </div>
         )}
@@ -98,7 +98,7 @@ export function AdminVendorPlatformFee({ vendorId, platformFeePct, globalDefault
           type="button"
           onClick={save}
           disabled={saving}
-          className="flex items-center gap-2 h-[38px] px-5 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] disabled:opacity-50"
+          className="flex items-center gap-2 h-[38px] px-5 rounded-[10px] bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-[#5A1926] disabled:opacity-50"
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
           Save platform fee

@@ -125,7 +125,7 @@ async function startRepayment(
         }
       },
       modal: { ondismiss: () => setBusy(false) },
-      theme: { color: '#53B175' },
+      theme: { color: '#6B1D2E' },
     });
     rzp.open();
   } catch (e) {
@@ -164,7 +164,7 @@ export default function DisccoCreditPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="animate-spin text-[#53B175]" size={28} />
+        <Loader2 className="animate-spin text-primary" size={28} />
       </div>
     );
   }
@@ -173,7 +173,7 @@ export default function DisccoCreditPage() {
     <div className="max-w-3xl mx-auto px-[clamp(1rem,3vw,2rem)] py-[clamp(1.5rem,4vw,3rem)] space-y-6">
       <header>
         <div className="flex items-center gap-2.5">
-          <CreditCard className="text-[#53B175]" size={22} strokeWidth={1.75} />
+          <CreditCard className="text-primary" size={22} strokeWidth={1.75} />
           <h1 className="text-[clamp(1.4rem,2vw+0.8rem,1.9rem)] font-bold text-[#181725]">DiSCCO</h1>
         </div>
         <p className="text-[14px] text-gray-500 font-medium mt-1">Buy Now, Pay Later</p>
@@ -234,14 +234,14 @@ export default function DisccoCreditPage() {
                       onClick={() => {
                         void startRepayment(w.id, outstanding, load, (busy) => setPayingId(busy ? w.id : null));
                       }}
-                      className="bg-[#53B175] text-white text-[13px] font-bold px-4 py-2 rounded-xl disabled:opacity-40 hover:bg-[#469E66] transition-colors"
+                      className="bg-primary text-white text-[13px] font-bold px-4 py-2 rounded-xl disabled:opacity-40 hover:bg-primary/90 transition-colors"
                     >
                       {payingId === w.id ? 'Opening…' : 'Repay'}
                     </button>
                   )}
                   <Link
                     href={`/wallet/${w.id}`}
-                    className="inline-flex items-center gap-0.5 text-[13px] font-semibold text-[#53B175] hover:underline"
+                    className="inline-flex items-center gap-0.5 text-[13px] font-semibold text-primary hover:underline"
                   >
                     View Credit <ChevronRight size={14} />
                   </Link>

@@ -30,6 +30,7 @@ import { NotificationBell } from '../features/NotificationBell';
 import { dalClient as dal } from '@/lib/dalClient';
 import type { Category } from '@/types';
 import { NavDeliverySelector } from './NavDeliverySelector';
+import { OutletContextStrip } from './OutletContextStrip';
 import { isAdminCustomerImpersonationActive, isAnyAdminImpersonationActive, readImpersonationMode, type ImpersonationMode } from '@/lib/clearImpersonation';
 import { resolvePortalNav, type InitialNav } from '@/lib/navChrome';
 
@@ -307,33 +308,27 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
             )}
 
             {/* ── Mobile Header ── */}
-            <header className="lg:hidden w-full bg-white relative z-[10000] sticky top-0 border-b border-gray-100">
-                <div className="w-full py-3 px-4 space-y-3">
-                    {/* Row 1: Logo | Location | Notifications | Cart */}
-                    <div className="flex items-center justify-between px-1">
-                        <Link href="/" className="flex items-center">
+            <header className="lg:hidden w-full bg-white relative z-[10000] sticky top-0 border-b border-divider">
+                <div className="w-full py-3 px-4">
+                    {/* Row 1: Logo | Notifications | Cart */}
+                    <div className="flex items-center justify-between">
+                        <Link href="/" className="flex items-center shrink-0">
                             <Image
-                                src="/horeca1_logo.jpg"
+                                src="/Horeca1.png"
                                 alt="Horeca1"
-                                width={40}
-                                height={40}
-                                className="h-[40px] w-[40px] object-contain rounded-lg"
+                                width={100}
+                                height={26}
+                                className="h-[24px] w-auto object-contain"
                                 priority
                             />
                         </Link>
 
-                        <NavDeliverySelector
-                            variant="mobile"
-                            fallbackLabel={selectedAddress?.shortAddress || 'Select Location'}
-                            onFallbackClick={() => setIsLocationOverlayOpen(true)}
-                        />
-
                         <div className="flex items-center gap-2">
                             {(isLoggedIn || reserveAuthSlots) && (
-                                <div className="flex items-center justify-end shrink-0 h-10 min-w-[84px] gap-1">
+                                <div className="flex items-center justify-end shrink-0 h-9 min-w-[76px] gap-1">
                                     {isLoggedIn ? (
                                         <>
-                                            <NotificationBell accentColor="#53B175" />
+                                            <NotificationBell accentColor="#6B1D2E" />
                                             <PushBell />
                                         </>
                                     ) : (
@@ -344,44 +339,24 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
                                     )}
                                 </div>
                             )}
-                            <Link href="/cart" className="relative p-1 cursor-pointer">
-                                <ShoppingCart size={20} className="text-[#181725]" />
+                            <Link href="/cart" className="relative p-1.5 cursor-pointer hover:bg-ivory rounded-lg transition-colors" aria-label="Cart">
+                                <ShoppingCart size={21} className="text-text" />
                                 {badgeCount > 0 && (
-                                    <span className="absolute -top-1 -right-1 bg-[#53B175] text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full font-bold border border-white">
+                                    <span className="absolute -top-0.5 -right-0.5 bg-primary text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full font-bold border border-white">
                                         {badgeCount}
                                     </span>
                                 )}
                             </Link>
                         </div>
                     </div>
-
-                    {/* Row 2: Search Bar — always visible (universal escape hatch) */}
-                    <div className="px-1">
-                        <div
-                            className={cn(
-                                "flex items-center gap-3 px-4 py-3 bg-[#F7F7F7] border rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-all duration-300",
-                                isNavSearchFocused ? "border-[#53B175] bg-white ring-1 ring-[#53B175]/10" : "border-gray-100"
-                            )}
-                        >
-                            <Search size={20} className={cn("transition-colors", isNavSearchFocused ? "text-[#53B175]" : "text-gray-400")} />
-                            <input
-                                type="text"
-                                placeholder="search for product or brand, store..."
-                                className="flex-1 bg-transparent text-[14px] outline-none placeholder:text-gray-400 font-medium"
-                                onFocus={() => setIsNavSearchFocused(true)}
-                                onBlur={() => setIsNavSearchFocused(false)}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (val.length > 0) {
-                                        openSearch('items', val);
-                                        e.target.value = '';
-                                    }
-                                }}
-                            />
-                        </div>
-                    </div>
                 </div>
             </header>
+
+            <OutletContextStrip
+                className="lg:hidden sticky top-[calc(var(--mobile-header-offset,0px)+0px)] z-[9999]"
+                onGuestLocationClick={() => setIsLocationOverlayOpen(true)}
+                onLoggedInSwitchClick={() => setIsLocationOverlayOpen(true)}
+            />
 
             {/* ── Desktop Navbar — single sticky row, no green bar ── */}
             <div className={cn(
@@ -494,7 +469,7 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
                                 {(isLoggedIn || reserveAuthSlots) && (
                                     <div className="flex items-center justify-center shrink-0 w-10 h-10">
                                         {isLoggedIn ? (
-                                            <NotificationBell accentColor="#53B175" />
+                                            <NotificationBell accentColor="#6B1D2E" />
                                         ) : (
                                             <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse" aria-hidden />
                                         )}
@@ -557,7 +532,7 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
                         <h2 className="text-[17px] font-black text-[#181725]">Shop By Category</h2>
                         <button
                             onClick={() => setIsCategoriesExpanded(!isCategoriesExpanded)}
-                            className="text-[#53B175] text-[14px] font-bold cursor-pointer"
+                            className="text-primary text-[14px] font-bold cursor-pointer"
                         >
                             {isCategoriesExpanded ? 'Collapse' : 'See All'}
                         </button>
@@ -591,13 +566,8 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
             </div>
 
             <MobileBottomNav
-                isCategoriesOpen={isCategoriesSidebarOpen}
-                onCategoriesClick={() => setIsCategoriesSidebarOpen(true)}
-                onStoreClick={() => openSearch('stores')}
-                onAccountClick={() => {
-                    if (isLoggedIn) router.push('/profile');
-                    else router.push('/login');
-                }}
+                onSearchClick={() => openSearch('items')}
+                onBusinessSwitchClick={() => setIsLocationOverlayOpen(true)}
             />
             <MobileSearchOverlay
                 isOpen={isSearchOverlayOpen}

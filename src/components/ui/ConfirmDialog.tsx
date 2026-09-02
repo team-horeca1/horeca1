@@ -50,28 +50,31 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const tone: ConfirmTone = pending?.opts.tone ?? 'danger';
   const confirmBg =
     tone === 'danger'
-      ? 'bg-[#E74C3C] hover:bg-[#c0392b]'
-      : 'bg-[#299E60] hover:bg-[#238a54]';
-  const iconBg = tone === 'danger' ? 'bg-[#FEE2E2] text-[#E74C3C]' : 'bg-[#E8F7EF] text-[#299E60]';
+      ? 'bg-error hover:bg-[#b91c1c]'
+      : 'bg-primary hover:bg-primary-dark';
+  const iconBg = tone === 'danger' ? 'bg-[#FEE2E2] text-error' : 'bg-primary-light text-primary';
 
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
       {pending && (
         <div
-          className="fixed inset-0 z-[50000] flex items-center justify-center bg-black/50 backdrop-blur-[2px] p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-[50000] flex items-end justify-center lg:items-center bg-black/45 p-0 lg:p-4"
           onClick={() => close(false)}
           role="dialog"
           aria-modal="true"
         >
           <div
-            className="bg-white w-full max-w-[420px] rounded-[16px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+            className="bg-white w-full max-w-[420px] rounded-t-[20px] lg:rounded-[16px] shadow-[0_20px_60px_rgba(0,0,0,0.15)] overflow-hidden pb-[env(safe-area-inset-bottom)]"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="lg:hidden flex justify-center pt-3 pb-1">
+              <span className="w-9 h-1 rounded-full bg-[#D1D5DB]" />
+            </div>
             <div className="relative p-6 pb-5">
               <button
                 onClick={() => close(false)}
-                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F5F5F5] text-[#AEAEAE] transition-colors"
+                className="absolute top-3 right-3 size-12 lg:size-8 flex items-center justify-center rounded-full hover:bg-ivory text-[#667085]"
                 aria-label="Close"
               >
                 <X size={18} />
@@ -88,17 +91,17 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2.5 px-6 py-4 bg-[#FAFAFA] border-t border-[#EEEEEE]">
+            <div className="flex items-center justify-end gap-2.5 px-6 py-4 bg-ivory border-t border-divider">
               <button
                 onClick={() => close(false)}
-                className="h-[40px] px-5 bg-white border border-[#EEEEEE] text-[#181725] rounded-[10px] text-[13px] font-bold hover:bg-[#F8F9FB] transition-colors"
+                className="min-h-12 px-5 bg-white border border-divider text-[#1C1C1C] rounded-[12px] text-[13px] font-semibold hover:bg-white"
               >
                 {pending.opts.cancelText ?? 'Cancel'}
               </button>
               <button
                 onClick={() => close(true)}
                 autoFocus
-                className={cn('h-[40px] px-5 text-white rounded-[10px] text-[13px] font-bold transition-colors', confirmBg)}
+                className={cn('min-h-12 px-5 text-white rounded-[12px] text-[13px] font-semibold active:scale-[0.97] transition-transform', confirmBg)}
               >
                 {pending.opts.confirmText ?? 'Confirm'}
               </button>

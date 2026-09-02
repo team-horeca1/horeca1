@@ -25,6 +25,7 @@ interface Card {
     productImages: string[];
     categories: string[];
     bgColor: string;
+    productCount?: number;
 }
 
 export default function BrandsPage() {
@@ -43,7 +44,8 @@ export default function BrandsPage() {
                     logoUrl: b.logo ?? undefined,
                     productImages: b.showcaseImages.length > 0 ? [b.showcaseImages[0]] : [],
                     categories: b.categories,
-                    bgColor: b.bgColor ?? '#f0faf4',
+                    bgColor: b.bgColor ?? '#6B1D2E',
+                    productCount: b.productCount,
                 })));
             })
             .catch(() => setBrands([]))
@@ -73,7 +75,7 @@ export default function BrandsPage() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32">
                 {loading ? (
                     <div className="flex items-center justify-center py-32">
-                        <div className="w-10 h-10 border-[3px] border-[#53B175]/10 border-t-[#53B175] rounded-full animate-spin" />
+                        <div className="w-10 h-10 border-[3px] border-primary/20 border-t-primary rounded-full animate-spin" />
                     </div>
                 ) : brands.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-32 text-center">

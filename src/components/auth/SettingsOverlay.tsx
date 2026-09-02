@@ -218,7 +218,7 @@ export function SettingsOverlay({
                                         onClick={() => setDarkMode(!darkMode)}
                                         className={cn(
                                             "w-[44px] md:w-[52px] h-[24px] md:h-[28px] rounded-full relative transition-colors duration-300 shrink-0",
-                                            darkMode ? "bg-[#53B175]" : "bg-gray-200"
+                                            darkMode ? "bg-primary" : "bg-gray-200"
                                         )}
                                     >
                                         <div
@@ -249,7 +249,7 @@ export function SettingsOverlay({
                                                 className={cn(
                                                     "flex-1 py-1.5 md:py-2.5 rounded-lg md:rounded-xl text-[11px] md:text-[13px] font-[700] capitalize transition-all border",
                                                     fontSize === size
-                                                        ? "bg-[#53B175] text-white border-[#53B175]"
+                                                        ? "bg-primary text-white border-primary"
                                                         : "bg-white text-[#181725] border-gray-200 md:hover:border-gray-300"
                                                 )}
                                             >
@@ -266,12 +266,12 @@ export function SettingsOverlay({
                                         className="w-full flex items-center justify-between"
                                     >
                                         <div className="flex items-center gap-3 md:gap-4">
-                                            <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-green-50 flex items-center justify-center">
-                                                <Globe size={16} className="text-[#53B175] md:w-5 md:h-5" />
+                                            <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-primary-light flex items-center justify-center">
+                                                <Globe size={16} className="text-primary md:w-5 md:h-5" />
                                             </div>
                                             <div className="text-left">
                                                 <p className="text-[13px] md:text-[15px] font-[600] text-[#181725]">Language</p>
-                                                <p className="text-[11px] md:text-[13px] text-[#7C7C7C] font-[400]">{language}</p>
+                                                <p className="text-[11px] md:text-[13px] text-[#7C7C7C] font-[400]">Language: {language}</p>
                                             </div>
                                         </div>
                                         <ChevronRight size={16} className={cn("text-gray-300 transition-transform", showLangPicker && "rotate-90")} />
@@ -286,7 +286,7 @@ export function SettingsOverlay({
                                                     className={cn(
                                                         "w-full text-left px-3 py-2 md:px-4 md:py-3 rounded-lg md:rounded-xl text-[12px] md:text-[14px] font-[600] transition-colors",
                                                         language === lang
-                                                            ? "bg-[#E8F5E9] text-[#53B175]"
+                                                            ? "bg-primary-light text-primary"
                                                             : "text-[#181725] md:hover:bg-white"
                                                     )}
                                                 >
@@ -299,13 +299,13 @@ export function SettingsOverlay({
                             </div>
                         </div>
 
-                        {/* Account Section */}
+                        {/* Security */}
                         <div>
-                            <h4 className="text-[14px] md:text-[16px] font-[700] text-[#181725] mb-2 px-1">Account & Security</h4>
+                            <h4 className="text-[12px] md:text-[14px] font-[700] text-[#7C7C7C] uppercase tracking-wider mb-2 md:mb-3 px-1">Security</h4>
                             <div className="bg-white md:bg-gray-50/80 border border-gray-100 rounded-[12px] md:rounded-2xl overflow-hidden shadow-sm">
                                 <button className="w-full flex items-center gap-3 md:gap-4 px-4 py-4 md:px-5 md:py-5 active:bg-gray-100 md:hover:bg-white transition-colors text-left border-b border-gray-50/80">
-                                    <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-[#E8F5E9] flex items-center justify-center">
-                                        <ShieldCheck size={16} className="text-[#53B175] md:w-5 md:h-5" />
+                                    <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-primary-light flex items-center justify-center">
+                                        <ShieldCheck size={16} className="text-primary md:w-5 md:h-5" />
                                     </div>
                                     <div className="flex-1">
                                         <p className="text-[13px] md:text-[15px] font-[600] text-[#181725]">Change Password</p>
@@ -361,7 +361,7 @@ export function SettingsOverlay({
                         <div className="p-5 space-y-4">
                             {accountsLoading && deleteStep === 'choose' && (
                                 <div className="flex items-center justify-center py-10">
-                                    <Loader2 size={24} className="animate-spin text-[#53B175]" />
+                                    <Loader2 size={24} className="animate-spin text-primary" />
                                 </div>
                             )}
 
@@ -375,7 +375,7 @@ export function SettingsOverlay({
                                         <button
                                             onClick={() => setDeleteStep('business-account')}
                                             disabled={!effectiveBaId}
-                                            className="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-[#53B175]/40 hover:bg-[#F8FBF9] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="w-full text-left p-4 rounded-xl border border-gray-200 hover:border-primary/40 hover:bg-primary-light/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <div className="flex items-start gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
@@ -417,7 +417,7 @@ export function SettingsOverlay({
                                 <>
                                     {baLoading ? (
                                         <div className="flex items-center justify-center py-8">
-                                            <Loader2 size={24} className="animate-spin text-[#53B175]" />
+                                            <Loader2 size={24} className="animate-spin text-primary" />
                                         </div>
                                     ) : baSummary ? (
                                         <>

@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
 import { BrandStoreCard } from '@/components/features/brand/BrandStoreCard';
+import { SectionHeader } from '@/components/ui/SectionHeader';
 
 interface ApiBrand {
     id: string;
@@ -15,72 +15,74 @@ interface ApiBrand {
     categories: string[];
     bgColor: string | null;
     showcaseImages: string[];
+    productCount?: number;
 }
 
 export function ShopByStorePromo() {
     const [brands, setBrands] = useState<ApiBrand[]>([]);
+    const [hasMore, setHasMore] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch('/api/v1/brands?limit=12')
-            .then(r => r.json())
-            .then(d => setBrands(d.data?.brands ?? []))
+        fetch('/api/v1/brands?limit=8')
+            .then((r) => r.json())
+            .then((d) => {
+                setBrands(d.data?.brands ?? []);
+                setHasMore(Boolean(d.data?.hasMore));
+            })
             .catch(() => setBrands([]))
             .finally(() => setLoading(false));
     }, []);
 
-    // Hide section entirely if no approved brands — better than showing a fake list.
     if (!loading && brands.length === 0) return null;
 
-    const cards = brands.map(b => ({
-        name: b.name,
-        slug: b.slug,
-        logoUrl: b.logo ?? undefined,
-        productImages: b.showcaseImages.length > 0 ? [b.showcaseImages[0]] : [],
-        categories: b.categories,
-        bgColor: b.bgColor ?? '#f0faf4',
-    }));
-
     return (
-        <section className="w-full py-8 md:py-12">
+        <section className="w-full py-6 md:py-10 bg-white border-y border-divider">
             <div className="max-w-[var(--container-max)] mx-auto">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-4 md:mb-6 px-4 md:px-[var(--container-padding)]">
-                    <h2 className="text-[20px] md:text-[24px] font-[900] text-[#181725] tracking-tight">
-                        Shop by Brand
-                    </h2>
-                    <Link
-                        href="/brands"
-                        className="flex items-center gap-1 text-[#53B175] font-black text-sm hover:gap-2 transition-all cursor-pointer group"
-                    >
-                        See All <ChevronRight size={14} strokeWidth={3} className="group-hover:translate-x-0.5 transition-transform" />
-                    </Link>
+                <div className="px-4 md:px-[var(--container-padding)] mb-3 md:mb-4">
+                    <SectionHeader
+                        title="Brand Store"
+                        subtitle="Shop direct from the source"
+                        actionLabel="View all →"
+                        actionHref="/brands"
+                    />
                 </div>
 
                 {loading ? (
-                    <div className="flex gap-3 px-4 md:px-[var(--container-padding)]">
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <div key={i} className="w-[140px] md:w-full h-[260px] bg-gray-100 rounded-[24px] animate-pulse shrink-0" />
+                    <div className="flex gap-2.5 overflow-hidden px-4 md:px-[var(--container-padding)]">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <div
+                                key={i}
+                                className="w-[150px] md:w-[168px] h-[225px] md:h-[248px] bg-[#E9E3DD] rounded-[16px] animate-pulse shrink-0"
+                            />
                         ))}
                     </div>
                 ) : (
-                    <>
-                        {/* Mobile: horizontal scroll */}
-                        <div className="md:hidden flex gap-3 overflow-x-auto pb-3 px-4 scrollbar-none snap-x snap-mandatory">
-                            {cards.map((brand) => (
-                                <div key={brand.slug} className="snap-start shrink-0 w-[140px]">
-                                    <BrandStoreCard {...brand} />
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Desktop: 6-column grid — portrait cards */}
-                        <div className="hidden md:grid md:grid-cols-4 lg:grid-cols-6 gap-4 px-[var(--container-padding)]">
-                            {cards.map((brand) => (
-                                <BrandStoreCard key={brand.slug} {...brand} />
-                            ))}
-                        </div>
-                    </>
+                    <div className="flex gap-2.5 md:gap-3 overflow-x-auto pb-2 px-4 md:px-[var(--container-padding)] no-scrollbar snap-x snap-mandatory">
+                        {brands.map((brand) => (
+                            <div key={brand.slug} className="snap-start shrink-0 w-[150px] md:w-[168px] lg:w-[180px]">
+                                <BrandStoreCard
+                                    name={brand.name}
+                                    slug={brand.slug}
+                                    logoUrl={brand.logo ?? undefined}
+                                    productImages={brand.showcaseImages.length > 0 ? [brand.showcaseImages[0]] : []}
+                                    categories={brand.categories}
+                                    bgColor={brand.bgColor ?? '#6B1D2E'}
+                                    productCount={brand.productCount}
+                                />
+                            </div>
+                        ))}
+                        {hasMore && (
+                            <Link
+                                href="/brands"
+                                className="snap-start shrink-0 w-[72px] md:w-[80px] h-[225px] md:h-[248px] rounded-[16px] bg-[#E8DFD2] flex items-center justify-center"
+                            >
+                                <span className="text-[12px] font-semibold text-[#5A4A3D] [writing-mode:vertical-rl] rotate-180">
+                                    More brands
+                                </span>
+                            </Link>
+                        )}
+                    </div>
                 )}
             </div>
         </section>

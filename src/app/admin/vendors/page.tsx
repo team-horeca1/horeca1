@@ -36,7 +36,7 @@ const AddVendorWizard = dynamic(
     loading: () => (
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center">
         <div className="bg-white rounded-[24px] p-10 flex flex-col items-center gap-3">
-          <Loader2 className="animate-spin text-[#299E60]" size={36} />
+          <Loader2 className="animate-spin text-[#6B1D2E]" size={36} />
           <span className="text-[13px] font-bold text-[#6B7280]">Loading wizard...</span>
         </div>
       </div>
@@ -151,7 +151,7 @@ export default function SuppliersPage() {
   }
 
   const registryStats = [
-    { label: 'Total Suppliers', value: stats.totalSuppliers, icon: Users, iconBg: 'bg-[#EEF8F1]', iconColor: 'text-[#299E60]' },
+    { label: 'Total Suppliers', value: stats.totalSuppliers, icon: Users, iconBg: 'bg-[#F8E8EC]', iconColor: 'text-[#6B1D2E]' },
     { label: 'Pending Approval', value: stats.pendingVerification, icon: ShieldCheck, iconBg: 'bg-[#FFF8EB]', iconColor: 'text-[#D97706]' },
     { label: 'Total Products', value: stats.totalProducts, icon: Boxes, iconBg: 'bg-[#EFF6FF]', iconColor: 'text-[#3B82F6]' },
     { label: 'Orders Placed', value: stats.totalOrders, icon: ShoppingBag, iconBg: 'bg-[#FDF2F2]', iconColor: 'text-[#EF4444]' },
@@ -166,7 +166,7 @@ export default function SuppliersPage() {
           canWriteSettings ? (
             <button
               onClick={() => setShowCreate(true)}
-              className="h-[44px] px-5 bg-[#299E60] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#238a54] active:scale-95 transition-all shadow-md shadow-[#299E60]/10 flex items-center gap-2 shrink-0"
+              className="h-[44px] px-5 bg-[#6B1D2E] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#5A1926] active:scale-95 transition-all shadow-md shadow-[#6B1D2E]/10 flex items-center gap-2 shrink-0"
             >
               <Plus size={16} />
               Add Supplier
@@ -214,7 +214,102 @@ export default function SuppliersPage() {
           }
         />
       ) : (
-        <div className="bg-white border border-[#E5E7EB] rounded-[16px] overflow-hidden shadow-sm">
+        <>
+          <div className="lg:hidden space-y-3">
+            {filtered.map((s) => {
+              const open = expanded[s.userId] ?? false;
+              return (
+                <div key={s.userId} className="bg-white border border-divider rounded-[16px] shadow-sm overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setExpanded((prev) => ({ ...prev, [s.userId]: !open }))}
+                    className="w-full min-h-12 px-4 py-3 flex items-start gap-3 text-left"
+                  >
+                    {open ? (
+                      <ChevronDown size={18} className="text-[#9CA3AF] mt-0.5 shrink-0" />
+                    ) : (
+                      <ChevronRight size={18} className="text-[#9CA3AF] mt-0.5 shrink-0" />
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold text-[#111827]">{s.fullName || s.email || 'Supplier'}</span>
+                      <span className="block text-[12px] text-[#6B7280] truncate">{s.email}</span>
+                      {s.hcid && (
+                        <span className="block text-[11px] text-[#9CA3AF] font-mono mt-0.5">{s.hcid}</span>
+                      )}
+                    </span>
+                  </button>
+                  <div className="grid grid-cols-3 gap-2 px-4 pb-3 text-center">
+                    <div className="rounded-[12px] bg-ivory py-2">
+                      <p className="text-[10px] font-semibold uppercase text-[#6B7280]">Businesses</p>
+                      <p className="text-[15px] font-bold tabular-nums">{s.businessCount}</p>
+                    </div>
+                    <div className="rounded-[12px] bg-ivory py-2">
+                      <p className="text-[10px] font-semibold uppercase text-[#6B7280]">Stores</p>
+                      <p className="text-[15px] font-bold tabular-nums">{s.storeCount}</p>
+                    </div>
+                    <div className="rounded-[12px] bg-ivory py-2">
+                      <p className="text-[10px] font-semibold uppercase text-[#6B7280]">Verified</p>
+                      <p className="text-[15px] font-bold tabular-nums">{s.verifiedCount}/{s.storeCount}</p>
+                    </div>
+                  </div>
+                  {canEditVendors && (
+                    <div className="px-4 pb-3">
+                      <button
+                        type="button"
+                        disabled={impersonateLoading || s.storeCount < 1}
+                        onClick={() => void startVendorView(s.userId)}
+                        className="w-full min-h-12 inline-flex items-center justify-center gap-1.5 text-[13px] font-semibold rounded-[12px] bg-primary-light text-primary disabled:opacity-50"
+                        data-testid="impersonate-supplier"
+                      >
+                        <LayoutDashboard size={16} />
+                        Impersonate
+                      </button>
+                    </div>
+                  )}
+                  {open && (
+                    <div className="border-t border-divider bg-ivory/60 px-4 py-3 space-y-3">
+                      {s.businesses.map((b) => (
+                        <div key={b.id} className="space-y-2">
+                          <p className="flex items-center gap-2 text-[12px] font-semibold text-primary">
+                            <Building2 size={14} />
+                            {b.displayName ?? b.legalName}
+                          </p>
+                          {b.stores.map((st) => (
+                            <div key={st.id} className="bg-white rounded-[12px] border border-divider p-3 space-y-2">
+                              <div className="flex items-start gap-3">
+                                <div className="size-10 rounded-full bg-[#F3F4F6] flex items-center justify-center shrink-0">
+                                  <Store size={16} className="text-primary" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-semibold text-[#111827]">{st.name}</p>
+                                  <p className="text-[11px] text-[#9CA3AF]">/{st.slug}</p>
+                                  <p className="text-[12px] text-[#6B7280] mt-1">{st.productCount} products · {st.orderCount} orders</p>
+                                </div>
+                                <AdminStatusBadge
+                                  variant={st.isVerified ? 'verified' : 'pending'}
+                                  label={st.isVerified ? 'Verified' : 'Pending'}
+                                  className="shrink-0 normal-case"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/admin/vendors/${st.id}`)}
+                                className="w-full min-h-12 text-[13px] font-semibold text-[#374151] rounded-[12px] border border-divider bg-white"
+                              >
+                                Details
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="hidden lg:block bg-white border border-[#E5E7EB] rounded-[16px] overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[13px]">
               <thead className="bg-[#F9FAFB] text-[#6B7280] uppercase text-[11px] tracking-wider">
@@ -270,7 +365,7 @@ export default function SuppliersPage() {
                                 onClick={() => void startVendorView(s.userId)}
                                 className={cn(
                                   'inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-bold rounded-[8px]',
-                                  'bg-[#EEF8F1] text-[#299E60] hover:bg-[#DCFCE7] disabled:opacity-50',
+                                  'bg-[#F8E8EC] text-[#6B1D2E] hover:bg-[#DCFCE7] disabled:opacity-50',
                                 )}
                                 data-testid="impersonate-supplier"
                               >
@@ -284,9 +379,9 @@ export default function SuppliersPage() {
                       {open
                         && s.businesses.map((b) => (
                           <React.Fragment key={b.id}>
-                            <tr className="bg-[#F8FAF9]">
+                            <tr className="bg-ivory">
                               <td colSpan={5} className="px-5 py-2.5">
-                                <div className="flex items-center gap-2 ml-6 text-[12px] font-bold text-[#299E60]">
+                                <div className="flex items-center gap-2 ml-6 text-[12px] font-bold text-[#6B1D2E]">
                                   <Building2 size={14} />
                                   {b.displayName ?? b.legalName}
                                   {b.displayName && b.displayName !== b.legalName && (
@@ -300,13 +395,13 @@ export default function SuppliersPage() {
                                 <td className="px-5 py-3 pl-14" colSpan={2}>
                                   <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-full bg-[#F3F4F6] flex items-center justify-center shrink-0">
-                                      <Store size={14} className="text-[#299E60]" />
+                                      <Store size={14} className="text-[#6B1D2E]" />
                                     </div>
                                     <div className="min-w-0">
                                       <button
                                         type="button"
                                         onClick={() => router.push(`/admin/vendors/${st.id}`)}
-                                        className="font-semibold text-[#111827] hover:text-[#299E60] truncate block text-left"
+                                        className="font-semibold text-[#111827] hover:text-[#6B1D2E] truncate block text-left"
                                       >
                                         {st.name}
                                       </button>
@@ -348,6 +443,7 @@ export default function SuppliersPage() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {showCreate && (

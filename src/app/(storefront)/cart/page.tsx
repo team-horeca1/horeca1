@@ -56,7 +56,7 @@ function openRazorpayPopup(opts: {
             order_id: opts.order_id,
             name: 'HoReCa Hub',
             description: opts.description,
-            theme: { color: '#53B175' },
+            theme: { color: '#6B1D2E' },
             handler: (response: RazorpaySuccessPayload) => resolve(response),
             modal: { ondismiss: () => reject(new Error('Payment cancelled')) },
         });
@@ -315,7 +315,7 @@ export default function CartPage() {
                 <div className="w-full max-w-[400px] flex flex-col gap-4">
                     <button
                         onClick={() => router.push('/orders')}
-                        className="w-full bg-[#53B175] text-white py-[18px] md:py-[22px] rounded-[18px] font-black text-[18px] shadow-xl shadow-green-100/80 hover:bg-[#48a068] transition-all hover:-translate-y-0.5"
+                        className="w-full bg-primary text-white py-[18px] md:py-[22px] rounded-[18px] font-black text-[18px] shadow-xl shadow-primary/20 hover:bg-primary-dark transition-all hover:-translate-y-0.5"
                     >
                         Track Your Order
                     </button>
@@ -506,7 +506,7 @@ export default function CartPage() {
                                         <button
                                             key={method.id}
                                             onClick={() => setPaymentMethod(method.id)}
-                                            className={`w-full px-5 md:px-7 py-4 md:py-5 flex items-center gap-4 text-left transition-all ${isSelected ? 'bg-[#53B175]/5' : 'hover:bg-gray-50/60'}`}
+                                            className={`w-full px-5 md:px-7 py-4 md:py-5 flex items-center gap-4 text-left transition-all ${isSelected ? 'bg-primary/5' : 'hover:bg-gray-50/60'}`}
                                         >
                                             {/* Icon badge */}
                                             <div className={`w-11 h-11 md:w-12 md:h-12 rounded-xl flex items-center justify-center shrink-0 ${method.badgeBg} ${method.badgeText} border border-black/5`}>
@@ -529,8 +529,8 @@ export default function CartPage() {
                                             </div>
 
                                             {/* Radio */}
-                                            <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${isSelected ? 'border-[#53B175]' : 'border-gray-300'}`}>
-                                                {isSelected && <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-[#53B175]" />}
+                                            <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${isSelected ? 'border-primary' : 'border-gray-300'}`}>
+                                                {isSelected && <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-primary" />}
                                             </div>
                                         </button>
                                     );
@@ -594,7 +594,7 @@ export default function CartPage() {
                             <button
                                 onClick={confirmOrder}
                                 disabled={isPlacingOrder}
-                                className="w-full bg-[#53B175] text-white py-5 rounded-2xl font-bold text-[18px] transition-all hover:bg-[#48a068] active:scale-[0.98] shadow-lg shadow-[#53B175]/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="w-full bg-primary text-white py-5 rounded-2xl font-bold text-[18px] transition-all hover:bg-primary-dark active:scale-[0.98] shadow-lg shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {isPlacingOrder
                                     ? <><Loader2 size={20} className="animate-spin" /> {paymentMethod === 'razorpay' ? 'Opening Payment...' : 'Placing Order...'}</>
@@ -606,7 +606,7 @@ export default function CartPage() {
                         {/* Mobile + Tablet Summary */}
                         <div className="lg:hidden bg-white rounded-2xl border border-[#E2E2E2] overflow-hidden shadow-sm">
                             {/* Selected method row */}
-                            <div className="px-5 py-4 flex items-center gap-3 bg-[#53B175]/5 border-b border-[#E8E8E8]">
+                            <div className="px-5 py-4 flex items-center gap-3 bg-primary/5 border-b border-[#E8E8E8]">
                                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${selected.badgeBg} ${selected.badgeText} border border-black/5`}>
                                     {selected.badge}
                                 </div>
@@ -650,7 +650,7 @@ export default function CartPage() {
                     <button
                         onClick={confirmOrder}
                         disabled={isPlacingOrder}
-                        className="w-full bg-[#53B175] text-white py-[18px] rounded-[16px] font-bold text-[17px] transition-all active:scale-[0.98] shadow-lg shadow-[#53B175]/20 hover:bg-[#48a068] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="w-full bg-primary text-white py-[18px] rounded-[16px] font-bold text-[17px] transition-all active:scale-[0.98] shadow-lg shadow-primary/20 hover:bg-primary-dark disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         {isPlacingOrder
                             ? <><Loader2 size={20} className="animate-spin" /> {paymentMethod === 'razorpay' ? 'Opening Payment...' : 'Placing Order...'}</>
@@ -697,7 +697,7 @@ export default function CartPage() {
                 <Image src="/images/empty-cart.png" alt="Empty Cart" width={180} height={180} className="mb-8 opacity-20" />
                 <h2 className="text-[20px] font-bold text-[#181725] mb-2">No items in cart</h2>
                 <p className="text-[#7C7C7C] text-center mb-8">Your cart is currently empty. Start adding some products!</p>
-                <button onClick={() => router.push('/')} className="bg-[#53B175] text-white px-12 py-4 rounded-xl font-bold hover:bg-[#48a068] transition-colors">
+                <button onClick={() => router.push('/')} className="bg-primary text-white px-12 py-4 rounded-xl font-bold hover:bg-primary-dark transition-colors">
                     Start Shopping
                 </button>
             </div>
@@ -785,7 +785,7 @@ export default function CartPage() {
                                     href={shipment.id === 's1' ? '#' : `/cart/shipment/${shipment.id}`}
                                     className={cn(
                                         "block bg-white rounded-[16px] border overflow-hidden hover:shadow-md transition-all",
-                                        selectedVendors.has(shipment.id) ? "border-[#53B175]/40 ring-1 ring-[#53B175]/15" : "border-[#CFCECE] opacity-75"
+                                        selectedVendors.has(shipment.id) ? "border-primary/40 ring-1 ring-primary/15" : "border-[#CFCECE] opacity-75"
                                     )}
                                 >
                                     <div className="w-full p-4 flex items-center gap-3 active:bg-gray-50/50 transition-colors">
@@ -795,7 +795,7 @@ export default function CartPage() {
                                             className={cn(
                                                 "w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all",
                                                 selectedVendors.has(shipment.id)
-                                                    ? "bg-[#53B175] border-[#53B175] text-white"
+                                                    ? "bg-primary border-primary text-white"
                                                     : "bg-white border-gray-300"
                                             )}
                                         >
@@ -814,7 +814,7 @@ export default function CartPage() {
                                         </div>
                                         <div className="flex flex-col items-end gap-1">
                                             <span className="text-[14px] font-bold text-[#181725] whitespace-nowrap">{getShipmentItemCount(shipment.items)} items</span>
-                                            <div className="flex items-center gap-1.5 text-[#53B175] text-[12px] font-bold">
+                                            <div className="flex items-center gap-1.5 text-primary text-[12px] font-bold">
                                                 <span>Details</span>
                                                 <ChevronRight size={14} strokeWidth={3} />
                                             </div>
@@ -835,7 +835,7 @@ export default function CartPage() {
                             {shipments.map((shipment) => (
                                 <div key={shipment.id} className={cn(
                                     "bg-white rounded-2xl border overflow-hidden shadow-sm transition-all",
-                                    selectedVendors.has(shipment.id) ? "border-[#53B175]/40 ring-1 ring-[#53B175]/15" : "border-[#E2E2E2] opacity-75"
+                                    selectedVendors.has(shipment.id) ? "border-primary/40 ring-1 ring-primary/15" : "border-[#E2E2E2] opacity-75"
                                 )}>
                                     {/* Vendor Group Header */}
                                     <div className="px-7 py-5 flex items-center justify-between bg-[#FAFAFA]">
@@ -845,8 +845,8 @@ export default function CartPage() {
                                             className={cn(
                                                 "w-6 h-6 rounded-md border-2 flex items-center justify-center mr-4 shrink-0 transition-all",
                                                 selectedVendors.has(shipment.id)
-                                                    ? "bg-[#53B175] border-[#53B175] text-white"
-                                                    : "bg-white border-gray-300 hover:border-[#53B175]"
+                                                    ? "bg-primary border-primary text-white"
+                                                    : "bg-white border-gray-300 hover:border-primary"
                                             )}
                                             title={selectedVendors.has(shipment.id) ? 'Skip this PO at checkout' : 'Pay for this PO at checkout'}
                                         >
@@ -1101,15 +1101,15 @@ export default function CartPage() {
                                                         aria-pressed={sel}
                                                         aria-label={sel ? `Skip ${g.vendorName} at checkout` : `Pay for ${g.vendorName} at checkout`}
                                                         className={cn(
-                                                            "w-full text-left rounded-xl border px-3 py-2.5 transition-all cursor-pointer hover:border-[#53B175]/40 active:scale-[0.99]",
-                                                            sel ? "bg-[#53B175]/5 border-[#53B175]/20" : "bg-gray-50 border-gray-100"
+                                                            "w-full text-left rounded-xl border px-3 py-2.5 transition-all cursor-pointer hover:border-primary/40 active:scale-[0.99]",
+                                                            sel ? "bg-primary/5 border-primary/20" : "bg-gray-50 border-gray-100"
                                                         )}
                                                     >
                                                         <div className="flex items-center justify-between gap-2">
                                                             <div className="flex items-center gap-2 min-w-0">
                                                                 <div className={cn(
                                                                     "w-4 h-4 rounded-sm border flex items-center justify-center shrink-0",
-                                                                    sel ? "bg-[#53B175] border-[#53B175] text-white" : "border-gray-300 bg-white"
+                                                                    sel ? "bg-primary border-primary text-white" : "border-gray-300 bg-white"
                                                                 )}>
                                                                     {sel && <Check size={11} strokeWidth={3.5} />}
                                                                 </div>
@@ -1174,7 +1174,7 @@ export default function CartPage() {
                         <button
                             onClick={() => router.push('/checkout')}
                             disabled={selectedGroups.length === 0}
-                            className="w-full bg-[#53B175] text-white py-5 rounded-2xl font-bold text-[18px] transition-all hover:bg-[#48a068] active:scale-[0.98] shadow-lg shadow-[#53B175]/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#53B175]"
+                            className="w-full bg-primary text-white py-5 rounded-2xl font-bold text-[18px] transition-all hover:bg-primary-dark active:scale-[0.98] shadow-lg shadow-primary/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
                         >
                             {selectedGroups.length === 0 ? 'Select a PO to checkout' : `Checkout (${selectedGroups.length} PO${selectedGroups.length !== 1 ? 's' : ''})`}
                             <ChevronRight size={20} strokeWidth={3} />
@@ -1233,7 +1233,7 @@ export default function CartPage() {
                 <button
                     onClick={() => router.push('/checkout')}
                     disabled={selectedGroups.length === 0}
-                    className="w-full bg-[#53B175] text-white py-[18px] rounded-[16px] font-bold text-[18px] transition-all active:scale-[0.98] shadow-lg shadow-[#53B175]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-primary text-white py-[18px] rounded-[16px] font-bold text-[18px] transition-all active:scale-[0.98] shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary-dark"
                 >
                     {selectedGroups.length === 0 ? 'Select a PO' : `Pay ₹${totalPay.toFixed(0)} · ${selectedGroups.length} PO${selectedGroups.length !== 1 ? 's' : ''}`}
                 </button>

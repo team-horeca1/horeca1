@@ -12,6 +12,8 @@ export { AdminRegistryPageHeader } from './AdminRegistryPageHeader';
 export { AdminRegistryStatsGrid } from './AdminRegistryStatsGrid';
 export type { AdminRegistryStat } from './AdminRegistryStatsGrid';
 export { AdminRegistryFilterBar, registryFilterPillClass } from './AdminRegistryFilterBar';
+export { AdminRegistryViewToggle } from './AdminRegistryViewToggle';
+export { useAdminDesktop } from './useAdminDesktop';
 export { AdminRegistryLoadingState } from './AdminRegistryLoadingState';
 export { AdminRegistryEmptyState } from './AdminRegistryEmptyState';
 export {

@@ -1,100 +1,13 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { Star, MapPin, Bookmark, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { dal } from '@/lib/dal';
 import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import type { Vendor } from '@/types';
-
-// Cover images for vendor cards (cycling through available images)
-const VENDOR_COVERS = [
-    '/images/vendors/chad-peltola-BTvQ2ET_iKc-unsplash.webp',
-    '/images/vendors/eryka-ragna-K5dvZHBJp3k-unsplash.webp',
-    '/images/vendors/gioia-m-EGjfIKl_ZvE-unsplash.webp',
-    '/images/vendors/kylle-pangan-LjpD-uW4dH0-unsplash.webp',
-    '/images/vendors/m-veven-4oHtqbwy7Lo-unsplash.webp',
-    '/images/vendors/sleeba-thomas-h-T2VPkw9Kw-unsplash.webp',
-    '/images/vendors/young-kane-kSDOJRNol9E-unsplash.webp',
-];
-
-
-function VendorCard({ vendor, index }: { vendor: Vendor; index: number }) {
-    // Prefer the vendor's uploaded card image (from /vendor/settings → bannerUrl).
-    // Falls back to the cycling defaults for vendors that haven't uploaded one.
-    const cover = vendor.coverImage || VENDOR_COVERS[index % VENDOR_COVERS.length];
-    const categoryPills = vendor.categories.slice(0, 4);
-    const addressLine = vendor.address ? `${vendor.address.city}${vendor.address.state ? ', ' + vendor.address.state : ''}` : null;
-
-    return (
-        <Link
-            href={`/vendor/${vendor.id}`}
-            className="flex-none w-[260px] md:w-[300px] bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:-translate-y-1.5 transition-transform duration-300 group"
-        >
-            {/* Cover Image */}
-            <div className="relative w-full h-[180px] md:h-[200px] overflow-hidden">
-                <Image
-                    src={cover}
-                    alt={vendor.name}
-                    fill
-                    sizes="(max-width: 768px) 260px, 300px"
-                    className="object-cover"
-                />
-            </div>
-
-            {/* Info */}
-            <div className="p-4">
-                {/* Name + Bookmark */}
-                <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="text-[17px] md:text-[19px] font-extrabold text-[#111] line-clamp-1 leading-tight">
-                        {vendor.name}
-                    </h3>
-                    <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                        className="shrink-0 mt-0.5 text-gray-400 hover:text-[#53B175] transition-colors"
-                    >
-                        <Bookmark size={20} strokeWidth={1.5} />
-                    </button>
-                </div>
-
-                {/* Rating + MOV */}
-                <div className="flex items-center gap-2 text-[12px] md:text-[13px] text-gray-600 mb-2.5">
-                    <div className="flex items-center gap-0.5 bg-[#53B175] text-white rounded-md px-1.5 py-0.5 text-[11px] font-bold shrink-0">
-                        {vendor.rating}
-                        <Star size={10} fill="white" className="text-white" />
-                    </div>
-                    {vendor.minOrderValue > 0 && (
-                        <span className="font-semibold text-gray-500 text-[12px]">MOV ₹{vendor.minOrderValue}</span>
-                    )}
-                </div>
-
-                {/* Category Pills (3-4) */}
-                {categoryPills.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2.5 h-[60px] content-start overflow-hidden">
-                        {categoryPills.map((cat) => (
-                            <span
-                                key={cat}
-                                className="text-[11px] font-semibold bg-gray-100 text-gray-700 rounded-full px-2.5 py-1"
-                            >
-                                {cat}
-                            </span>
-                        ))}
-                    </div>
-                )}
-
-                {/* Address (real data only) */}
-                {addressLine && (
-                    <div className="flex items-center gap-1 text-[11px] md:text-[12px] text-gray-500">
-                        <MapPin size={11} className="shrink-0 text-gray-500" />
-                        <span className="truncate">{addressLine}</span>
-                    </div>
-                )}
-            </div>
-        </Link>
-    );
-}
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { VendorCard } from '@/components/features/homepage/VendorCardShared';
 
 export function NearbyVendors() {
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -160,13 +73,13 @@ export function NearbyVendors() {
     return (
         <section id="vendors" className="w-full py-6 bg-white overflow-hidden">
             <div className="max-w-[var(--container-max)] mx-auto">
-                {/* Header Container */}
-                <div className="flex items-center justify-between mb-6 px-6 md:px-[var(--container-padding)]">
-                    <h2 className="text-[18px] md:text-[22px] lg:text-[24px] font-[900] text-[#181725] tracking-tight">Shop By Vendor</h2>
-                    <Link href="/vendors" className="flex items-center gap-1 text-[#53B175] font-black text-sm hover:gap-2 transition-all cursor-pointer group">
-                        See All
-                        <ChevronRight size={14} strokeWidth={3} className="group-hover:translate-x-0.5 transition-transform" />
-                    </Link>
+                <div className="px-4 md:px-[var(--container-padding)]">
+                    <SectionHeader
+                        title="Shop by Vendor"
+                        subtitle={pincode ? `Verified suppliers delivering to ${pincode}` : 'Explore verified hospitality suppliers'}
+                        actionLabel="View all →"
+                        actionHref="/vendors"
+                    />
                 </div>
 
                 {/* Horizontal Scroll Cards with Side Arrows */}

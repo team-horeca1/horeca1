@@ -617,9 +617,9 @@ export default function VendorDetailsPage() {
                 title={`Review uploaded ${DOC_TYPE_LABELS[type] ?? 'document'}`}
                 className={cn(
                     'shrink-0 w-[38px] h-[38px] rounded-[8px] border flex items-center justify-center transition-colors',
-                    doc.status === 'verified' ? 'border-[#299E60]/30 bg-[#EEF8F1] text-[#299E60] hover:bg-[#D1FAE5]' :
+                    doc.status === 'verified' ? 'border-[#6B1D2E]/30 bg-[#F8E8EC] text-[#6B1D2E] hover:bg-[#F8E8EC]' :
                     doc.status === 'rejected' ? 'border-[#EF4444]/30 bg-[#FDF2F2] text-[#EF4444] hover:bg-[#FCE4E4]' :
-                    'border-[#D1D5DB] bg-white text-[#6B7280] hover:bg-[#F9FAFB] hover:text-[#299E60]'
+                    'border-[#D1D5DB] bg-white text-[#6B7280] hover:bg-[#F9FAFB] hover:text-[#6B1D2E]'
                 )}
             >
                 <ImageIcon size={16} />
@@ -638,7 +638,7 @@ export default function VendorDetailsPage() {
                 <p className="text-[16px] font-bold text-[#7C7C7C]">{error || 'Online Store not found'}</p>
                 <button
                     onClick={() => router.back()}
-                    className="mt-2 text-[14px] font-bold text-[#299E60] hover:underline"
+                    className="mt-2 text-[14px] font-bold text-[#6B1D2E] hover:underline"
                 >
                     Go Back
                 </button>
@@ -657,14 +657,14 @@ export default function VendorDetailsPage() {
     });
 
     const stats = [
-        { label: 'Products Listed', value: vendor._count.products, icon: Package, color: '#299E60' },
+        { label: 'Products Listed', value: vendor._count.products, icon: Package, color: '#6B1D2E' },
         { label: 'Total Orders', value: vendor._count.orders, icon: ShoppingCart, color: '#F59E0B' },
         { label: 'Coverage Areas', value: serviceAreas.length, icon: MapPinned, color: '#3B82F6' },
         {
             label: 'KYC Status',
             value: vendor.isVerified ? 'VERIFIED' : 'PENDING',
             icon: vendor.isVerified ? ShieldCheck : ShieldX,
-            color: vendor.isVerified ? '#299E60' : '#F59E0B',
+            color: vendor.isVerified ? '#6B1D2E' : '#F59E0B',
         },
     ];
 
@@ -731,7 +731,7 @@ export default function VendorDetailsPage() {
                         <button
                             onClick={handleSaveVendor}
                             disabled={savingEdits}
-                            className="px-4 py-1.5 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                            className="px-4 py-1.5 bg-primary text-white rounded-[8px] text-[12px] font-bold hover:bg-primary-dark transition-colors flex items-center gap-1.5 disabled:opacity-50 shadow-sm shadow-primary/20"
                         >
                             {savingEdits ? (
                                 <>
@@ -756,7 +756,7 @@ export default function VendorDetailsPage() {
                                 className="w-full h-full object-contain"
                             />
                         ) : (
-                            <span className="text-[42px] font-black text-[#299E60]">
+                            <span className="text-[42px] font-black text-primary">
                                 {getInitials(vendor.businessName)}
                             </span>
                         )}
@@ -800,8 +800,8 @@ export default function VendorDetailsPage() {
                 }
                 contact={
                     <AdminEntityContactGrid
-                        accent="#299E60"
-                        accentBg="#EEF8F1"
+                        accent="#6B1D2E"
+                        accentBg="#F8E8EC"
                         items={[
                             { icon: User, label: 'Authorized Owner', value: vendor.user.fullName },
                             { icon: Mail, label: 'Billing Email', value: vendor.user.email },
@@ -828,7 +828,7 @@ export default function VendorDetailsPage() {
                                 <div className="min-w-0">
                                     <Link
                                         href={`/admin/vendors/${s.id}`}
-                                        className="text-[13px] font-semibold text-[#111827] hover:text-[#299E60] truncate block"
+                                        className="text-[13px] font-semibold text-[#111827] hover:text-primary truncate block"
                                     >
                                         {s.name}
                                     </Link>
@@ -870,7 +870,7 @@ export default function VendorDetailsPage() {
                                     label: 'Catalog Products',
                                     icon: Package,
                                     badge: vendor.products.length > 0 ? (
-                                        <span className="ml-1 bg-[#EEF8F1] text-[#299E60] text-[10px] px-1.5 py-0.5 rounded-full font-black border border-[#299E60]/10">
+                                        <span className="ml-1 bg-primary-light text-primary text-[10px] px-1.5 py-0.5 rounded-full font-black border border-primary/20">
                                             {vendor.products.length}
                                         </span>
                                     ) : undefined,
@@ -893,7 +893,7 @@ export default function VendorDetailsPage() {
                                                         onChange={(e) => setVendorCode(e.target.value.toUpperCase())}
                                                         placeholder="e.g. MAN"
                                                         maxLength={20}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono font-bold uppercase tracking-wide bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-mono font-bold uppercase tracking-wide bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Commercial Business Name">
@@ -901,7 +901,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={businessName}
                                                         onChange={(e) => setBusinessName(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <div className="md:col-span-2">
@@ -910,7 +910,7 @@ export default function VendorDetailsPage() {
                                                             value={description}
                                                             onChange={(e) => setDescription(e.target.value)}
                                                             rows={3}
-                                                            className="w-full border border-[#D1D5DB] rounded-[8px] p-3 text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all resize-none"
+                                                            className="w-full border border-[#D1D5DB] rounded-[8px] p-3 text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all resize-none"
                                                         />
                                                     </EditField>
                                                 </div>
@@ -920,7 +920,7 @@ export default function VendorDetailsPage() {
                                                             type="text"
                                                             value={address}
                                                             onChange={(e) => setAddress(e.target.value)}
-                                                            className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                            className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                         />
                                                     </EditField>
                                                 </div>
@@ -929,7 +929,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={city}
                                                         onChange={(e) => setCity(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Office State">
@@ -937,7 +937,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={stateVal}
                                                         onChange={(e) => setStateVal(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Office Pincode">
@@ -945,7 +945,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={pincode}
                                                         onChange={(e) => setPincode(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                             </div>
@@ -957,7 +957,7 @@ export default function VendorDetailsPage() {
                                                         type="number"
                                                         value={minOrderValue}
                                                         onChange={(e) => setMinOrderValue(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-bold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-bold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Delivery Surcharge Fee (₹)">
@@ -965,7 +965,7 @@ export default function VendorDetailsPage() {
                                                         type="number"
                                                         value={deliveryFee}
                                                         onChange={(e) => setDeliveryFee(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-bold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-bold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Free Delivery Above (₹)">
@@ -974,7 +974,7 @@ export default function VendorDetailsPage() {
                                                         value={freeDeliveryAbove}
                                                         onChange={(e) => setFreeDeliveryAbove(e.target.value)}
                                                         placeholder="optional"
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-bold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-bold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                             </div>
@@ -986,7 +986,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={fullName}
                                                         onChange={(e) => setFullName(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Primary Account Email">
@@ -994,7 +994,7 @@ export default function VendorDetailsPage() {
                                                         type="email"
                                                         value={email}
                                                         onChange={(e) => setEmail(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Primary Mobile Phone">
@@ -1002,7 +1002,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={phone}
                                                         onChange={(e) => setPhone(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Primary User GSTIN">
@@ -1010,7 +1010,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={userGstNumber}
                                                         onChange={(e) => setUserGstNumber(e.target.value.toUpperCase())}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                             </div>
@@ -1020,7 +1020,7 @@ export default function VendorDetailsPage() {
                                             {/* Business Profile Details */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <Building2 size={16} className="text-[#299E60]" />
+                                                    <Building2 size={16} className="text-primary" />
                                                     Commercial Business Profile
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -1037,7 +1037,7 @@ export default function VendorDetailsPage() {
                                             {/* Registered Office Address */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <MapPin size={16} className="text-[#299E60]" />
+                                                    <MapPin size={16} className="text-primary" />
                                                     Registered Office Address
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -1053,7 +1053,7 @@ export default function VendorDetailsPage() {
                                             {/* Order Settings & Metrics */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <SlidersHorizontal size={16} className="text-[#299E60]" />
+                                                    <SlidersHorizontal size={16} className="text-primary" />
                                                     Commercial Order Settings
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -1067,7 +1067,7 @@ export default function VendorDetailsPage() {
                                             {/* Onboarding account details */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <User size={16} className="text-[#299E60]" />
+                                                    <User size={16} className="text-primary" />
                                                     Onboarding Primary User Account
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -1095,7 +1095,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={tradeName}
                                                         onChange={(e) => setTradeName(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Vendor Entity Type">
@@ -1103,7 +1103,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={vendorType}
                                                         onChange={(e) => setVendorType(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Corporate GSTIN">
@@ -1111,7 +1111,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={gstNumber}
                                                         onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Corporate PAN">
@@ -1119,7 +1119,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={panNumber}
                                                         onChange={(e) => setPanNumber(e.target.value.toUpperCase())}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="FSSAI License">
@@ -1127,7 +1127,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={fssaiNumber}
                                                         onChange={(e) => setFssaiNumber(e.target.value.toUpperCase())}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="MSME Udyam Number">
@@ -1135,7 +1135,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={udyamNumber}
                                                         onChange={(e) => setUdyamNumber(e.target.value.toUpperCase())}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Corporate CIN">
@@ -1143,7 +1143,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={cinNumber}
                                                         onChange={(e) => setCinNumber(e.target.value.toUpperCase())}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Delivery Capability">
@@ -1151,7 +1151,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={deliveryCapability}
                                                         onChange={(e) => setDeliveryCapability(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                             </div>
@@ -1163,7 +1163,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={bankName}
                                                         onChange={(e) => setBankName(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Account Holder Name">
@@ -1171,7 +1171,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={bankAccountName}
                                                         onChange={(e) => setBankAccountName(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Account Number">
@@ -1179,14 +1179,14 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={bankAccountNumber}
                                                         onChange={(e) => setBankAccountNumber(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Account Type">
                                                     <select
                                                         value={bankAccountType}
                                                         onChange={(e) => setBankAccountType(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-medium bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-medium bg-[#F9FAFB] focus:bg-white transition-all"
                                                     >
                                                         <option value="">Select account type...</option>
                                                         <option value="current">Current Account</option>
@@ -1198,7 +1198,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={bankIfsc}
                                                         onChange={(e) => setBankIfsc(e.target.value.toUpperCase())}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-mono uppercase bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                             </div>
@@ -1210,7 +1210,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={authorizedPersonName}
                                                         onChange={(e) => setAuthorizedPersonName(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Authorized Person Phone">
@@ -1218,7 +1218,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={authorizedPersonPhone}
                                                         onChange={(e) => setAuthorizedPersonPhone(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Authorized Person Email">
@@ -1226,7 +1226,7 @@ export default function VendorDetailsPage() {
                                                         type="email"
                                                         value={authorizedPersonEmail}
                                                         onChange={(e) => setAuthorizedPersonEmail(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                             </div>
@@ -1239,7 +1239,7 @@ export default function VendorDetailsPage() {
                                                             type="text"
                                                             value={pickupAddressLine}
                                                             onChange={(e) => setPickupAddressLine(e.target.value)}
-                                                            className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                            className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                         />
                                                     </EditField>
                                                 </div>
@@ -1248,7 +1248,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={pickupCity}
                                                         onChange={(e) => setPickupCity(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Pickup state">
@@ -1256,7 +1256,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={pickupState}
                                                         onChange={(e) => setPickupState(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                                 <EditField label="Pickup Pincode">
@@ -1264,7 +1264,7 @@ export default function VendorDetailsPage() {
                                                         type="text"
                                                         value={pickupPincode}
                                                         onChange={(e) => setPickupPincode(e.target.value)}
-                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-[#299E60] font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
+                                                        className="w-full h-[40px] px-3 border border-[#D1D5DB] rounded-[8px] text-[13px] outline-none focus:border-primary font-semibold bg-[#F9FAFB] focus:bg-white transition-all"
                                                     />
                                                 </EditField>
                                             </div>
@@ -1274,7 +1274,7 @@ export default function VendorDetailsPage() {
                                             {/* Compliance Identifiers */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <ShieldCheck size={16} className="text-[#299E60]" />
+                                                    <ShieldCheck size={16} className="text-primary" />
                                                     Compliance Identifiers & Licenses
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -1292,7 +1292,7 @@ export default function VendorDetailsPage() {
                                             {/* Settlement Bank Details */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <Landmark size={16} className="text-[#299E60]" />
+                                                    <Landmark size={16} className="text-primary" />
                                                     Settlement Bank Account
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -1307,7 +1307,7 @@ export default function VendorDetailsPage() {
                                             {/* Authorized Person */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <User size={16} className="text-[#299E60]" />
+                                                    <User size={16} className="text-[#6B1D2E]" />
                                                     Primary Authorized Representative
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -1320,7 +1320,7 @@ export default function VendorDetailsPage() {
                                             {/* Pickup Address */}
                                             <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
                                                 <h3 className="font-extrabold text-[15px] text-[#181725] mb-4 border-b pb-2.5 flex items-center gap-2">
-                                                    <MapPin size={16} className="text-[#299E60]" />
+                                                    <MapPin size={16} className="text-[#6B1D2E]" />
                                                     Business Warehouse Pickup Address
                                                 </h3>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -1360,7 +1360,7 @@ export default function VendorDetailsPage() {
                                                     type="button"
                                                     onClick={() => setReviewDoc(doc)}
                                                     title="Click to review"
-                                                    className="w-[44px] h-[44px] rounded-[10px] bg-[#EEF2F6] flex items-center justify-center text-[#4B5563] shrink-0 border border-[#E5E7EB] overflow-hidden hover:ring-2 hover:ring-[#299E60]/40 transition-all"
+                                                    className="w-[44px] h-[44px] rounded-[10px] bg-[#EEF2F6] flex items-center justify-center text-[#4B5563] shrink-0 border border-[#E5E7EB] overflow-hidden hover:ring-2 hover:ring-[#6B1D2E]/40 transition-all"
                                                 >
                                                     {docIsImage(doc) ? (
                                                         // eslint-disable-next-line @next/next/no-img-element
@@ -1377,7 +1377,7 @@ export default function VendorDetailsPage() {
                                                         <button
                                                             type="button"
                                                             onClick={() => setReviewDoc(doc)}
-                                                            className="text-[12px] text-[#299E60] font-bold hover:underline inline-flex items-center gap-1 shrink-0"
+                                                            className="text-[12px] text-[#6B1D2E] font-bold hover:underline inline-flex items-center gap-1 shrink-0"
                                                         >
                                                             <Eye size={12} />
                                                             <span>Review</span>
@@ -1398,7 +1398,7 @@ export default function VendorDetailsPage() {
                                             <div className="flex items-center gap-3 self-end md:self-auto border-t md:border-t-0 pt-3 md:pt-0 border-[#F3F4F6] w-full md:w-auto justify-end">
                                                 <span className={cn(
                                                     'text-[10px] font-black px-2.5 py-1 rounded-full uppercase border tracking-wider',
-                                                    doc.status === 'verified' ? 'bg-[#EEF8F1] border-[#299E60]/15 text-[#299E60]' :
+                                                    doc.status === 'verified' ? 'bg-[#F8E8EC] border-[#6B1D2E]/15 text-[#6B1D2E]' :
                                                     doc.status === 'rejected' ? 'bg-[#FDF2F2] border-[#EF4444]/15 text-[#EF4444]' :
                                                     'bg-[#FFF8EB] border-[#D97706]/15 text-[#D97706]'
                                                 )}>
@@ -1410,7 +1410,7 @@ export default function VendorDetailsPage() {
                                                         <button 
                                                             onClick={() => handleDocStatus(doc.id, 'verified')}
                                                             disabled={updatingDoc === doc.id}
-                                                            className="h-[32px] px-3 bg-[#299E60] hover:bg-[#238a54] text-white text-[11px] font-bold rounded-[8px] disabled:opacity-50 flex items-center gap-1 shadow-sm transition-colors"
+                                                            className="h-[32px] px-3 bg-[#6B1D2E] hover:bg-[#5A1926] text-white text-[11px] font-bold rounded-[8px] disabled:opacity-50 flex items-center gap-1 shadow-sm transition-colors"
                                                         >
                                                             {updatingDoc === doc.id ? (
                                                                 <Loader2 size={11} className="animate-spin" />
@@ -1500,7 +1500,7 @@ export default function VendorDetailsPage() {
                                                     </td>
                                                     <td className="px-5 py-3">
                                                         {product.isActive ? (
-                                                            <span className="inline-flex items-center gap-1 bg-[#EEF8F1] text-[#299E60] text-[10px] font-black px-2 py-0.5 rounded-full border border-[#D1FAE5] uppercase tracking-wide">
+                                                            <span className="inline-flex items-center gap-1 bg-[#F8E8EC] text-[#6B1D2E] text-[10px] font-black px-2 py-0.5 rounded-full border border-[#F8E8EC] uppercase tracking-wide">
                                                                 Active
                                                             </span>
                                                         ) : (
@@ -1526,7 +1526,7 @@ export default function VendorDetailsPage() {
                                 <div className="space-y-4">
                                     <div className="border-b border-[#F3F4F6] pb-2 mb-2 flex items-center justify-between">
                                         <h3 className="text-[15px] font-black text-[#111827] flex items-center gap-1.5">
-                                            <CalendarClock size={16} className="text-[#299E60]" />
+                                            <CalendarClock size={16} className="text-[#6B1D2E]" />
                                             Active Schedule Delivery Slots
                                         </h3>
                                         {isEditing && (
@@ -1536,7 +1536,7 @@ export default function VendorDetailsPage() {
                                                     resetSlotForm();
                                                     setShowSlotForm(true);
                                                 }}
-                                                className="h-[30px] px-3 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54] transition-colors flex items-center gap-1"
+                                                className="h-[30px] px-3 bg-[#6B1D2E] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#5A1926] transition-colors flex items-center gap-1"
                                             >
                                                 + Add Slot
                                             </button>
@@ -1597,7 +1597,7 @@ export default function VendorDetailsPage() {
                                                 <button
                                                     type="button"
                                                     onClick={handleSaveSlotLocal}
-                                                    className="h-[32px] px-4 bg-[#299E60] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#238a54]"
+                                                    className="h-[32px] px-4 bg-[#6B1D2E] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#5A1926]"
                                                 >
                                                     Save Slot
                                                 </button>
@@ -1625,7 +1625,7 @@ export default function VendorDetailsPage() {
                                                     className="px-5 py-3.5 flex items-center justify-between hover:bg-[#F9FAFB]/50 transition-colors"
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-[32px] h-[32px] rounded-[8px] bg-[#EEF8F1] flex items-center justify-center text-[#299E60] shrink-0 border border-[#D1FAE5]">
+                                                        <div className="w-[32px] h-[32px] rounded-[8px] bg-[#F8E8EC] flex items-center justify-center text-[#6B1D2E] shrink-0 border border-[#F8E8EC]">
                                                             <Clock size={14} />
                                                         </div>
                                                         <div>
@@ -1645,7 +1645,7 @@ export default function VendorDetailsPage() {
                                                         <span className={cn(
                                                             "text-[9px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wider",
                                                             slot.isActive 
-                                                                ? "bg-[#EEF8F1] border-[#299E60]/10 text-[#299E60]" 
+                                                                ? "bg-[#F8E8EC] border-[#6B1D2E]/10 text-[#6B1D2E]" 
                                                                 : "bg-[#FDF2F2] border-[#EF4444]/10 text-[#EF4444]"
                                                         )}>
                                                             {slot.isActive ? 'Active' : 'Inactive'}
@@ -1802,7 +1802,7 @@ export default function VendorDetailsPage() {
                         <button
                             onClick={handleSaveVendor}
                             disabled={savingEdits}
-                            className="px-6 py-2 bg-[#299E60] hover:bg-[#238a54] text-white rounded-[10px] text-[13px] font-bold active:scale-97 transition-colors flex items-center gap-1.5 disabled:opacity-50 shadow-md shadow-[#299E60]/10"
+                            className="px-6 py-2 bg-[#6B1D2E] hover:bg-[#5A1926] text-white rounded-[10px] text-[13px] font-bold active:scale-97 transition-colors flex items-center gap-1.5 disabled:opacity-50 shadow-md shadow-[#6B1D2E]/10"
                         >
                             {savingEdits ? (
                                 <>
@@ -1826,7 +1826,7 @@ export default function VendorDetailsPage() {
                             user={vendor.user}
                             adminPassword={ownerPassword}
                             permission="vendors.edit"
-                            accent="#299E60"
+                            accent="#6B1D2E"
                             onPasswordUpdated={setOwnerPassword}
                         />
                     )}
@@ -1849,7 +1849,7 @@ export default function VendorDetailsPage() {
                                 'w-full py-2.5 rounded-[10px] text-[12px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 border',
                                 vendor.isVerified
                                     ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
-                                    : 'bg-[#299E60] border-[#299E60] text-white hover:bg-[#238a54]'
+                                    : 'bg-[#6B1D2E] border-[#6B1D2E] text-white hover:bg-[#5A1926]'
                             )}
                         >
                             {togglingVerification ? (
@@ -1924,7 +1924,7 @@ export default function VendorDetailsPage() {
             <AdminUserTeamPanel
                 teamEndpoint={`/api/v1/admin/vendors/${vendorId}/team`}
                 editPermission="vendors.edit"
-                accent="#299E60"
+                accent="#6B1D2E"
             />
 
             {/* ── Document Review Popup ──────────────────────────────────── */}
@@ -1940,7 +1940,7 @@ export default function VendorDetailsPage() {
                         {/* Header */}
                         <div className="flex items-center justify-between px-5 py-4 border-b border-[#EEEEEE]">
                             <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="w-9 h-9 rounded-[8px] bg-[#EEF8F1] flex items-center justify-center text-[#299E60] shrink-0">
+                                <div className="w-9 h-9 rounded-[8px] bg-[#F8E8EC] flex items-center justify-center text-[#6B1D2E] shrink-0">
                                     <FileCheck2 size={16} />
                                 </div>
                                 <div className="min-w-0">
@@ -1951,7 +1951,7 @@ export default function VendorDetailsPage() {
                             <div className="flex items-center gap-2 shrink-0">
                                 <span className={cn(
                                     'text-[10px] font-black px-2.5 py-1 rounded-full uppercase border tracking-wider',
-                                    reviewDoc.status === 'verified' ? 'bg-[#EEF8F1] border-[#299E60]/15 text-[#299E60]' :
+                                    reviewDoc.status === 'verified' ? 'bg-[#F8E8EC] border-[#6B1D2E]/15 text-[#6B1D2E]' :
                                     reviewDoc.status === 'rejected' ? 'bg-[#FDF2F2] border-[#EF4444]/15 text-[#EF4444]' :
                                     'bg-[#FFF8EB] border-[#D97706]/15 text-[#D97706]'
                                 )}>{reviewDoc.status}</span>
@@ -1977,14 +1977,14 @@ export default function VendorDetailsPage() {
                         <div className="flex-1 overflow-auto bg-[#F3F4F6] flex items-center justify-center p-4 min-h-[300px]">
                             {previewLoading ? (
                                 <div className="flex flex-col items-center gap-2 text-[#9CA3AF] py-12">
-                                    <Loader2 size={28} className="animate-spin text-[#299E60]" />
+                                    <Loader2 size={28} className="animate-spin text-[#6B1D2E]" />
                                     <p className="text-[12px] font-bold">Loading document…</p>
                                 </div>
                             ) : previewError || !previewUrl ? (
                                 <div className="text-center py-12">
                                     <FileText size={40} className="text-[#9CA3AF] mx-auto mb-3" />
                                     <p className="text-[13px] text-[#6B7280] font-bold">Couldn&apos;t load preview.</p>
-                                    <a href={reviewDoc.fileUrl} target="_blank" rel="noopener noreferrer" className="text-[12px] text-[#299E60] font-bold hover:underline mt-2 inline-block">Open in new tab</a>
+                                    <a href={reviewDoc.fileUrl} target="_blank" rel="noopener noreferrer" className="text-[12px] text-[#6B1D2E] font-bold hover:underline mt-2 inline-block">Open in new tab</a>
                                 </div>
                             ) : docIsImage(reviewDoc) ? (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -1995,7 +1995,7 @@ export default function VendorDetailsPage() {
                                 <div className="text-center py-12">
                                     <FileText size={40} className="text-[#9CA3AF] mx-auto mb-3" />
                                     <p className="text-[13px] text-[#6B7280] font-bold">Preview not available for this file type.</p>
-                                    <a href={reviewDoc.fileUrl} target="_blank" rel="noopener noreferrer" className="text-[12px] text-[#299E60] font-bold hover:underline mt-2 inline-block">Open in new tab</a>
+                                    <a href={reviewDoc.fileUrl} target="_blank" rel="noopener noreferrer" className="text-[12px] text-[#6B1D2E] font-bold hover:underline mt-2 inline-block">Open in new tab</a>
                                 </div>
                             )}
                         </div>
@@ -2022,7 +2022,7 @@ export default function VendorDetailsPage() {
                             <button
                                 onClick={() => handleDocStatus(reviewDoc.id, 'verified')}
                                 disabled={updatingDoc === reviewDoc.id || reviewDoc.status === 'verified'}
-                                className="h-[38px] px-4 bg-[#299E60] hover:bg-[#238a54] text-white text-[12px] font-bold rounded-[10px] disabled:opacity-50 flex items-center gap-1.5 shadow-sm transition-colors"
+                                className="h-[38px] px-4 bg-[#6B1D2E] hover:bg-[#5A1926] text-white text-[12px] font-bold rounded-[10px] disabled:opacity-50 flex items-center gap-1.5 shadow-sm transition-colors"
                             >
                                 {updatingDoc === reviewDoc.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                                 Verify Document
@@ -2059,7 +2059,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
             title={`Copy ${label}`}
         >
             {copied ? (
-                <Check size={12} className="text-[#299E60]" />
+                <Check size={12} className="text-[#6B1D2E]" />
             ) : (
                 <Copy size={12} />
             )}
@@ -2116,11 +2116,11 @@ function InfoCardField({
                 {copyable && value && (
                     <button
                         onClick={handleCopy}
-                        className="p-1 rounded hover:bg-white hover:shadow-sm text-[#9CA3AF] hover:text-[#299E60] transition-all cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        className="p-1 rounded hover:bg-white hover:shadow-sm text-[#9CA3AF] hover:text-[#6B1D2E] transition-all cursor-pointer shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
                         title={`Copy ${label}`}
                     >
                         {copied ? (
-                            <Check size={11} className="text-[#299E60]" />
+                            <Check size={11} className="text-[#6B1D2E]" />
                         ) : (
                             <Copy size={11} />
                         )}

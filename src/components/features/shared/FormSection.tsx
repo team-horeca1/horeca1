@@ -15,7 +15,7 @@ export function FieldLabel({ children, required }: { children: React.ReactNode; 
 export function SectionHeader({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
     <div className="flex items-center gap-2.5 mb-5 mt-1">
-      <div className="w-[32px] h-[32px] rounded-[8px] bg-[#EEF8F1] flex items-center justify-center text-[#299E60]">
+      <div className="w-[32px] h-[32px] rounded-[8px] bg-primary-light flex items-center justify-center text-primary">
         {icon}
       </div>
       <h3 className="text-[16px] font-bold text-[#181725]">{title}</h3>
@@ -38,7 +38,7 @@ export default function FormSection({ title, icon, requiredBadge, sectionId, chi
       id={sectionId ? `section-${sectionId}` : undefined}
       className={cn(
         'bg-white rounded-[14px] border shadow-sm p-6 space-y-4 scroll-mt-4',
-        requiredBadge ? 'border-[#299E60]/25' : 'border-[#EEEEEE]',
+        requiredBadge ? 'border-primary/25' : 'border-[#EEEEEE]',
         className,
       )}
     >
@@ -47,7 +47,7 @@ export default function FormSection({ title, icon, requiredBadge, sectionId, chi
           <h3 className="text-[16px] font-bold text-[#181725]">{title}</h3>
         )}
         {requiredBadge && (
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[#299E60] bg-[#EEF8F1] px-2.5 py-1 rounded-full shrink-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary-light px-2.5 py-1 rounded-full shrink-0">
             Required
           </span>
         )}
@@ -58,10 +58,10 @@ export default function FormSection({ title, icon, requiredBadge, sectionId, chi
 }
 
 export const productFormInputCls =
-  'w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40 transition-colors bg-white';
+  'w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-primary/40 transition-colors bg-white';
 
 export const productFormSelectCls =
-  'w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40 transition-colors bg-white appearance-none';
+  'w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-primary/40 transition-colors bg-white appearance-none';
 
 export const productFormTextareaCls =
-  'w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-[#299E60]/40 transition-colors resize-none bg-white';
+  'w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-primary/40 transition-colors resize-none bg-white';

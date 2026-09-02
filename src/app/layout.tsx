@@ -12,7 +12,7 @@ import { CallbackUrlRedirect } from '@/components/auth/CallbackUrlRedirect';
 // Only weights used by UI tokens — fewer font files on cold start.
 const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
+  weight: ['400', '500', '600', '700', '800'],
   variable: '--font-inter',
 });
 

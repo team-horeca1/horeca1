@@ -16,12 +16,12 @@ export function VendorSettingsSaveBar({ saving, saved, onSave, label = 'Save cha
         type="button"
         onClick={onSave}
         disabled={saving}
-        className="h-[44px] px-8 bg-[#299E60] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#238a54] transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
+        className="h-[44px] px-8 bg-primary text-white rounded-[12px] text-[14px] font-bold hover:bg-primary-dark transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
       >
         <Save size={16} />
         {saving ? 'Saving...' : label}
       </button>
-      {saved && <span className="text-[14px] font-bold text-[#299E60] animate-pulse">Saved successfully!</span>}
+      {saved && <span className="text-[14px] font-bold text-success animate-pulse">Saved successfully!</span>}
     </div>
   );
 }

@@ -542,11 +542,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                         ) : (
                                             <h3 className="text-[16px] font-[700] text-[#181725] truncate">{userData.fullName || 'Welcome'}</h3>
                                         )}
-                                        {isProfileComplete && <BadgeCheck size={15} className="text-[#53B175] shrink-0" />}
+                                        {isProfileComplete && <BadgeCheck size={15} className="text-primary shrink-0" />}
                                     </div>
                                     <p className="text-[12px] text-gray-400 font-medium truncate">{userData.email}</p>
                                     {deliverToLabel && (
-                                        <span className="inline-flex items-center mt-1 text-[10px] font-bold text-[#53B175] bg-[#53B175]/10 border border-[#53B175]/15 px-2 py-0.5 rounded-full max-w-full truncate">
+                                        <span className="inline-flex items-center mt-1 text-[10px] font-bold text-primary bg-primary-light border border-primary/20 px-2 py-0.5 rounded-full max-w-full truncate">
                                             {deliverToLabel}
                                         </span>
                                     )}
@@ -555,15 +555,15 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
 
                             {/* Mobile DiSCCO summary */}
                             {creditSummary && creditSummary.hasWallets && (
-                                <div className="mb-4 bg-gradient-to-br from-[#1b5e3a] to-[#2e7d32] text-white rounded-2xl p-5 shadow-md relative overflow-hidden">
+                                <div className="mb-4 bg-gradient-to-br from-[#4A141F] via-[#6B1D2E] to-[#8B2C3E] text-white rounded-2xl p-5 shadow-md relative overflow-hidden border border-primary/20">
                                     <div className="absolute right-0 bottom-0 opacity-10 translate-x-4 translate-y-4">
                                         <CreditCard size={120} strokeWidth={1} />
                                     </div>
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="text-[10px] uppercase tracking-wider text-emerald-200 font-bold">DiSCCO</p>
+                                            <p className="text-[10px] uppercase tracking-wider text-rose-200 font-bold">DiSCCO</p>
                                             <h3 className="text-[20px] font-black mt-1">Buy Now, Pay Later</h3>
-                                            <p className="text-[10px] text-emerald-100/80 mt-0.5">
+                                            <p className="text-[10px] text-rose-100/80 mt-0.5">
                                                 {creditSummary.lineCount} supplier credit line{creditSummary.lineCount === 1 ? '' : 's'}
                                             </p>
                                         </div>
@@ -581,13 +581,13 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
 
                                     <div className="mt-4 grid grid-cols-2 gap-3">
                                         <div>
-                                            <p className="text-[9px] text-emerald-200/80 uppercase font-bold">Outstanding</p>
+                                            <p className="text-[9px] text-rose-200/80 uppercase font-bold">Outstanding</p>
                                             <p className="text-[13px] font-bold">₹{creditSummary.totalOutstanding.toLocaleString('en-IN')}</p>
                                         </div>
                                         <div className="flex items-end justify-end">
                                             <button
                                                 onClick={() => { onClose(); router.push('/wallet'); }}
-                                                className="bg-white text-[#1b5e3a] hover:bg-emerald-50 text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
+                                                className="bg-white text-primary hover:bg-primary-light text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer shadow-sm"
                                             >
                                                 View Credit
                                             </button>
@@ -602,7 +602,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                     const Icon = action.icon;
                                     return (
                                         <button key={action.id} onClick={action.onClick} className="flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-3 shadow-sm active:scale-[0.98] transition-all text-left cursor-pointer">
-                                            <div className="w-10 h-10 rounded-xl bg-[#53B175]/10 text-[#53B175] flex items-center justify-center shrink-0">
+                                            <div className="w-10 h-10 rounded-xl bg-primary-light text-primary flex items-center justify-center shrink-0">
                                                 <Icon size={18} strokeWidth={2.4} />
                                             </div>
                                             <div className="min-w-0">
@@ -659,7 +659,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                             const Icon = item.icon;
                                             return (
                                                 <button key={item.id} onClick={item.onClick} className={cn("w-full flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 transition-colors text-left cursor-pointer", idx < portalItems.length - 1 && "border-b border-gray-50")}>
-                                                    <span className="w-8 h-8 rounded-lg bg-[#53B175]/10 text-[#53B175] flex items-center justify-center shrink-0">
+                                                    <span className="w-8 h-8 rounded-lg bg-primary-light text-primary flex items-center justify-center shrink-0">
                                                         <Icon size={15} />
                                                     </span>
                                                     <div className="flex-1 min-w-0">
@@ -683,7 +683,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                             const Icon = item.icon;
                                             return (
                                                 <button key={item.id} onClick={item.onClick} className={cn("w-full flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 transition-colors text-left cursor-pointer", idx < businessAccountItems.length - 1 && "border-b border-gray-50")}>
-                                                    <span className="w-8 h-8 rounded-lg bg-[#53B175]/10 text-[#53B175] flex items-center justify-center shrink-0">
+                                                    <span className="w-8 h-8 rounded-lg bg-primary-light text-primary flex items-center justify-center shrink-0">
                                                         <Icon size={15} />
                                                     </span>
                                                     <div className="flex-1 min-w-0">
@@ -753,7 +753,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)] p-5">
                                     <div className="flex flex-col items-center text-center">
                                         <div className="relative mb-3">
-                                            <div className="w-[80px] h-[80px] rounded-full overflow-hidden border-[2px] border-[#53B175] bg-white">
+                                            <div className="w-[80px] h-[80px] rounded-full overflow-hidden border-[2px] border-primary bg-white">
                                                 <img src={userData.image || '/images/profile/sample-profile.png'} alt="Profile" className="w-full h-full object-cover" />
                                             </div>
                                             <button
@@ -770,11 +770,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                             ) : (
                                                 <h3 className="text-[15px] font-[700] text-[#181725] truncate">{userData.fullName || 'Welcome'}</h3>
                                             )}
-                                            {isProfileComplete && <BadgeCheck size={14} className="text-[#53B175] shrink-0" />}
+                                            {isProfileComplete && <BadgeCheck size={14} className="text-primary shrink-0" />}
                                         </div>
                                         <p className="text-[11.5px] text-gray-400 font-medium mt-0.5 truncate max-w-full">{userData.email}</p>
                                         {deliverToLabel && (
-                                            <span className="mt-2 inline-flex items-center text-[10.5px] font-bold text-[#53B175] bg-[#53B175]/10 border border-[#53B175]/15 px-2.5 py-0.5 rounded-full max-w-full truncate">
+                                            <span className="mt-2 inline-flex items-center text-[10.5px] font-bold text-primary bg-primary-light border border-primary/20 px-2.5 py-0.5 rounded-full max-w-full truncate">
                                                 {deliverToLabel}
                                             </span>
                                         )}
@@ -791,11 +791,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                 <li key={item.id}>
                                                     <button
                                                         onClick={item.onClick}
-                                                        className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[#53B175]/8 text-[#181725] hover:text-[#53B175] transition-colors group cursor-pointer"
+                                                        className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-primary-light text-[#181725] hover:text-primary transition-colors group cursor-pointer"
                                                     >
-                                                        <Icon size={15} className="text-gray-400 group-hover:text-[#53B175] shrink-0" />
+                                                        <Icon size={15} className="text-gray-400 group-hover:text-primary shrink-0" />
                                                         <span className="text-[13px] font-[600] flex-1 text-left">{item.label}</span>
-                                                        <ChevronRight size={13} className="text-gray-300 group-hover:text-[#53B175]" />
+                                                        <ChevronRight size={13} className="text-gray-300 group-hover:text-primary" />
                                                     </button>
                                                 </li>
                                             );
@@ -813,11 +813,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                         <li key={item.id}>
                                                             <button
                                                                 onClick={item.onClick}
-                                                                className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[#53B175]/8 text-[#181725] hover:text-[#53B175] transition-colors group cursor-pointer"
+                                                                className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-primary-light text-[#181725] hover:text-primary transition-colors group cursor-pointer"
                                                             >
-                                                                <Icon size={15} className="text-gray-400 group-hover:text-[#53B175] shrink-0" />
+                                                                <Icon size={15} className="text-gray-400 group-hover:text-primary shrink-0" />
                                                                 <span className="text-[13px] font-[600] flex-1 text-left">{item.label}</span>
-                                                                <ChevronRight size={13} className="text-gray-300 group-hover:text-[#53B175]" />
+                                                                <ChevronRight size={13} className="text-gray-300 group-hover:text-primary" />
                                                             </button>
                                                         </li>
                                                     );
@@ -837,11 +837,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                         <li key={item.id}>
                                                             <button
                                                                 onClick={item.onClick}
-                                                                className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[#53B175]/8 text-[#181725] hover:text-[#53B175] transition-colors group cursor-pointer"
+                                                                className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-primary-light text-[#181725] hover:text-primary transition-colors group cursor-pointer"
                                                             >
-                                                                <Icon size={15} className="text-gray-400 group-hover:text-[#53B175] shrink-0" />
+                                                                <Icon size={15} className="text-gray-400 group-hover:text-primary shrink-0" />
                                                                 <span className="text-[13px] font-[600] flex-1 text-left">{item.label}</span>
-                                                                <ChevronRight size={13} className="text-gray-300 group-hover:text-[#53B175]" />
+                                                                <ChevronRight size={13} className="text-gray-300 group-hover:text-primary" />
                                                             </button>
                                                         </li>
                                                     );
@@ -853,24 +853,24 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                     <p className="text-[10px] font-[700] text-gray-400 uppercase tracking-[0.12em] px-2 pt-3 pb-1.5">Activity</p>
                                     <ul className="space-y-0.5">
                                         <li>
-                                            <button onClick={() => router.push('/orders')} className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[#53B175]/8 text-[#181725] hover:text-[#53B175] transition-colors group cursor-pointer">
-                                                <ShoppingBag size={15} className="text-gray-400 group-hover:text-[#53B175] shrink-0" />
+                                            <button onClick={() => router.push('/orders')} className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-primary-light text-[#181725] hover:text-primary transition-colors group cursor-pointer">
+                                                <ShoppingBag size={15} className="text-gray-400 group-hover:text-primary shrink-0" />
                                                 <span className="text-[13px] font-[600] flex-1 text-left">Your Orders</span>
-                                                <ChevronRight size={13} className="text-gray-300 group-hover:text-[#53B175]" />
+                                                <ChevronRight size={13} className="text-gray-300 group-hover:text-primary" />
                                             </button>
                                         </li>
                                         <li>
-                                            <button onClick={() => router.push('/order-lists')} className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[#53B175]/8 text-[#181725] hover:text-[#53B175] transition-colors group cursor-pointer">
-                                                <ListOrdered size={15} className="text-gray-400 group-hover:text-[#53B175] shrink-0" />
+                                            <button onClick={() => router.push('/order-lists')} className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-primary-light text-[#181725] hover:text-primary transition-colors group cursor-pointer">
+                                                <ListOrdered size={15} className="text-gray-400 group-hover:text-primary shrink-0" />
                                                 <span className="text-[13px] font-[600] flex-1 text-left">Quick Order Lists</span>
-                                                <ChevronRight size={13} className="text-gray-300 group-hover:text-[#53B175]" />
+                                                <ChevronRight size={13} className="text-gray-300 group-hover:text-primary" />
                                             </button>
                                         </li>
                                         <li>
-                                            <button onClick={() => router.push('/vendors')} className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[#53B175]/8 text-[#181725] hover:text-[#53B175] transition-colors group cursor-pointer">
-                                                <Store size={15} className="text-gray-400 group-hover:text-[#53B175] shrink-0" />
+                                            <button onClick={() => router.push('/vendors')} className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-primary-light text-[#181725] hover:text-primary transition-colors group cursor-pointer">
+                                                <Store size={15} className="text-gray-400 group-hover:text-primary shrink-0" />
                                                 <span className="text-[13px] font-[600] flex-1 text-left">My Vendors</span>
-                                                <ChevronRight size={13} className="text-gray-300 group-hover:text-[#53B175]" />
+                                                <ChevronRight size={13} className="text-gray-300 group-hover:text-primary" />
                                             </button>
                                         </li>
                                     </ul>
@@ -883,11 +883,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                 <li key={item.id}>
                                                     <button
                                                         onClick={item.onClick}
-                                                        className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[#53B175]/8 text-[#181725] hover:text-[#53B175] transition-colors group cursor-pointer"
+                                                        className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-primary-light text-[#181725] hover:text-primary transition-colors group cursor-pointer"
                                                     >
-                                                        <Icon size={15} className="text-gray-400 group-hover:text-[#53B175] shrink-0" />
+                                                        <Icon size={15} className="text-gray-400 group-hover:text-primary shrink-0" />
                                                         <span className="text-[13px] font-[600] flex-1 text-left">{item.label}</span>
-                                                        <ChevronRight size={13} className="text-gray-300 group-hover:text-[#53B175]" />
+                                                        <ChevronRight size={13} className="text-gray-300 group-hover:text-primary" />
                                                     </button>
                                                 </li>
                                             );
@@ -934,7 +934,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                     {!isProfileComplete && (
                                         <button
                                             onClick={() => setIsEditProfileOpen(true)}
-                                            className="hidden lg:flex items-center gap-2 shrink-0 bg-[#53B175] text-white text-[12px] font-bold px-4 py-2.5 rounded-xl hover:bg-[#469E66] transition-colors cursor-pointer"
+                                            className="hidden lg:flex items-center gap-2 shrink-0 bg-primary text-white text-[12px] font-bold px-4 py-2.5 rounded-xl hover:bg-primary-dark transition-colors cursor-pointer"
                                         >
                                             <Pencil size={13} />
                                             Complete profile
@@ -944,7 +944,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
 
                                 {/* Desktop DiSCCO summary */}
                                 {creditSummary && creditSummary.hasWallets && (
-                                    <div className="bg-gradient-to-r from-[#1b5e3a] via-[#246c43] to-[#2e7d32] text-white rounded-2xl p-6 shadow-md relative overflow-hidden border border-emerald-800/20">
+                                    <div className="bg-gradient-to-r from-[#4A141F] via-[#6B1D2E] to-[#8B2C3E] text-white rounded-2xl p-6 shadow-md relative overflow-hidden border border-primary/20">
                                         <div className="absolute right-0 bottom-0 opacity-10 translate-x-6 translate-y-6">
                                             <CreditCard size={180} strokeWidth={1} />
                                         </div>
@@ -955,9 +955,9 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                         <CreditCard size={20} />
                                                     </span>
                                                     <div>
-                                                        <p className="text-[10px] uppercase tracking-wider text-emerald-200 font-bold">DiSCCO</p>
+                                                        <p className="text-[10px] uppercase tracking-wider text-rose-200 font-bold">DiSCCO</p>
                                                         <h3 className="text-[22px] font-black leading-tight mt-0.5">Buy Now, Pay Later</h3>
-                                                        <p className="text-[11px] text-emerald-100/80 mt-0.5">
+                                                        <p className="text-[11px] text-rose-100/80 mt-0.5">
                                                             {creditSummary.lineCount} supplier credit line{creditSummary.lineCount === 1 ? '' : 's'}
                                                         </p>
                                                     </div>
@@ -965,11 +965,11 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
 
                                                 <div className="grid grid-cols-2 gap-4 max-w-sm pt-1">
                                                     <div>
-                                                        <p className="text-[10px] text-emerald-200/80 font-semibold">Outstanding</p>
+                                                        <p className="text-[10px] text-rose-200/80 font-semibold">Outstanding</p>
                                                         <p className="text-[16px] font-bold">₹{creditSummary.totalOutstanding.toLocaleString('en-IN')}</p>
                                                     </div>
                                                     <div>
-                                                        <p className="text-[10px] text-emerald-200/80 font-semibold">Status</p>
+                                                        <p className="text-[10px] text-rose-200/80 font-semibold">Status</p>
                                                         <span className={cn(
                                                             "inline-block mt-0.5 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase border",
                                                             creditSummary.hasOverdue
@@ -985,7 +985,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                             <div className="flex sm:flex-col items-stretch gap-2 shrink-0">
                                                 <button
                                                     onClick={() => { onClose(); router.push('/wallet'); }}
-                                                    className="bg-white text-[#1b5e3a] hover:bg-emerald-50 text-[13px] font-black px-6 py-3 rounded-xl transition-all shadow-sm hover:shadow active:scale-[0.98] duration-150 cursor-pointer text-center"
+                                                    className="bg-white text-primary hover:bg-primary-light text-[13px] font-black px-6 py-3 rounded-xl transition-all shadow-sm hover:shadow active:scale-[0.98] duration-150 cursor-pointer text-center"
                                                 >
                                                     View Credit
                                                 </button>
@@ -998,24 +998,24 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 {showBecomeVendorCta && (
                                     <button
                                         onClick={() => setIsBecomeVendorOpen(true)}
-                                        className="w-full text-left bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 border border-emerald-200 rounded-2xl p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group cursor-pointer"
+                                        className="w-full text-left bg-gradient-to-br from-primary-light/60 via-white to-primary-light/40 border border-primary/20 rounded-2xl p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group cursor-pointer"
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center shrink-0 shadow-md shadow-emerald-200">
-                                                <Store size={20} className="text-white" />
+                                            <div className="relative w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
+                                                <Store size={20} />
                                                 <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-amber-400 flex items-center justify-center">
                                                     <Sparkles size={8} className="text-white" />
                                                 </span>
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-[14px] font-bold text-emerald-900 leading-tight">
+                                                <p className="text-[14px] font-bold text-text leading-tight">
                                                     Want to sell on Horeca1? Become a supplier.
                                                 </p>
-                                                <p className="text-[12px] text-emerald-800/70 mt-0.5">
+                                                <p className="text-[12px] text-text-secondary mt-0.5">
                                                     Keep your account — just unlock the supplier portal. Admin reviews in ~24h.
                                                 </p>
                                             </div>
-                                            <span className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-[12px] font-bold group-hover:bg-emerald-700 shrink-0">
+                                            <span className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-white text-[12px] font-bold group-hover:bg-primary-dark transition-colors shrink-0 shadow-sm shadow-primary/20">
                                                 Apply
                                                 <ChevronRight size={13} />
                                             </span>
@@ -1036,14 +1036,14 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                 <button
                                                     key={action.id}
                                                     onClick={action.onClick}
-                                                    className="group relative text-left bg-white border border-gray-100 rounded-2xl p-5 hover:border-[#53B175]/40 hover:shadow-[0_8px_24px_rgba(83,177,117,0.12)] hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] cursor-pointer overflow-hidden"
+                                                    className="group relative text-left bg-white border border-gray-100 rounded-2xl p-5 hover:border-primary/40 hover:shadow-cdl-2 hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] cursor-pointer overflow-hidden"
                                                 >
-                                                    <div className="w-11 h-11 rounded-xl bg-[#53B175]/10 text-[#53B175] flex items-center justify-center mb-4 group-hover:bg-[#53B175] group-hover:text-white transition-colors">
+                                                    <div className="w-11 h-11 rounded-xl bg-primary-light text-primary flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-white transition-colors">
                                                         <Icon size={20} strokeWidth={2.3} />
                                                     </div>
                                                     <p className="text-[14px] font-[700] text-[#181725] leading-tight">{action.label}</p>
                                                     <p className="text-[11.5px] text-gray-400 font-medium mt-1">{action.sub}</p>
-                                                    <ChevronRight size={16} className="absolute top-5 right-5 text-gray-200 group-hover:text-[#53B175] transition-colors" />
+                                                    <ChevronRight size={16} className="absolute top-5 right-5 text-gray-200 group-hover:text-primary transition-colors" />
                                                 </button>
                                             );
                                         })}
@@ -1064,14 +1064,14 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                     <button
                                                         key={item.id}
                                                         onClick={item.onClick}
-                                                        className="group relative text-left bg-white border border-gray-100 rounded-2xl p-5 hover:border-[#53B175]/40 hover:shadow-[0_8px_24px_rgba(83,177,117,0.12)] hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] cursor-pointer overflow-hidden"
+                                                        className="group relative text-left bg-white border border-gray-100 rounded-2xl p-5 hover:border-primary/40 hover:shadow-cdl-2 hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] cursor-pointer overflow-hidden"
                                                     >
-                                                        <div className="w-11 h-11 rounded-xl bg-[#53B175]/10 text-[#53B175] flex items-center justify-center mb-4 group-hover:bg-[#53B175] group-hover:text-white transition-colors">
+                                                        <div className="w-11 h-11 rounded-xl bg-primary-light text-primary flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-white transition-colors">
                                                             <Icon size={20} strokeWidth={2.3} />
                                                         </div>
                                                         <p className="text-[14px] font-[700] text-[#181725] leading-tight">{item.label}</p>
                                                         <p className="text-[11.5px] text-gray-400 font-medium mt-1 line-clamp-2">{item.desc}</p>
-                                                        <ChevronRight size={16} className="absolute top-5 right-5 text-gray-200 group-hover:text-[#53B175] transition-colors" />
+                                                        <ChevronRight size={16} className="absolute top-5 right-5 text-gray-200 group-hover:text-primary transition-colors" />
                                                     </button>
                                                 );
                                             })}
@@ -1093,14 +1093,14 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                     <button
                                                         key={item.id}
                                                         onClick={item.onClick}
-                                                        className="group relative text-left bg-white border border-gray-100 rounded-2xl p-5 hover:border-[#53B175]/40 hover:shadow-[0_8px_24px_rgba(83,177,117,0.12)] hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] cursor-pointer overflow-hidden"
+                                                        className="group relative text-left bg-white border border-gray-100 rounded-2xl p-5 hover:border-primary/40 hover:shadow-cdl-2 hover:-translate-y-0.5 transition-all duration-200 active:scale-[0.98] cursor-pointer overflow-hidden"
                                                     >
-                                                        <div className="w-11 h-11 rounded-xl bg-[#53B175]/10 text-[#53B175] flex items-center justify-center mb-4 group-hover:bg-[#53B175] group-hover:text-white transition-colors">
+                                                        <div className="w-11 h-11 rounded-xl bg-primary-light text-primary flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-white transition-colors">
                                                             <Icon size={20} strokeWidth={2.3} />
                                                         </div>
                                                         <p className="text-[14px] font-[700] text-[#181725] leading-tight">{item.label}</p>
                                                         <p className="text-[11.5px] text-gray-400 font-medium mt-1 line-clamp-2">{item.desc}</p>
-                                                        <ChevronRight size={16} className="absolute top-5 right-5 text-gray-200 group-hover:text-[#53B175] transition-colors" />
+                                                        <ChevronRight size={16} className="absolute top-5 right-5 text-gray-200 group-hover:text-primary transition-colors" />
                                                     </button>
                                                 );
                                             })}

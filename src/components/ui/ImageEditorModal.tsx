@@ -255,9 +255,9 @@ function PreviewWithMeta({
     // object-cover/contain via classNames, the cleanest hack is to render our own
     // matching wrapper here so the live preview reflects the user's adjustments in real time.
     const VARIANT_DIMS: Record<ImagePreviewVariant, { w: number; h: number; shape: string; bg: string; fit: 'cover' | 'contain'; border?: boolean }> = {
-        'brand-logo':     { w: 76,  h: 76,  shape: 'rounded-full',     bg: '#fff',     fit: 'contain', border: true },
-        'brand-banner':   { w: 320, h: 80,  shape: 'rounded-2xl',      bg: '#22844f',  fit: 'cover'  },
-        'brand-card-top': { w: 220, h: 160, shape: 'rounded-t-2xl',    bg: '#f0faf4',  fit: 'cover'  },
+        'brand-logo':     { w: 40,  h: 40,  shape: 'rounded-[10px]',   bg: '#fff',     fit: 'contain', border: true },
+        'brand-banner':   { w: 320, h: 80,  shape: 'rounded-2xl',      bg: '#6B1D2E',  fit: 'cover'  },
+        'brand-card-top': { w: 150, h: 225, shape: 'rounded-[16px]',   bg: '#6B1D2E',  fit: 'cover'  },
         'product-square': { w: 200, h: 200, shape: 'rounded-2xl',      bg: '#fff',     fit: 'contain' },
         'vendor-cover':   { w: 280, h: 160, shape: 'rounded-2xl',      bg: '#fafafa',  fit: 'cover'  },
     };

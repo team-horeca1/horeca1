@@ -30,10 +30,10 @@ export function StickyCartBar() {
                 type="button"
                 onClick={() => setHidden(false)}
                 aria-label="Show cart bar"
-                className="fixed z-50 bottom-4 right-4 w-12 h-12 rounded-full bg-[#299e60] text-white shadow-2xl shadow-green-900/30 flex items-center justify-center hover:bg-[#238a54] transition-colors"
+                className="fixed z-50 bottom-4 right-4 w-12 h-12 rounded-full bg-primary text-white shadow-cdl-3 flex items-center justify-center hover:bg-primary-dark transition-colors"
             >
                 <ShoppingCart size={18} />
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-white text-[#299e60] text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#299e60]">
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-white text-primary text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-primary">
                     {display.totalItems}
                 </span>
             </button>
@@ -42,17 +42,17 @@ export function StickyCartBar() {
 
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50 md:bottom-4 md:left-auto md:right-4 md:max-w-[420px]">
-            <div className="relative bg-[#299e60] md:rounded-2xl shadow-2xl shadow-green-900/30">
+            <div className="relative bg-primary md:rounded-2xl shadow-cdl-3">
                 <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setHidden(true); }}
                     aria-label="Hide cart bar"
                     className={cn(
                         'absolute top-1/2 -translate-y-1/2 right-2 w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors z-10',
-                        'md:-top-2 md:right-2 md:translate-y-0 md:w-6 md:h-6 md:bg-white md:text-[#299e60] md:shadow-md md:hover:bg-gray-50'
+                        'md:-top-2 md:right-2 md:translate-y-0 md:w-6 md:h-6 md:bg-white md:text-primary md:shadow-md md:hover:bg-gray-50'
                     )}
                 >
-                    <X size={14} strokeWidth={3} />
+                    <X size={14} strokeWidth={2.5} />
                 </button>
 
                 <Link
@@ -60,24 +60,24 @@ export function StickyCartBar() {
                     className="flex items-center gap-3 pl-4 pr-12 py-3 md:py-3.5"
                 >
                     <div className="relative shrink-0">
-                        <ShoppingCart size={20} className="text-white" strokeWidth={2.5} />
-                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-white text-[#299e60] text-[10px] font-black rounded-full flex items-center justify-center">
+                        <ShoppingCart size={20} className="text-white" strokeWidth={2} />
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-white text-primary text-[10px] font-bold rounded-full flex items-center justify-center">
                             {display.totalItems}
                         </span>
                     </div>
 
                     <div className="flex-1 min-w-0 leading-tight">
-                        <p className="text-white text-[13px] font-bold truncate">
+                        <p className="text-white text-xs md:text-sm font-bold truncate">
                             {display.totalItems} item{display.totalItems > 1 ? 's' : ''}
                             {display.vendorCount > 1 ? ` · ${display.vendorCount} stores` : ''}
                         </p>
-                        <p className="text-green-100 text-[11px] font-semibold">
+                        <p className="text-white/80 text-[11px] font-medium">
                             ₹{display.totalAmount.toLocaleString('en-IN')}
                         </p>
                     </div>
 
-                    <span className="bg-white text-[#299e60] px-3.5 py-1.5 rounded-lg text-[11px] font-black tracking-wider shadow-md hover:shadow-lg transition-shadow shrink-0 flex items-center gap-1">
-                        VIEW <ChevronUp size={12} strokeWidth={3} className="rotate-90" />
+                    <span className="bg-white text-primary px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wider shadow-sm hover:shadow transition-shadow shrink-0 flex items-center gap-1">
+                        VIEW <ChevronUp size={12} strokeWidth={2.5} className="rotate-90" />
                     </span>
                 </Link>
             </div>

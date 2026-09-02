@@ -56,7 +56,7 @@ export default function AdminLedgerPage() {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-6 pb-12 p-[clamp(1rem,2.5vw,2rem)]">
+    <div className="max-w-[1400px] mx-auto space-y-6 pb-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-[clamp(1.25rem,2vw+0.75rem,1.75rem)] font-bold text-[#181725]">Platform Ledger</h1>
@@ -66,7 +66,7 @@ export default function AdminLedgerPage() {
         </div>
         <button
           onClick={exportCsv}
-          className="flex items-center gap-2 h-[40px] px-5 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54]"
+          className="flex items-center justify-center gap-2 min-h-12 w-full sm:w-auto px-5 rounded-[12px] bg-[#6B1D2E] text-white text-[13px] font-semibold hover:bg-[#5A1926]"
         >
           <Download size={16} />
           Export CSV
@@ -91,8 +91,8 @@ export default function AdminLedgerPage() {
             type="button"
             onClick={() => setTab(t.id)}
             className={cn(
-              'px-4 py-2 rounded-[10px] text-[12px] font-bold transition-colors',
-              tab === t.id ? 'bg-[#181725] text-white' : 'bg-white border border-[#EEEEEE] text-[#7C7C7C]',
+              'min-h-12 px-4 rounded-[12px] text-[13px] font-semibold transition-colors',
+              tab === t.id ? 'bg-primary text-white' : 'bg-white border border-[#EEEEEE] text-[#7C7C7C]',
             )}
           >
             {t.label}
@@ -102,15 +102,15 @@ export default function AdminLedgerPage() {
 
       <div className="flex gap-3 flex-wrap">
         <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-          className="h-[36px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px]" />
+          className="min-h-12 px-3 rounded-[12px] border border-[#EEEEEE] text-[13px] flex-1 min-w-[8rem]" />
         <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-          className="h-[36px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px]" />
-        <button onClick={load} className="h-[36px] px-4 rounded-[10px] bg-[#299E60] text-white text-[12px] font-bold">Apply</button>
+          className="min-h-12 px-3 rounded-[12px] border border-[#EEEEEE] text-[13px] flex-1 min-w-[8rem]" />
+        <button type="button" onClick={load} className="min-h-12 px-5 rounded-[12px] bg-[#6B1D2E] text-white text-[13px] font-semibold">Apply</button>
       </div>
 
       <div className="bg-white rounded-[14px] border border-[#EEEEEE] overflow-hidden">
         {loading ? (
-          <div className="flex justify-center py-16"><Loader2 className="animate-spin text-[#299E60]" size={28} /></div>
+          <div className="flex justify-center py-16"><Loader2 className="animate-spin text-[#6B1D2E]" size={28} /></div>
         ) : rows.length === 0 ? (
           <div className="py-14 text-center">
             <BookOpen size={36} className="text-[#E5E7EB] mx-auto mb-3" />
@@ -158,14 +158,14 @@ export default function AdminLedgerPage() {
                         <td className="px-4 py-3 font-semibold">{String(row.vendorName)}</td>
                         <td className="px-4 py-3 font-mono text-[11px]">{String(row.reference)}</td>
                         <td className="px-4 py-3 text-right">{inr(Number(row.gross))}</td>
-                        <td className="px-4 py-3 text-right text-[#299E60] font-semibold">{inr(Number(row.platformFee))}</td>
+                        <td className="px-4 py-3 text-right text-[#6B1D2E] font-semibold">{inr(Number(row.platformFee))}</td>
                         <td className="px-4 py-3 text-right">{inr(Number(row.netVendor))}</td>
                       </>
                     )}
                     {tab === 'payouts' && (
                       <>
                         <td className="px-4 py-3 font-semibold">{String(row.vendorName)}</td>
-                        <td className="px-4 py-3 text-right font-bold text-[#299E60]">{inr(Number(row.balance))}</td>
+                        <td className="px-4 py-3 text-right font-bold text-[#6B1D2E]">{inr(Number(row.balance))}</td>
                         <td className="px-4 py-3 text-right">{inr(Number(row.pendingAmount))}</td>
                       </>
                     )}

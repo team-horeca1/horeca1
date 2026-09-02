@@ -6,6 +6,7 @@ import { dal } from '@/lib/dal';
 import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { VendorProductCard } from '@/components/features/vendor/VendorProductCard';
+import { SectionHeader } from '@/components/ui/SectionHeader';
 import type { VendorProduct } from '@/types';
 
 export function FeaturedDeals() {
@@ -48,18 +49,13 @@ export function FeaturedDeals() {
   return (
     <section className="w-full py-6 bg-white overflow-hidden">
       <div className="max-w-[var(--container-max)] mx-auto">
-        <div className="flex items-center justify-between mb-4 px-6 md:px-[var(--container-padding)]">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600">
-              <Zap className="h-4 w-4 fill-current" />
-            </div>
-            <h2 className="text-[18px] md:text-[22px] lg:text-[24px] font-[900] text-[#181725] tracking-tight">
-              Featured Deals
-            </h2>
-          </div>
-          <span className="text-[12px] md:text-[13px] font-bold text-gray-500">
-            {products.length > 0 ? `${products.length} on sale` : ''}
-          </span>
+        <div className="px-4 md:px-[var(--container-padding)]">
+          <SectionHeader
+            title="Mega Savings & Deals"
+            subtitle={products.length > 0 ? `${products.length} bulk offers currently available` : 'Volume discounts and limited-time savings'}
+            actionLabel="View all →"
+            actionHref="/deals"
+          />
         </div>
 
         <div className="relative w-full">

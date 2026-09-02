@@ -13,7 +13,7 @@ interface AdminCreditKpiStripProps {
 
 export function AdminCreditKpiStrip({ lines, exposure, outstanding, overdue }: AdminCreditKpiStripProps) {
   const cards = [
-    { label: 'Credit lines', value: String(lines), Icon: CreditCard, tint: 'text-[#299E60] bg-[#EEF8F1]' },
+    { label: 'Credit lines', value: String(lines), Icon: CreditCard, tint: 'text-[#6B1D2E] bg-[#F8E8EC]' },
     { label: 'Total limit', value: inr(exposure), Icon: IndianRupee, tint: 'text-blue-600 bg-blue-50' },
     { label: 'Outstanding', value: inr(outstanding), Icon: AlertTriangle, tint: 'text-amber-600 bg-amber-50' },
     { label: 'Overdue', value: String(overdue), Icon: ShieldOff, tint: 'text-red-500 bg-red-50' },

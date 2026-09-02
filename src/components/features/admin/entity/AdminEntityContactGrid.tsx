@@ -19,8 +19,8 @@ interface AdminEntityContactGridProps {
 
 export function AdminEntityContactGrid({
   items,
-  accent = '#299E60',
-  accentBg = '#EEF8F1',
+  accent = '#6B1D2E',
+  accentBg = '#F8E8EC',
   className,
 }: AdminEntityContactGridProps) {
   return (

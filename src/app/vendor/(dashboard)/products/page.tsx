@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
     Search, Plus, Loader2, Package, Pencil, X,
@@ -33,6 +33,11 @@ import {
     type ProductValidationField,
 } from '@/components/features/shared/productFormValidation';
 import { brandOverrideDeviations } from '@/lib/brandOverrideFields';
+import {
+    ProductCreatePreviewPanel,
+    type ProductPreviewChecklist,
+    type ProductPreviewFormState,
+} from '@/components/features/vendor/ProductCreatePreviewPanel';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -510,7 +515,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[
         <div>
             <div className="flex flex-wrap gap-2 mb-2">
                 {tags.map(tag => (
-                    <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#EEF8F1] text-[#299E60] text-[12px] font-bold rounded-[8px]">
+                    <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#EEF8F1] text-primary text-[12px] font-bold rounded-[8px]">
                         {tag}
                         <button type="button" onClick={() => removeTag(tag)} className="hover:text-[#E74C3C] transition-colors">
                             <X size={12} />
@@ -798,6 +803,52 @@ export default function VendorProductsPage() {
             })
         );
     }, [form, masterProductId, basedOnProductId, basedOnBrandMasterProductId]);
+
+    const previewFormState = useMemo((): ProductPreviewFormState => {
+        const slabs = form.priceSlabs
+            .map((s) => ({
+                minQty: parseInt(s.minQty, 10),
+                price: parseFloat(s.price),
+            }))
+            .filter((s) => Number.isFinite(s.minQty) && s.minQty > 0 && Number.isFinite(s.price) && s.price > 0);
+        return {
+            name: form.name,
+            brandName: form.brand || undefined,
+            imageUrl: form.imageUrl || form.images[0] || undefined,
+            sellingPrice: parseFloat(form.basePrice) || 0,
+            mrp: parseFloat(form.originalPrice) || undefined,
+            unit: form.unit || 'Pc',
+            bulkEnabled: slabs.length > 0,
+            priceSlabs: slabs,
+            creditEligible: form.creditEligible,
+        };
+    }, [form]);
+
+    const previewChecklist = useMemo((): ProductPreviewChecklist[] => {
+        const hasSlabs = form.priceSlabs.some((s) => s.minQty.trim() && s.price.trim());
+        return [
+            { id: 'name', label: 'Product name', done: form.name.trim().length > 0, required: true },
+            { id: 'category', label: 'Category', done: form.categoryIds.length > 0, required: true },
+            {
+                id: 'price',
+                label: 'Selling price',
+                done: !!form.basePrice && parseFloat(form.basePrice) > 0,
+                required: true,
+            },
+            {
+                id: 'image',
+                label: 'Primary image',
+                done: !!(form.imageUrl || form.images[0]),
+                required: true,
+            },
+            {
+                id: 'slabs',
+                label: 'Bulk price slabs',
+                done: !hasSlabs || form.priceSlabs.every((s) => !s.minQty || (s.minQty && s.price)),
+                required: hasSlabs,
+            },
+        ];
+    }, [form]);
 
     /* ---- Data fetching ---- */
 
@@ -1180,7 +1231,7 @@ export default function VendorProductsPage() {
                 {catalogSearchEnabled && loadingSuggestions && (
                     <Loader2
                         size={16}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-[#299E60]"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-primary"
                     />
                 )}
             </div>
@@ -2724,14 +2775,14 @@ export default function VendorProductsPage() {
                         onClick={() => setShowPriceReplace(true)}
                         className="h-[40px] px-3.5 border border-[#EEEEEE] bg-white rounded-[10px] text-[12px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] transition-all flex items-center gap-1.5 shrink-0"
                     >
-                        <IndianRupee size={13} className="text-[#299E60]" />
+                        <IndianRupee size={13} className="text-primary" />
                         Price Bulk Update
                     </button>
                     <button
                         onClick={() => setGridOpen(true)}
                         className="h-[40px] px-3.5 border border-[#EEEEEE] bg-white rounded-[10px] text-[12px] font-bold text-[#7C7C7C] hover:bg-[#F5F5F5] transition-all flex items-center gap-1.5 shrink-0"
                     >
-                        <FileSpreadsheet size={13} className="text-[#299E60]" />
+                        <FileSpreadsheet size={13} className="text-primary" />
                         Bulk Update
                     </button>
 
@@ -2748,7 +2799,7 @@ export default function VendorProductsPage() {
 
                     <button
                         onClick={openAddPanel}
-                        className="h-[40px] px-4 bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold hover:bg-[#238a54] transition-all shadow-sm flex items-center gap-2 shrink-0"
+                        className="h-[40px] px-4 bg-primary text-white rounded-[10px] text-[13px] font-bold hover:bg-primary-dark transition-all shadow-sm flex items-center gap-2 shrink-0"
                     >
                         <Plus size={16} />
                         Add Product
@@ -2789,7 +2840,7 @@ export default function VendorProductsPage() {
                             statusFilter === tab
                                 ? tab === 'drafts'
                                     ? 'bg-[#4F6BED] text-white shadow-sm'
-                                    : 'bg-[#299E60] text-white shadow-sm'
+                                    : 'bg-primary text-white shadow-sm'
                                 : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5]'
                         )}
                     >
@@ -2823,7 +2874,7 @@ export default function VendorProductsPage() {
                                 ? tab === 'rejected'
                                     ? 'bg-[#E74C3C] text-white shadow-sm'
                                     : tab === 'approved'
-                                      ? 'bg-[#299E60] text-white shadow-sm'
+                                      ? 'bg-primary text-white shadow-sm'
                                       : tab === 'pending'
                                         ? 'bg-[#F59E0B] text-white shadow-sm'
                                         : 'bg-[#181725] text-white shadow-sm'
@@ -2853,7 +2904,7 @@ export default function VendorProductsPage() {
             <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <Loader2 className="animate-spin text-[#299E60]" size={32} />
+                        <Loader2 className="animate-spin text-primary" size={32} />
                     </div>
                 ) : filteredProducts.length === 0 ? (
                     <div className="py-20 text-center">
@@ -2873,7 +2924,7 @@ export default function VendorProductsPage() {
                                             type="checkbox"
                                             checked={allPageSelected}
                                             onChange={toggleSelectPage}
-                                            className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
+                                            className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-[#299E60] cursor-pointer"
                                             title="Select all on this page"
                                         />
                                     </th>
@@ -2918,7 +2969,7 @@ export default function VendorProductsPage() {
                                                 type="checkbox"
                                                 checked={selectedIds.has(product.id)}
                                                 onChange={() => toggleSelect(product.id)}
-                                                className="w-4 h-4 rounded border-gray-300 text-[#299E60] focus:ring-[#299E60] cursor-pointer"
+                                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-[#299E60] cursor-pointer"
                                             />
                                         </td>
                                         <td className="px-6 py-4">
@@ -2935,7 +2986,7 @@ export default function VendorProductsPage() {
                                                         <p className="text-[14px] font-bold text-[#181725] truncate">{displayName}</p>
                                                         {isMapped && (
                                                             <span
-                                                                className="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#EEF8F1] text-[#299E60]"
+                                                                className="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#EEF8F1] text-primary"
                                                                 title={
                                                                     brandMaster!.brand?.name
                                                                         ? `Brand override — ${brandMaster!.brand.name}`
@@ -2971,7 +3022,7 @@ export default function VendorProductsPage() {
                                             <span className={cn(
                                                 'text-[12px] font-bold px-2.5 py-1 rounded-[6px]',
                                                 product.qty_available > 0
-                                                    ? 'bg-[#EEF8F1] text-[#299E60]'
+                                                    ? 'bg-[#EEF8F1] text-primary'
                                                     : 'bg-[#F8F9FB] text-[#AEAEAE]'
                                             )}>
                                                 {product.qty_available > 0 ? product.qty_available : '0'}
@@ -2981,7 +3032,7 @@ export default function VendorProductsPage() {
                                             <div className="flex flex-col items-center gap-1">
                                                 <span className={cn(
                                                     'text-[11px] font-[900] px-2.5 py-1.5 rounded-[6px] uppercase',
-                                                    product.approvalStatus === 'approved' ? 'bg-[#EEF8F1] text-[#299E60]' :
+                                                    product.approvalStatus === 'approved' ? 'bg-[#EEF8F1] text-primary' :
                                                     product.approvalStatus === 'rejected' ? 'bg-[#FFF0F0] text-[#E74C3C]' :
                                                     'bg-[#FFF7E6] text-[#F59E0B]'
                                                 )}>
@@ -3006,7 +3057,7 @@ export default function VendorProductsPage() {
                                                 product.listingStatus === 'draft'
                                                     ? 'bg-[#F0F4FF] text-[#4F6BED]'
                                                     : product.isActive
-                                                        ? 'bg-[#EEF8F1] text-[#299E60]'
+                                                        ? 'bg-[#EEF8F1] text-primary'
                                                         : 'bg-[#FFF0F0] text-[#E74C3C]'
                                             )}>
                                                 {product.listingStatus === 'draft'
@@ -3037,7 +3088,7 @@ export default function VendorProductsPage() {
                                                 </button>
                                                 <button
                                                     onClick={() => openEditPanel(product)}
-                                                    className="p-2 hover:bg-[#EEF8F1] rounded-[8px] transition-colors text-[#299E60]"
+                                                    className="p-2 hover:bg-[#EEF8F1] rounded-[8px] transition-colors text-primary"
                                                     title="Edit"
                                                 >
                                                     <Pencil size={16} />
@@ -3134,7 +3185,7 @@ export default function VendorProductsPage() {
                                             className={cn(
                                                 'w-[34px] h-[34px] flex items-center justify-center rounded-[8px] text-[13px] font-bold transition-colors',
                                                 item === safeCurrentPage
-                                                    ? 'bg-[#299E60] text-white'
+                                                    ? 'bg-primary text-white'
                                                     : 'border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5]'
                                             )}
                                         >
@@ -3172,7 +3223,7 @@ export default function VendorProductsPage() {
                     {/* Panel */}
                     <div
                         ref={panelRef}
-                        className="fixed top-0 right-0 h-full w-full bg-white z-[70] shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
+                        className="fixed top-0 right-0 h-full w-full xl:max-w-[min(100%,1200px)] bg-white z-[70] shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
                     >
                         {/* Panel Header */}
                         <div className="flex items-center justify-between px-4 lg:px-6 py-4 border-b border-[#EEEEEE] shrink-0">
@@ -3187,7 +3238,7 @@ export default function VendorProductsPage() {
                                         </p>
                                     )}
                                     {editingProduct?.brandMappings?.[0]?.id && (
-                                        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#EEF8F1] text-[#299E60]">
+                                        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#EEF8F1] text-primary">
                                             Mapped
                                         </span>
                                     )}
@@ -3244,11 +3295,12 @@ export default function VendorProductsPage() {
                             </div>
                         </div>
 
+                        <div className="flex flex-1 min-h-0">
                         <div className="flex-1 overflow-y-auto bg-[#F8F9FB] px-4 lg:px-8 py-4">
                             <form id="vendor-product-form" onSubmit={handleSubmit} className="space-y-4">
                                     {loadingProduct ? (
                                         <div className="flex items-center justify-center py-32">
-                                            <Loader2 className="animate-spin text-[#299E60]" size={32} />
+                                            <Loader2 className="animate-spin text-primary" size={32} />
                                         </div>
                                     ) : (
                                     <>
@@ -3308,8 +3360,8 @@ export default function VendorProductsPage() {
 
                                     {editingProduct?.brandMappings?.[0]?.id && (
                                         <div className="rounded-[10px] bg-[#EEF8F1] border border-[#299E60]/30 px-4 py-3 flex items-start gap-3">
-                                            <Info size={16} className="shrink-0 mt-0.5 text-[#299E60]" />
-                                            <p className="text-[12px] font-medium text-[#299E60]">
+                                            <Info size={16} className="shrink-0 mt-0.5 text-primary" />
+                                            <p className="text-[12px] font-medium text-primary">
                                                 Brand override — storefront shows the brand SKU. Price and stock edits keep the link. Changing brand details (name, pack, HSN, images, etc.) and saving will unlink this product so your values go live.
                                             </p>
                                         </div>
@@ -3330,7 +3382,7 @@ export default function VendorProductsPage() {
                                         catalogBanner={
                                             (!editingProduct || editingProduct.approvalStatus === 'rejected') && identityFromCatalog ? (
                                                 <div className="rounded-[10px] bg-[#EEF8F1] border border-[#299E60]/30 px-4 py-3 flex items-center justify-between gap-3">
-                                                    <p className="text-[12px] font-medium text-[#299E60]">
+                                                    <p className="text-[12px] font-medium text-primary">
                                                         {basedOnBrandMasterProductId
                                                             ? `Linked to brand catalog — ${catalogSearch || form.name}`
                                                             : masterProductId
@@ -3340,7 +3392,7 @@ export default function VendorProductsPage() {
                                                     <button
                                                         type="button"
                                                         onClick={clearCatalogSelection}
-                                                        className="text-[12px] font-bold text-[#299E60] hover:underline shrink-0"
+                                                        className="text-[12px] font-bold text-primary hover:underline shrink-0"
                                                     >
                                                         Change
                                                     </button>
@@ -3452,7 +3504,7 @@ export default function VendorProductsPage() {
                                                             ...prev,
                                                             priceSlabs: [...prev.priceSlabs, { minQty: '', price: '' }],
                                                         }))}
-                                                        className="h-[32px] px-3.5 bg-[#EEF8F1] hover:bg-[#53B175] text-[#299E60] hover:text-white rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-colors shrink-0"
+                                                        className="h-[32px] px-3.5 bg-[#EEF8F1] hover:bg-[#53B175] text-primary hover:text-white rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-colors shrink-0"
                                                     >
                                                         <Plus size={13} /> Add Bulk Tier
                                                     </button>
@@ -3464,7 +3516,7 @@ export default function VendorProductsPage() {
                                                     <div key={index} className="rounded-[14px] border border-[#EEEEEE] overflow-hidden">
                                                         <div className="flex items-center justify-between px-5 py-3 bg-[#FAFAFA] border-b border-[#EEEEEE]">
                                                             <div className="flex items-center gap-2.5">
-                                                                <span className="w-[28px] h-[28px] rounded-full bg-[#299E60] text-white text-[12px] font-bold flex items-center justify-center">
+                                                                <span className="w-[28px] h-[28px] rounded-full bg-primary text-white text-[12px] font-bold flex items-center justify-center">
                                                                     {index + 1}
                                                                 </span>
                                                                 <h4 className="text-[14px] font-bold text-[#181725]">Bulk Tier {index + 1}</h4>
@@ -3519,12 +3571,12 @@ export default function VendorProductsPage() {
                                                                 <div>
                                                                     <FieldLabel>Gross (incl. GST)</FieldLabel>
                                                                     <div className="relative">
-                                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#299E60] font-bold text-[14px]">₹</span>
+                                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-bold text-[14px]">₹</span>
                                                                         <input
                                                                             type="text"
                                                                             readOnly
                                                                             value={calcGrossRate(slab.price, form.taxPercent)}
-                                                                            className={cn(inputCls, 'pl-8 font-bold text-[#299E60] bg-[#EEF8F1]/40')}
+                                                                            className={cn(inputCls, 'pl-8 font-bold text-primary bg-[#EEF8F1]/40')}
                                                                             placeholder="—"
                                                                         />
                                                                     </div>
@@ -4002,7 +4054,7 @@ export default function VendorProductsPage() {
                                                         >
                                                             <span className="font-bold text-[#181725]">{log.field}</span>
                                                             {log.priceListName ? (
-                                                                <span className="text-[#299E60]"> · {log.priceListName}</span>
+                                                                <span className="text-primary"> · {log.priceListName}</span>
                                                             ) : null}
                                                             {' · '}
                                                             <span className="text-[#AEAEAE]">{log.source}</span>
@@ -4014,7 +4066,7 @@ export default function VendorProductsPage() {
                                                             <div className="mt-0.5 font-mono text-[10px] break-all">
                                                                 <span className="text-[#E74C3C]">{log.oldValue ?? '—'}</span>
                                                                 {' → '}
-                                                                <span className="text-[#299E60]">{log.newValue ?? '—'}</span>
+                                                                <span className="text-primary">{log.newValue ?? '—'}</span>
                                                             </div>
                                                         </li>
                                                     ))}
@@ -4025,6 +4077,14 @@ export default function VendorProductsPage() {
                                     </>
                                     )}
                                 </form>
+                        </div>
+                        <aside className="hidden xl:block w-[300px] shrink-0 border-l border-[#EEEEEE] bg-white p-4 overflow-y-auto">
+                            <ProductCreatePreviewPanel form={previewFormState} checklist={previewChecklist} />
+                        </aside>
+                        </div>
+
+                        <div className="xl:hidden border-t border-[#EEEEEE] bg-white px-4 py-3 shrink-0">
+                            <ProductCreatePreviewPanel form={previewFormState} checklist={previewChecklist} />
                         </div>
 
                         {/* Panel Footer */}
@@ -4049,7 +4109,7 @@ export default function VendorProductsPage() {
                                 type="submit"
                                 form="vendor-product-form"
                                 disabled={saving || loadingProduct || draftSaving}
-                                className="flex-1 h-[48px] bg-[#299E60] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-2 shadow-sm shadow-[#299E60]/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                                className="flex-1 h-[48px] bg-primary text-white rounded-[12px] text-[14px] font-bold hover:bg-primary-dark transition-all flex items-center justify-center gap-2 shadow-sm shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 {saving && <Loader2 size={16} className="animate-spin" />}
                                 {saving
@@ -4128,7 +4188,7 @@ export default function VendorProductsPage() {
                         <div className="bg-white rounded-[16px] shadow-xl max-w-[420px] w-full p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="w-[40px] h-[40px] rounded-full bg-[#EEF8F1] flex items-center justify-center shrink-0">
-                                    <Unlink size={20} className="text-[#299E60]" />
+                                    <Unlink size={20} className="text-primary" />
                                 </div>
                                 <h3 className="text-[18px] font-bold text-[#181725]">Save &amp; Unlink</h3>
                             </div>
@@ -4154,7 +4214,7 @@ export default function VendorProductsPage() {
                                     type="button"
                                     onClick={() => void performProductSave()}
                                     disabled={saving}
-                                    className="flex-1 h-[44px] bg-[#299E60] text-white rounded-[10px] text-[14px] font-bold hover:bg-[#238a54] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                    className="flex-1 h-[44px] bg-primary text-white rounded-[10px] text-[14px] font-bold hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                                 >
                                     {saving && <Loader2 size={16} className="animate-spin" />}
                                     {saving ? 'Saving...' : 'Save & Unlink'}
@@ -4258,7 +4318,7 @@ export default function VendorProductsPage() {
                     <span className="text-[13px] font-bold">{selectedIds.size} selected</span>
                     <button
                         onClick={() => setBulkOpen(true)}
-                        className="h-[36px] px-4 bg-[#299E60] hover:bg-[#238a54] rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 transition-colors"
+                        className="h-[36px] px-4 bg-primary hover:bg-primary-dark rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 transition-colors"
                     >
                         <Wand2 size={14} /> Bulk edit
                     </button>

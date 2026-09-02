@@ -28,7 +28,7 @@ export default function AdminAuditLogsPage() {
   }, []);
 
   return (
-    <div className="p-[clamp(1rem,2.5vw,2rem)] space-y-6 pb-12">
+    <div className="space-y-6 pb-4">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-[10px] bg-[#F3F4F6] flex items-center justify-center">
           <ScrollText size={20} className="text-[#374151]" />
@@ -41,7 +41,7 @@ export default function AdminAuditLogsPage() {
 
       {loading ? (
         <div className="flex justify-center py-20">
-          <Loader2 className="animate-spin text-[#299E60]" size={32} />
+          <Loader2 className="animate-spin text-[#6B1D2E]" size={32} />
         </div>
       ) : logs.length === 0 ? (
         <div className="bg-white border border-[#EEEEEE] rounded-[14px] p-10 text-center text-[#7C7C7C] text-[14px]">
@@ -49,7 +49,20 @@ export default function AdminAuditLogsPage() {
         </div>
       ) : (
         <div className="bg-white border border-[#EEEEEE] rounded-[14px] overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="lg:hidden divide-y divide-[#F0F0F0]">
+            {logs.map((log) => (
+              <div key={log.id} className="px-4 py-3 space-y-1">
+                <p className="text-[13px] font-semibold text-[#181725]">{log.action}</p>
+                <p className="text-[12px] text-[#6B7280]">
+                  {log.entity}{log.entityId ? ` · ${log.entityId.slice(0, 8)}…` : ''}
+                </p>
+                <p className="text-[11px] text-[#9CA3AF]">
+                  {new Date(log.at).toLocaleString('en-IN')} · {log.actorRole ?? '—'}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="hidden lg:block overflow-x-auto">
             <table className="w-full text-left text-[13px]">
               <thead className="bg-[#F8F9FB] text-[#7C7C7C] uppercase text-[11px] tracking-wide">
                 <tr>

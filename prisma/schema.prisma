@@ -3608,6 +3608,26 @@ model PayoutInvite {
   @@map("payout_invites")
 }
 
+// Editorial "Horeca1 Voices" stories for homepage + shareable articles.
+model VoiceStory {
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique @db.VarChar(120)
+  badge       String   @db.VarChar(80)
+  name        String   @db.VarChar(255)
+  role        String?  @db.VarChar(255)
+  venue       String?  @db.VarChar(255)
+  quote       String   @db.Text
+  body        String?  @db.Text
+  photoUrl    String?  @map("photo_url") @db.VarChar(512)
+  published   Boolean  @default(true)
+  publishedAt DateTime @default(now()) @map("published_at") @db.Timestamptz
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([published, publishedAt])
+  @@map("voice_stories")
+}
+
 // Global, single-row platform configuration edited from the admin Settings page.
 model PlatformSetting {
   id                    String   @id @default(uuid()) @db.Uuid

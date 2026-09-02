@@ -145,9 +145,9 @@ export default function RewardsPage() {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50/50 px-4">
                 <div className="text-center">
-                    <Gift size={40} className="text-[#53B175] mx-auto mb-3" strokeWidth={1.5} />
+                    <Gift size={40} className="text-primary mx-auto mb-3" strokeWidth={1.5} />
                     <p className="text-[18px] font-bold text-gray-800 mb-2">Sign in to see your rewards</p>
-                    <Link href="/login" className="text-[14px] text-[#53B175] font-semibold hover:underline">Sign in</Link>
+                    <Link href="/login" className="text-[14px] text-primary font-semibold hover:underline">Sign in</Link>
                 </div>
             </div>
         );
@@ -172,7 +172,7 @@ export default function RewardsPage() {
                 {referral && (
                     <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
                         <div className="flex items-center gap-2 mb-1">
-                            <Users size={16} className="text-[#53B175]" strokeWidth={2} />
+                            <Users size={16} className="text-primary" strokeWidth={2} />
                             <h2 className="text-[15px] font-bold text-[#181725]">Invite friends</h2>
                         </div>
                         <p className="text-[12px] text-gray-400 font-medium mb-3">
@@ -182,23 +182,16 @@ export default function RewardsPage() {
                             <input
                                 readOnly
                                 value={publicInviteUrl(referral)}
-                                className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-gray-200 text-[12px] font-semibold text-[#181725] bg-gray-50"
+                                className="flex-1 min-w-0 px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-[13px] font-mono text-gray-700 select-all"
                             />
                             <button
                                 type="button"
-                                disabled={copying}
-                                onClick={async () => {
-                                    setCopying(true);
-                                    try {
-                                        await navigator.clipboard.writeText(publicInviteUrl(referral));
-                                        toast.success('Invite link copied');
-                                    } catch {
-                                        toast.error('Could not copy link');
-                                    } finally {
-                                        setCopying(false);
-                                    }
+                                onClick={() => {
+                                    void navigator.clipboard.writeText(publicInviteUrl(referral))
+                                        .then(() => toast.success('Invite link copied'))
+                                        .catch(() => toast.error('Could not copy link'));
                                 }}
-                                className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#53B175] text-white text-[12px] font-bold hover:bg-[#48a068] cursor-pointer"
+                                className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-primary text-white text-[12px] font-bold hover:bg-primary-dark cursor-pointer shadow-sm shadow-primary/20"
                             >
                                 <Copy size={13} strokeWidth={2.5} />
                                 Copy
@@ -233,7 +226,7 @@ export default function RewardsPage() {
                         {referral.rewards.length > 0 && (
                             <ul className="mt-2 space-y-1">
                                 {referral.rewards.map((r) => (
-                                    <li key={r.id ?? `${r.rewardType}-${r.createdAt}`} className="text-[12px] text-[#53B175] font-semibold">
+                                    <li key={r.id ?? `${r.rewardType}-${r.createdAt}`} className="text-[12px] text-primary font-semibold">
                                         + {formatProgramReward(r.rewardType, r.rewardValue)}
                                         {r.createdAt ? ` · ${new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}
                                     </li>
@@ -254,7 +247,7 @@ export default function RewardsPage() {
 
                 {loading ? (
                     <div className="flex items-center justify-center py-16">
-                        <Loader2 size={28} className="text-[#53B175] animate-spin" />
+                        <Loader2 size={28} className="text-primary animate-spin" />
                     </div>
                 ) : (
                     <>
@@ -299,13 +292,13 @@ export default function RewardsPage() {
                                                             value={upiInput}
                                                             onChange={(ev) => { setUpiInput(ev.target.value); setClaimError(null); }}
                                                             placeholder="yourname@upi"
-                                                            className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-gray-200 text-[13px] font-semibold focus:outline-none focus:border-[#53B175]"
+                                                            className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-gray-200 text-[13px] font-semibold focus:outline-none focus:border-primary"
                                                         />
                                                         <button
                                                             type="button"
                                                             disabled={claimBusy || !upiInput.trim()}
                                                             onClick={() => submitClaim(e.id)}
-                                                            className="shrink-0 px-4 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold disabled:bg-gray-200 disabled:text-gray-400 hover:bg-[#48a068] transition-colors cursor-pointer"
+                                                            className="shrink-0 px-4 py-2 rounded-xl bg-primary text-white text-[12px] font-bold disabled:bg-gray-200 disabled:text-gray-400 hover:bg-primary-dark transition-colors cursor-pointer shadow-sm shadow-primary/20"
                                                         >
                                                             {claimBusy ? <Loader2 size={13} className="animate-spin" /> : 'Save UPI'}
                                                         </button>
@@ -314,7 +307,7 @@ export default function RewardsPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => { setClaimingId(e.id); setUpiInput(''); setClaimError(null); }}
-                                                        className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-green-50 text-[#53B175] text-[12px] font-bold hover:bg-green-100 transition-colors cursor-pointer"
+                                                        className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary-light text-primary text-[12px] font-bold hover:bg-primary hover:text-white transition-colors cursor-pointer"
                                                     >
                                                         <IndianRupee size={13} strokeWidth={1.5} /> Grab your incentive — add UPI ID
                                                     </button>

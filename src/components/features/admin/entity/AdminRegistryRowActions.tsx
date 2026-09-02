@@ -30,7 +30,7 @@ export function AdminRegistryRowActions({
       <Link
         href={detailsHref}
         onClick={onDetailsClick}
-        className="h-[34px] px-3 bg-white border border-[#E5E7EB] text-[#374151] rounded-[8px] text-[12px] font-bold hover:bg-[#F9FAFB] transition-all flex items-center justify-center whitespace-nowrap"
+        className="min-h-12 md:min-h-[34px] px-3 bg-white border border-divider text-[#374151] rounded-[10px] text-[12px] font-semibold hover:bg-ivory flex items-center justify-center whitespace-nowrap"
       >
         Details
       </Link>
@@ -40,7 +40,7 @@ export function AdminRegistryRowActions({
           type="button"
           onClick={onMenuToggle}
           className={cn(
-            'w-[34px] h-[34px] flex items-center justify-center rounded-[10px] transition-all shadow-sm',
+            'size-12 md:size-[34px] flex items-center justify-center rounded-[10px] shadow-sm',
             menuOpen
               ? 'bg-gray-100 text-gray-900 border border-gray-200'
               : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:bg-gray-50',

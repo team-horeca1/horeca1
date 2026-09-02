@@ -125,10 +125,10 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
         type="button"
         onClick={() => { setIsOpen((v) => !v); }}
         disabled={switching}
-        className="flex items-center gap-3 cursor-pointer group disabled:opacity-50"
+        className="flex items-center gap-0 lg:gap-3 cursor-pointer group disabled:opacity-50 min-h-12"
       >
         <div
-          className="w-[42px] h-[42px] rounded-full flex items-center justify-center shrink-0 ring-2 ring-white shadow-sm"
+          className="size-10 lg:size-[42px] rounded-full flex items-center justify-center shrink-0 ring-2 ring-white shadow-sm"
           style={{ backgroundColor: conf.bg }}
         >
           {switching ? (
@@ -137,11 +137,11 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
             <span className="text-[12px] font-bold" style={{ color: conf.color }}>{initials}</span>
           )}
         </div>
-        <div className="flex flex-col items-start min-w-0">
+        <div className="hidden lg:flex flex-col items-start min-w-0">
           <span className="text-[14px] font-bold text-[#181725] truncate max-w-[180px]">{displayName}</span>
           {isVendorPortal && activeStore ? (
             <span className="text-[11px] text-[#666] flex items-center gap-1 truncate max-w-[180px]">
-              <Store size={10} className="shrink-0 text-[#299E60]" />
+              <Store size={10} className="shrink-0 text-primary" />
               <span className="truncate">{activeStore.displayName}</span>
             </span>
           ) : isVendorPortal && accountDisplayName ? (
@@ -157,12 +157,12 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
         </div>
         <ChevronDown
           size={16}
-          className={`text-[#AEAEAE] group-hover:text-[#181725] transition-all duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`hidden lg:block text-[#AEAEAE] group-hover:text-[#181725] ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-[calc(100%+8px)] w-[300px] bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[#F0F0F0] z-[100] overflow-hidden">
+        <div className="absolute right-0 top-[calc(100%+8px)] w-[min(300px,calc(100vw-1.5rem))] bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-divider z-[100] overflow-hidden">
           <div className="p-4 border-b border-[#F0F0F0]">
             <div className="flex items-center gap-3">
               <div
