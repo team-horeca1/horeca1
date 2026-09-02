@@ -158,7 +158,7 @@ export function CategoryMultiPicker({
                     <span className="text-[12px] text-gray-400 italic px-1">No categories selected yet</span>
                 )}
                 {value.map(name => (
-                    <span key={name} className="flex items-center gap-1 bg-[#e8f5e9] text-[#2e7d46] text-[12px] font-semibold rounded-full px-3 py-1">
+                    <span key={name} className="flex items-center gap-1 bg-[#e8f5e9] text-primary text-[12px] font-semibold rounded-full px-3 py-1">
                         {name}
                         <button type="button" onClick={() => remove(name)} className="hover:text-red-500 transition-colors">
                             <X size={11} />
@@ -178,7 +178,7 @@ export function CategoryMultiPicker({
                         onFocus={() => setOpen(true)}
                         placeholder={loading ? 'Loading categories…' : 'Search categories or type a new one…'}
                         disabled={loading || value.length >= max}
-                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-[#53B175]/50 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary/50 disabled:bg-gray-50 disabled:cursor-not-allowed"
                     />
                 </div>
 
@@ -216,7 +216,7 @@ export function CategoryMultiPicker({
                                     disabled={suggesting}
                                     className={cn(
                                         'w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors',
-                                        'bg-[#EEF8F1] hover:bg-[#53B175] hover:text-white text-[#2e7d46]',
+                                        'bg-primary-light hover:bg-primary hover:text-white text-primary',
                                         suggesting && 'opacity-60'
                                     )}
                                 >

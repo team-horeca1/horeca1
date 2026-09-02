@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -515,7 +516,7 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[
         <div>
             <div className="flex flex-wrap gap-2 mb-2">
                 {tags.map(tag => (
-                    <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#EEF8F1] text-primary text-[12px] font-bold rounded-[8px]">
+                    <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-light text-primary text-[12px] font-bold rounded-[8px]">
                         {tag}
                         <button type="button" onClick={() => removeTag(tag)} className="hover:text-[#E74C3C] transition-colors">
                             <X size={12} />
@@ -1095,7 +1096,7 @@ export default function VendorProductsPage() {
                                         type="button"
                                         onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => fillFromBrandMaster(b)}
-                                        className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-[#EEF8F1] transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
+                                        className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-primary-light transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
                                     >
                                         <div className="min-w-0">
                                             <p className="font-bold text-[#181725] truncate">{b.name}</p>
@@ -1127,7 +1128,7 @@ export default function VendorProductsPage() {
                                         type="button"
                                         onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => fillFromMaster(m)}
-                                        className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-[#EEF8F1] transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
+                                        className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-primary-light transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
                                     >
                                         <div className="min-w-0">
                                             <p className="font-bold text-[#181725] truncate">{m.name}</p>
@@ -1159,7 +1160,7 @@ export default function VendorProductsPage() {
                                         type="button"
                                         onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => fillFromSuggestion(s)}
-                                        className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-[#EEF8F1] transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
+                                        className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-primary-light transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
                                     >
                                         <div className="min-w-0">
                                             <p className="font-bold text-[#181725] truncate">{s.name}</p>
@@ -2767,7 +2768,7 @@ export default function VendorProductsPage() {
                             placeholder="Search products..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="h-[40px] w-full bg-white border border-[#EEEEEE] rounded-[10px] pl-10 pr-4 text-[13px] outline-none transition-all placeholder:text-[#AEAEAE] font-medium focus:border-[#299E60]/40 shadow-sm"
+                            className="h-[40px] w-full bg-white border border-[#EEEEEE] rounded-[10px] pl-10 pr-4 text-[13px] outline-none transition-all placeholder:text-[#AEAEAE] font-medium focus:border-primary/40 shadow-sm"
                         />
                     </div>
 
@@ -2924,7 +2925,7 @@ export default function VendorProductsPage() {
                                             type="checkbox"
                                             checked={allPageSelected}
                                             onChange={toggleSelectPage}
-                                            className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-[#299E60] cursor-pointer"
+                                            className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
                                             title="Select all on this page"
                                         />
                                     </th>
@@ -2961,7 +2962,7 @@ export default function VendorProductsPage() {
                                         className={cn(
                                             'transition-colors',
                                             product.approvalStatus === 'rejected' && !selectedIds.has(product.id) && 'bg-[#FFF8F8]',
-                                            selectedIds.has(product.id) ? 'bg-[#EEF8F1]/50' : 'hover:bg-[#FAFAFA]'
+                                            selectedIds.has(product.id) ? 'bg-primary-light/50' : 'hover:bg-[#FAFAFA]'
                                         )}
                                     >
                                         <td className="pl-6 pr-2 py-4">
@@ -2969,7 +2970,7 @@ export default function VendorProductsPage() {
                                                 type="checkbox"
                                                 checked={selectedIds.has(product.id)}
                                                 onChange={() => toggleSelect(product.id)}
-                                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-[#299E60] cursor-pointer"
+                                                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
                                             />
                                         </td>
                                         <td className="px-6 py-4">
@@ -2986,7 +2987,7 @@ export default function VendorProductsPage() {
                                                         <p className="text-[14px] font-bold text-[#181725] truncate">{displayName}</p>
                                                         {isMapped && (
                                                             <span
-                                                                className="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#EEF8F1] text-primary"
+                                                                className="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary-light text-primary"
                                                                 title={
                                                                     brandMaster!.brand?.name
                                                                         ? `Brand override — ${brandMaster!.brand.name}`
@@ -3022,7 +3023,7 @@ export default function VendorProductsPage() {
                                             <span className={cn(
                                                 'text-[12px] font-bold px-2.5 py-1 rounded-[6px]',
                                                 product.qty_available > 0
-                                                    ? 'bg-[#EEF8F1] text-primary'
+                                                    ? 'bg-primary-light text-primary'
                                                     : 'bg-[#F8F9FB] text-[#AEAEAE]'
                                             )}>
                                                 {product.qty_available > 0 ? product.qty_available : '0'}
@@ -3032,7 +3033,7 @@ export default function VendorProductsPage() {
                                             <div className="flex flex-col items-center gap-1">
                                                 <span className={cn(
                                                     'text-[11px] font-[900] px-2.5 py-1.5 rounded-[6px] uppercase',
-                                                    product.approvalStatus === 'approved' ? 'bg-[#EEF8F1] text-primary' :
+                                                    product.approvalStatus === 'approved' ? 'bg-primary-light text-primary' :
                                                     product.approvalStatus === 'rejected' ? 'bg-[#FFF0F0] text-[#E74C3C]' :
                                                     'bg-[#FFF7E6] text-[#F59E0B]'
                                                 )}>
@@ -3057,7 +3058,7 @@ export default function VendorProductsPage() {
                                                 product.listingStatus === 'draft'
                                                     ? 'bg-[#F0F4FF] text-[#4F6BED]'
                                                     : product.isActive
-                                                        ? 'bg-[#EEF8F1] text-primary'
+                                                        ? 'bg-primary-light text-primary'
                                                         : 'bg-[#FFF0F0] text-[#E74C3C]'
                                             )}>
                                                 {product.listingStatus === 'draft'
@@ -3088,7 +3089,7 @@ export default function VendorProductsPage() {
                                                 </button>
                                                 <button
                                                     onClick={() => openEditPanel(product)}
-                                                    className="p-2 hover:bg-[#EEF8F1] rounded-[8px] transition-colors text-primary"
+                                                    className="p-2 hover:bg-primary-light rounded-[8px] transition-colors text-primary"
                                                     title="Edit"
                                                 >
                                                     <Pencil size={16} />
@@ -3108,7 +3109,7 @@ export default function VendorProductsPage() {
                                                 <button
                                                     onClick={() => toggleActive(product)}
                                                     className="relative inline-flex h-[22px] w-[40px] shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200"
-                                                    style={{ backgroundColor: product.isActive ? '#299E60' : '#D1D5DB' }}
+                                                    style={{ backgroundColor: product.isActive ? CDL.primary : '#D1D5DB' }}
                                                     title={product.isActive ? 'Archive (hide from store)' : 'Unarchive'}
                                                 >
                                                     <span
@@ -3153,7 +3154,7 @@ export default function VendorProductsPage() {
                                         setPageSize(val);
                                         setCurrentPage(1);
                                     }}
-                                    className="h-[28px] px-1.5 bg-white border border-[#EEEEEE] rounded-[6px] text-[12px] font-bold text-[#181725] outline-none cursor-pointer focus:border-[#299E60]/40"
+                                    className="h-[28px] px-1.5 bg-white border border-[#EEEEEE] rounded-[6px] text-[12px] font-bold text-[#181725] outline-none cursor-pointer focus:border-primary/40"
                                 >
                                     <option value={20}>20</option>
                                     <option value={50}>50</option>
@@ -3238,7 +3239,7 @@ export default function VendorProductsPage() {
                                         </p>
                                     )}
                                     {editingProduct?.brandMappings?.[0]?.id && (
-                                        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#EEF8F1] text-primary">
+                                        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary-light text-primary">
                                             Mapped
                                         </span>
                                     )}
@@ -3359,7 +3360,7 @@ export default function VendorProductsPage() {
                                     })()}
 
                                     {editingProduct?.brandMappings?.[0]?.id && (
-                                        <div className="rounded-[10px] bg-[#EEF8F1] border border-[#299E60]/30 px-4 py-3 flex items-start gap-3">
+                                        <div className="rounded-[10px] bg-primary-light border border-primary/30 px-4 py-3 flex items-start gap-3">
                                             <Info size={16} className="shrink-0 mt-0.5 text-primary" />
                                             <p className="text-[12px] font-medium text-primary">
                                                 Brand override — storefront shows the brand SKU. Price and stock edits keep the link. Changing brand details (name, pack, HSN, images, etc.) and saving will unlink this product so your values go live.
@@ -3381,7 +3382,7 @@ export default function VendorProductsPage() {
                                         )}
                                         catalogBanner={
                                             (!editingProduct || editingProduct.approvalStatus === 'rejected') && identityFromCatalog ? (
-                                                <div className="rounded-[10px] bg-[#EEF8F1] border border-[#299E60]/30 px-4 py-3 flex items-center justify-between gap-3">
+                                                <div className="rounded-[10px] bg-primary-light border border-primary/30 px-4 py-3 flex items-center justify-between gap-3">
                                                     <p className="text-[12px] font-medium text-primary">
                                                         {basedOnBrandMasterProductId
                                                             ? `Linked to brand catalog — ${catalogSearch || form.name}`
@@ -3504,7 +3505,7 @@ export default function VendorProductsPage() {
                                                             ...prev,
                                                             priceSlabs: [...prev.priceSlabs, { minQty: '', price: '' }],
                                                         }))}
-                                                        className="h-[32px] px-3.5 bg-[#EEF8F1] hover:bg-[#53B175] text-primary hover:text-white rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-colors shrink-0"
+                                                        className="h-[32px] px-3.5 bg-primary-light hover:bg-primary text-primary hover:text-white rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-colors shrink-0"
                                                     >
                                                         <Plus size={13} /> Add Bulk Tier
                                                     </button>
@@ -3576,7 +3577,7 @@ export default function VendorProductsPage() {
                                                                             type="text"
                                                                             readOnly
                                                                             value={calcGrossRate(slab.price, form.taxPercent)}
-                                                                            className={cn(inputCls, 'pl-8 font-bold text-primary bg-[#EEF8F1]/40')}
+                                                                            className={cn(inputCls, 'pl-8 font-bold text-primary bg-primary-light/40')}
                                                                             placeholder="—"
                                                                         />
                                                                     </div>
@@ -3618,7 +3619,7 @@ export default function VendorProductsPage() {
                                                         type="checkbox"
                                                         checked={form.activeOnlineStore}
                                                         onChange={(e) => updateField('activeOnlineStore', e.target.checked)}
-                                                        className="w-5 h-5 accent-[#299E60]"
+                                                        className="w-5 h-5 accent-primary"
                                                     />
                                                     <div>
                                                         <span className="text-[13.5px] font-bold text-[#181725]">Active on Online Store</span>
@@ -3737,7 +3738,7 @@ export default function VendorProductsPage() {
                                                             type="checkbox"
                                                             checked={form.trackInventory}
                                                             onChange={(e) => updateField('trackInventory', e.target.checked)}
-                                                            className="w-5 h-5 accent-[#299E60]"
+                                                            className="w-5 h-5 accent-primary"
                                                         />
                                                         <div>
                                                             <span className="text-[13.5px] font-bold text-[#181725]">Track Inventory</span>
@@ -3995,7 +3996,7 @@ export default function VendorProductsPage() {
                                                         type="checkbox"
                                                         checked={form.sellable}
                                                         onChange={(e) => updateField('sellable', e.target.checked)}
-                                                        className="w-5 h-5 accent-[#299E60]"
+                                                        className="w-5 h-5 accent-primary"
                                                     />
                                                     <div>
                                                         <span className="text-[13px] font-bold text-[#181725]">Sellable</span>
@@ -4006,7 +4007,7 @@ export default function VendorProductsPage() {
                                                         type="checkbox"
                                                         checked={form.purchasable}
                                                         onChange={(e) => updateField('purchasable', e.target.checked)}
-                                                        className="w-5 h-5 accent-[#299E60]"
+                                                        className="w-5 h-5 accent-primary"
                                                     />
                                                     <div>
                                                         <span className="text-[13px] font-bold text-[#181725]">Purchasable</span>
@@ -4187,7 +4188,7 @@ export default function VendorProductsPage() {
                     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
                         <div className="bg-white rounded-[16px] shadow-xl max-w-[420px] w-full p-6">
                             <div className="flex items-center gap-3 mb-4">
-                                <div className="w-[40px] h-[40px] rounded-full bg-[#EEF8F1] flex items-center justify-center shrink-0">
+                                <div className="w-[40px] h-[40px] rounded-full bg-primary-light flex items-center justify-center shrink-0">
                                     <Unlink size={20} className="text-primary" />
                                 </div>
                                 <h3 className="text-[18px] font-bold text-[#181725]">Save &amp; Unlink</h3>

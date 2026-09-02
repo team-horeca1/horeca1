@@ -74,8 +74,8 @@ function formatProgramReward(type: string, value: string | number) {
 const STATUS_META: Record<CashbackEntryRow['status'], { label: string; cls: string }> = {
     pending: { label: 'Pending delivery', cls: 'bg-amber-50 text-amber-600' },
     approved: { label: 'Ready to pay out', cls: 'bg-blue-50 text-blue-600' },
-    credited: { label: 'In wallet', cls: 'bg-green-50 text-[#53B175]' },
-    paid: { label: 'Paid to UPI', cls: 'bg-green-50 text-[#53B175]' },
+    credited: { label: 'In wallet', cls: 'bg-success-light text-success' },
+    paid: { label: 'Paid to UPI', cls: 'bg-success-light text-success' },
     cancelled: { label: 'Cancelled', cls: 'bg-gray-100 text-gray-400' },
 };
 
@@ -333,9 +333,9 @@ export default function RewardsPage() {
                                 {txns.map((t) => (
                                     <div key={t.id} className="flex items-center justify-between px-4 py-3">
                                         <div className="flex items-center gap-3 min-w-0">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${t.type === 'credit' ? 'bg-green-50' : 'bg-red-50'}`}>
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${t.type === 'credit' ? 'bg-success-light' : 'bg-red-50'}`}>
                                                 {t.type === 'credit'
-                                                    ? <ArrowDownLeft size={14} className="text-[#53B175]" strokeWidth={1.5} />
+                                                    ? <ArrowDownLeft size={14} className="text-success" strokeWidth={1.5} />
                                                     : <ArrowUpRight size={14} className="text-red-500" strokeWidth={1.5} />}
                                             </div>
                                             <div className="min-w-0">
@@ -345,7 +345,7 @@ export default function RewardsPage() {
                                                 </p>
                                             </div>
                                         </div>
-                                        <span className={`text-[13px] font-bold shrink-0 ${t.type === 'credit' ? 'text-[#53B175]' : 'text-red-500'}`}>
+                                        <span className={`text-[13px] font-bold shrink-0 ${t.type === 'credit' ? 'text-success' : 'text-red-500'}`}>
                                             {t.type === 'credit' ? '+' : '−'}₹{Number(t.amount).toLocaleString('en-IN')}
                                         </span>
                                     </div>

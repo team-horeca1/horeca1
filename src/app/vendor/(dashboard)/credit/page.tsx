@@ -135,7 +135,7 @@ function CreditModal({ row, onClose, onSaved }: {
     }
   };
 
-  const inputCls = 'w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white';
+  const inputCls = 'w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white';
   const labelCls = 'block text-[12px] font-semibold text-[#7C7C7C] mb-1';
 
   return (
@@ -176,13 +176,13 @@ function CreditModal({ row, onClose, onSaved }: {
                   key={opt.v}
                   className={cn(
                     'flex items-start gap-3 p-3 rounded-[12px] border cursor-pointer transition-colors',
-                    terms === opt.v ? 'border-[#299E60] bg-[#EEF8F1]/50' : 'border-[#EEEEEE] hover:border-[#299E60]/40',
+                    terms === opt.v ? 'border-primary bg-primary-light/50' : 'border-[#EEEEEE] hover:border-primary/40',
                   )}
                 >
                   <input
                     type="radio" name="terms" checked={terms === opt.v}
                     onChange={() => setTerms(opt.v)}
-                    className="mt-0.5 accent-[#299E60]"
+                    className="mt-0.5 accent-primary"
                   />
                   <span>
                     <span className="block text-[13px] font-semibold text-[#181725]">{opt.title}</span>
@@ -211,7 +211,7 @@ function CreditModal({ row, onClose, onSaved }: {
           </div>
 
           <div>
-            <button type="button" onClick={() => setShowAdvanced((s) => !s)} className="text-[12.5px] font-semibold text-[#299E60] hover:underline">
+            <button type="button" onClick={() => setShowAdvanced((s) => !s)} className="text-[12.5px] font-semibold text-primary hover:underline">
               {showAdvanced ? 'Hide' : 'Show'} interest, penalty &amp; grace
             </button>
             {showAdvanced && (
@@ -229,7 +229,7 @@ function CreditModal({ row, onClose, onSaved }: {
 
         <div className="px-6 py-4 border-t border-[#EEEEEE] flex justify-end gap-3">
           <button onClick={onClose} className="px-5 h-[38px] rounded-[10px] border border-[#EEEEEE] text-[13px] font-semibold text-[#7C7C7C]">Cancel</button>
-          <button onClick={save} disabled={saving} className="px-5 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold disabled:opacity-50 flex items-center gap-2">
+          <button onClick={save} disabled={saving} className="px-5 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold disabled:opacity-50 flex items-center gap-2">
             {saving && <Loader2 size={13} className="animate-spin" />}
             Save terms
           </button>
@@ -241,7 +241,7 @@ function CreditModal({ row, onClose, onSaved }: {
 
 export default function VendorCreditPageWrapper() {
   return (
-    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-[#299E60]" /></div>}>
+    <Suspense fallback={<div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary" /></div>}>
       <VendorCreditPage />
     </Suspense>
   );
@@ -360,7 +360,7 @@ function VendorCreditPage() {
           <button
             type="button"
             onClick={() => setShowBulk(true)}
-            className="h-[38px] px-4 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold"
+            className="h-[38px] px-4 rounded-[10px] bg-primary text-white text-[13px] font-bold"
           >
             Bulk assign credit
           </button>
@@ -396,7 +396,7 @@ function VendorCreditPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Credit lines', value: String(stats.lines), Icon: CreditCard, tint: 'text-[#299E60] bg-[#EEF8F1]' },
+          { label: 'Credit lines', value: String(stats.lines), Icon: CreditCard, tint: 'text-primary bg-primary-light' },
           { label: 'Total limit', value: inr(stats.exposure), Icon: IndianRupee, tint: 'text-blue-600 bg-blue-50' },
           { label: 'Outstanding', value: inr(stats.outstanding), Icon: AlertTriangle, tint: 'text-amber-600 bg-amber-50' },
           { label: 'Overdue', value: String(stats.overdue), Icon: ShieldOff, tint: 'text-red-500 bg-red-50' },
@@ -421,7 +421,7 @@ function VendorCreditPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search customer, phone, email…"
-            className="w-full h-[38px] pl-8 pr-3 rounded-[10px] border border-[#EEEEEE] text-[12.5px] outline-none focus:border-[#299E60]/40 bg-white"
+            className="w-full h-[38px] pl-8 pr-3 rounded-[10px] border border-[#EEEEEE] text-[12.5px] outline-none focus:border-primary/40 bg-white"
           />
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -442,7 +442,7 @@ function VendorCreditPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="animate-spin text-[#299E60]" size={28} />
+          <Loader2 className="animate-spin text-primary" size={28} />
         </div>
       ) : gridRows.length === 0 ? (
         <div className="bg-white rounded-[14px] border border-[#EEEEEE] py-16 text-center shadow-sm">

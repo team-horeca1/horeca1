@@ -71,7 +71,7 @@ function txnLabel(type: WalletTxn['type']) {
 
 function txnColor(type: WalletTxn['type']) {
   return type === 'order_credit' || type === 'adjustment'
-    ? 'text-[#299E60]'
+    ? 'text-primary'
     : 'text-[#E74C3C]';
 }
 
@@ -93,7 +93,7 @@ function payoutStatusBadge(status: Payout['status']) {
   switch (status) {
     case 'settled':
       return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#EEF8F1] text-[#299E60]">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-primary-light text-primary">
           Completed
         </span>
       );
@@ -206,7 +206,7 @@ export default function VendorWalletPage() {
 
       {/* Balance cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-[#299E60] rounded-[14px] p-5 text-white">
+        <div className="bg-primary rounded-[14px] p-5 text-white">
           <p className="text-[12px] font-semibold opacity-80">Available Balance</p>
           {loading ? (
             <Loader2 size={20} className="animate-spin mt-2" />
@@ -301,7 +301,7 @@ export default function VendorWalletPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-[#F0FDF4] flex items-center justify-center shrink-0">
-                <Building2 size={16} className="text-[#299E60]" />
+                <Building2 size={16} className="text-primary" />
               </div>
               <div>
                 <p className="text-[13px] font-bold text-[#181725]">Bank Account (for settlements)</p>
@@ -322,7 +322,7 @@ export default function VendorWalletPage() {
               <div className="flex items-center gap-2 mt-0.5">
                 <p className="text-[13px] font-bold text-[#181725]">{bankSettings.bankName ?? '—'}</p>
                 {bankSettings.bankAccountType && (
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-[4px] bg-[#EEF8F1] text-[#299E60] uppercase">
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-[4px] bg-primary-light text-primary uppercase">
                     {bankSettings.bankAccountType}
                   </span>
                 )}
@@ -356,7 +356,7 @@ export default function VendorWalletPage() {
             </div>
             <Link
               href="/vendor/settings"
-              className="h-[34px] px-4 bg-[#299E60] text-white rounded-[10px] text-[12px] font-bold hover:bg-[#238a54] transition-colors flex items-center gap-1.5 shrink-0"
+              className="h-[34px] px-4 bg-primary text-white rounded-[10px] text-[12px] font-bold hover:bg-primary-dark transition-colors flex items-center gap-1.5 shrink-0"
             >
               <Settings size={13} />
               Configure Bank Account
@@ -373,7 +373,7 @@ export default function VendorWalletPage() {
 
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="animate-spin text-[#299E60]" size={28} />
+            <Loader2 className="animate-spin text-primary" size={28} />
           </div>
         ) : txns.length === 0 ? (
           <div className="py-14 text-center">
@@ -400,10 +400,10 @@ export default function VendorWalletPage() {
                     >
                       <div className={cn(
                         'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
-                        isCredit ? 'bg-[#EEF8F1]' : 'bg-[#FFF0F0]'
+                        isCredit ? 'bg-primary-light' : 'bg-[#FFF0F0]'
                       )}>
                         {isCredit
-                          ? <ArrowDownCircle size={16} className="text-[#299E60]" />
+                          ? <ArrowDownCircle size={16} className="text-primary" />
                           : <ArrowUpCircle size={16} className="text-[#E74C3C]" />
                         }
                       </div>
@@ -413,7 +413,7 @@ export default function VendorWalletPage() {
                           <p className="text-[11px] text-[#AEAEAE] truncate">{txn.notes}</p>
                         )}
                         {hasBreakdown && (
-                          <p className="text-[10px] text-[#299E60] font-semibold mt-0.5">
+                          <p className="text-[10px] text-primary font-semibold mt-0.5">
                             {isExpanded ? 'Hide breakdown' : 'Tap for fee breakdown'}
                           </p>
                         )}
@@ -449,7 +449,7 @@ export default function VendorWalletPage() {
                 <button
                   onClick={() => fetchWallet(nextCursor)}
                   disabled={loadingMore}
-                  className="w-full text-center text-[12px] font-semibold text-[#299E60] hover:text-[#238a54] disabled:opacity-50 transition-colors"
+                  className="w-full text-center text-[12px] font-semibold text-primary hover:text-primary-dark disabled:opacity-50 transition-colors"
                 >
                   {loadingMore ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Load more'}
                 </button>
@@ -468,7 +468,7 @@ export default function VendorWalletPage() {
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="animate-spin text-[#299E60]" size={24} />
+            <Loader2 className="animate-spin text-primary" size={24} />
           </div>
         ) : payouts.length === 0 ? (
           <div className="py-12 text-center">

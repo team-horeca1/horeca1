@@ -144,7 +144,7 @@ export function ContinueOrdering() {
                                                         </span>
                                                         <span className="flex items-center gap-1.5 ml-1">
                                                             {vendorList.lastUsed ? (
-                                                                <span className="flex items-center gap-0.5 text-[#299e60] font-bold">
+                                                                <span className="flex items-center gap-0.5 text-primary font-bold">
                                                                     <Clock size={10} className="md:w-3 md:h-3" />
                                                                     <span>Used {new Date(vendorList.lastUsed).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
                                                                 </span>

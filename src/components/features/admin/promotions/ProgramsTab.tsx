@@ -301,7 +301,7 @@ export function ProgramsTab() {
                 <button
                     onClick={saveWelcome}
                     disabled={saving === 'welcome'}
-                    className="mt-4 px-4 py-2 rounded-xl bg-[#6B1D2E] text-white text-[12px] font-bold hover:bg-[#48a068] disabled:opacity-50 cursor-pointer"
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#6B1D2E] text-white text-[12px] font-bold hover:bg-primary-dark disabled:opacity-50 cursor-pointer"
                 >
                     {saving === 'welcome' ? <Loader2 size={14} className="animate-spin" /> : 'Save welcome offer'}
                 </button>
@@ -329,7 +329,7 @@ export function ProgramsTab() {
                 <button
                     onClick={saveFirst}
                     disabled={saving === 'first-order'}
-                    className="mt-4 px-4 py-2 rounded-xl bg-[#6B1D2E] text-white text-[12px] font-bold hover:bg-[#48a068] disabled:opacity-50 cursor-pointer"
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#6B1D2E] text-white text-[12px] font-bold hover:bg-primary-dark disabled:opacity-50 cursor-pointer"
                 >
                     {saving === 'first-order' ? <Loader2 size={14} className="animate-spin" /> : 'Save first order offer'}
                 </button>
@@ -407,7 +407,7 @@ export function ProgramsTab() {
                 <button
                     onClick={saveReferral}
                     disabled={saving === 'referral'}
-                    className="mt-4 px-4 py-2 rounded-xl bg-[#6B1D2E] text-white text-[12px] font-bold hover:bg-[#48a068] disabled:opacity-50 cursor-pointer"
+                    className="mt-4 px-4 py-2 rounded-xl bg-[#6B1D2E] text-white text-[12px] font-bold hover:bg-primary-dark disabled:opacity-50 cursor-pointer"
                 >
                     {saving === 'referral' ? <Loader2 size={14} className="animate-spin" /> : 'Save referral program'}
                 </button>

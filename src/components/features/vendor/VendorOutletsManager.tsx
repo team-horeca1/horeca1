@@ -56,7 +56,7 @@ export function VendorOutletsManager({ embedded = false }: Props) {
   if (loading) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="animate-spin text-[#299E60]" size={28} />
+        <Loader2 className="animate-spin text-primary" size={28} />
       </div>
     );
   }
@@ -78,7 +78,7 @@ export function VendorOutletsManager({ embedded = false }: Props) {
                 setEditOutletId(null);
                 setShowOverlay(true);
               }}
-              className="inline-flex items-center gap-2 h-[40px] px-4 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold"
+              className="inline-flex items-center gap-2 h-[40px] px-4 rounded-[10px] bg-primary text-white text-[13px] font-bold"
             >
               <Plus size={16} />
               Add outlet
@@ -96,7 +96,7 @@ export function VendorOutletsManager({ embedded = false }: Props) {
             <button
               type="button"
               onClick={() => setShowOverlay(true)}
-              className="mt-4 inline-flex items-center gap-2 h-[40px] px-4 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold"
+              className="mt-4 inline-flex items-center gap-2 h-[40px] px-4 rounded-[10px] bg-primary text-white text-[13px] font-bold"
             >
               <Plus size={16} />
               Add warehouse
@@ -111,14 +111,14 @@ export function VendorOutletsManager({ embedded = false }: Props) {
               className="bg-white rounded-[14px] border border-[#EEEEEE] p-5 flex flex-wrap gap-4 items-start justify-between"
             >
               <div className="flex gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
-                  <MapPin size={18} className="text-[#299E60]" />
+                <div className="w-10 h-10 rounded-full bg-success-light flex items-center justify-center shrink-0">
+                  <MapPin size={18} className="text-primary" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-[15px] font-bold text-[#181725]">{o.name}</h2>
                     {o.isPrimary && (
-                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-success-light text-success">
                         Primary
                       </span>
                     )}
@@ -127,7 +127,7 @@ export function VendorOutletsManager({ embedded = false }: Props) {
                   <p className="text-[11px] text-[#AEAEAE] mt-0.5">
                     {[o.city, o.pincode].filter(Boolean).join(' · ')}
                   </p>
-                  <p className="text-[11px] text-[#299E60] font-semibold mt-2">
+                  <p className="text-[11px] text-primary font-semibold mt-2">
                     {o.serviceAreaCount ?? 0} delivery pin{(o.serviceAreaCount ?? 0) === 1 ? '' : 's'} · {o.totalQty ?? 0} units in stock
                   </p>
                 </div>

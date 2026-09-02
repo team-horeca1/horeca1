@@ -246,7 +246,7 @@ function SearchPageContent() {
                                                         {vendor.categories.join(', ')}
                                                     </p>
                                                     <div className="flex items-center gap-2 mt-1.5">
-                                                        <div className="flex items-center gap-0.5 text-[10px] font-bold text-green-600">
+                                                        <div className="flex items-center gap-0.5 text-[10px] font-bold text-success">
                                                             <Star size={10} fill="currentColor" />
                                                             {vendor.rating}
                                                         </div>

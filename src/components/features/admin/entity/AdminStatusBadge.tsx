@@ -6,9 +6,9 @@ import { cn } from '@/lib/utils';
 export type AdminStatusVariant = 'verified' | 'pending' | 'active' | 'inactive' | 'rejected';
 
 const STYLES: Record<AdminStatusVariant, string> = {
-  verified: 'bg-[#DCFCE7] border-success/15 text-success',
+  verified: 'bg-success-light border-success/15 text-success',
   pending: 'bg-[#FEF3C7] border-warning/20 text-[#B45309]',
-  active: 'bg-[#DCFCE7] border-success/15 text-success',
+  active: 'bg-success-light border-success/15 text-success',
   inactive: 'bg-[#FEE2E2] border-error/15 text-error',
   rejected: 'bg-[#FEE2E2] border-error/15 text-error',
 };

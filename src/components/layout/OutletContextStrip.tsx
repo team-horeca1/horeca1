@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { MapPin, ChevronDown, Store } from 'lucide-react';
+import { Crosshair, ChevronDown, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStableSession } from '@/hooks/useStableSession';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
@@ -28,47 +28,43 @@ export function OutletContextStrip({
 
   if (loading && isAuthenticated) {
     return (
-      <div className={cn('bg-[#1C1C1C] px-4 py-2.5', className)}>
-        <div className="h-4 w-48 bg-white/10 rounded animate-pulse" />
+      <div className={cn('w-full bg-white px-3.5 py-1.5 border-b border-divider/60', className)}>
+        <div className="h-9 w-full bg-gray-100 rounded-xl animate-pulse" />
       </div>
     );
   }
 
   if (isAuthenticated) {
     return (
-      <button
-        type="button"
-        onClick={onLoggedInSwitchClick}
-        className={cn(
-          'w-full bg-[#1C1C1C] px-4 py-2.5 flex items-center gap-2 text-left',
-          'hover:bg-[#2a2a2a] transition-colors',
-          className,
-        )}
-      >
-        <Store size={16} className="text-white/80 shrink-0" />
-        <span className="text-[13px] text-white flex-1 min-w-0 truncate">
-          Ordering for: <strong className="font-semibold">{loggedInLabel}</strong>
-        </span>
-        <ChevronDown size={16} className="text-white/60 shrink-0" />
-      </button>
+      <div className={cn('w-full bg-white px-3.5 py-1.5 border-b border-divider/60', className)}>
+        <button
+          type="button"
+          onClick={onLoggedInSwitchClick}
+          className="w-full bg-white hover:bg-gray-50/80 border border-gray-200 rounded-xl px-3 py-2 flex items-center gap-2 text-left transition-colors shadow-2xs group"
+        >
+          <Store size={15} className="text-primary shrink-0" />
+          <span className="text-[13px] text-text-secondary flex-1 min-w-0 truncate">
+            Ordering for: <strong className="font-semibold text-text">{loggedInLabel}</strong>
+          </span>
+          <ChevronDown size={15} className="text-text-muted shrink-0" />
+        </button>
+      </div>
     );
   }
 
   return (
-    <button
-      type="button"
-      onClick={onGuestLocationClick}
-      className={cn(
-        'w-full bg-[#1C1C1C] px-4 py-2.5 flex items-center gap-2 text-left',
-        'hover:bg-[#2a2a2a] transition-colors',
-        className,
-      )}
-    >
-      <MapPin size={16} className="text-white/80 shrink-0" />
-      <span className="text-[13px] text-white flex-1 min-w-0 truncate">
-        Deliver to: <strong className="font-semibold">Select your location</strong>
-      </span>
-      <ChevronDown size={16} className="text-white/60 shrink-0" />
-    </button>
+    <div className={cn('w-full bg-white px-3.5 py-1.5 border-b border-divider/60', className)}>
+      <button
+        type="button"
+        onClick={onGuestLocationClick}
+        className="w-full bg-white hover:bg-gray-50/80 border border-gray-200 rounded-xl px-3 py-2 flex items-center gap-2 text-left transition-colors shadow-2xs group"
+      >
+        <Crosshair size={15} className="text-primary shrink-0 transition-transform group-hover:rotate-45" />
+        <span className="text-[13px] text-text-secondary flex-1 min-w-0 truncate">
+          Deliver to: <strong className="font-semibold text-text">Select your location</strong>
+        </span>
+        <ChevronDown size={15} className="text-text-muted shrink-0" />
+      </button>
+    </div>
   );
 }

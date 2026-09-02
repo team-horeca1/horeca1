@@ -82,7 +82,7 @@ export function AccountOverviewPanel({ accountId, fromPortal, onSelectTab }: Acc
   if (loading) {
     return (
       <div className="py-12 flex justify-center">
-        <Loader2 className="animate-spin text-[#299E60]" />
+        <Loader2 className="animate-spin text-primary" />
       </div>
     );
   }
@@ -93,7 +93,7 @@ export function AccountOverviewPanel({ accountId, fromPortal, onSelectTab }: Acc
 
   const incomplete = account.outlets.filter((o) => o.requiresAddressUpdate).length;
 
-  const statClass = 'bg-white border border-[#F0F0F0] rounded-xl p-4 hover:border-[#299E60]/30 hover:shadow-sm transition-all flex flex-col justify-between text-left w-full';
+  const statClass = 'bg-white border border-[#F0F0F0] rounded-xl p-4 hover:border-primary/30 hover:shadow-sm transition-all flex flex-col justify-between text-left w-full';
 
   return (
     <div className="space-y-4">
@@ -101,7 +101,7 @@ export function AccountOverviewPanel({ accountId, fromPortal, onSelectTab }: Acc
         {onSelectTab ? (
           <>
             <button type="button" onClick={() => onSelectTab('outlets')} className={statClass}>
-              <StatCardInner icon={<MapPin size={16} className="text-[#299E60]" />} iconBg="bg-[#E8F5E9]" title="Outlets" value={String(account.outlets.length)} sub={incomplete > 0 ? `${incomplete} need address` : 'All complete'} subClass={incomplete > 0 ? 'text-amber-600' : 'text-emerald-600'} />
+              <StatCardInner icon={<MapPin size={16} className="text-primary" />} iconBg="bg-primary-light" title="Outlets" value={String(account.outlets.length)} sub={incomplete > 0 ? `${incomplete} need address` : 'All complete'} subClass={incomplete > 0 ? 'text-amber-600' : 'text-primary'} />
             </button>
             <button type="button" onClick={() => onSelectTab('users')} className={statClass}>
               <StatCardInner icon={<Users size={16} className="text-blue-500" />} iconBg="bg-blue-50" title="Members" value={String(account._count.members)} sub="Manage access" />
@@ -113,7 +113,7 @@ export function AccountOverviewPanel({ accountId, fromPortal, onSelectTab }: Acc
         ) : (
           <>
             <Link href={`${base}/outlets${qs}`} className={statClass}>
-              <StatCardInner icon={<MapPin size={16} className="text-[#299E60]" />} iconBg="bg-[#E8F5E9]" title="Outlets" value={String(account.outlets.length)} sub={incomplete > 0 ? `${incomplete} need address` : 'All complete'} subClass={incomplete > 0 ? 'text-amber-600' : 'text-emerald-600'} />
+              <StatCardInner icon={<MapPin size={16} className="text-primary" />} iconBg="bg-primary-light" title="Outlets" value={String(account.outlets.length)} sub={incomplete > 0 ? `${incomplete} need address` : 'All complete'} subClass={incomplete > 0 ? 'text-amber-600' : 'text-primary'} />
             </Link>
             <Link href={`${base}/users${qs}`} className={statClass}>
               <StatCardInner icon={<Users size={16} className="text-blue-500" />} iconBg="bg-blue-50" title="Members" value={String(account._count.members)} sub="Manage access" />
@@ -127,7 +127,7 @@ export function AccountOverviewPanel({ accountId, fromPortal, onSelectTab }: Acc
 
       <div className="bg-white border border-[#F0F0F0] rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4 border-b border-gray-50 pb-2.5">
-          <Building2 size={16} className="text-[#299E60]" />
+          <Building2 size={16} className="text-primary" />
           <h3 className="text-[14px] font-bold text-[#181725]">Business details</h3>
         </div>
         <dl className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-4 text-[13px]">

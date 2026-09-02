@@ -98,7 +98,7 @@ function CollapsibleSection({
       <button type="button" onClick={() => setOpen(!open)}
         className="w-full px-4 py-3.5 flex items-center justify-between text-[12px] font-bold text-gray-700 hover:bg-[#FAFAFA]/70 transition-colors">
         <span className="flex items-center gap-2">
-          <Icon size={16} className="text-[#299E60]" />
+          <Icon size={16} className="text-primary" />
           {title}
         </span>
         {open ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
@@ -236,11 +236,11 @@ export function CustomerProfileForm({
           onChange={v => set({ state: v, billingState: v })} placeholder="State" />
       </div>
       {value.latitude != null && value.longitude != null && (
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-            <Check size={12} className="text-emerald-700" strokeWidth={3} />
+        <div className="rounded-xl border border-primary/20 bg-primary-light/60 p-3 flex items-center gap-2">
+          <div className="w-5 h-5 rounded-full bg-primary-light flex items-center justify-center shrink-0">
+            <Check size={12} className="text-primary" strokeWidth={3} />
           </div>
-          <p className="text-[11.5px] text-emerald-900/80">
+          <p className="text-[11.5px] text-primary">
             GPS coordinates captured ({value.latitude.toFixed(5)}, {value.longitude.toFixed(5)})
           </p>
         </div>
@@ -406,7 +406,7 @@ export function CustomerProfileForm({
               {(['business', 'individual'] as const).map(t => (
                 <label key={t} className="flex items-center gap-2 text-[14px] font-medium text-[#181725] cursor-pointer">
                   <input type="radio" checked={(value.customerType ?? 'business') === t}
-                    onChange={() => set({ customerType: t })} className="accent-[#299E60]" />
+                    onChange={() => set({ customerType: t })} className="accent-primary" />
                   {t === 'business' ? 'Business' : 'Individual'}
                 </label>
               ))}
@@ -435,7 +435,7 @@ export function CustomerProfileForm({
               {([['taxable', 'Taxable'], ['exempt', 'Tax Exempt']] as const).map(([v, l]) => (
                 <label key={v} className="flex items-center gap-2 text-[14px] font-medium text-[#181725] cursor-pointer">
                   <input type="radio" checked={(value.taxPreference ?? 'taxable') === v}
-                    onChange={() => set({ taxPreference: v })} className="accent-[#299E60]" />{l}
+                    onChange={() => set({ taxPreference: v })} className="accent-primary" />{l}
                 </label>
               ))}
             </div>
@@ -443,7 +443,7 @@ export function CustomerProfileForm({
           <FormField label="Portal Access">
             <label className="flex items-center gap-2 h-[44px] text-[14px] font-medium text-[#181725] cursor-pointer">
               <input type="checkbox" checked={!!value.enablePortal}
-                onChange={e => set({ enablePortal: e.target.checked })} className="accent-[#299E60] w-4 h-4" />
+                onChange={e => set({ enablePortal: e.target.checked })} className="accent-primary w-4 h-4" />
               Allow portal access
             </label>
           </FormField>
@@ -533,12 +533,12 @@ export function CustomerProfileForm({
                 <input type="checkbox" checked={!!c.isPrimary}
                   onChange={e => {
                     const next = [...contactPersons]; next[i] = { ...c, isPrimary: e.target.checked }; onContactPersonsChange(next);
-                  }} className="accent-[#299E60]" /> Primary contact
+                  }} className="accent-primary" /> Primary contact
               </label>
             </div>
           ))}
           <button type="button" onClick={() => onContactPersonsChange([...contactPersons, { isPrimary: contactPersons.length === 0 }])}
-            className="flex items-center gap-2 text-[13px] font-bold text-[#299E60] hover:underline">
+            className="flex items-center gap-2 text-[13px] font-bold text-primary hover:underline">
             <Plus size={15} /> Add contact person
           </button>
         </div>

@@ -76,7 +76,7 @@ function MappedCountControl({
         <button
             type="button"
             onClick={onOpen}
-            className="inline-flex items-center gap-0.5 text-[#53B175] font-semibold underline underline-offset-2 hover:text-[#3d9e5f]"
+            className="inline-flex items-center gap-0.5 text-primary font-semibold underline underline-offset-2 hover:text-primary-dark"
         >
             {label}
             <ChevronRight size={12} className="shrink-0" />
@@ -207,7 +207,7 @@ export default function BrandDistributorsPage() {
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="text-[26px] font-[900] text-[#181725] tracking-tight flex items-center gap-2">
-                        <Users size={26} className="text-[#53B175]" /> Distributor Network
+                        <Users size={26} className="text-primary" /> Distributor Network
                     </h1>
                     <p className="text-[#7C7C7C] font-medium mt-0.5 text-[14px] max-w-2xl">
                         Search marketplace vendors and add them as your distributors, or onboard a new one.
@@ -216,7 +216,7 @@ export default function BrandDistributorsPage() {
                 </div>
                 <button
                     onClick={() => setShowCreate(true)}
-                    className="h-[40px] px-5 bg-[#53B175] text-white rounded-[12px] text-[13px] font-bold hover:bg-[#3d9e5f] transition-colors flex items-center gap-1.5"
+                    className="h-[40px] px-5 bg-primary text-white rounded-[12px] text-[13px] font-bold hover:bg-primary-dark transition-colors flex items-center gap-1.5"
                 >
                     <UserPlus size={14} /> Create Distributor
                 </button>
@@ -225,7 +225,7 @@ export default function BrandDistributorsPage() {
             {/* Search existing vendors */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
                 <h2 className="text-[15px] font-bold text-[#181725] flex items-center gap-2">
-                    <Search size={16} className="text-[#53B175]" /> Find &amp; add vendors
+                    <Search size={16} className="text-primary" /> Find &amp; add vendors
                 </h2>
                 <div className="flex flex-wrap gap-3">
                     <div className="relative flex-1 min-w-[200px]">
@@ -235,7 +235,7 @@ export default function BrandDistributorsPage() {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search by name, email, or slug..."
-                            className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-[#53B175]/50"
+                            className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary/50"
                         />
                     </div>
                     <input
@@ -243,12 +243,12 @@ export default function BrandDistributorsPage() {
                         value={searchCity}
                         onChange={(e) => setSearchCity(e.target.value)}
                         placeholder="City filter"
-                        className="w-[140px] px-3 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-[#53B175]/50"
+                        className="w-[140px] px-3 py-2.5 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary/50"
                     />
                 </div>
 
                 {searching ? (
-                    <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-[#53B175]" /></div>
+                    <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-primary" /></div>
                 ) : searchResults.length > 0 ? (
                     <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
                         {searchResults.map((v) => (
@@ -266,7 +266,7 @@ export default function BrandDistributorsPage() {
                                 <button
                                     onClick={() => addDistributor(v.id)}
                                     disabled={actingId === v.id}
-                                    className="h-[32px] px-4 bg-[#53B175] text-white rounded-lg text-[12px] font-bold disabled:opacity-50 flex items-center gap-1"
+                                    className="h-[32px] px-4 bg-primary text-white rounded-lg text-[12px] font-bold disabled:opacity-50 flex items-center gap-1"
                                 >
                                     {actingId === v.id ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
                                     Add
@@ -281,7 +281,7 @@ export default function BrandDistributorsPage() {
 
             {/* Approved (left) + Pending requests (right) */}
             {loading ? (
-                <div className="flex justify-center py-12"><Loader2 size={22} className="animate-spin text-[#53B175]" /></div>
+                <div className="flex justify-center py-12"><Loader2 size={22} className="animate-spin text-primary" /></div>
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                     {/* Left — approved distributors (public brand store) */}
@@ -290,7 +290,7 @@ export default function BrandDistributorsPage() {
                             <h2 className="text-[15px] font-bold text-[#181725]">
                                 Your distributors
                             </h2>
-                            <span className="text-[12px] font-bold text-[#53B175] bg-[#53B175]/10 px-2.5 py-0.5 rounded-full">
+                            <span className="text-[12px] font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
                                 {approved.length}
                             </span>
                         </div>
@@ -398,7 +398,7 @@ export default function BrandDistributorsPage() {
                                                 <button
                                                     onClick={() => approveRequest(d.vendorId, d.vendor.businessName)}
                                                     disabled={busy}
-                                                    className="h-[32px] px-3 bg-[#53B175] text-white rounded-lg text-[12px] font-bold hover:bg-[#3d9e5f] disabled:opacity-50 flex items-center gap-1"
+                                                    className="h-[32px] px-3 bg-primary text-white rounded-lg text-[12px] font-bold hover:bg-primary-dark disabled:opacity-50 flex items-center gap-1"
                                                 >
                                                     {busy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
                                                     Approve

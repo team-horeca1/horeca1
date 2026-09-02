@@ -22,7 +22,7 @@ export default function SentryExamplePage() {
         <h1 className="text-2xl font-bold text-[#181725]">Sentry Test Page</h1>
         <p className="text-sm text-gray-500">
           Click a button to send a test error to Sentry. Check your{" "}
-          <a href="https://horeca1.sentry.io/issues/" target="_blank" rel="noopener noreferrer" className="text-[#299E60] underline">
+          <a href="https://horeca1.sentry.io/issues/" target="_blank" rel="noopener noreferrer" className="text-primary underline">
             Sentry dashboard
           </a>{" "}
           to verify it appears.
@@ -31,7 +31,7 @@ export default function SentryExamplePage() {
         <div className="space-y-3">
           <button
             onClick={triggerError}
-            className="w-full h-12 bg-[#299E60] text-white rounded-xl font-bold hover:bg-[#238a54] transition-colors"
+            className="w-full h-12 bg-primary text-white rounded-xl font-bold hover:bg-primary-dark transition-colors"
           >
             Send Captured Error
           </button>
@@ -45,7 +45,7 @@ export default function SentryExamplePage() {
         </div>
 
         {sent && (
-          <p className="text-sm font-bold text-[#299E60] animate-pulse">
+          <p className="text-sm font-bold text-primary animate-pulse">
             Error sent! Check Sentry dashboard in ~30 seconds.
           </p>
         )}

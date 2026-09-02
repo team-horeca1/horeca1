@@ -62,7 +62,7 @@ export function CancelRequestBanner({
           rows={2}
           placeholder="Explain why you are declining, or optional note if approving..."
           data-testid="vendor-cancel-note"
-          className="w-full resize-none rounded-[10px] border border-[#EEEEEE] bg-white px-3 py-2 text-[13px] outline-none focus:border-[#299E60]/40"
+          className="w-full resize-none rounded-[10px] border border-[#EEEEEE] bg-white px-3 py-2 text-[13px] outline-none focus:border-primary/40"
         />
         {!canDecline && (
           <p className="mt-1 text-[11px] text-[#AEAEAE]">

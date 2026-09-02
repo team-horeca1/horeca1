@@ -64,7 +64,7 @@ export default function SupplierDashboardPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <Loader2 className="animate-spin text-[#299E60]" size={32} />
+        <Loader2 className="animate-spin text-primary" size={32} />
       </div>
     );
   }
@@ -110,7 +110,7 @@ export default function SupplierDashboardPage() {
           <p className="text-[26px] font-extrabold text-[#181725] mt-1" data-testid="kpi-stores">
             {d.storeCount}
           </p>
-          <p className="text-[11px] text-[#299E60] font-semibold mt-0.5">{d.activeStoreCount} active</p>
+          <p className="text-[11px] text-primary font-semibold mt-0.5">{d.activeStoreCount} active</p>
         </div>
         <div className="bg-white border border-[#EEEEEE] rounded-[16px] p-4">
           <div className="flex items-center gap-2 text-[#AEAEAE]">
@@ -126,7 +126,7 @@ export default function SupplierDashboardPage() {
             <IndianRupee size={14} />
             <p className="text-[11px] font-bold uppercase tracking-wider">Revenue</p>
           </div>
-          <p className="text-[22px] font-extrabold text-[#299E60] mt-1" data-testid="kpi-revenue">
+          <p className="text-[22px] font-extrabold text-primary mt-1" data-testid="kpi-revenue">
             {formatInr(d.totalRevenue)}
           </p>
         </div>
@@ -153,7 +153,7 @@ export default function SupplierDashboardPage() {
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F8F9FB] text-[12px] font-semibold text-[#181725]"
               >
                 <span className="capitalize">{status.replace(/_/g, ' ')}</span>
-                <span className="text-[#299E60]">{count}</span>
+                <span className="text-primary">{count}</span>
               </span>
             ))}
           </div>
@@ -163,7 +163,7 @@ export default function SupplierDashboardPage() {
       <div className="flex flex-wrap gap-3 justify-center pt-1">
         <Link
           href="/vendor/all-orders"
-          className="inline-flex items-center justify-center px-4 py-2.5 bg-[#299E60] hover:bg-[#238a54] text-white text-[13px] font-bold rounded-[10px] transition-colors"
+          className="inline-flex items-center justify-center px-4 py-2.5 bg-primary hover:bg-primary-dark text-white text-[13px] font-bold rounded-[10px] transition-colors"
         >
           View all orders
         </Link>

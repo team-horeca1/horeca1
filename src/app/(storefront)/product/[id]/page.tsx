@@ -282,7 +282,7 @@ export default function ProductDetailPage() {
     if (pageLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-white">
-                <Loader2 size={36} className="animate-spin text-[#53B175]" />
+                <Loader2 size={36} className="animate-spin text-primary" />
             </div>
         );
     }
@@ -292,7 +292,7 @@ export default function ProductDetailPage() {
             <div className="min-h-screen flex items-center justify-center bg-white">
                 <div className="text-center p-8">
                     <p className="text-[18px] font-bold text-gray-800 mb-2">Product not found</p>
-                    <button onClick={() => router.back()} className="text-[#53B175] font-bold">Go Back</button>
+                    <button onClick={() => router.back()} className="text-primary font-bold">Go Back</button>
                 </div>
             </div>
         );
@@ -301,7 +301,7 @@ export default function ProductDetailPage() {
     return (
         <div className="bg-[#FFFFFF] min-h-screen">
             {/* Top Green Bar (Mobile Only) */}
-            <div className="w-full h-[5px] bg-[#53B175] md:hidden" />
+            <div className="w-full h-[5px] bg-primary md:hidden" />
 
             {/* Mobile Header */}
             <header className="md:hidden bg-white px-4 py-3 flex items-center justify-between sticky top-0 z-[100] border-b border-gray-50">
@@ -338,12 +338,12 @@ export default function ProductDetailPage() {
                     </div>
 
                     <div className="pt-8">
-                        <span className="inline-block px-2 py-1 rounded-[6px] bg-[#EAF6EF] text-[#53B175] text-[11px] font-bold mb-3 uppercase tracking-wider">{product.category}</span>
+                        <span className="inline-block px-2 py-1 rounded-[6px] bg-[#EAF6EF] text-primary text-[11px] font-bold mb-3 uppercase tracking-wider">{product.category}</span>
                         <div className="flex items-start justify-between gap-4 mb-1">
                             <div className="flex-1">
                                 <h1 className="text-[24px] font-extrabold text-[#181725] leading-tight tracking-tight">{product.name}</h1>
                                 {brandSlug && brandName && (
-                                    <Link href={`/brand/${brandSlug}`} className="inline-block mt-1 text-[12px] font-bold text-[#53B175] hover:underline">
+                                    <Link href={`/brand/${brandSlug}`} className="inline-block mt-1 text-[12px] font-bold text-primary hover:underline">
                                         by {brandName}
                                     </Link>
                                 )}
@@ -358,11 +358,11 @@ export default function ProductDetailPage() {
 
                         {/* Mobile Tiered Pricing Box */}
                         {bulkPrices.length > 0 && (
-                        <div className="bg-[#F1FBF4]/40 border border-[#53B175]/15 rounded-[22px] overflow-hidden mb-6">
+                        <div className="bg-[#F1FBF4]/40 border border-primary/15 rounded-[22px] overflow-hidden mb-6">
                             {bulkPrices.map((slab, i) => (
-                                <div key={i} className="flex items-center justify-between px-4 py-3 border-b border-[#53B175]/10 last:border-b-0">
-                                    <span className="text-[15px] font-bold text-[#53B175]">₹ {slab.price}/{productUnit} for {slab.minQty}+</span>
-                                    <button onClick={() => handleAdd(slab.minQty)} className="bg-white border border-gray-100 rounded-full px-4 py-1.5 flex items-center gap-1.5 text-[11px] font-bold text-[#53B175] active:scale-95 shadow-sm">
+                                <div key={i} className="flex items-center justify-between px-4 py-3 border-b border-primary/10 last:border-b-0">
+                                    <span className="text-[15px] font-bold text-primary">₹ {slab.price}/{productUnit} for {slab.minQty}+</span>
+                                    <button onClick={() => handleAdd(slab.minQty)} className="bg-white border border-gray-100 rounded-full px-4 py-1.5 flex items-center gap-1.5 text-[11px] font-bold text-primary active:scale-95 shadow-sm">
                                         <Plus size={16} strokeWidth={3} /> ADD
                                     </button>
                                 </div>
@@ -377,11 +377,11 @@ export default function ProductDetailPage() {
                             )}
                             <span className="text-[15px] text-[#7C7C7C] font-semibold"> /kg</span>
                             {hasCustomerPrice && (
-                                <span className="text-[10px] font-bold bg-[#EEF8F1] text-[#299E60] px-2 py-0.5 rounded-full uppercase tracking-wide">Your price</span>
+                                <span className="text-[10px] font-bold bg-primary-light text-primary px-2 py-0.5 rounded-full uppercase tracking-wide">Your price</span>
                             )}
                         </div>
 
-                        <button onClick={() => handleAdd(1)} className="w-full py-4 bg-[#EAF7EF] rounded-[20px] border border-[#53B175]/30 flex items-center justify-center gap-3 text-[#53B175] text-[16px] font-bold transition-all active:scale-95 hover:bg-[#E2F2E8]">
+                        <button onClick={() => handleAdd(1)} className="w-full py-4 bg-[#EAF7EF] rounded-[20px] border border-primary/30 flex items-center justify-center gap-3 text-primary text-[16px] font-bold transition-all active:scale-95 hover:bg-[#E2F2E8]">
                             <span>Add To Cart</span>
                             <ShoppingCart size={20} />
                         </button>
@@ -433,12 +433,12 @@ export default function ProductDetailPage() {
                                     className="object-contain p-12 transition-all duration-700 group-hover:scale-110"
                                 />
                                 <div className="absolute bottom-10 flex gap-2.5">
-                                    <div className="w-8 h-1.5 bg-[#53B175] rounded-full" />
+                                    <div className="w-8 h-1.5 bg-primary rounded-full" />
                                     <div className="w-2 h-1.5 bg-[#E2E2E2] rounded-full" />
                                     <div className="w-2 h-1.5 bg-[#E2E2E2] rounded-full" />
                                 </div>
-                                <div className="absolute top-8 left-8 flex items-center gap-2 bg-white/95 backdrop-blur-sm px-4 py-2 rounded-2xl border border-green-50 shadow-sm">
-                                    <ShieldCheck size={16} className="text-[#53B175]" />
+                                <div className="absolute top-8 left-8 flex items-center gap-2 bg-white/95 backdrop-blur-sm px-4 py-2 rounded-2xl border border-success/10 shadow-sm">
+                                    <ShieldCheck size={16} className="text-primary" />
                                     <span className="text-[12px] font-black text-[#181725] uppercase tracking-widest">Quality Verified</span>
                                 </div>
                             </div>
@@ -447,9 +447,9 @@ export default function ProductDetailPage() {
                         {/* Right: Professional Actions */}
                         <div className="col-span-12 lg:col-span-7 flex flex-col pt-4">
                             <div className="flex items-center gap-2 text-[12px] font-black text-[#7C7C7C] mb-8 uppercase tracking-[0.2em] opacity-50">
-                                <Link href="/" className="hover:text-[#53B175]">Home</Link>
+                                <Link href="/" className="hover:text-primary">Home</Link>
                                 <span>/</span>
-                                <span className="text-[#53B175]">{product.category}</span>
+                                <span className="text-primary">{product.category}</span>
                             </div>
 
                             <div className="flex items-start justify-between gap-10 mb-4">
@@ -466,28 +466,28 @@ export default function ProductDetailPage() {
                             <div className="flex items-center gap-5 mb-12">
                                 <span className="text-[24px] font-bold text-[#7C7C7C]">{product.weight || '1 kg'}</span>
                                 <div className="w-1.5 h-1.5 rounded-full bg-gray-200" />
-                                <span className="text-[17px] font-medium text-gray-500">Procured by <span className="text-[#181725] font-black underline decoration-[#53B175]/30 underline-offset-4">{vendorName}</span></span>
+                                <span className="text-[17px] font-medium text-gray-500">Procured by <span className="text-[#181725] font-black underline decoration-primary/30 underline-offset-4">{vendorName}</span></span>
                             </div>
 
                             {/* Desktop Professional Pricing Cards */}
                             {bulkPrices.length > 0 && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-12">
                                 {bulkPrices.slice(0, 2).map((slab, i) => (
-                                <div key={i} className="bg-[#F1FBF4]/40 border border-[#53B175]/15 rounded-[32px] p-7 transition-all hover:bg-[#F1FBF4]/60">
+                                <div key={i} className="bg-[#F1FBF4]/40 border border-primary/15 rounded-[32px] p-7 transition-all hover:bg-[#F1FBF4]/60">
                                     <div className="flex items-center justify-between mb-5">
-                                        <span className="text-[13px] font-black text-[#53B175] uppercase tracking-widest">
+                                        <span className="text-[13px] font-black text-primary uppercase tracking-widest">
                                             {i === 0 ? 'Standard Bulk' : 'Institutional'}
                                         </span>
-                                        <span className="bg-[#53B175] text-white px-3 py-1 rounded-lg text-[10px] font-black tracking-wide">
+                                        <span className="bg-primary text-white px-3 py-1 rounded-lg text-[10px] font-black tracking-wide">
                                             {slab.minQty}+ {productUnit.toUpperCase()} MIN
                                         </span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <div className="flex flex-col">
                                             <span className="text-[24px] font-black text-[#181725]">₹ {slab.price}<span className="text-[15px] text-gray-400">/{productUnit}</span></span>
-                                            <span className="text-[12px] text-[#53B175] font-bold">{i === 0 ? 'Recommended' : 'Best Value'}</span>
+                                            <span className="text-[12px] text-primary font-bold">{i === 0 ? 'Recommended' : 'Best Value'}</span>
                                         </div>
-                                        <button onClick={() => handleAdd(slab.minQty)} className="bg-[#53B175] text-white rounded-full px-7 py-3 flex items-center gap-2 text-[13px] font-black active:scale-95 transition-all shadow-lg shadow-green-200">
+                                        <button onClick={() => handleAdd(slab.minQty)} className="bg-primary text-white rounded-full px-7 py-3 flex items-center gap-2 text-[13px] font-black active:scale-95 transition-all shadow-lg shadow-green-200">
                                             <Plus size={16} strokeWidth={3} /> ADD
                                         </button>
                                     </div>
@@ -500,7 +500,7 @@ export default function ProductDetailPage() {
                             <div className="flex items-center gap-8 pt-2">
                                 <div className="flex flex-col min-w-[160px]">
                                     {hasCustomerPrice && (
-                                        <span className="text-[11px] font-bold bg-[#EEF8F1] text-[#299E60] px-2 py-0.5 rounded-full uppercase tracking-wide w-fit mb-1">Your price</span>
+                                        <span className="text-[11px] font-bold bg-primary-light text-primary px-2 py-0.5 rounded-full uppercase tracking-wide w-fit mb-1">Your price</span>
                                     )}
                                     <div className="flex items-baseline gap-2">
                                         <span className="text-[48px] font-black text-[#181725]">₹ {productPrice}</span>
@@ -510,7 +510,7 @@ export default function ProductDetailPage() {
                                         <span className="text-[20px] text-[#7C7C7C] font-bold">/kg</span>
                                     </div>
                                 </div>
-                                <button onClick={() => handleAdd(1)} className="flex-1 h-[72px] bg-[#53B175] text-white rounded-[28px] flex items-center justify-center gap-4 text-[20px] font-black transition-all active:scale-[0.98] hover:bg-[#489e67] shadow-2xl shadow-green-100">
+                                <button onClick={() => handleAdd(1)} className="flex-1 h-[72px] bg-primary text-white rounded-[28px] flex items-center justify-center gap-4 text-[20px] font-black transition-all active:scale-[0.98] hover:bg-primary-dark shadow-2xl shadow-green-100">
                                     <span>Add To Cart</span>
                                     <ShoppingCart size={24} strokeWidth={2.5} />
                                 </button>
@@ -530,10 +530,10 @@ export default function ProductDetailPage() {
                         <div className="col-span-12 lg:col-span-8 space-y-20">
                             <div>
                                 <h3 className="text-[28px] font-black text-[#181725] mb-10 flex items-center gap-4">
-                                    <Info size={28} className="text-[#53B175]" />
+                                    <Info size={28} className="text-primary" />
                                     Product Overview
                                 </h3>
-                                <p className="text-[18px] text-[#4C4C4C] leading-[1.8] font-medium opacity-90 border-l-[6px] border-[#53B175]/40 pl-10 mb-12 italic bg-[#F1FBF4]/20 py-10 rounded-r-3xl">
+                                <p className="text-[18px] text-[#4C4C4C] leading-[1.8] font-medium opacity-90 border-l-[6px] border-primary/40 pl-10 mb-12 italic bg-[#F1FBF4]/20 py-10 rounded-r-3xl">
                                     {product.description}
                                     {" Certified as commercial-grade produce, ideal for high-volume kitchen operations. Our sourcing methodology guarantees uniform size metrics and consistent density across every delivery batch."}
                                 </p>
@@ -568,7 +568,7 @@ export default function ProductDetailPage() {
                         <div className="col-span-12 lg:col-span-4 flex flex-col gap-10">
                             <h3 className="text-[22px] font-black text-[#181725] mb-2">Quality Trust</h3>
                             {[
-                                { t: 'Farm-Direct Network', d: 'Eliminating middle-men for freshness.', i: Leaf, c: 'bg-emerald-50 text-emerald-600' },
+                                { t: 'Farm-Direct Network', d: 'Eliminating middle-men for freshness.', i: Leaf, c: 'bg-primary-light text-primary' },
                                 { t: 'Batch Verification', d: 'Verified by certified specialists.', i: ShieldCheck, c: 'bg-blue-50 text-blue-600' },
                                 { t: 'Commercial Sourcing', d: 'Uniform metrics for professionals.', i: Store, c: 'bg-orange-50 text-orange-600' }
                             ].map((p, i) => {
@@ -596,8 +596,8 @@ export default function ProductDetailPage() {
                                 <p className="text-gray-400 font-bold mt-2 text-[17px]">Complete your procurement with these verified alternatives</p>
                             </div>
                             <div className="flex gap-3">
-                                <button className="w-14 h-14 rounded-full border border-gray-100 flex items-center justify-center hover:bg-[#53B175] hover:text-white transition-all bg-white shadow-sm"><ArrowLeft size={22} /></button>
-                                <button className="w-14 h-14 rounded-full border border-gray-100 flex items-center justify-center hover:bg-[#53B175] hover:text-white transition-all bg-white shadow-sm"><ArrowRight size={22} /></button>
+                                <button className="w-14 h-14 rounded-full border border-gray-100 flex items-center justify-center hover:bg-primary hover:text-white transition-all bg-white shadow-sm"><ArrowLeft size={22} /></button>
+                                <button className="w-14 h-14 rounded-full border border-gray-100 flex items-center justify-center hover:bg-primary hover:text-white transition-all bg-white shadow-sm"><ArrowRight size={22} /></button>
                             </div>
                         </div>
 
@@ -607,10 +607,10 @@ export default function ProductDetailPage() {
                                     <div className="w-full aspect-square relative mb-8 bg-[#F8F9FB]/50 rounded-[38px] overflow-hidden group-hover:bg-[#F1FBF4]/50 transition-colors duration-500">
                                         <Image src={item.image || '/placeholder.png'} alt={item.name} fill className="object-contain group-hover:scale-110 transition-transform duration-700" sizes="25vw" />
                                     </div>
-                                    <h3 className="text-[18px] font-black text-[#181725] leading-tight line-clamp-2 mb-4 group-hover:text-[#53B175] transition-colors">{item.name}</h3>
+                                    <h3 className="text-[18px] font-black text-[#181725] leading-tight line-clamp-2 mb-4 group-hover:text-primary transition-colors">{item.name}</h3>
                                     <div className="mt-auto flex items-center justify-between border-t border-gray-50 pt-6">
                                         <span className="text-[14px] text-[#7C7C7C] font-bold">Sold by {item.vendorCount || 3} stores</span>
-                                        <div className="w-11 h-11 rounded-2xl bg-[#EAF6EF] flex items-center justify-center text-[#53B175] group-hover:bg-[#53B175] group-hover:text-white transition-all shadow-sm">
+                                        <div className="w-11 h-11 rounded-2xl bg-[#EAF6EF] flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
                                             <Plus size={22} strokeWidth={3} />
                                         </div>
                                     </div>

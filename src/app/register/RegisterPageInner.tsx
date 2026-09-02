@@ -290,7 +290,7 @@ export default function RegisterPageInner() {
   if (role === 'vendor' || role === 'brand') {
     return (
       <div className="flex items-center justify-center px-4 py-12 min-h-[calc(100vh-180px)]">
-        <Loader2 size={28} className="animate-spin text-[#299E60]" />
+        <Loader2 size={28} className="animate-spin text-primary" />
       </div>
     );
   }
@@ -299,8 +299,8 @@ export default function RegisterPageInner() {
     return (
       <CenteredCard>
         <div className="p-8 text-center">
-          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Check size={42} className="text-[#299E60]" strokeWidth={2.5} />
+          <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-6">
+            <Check size={42} className="text-primary" strokeWidth={2.5} />
           </div>
           <h1 className="text-[24px] font-[800] text-gray-800 mb-2">Welcome to Horeca1!</h1>
           <p className="text-[14px] text-gray-500 flex items-center justify-center gap-2">
@@ -323,7 +323,7 @@ export default function RegisterPageInner() {
       <CenteredCard>
         <div className="p-6 sm:p-8">
           <button onClick={() => { setStep('form'); setOtp(['', '', '', '']); setApiError(''); }}
-            className="flex items-center gap-1.5 text-[12px] font-bold text-gray-400 hover:text-[#299E60] transition-colors mb-5 -ml-1">
+            className="flex items-center gap-1.5 text-[12px] font-bold text-gray-400 hover:text-primary transition-colors mb-5 -ml-1">
             <ArrowLeft size={14} /> Back
           </button>
           <h1 className="text-[22px] font-[800] text-gray-800 mb-1 leading-tight">Enter verification code</h1>
@@ -344,8 +344,8 @@ export default function RegisterPageInner() {
                 disabled={isLoading}
                 className={cn(
                   'w-[58px] h-[58px] text-center text-[22px] font-[800] border-2 rounded-2xl outline-none transition-all',
-                  digit ? 'border-[#299E60] bg-green-50/40 text-[#299E60] ring-2 ring-[#299E60]/10' : 'border-gray-200 bg-[#FAFAFA] focus:bg-white',
-                  'focus:border-[#299E60] focus:ring-4 focus:ring-[#299E60]/10',
+                  digit ? 'border-primary bg-primary-light/40 text-primary ring-2 ring-primary/10' : 'border-gray-200 bg-[#FAFAFA] focus:bg-white',
+                  'focus:border-primary focus:ring-4 focus:ring-primary/10',
                   isLoading && 'opacity-60 cursor-not-allowed',
                 )}
               />
@@ -360,7 +360,7 @@ export default function RegisterPageInner() {
             {resendTimer > 0 ? (
               <p className="text-[13px] text-gray-400">Resend code in <span className="font-bold text-gray-600">{resendTimer}s</span></p>
             ) : (
-              <button onClick={handleSendOtp} disabled={isLoading} className="text-[13px] text-[#299E60] font-bold hover:underline disabled:opacity-50">
+              <button onClick={handleSendOtp} disabled={isLoading} className="text-[13px] text-primary font-bold hover:underline disabled:opacity-50">
                 Resend Code
               </button>
             )}
@@ -376,13 +376,13 @@ export default function RegisterPageInner() {
         <div className="px-5 sm:px-7 pt-6 sm:pt-7 pb-5 border-b border-[#F5F5F5]">
           <Link
             href={registerOptionsHref}
-            className="inline-flex items-center gap-1.5 text-[12px] font-bold text-gray-400 hover:text-[#299E60] transition-colors mb-4"
+            className="inline-flex items-center gap-1.5 text-[12px] font-bold text-gray-400 hover:text-primary transition-colors mb-4"
           >
             <ArrowLeft size={14} /> All signup options
           </Link>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#299E60] mb-1">Customer signup</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-primary mb-1">Customer signup</p>
               <h1 className="text-[clamp(1.25rem,2vw+0.5rem,1.5rem)] font-[800] text-[#181725] leading-tight">
                 Create your account
               </h1>
@@ -391,7 +391,7 @@ export default function RegisterPageInner() {
             <p className="text-[13px] text-gray-500 lg:text-right shrink-0">
               Already have an account?{' '}
               <Link href={`/login${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`}
-                className="text-[#299E60] font-[800] hover:underline">
+                className="text-primary font-[800] hover:underline">
                 Login
               </Link>
             </p>
@@ -414,7 +414,7 @@ export default function RegisterPageInner() {
                   className={cn(
                     'flex-1 py-2.5 rounded-lg text-[12px] font-bold transition-colors',
                     verifyChannel === ch
-                      ? 'bg-white text-[#299E60] shadow-sm'
+                      ? 'bg-white text-primary shadow-sm'
                       : 'text-gray-500 hover:text-gray-700',
                   )}
                 >

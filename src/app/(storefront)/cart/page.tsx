@@ -302,9 +302,9 @@ export default function CartPage() {
     if (screen === 'success') {
         return (
             <div className="min-h-screen bg-white flex flex-col items-center justify-center px-8 text-center animate-in fade-in duration-500">
-                <div className="w-[120px] h-[120px] md:w-[150px] md:h-[150px] bg-[#53B175]/10 rounded-full flex items-center justify-center mb-8 md:mb-10 relative">
-                    <div className="absolute inset-0 bg-[#53B175]/5 rounded-full animate-ping duration-[2000ms]" />
-                    <Check size={60} className="text-[#53B175] relative z-10 md:!w-20 md:!h-20" strokeWidth={3} />
+                <div className="w-[120px] h-[120px] md:w-[150px] md:h-[150px] bg-success-light rounded-full flex items-center justify-center mb-8 md:mb-10 relative">
+                    <div className="absolute inset-0 bg-success/5 rounded-full animate-ping duration-[2000ms]" />
+                    <Check size={60} className="text-success relative z-10 md:!w-20 md:!h-20" strokeWidth={3} />
                 </div>
                 <h1 className="text-[28px] md:text-[40px] font-black text-[#181725] leading-tight mb-4 tracking-tight">
                     Your Order has been <br className="hidden md:block" /> accepted!
@@ -362,8 +362,8 @@ export default function CartPage() {
             label: 'Bank Transfer',
             sub: 'NEFT / RTGS / IMPS',
             badge: <Banknote size={18} strokeWidth={2.5} />,
-            badgeBg: 'bg-green-50',
-            badgeText: 'text-green-600',
+            badgeBg: 'bg-primary-light',
+            badgeText: 'text-primary',
         },
         {
             id: 'po_number',
@@ -570,8 +570,8 @@ export default function CartPage() {
                                     </div>
                                     {promoDiscount > 0 && (
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[15px] text-[#53B175] font-medium">Store Offer{promoLabel ? ` (${promoLabel})` : ''}</span>
-                                            <span className={cn('text-[15px] font-bold text-[#53B175]', billAmountClass)}>−₹{promoDiscount.toFixed(2)}</span>
+                                            <span className="text-[15px] text-success font-medium">Store Offer{promoLabel ? ` (${promoLabel})` : ''}</span>
+                                            <span className={cn('text-[15px] font-bold text-success', billAmountClass)}>−₹{promoDiscount.toFixed(2)}</span>
                                         </div>
                                     )}
                                 </div>
@@ -627,8 +627,8 @@ export default function CartPage() {
                                 </div>
                                 {promoDiscount > 0 && (
                                     <div className="flex justify-between">
-                                        <span className="text-[14px] text-[#53B175] font-medium">Store Offer{promoLabel ? ` (${promoLabel})` : ''}</span>
-                                        <span className={cn('text-[14px] font-bold text-[#53B175]', billAmountClass)}>−₹{promoDiscount.toFixed(2)}</span>
+                                        <span className="text-[14px] text-success font-medium">Store Offer{promoLabel ? ` (${promoLabel})` : ''}</span>
+                                        <span className={cn('text-[14px] font-bold text-success', billAmountClass)}>−₹{promoDiscount.toFixed(2)}</span>
                                     </div>
                                 )}
                                 <div className="border-t border-dashed border-gray-200 pt-3 flex justify-between items-baseline">
@@ -762,9 +762,9 @@ export default function CartPage() {
 
                         {/* Multi-vendor awareness banner */}
                         {shipments.length > 1 && (
-                            <div className="bg-gradient-to-r from-[#53B175]/5 to-[#53B175]/10 border border-[#53B175]/25 rounded-[16px] md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex items-start gap-3">
-                                <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-white border border-[#53B175]/20 flex items-center justify-center shrink-0 shadow-sm">
-                                    <Info size={18} className="text-[#53B175]" strokeWidth={2.5} />
+                            <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/25 rounded-[16px] md:rounded-2xl px-4 py-3 md:px-5 md:py-4 flex items-start gap-3">
+                                <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl bg-white border border-primary/20 flex items-center justify-center shrink-0 shadow-sm">
+                                    <Info size={18} className="text-primary" strokeWidth={2.5} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-[13px] md:text-[14px] font-black text-[#181725] leading-snug">
@@ -947,7 +947,7 @@ export default function CartPage() {
                                                                 )}
                                                             </div>
                                                             {item.tierLabel && (
-                                                                <span className="text-[10px] font-black uppercase tracking-wide bg-green-50 text-green-700 border border-green-200 px-1.5 py-0.5 rounded-md">
+                                                                <span className="text-[10px] font-black uppercase tracking-wide bg-primary-light text-primary border border-primary/30 px-1.5 py-0.5 rounded-md">
                                                                     {item.tierLabel}
                                                                 </span>
                                                             )}
@@ -1003,13 +1003,13 @@ export default function CartPage() {
                                                                     }
                                                                     if (parsed !== item.pcs) updateQuantity(item.id, parsed);
                                                                 }}
-                                                                className="w-full h-full text-center text-[15px] font-bold text-[#181725] bg-transparent outline-none focus:bg-green-50/40"
+                                                                className="w-full h-full text-center text-[15px] font-bold text-[#181725] bg-transparent outline-none focus:bg-primary-light/40"
                                                                 aria-label={`Quantity for ${item.name}`}
                                                             />
                                                         </div>
                                                         <button
                                                             onClick={() => adjustQuantity(item.id, 1)}
-                                                            className="w-10 h-10 flex items-center justify-center text-primary hover:bg-green-50 transition-colors"
+                                                            className="w-10 h-10 flex items-center justify-center text-primary hover:bg-primary-light transition-colors"
                                                         >
                                                             <Plus size={16} strokeWidth={2.5} />
                                                         </button>
@@ -1069,7 +1069,7 @@ export default function CartPage() {
                                     {groups.length > 1 && (
                                         <button
                                             onClick={() => setSelectedVendors(fullCartSelected ? new Set() : new Set(groups.map(g => g.vendorId)))}
-                                            className="text-[12px] font-bold text-[#53B175] hover:underline"
+                                            className="text-[12px] font-bold text-primary hover:underline"
                                         >
                                             {fullCartSelected ? 'Deselect all' : 'Select all'}
                                         </button>
@@ -1082,7 +1082,7 @@ export default function CartPage() {
                                 <div className="px-7 pt-3">
                                     <button
                                         onClick={() => setShowBreakdown(s => !s)}
-                                        className="w-full flex items-center justify-between text-[13px] font-bold text-[#181725] py-2 hover:text-[#53B175] transition-colors"
+                                        className="w-full flex items-center justify-between text-[13px] font-bold text-[#181725] py-2 hover:text-primary transition-colors"
                                     >
                                         <span>Per-vendor breakdown</span>
                                         {showBreakdown

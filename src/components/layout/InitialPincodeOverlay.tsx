@@ -255,8 +255,8 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
 
                     {/* Header */}
                     <div className="text-center mb-6">
-                        <div className="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                            <MapPin size={24} className="text-[#33a852]" />
+                        <div className="w-12 h-12 bg-primary-light rounded-2xl flex items-center justify-center mx-auto mb-3">
+                            <MapPin size={24} className="text-primary" />
                         </div>
                         <h2 className="text-[20px] font-bold text-[#181725] mb-1">Choose Delivery Location</h2>
                         <p className="text-[13px] text-gray-400">Find your restaurant, hotel or cafe</p>
@@ -269,7 +269,7 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
                             className={cn(
                                 'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[13px] font-bold transition-all',
                                 tab === 'business'
-                                    ? 'bg-white text-[#33a852] shadow-sm'
+                                    ? 'bg-white text-primary shadow-sm'
                                     : 'text-gray-400 hover:text-gray-600'
                             )}
                         >
@@ -281,7 +281,7 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
                             className={cn(
                                 'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[13px] font-bold transition-all',
                                 tab === 'pincode'
-                                    ? 'bg-white text-[#33a852] shadow-sm'
+                                    ? 'bg-white text-primary shadow-sm'
                                     : 'text-gray-400 hover:text-gray-600'
                             )}
                         >
@@ -297,9 +297,9 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
                             <div className="relative mb-3">
                                 <div className={cn(
                                     'flex items-center gap-3 px-4 py-3 border-2 rounded-xl transition-all',
-                                    'border-gray-200 focus-within:border-[#33a852] bg-white'
+                                    'border-gray-200 focus-within:border-primary bg-white'
                                 )}>
-                                    <Store size={18} className="text-[#33a852] shrink-0" />
+                                    <Store size={18} className="text-primary shrink-0" />
                                     <input
                                         type="text"
                                         value={businessQuery}
@@ -315,7 +315,7 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
                                         autoComplete="off"
                                         autoFocus
                                     />
-                                    {isBusy && <Loader2 size={16} className="animate-spin text-[#33a852] shrink-0" />}
+                                    {isBusy && <Loader2 size={16} className="animate-spin text-primary shrink-0" />}
                                     {businessQuery && !isBusy && (
                                         <button onClick={() => { setBusinessQuery(''); setSelectedName(''); clearPredictions(); }}>
                                             <X size={16} className="text-gray-400" />
@@ -341,9 +341,9 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
                                             <button
                                                 key={pred.placeId}
                                                 onClick={() => handleSelectBusiness(pred.placeId, pred.mainText)}
-                                                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-green-50 transition-colors text-left border-b border-gray-50 last:border-0"
+                                                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-primary-light transition-colors text-left border-b border-gray-50 last:border-0"
                                             >
-                                                <Store size={15} className="text-[#33a852] mt-0.5 shrink-0" />
+                                                <Store size={15} className="text-primary mt-0.5 shrink-0" />
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-[13px] font-bold text-gray-800 truncate">{pred.mainText}</p>
                                                     <p className="text-[11px] text-gray-400 truncate">{pred.secondaryText}</p>
@@ -356,12 +356,12 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
 
                             {/* Selected business confirmation */}
                             {selectedName && (
-                                <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-100 rounded-xl mb-3">
-                                    <CheckCircle size={16} className="text-[#33a852] shrink-0" />
+                                <div className="flex items-center gap-2 px-4 py-3 bg-primary-light border border-primary/20 rounded-xl mb-3">
+                                    <CheckCircle size={16} className="text-primary shrink-0" />
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-[13px] font-bold text-[#33a852] truncate">{selectedName}</p>
+                                        <p className="text-[13px] font-bold text-primary truncate">{selectedName}</p>
                                         {selectedPincode && (
-                                            <p className="text-[11px] text-green-600">Pincode: {selectedPincode}</p>
+                                            <p className="text-[11px] text-primary">Pincode: {selectedPincode}</p>
                                         )}
                                     </div>
                                 </div>
@@ -377,11 +377,11 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
                             <button
                                 onClick={handleUseGPS}
                                 disabled={isBusy}
-                                className="w-full flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-xl hover:border-[#33a852]/30 hover:bg-green-50/30 transition-all disabled:opacity-60 mb-4"
+                                className="w-full flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-xl hover:border-primary/30 hover:bg-primary-light/30 transition-all disabled:opacity-60 mb-4"
                             >
                                 {isDetectingLocation
-                                    ? <Loader2 size={18} className="animate-spin text-[#33a852] shrink-0" />
-                                    : <Navigation size={18} className="text-[#33a852] shrink-0" />}
+                                    ? <Loader2 size={18} className="animate-spin text-primary shrink-0" />
+                                    : <Navigation size={18} className="text-primary shrink-0" />}
                                 <span className="text-[13px] font-semibold text-gray-700">
                                     {isDetectingLocation ? 'Detecting location...' : 'Use my current location (GPS)'}
                                 </span>
@@ -394,9 +394,9 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
                         <form onSubmit={handlePincodeSubmit} className="mb-4 space-y-3">
                             <div className={cn(
                                 'flex items-center gap-3 px-4 py-3 border-2 rounded-xl transition-all',
-                                pincodeError ? 'border-red-400 bg-red-50/30' : 'border-gray-200 focus-within:border-[#33a852]'
+                                pincodeError ? 'border-red-400 bg-red-50/30' : 'border-gray-200 focus-within:border-primary'
                             )}>
-                                <Search size={18} className={cn('shrink-0', pincodeError ? 'text-red-400' : 'text-[#33a852]')} />
+                                <Search size={18} className={cn('shrink-0', pincodeError ? 'text-red-400' : 'text-primary')} />
                                 <input
                                     type="text"
                                     inputMode="numeric"
@@ -418,7 +418,7 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
                             <button
                                 type="submit"
                                 disabled={checkingPincode}
-                                className="w-full bg-[#33a852] hover:bg-[#2d9548] disabled:opacity-70 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-[0.98]"
+                                className="w-full bg-primary hover:bg-primary-dark disabled:opacity-70 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-[0.98]"
                             >
                                 {checkingPincode ? 'Checking...' : 'Confirm Pincode'}
                             </button>

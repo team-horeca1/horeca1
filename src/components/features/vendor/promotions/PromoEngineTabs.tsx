@@ -61,7 +61,7 @@ const num = (v: string): number | undefined => {
 const toIsoStart = (d: string) => (d ? new Date(`${d}T00:00:00`).toISOString() : undefined);
 const toIsoEnd = (d: string) => (d ? new Date(`${d}T23:59:59`).toISOString() : undefined);
 
-const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-medium focus:outline-none focus:border-[#299E60]';
+const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 text-[13px] font-medium focus:outline-none focus:border-primary';
 const labelCls = 'block text-[11px] font-bold text-gray-500 mb-1';
 const thCls = 'px-3 py-2.5 text-left text-[10px] uppercase tracking-wider font-bold text-gray-400';
 const tdCls = 'px-3 py-2.5 text-[12px] font-medium text-gray-700';
@@ -121,14 +121,14 @@ export function VendorCouponsTab() {
                 </div>
                 <button
                     onClick={() => setModal({ open: true, editing: null })}
-                    className="flex items-center gap-2 px-5 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] transition-colors cursor-pointer"
+                    className="flex items-center gap-2 px-5 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark transition-colors cursor-pointer"
                 >
                     <Plus size={14} /> New Coupon
                 </button>
             </div>
 
             {loading ? (
-                <div className="flex items-center justify-center py-16"><Loader2 className="animate-spin text-[#299E60]" size={26} /></div>
+                <div className="flex items-center justify-center py-16"><Loader2 className="animate-spin text-primary" size={26} /></div>
             ) : (
                 <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-x-auto">
                     <table className="w-full min-w-[760px]">
@@ -157,12 +157,12 @@ export function VendorCouponsTab() {
                                     <td className={tdCls}>{fmtDate(c.startDate)} → {fmtDate(c.endDate)}</td>
                                     <td className={tdCls}>{c.usedCount}{c.usageLimit ? ` / ${c.usageLimit}` : ''}</td>
                                     <td className={tdCls}>
-                                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-[#EEF8F1] text-[#299E60]' : 'bg-gray-100 text-gray-400')}>
+                                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-primary-light text-primary' : 'bg-gray-100 text-gray-400')}>
                                             {c.isActive ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
                                     <td className={cn(tdCls, 'whitespace-nowrap')}>
-                                        <button onClick={() => setModal({ open: true, editing: c })} className="p-1.5 text-gray-400 hover:text-[#299E60] cursor-pointer" title="Edit"><Pencil size={14} /></button>
+                                        <button onClick={() => setModal({ open: true, editing: c })} className="p-1.5 text-gray-400 hover:text-primary cursor-pointer" title="Edit"><Pencil size={14} /></button>
                                         <button onClick={() => remove(c)} className="p-1.5 text-gray-400 hover:text-red-500 cursor-pointer" title="Delete"><Trash2 size={14} /></button>
                                     </td>
                                 </tr>
@@ -307,32 +307,32 @@ function VendorCouponModal({ editing, onClose, onSaved }: { editing: VendorCoupo
                         productIds={form.productIds}
                         brandNames={form.brandNames}
                         productSource="vendor"
-                        focusBorder="focus:border-[#299E60]"
+                        focusBorder="focus:border-primary"
                         onChange={(patch) => set(patch)}
                     />
                 </div>
                 <div className="mt-4 space-y-2">
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#299E60]" checked={form.stacksWithVendorPromo} onChange={(e) => set({ stacksWithVendorPromo: e.target.checked })} />
+                        <input type="checkbox" className="accent-primary" checked={form.stacksWithVendorPromo} onChange={(e) => set({ stacksWithVendorPromo: e.target.checked })} />
                         Can be clubbed with my store offers
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#299E60]" checked={form.stacksWithCashback} onChange={(e) => set({ stacksWithCashback: e.target.checked })} />
+                        <input type="checkbox" className="accent-primary" checked={form.stacksWithCashback} onChange={(e) => set({ stacksWithCashback: e.target.checked })} />
                         Can be clubbed with cashback offers
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#299E60]" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
+                        <input type="checkbox" className="accent-primary" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
                         Can be clubbed with H1 Wallet
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#299E60]" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
+                        <input type="checkbox" className="accent-primary" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
                         Active
                     </label>
                 </div>
                 <button
                     onClick={submit}
                     disabled={saving}
-                    className="mt-5 w-full py-2.5 rounded-xl bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] disabled:opacity-50 transition-colors cursor-pointer"
+                    className="mt-5 w-full py-2.5 rounded-xl bg-primary text-white text-[13px] font-bold hover:bg-primary-dark disabled:opacity-50 transition-colors cursor-pointer"
                 >
                     {saving ? <Loader2 size={15} className="animate-spin mx-auto" /> : editing ? 'Save Changes' : 'Create Coupon'}
                 </button>
@@ -394,14 +394,14 @@ export function VendorCashbackTab() {
                 </div>
                 <button
                     onClick={() => setModal({ open: true, editing: null })}
-                    className="flex items-center gap-2 px-5 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] transition-colors cursor-pointer"
+                    className="flex items-center gap-2 px-5 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark transition-colors cursor-pointer"
                 >
                     <Plus size={14} /> New Campaign
                 </button>
             </div>
 
             {loading ? (
-                <div className="flex items-center justify-center py-16"><Loader2 className="animate-spin text-[#299E60]" size={26} /></div>
+                <div className="flex items-center justify-center py-16"><Loader2 className="animate-spin text-primary" size={26} /></div>
             ) : (
                 <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-x-auto">
                     <table className="w-full min-w-[760px]">
@@ -432,12 +432,12 @@ export function VendorCashbackTab() {
                                     <td className={tdCls}>{fmtDate(c.startDate)} → {fmtDate(c.endDate)}</td>
                                     <td className={tdCls}>{c.usedCount}</td>
                                     <td className={tdCls}>
-                                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-[#EEF8F1] text-[#299E60]' : 'bg-gray-100 text-gray-400')}>
+                                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-primary-light text-primary' : 'bg-gray-100 text-gray-400')}>
                                             {c.isActive ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
                                     <td className={cn(tdCls, 'whitespace-nowrap')}>
-                                        <button onClick={() => setModal({ open: true, editing: c })} className="p-1.5 text-gray-400 hover:text-[#299E60] cursor-pointer" title="Edit"><Pencil size={14} /></button>
+                                        <button onClick={() => setModal({ open: true, editing: c })} className="p-1.5 text-gray-400 hover:text-primary cursor-pointer" title="Edit"><Pencil size={14} /></button>
                                         <button onClick={() => remove(c)} className="p-1.5 text-gray-400 hover:text-red-500 cursor-pointer" title="Delete"><Trash2 size={14} /></button>
                                     </td>
                                 </tr>
@@ -565,22 +565,22 @@ function VendorCampaignModal({ editing, onClose, onSaved }: { editing: VendorCam
                 <p className="mt-3 text-[11px] text-gray-400 font-medium">Credits the customer&apos;s H1 Wallet after delivery.</p>
                 <div className="mt-4 space-y-2">
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#299E60]" checked={form.stacksWithCoupon} onChange={(e) => set({ stacksWithCoupon: e.target.checked })} />
+                        <input type="checkbox" className="accent-primary" checked={form.stacksWithCoupon} onChange={(e) => set({ stacksWithCoupon: e.target.checked })} />
                         Can be clubbed with coupons
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#299E60]" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
+                        <input type="checkbox" className="accent-primary" checked={form.stacksWithWallet} onChange={(e) => set({ stacksWithWallet: e.target.checked })} />
                         Can be clubbed with H1 Wallet payment
                     </label>
                     <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="accent-[#299E60]" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
+                        <input type="checkbox" className="accent-primary" checked={form.isActive} onChange={(e) => set({ isActive: e.target.checked })} />
                         Active
                     </label>
                 </div>
                 <button
                     onClick={submit}
                     disabled={saving}
-                    className="mt-5 w-full py-2.5 rounded-xl bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] disabled:opacity-50 transition-colors cursor-pointer"
+                    className="mt-5 w-full py-2.5 rounded-xl bg-primary text-white text-[13px] font-bold hover:bg-primary-dark disabled:opacity-50 transition-colors cursor-pointer"
                 >
                     {saving ? <Loader2 size={15} className="animate-spin mx-auto" /> : editing ? 'Save Changes' : 'Create Campaign'}
                 </button>

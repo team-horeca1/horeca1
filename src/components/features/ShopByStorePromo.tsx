@@ -58,30 +58,32 @@ export function ShopByStorePromo() {
                         ))}
                     </div>
                 ) : (
-                    <div className="flex gap-2.5 md:gap-3 overflow-x-auto pb-2 px-4 md:px-[var(--container-padding)] no-scrollbar snap-x snap-mandatory">
-                        {brands.map((brand) => (
-                            <div key={brand.slug} className="snap-start shrink-0 w-[150px] md:w-[168px] lg:w-[180px]">
-                                <BrandStoreCard
-                                    name={brand.name}
-                                    slug={brand.slug}
-                                    logoUrl={brand.logo ?? undefined}
-                                    productImages={brand.showcaseImages.length > 0 ? [brand.showcaseImages[0]] : []}
-                                    categories={brand.categories}
-                                    bgColor={brand.bgColor ?? '#6B1D2E'}
-                                    productCount={brand.productCount}
-                                />
-                            </div>
-                        ))}
-                        {hasMore && (
-                            <Link
-                                href="/brands"
-                                className="snap-start shrink-0 w-[72px] md:w-[80px] h-[225px] md:h-[248px] rounded-[16px] bg-[#E8DFD2] flex items-center justify-center"
-                            >
-                                <span className="text-[12px] font-semibold text-[#5A4A3D] [writing-mode:vertical-rl] rotate-180">
-                                    More brands
-                                </span>
-                            </Link>
-                        )}
+                    <div className="overflow-x-auto no-scrollbar scroll-smooth w-full scroll-pl-4 md:scroll-pl-[var(--container-padding)] snap-x snap-mandatory">
+                        <div className="flex gap-2.5 md:gap-3 pb-2 px-4 md:px-[var(--container-padding)] w-max">
+                            {brands.map((brand) => (
+                                <div key={brand.slug} className="snap-start shrink-0 w-[150px] md:w-[168px] lg:w-[180px]">
+                                    <BrandStoreCard
+                                        name={brand.name}
+                                        slug={brand.slug}
+                                        logoUrl={brand.logo ?? undefined}
+                                        productImages={brand.showcaseImages.length > 0 ? [brand.showcaseImages[0]] : []}
+                                        categories={brand.categories}
+                                        bgColor={brand.bgColor ?? '#6B1D2E'}
+                                        productCount={brand.productCount}
+                                    />
+                                </div>
+                            ))}
+                            {hasMore && (
+                                <Link
+                                    href="/brands"
+                                    className="snap-start shrink-0 w-[72px] md:w-[80px] h-[225px] md:h-[248px] rounded-[16px] bg-[#E8DFD2] flex items-center justify-center"
+                                >
+                                    <span className="text-[12px] font-semibold text-[#5A4A3D] [writing-mode:vertical-rl] rotate-180">
+                                        More brands
+                                    </span>
+                                </Link>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

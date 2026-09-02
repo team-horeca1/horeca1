@@ -345,7 +345,7 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                 {/* Avatar Section */}
                 <div className="flex flex-col items-center pt-6 pb-4 md:pt-8 md:pb-6">
                     <div className="relative mb-2">
-                        <div className="w-[85px] h-[85px] md:w-[100px] md:h-[100px] rounded-full overflow-hidden border-[2.5px] border-[#53B175]">
+                        <div className="w-[85px] h-[85px] md:w-[100px] md:h-[100px] rounded-full overflow-hidden border-[2.5px] border-primary">
                             <img
                                 src={avatarSrc}
                                 alt="Profile"
@@ -388,7 +388,7 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                                 type="text"
                                 value={fullName}
                                 onChange={(e) => setFullName(e.target.value)}
-                                className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-white border border-gray-200 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium text-gray-500 outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 transition-all"
+                                className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-white border border-gray-200 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium text-gray-500 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
                             />
                         </div>
                         <div>
@@ -397,21 +397,21 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                                 type="text"
                                 value={businessName}
                                 onChange={(e) => setBusinessName(e.target.value)}
-                                className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-white border border-gray-200 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium text-gray-500 outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 transition-all"
+                                className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-white border border-gray-200 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium text-gray-500 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
                             />
                         </div>
                         <div>
                             <label className="text-[12px] md:text-[13px] font-semibold text-[#181725] ml-0.5 mb-1.5 block">
                                 Phone number
                                 {phoneVerified && (
-                                    <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-bold text-[#53B175]">
+                                    <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-bold text-primary">
                                         <Check size={12} /> Verified
                                     </span>
                                 )}
                             </label>
                             <div className={cn(
-                                'flex items-center w-full bg-white border border-gray-200 rounded-lg md:rounded-xl overflow-hidden focus-within:border-[#53B175] focus-within:ring-2 focus-within:ring-[#53B175]/10 transition-all',
-                                phoneVerified && 'border-[#53B175] bg-green-50/40',
+                                'flex items-center w-full bg-white border border-gray-200 rounded-lg md:rounded-xl overflow-hidden focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all',
+                                phoneVerified && 'border-primary bg-primary-light/40',
                             )}>
                                 <span className="px-3 md:px-3.5 py-2.5 md:py-3 text-[13px] md:text-[14px] font-medium text-gray-500 bg-gray-50 border-r border-gray-200 select-none">+91</span>
                                 <input
@@ -459,8 +459,8 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                                             disabled={otpLoading}
                                             className={cn(
                                                 'w-12 h-12 md:w-14 md:h-14 text-center text-[18px] md:text-[22px] font-[800] border-2 rounded-xl md:rounded-2xl outline-none transition-all',
-                                                digit ? 'border-[#53B175] bg-green-50 text-[#53B175]' : 'border-gray-200 bg-[#F7F8FA]',
-                                                'focus:border-[#53B175]',
+                                                digit ? 'border-primary bg-primary-light text-primary' : 'border-gray-200 bg-[#F7F8FA]',
+                                                'focus:border-primary',
                                                 otpLoading && 'opacity-60',
                                             )}
                                         />
@@ -476,7 +476,7 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                                             type="button"
                                             onClick={handleSendOtp}
                                             disabled={otpLoading}
-                                            className="text-[13px] text-[#53B175] font-bold hover:underline disabled:opacity-50"
+                                            className="text-[13px] text-primary font-bold hover:underline disabled:opacity-50"
                                         >
                                             Resend OTP
                                         </button>
@@ -502,7 +502,7 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                                 value={address2}
                                 onChange={(e) => setAddress2(e.target.value)}
                                 placeholder="Apartment, suite, landmark"
-                                className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-white border border-gray-200 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium text-gray-700 placeholder:text-gray-400 outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 transition-all"
+                                className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-white border border-gray-200 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium text-gray-700 placeholder:text-gray-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
                             />
                         </div>
                         <div className="grid grid-cols-2 gap-3 md:gap-4">
@@ -515,7 +515,7 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                                     value={pincode}
                                     onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
                                     placeholder="e.g. 400076"
-                                    className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-white border border-gray-200 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium text-gray-700 placeholder:text-gray-400 outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 transition-all"
+                                    className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-white border border-gray-200 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium text-gray-700 placeholder:text-gray-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
                                 />
                             </div>
                             <div>
@@ -525,7 +525,7 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                                     value={city}
                                     onChange={(e) => setCity(e.target.value)}
                                     placeholder="e.g. Mumbai"
-                                    className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-white border border-gray-200 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium text-gray-700 placeholder:text-gray-400 outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 transition-all"
+                                    className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-white border border-gray-200 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium text-gray-700 placeholder:text-gray-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
                                 />
                             </div>
                         </div>
@@ -545,8 +545,8 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                         }}
                         disabled={busy || (otpSent && !phoneVerified && otpDigits.join('').length !== 4)}
                         className={cn(
-                            'w-full bg-[#53B175] hover:bg-[#48a068] text-white font-bold py-3.5 md:py-4 rounded-xl md:rounded-2xl active:scale-[0.98] transition-all text-[14px] md:text-[16px] shadow-lg shadow-green-100 flex items-center justify-center gap-2',
-                            (busy || (otpSent && !phoneVerified && otpDigits.join('').length !== 4)) && 'opacity-60 cursor-not-allowed hover:bg-[#53B175]',
+                            'w-full bg-primary hover:bg-primary-dark text-white font-bold py-3.5 md:py-4 rounded-xl md:rounded-2xl active:scale-[0.98] transition-all text-[14px] md:text-[16px] shadow-lg shadow-green-100 flex items-center justify-center gap-2',
+                            (busy || (otpSent && !phoneVerified && otpDigits.join('').length !== 4)) && 'opacity-60 cursor-not-allowed hover:bg-primary',
                         )}
                     >
                         {busy && <Loader2 size={18} className="animate-spin" />}

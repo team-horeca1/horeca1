@@ -135,7 +135,7 @@ export default function ReorderPage() {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <Loader2 size={32} className="animate-spin text-[#53B175]" />
+                <Loader2 size={32} className="animate-spin text-primary" />
             </div>
         );
     }
@@ -149,7 +149,7 @@ export default function ReorderPage() {
                         <ChevronLeft size={16} /> Back
                     </button>
                     <div className="flex items-center gap-3">
-                        <Store size={22} className="text-[#53B175]" />
+                        <Store size={22} className="text-primary" />
                         <div>
                             <h1 className="text-[20px] font-black text-[#181725]">Reorder from {vendorName}</h1>
                             <p className="text-[12px] text-gray-400 font-medium">{items.length} items · Set quantities and add to cart</p>
@@ -172,13 +172,13 @@ export default function ReorderPage() {
                             <div className="flex-1 min-w-0">
                                 <p className="text-[14px] font-black text-[#181725] line-clamp-2 leading-snug">{item.productName}</p>
                                 <div className="flex items-center gap-3 mt-1">
-                                    <span className="text-[11px] font-black text-[#53B175]">₹{item.unitPrice}/unit</span>
+                                    <span className="text-[11px] font-black text-primary">₹{item.unitPrice}/unit</span>
                                     <span className="text-[10px] text-gray-400 font-medium">
                                         Last ordered: {item.lastOrderedQty} units
                                     </span>
                                 </div>
                                 <button onClick={() => handleRefillLast(item.productId)}
-                                    className="text-[10px] font-black text-[#53B175] hover:text-[#489d67] transition-colors mt-0.5">
+                                    className="text-[10px] font-black text-primary hover:text-primary-dark transition-colors mt-0.5">
                                     Re-fill Last Qty
                                 </button>
                             </div>
@@ -191,7 +191,7 @@ export default function ReorderPage() {
                                 </button>
                                 <span className="text-[16px] font-black text-[#181725] w-8 text-center tabular-nums">{item.currentQty}</span>
                                 <button onClick={() => handleQtyChange(item.productId, 1)}
-                                    className="w-8 h-8 rounded-lg bg-[#53B175]/10 border border-[#53B175]/20 flex items-center justify-center text-[#53B175] hover:bg-[#53B175]/20 transition-colors">
+                                    className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary hover:bg-primary/20 transition-colors">
                                     <Plus size={14} strokeWidth={3} />
                                 </button>
                             </div>
@@ -206,7 +206,7 @@ export default function ReorderPage() {
                     <button
                         onClick={handleAddToCart}
                         disabled={selectedCount === 0}
-                        className="flex-1 bg-[#53B175] text-white py-4 rounded-2xl font-black text-[15px] shadow-lg shadow-green-200/50 hover:bg-[#489d67] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="flex-1 bg-primary text-white py-4 rounded-2xl font-black text-[15px] shadow-lg shadow-green-200/50 hover:bg-primary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         <ShoppingCart size={18} />
                         Add {selectedCount > 0 ? `${selectedCount} items` : 'to Cart'}

@@ -439,7 +439,7 @@ export default function PriceListDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="animate-spin text-[#299E60]" size={28} />
+        <Loader2 className="animate-spin text-primary" size={28} />
       </div>
     );
   }
@@ -479,17 +479,17 @@ export default function PriceListDetailPage() {
             className={cn(
               'flex items-center gap-1.5 px-3 h-[38px] rounded-[10px] text-[12.5px] font-bold border transition-colors',
               isActive
-                ? 'bg-[#EEF8F1] border-[#299E60]/30 text-[#299E60]'
+                ? 'bg-primary-light border-primary/30 text-primary'
                 : 'bg-[#F5F5F5] border-[#E5E7EB] text-[#7C7C7C]',
             )}
           >
-            <span className={cn('w-2 h-2 rounded-full', isActive ? 'bg-[#299E60]' : 'bg-[#AEAEAE]')} />
+            <span className={cn('w-2 h-2 rounded-full', isActive ? 'bg-primary' : 'bg-[#AEAEAE]')} />
             {isActive ? 'Active' : 'Inactive'}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-5 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-5 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark transition-colors disabled:opacity-50"
           >
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
             Save Changes
@@ -506,7 +506,7 @@ export default function PriceListDetailPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Cafe Pricing, Bulk Buyers"
-            className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+            className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
           />
         </div>
 
@@ -522,7 +522,7 @@ export default function PriceListDetailPage() {
                 type="date"
                 value={validFrom}
                 onChange={(e) => setValidFrom(e.target.value)}
-                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
               />
             </div>
             <div>
@@ -531,7 +531,7 @@ export default function PriceListDetailPage() {
                 type="date"
                 value={validTo}
                 onChange={(e) => setValidTo(e.target.value)}
-                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
               />
             </div>
           </div>
@@ -560,13 +560,13 @@ export default function PriceListDetailPage() {
       <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-[#F5F5F5] flex items-center justify-between">
           <div>
-            <h2 className="text-[14px] font-bold text-[#181725]"><span className="text-[#299E60]">①</span> Who gets this list</h2>
+            <h2 className="text-[14px] font-bold text-[#181725]"><span className="text-primary">①</span> Who gets this list</h2>
             <p className="text-[12px] text-[#AEAEAE]">Add a rule and the prices apply automatically — to a customer, an outlet, a pincode, an area, a customer group, or a brand&apos;s products.</p>
           </div>
           {!addingAssign && (
             <button
               onClick={() => setAddingAssign(true)}
-              className="flex items-center gap-1.5 px-3 h-[34px] rounded-[10px] border border-[#EEEEEE] hover:border-[#299E60]/40 text-[12.5px] font-bold text-[#181725] transition-colors"
+              className="flex items-center gap-1.5 px-3 h-[34px] rounded-[10px] border border-[#EEEEEE] hover:border-primary/40 text-[12.5px] font-bold text-[#181725] transition-colors"
             >
               <Plus size={13} /> Add assignment
             </button>
@@ -613,7 +613,7 @@ export default function PriceListDetailPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={addAssignment}
-                className="px-4 h-[34px] rounded-[10px] bg-[#299E60] text-white text-[12.5px] font-bold hover:bg-[#238a54] transition-colors"
+                className="px-4 h-[34px] rounded-[10px] bg-primary text-white text-[12.5px] font-bold hover:bg-primary-dark transition-colors"
               >
                 Add rule
               </button>
@@ -662,7 +662,7 @@ export default function PriceListDetailPage() {
       {/* ── ② What they pay ────────────────────────────────────────── */}
       <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-[#F5F5F5]">
-          <h2 className="text-[14px] font-bold text-[#181725]"><span className="text-[#299E60]">②</span> What they pay</h2>
+          <h2 className="text-[14px] font-bold text-[#181725]"><span className="text-primary">②</span> What they pay</h2>
           <p className="text-[12px] text-[#AEAEAE]">Pick a default for the whole list, then set special prices for individual products if you need to.</p>
         </div>
 
@@ -675,7 +675,7 @@ export default function PriceListDetailPage() {
               onClick={() => setDiscountPercent('0')}
               className={cn(
                 'rounded-[12px] border p-3.5 text-left transition-colors',
-                Number(discountPercent) > 0 ? 'border-[#EEEEEE] hover:border-[#D1D5DB]' : 'border-[#299E60] bg-[#EEF8F1]',
+                Number(discountPercent) > 0 ? 'border-[#EEEEEE] hover:border-[#D1D5DB]' : 'border-primary bg-primary-light',
               )}
             >
               <div className="text-[13px] font-bold text-[#181725]">Same as base price</div>
@@ -686,7 +686,7 @@ export default function PriceListDetailPage() {
               onClick={() => { if (!(Number(discountPercent) > 0)) setDiscountPercent('5'); }}
               className={cn(
                 'rounded-[12px] border p-3.5 text-left transition-colors',
-                Number(discountPercent) > 0 ? 'border-[#299E60] bg-[#EEF8F1]' : 'border-[#EEEEEE] hover:border-[#D1D5DB]',
+                Number(discountPercent) > 0 ? 'border-primary bg-primary-light' : 'border-[#EEEEEE] hover:border-[#D1D5DB]',
               )}
             >
               <div className="text-[13px] font-bold text-[#181725]">% adjustment on everything</div>
@@ -699,11 +699,11 @@ export default function PriceListDetailPage() {
                 type="number" min="0" max="100" step="0.5"
                 value={discountPercent}
                 onChange={(e) => setDiscountPercent(e.target.value)}
-                className="w-[90px] h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] text-right outline-none focus:border-[#299E60]/50 bg-white"
+                className="w-[90px] h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] text-right outline-none focus:border-primary/50 bg-white"
               />
               <span>% off the base price.</span>
               <span className="ml-auto text-[11px] text-[#AEAEAE]">
-                Example: ₹100 → <strong className="text-[#299E60]">₹{(100 * (1 - (Number(discountPercent) || 0) / 100)).toFixed(0)}</strong>
+                Example: ₹100 → <strong className="text-primary">₹{(100 * (1 - (Number(discountPercent) || 0) / 100)).toFixed(0)}</strong>
               </span>
             </div>
           )}
@@ -718,7 +718,7 @@ export default function PriceListDetailPage() {
           <button
             type="button"
             onClick={() => setShowBulk((v) => !v)}
-            className="flex items-center gap-1.5 px-3 h-[34px] rounded-[10px] border border-[#EEEEEE] hover:border-[#299E60]/40 text-[12px] font-bold text-[#7C7C7C] transition-colors shrink-0"
+            className="flex items-center gap-1.5 px-3 h-[34px] rounded-[10px] border border-[#EEEEEE] hover:border-primary/40 text-[12px] font-bold text-[#7C7C7C] transition-colors shrink-0"
           >
             <Upload size={13} /> Import from spreadsheet
           </button>
@@ -740,12 +740,12 @@ export default function PriceListDetailPage() {
                 <button
                   type="button"
                   onClick={downloadTemplate}
-                  className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] border border-[#EEEEEE] bg-white hover:border-[#299E60]/40 text-[12.5px] font-bold text-[#181725] transition-colors"
+                  className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] border border-[#EEEEEE] bg-white hover:border-primary/40 text-[12.5px] font-bold text-[#181725] transition-colors"
                 >
                   <Download size={13} />
                   Download Template
                 </button>
-                <label className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] border border-[#EEEEEE] bg-white hover:border-[#299E60]/40 cursor-pointer text-[12.5px] font-bold text-[#181725] transition-colors">
+                <label className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] border border-[#EEEEEE] bg-white hover:border-primary/40 cursor-pointer text-[12.5px] font-bold text-[#181725] transition-colors">
                   {bulkUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
                   {bulkUploading ? 'Uploading…' : 'Choose file'}
                   <input
@@ -787,7 +787,7 @@ export default function PriceListDetailPage() {
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
               placeholder="Search products to add…"
-              className="w-full h-[38px] pl-8 pr-4 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/40 bg-white"
+              className="w-full h-[38px] pl-8 pr-4 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-primary/40 bg-white"
             />
             {searching && (
               <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-[#AEAEAE]" />
@@ -808,7 +808,7 @@ export default function PriceListDetailPage() {
                       {p.packSize ?? p.unit ?? ''} · Base ₹{Number(p.basePrice).toFixed(2)}
                     </p>
                   </div>
-                  <Plus size={14} className="text-[#299E60] shrink-0" />
+                  <Plus size={14} className="text-primary shrink-0" />
                 </button>
               ))}
             </div>
@@ -889,7 +889,7 @@ function ItemRow({
           {effective != null && (
             <p className="text-[11px] mt-1">
               <span className="text-[#AEAEAE]">They pay </span>
-              <span className="font-bold text-[#299E60]">₹{effective.toFixed(2)}</span>
+              <span className="font-bold text-primary">₹{effective.toFixed(2)}</span>
               {item.pricingType === 'discount' && <span className="text-[#AEAEAE]"> (-{item.discountPercent || 0}% base)</span>}
               {item.pricingType === 'scheme' && item.schemeMinQty && (
                 <span className="text-[#AEAEAE]"> at {item.schemeMinQty}+ pcs{item.schemeFreeQty ? `, +${item.schemeFreeQty} free` : ''}</span>
@@ -925,7 +925,7 @@ function ItemRow({
                 type="number" min="0" step="0.01"
                 value={item.customPrice}
                 onChange={(e) => onUpdate({ customPrice: e.target.value })}
-                className="w-[110px] h-[32px] px-2 rounded-[8px] border border-[#EEEEEE] text-[12px] text-right outline-none focus:border-[#299E60]/50 bg-white"
+                className="w-[110px] h-[32px] px-2 rounded-[8px] border border-[#EEEEEE] text-[12px] text-right outline-none focus:border-primary/50 bg-white"
               />
             </div>
           )}
@@ -936,7 +936,7 @@ function ItemRow({
                 type="number" min="0" max="100" step="0.1"
                 value={item.discountPercent}
                 onChange={(e) => onUpdate({ discountPercent: e.target.value })}
-                className="w-[110px] h-[32px] px-2 rounded-[8px] border border-[#EEEEEE] text-[12px] text-right outline-none focus:border-[#299E60]/50 bg-white"
+                className="w-[110px] h-[32px] px-2 rounded-[8px] border border-[#EEEEEE] text-[12px] text-right outline-none focus:border-primary/50 bg-white"
               />
             </div>
           )}
@@ -948,7 +948,7 @@ function ItemRow({
                   type="number" min="1" step="1"
                   value={item.schemeMinQty}
                   onChange={(e) => onUpdate({ schemeMinQty: e.target.value })}
-                  className="w-[80px] h-[32px] px-2 rounded-[8px] border border-[#EEEEEE] text-[12px] text-right outline-none focus:border-[#299E60]/50 bg-white"
+                  className="w-[80px] h-[32px] px-2 rounded-[8px] border border-[#EEEEEE] text-[12px] text-right outline-none focus:border-primary/50 bg-white"
                 />
               </div>
               <div>
@@ -957,7 +957,7 @@ function ItemRow({
                   type="number" min="0" step="0.01"
                   value={item.customPrice}
                   onChange={(e) => onUpdate({ customPrice: e.target.value })}
-                  className="w-[100px] h-[32px] px-2 rounded-[8px] border border-[#EEEEEE] text-[12px] text-right outline-none focus:border-[#299E60]/50 bg-white"
+                  className="w-[100px] h-[32px] px-2 rounded-[8px] border border-[#EEEEEE] text-[12px] text-right outline-none focus:border-primary/50 bg-white"
                 />
               </div>
               <div>
@@ -966,7 +966,7 @@ function ItemRow({
                   type="number" min="0" step="1"
                   value={item.schemeFreeQty}
                   onChange={(e) => onUpdate({ schemeFreeQty: e.target.value })}
-                  className="w-[80px] h-[32px] px-2 rounded-[8px] border border-[#EEEEEE] text-[12px] text-right outline-none focus:border-[#299E60]/50 bg-white"
+                  className="w-[80px] h-[32px] px-2 rounded-[8px] border border-[#EEEEEE] text-[12px] text-right outline-none focus:border-primary/50 bg-white"
                 />
               </div>
             </>
@@ -1075,7 +1075,7 @@ function dateInputToIso(value: string): string | null {
 
 const ASSIGN_STYLE: Record<AssignmentType, { bg: string; text: string }> = {
   customer: { bg: 'bg-blue-50',    text: 'text-blue-700' },
-  outlet:   { bg: 'bg-emerald-50', text: 'text-emerald-700' },
+  outlet:   { bg: 'bg-success-light', text: 'text-success' },
   pincode:  { bg: 'bg-amber-50',   text: 'text-amber-700' },
   area:     { bg: 'bg-purple-50',  text: 'text-purple-700' },
   segment:  { bg: 'bg-pink-50',    text: 'text-pink-700' },

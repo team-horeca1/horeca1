@@ -365,7 +365,7 @@ export default function SuppliersPage() {
                                 onClick={() => void startVendorView(s.userId)}
                                 className={cn(
                                   'inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-bold rounded-[8px]',
-                                  'bg-[#F8E8EC] text-[#6B1D2E] hover:bg-[#DCFCE7] disabled:opacity-50',
+                                  'bg-[#F8E8EC] text-[#6B1D2E] hover:bg-success-light disabled:opacity-50',
                                 )}
                                 data-testid="impersonate-supplier"
                               >

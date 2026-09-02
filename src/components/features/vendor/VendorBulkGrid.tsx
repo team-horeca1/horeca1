@@ -77,7 +77,7 @@ function formatItemIdDisplay(p: GridProduct): { display: string; full: string } 
 function stickyBodyBg(colIdx: number, isDirty: boolean, rowError: string | undefined): string {
   if (colIdx === 2) {
     if (rowError) return 'bg-red-50';
-    if (isDirty) return 'bg-green-50';
+    if (isDirty) return 'bg-success-light';
     return 'bg-white';
   }
   return 'bg-gray-50';
@@ -588,7 +588,7 @@ export default function VendorBulkGrid({
                     }}
                     className="w-full flex items-center gap-2.5 px-4 py-3 text-[12px] font-semibold text-[#181725] hover:bg-[#F5F5F5] transition-colors text-left"
                   >
-                    <FileSpreadsheet size={13} className="text-[#299E60]" />
+                    <FileSpreadsheet size={13} className="text-primary" />
                     Export CSV
                   </button>
                   <button
@@ -622,7 +622,7 @@ export default function VendorBulkGrid({
               onClick={onOpenAdvanced}
               className="h-[38px] px-3.5 border border-[#EEEEEE] bg-white rounded-[10px] text-[12px] font-bold text-[#7C7C7C] hover:bg-gray-50 hover:text-[#181725] transition-all flex items-center gap-1.5 shrink-0"
             >
-              <Wand2 size={13} className="text-[#299E60]" />
+              <Wand2 size={13} className="text-primary" />
               Advanced
             </button>
           )}
@@ -633,7 +633,7 @@ export default function VendorBulkGrid({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search products…"
-              className="w-[220px] h-[38px] pl-9 pr-3 border border-[#EEEEEE] rounded-[10px] text-[13px] outline-none focus:border-[#299E60]/40"
+              className="w-[220px] h-[38px] pl-9 pr-3 border border-[#EEEEEE] rounded-[10px] text-[13px] outline-none focus:border-primary/40"
             />
           </div>
           <span className="text-[12px] font-semibold text-[#7C7C7C]">
@@ -643,7 +643,7 @@ export default function VendorBulkGrid({
             type="button"
             onClick={() => void save()}
             disabled={saving || dirtyIds.length === 0}
-            className="h-[40px] px-5 bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold hover:bg-[#238a54] transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
+            className="h-[40px] px-5 bg-primary text-white rounded-[10px] text-[13px] font-bold hover:bg-primary-dark transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             Save changes
@@ -711,7 +711,7 @@ export default function VendorBulkGrid({
                       key={p.id}
                       className={cn(
                         'border-b border-[#E5E7EB] hover:bg-[#F9FAFB] transition-colors h-[32px]',
-                        isDirty && 'bg-green-50/70 hover:bg-green-50',
+                        isDirty && 'bg-primary-light/70 hover:bg-primary-light',
                         rowError && 'bg-red-50/80',
                       )}
                       title={rowError || undefined}
@@ -785,7 +785,7 @@ export default function VendorBulkGrid({
                                   type="checkbox"
                                   checked={boolVal(p, fieldKey)}
                                   onChange={(e) => setVal(p.id, fieldKey, e.target.checked)}
-                                  className="w-4 h-4 accent-[#299E60] cursor-pointer"
+                                  className="w-4 h-4 accent-primary cursor-pointer"
                                 />
                               </div>
                             </td>
@@ -808,7 +808,7 @@ export default function VendorBulkGrid({
                               key={col.key}
                               style={stickyLeftStyle(colIdx)}
                               className={cn(
-                                'p-0 border-r border-b border-[#E5E7EB] align-middle focus-within:ring-1 focus-within:ring-[#299E60] focus-within:bg-white overflow-hidden',
+                                'p-0 border-r border-b border-[#E5E7EB] align-middle focus-within:ring-1 focus-within:ring-primary focus-within:bg-white overflow-hidden',
                                 col.width,
                                 stickyClass,
                               )}
@@ -833,7 +833,7 @@ export default function VendorBulkGrid({
                             key={col.key}
                             style={stickyLeftStyle(colIdx)}
                             className={cn(
-                              'p-0 border-r border-b border-[#E5E7EB] align-middle focus-within:ring-1 focus-within:ring-[#299E60] focus-within:bg-white overflow-hidden',
+                              'p-0 border-r border-b border-[#E5E7EB] align-middle focus-within:ring-1 focus-within:ring-primary focus-within:bg-white overflow-hidden',
                               col.width,
                               isSticky ? stickyClass : '',
                             )}

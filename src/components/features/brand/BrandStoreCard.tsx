@@ -56,7 +56,7 @@ export function BrandStoreCard({
                         style={img ? imgStyle : logoStyle}
                     />
                 ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary-pressed" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary-dark-pressed" />
                 )}
             </div>
 
@@ -78,16 +78,20 @@ export function BrandStoreCard({
             </div>
 
             <div className="relative z-10 mt-auto p-3 text-white">
-                <h3 className="text-[13px] md:text-[15px] font-bold leading-tight line-clamp-1">{name}</h3>
+                <h3 className="text-[13px] md:text-[15px] font-bold leading-tight line-clamp-1 !text-white text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]">
+                    {name}
+                </h3>
                 {categoryLine ? (
-                    <p className="text-[11px] text-white/85 leading-snug line-clamp-1 mt-0.5">{categoryLine}</p>
+                    <p className="text-[11px] text-white/90 leading-snug line-clamp-1 mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
+                        {categoryLine}
+                    </p>
                 ) : null}
                 {typeof productCount === 'number' && productCount > 0 ? (
-                    <p className="text-[10px] text-white/70 mt-0.5">
+                    <p className="text-[10px] text-white/80 mt-0.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
                         {productCount} {productCount === 1 ? 'product' : 'products'}
                     </p>
                 ) : null}
-                <span className="mt-2 inline-flex min-h-8 items-center px-3 rounded-full bg-white text-[#1C1C1C] text-[11px] font-semibold">
+                <span className="mt-2 inline-flex min-h-8 items-center px-3 rounded-full bg-white text-[#1C1C1C] text-[11px] font-semibold shadow-sm">
                     Explore Store
                 </span>
             </div>

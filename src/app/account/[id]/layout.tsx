@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
@@ -31,7 +32,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   return (
     <Suspense fallback={(
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#299E60]" />
+        <Loader2 className="animate-spin text-primary" />
       </div>
     )}>
       <AccountLayoutInner>{children}</AccountLayoutInner>
@@ -106,7 +107,7 @@ function AccountLayoutInner({ children }: { children: React.ReactNode }) {
 
         {loading || permsLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="animate-spin text-[#299E60]" />
+            <Loader2 className="animate-spin text-primary" />
           </div>
         ) : error || !account ? (
           <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700">
@@ -127,7 +128,7 @@ function AccountLayoutInner({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="flex flex-wrap gap-2 sm:ml-auto">
                   {account.isCustomer && <Badge color="#2563EB" bg="#DBEAFE">Customer</Badge>}
-                  {account.isVendor   && <Badge color="#299E60" bg="#DCFCE7">Vendor</Badge>}
+                  {account.isVendor   && <Badge color={CDL.primary} bg={CDL.successLight}>Vendor</Badge>}
                   {account.isBrand    && <Badge color="#7C3AED" bg="#EDE9FE">Brand</Badge>}
                   {account.status !== 'active' && <Badge color="#DC2626" bg="#FEE2E2">{account.status}</Badge>}
                 </div>

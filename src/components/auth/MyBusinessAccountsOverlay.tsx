@@ -126,7 +126,7 @@ export function MyBusinessAccountsOverlay({ isOpen, onClose, onAccountDeleted }:
         <div className="flex-1 overflow-y-auto px-4 md:px-6 pt-4 md:pt-5 pb-28 md:pb-6">
           {loading ? (
             <div className="py-12 flex justify-center">
-              <Loader2 className="animate-spin text-[#53B175]" />
+              <Loader2 className="animate-spin text-primary" />
             </div>
           ) : accounts.length === 0 ? (
             <p className="text-[13px] text-[#666] py-12 text-center bg-white rounded-xl border border-gray-100">
@@ -153,7 +153,7 @@ export function MyBusinessAccountsOverlay({ isOpen, onClose, onAccountDeleted }:
                             {acc.displayName || acc.legalName}
                           </p>
                           {isActive && (
-                            <span className="text-[10px] font-bold uppercase tracking-wide bg-[#ECFDF5] text-[#299E60] px-2 py-0.5 rounded-full">
+                            <span className="text-[10px] font-bold uppercase tracking-wide bg-success-light text-primary px-2 py-0.5 rounded-full">
                               Active
                             </span>
                           )}
@@ -170,7 +170,7 @@ export function MyBusinessAccountsOverlay({ isOpen, onClose, onAccountDeleted }:
                             </span>
                           )}
                           {acc.isVendor && (
-                            <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                            <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-success bg-success-light px-2 py-0.5 rounded-full">
                               <Store size={10} /> Supplier
                             </span>
                           )}

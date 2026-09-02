@@ -75,7 +75,7 @@ export function NotificationOverlay({ isOpen, onClose }: NotificationOverlayProp
                                         onClick={() => toggleSetting(setting.id)}
                                         className={cn(
                                             "w-[44px] md:w-[52px] h-[24px] md:h-[28px] rounded-full relative transition-colors duration-300 shrink-0",
-                                            setting.enabled ? "bg-[#53B175]" : "bg-gray-200"
+                                            setting.enabled ? "bg-primary" : "bg-gray-200"
                                         )}
                                     >
                                         <div
@@ -113,7 +113,7 @@ export function NotificationOverlay({ isOpen, onClose }: NotificationOverlayProp
                                         onClick={() => toggleSetting(setting.id)}
                                         className={cn(
                                             "w-[44px] md:w-[52px] h-[24px] md:h-[28px] rounded-full relative transition-colors duration-300 shrink-0",
-                                            setting.enabled ? "bg-[#53B175]" : "bg-gray-200"
+                                            setting.enabled ? "bg-primary" : "bg-gray-200"
                                         )}
                                     >
                                         <div
@@ -133,7 +133,7 @@ export function NotificationOverlay({ isOpen, onClose }: NotificationOverlayProp
                 <div className="hidden md:block p-6 bg-white border-t border-gray-100">
                     <button 
                         onClick={onClose}
-                        className="w-full bg-[#53B175] hover:bg-[#48a068] text-white font-bold py-4 rounded-xl active:scale-[0.98] transition-all text-[16px] shadow-lg shadow-green-100"
+                        className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-xl active:scale-[0.98] transition-all text-[16px] shadow-lg shadow-green-100"
                     >
                         Save Preferences
                     </button>

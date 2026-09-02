@@ -114,7 +114,7 @@ export function ExistingPhoneModal({
             {showHcid && (
               <div className="flex justify-between gap-3 text-[12px]">
                 <span className="text-gray-400 font-bold uppercase tracking-wider">HCID</span>
-                <span className="font-bold text-[#299E60] tracking-wider">{hcidDisplay}</span>
+                <span className="font-bold text-primary tracking-wider">{hcidDisplay}</span>
               </div>
             )}
             <div className="flex justify-between gap-3 text-[12px]">
@@ -140,7 +140,7 @@ export function ExistingPhoneModal({
           </button>
           <Link
             href={loginHref}
-            className={cn(FORM.primaryBtn, 'px-6 py-2.5 text-[13px] justify-center shadow-emerald-100')}
+            className={cn(FORM.primaryBtn, 'px-6 py-2.5 text-[13px] justify-center shadow-primary/10')}
           >
             {copy.cta}
             <ArrowRight size={16} />

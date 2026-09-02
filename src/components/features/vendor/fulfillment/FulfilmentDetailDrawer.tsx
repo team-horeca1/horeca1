@@ -185,7 +185,7 @@ function FulfilmentDetailBody({
         {fulfill && (
           <p>
             <span className="text-[#7C7C7C]">Fulfill:</span>{' '}
-            <strong className="text-[#299E60]">{fulfill}</strong>
+            <strong className="text-primary">{fulfill}</strong>
           </p>
         )}
         <p>
@@ -247,7 +247,7 @@ function FulfilmentDetailBody({
             </p>
           )}
           {!detail.boyPortal && detail.magicLink?.usedAt && (
-            <p className="text-[11px] text-emerald-700 font-semibold">
+            <p className="text-[11px] text-success font-semibold">
               Link used (delivery completed via OTP)
             </p>
           )}

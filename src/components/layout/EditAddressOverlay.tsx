@@ -130,13 +130,13 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
                                 value={businessName}
                                 onChange={(e) => setBusinessName(e.target.value)}
                                 placeholder="e.g. Malvan Tadka"
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[14px] outline-none focus:border-[#33a852] transition-colors"
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[14px] outline-none focus:border-primary transition-colors"
                             />
                         </div>
 
                         <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 flex items-start gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center shrink-0">
-                                <MapPin size={16} className="text-[#33a852]" />
+                            <div className="w-9 h-9 rounded-xl bg-primary-light flex items-center justify-center shrink-0">
+                                <MapPin size={16} className="text-primary" />
                             </div>
                             <div className="min-w-0 flex-1">
                                 <p className="text-[13px] font-bold text-gray-800 leading-tight">
@@ -150,7 +150,7 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
                                         : fullAddress}
                                 </p>
                                 {pincode && !isPlaceholder && (
-                                    <span className="inline-block mt-1.5 text-[11px] font-semibold text-[#33a852] bg-green-50 px-2 py-0.5 rounded-full">
+                                    <span className="inline-block mt-1.5 text-[11px] font-semibold text-primary bg-primary-light px-2 py-0.5 rounded-full">
                                         {pincode}{city ? ` · ${city}` : ''}
                                     </span>
                                 )}
@@ -164,7 +164,7 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
                                 value={flatInfo}
                                 onChange={(e) => setFlatInfo(e.target.value)}
                                 placeholder="e.g. Ground Floor, Shop 4"
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-[#33a852] transition-colors"
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary transition-colors"
                             />
                         </div>
 
@@ -177,7 +177,7 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
                                 value={landmark}
                                 onChange={(e) => setLandmark(e.target.value)}
                                 placeholder="Near main gate / opposite bus stop"
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-[#33a852] transition-colors"
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary transition-colors"
                             />
                         </div>
                     </div>
@@ -192,7 +192,7 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
                         <button
                             onClick={handleSave}
                             disabled={isSaving || !canSave}
-                            className="flex-1 h-[44px] bg-[#33a852] hover:bg-[#2d9548] disabled:opacity-70 text-white rounded-xl text-[13px] font-bold transition-colors flex items-center justify-center gap-2"
+                            className="flex-1 h-[44px] bg-primary hover:bg-primary-dark disabled:opacity-70 text-white rounded-xl text-[13px] font-bold transition-colors flex items-center justify-center gap-2"
                         >
                             {isSaving && <Loader2 size={15} className="animate-spin" />}
                             {isSaving ? 'Saving...' : 'Save Changes'}

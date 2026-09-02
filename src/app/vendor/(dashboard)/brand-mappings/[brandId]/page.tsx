@@ -293,7 +293,7 @@ export default function VendorBrandMappingWorkspacePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="w-7 h-7 animate-spin text-[#53B175]" />
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
       </div>
     );
   }
@@ -306,7 +306,7 @@ export default function VendorBrandMappingWorkspacePage() {
         <p className="text-[13px] text-gray-500 mt-1 max-w-sm">This brand is unavailable or no longer approved.</p>
         <Link
           href="/vendor/brand-mappings"
-          className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#299E60] hover:underline"
+          className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-primary hover:underline"
         >
           <ChevronLeft size={14} />
           Back to brands
@@ -323,7 +323,7 @@ export default function VendorBrandMappingWorkspacePage() {
         <p className="text-[13px] text-gray-500 mt-1 max-w-sm">There are no approved brands to map yet. Check back once brands join the platform.</p>
         <Link
           href="/vendor/brand-mappings"
-          className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-[#299E60] hover:underline"
+          className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-primary hover:underline"
         >
           <ChevronLeft size={14} />
           Back to brands
@@ -351,7 +351,7 @@ export default function VendorBrandMappingWorkspacePage() {
         </Link>
 
         <h1 className="text-[17px] font-black text-[#181725] flex items-center gap-1.5 mr-1">
-          <GitMerge size={18} className="text-[#53B175]" />
+          <GitMerge size={18} className="text-primary" />
           {activeBrand?.name ?? 'Brand Mappings'}
         </h1>
 
@@ -387,7 +387,7 @@ export default function VendorBrandMappingWorkspacePage() {
         <span className="font-bold text-gray-400">2.</span>
         Click your matching SKU
         {selectedMaster && (
-          <span className="ml-2 text-[#53B175] font-bold truncate max-w-[40%]">
+          <span className="ml-2 text-primary font-bold truncate max-w-[40%]">
             → {selectedMaster.name}
           </span>
         )}
@@ -408,7 +408,7 @@ export default function VendorBrandMappingWorkspacePage() {
                 onChange={(e) => setCatalogSearch(e.target.value)}
                 placeholder="Search brand SKUs…"
                 disabled={!brandId}
-                className="w-full h-8 pl-8 pr-2 border border-gray-200 rounded-lg text-[12px] bg-white disabled:opacity-50 outline-none focus:border-[#53B175]/50"
+                className="w-full h-8 pl-8 pr-2 border border-gray-200 rounded-lg text-[12px] bg-white disabled:opacity-50 outline-none focus:border-primary/50"
               />
             </div>
           </div>
@@ -417,7 +417,7 @@ export default function VendorBrandMappingWorkspacePage() {
               <p className="text-[12px] text-gray-400 text-center py-10">Select a brand</p>
             ) : catalogLoading ? (
               <div className="flex justify-center py-10">
-                <Loader2 size={18} className="animate-spin text-[#53B175]" />
+                <Loader2 size={18} className="animate-spin text-primary" />
               </div>
             ) : catalog.length === 0 ? (
               <p className="text-[12px] text-gray-400 text-center py-10">No SKUs found</p>
@@ -435,7 +435,7 @@ export default function VendorBrandMappingWorkspacePage() {
                     className={cn(
                       'w-full flex items-center gap-2 px-3 py-2 text-left border-b border-gray-50 transition-colors',
                       selected
-                        ? 'bg-[#EEF8F1] border-l-2 border-l-[#53B175]'
+                        ? 'bg-primary-light border-l-2 border-l-primary'
                         : 'hover:bg-gray-50/80 border-l-2 border-l-transparent',
                     )}
                   >
@@ -449,12 +449,12 @@ export default function VendorBrandMappingWorkspacePage() {
                       </p>
                     </div>
                     {alreadyMapped && (
-                      <span className="text-[9px] font-bold text-[#299E60] uppercase px-1.5 py-0.5 bg-[#EEF8F1] rounded shrink-0">
+                      <span className="text-[9px] font-bold text-primary uppercase px-1.5 py-0.5 bg-primary-light rounded shrink-0">
                         Linked
                       </span>
                     )}
                     {selected && !alreadyMapped && (
-                      <span className="text-[10px] font-bold text-[#53B175] shrink-0">Selected</span>
+                      <span className="text-[10px] font-bold text-primary shrink-0">Selected</span>
                     )}
                   </button>
                 );
@@ -475,7 +475,7 @@ export default function VendorBrandMappingWorkspacePage() {
                 value={vendorSearch}
                 onChange={(e) => setVendorSearch(e.target.value)}
                 placeholder="Filter…"
-                className="w-full h-8 pl-8 pr-2 border border-gray-200 rounded-lg text-[12px] bg-white outline-none focus:border-[#53B175]/50"
+                className="w-full h-8 pl-8 pr-2 border border-gray-200 rounded-lg text-[12px] bg-white outline-none focus:border-primary/50"
               />
             </div>
           </div>
@@ -501,9 +501,9 @@ export default function VendorBrandMappingWorkspacePage() {
                     className={cn(
                       'w-full flex items-start gap-2 px-3 py-2.5 text-left border-b border-gray-50 transition-colors',
                       canLink
-                        ? 'hover:bg-[#EEF8F1] cursor-pointer border-l-2 border-l-transparent hover:border-l-[#53B175]'
+                        ? 'hover:bg-primary-light cursor-pointer border-l-2 border-l-transparent hover:border-l-primary'
                         : isOverride
-                          ? 'border-l-2 border-l-[#53B175]/40 bg-[#FAFDFB]'
+                          ? 'border-l-2 border-l-primary/40 bg-[#FAFDFB]'
                           : 'border-l-2 border-l-transparent',
                       !canLink && !isOverride && selectedMaster && 'opacity-60',
                     )}
@@ -513,7 +513,7 @@ export default function VendorBrandMappingWorkspacePage() {
                         <ProductThumb src={row.brandImage} alt="" className="mt-0.5" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                            <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#EEF8F1] text-[#299E60]">
+                            <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary-light text-primary">
                               Brand override
                             </span>
                             {row.mappingStatus === 'pending' && (
@@ -562,7 +562,7 @@ export default function VendorBrandMappingWorkspacePage() {
                             type="button"
                             onClick={(e) => handleConfirmPending(row, e)}
                             disabled={saving}
-                            className="p-1 rounded hover:bg-green-100 text-[#53B175]"
+                            className="p-1 rounded hover:bg-primary-light text-primary"
                             title="Confirm"
                           >
                             <Check size={13} />
@@ -590,7 +590,7 @@ export default function VendorBrandMappingWorkspacePage() {
                         </button>
                       )}
                       {row.mappingStatus === 'unmapped' && canLink && (
-                        <span className="text-[10px] font-bold text-[#53B175] shrink-0">Map</span>
+                        <span className="text-[10px] font-bold text-primary shrink-0">Map</span>
                       )}
                       {row.mappingStatus === 'unmapped' && !selectedMaster && (
                         <span className="text-[9px] font-bold text-gray-400 uppercase px-1">New</span>

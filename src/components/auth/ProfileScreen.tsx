@@ -528,7 +528,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                             {/* Identity card */}
                             <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm mb-4">
                                 <div className="relative shrink-0">
-                                    <div className="w-[60px] h-[60px] rounded-full overflow-hidden border-[2px] border-[#53B175] bg-white">
+                                    <div className="w-[60px] h-[60px] rounded-full overflow-hidden border-[2px] border-primary bg-white">
                                         <img src={userData.image || '/images/profile/sample-profile.png'} alt="Profile" className="w-full h-full object-cover" />
                                     </div>
                                     <button onClick={() => setIsEditProfileOpen(true)} className="absolute -bottom-0.5 -right-0.5 w-6 h-6 bg-white rounded-full flex items-center justify-center border border-gray-100 shadow-sm cursor-pointer">
@@ -912,7 +912,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 {/* Welcome strip — flat, professional, B2B-friendly */}
                                 <div className="bg-white border border-gray-100 rounded-2xl px-6 lg:px-8 py-5 lg:py-6 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)] flex items-center justify-between gap-4">
                                     <div className="min-w-0">
-                                        <p className="text-[10.5px] font-[800] text-[#53B175] uppercase tracking-[0.18em] mb-1">Welcome back</p>
+                                        <p className="text-[10.5px] font-[800] text-primary uppercase tracking-[0.18em] mb-1">Welcome back</p>
                                         {!profileReady && !userData.fullName ? (
                                             <div className="space-y-2" aria-hidden>
                                                 <div className="h-7 w-40 max-w-full rounded-lg bg-gray-100 animate-pulse" />
@@ -974,7 +974,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                             "inline-block mt-0.5 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase border",
                                                             creditSummary.hasOverdue
                                                                 ? "bg-red-500/20 text-red-100 border-red-400/30"
-                                                                : "bg-emerald-500/20 text-emerald-100 border-emerald-400/30"
+                                                                : "bg-primary-light0/20 text-primary-light border-primary/30"
                                                         )}>
                                                             {creditSummary.hasOverdue ? 'Overdue' : 'Active'}
                                                         </span>
@@ -1112,7 +1112,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 <section>
                                     <div className="flex items-baseline justify-between mb-3 px-1">
                                         <h3 className="text-[15px] font-[700] text-[#181725]">Account details</h3>
-                                        <button onClick={() => setIsEditProfileOpen(true)} className="text-[12px] font-bold text-[#53B175] hover:text-[#469E66] transition-colors cursor-pointer">
+                                        <button onClick={() => setIsEditProfileOpen(true)} className="text-[12px] font-bold text-primary hover:text-primary-dark transition-colors cursor-pointer">
                                             Edit
                                         </button>
                                     </div>

@@ -243,7 +243,7 @@ function BulkUploadModal({
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={handleDrop}
                         onClick={() => fileRef.current?.click()}
-                        className="border-2 border-dashed border-[#EEEEEE] rounded-[12px] p-8 text-center cursor-pointer hover:border-[#299E60]/50 hover:bg-[#EEF8F1]/30 transition-all"
+                        className="border-2 border-dashed border-[#EEEEEE] rounded-[12px] p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary-light/30 transition-all"
                     >
                         <Upload size={24} className="text-[#AEAEAE] mx-auto mb-2" />
                         <p className="text-[13px] font-bold text-[#181725]">Drop CSV/XLSX here or click to browse</p>
@@ -285,7 +285,7 @@ function BulkUploadModal({
                                         {row.error ? (
                                             <span className="text-[11px] text-[#E74C3C] font-bold shrink-0">{row.error}</span>
                                         ) : (
-                                            <span className="text-[12px] font-bold text-[#299E60] shrink-0">qty → {row.qtyAvailable}</span>
+                                            <span className="text-[12px] font-bold text-primary shrink-0">qty → {row.qtyAvailable}</span>
                                         )}
                                     </div>
                                 ))}
@@ -305,7 +305,7 @@ function BulkUploadModal({
                         <button
                             onClick={handleUpload}
                             disabled={validRows.length === 0 || uploading}
-                            className="flex-1 h-[42px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                            className="flex-1 h-[42px] rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                             {uploading ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                             Import {validRows.length > 0 ? `${validRows.length} rows` : ''}
@@ -553,20 +553,20 @@ function InventoryRow({
                         type="number"
                         value={qty}
                         onChange={e => handleQtyInput(e.target.value)}
-                        className="w-[52px] h-7 text-center text-[13px] font-bold text-[#181725] border border-[#EEEEEE] rounded-[6px] outline-none focus:border-[#299E60]/50"
+                        className="w-[52px] h-7 text-center text-[13px] font-bold text-[#181725] border border-[#EEEEEE] rounded-[6px] outline-none focus:border-primary/50"
                         min={0}
                     />
-                    <button type="button" onClick={() => nudgeQty(1)} className="w-7 h-7 rounded-[6px] border border-[#EEEEEE] flex items-center justify-center text-[#7C7C7C] hover:bg-[#EEF8F1] hover:border-[#299E60]/40 hover:text-[#299E60] transition-all text-[14px] font-bold leading-none">+</button>
+                    <button type="button" onClick={() => nudgeQty(1)} className="w-7 h-7 rounded-[6px] border border-[#EEEEEE] flex items-center justify-center text-[#7C7C7C] hover:bg-primary-light hover:border-primary/40 hover:text-primary transition-all text-[14px] font-bold leading-none">+</button>
                     {qtyDirty && !saving && (
                         <button
                             type="button"
                             onClick={handleSaveQty}
-                            className="h-7 px-2 ml-0.5 rounded-[6px] border border-[#299E60]/40 bg-[#EEF8F1] text-[11px] font-bold text-[#299E60] hover:bg-[#d9f0e3] transition-colors"
+                            className="h-7 px-2 ml-0.5 rounded-[6px] border border-primary/40 bg-primary-light text-[11px] font-bold text-primary hover:bg-[#d9f0e3] transition-colors"
                         >
                             Save
                         </button>
                     )}
-                    {saving && <Loader2 size={11} className="animate-spin text-[#299E60] ml-0.5" />}
+                    {saving && <Loader2 size={11} className="animate-spin text-primary ml-0.5" />}
                 </div>
             </td>
 
@@ -623,7 +623,7 @@ function InventoryRow({
                         onChange={e => setThreshold(Math.max(0, parseInt(e.target.value, 10) || 0))}
                         onBlur={handleThresholdBlur}
                         onKeyDown={e => e.key === 'Enter' && handleThresholdBlur()}
-                        className="w-[52px] h-7 text-center text-[13px] font-bold border border-[#299E60]/50 rounded-[6px] outline-none"
+                        className="w-[52px] h-7 text-center text-[13px] font-bold border border-primary/50 rounded-[6px] outline-none"
                     />
                 ) : (
                     <button
@@ -647,7 +647,7 @@ function InventoryRow({
                         <AlertTriangle size={11} /> Low
                     </span>
                 ) : (
-                    <span className="inline-flex items-center bg-[#EEF8F1] text-[#299E60] text-[11px] font-[900] px-2.5 py-1 rounded-[6px] uppercase">
+                    <span className="inline-flex items-center bg-primary-light text-primary text-[11px] font-[900] px-2.5 py-1 rounded-[6px] uppercase">
                         OK
                     </span>
                 )}
@@ -785,12 +785,12 @@ function InventoryMobileCard({
                     <button
                         type="button"
                         onClick={() => void saveQty()}
-                        className="h-7 px-2 rounded-[6px] border border-[#299E60]/40 bg-[#EEF8F1] text-[11px] font-bold text-[#299E60]"
+                        className="h-7 px-2 rounded-[6px] border border-primary/40 bg-primary-light text-[11px] font-bold text-primary"
                     >
                         Save
                     </button>
                 )}
-                {saving && <Loader2 size={12} className="animate-spin text-[#299E60]" />}
+                {saving && <Loader2 size={12} className="animate-spin text-primary" />}
             </div>
         </div>
     );
@@ -1007,8 +1007,8 @@ export default function VendorInventoryPage() {
                             className={cn(
                                 'h-[34px] px-4 rounded-[8px] text-[12px] font-bold transition-all flex items-center gap-1.5',
                                 activeFilter === tab.key
-                                    ? 'bg-[#299E60] text-white shadow-sm'
-                                    : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:border-[#299E60]/30'
+                                    ? 'bg-primary text-white shadow-sm'
+                                    : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:border-primary/30'
                             )}
                         >
                             {tab.label}
@@ -1031,14 +1031,14 @@ export default function VendorInventoryPage() {
                             placeholder="Search SKU / name / brand..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            className="h-[34px] w-[min(200px,100%)] max-w-full bg-white border border-[#EEEEEE] rounded-[8px] pl-9 pr-3 text-[12px] outline-none placeholder:text-[#AEAEAE] focus:border-[#299E60]/40 shadow-sm"
+                            className="h-[34px] w-[min(200px,100%)] max-w-full bg-white border border-[#EEEEEE] rounded-[8px] pl-9 pr-3 text-[12px] outline-none placeholder:text-[#AEAEAE] focus:border-primary/40 shadow-sm"
                         />
                     </div>
                     <select
                         aria-label="Filter by brand"
                         value={brandFilter}
                         onChange={(e) => setBrandFilter(e.target.value)}
-                        className="h-[34px] max-w-[140px] bg-white border border-[#EEEEEE] rounded-[8px] px-2 text-[12px] outline-none focus:border-[#299E60]/40 shadow-sm"
+                        className="h-[34px] max-w-[140px] bg-white border border-[#EEEEEE] rounded-[8px] px-2 text-[12px] outline-none focus:border-primary/40 shadow-sm"
                     >
                         <option value="">All brands</option>
                         {brandOptions.map((b) => (
@@ -1049,7 +1049,7 @@ export default function VendorInventoryPage() {
                         aria-label="Filter by category"
                         value={categoryFilter}
                         onChange={(e) => setCategoryFilter(e.target.value)}
-                        className="h-[34px] max-w-[160px] bg-white border border-[#EEEEEE] rounded-[8px] px-2 text-[12px] outline-none focus:border-[#299E60]/40 shadow-sm"
+                        className="h-[34px] max-w-[160px] bg-white border border-[#EEEEEE] rounded-[8px] px-2 text-[12px] outline-none focus:border-primary/40 shadow-sm"
                     >
                         <option value="">All categories</option>
                         {categoryOptions.map(([id, name]) => (
@@ -1063,7 +1063,7 @@ export default function VendorInventoryPage() {
             <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <Loader2 className="animate-spin text-[#299E60]" size={28} />
+                        <Loader2 className="animate-spin text-primary" size={28} />
                     </div>
                 ) : filtered.length === 0 ? (
                     <div className="py-16 text-center px-6">

@@ -101,7 +101,7 @@ function parseOptionalInt(raw: string): number | null | undefined {
 }
 
 const inputCls =
-  'w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white';
+  'w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white';
 const labelCls = 'block text-[12px] font-semibold text-[#7C7C7C] mb-1';
 
 function ProvenanceHint({ globalLabel }: { globalLabel: string }) {
@@ -200,7 +200,7 @@ export function VendorCreditDefaultsPanel({ canEdit }: { canEdit: boolean }) {
   if (loading) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="animate-spin text-[#299E60]" size={28} />
+        <Loader2 className="animate-spin text-primary" size={28} />
       </div>
     );
   }
@@ -407,7 +407,7 @@ export function VendorCreditDefaultsPanel({ canEdit }: { canEdit: boolean }) {
               onClick={() => void save()}
               disabled={saving}
               className={cn(
-                'px-4 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold flex items-center gap-2 disabled:opacity-50',
+                'px-4 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold flex items-center gap-2 disabled:opacity-50',
               )}
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}

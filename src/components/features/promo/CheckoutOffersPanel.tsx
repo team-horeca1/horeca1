@@ -176,9 +176,9 @@ export function CheckoutOffersPanel({
             aria-labelledby="checkout-offers-title"
             className="relative w-full md:w-[min(440px,92vw)] max-h-[88vh] flex flex-col bg-white rounded-t-[1.5rem] md:rounded-2xl shadow-2xl overflow-hidden"
           >
-            <div className="shrink-0 flex items-start justify-between gap-3 px-[clamp(1rem,3vw,1.25rem)] pt-4 pb-3 border-b border-gray-100 bg-gradient-to-b from-green-50/80 to-white">
+            <div className="shrink-0 flex items-start justify-between gap-3 px-[clamp(1rem,3vw,1.25rem)] pt-4 pb-3 border-b border-gray-100 bg-gradient-to-b from-primary-light/80 to-white">
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#53B175]">Savings</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-primary">Savings</p>
                 <h2 id="checkout-offers-title" className="text-[18px] font-black text-[#181725] leading-tight mt-0.5">
                   Coupons & offers
                 </h2>
@@ -208,7 +208,7 @@ export function CheckoutOffersPanel({
                     onChange={(e) => onCouponInputChange(e.target.value.toUpperCase())}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleApplyInput(); }}
                     placeholder="ENTER CODE"
-                    className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-[13px] font-bold uppercase tracking-wide focus:outline-none focus:border-[#53B175]"
+                    className="flex-1 min-w-0 px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-[13px] font-bold uppercase tracking-wide focus:outline-none focus:border-primary"
                   />
                   <button
                     type="button"
@@ -236,10 +236,10 @@ export function CheckoutOffersPanel({
                           key={c.id}
                           className={`rounded-2xl border transition-colors ${
                             selected
-                              ? 'bg-green-50/90 border-[#53B175]/40 shadow-sm'
+                              ? 'bg-primary-light/90 border-primary/40 shadow-sm'
                               : disabled
                                 ? 'bg-gray-50 border-gray-100 opacity-55'
-                                : 'bg-white border-gray-200 hover:border-[#53B175]/45'
+                                : 'bg-white border-gray-200 hover:border-primary/45'
                           }`}
                         >
                           <div className="p-3.5 flex items-start justify-between gap-3">
@@ -252,7 +252,7 @@ export function CheckoutOffersPanel({
                                   {couponHeadline(c)}
                                 </p>
                                 {c.eligible && c.estimatedDiscount != null && c.estimatedDiscount > 0 && (
-                                  <p className="text-[12px] font-bold text-[#53B175] mt-0.5">
+                                  <p className="text-[12px] font-bold text-primary mt-0.5">
                                     You save ₹{c.estimatedDiscount.toLocaleString('en-IN')}
                                   </p>
                                 )}
@@ -283,7 +283,7 @@ export function CheckoutOffersPanel({
                                     type="button"
                                     onClick={() => handleSelect(c.code)}
                                     disabled={disabled || couponValidating}
-                                    className="min-w-[4.5rem] px-3.5 py-2 rounded-xl bg-[#53B175] text-white text-[12px] font-bold disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-[#489e67] transition-colors cursor-pointer"
+                                    className="min-w-[4.5rem] px-3.5 py-2 rounded-xl bg-primary text-white text-[12px] font-bold disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed hover:bg-primary-dark transition-colors cursor-pointer"
                                   >
                                     {couponValidating ? <Loader2 size={13} className="animate-spin mx-auto" /> : 'Apply'}
                                   </button>
@@ -348,14 +348,14 @@ export function CheckoutOffersPanel({
                         key={so.id}
                         className={`rounded-2xl border px-3.5 py-3 ${
                           so.isApplied
-                            ? 'bg-green-50 border-green-200'
+                            ? 'bg-primary-light border-primary/30'
                             : so.eligible
                               ? 'bg-white border-gray-200'
                               : 'bg-gray-50 border-gray-100 opacity-55'
                         }`}
                       >
                         <div className="flex items-start gap-2.5">
-                          <div className={`mt-0.5 w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${so.eligible ? 'bg-green-100 text-[#53B175]' : 'bg-gray-100 text-gray-400'}`}>
+                          <div className={`mt-0.5 w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${so.eligible ? 'bg-primary-light text-primary' : 'bg-gray-100 text-gray-400'}`}>
                             <Store size={14} />
                           </div>
                           <div className="min-w-0 flex-1">
@@ -367,7 +367,7 @@ export function CheckoutOffersPanel({
                               {so.vendorName ? ` · ${so.vendorName}` : ''}
                             </p>
                             {so.isApplied && so.estimatedDiscount != null && so.estimatedDiscount > 0 && (
-                              <p className="text-[11px] font-bold text-[#53B175] mt-1.5">
+                              <p className="text-[11px] font-bold text-primary mt-1.5">
                                 Applied · −₹{so.estimatedDiscount.toLocaleString('en-IN')}
                               </p>
                             )}
@@ -406,20 +406,20 @@ export function CheckoutOffersPanel({
         <div className="flex items-center justify-between gap-2">
           <p className="text-[12px] font-bold text-[#181725]">Offers & coupons</p>
           {eligibleCount > 0 && !appliedCode && (
-            <span className="text-[10px] font-bold text-[#53B175] bg-green-50 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] font-bold text-primary bg-primary-light px-2 py-0.5 rounded-full">
               {eligibleCount} available
             </span>
           )}
         </div>
 
         {appliedCode ? (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50/80 px-3 py-2.5">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary-light/80 px-3 py-2.5">
             <div className="min-w-0 flex items-start gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-[#53B175] text-white flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center shrink-0">
                 <Ticket size={14} />
               </div>
               <div className="min-w-0">
-                <p className="text-[13px] font-black text-[#53B175] tracking-wide truncate">{appliedCode}</p>
+                <p className="text-[13px] font-black text-primary tracking-wide truncate">{appliedCode}</p>
                 <p className="text-[11px] text-gray-500 truncate">
                   {appliedName || appliedFromList?.name || 'Coupon applied'}
                   {savingsLabel ? ` · ${savingsLabel}` : ''}
@@ -449,7 +449,7 @@ export function CheckoutOffersPanel({
         <button
           type="button"
           onClick={() => setSheetOpen(true)}
-          className="w-full flex items-center justify-between gap-3 rounded-xl border border-gray-200 hover:border-[#53B175]/50 hover:bg-green-50/40 px-3.5 py-3 transition-colors cursor-pointer text-left"
+          className="w-full flex items-center justify-between gap-3 rounded-xl border border-gray-200 hover:border-primary/50 hover:bg-primary-light/40 px-3.5 py-3 transition-colors cursor-pointer text-left"
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-[#181725] text-white flex items-center justify-center shrink-0">
@@ -488,7 +488,7 @@ export function CheckoutOffersPanel({
               checked={useRewardsWallet && !couponBlocksWallet}
               disabled={couponBlocksWallet}
               onChange={(e) => onToggleWallet(e.target.checked)}
-              className="w-4 h-4 accent-[#53B175] shrink-0"
+              className="w-4 h-4 accent-primary shrink-0"
             />
           </label>
         )}

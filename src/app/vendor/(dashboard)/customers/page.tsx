@@ -58,7 +58,7 @@ interface CustomerTask {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_ICONS = {
-  active: <CheckCircle size={13} className="text-[#299E60]" />,
+  active: <CheckCircle size={13} className="text-primary" />,
   blocked: <XCircle size={13} className="text-[#E74C3C]" />,
   suspended: <PauseCircle size={13} className="text-amber-500" />,
 };
@@ -187,7 +187,7 @@ function TasksSection({ customerId }: TasksSectionProps) {
   return (
     <div className="pt-4 border-t border-[#F5F5F5]">
       <p className="text-[12px] font-bold text-[#181725] mb-3 flex items-center gap-1.5">
-        <Bell size={13} className="text-[#299E60]" />
+        <Bell size={13} className="text-primary" />
         Tasks &amp; Reminders
       </p>
 
@@ -199,18 +199,18 @@ function TasksSection({ customerId }: TasksSectionProps) {
           onChange={(e) => setNewTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void handleAdd(); }}
           placeholder="e.g. Follow up on payment, Call to check stock needs"
-          className="flex-1 h-[36px] px-3 rounded-[8px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/50 bg-white"
+          className="flex-1 h-[36px] px-3 rounded-[8px] border border-[#EEEEEE] text-[12px] outline-none focus:border-primary/50 bg-white"
         />
         <input
           type="date"
           value={newDueDate}
           onChange={(e) => setNewDueDate(e.target.value)}
-          className="h-[36px] px-2 rounded-[8px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/50 bg-white text-[#7C7C7C]"
+          className="h-[36px] px-2 rounded-[8px] border border-[#EEEEEE] text-[12px] outline-none focus:border-primary/50 bg-white text-[#7C7C7C]"
         />
         <button
           onClick={() => void handleAdd()}
           disabled={adding || !newTitle.trim()}
-          className="h-[36px] w-[36px] flex items-center justify-center rounded-[8px] bg-[#299E60] text-white hover:bg-[#238a54] transition-colors disabled:opacity-40"
+          className="h-[36px] w-[36px] flex items-center justify-center rounded-[8px] bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-40"
         >
           {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
         </button>
@@ -219,7 +219,7 @@ function TasksSection({ customerId }: TasksSectionProps) {
       {/* Task list */}
       {loading ? (
         <div className="flex justify-center py-3">
-          <Loader2 size={16} className="animate-spin text-[#299E60]" />
+          <Loader2 size={16} className="animate-spin text-primary" />
         </div>
       ) : tasks.length === 0 ? (
         <p className="text-[11px] text-[#AEAEAE] text-center py-2">No tasks yet — add one above</p>
@@ -239,8 +239,8 @@ function TasksSection({ customerId }: TasksSectionProps) {
                 className={cn(
                   'mt-0.5 flex-shrink-0 w-[16px] h-[16px] rounded-[4px] border-2 flex items-center justify-center transition-colors',
                   task.isDone
-                    ? 'bg-[#299E60] border-[#299E60]'
-                    : 'border-[#AEAEAE] hover:border-[#299E60]'
+                    ? 'bg-primary border-primary'
+                    : 'border-[#AEAEAE] hover:border-primary'
                 )}
               >
                 {task.isDone && <CheckCircle size={10} className="text-white" />}
@@ -392,7 +392,7 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as typeof status)}
-              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
             >
               <option value="active">Active</option>
               <option value="suspended">Suspended</option>
@@ -405,7 +405,7 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
             <select
               value={priceListId}
               onChange={(e) => setPriceListId(e.target.value)}
-              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
             >
               <option value="">Default pricing</option>
               {priceLists.map((pl) => (
@@ -424,7 +424,7 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
                 value={territory}
                 onChange={(e) => setTerritory(e.target.value)}
                 placeholder="e.g. North Zone"
-                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
               />
             </div>
             <div>
@@ -434,7 +434,7 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
                 value={paymentTerms}
                 onChange={(e) => setPaymentTerms(e.target.value)}
                 placeholder="e.g. Net 30"
-                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
               />
             </div>
             <div>
@@ -442,7 +442,7 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
               <select
                 value={salespersonId}
                 onChange={(e) => setSalespersonId(e.target.value)}
-                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
               >
                 <option value="">Unassigned</option>
                 {salespersons.map((sp) => (
@@ -459,7 +459,7 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
                 value={deliveryRoute}
                 onChange={(e) => setDeliveryRoute(e.target.value)}
                 placeholder="e.g. Route A"
-                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
               />
             </div>
           </div>
@@ -475,7 +475,7 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
                     onChange={(e) => {
                       setAllowedModes((prev) => e.target.checked ? [...prev, mode] : prev.filter((m) => m !== mode));
                     }}
-                    className="w-4 h-4 rounded text-[#299E60]"
+                    className="w-4 h-4 rounded text-primary"
                   />
                   {mode.toUpperCase()}
                 </label>
@@ -489,13 +489,13 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white resize-none"
+              className="w-full px-3 py-2 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white resize-none"
             />
           </div>
 
           <div>
             <label className="block text-[12px] font-semibold text-[#7C7C7C] mb-1">Customer Tags</label>
-            <div className="w-full min-h-[40px] px-3 py-2 rounded-[10px] border border-[#EEEEEE] bg-white flex flex-wrap gap-1.5 items-center focus-within:border-[#299E60]/50">
+            <div className="w-full min-h-[40px] px-3 py-2 rounded-[10px] border border-[#EEEEEE] bg-white flex flex-wrap gap-1.5 items-center focus-within:border-primary/50">
               {tags.map((tag) => (
                 <span
                   key={tag}
@@ -539,7 +539,7 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
           <button
             onClick={() => void handleSave()}
             disabled={saving}
-            className="px-5 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] transition-colors disabled:opacity-50"
+            className="px-5 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark transition-colors disabled:opacity-50"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : 'Save'}
           </button>
@@ -644,7 +644,7 @@ function PriceHistoryModal({ customer, onClose }: PriceHistoryModalProps) {
                   <div className="mt-0.5 font-mono text-[10px] break-all">
                     <span className="text-[#E74C3C]">{e.oldValue ?? '—'}</span>
                     {' → '}
-                    <span className="text-[#299E60]">{e.newValue ?? '—'}</span>
+                    <span className="text-primary">{e.newValue ?? '—'}</span>
                   </div>
                 </li>
               ))}
@@ -733,7 +733,7 @@ export default function VendorCustomersPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, email, phone…"
-            className="w-[260px] h-[36px] pl-8 pr-3 rounded-[10px] border border-[#EEEEEE] bg-white text-[12px] outline-none focus:border-[#299E60]/40"
+            className="w-[260px] h-[36px] pl-8 pr-3 rounded-[10px] border border-[#EEEEEE] bg-white text-[12px] outline-none focus:border-primary/40"
           />
         </form>
 
@@ -759,7 +759,7 @@ export default function VendorCustomersPage() {
       <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="animate-spin text-[#299E60]" size={28} />
+            <Loader2 className="animate-spin text-primary" size={28} />
           </div>
         ) : customers.length === 0 ? (
           <div className="py-14 text-center">
@@ -822,7 +822,7 @@ export default function VendorCustomersPage() {
                     </td>
                     <td className="px-4 py-3.5">
                       {c.priceList ? (
-                        <span className="flex items-center gap-1 text-[#299E60]">
+                        <span className="flex items-center gap-1 text-primary">
                           <Tag size={11} />
                           {c.priceList.name}
                         </span>

@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -48,14 +49,14 @@ function AddressPreview({ shortAddress, fullAddress, pincode, city, isGeocoding,
 
     return (
         <div className="flex items-start gap-3 pt-1">
-            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center shrink-0">
-                <MapPin size={17} className="text-[#33a852]" />
+            <div className="w-10 h-10 bg-primary-light rounded-xl flex items-center justify-center shrink-0">
+                <MapPin size={17} className="text-primary" />
             </div>
             <div className="flex-1 min-w-0">
                 <h3 className="text-[14px] font-bold text-gray-800 leading-tight truncate">{heading}</h3>
                 <p className="text-[12px] text-gray-400 mt-0.5 line-clamp-2">{subtext}</p>
                 {pincode && !isLocating && (
-                    <span className="inline-block mt-1.5 text-[11px] font-semibold text-[#33a852] bg-green-50 px-2 py-0.5 rounded-full">
+                    <span className="inline-block mt-1.5 text-[11px] font-semibold text-primary bg-primary-light px-2 py-0.5 rounded-full">
                         📍 {pincode}{city ? ` · ${city}` : ''}
                     </span>
                 )}
@@ -92,7 +93,7 @@ function FormFields({
                     value={flatInfo}
                     onChange={(e) => setFlatInfo(e.target.value)}
                     placeholder="e.g. Ground Floor, Shop 4"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-[#33a852] transition-colors"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary transition-colors"
                 />
             </div>
             <div>
@@ -104,7 +105,7 @@ function FormFields({
                     value={landmark}
                     onChange={(e) => setLandmark(e.target.value)}
                     placeholder="Near main gate / opposite metro..."
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-[#33a852] transition-colors"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary transition-colors"
                 />
             </div>
             <AddressPreview
@@ -143,7 +144,7 @@ function BusinessSearchBar({
                 ? 'absolute top-3 left-3 right-3'
                 : 'shrink-0 px-3 py-2.5 bg-white border-b border-gray-100'
         )}>
-            <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus-within:border-[#33a852] focus-within:bg-white transition-all">
+            <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus-within:border-primary focus-within:bg-white transition-all">
                 <Search size={17} className="text-gray-400 shrink-0" />
                 <input
                     type="text"
@@ -158,7 +159,7 @@ function BusinessSearchBar({
                     autoComplete="off"
                 />
                 {(isSearching || isFetchingDetails) && (
-                    <Loader2 size={15} className="animate-spin text-[#33a852] shrink-0" />
+                    <Loader2 size={15} className="animate-spin text-primary shrink-0" />
                 )}
                 {query && !isSearching && !isFetchingDetails && (
                     <button
@@ -187,10 +188,10 @@ function BusinessSearchBar({
                             key={pred.placeId}
                             type="button"
                             onClick={() => onSelect(pred.placeId)}
-                            className="w-full flex items-start gap-3 px-4 py-3 hover:bg-green-50/70 transition-colors text-left border-b border-gray-50 last:border-0"
+                            className="w-full flex items-start gap-3 px-4 py-3 hover:bg-primary-light/70 transition-colors text-left border-b border-gray-50 last:border-0"
                         >
-                            <div className="w-9 h-9 bg-green-50 rounded-xl flex items-center justify-center shrink-0">
-                                <Store size={15} className="text-[#33a852]" />
+                            <div className="w-9 h-9 bg-primary-light rounded-xl flex items-center justify-center shrink-0">
+                                <Store size={15} className="text-primary" />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-[13px] font-bold text-gray-800 leading-tight">{pred.mainText}</p>
@@ -355,25 +356,27 @@ export function AddNewAddressOverlay({
         gpsBtn.type = 'button';
         gpsBtn.title = 'Use my current location';
         gpsBtn.setAttribute('style', btnStyle + 'background:#fff;margin-bottom:8px;margin-right:12px;box-shadow:0 2px 8px rgba(0,0,0,0.15);');
-        gpsBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#33a852" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
+        const gpsIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${CDL.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>`;
+        const gpsSpinIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${CDL.primary}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 11-6.219-8.56"></path></svg>`;
+        gpsBtn.innerHTML = gpsIcon;
         gpsBtn.addEventListener('mouseover', () => { gpsBtn.style.background = '#f9fafb'; });
         gpsBtn.addEventListener('mouseout', () => { gpsBtn.style.background = '#fff'; });
         gpsBtn.addEventListener('click', () => {
             if (!navigator.geolocation) { toast.error('GPS not supported by your browser'); return; }
             setIsLocatingGps(true);
-            gpsBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#33a852" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 11-6.219-8.56"></path></svg>';
+            gpsBtn.innerHTML = gpsSpinIcon;
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     allowGeocodeRef.current = true;
                     map.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
                     map.setZoom(DETAIL_ZOOM);
                     setIsLocatingGps(false);
-                    gpsBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#33a852" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
+                    gpsBtn.innerHTML = gpsIcon;
                 },
                 (err) => {
                     setIsLocatingGps(false);
                     allowGeocodeRef.current = true;
-                    gpsBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#33a852" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>';
+                    gpsBtn.innerHTML = gpsIcon;
                     if (err.code === 1) toast.error('Location access denied — enable it in browser settings');
                     else if (err.code === 2) toast.error('Unable to detect location, try again');
                     else toast.error('Location request timed out');
@@ -395,8 +398,8 @@ export function AddNewAddressOverlay({
             if (next === 'hybrid') {
                 map.setZoom(Math.max(map.getZoom() ?? 15, 15));
                 map.setTilt(45);
-                satBtn.style.background = '#33a852';
-                satBtn.style.borderColor = '#33a852';
+                satBtn.style.background = CDL.primary;
+                satBtn.style.borderColor = CDL.primary;
                 satBtn.querySelector('svg')!.setAttribute('stroke', '#fff');
             } else {
                 map.setTilt(0);
@@ -579,7 +582,7 @@ export function AddNewAddressOverlay({
                                 type="button"
                                 onClick={() => void handleSave()}
                                 disabled={!canSave}
-                                className="w-full bg-[#33a852] hover:bg-[#2d9548] disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]"
+                                className="w-full bg-primary hover:bg-primary-dark disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]"
                             >
                                 {saving || isGeocodingPin || isLocatingGps
                                     ? (
@@ -638,14 +641,14 @@ export function AddNewAddressOverlay({
 
                         {!loadError && !isLoaded && (
                             <div className="absolute inset-0 bg-gray-100 flex flex-col items-center justify-center gap-3 z-[500]">
-                                <Loader2 size={32} className="animate-spin text-[#33a852]" />
+                                <Loader2 size={32} className="animate-spin text-primary" />
                                 <span className="text-sm text-gray-400 font-medium">Loading map...</span>
                             </div>
                         )}
 
                         {!loadError && isLoaded && isLocatingGps && (
                             <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg flex items-center gap-2 z-[500] border border-gray-100 pointer-events-none">
-                                <Loader2 size={13} className="animate-spin text-[#33a852]" />
+                                <Loader2 size={13} className="animate-spin text-primary" />
                                 <span className="text-xs font-semibold text-gray-600">Detecting your location...</span>
                             </div>
                         )}
@@ -655,8 +658,8 @@ export function AddNewAddressOverlay({
                                 <div className={cn('flex flex-col items-center transition-all duration-200', isDragging ? '-translate-y-4' : '')}>
                                     <div className={cn(
                                         'w-12 h-12 rounded-full rounded-bl-none -rotate-45 flex items-center justify-center transition-all duration-200',
-                                        'shadow-[0_4px_20px_rgba(51,168,82,0.55)]',
-                                        isDragging ? 'bg-[#2d9548] scale-110' : 'bg-[#33a852]'
+                                        'shadow-[0_4px_20px_rgba(107, 29, 46, )]',
+                                        isDragging ? 'bg-primary-dark scale-110' : 'bg-primary'
                                     )}>
                                         <div className="w-4 h-4 bg-white rounded-full rotate-45" />
                                     </div>
@@ -670,7 +673,7 @@ export function AddNewAddressOverlay({
 
                         {isGeocodingPin && !isLocatingGps && (
                             <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg flex items-center gap-2 z-[500] border border-gray-100 pointer-events-none">
-                                <Loader2 size={13} className="animate-spin text-[#33a852]" />
+                                <Loader2 size={13} className="animate-spin text-primary" />
                                 <span className="text-xs font-semibold text-gray-600">Finding address...</span>
                             </div>
                         )}
@@ -691,7 +694,7 @@ export function AddNewAddressOverlay({
                                 type="button"
                                 onClick={() => void handleSave()}
                                 disabled={!canSave}
-                                className="w-full mt-4 bg-[#33a852] hover:bg-[#2d9548] disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]"
+                                className="w-full mt-4 bg-primary hover:bg-primary-dark disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]"
                             >
                                 {saving || isGeocodingPin || isLocatingGps
                                     ? (

@@ -47,7 +47,7 @@ export function ShopByStoreAlt() {
                     <h2 className="text-[16px] md:text-[18px] lg:text-[22px] font-bold text-[#181725]">
                         Shop By Store
                     </h2>
-                    <span className="text-[12px] font-semibold text-[#299e60] cursor-pointer hover:underline transition-all">See all</span>
+                    <span className="text-[12px] font-semibold text-primary cursor-pointer hover:underline transition-all">See all</span>
                 </div>
 
                 {/* Scrolling Area (Inside max-w) */}

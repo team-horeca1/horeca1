@@ -226,15 +226,15 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
                                     onChange={(e) => setListName(e.target.value)}
                                     onBlur={() => setEditingName(false)}
                                     onKeyDown={(e) => { if (e.key === 'Enter') setEditingName(false); }}
-                                    className="w-full bg-[#F7F8FA] border border-[#53B175]/30 rounded-xl px-3 py-2 text-[14px] font-bold text-[#181725] focus:bg-white focus:border-[#53B175] outline-none"
+                                    className="w-full bg-[#F7F8FA] border border-primary/30 rounded-xl px-3 py-2 text-[14px] font-bold text-[#181725] focus:bg-white focus:border-primary outline-none"
                                 />
                             ) : (
                                 <button
                                     onClick={() => setEditingName(true)}
-                                    className="flex items-center gap-1.5 text-[13px] text-gray-500 hover:text-[#53B175] transition-colors"
+                                    className="flex items-center gap-1.5 text-[13px] text-gray-500 hover:text-primary transition-colors"
                                 >
                                     <span className="font-bold text-[#181725]">{listName || 'Untitled list'}</span>
-                                    <span className="text-[11px] text-[#53B175] font-semibold underline">edit</span>
+                                    <span className="text-[11px] text-primary font-semibold underline">edit</span>
                                 </button>
                             )}
                         </div>
@@ -242,8 +242,8 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
 
                     {/* Progress Bar — 2 steps */}
                     <div className="flex gap-1 h-1 mt-4">
-                        <div className="flex-1 rounded-full bg-[#53B175]" />
-                        <div className={cn("flex-1 rounded-full transition-colors", step === 'items' ? "bg-[#53B175]" : "bg-gray-100")} />
+                        <div className="flex-1 rounded-full bg-primary" />
+                        <div className={cn("flex-1 rounded-full transition-colors", step === 'items' ? "bg-primary" : "bg-gray-100")} />
                     </div>
                 </div>
 
@@ -263,7 +263,7 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
                                     placeholder="e.g. Weekly Dairy"
                                     value={listName}
                                     onChange={(e) => setListName(e.target.value)}
-                                    className="w-full bg-[#F7F8FA] border border-gray-100 rounded-[16px] px-5 py-3 text-[15px] font-bold text-[#181725] focus:bg-white focus:border-[#53B175] focus:ring-4 focus:ring-[#53B175]/10 outline-none transition-all placeholder:text-gray-300"
+                                    className="w-full bg-[#F7F8FA] border border-gray-100 rounded-[16px] px-5 py-3 text-[15px] font-bold text-[#181725] focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-gray-300"
                                 />
                             </div>
 
@@ -280,19 +280,19 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
                                             setVendorSearchQuery(e.target.value);
                                             if (selectedCategory) setSelectedCategory(null);
                                         }}
-                                        className="w-full bg-[#F7F8FA] border border-transparent rounded-full pl-12 pr-4 py-3 text-[14px] font-medium text-[#181725] focus:bg-white focus:border-[#53B175]/20 outline-none transition-all"
+                                        className="w-full bg-[#F7F8FA] border border-transparent rounded-full pl-12 pr-4 py-3 text-[14px] font-medium text-[#181725] focus:bg-white focus:border-primary/20 outline-none transition-all"
                                     />
                                 </div>
                             </div>
 
                             {/* Active category filter pill */}
                             {selectedCategory && (
-                                <div className="flex items-center gap-2 bg-[#53B175]/10 border border-[#53B175]/30 px-3 py-2 rounded-xl">
+                                <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 px-3 py-2 rounded-xl">
                                     <span className="text-[11px] font-bold text-gray-500">Category:</span>
-                                    <span className="text-[12px] font-bold text-[#53B175]">{selectedCategory}</span>
+                                    <span className="text-[12px] font-bold text-primary">{selectedCategory}</span>
                                     <button
                                         onClick={() => setSelectedCategory(null)}
-                                        className="ml-auto text-[#53B175] hover:text-[#181725]"
+                                        className="ml-auto text-primary hover:text-[#181725]"
                                         title="Clear category filter"
                                     >
                                         <X size={14} />
@@ -312,7 +312,7 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
                                                     setSelectedCategory(cat);
                                                     setVendorSearchQuery('');
                                                 }}
-                                                className="text-[11px] font-bold bg-white border border-[#53B175]/30 text-[#53B175] hover:bg-[#53B175] hover:text-white rounded-full px-3 py-1 transition-colors"
+                                                className="text-[11px] font-bold bg-white border border-primary/30 text-primary hover:bg-primary hover:text-white rounded-full px-3 py-1 transition-colors"
                                             >
                                                 {cat}
                                             </button>
@@ -334,8 +334,8 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
                                                     className={cn(
                                                         "flex flex-col items-center text-center p-3 rounded-2xl border transition-all active:scale-95",
                                                         isActive
-                                                            ? "bg-[#53B175]/10 border-[#53B175] ring-2 ring-[#53B175]/20"
-                                                            : "bg-white border-gray-100 hover:border-[#53B175]/40"
+                                                            ? "bg-primary/10 border-primary ring-2 ring-primary/20"
+                                                            : "bg-white border-gray-100 hover:border-primary/40"
                                                     )}
                                                 >
                                                     <div className="w-12 h-12 rounded-xl border border-gray-100 p-1 bg-white overflow-hidden mb-2">
@@ -343,7 +343,7 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
                                                     </div>
                                                     <div className="text-[12px] font-bold text-[#181725] truncate w-full">{vendor.name}</div>
                                                     <div className="text-[10px] text-gray-400 font-medium truncate w-full">{vendor.categories[0]}</div>
-                                                    {isActive && <Check size={13} className="text-[#53B175] mt-1" />}
+                                                    {isActive && <Check size={13} className="text-primary mt-1" />}
                                                 </button>
                                             );
                                         })}
@@ -369,14 +369,14 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
 
                                 {/* Active vendor pill */}
                                 {activeVendor && (
-                                    <div className="flex items-center justify-between bg-[#53B175]/10 p-3 rounded-2xl border border-[#53B175]/20">
+                                    <div className="flex items-center justify-between bg-primary/10 p-3 rounded-2xl border border-primary/20">
                                         <div className="flex items-center gap-3 min-w-0">
                                             <div className="w-8 h-8 rounded-lg border border-gray-100 p-1 bg-white overflow-hidden shrink-0">
                                                 <img src={activeVendor.logo} alt="" className="w-full h-full object-contain" />
                                             </div>
                                             <div className="text-left min-w-0">
-                                                <div className="text-[13px] font-bold text-[#53B175] truncate">{activeVendor.name}</div>
-                                                <div className="text-[10px] text-[#53B175]/70 font-medium">
+                                                <div className="text-[13px] font-bold text-primary truncate">{activeVendor.name}</div>
+                                                <div className="text-[10px] text-primary/70 font-medium">
                                                     {itemsPerVendor[activeVendor.id]
                                                         ? `${itemsPerVendor[activeVendor.id]} item${itemsPerVendor[activeVendor.id] !== 1 ? 's' : ''} added`
                                                         : 'No items added yet'}
@@ -385,7 +385,7 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
                                         </div>
                                         <button
                                             onClick={() => { setStep('vendor'); setSearchQuery(''); }}
-                                            className="text-[11px] font-bold text-[#53B175] underline shrink-0 ml-2"
+                                            className="text-[11px] font-bold text-primary underline shrink-0 ml-2"
                                         >
                                             Change
                                         </button>
@@ -415,7 +415,7 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
                                             placeholder={`Search in ${activeVendor?.name || 'vendor'}...`}
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full bg-[#F7F8FA] border border-transparent rounded-full pl-12 pr-4 py-3 text-[14px] font-medium text-[#181725] focus:bg-white focus:border-[#53B175]/20 outline-none transition-all"
+                                            className="w-full bg-[#F7F8FA] border border-transparent rounded-full pl-12 pr-4 py-3 text-[14px] font-medium text-[#181725] focus:bg-white focus:border-primary/20 outline-none transition-all"
                                         />
                                     </div>
                                 </div>
@@ -441,19 +441,19 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
 
                                                     <div className="flex items-center gap-3 shrink-0">
                                                         {qty > 0 ? (
-                                                            <div className="flex items-center gap-3 bg-white border border-[#53B175]/20 px-2 py-1.5 rounded-full shadow-sm">
-                                                                <button onClick={() => handleRemoveItem(product.id)} className="text-[#53B175] active:scale-75 transition-transform">
+                                                            <div className="flex items-center gap-3 bg-white border border-primary/20 px-2 py-1.5 rounded-full shadow-sm">
+                                                                <button onClick={() => handleRemoveItem(product.id)} className="text-primary active:scale-75 transition-transform">
                                                                     <Minus size={14} strokeWidth={3} />
                                                                 </button>
                                                                 <span className="text-[13px] font-extrabold text-[#181725] w-4 text-center">{qty}</span>
-                                                                <button onClick={() => handleAddItem(product.id)} className="text-[#53B175] active:scale-75 transition-transform">
+                                                                <button onClick={() => handleAddItem(product.id)} className="text-primary active:scale-75 transition-transform">
                                                                     <Plus size={14} strokeWidth={3} />
                                                                 </button>
                                                             </div>
                                                         ) : (
                                                             <button
                                                                 onClick={() => handleAddItem(product.id)}
-                                                                className="bg-white border-2 border-dashed border-gray-100 p-2 rounded-full text-gray-300 hover:text-[#53B175] hover:border-[#53B175] transition-all active:scale-90"
+                                                                className="bg-white border-2 border-dashed border-gray-100 p-2 rounded-full text-gray-300 hover:text-primary hover:border-primary transition-all active:scale-90"
                                                             >
                                                                 <Plus size={18} />
                                                             </button>
@@ -484,8 +484,8 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
                                                                         exceedsStock
                                                                             ? 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed'
                                                                             : active
-                                                                                ? 'bg-[#53B175] border-[#53B175] text-white'
-                                                                                : 'bg-[#53B175]/10 border-[#53B175]/30 text-[#53B175] hover:bg-[#53B175] hover:text-white'
+                                                                                ? 'bg-primary border-primary text-white'
+                                                                                : 'bg-primary/10 border-primary/30 text-primary hover:bg-primary hover:text-white'
                                                                     }`}
                                                                 >
                                                                     {slab.minQty}+ @ ₹{slab.price}
@@ -531,7 +531,7 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
                             <button
                                 disabled={totalItemCount === 0}
                                 onClick={handleSave}
-                                className="flex-[2] bg-[#53B175] text-white py-[18px] rounded-[22px] font-bold text-[16px] flex items-center justify-center shadow-lg shadow-green-100 disabled:opacity-50 transition-all active:scale-95"
+                                className="flex-[2] bg-primary text-white py-[18px] rounded-[22px] font-bold text-[16px] flex items-center justify-center shadow-lg shadow-green-100 disabled:opacity-50 transition-all active:scale-95"
                             >
                                 <Plus size={20} className="mr-2" />
                                 {initialData ? 'Update Order List' : 'Create Order List'}

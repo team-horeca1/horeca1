@@ -45,7 +45,7 @@ export default function InviteLandingClient({ token }: { token: string }) {
       <div className="rounded-2xl bg-white p-[clamp(1.25rem,4vw,2.5rem)] shadow-sm ring-1 ring-gray-100">
         {state.status === 'loading' && (
           <div className="flex flex-col items-center gap-3 py-10 text-[#7C7C7C]">
-            <Loader2 className="h-8 w-8 animate-spin text-[#53B175]" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p>Opening your invite…</p>
           </div>
         )}
@@ -57,7 +57,7 @@ export default function InviteLandingClient({ token }: { token: string }) {
             <p className="text-[#7C7C7C]">{state.message}</p>
             <Link
               href="/"
-              className="mt-2 inline-flex rounded-2xl bg-[#53B175] px-6 py-3 font-medium text-white"
+              className="mt-2 inline-flex rounded-2xl bg-primary px-6 py-3 font-medium text-white"
             >
               Go to HoReCa Hub
             </Link>
@@ -66,8 +66,8 @@ export default function InviteLandingClient({ token }: { token: string }) {
 
         {state.status === 'ok' && (
           <div className="flex flex-col items-center gap-4 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#53B175]/10">
-              <Gift className="h-7 w-7 text-[#53B175]" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+              <Gift className="h-7 w-7 text-primary" />
             </div>
             <h1 className="text-[clamp(1.35rem,3.5vw,1.9rem)] font-semibold text-[#181725]">
               {state.referrerName} invited you
@@ -77,11 +77,11 @@ export default function InviteLandingClient({ token }: { token: string }) {
             </p>
             <Link
               href="/register"
-              className="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-[#53B175] px-6 py-3 font-medium text-white"
+              className="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-primary px-6 py-3 font-medium text-white"
             >
               Create account
             </Link>
-            <Link href="/login" className="text-sm font-medium text-[#53B175]">
+            <Link href="/login" className="text-sm font-medium text-primary">
               Already have an account? Sign in
             </Link>
           </div>

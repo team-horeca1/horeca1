@@ -58,7 +58,7 @@ const TYPE_LABELS: Record<PromoType, string> = {
 
 const TYPE_COLORS: Record<PromoType, string> = {
   pct_discount: 'bg-blue-50 text-blue-600',
-  flat_discount: 'bg-[#EEF8F1] text-[#299E60]',
+  flat_discount: 'bg-primary-light text-primary',
   bxgy: 'bg-purple-50 text-purple-600',
 };
 
@@ -201,7 +201,7 @@ function PromotionModal({
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="e.g. Summer Sale 10% Off"
-              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50"
+              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50"
             />
           </div>
 
@@ -216,7 +216,7 @@ function PromotionModal({
                     onClick={() => setType(t)}
                     className={cn(
                       'py-2.5 px-3 rounded-[10px] border text-[12px] font-semibold transition-colors text-center',
-                      type === t ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]' : 'border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5]'
+                      type === t ? 'border-primary bg-primary-light text-primary' : 'border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5]'
                     )}
                   >
                     {TYPE_LABELS[t]}
@@ -236,7 +236,7 @@ function PromotionModal({
                     type="number" min="0" max="100" step="0.5"
                     value={discountPct}
                     onChange={e => setDiscountPct(e.target.value)}
-                    className="w-full h-[40px] px-3 pr-8 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50"
+                    className="w-full h-[40px] px-3 pr-8 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50"
                   />
                   <Percent size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#AEAEAE]" />
                 </div>
@@ -248,7 +248,7 @@ function PromotionModal({
                   value={minOrderValue}
                   onChange={e => setMinOrderValue(e.target.value)}
                   placeholder="0 = no minimum"
-                  className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50"
+                  className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50"
                 />
               </div>
             </div>
@@ -264,7 +264,7 @@ function PromotionModal({
                     type="number" min="0" step="1"
                     value={discountFlat}
                     onChange={e => setDiscountFlat(e.target.value)}
-                    className="w-full h-[40px] pl-7 pr-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50"
+                    className="w-full h-[40px] pl-7 pr-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50"
                   />
                 </div>
               </div>
@@ -275,7 +275,7 @@ function PromotionModal({
                   value={minOrderValue}
                   onChange={e => setMinOrderValue(e.target.value)}
                   placeholder="0 = no minimum"
-                  className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50"
+                  className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50"
                 />
               </div>
             </div>
@@ -301,7 +301,7 @@ function PromotionModal({
                       value={buySearch.query}
                       onChange={e => buySearch.setQuery(e.target.value)}
                       placeholder="Search product…"
-                      className="w-full h-[38px] pl-8 pr-4 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/40"
+                      className="w-full h-[38px] pl-8 pr-4 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-primary/40"
                     />
                     {buySearch.results.length > 0 && (
                       <div className="absolute z-20 left-0 right-0 mt-1 bg-white rounded-[10px] border border-[#EEEEEE] shadow-lg overflow-hidden">
@@ -320,12 +320,12 @@ function PromotionModal({
                 <div>
                   <label className="block text-[12px] font-semibold text-[#7C7C7C] mb-1">Buy Qty</label>
                   <input type="number" min="1" value={minQty} onChange={e => setMinQty(e.target.value)}
-                    className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50" />
+                    className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50" />
                 </div>
                 <div>
                   <label className="block text-[12px] font-semibold text-[#7C7C7C] mb-1">Get Qty (free)</label>
                   <input type="number" min="1" value={getQty} onChange={e => setGetQty(e.target.value)}
-                    className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50" />
+                    className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50" />
                 </div>
               </div>
               {/* Get product */}
@@ -346,7 +346,7 @@ function PromotionModal({
                       value={getSearch.query}
                       onChange={e => getSearch.setQuery(e.target.value)}
                       placeholder="Search product…"
-                      className="w-full h-[38px] pl-8 pr-4 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/40"
+                      className="w-full h-[38px] pl-8 pr-4 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-primary/40"
                     />
                     {getSearch.results.length > 0 && (
                       <div className="absolute z-20 left-0 right-0 mt-1 bg-white rounded-[10px] border border-[#EEEEEE] shadow-lg overflow-hidden">
@@ -369,12 +369,12 @@ function PromotionModal({
             <div>
               <label className="block text-[12px] font-semibold text-[#7C7C7C] mb-1">Start Date (optional)</label>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50" />
+                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50" />
             </div>
             <div>
               <label className="block text-[12px] font-semibold text-[#7C7C7C] mb-1">End Date (optional)</label>
               <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50" />
+                className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50" />
             </div>
           </div>
 
@@ -383,13 +383,13 @@ function PromotionModal({
             <label className="block text-[12px] font-semibold text-[#7C7C7C] mb-1">Usage Limit (optional)</label>
             <input type="number" min="1" value={usageLimit} onChange={e => setUsageLimit(e.target.value)}
               placeholder="Unlimited if blank"
-              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50" />
+              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50" />
           </div>
 
           {/* Active toggle */}
           <div className="flex items-center justify-between pt-1">
             <span className="text-[13px] font-semibold text-[#181725]">Active</span>
-            <button onClick={() => setIsActive(v => !v)} className="text-[#299E60]">
+            <button onClick={() => setIsActive(v => !v)} className="text-primary">
               {isActive ? <ToggleRight size={28} /> : <ToggleLeft size={28} className="text-[#AEAEAE]" />}
             </button>
           </div>
@@ -401,7 +401,7 @@ function PromotionModal({
             Cancel
           </button>
           <button onClick={handleSave} disabled={saving}
-            className="h-[38px] px-5 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] disabled:opacity-50 flex items-center gap-2">
+            className="h-[38px] px-5 rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2">
             {saving && <Loader2 size={13} className="animate-spin" />}
             {isEdit ? 'Save Changes' : 'Create Promotion'}
           </button>
@@ -479,7 +479,7 @@ export function StoreOffersTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="animate-spin text-[#299E60]" size={28} />
+        <Loader2 className="animate-spin text-primary" size={28} />
       </div>
     );
   }
@@ -497,7 +497,7 @@ export function StoreOffersTab() {
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-5 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] transition-colors"
+          className="flex items-center gap-2 px-5 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark transition-colors"
         >
           <Plus size={14} />
           New Promotion
@@ -508,7 +508,7 @@ export function StoreOffersTab() {
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: 'Total Promotions', value: promotions.length, color: 'text-[#181725]' },
-          { label: 'Currently Live', value: live.length, color: 'text-[#299E60]' },
+          { label: 'Currently Live', value: live.length, color: 'text-primary' },
           { label: 'Paused / Expired', value: inactive.length, color: 'text-[#AEAEAE]' },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm p-5">
@@ -526,7 +526,7 @@ export function StoreOffersTab() {
           <p className="text-[12px] text-[#AEAEAE] mt-1">Create a discount or deal to attract more orders</p>
           <button
             onClick={() => setShowCreate(true)}
-            className="mt-5 flex items-center gap-2 mx-auto px-5 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54]"
+            className="mt-5 flex items-center gap-2 mx-auto px-5 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark"
           >
             <Plus size={14} /> New Promotion
           </button>
@@ -555,7 +555,7 @@ export function StoreOffersTab() {
                         {TYPE_LABELS[p.type]}
                       </span>
                       {live ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EEF8F1] text-[#299E60]">Live</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary-light text-primary">Live</span>
                       ) : (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#F5F5F5] text-[#AEAEAE]">
                           {p.isActive ? 'Scheduled' : 'Paused'}
@@ -570,7 +570,7 @@ export function StoreOffersTab() {
                     {promoDescription(p)}
                   </div>
 
-                  <div className="col-span-2 text-[11px] text-[#299E60] font-semibold" title="Customers see badge on product + free item in cart">
+                  <div className="col-span-2 text-[11px] text-primary font-semibold" title="Customers see badge on product + free item in cart">
                     {promotionStorefrontLabel(p.type, live)}
                   </div>
 
@@ -582,7 +582,7 @@ export function StoreOffersTab() {
                         <span className="text-[10px]">→ {p.endDate ? fmt(p.endDate) : 'No end'}</span>
                       </>
                     ) : (
-                      <span className="text-[#299E60] text-[11px] font-semibold">Always on</span>
+                      <span className="text-primary text-[11px] font-semibold">Always on</span>
                     )}
                   </div>
 
@@ -601,7 +601,7 @@ export function StoreOffersTab() {
                       className={cn(
                         'transition-colors',
                         toggling === p.id ? 'opacity-50' : '',
-                        p.isActive ? 'text-[#299E60]' : 'text-[#AEAEAE]'
+                        p.isActive ? 'text-primary' : 'text-[#AEAEAE]'
                       )}
                     >
                       {toggling === p.id ? (

@@ -141,7 +141,7 @@ export function CategorySinglePicker({
                     className={cn(
                         'w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left',
                         'border border-[#EEEEEE] rounded-[10px] text-[14px] font-medium bg-[#FAFAFA] hover:bg-white',
-                        'focus:outline-none focus:border-[#53B175]/50 transition-colors',
+                        'focus:outline-none focus:border-primary/50 transition-colors',
                         loading && 'opacity-60'
                     )}
                 >
@@ -176,7 +176,7 @@ export function CategorySinglePicker({
                                     value={query}
                                     onChange={e => setQuery(e.target.value)}
                                     placeholder="Search or type a new category…"
-                                    className="w-full pl-8 pr-2 py-1.5 border border-gray-100 rounded-lg text-[12px] outline-none focus:border-[#53B175]/40"
+                                    className="w-full pl-8 pr-2 py-1.5 border border-gray-100 rounded-lg text-[12px] outline-none focus:border-primary/40"
                                 />
                             </div>
                         </div>
@@ -191,13 +191,13 @@ export function CategorySinglePicker({
                                             onClick={() => selectCat(c)}
                                             className={cn(
                                                 'w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 text-left transition-colors',
-                                                valueId === c.id && 'bg-[#EEF8F1]'
+                                                valueId === c.id && 'bg-primary-light'
                                             )}
                                         >
                                             <Tag size={11} className="text-gray-400 shrink-0" />
                                             <span className="text-[12px] text-[#181725] flex-1 truncate">{c.name}</span>
                                             {c.parentName && <span className="text-[10px] text-gray-400">in {c.parentName}</span>}
-                                            {valueId === c.id && <Check size={11} className="text-[#53B175]" />}
+                                            {valueId === c.id && <Check size={11} className="text-primary" />}
                                         </button>
                                     ))}
                                 </div>
@@ -214,7 +214,7 @@ export function CategorySinglePicker({
                                     disabled={suggesting}
                                     className={cn(
                                         'w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg transition-colors',
-                                        'bg-[#EEF8F1] hover:bg-[#53B175] hover:text-white text-[#2e7d46]',
+                                        'bg-primary-light hover:bg-primary hover:text-white text-primary',
                                         suggesting && 'opacity-60'
                                     )}
                                 >

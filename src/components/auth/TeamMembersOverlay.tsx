@@ -125,7 +125,7 @@ export function TeamMembersOverlay({ isOpen, onClose, accountId }: TeamMembersOv
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-[14px] font-[700] text-[#181725]">{m.user.fullName || '(no name)'}</p>
                       {m.isPrimary && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-100 text-green-700">Primary</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-success-light text-success">Primary</span>
                       )}
                       {m.user.hcidDisplay && (
                         <span className="text-[11px] text-[#AEAEAE] font-mono">{m.user.hcidDisplay}</span>

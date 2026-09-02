@@ -250,7 +250,7 @@ export function FulfilmentActions({ detail, busy, onAction }: Props) {
       )}
 
       {ui === 'delivered' && (
-        <p className="text-[13px] text-emerald-700 font-semibold flex items-center gap-1.5">
+        <p className="text-[13px] text-success font-semibold flex items-center gap-1.5">
           <CheckCircle2 size={16} /> Delivered
         </p>
       )}

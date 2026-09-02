@@ -235,7 +235,7 @@ export function ReturnActions({ detail, busy, onAction }: Props) {
   if (ui === 'closed') {
     return (
       <div className="space-y-2">
-        <p className="text-[13px] text-emerald-700 font-semibold flex items-center gap-1.5">
+        <p className="text-[13px] text-success font-semibold flex items-center gap-1.5">
           <CheckCircle2 size={16} /> Return closed
         </p>
         {hasCn && (
@@ -561,7 +561,7 @@ export function ReturnActions({ detail, busy, onAction }: Props) {
               : 'Boy opens the link and taps Complete pickup — that sends the customer OTP.'}
           </p>
           {detail.pickupLink.usedAt && (
-            <p className="text-[11px] text-emerald-700 font-semibold">
+            <p className="text-[11px] text-success font-semibold">
               Link used (pickup completed via OTP)
             </p>
           )}
@@ -780,7 +780,7 @@ export function ReturnActions({ detail, busy, onAction }: Props) {
       )}
 
       {canDisposition && allDispositioned && pendingDisposition.length === 0 && !hasCn && (
-        <p className="text-[12px] text-emerald-700 font-semibold">Disposition recorded on all lines</p>
+        <p className="text-[12px] text-success font-semibold">Disposition recorded on all lines</p>
       )}
 
       {canCnAfterDisposition && allDispositioned && creditNoteForm}

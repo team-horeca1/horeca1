@@ -124,7 +124,7 @@ export interface GlobalConfig {
 }
 
 export const STATUS_STYLE: Record<WalletStatus, string> = {
-  ACTIVE: 'bg-[#DCFCE7] text-[#16A34A]',
+  ACTIVE: 'bg-success-light text-success',
   BLOCKED: 'bg-[#FFF4E5] text-[#976538]',
   SUSPENDED: 'bg-slate-100 text-slate-700',
   FROZEN: 'bg-cyan-50 text-cyan-800',
@@ -158,7 +158,7 @@ export const TXN_LABEL: Record<string, string> = {
 
 export const DIR_STYLE: Record<StatementRow['direction'], string> = {
   debit: 'bg-[#FFF0F0] text-[#E74C3C]',
-  credit: 'bg-[#DCFCE7] text-[#16A34A]',
+  credit: 'bg-success-light text-success',
   info: 'bg-[#F0F4FF] text-[#3B5BDB]',
 };
 

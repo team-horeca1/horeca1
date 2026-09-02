@@ -21,7 +21,7 @@ interface VendorNotification {
 function notificationAccent(title: string | null, type: string): string {
   const t = (title ?? type).toLowerCase();
   if (t.includes('reject') || t.includes('needs changes')) return 'bg-[#FFF0F0] text-[#E74C3C]';
-  if (t.includes('approv')) return 'bg-[#EEF8F1] text-[#299E60]';
+  if (t.includes('approv')) return 'bg-primary-light text-primary';
   if (t.includes('pending')) return 'bg-[#FFF7E6] text-[#F59E0B]';
   return 'bg-[#F5F5F5] text-[#7C7C7C]';
 }
@@ -71,11 +71,11 @@ export async function handleVendorNotificationClick(
 export function vendorNotificationAccent(title: string | null, type: string): string {
   const t = (title ?? type).toLowerCase();
   if (t.includes('reject') || t.includes('needs changes')) return 'bg-[#FFF0F0] text-[#E74C3C]';
-  if (t.includes('approv')) return 'bg-[#EEF8F1] text-[#299E60]';
+  if (t.includes('approv')) return 'bg-primary-light text-primary';
   if (t.includes('pending')) return 'bg-[#FFF7E6] text-[#F59E0B]';
   if (type === 'order' || t.includes('order')) return 'bg-blue-50 text-blue-600';
   if (t.includes('low') || t.includes('stock')) return 'bg-amber-50 text-amber-600';
-  if (t.includes('payment') || t.includes('credit')) return 'bg-[#EEF8F1] text-[#299E60]';
+  if (t.includes('payment') || t.includes('credit')) return 'bg-primary-light text-primary';
   return 'bg-[#F5F5F5] text-[#7C7C7C]';
 }
 
@@ -166,7 +166,7 @@ export function VendorNotificationBell() {
 
           {loading ? (
             <div className="flex items-center justify-center py-10">
-              <Loader2 size={22} className="animate-spin text-[#299E60]" />
+              <Loader2 size={22} className="animate-spin text-primary" />
             </div>
           ) : recent.length === 0 ? (
             <p className="text-[13px] text-[#AEAEAE] text-center py-10 px-4">No notifications yet</p>
@@ -217,7 +217,7 @@ export function VendorNotificationBell() {
             <Link
               href="/vendor/notifications"
               onClick={() => setOpen(false)}
-              className="text-[13px] font-bold text-[#299E60] hover:underline"
+              className="text-[13px] font-bold text-primary hover:underline"
             >
               View all notifications
             </Link>

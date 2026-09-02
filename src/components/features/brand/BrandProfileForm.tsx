@@ -116,7 +116,7 @@ function CollapsibleSection({
       <button type="button" onClick={() => setOpen(!open)}
         className="w-full px-4 py-3.5 flex items-center justify-between text-[12px] font-bold text-gray-700 hover:bg-[#FAFAFA]/70 transition-colors">
         <span className="flex items-center gap-2">
-          <Icon size={16} className="text-[#299E60]" />
+          <Icon size={16} className="text-primary" />
           {title}
         </span>
         {open ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
@@ -249,11 +249,11 @@ export function BrandProfileForm({
           onChange={v => set({ state: v, billingState: v })} placeholder="State" />
       </div>
       {value.latitude != null && value.longitude != null && (
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-            <Check size={12} className="text-emerald-700" strokeWidth={3} />
+        <div className="rounded-xl border border-primary/20 bg-primary-light/60 p-3 flex items-center gap-2">
+          <div className="w-5 h-5 rounded-full bg-primary-light flex items-center justify-center shrink-0">
+            <Check size={12} className="text-primary" strokeWidth={3} />
           </div>
-          <p className="text-[11.5px] text-emerald-900/80">
+          <p className="text-[11.5px] text-primary">
             GPS coordinates captured ({value.latitude.toFixed(5)}, {value.longitude.toFixed(5)})
           </p>
         </div>
@@ -302,7 +302,7 @@ export function BrandProfileForm({
                         className={cn(
                           'px-3 py-1.5 rounded-full text-[12px] font-bold border transition-colors',
                           selected
-                            ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]'
+                            ? 'border-primary bg-primary-light text-primary'
                             : 'border-[#EEEEEE] bg-white text-gray-500 hover:border-gray-300',
                         )}>
                         {cat}
@@ -359,7 +359,7 @@ export function BrandProfileForm({
                       className={cn(
                         'px-3 py-1.5 rounded-full text-[12px] font-bold border transition-colors',
                         selected
-                          ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]'
+                          ? 'border-primary bg-primary-light text-primary'
                           : 'border-[#EEEEEE] bg-white text-gray-500 hover:border-gray-300',
                       )}>
                       {seg}
@@ -513,7 +513,7 @@ export function BrandProfileForm({
                     type="checkbox"
                     checked={value.creditSupport === true}
                     onChange={e => set({ creditSupport: e.target.checked })}
-                    className="accent-[#299E60] w-4 h-4"
+                    className="accent-primary w-4 h-4"
                   />
                   Enable DiSCCO credit for this brand
                 </label>

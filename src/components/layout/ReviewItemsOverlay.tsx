@@ -23,7 +23,7 @@ export function ReviewItemsOverlay({ isOpen, onClose }: ReviewItemsOverlayProps)
     return (
         <div className="fixed inset-0 z-[11000] bg-white flex flex-col md:hidden animate-in fade-in slide-in-from-right duration-300">
             {/* Persistent Top Green Line */}
-            <div className="w-full h-2 bg-[#33a852] shrink-0 sticky top-0 z-[10002]" />
+            <div className="w-full h-2 bg-primary shrink-0 sticky top-0 z-[10002]" />
 
             {/* Header */}
             <div className="flex items-center justify-between p-4 bg-white sticky top-2 z-10 border-b border-gray-50/50">
@@ -42,7 +42,7 @@ export function ReviewItemsOverlay({ isOpen, onClose }: ReviewItemsOverlayProps)
                     {ITEMS.map((item) => (
                         <div key={item.id} className="p-4 flex items-center justify-between group">
                             <div className="flex items-start gap-4 flex-1 min-w-0">
-                                <div className="mt-2 w-2 h-2 rounded-full bg-[#33a852] shrink-0" />
+                                <div className="mt-2 w-2 h-2 rounded-full bg-primary shrink-0" />
                                 <div className="flex-1 min-w-0">
                                     <h3 className="text-[15px] font-bold text-gray-800 leading-tight">{item.name}</h3>
                                     <p className="text-[11px] text-gray-400 font-medium mt-0.5">{item.weight}</p>
@@ -53,7 +53,7 @@ export function ReviewItemsOverlay({ isOpen, onClose }: ReviewItemsOverlayProps)
                                 <div className="flex items-center gap-4 bg-white border border-gray-100 rounded-full px-2 py-0.5 shadow-sm scale-90">
                                     <button className="text-gray-400 p-1"><Minus size={14} /></button>
                                     <span className="text-[13px] font-bold text-gray-800">{item.quantity}</span>
-                                    <button className="text-[#33a852] p-1"><Plus size={14} /></button>
+                                    <button className="text-primary p-1"><Plus size={14} /></button>
                                 </div>
                                 <div className="text-right">
                                     <div className="text-[13px] font-bold text-gray-800">$ {item.price.toFixed(2)} {item.weight.split(' ')[1]}</div>
@@ -67,13 +67,13 @@ export function ReviewItemsOverlay({ isOpen, onClose }: ReviewItemsOverlayProps)
                 {/* Coupon Code */}
                 <div className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-lg shadow-sm active:scale-[0.98] transition-transform cursor-pointer">
                     <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full border border-gray-50 flex items-center justify-center text-[#33a852]">
+                        <div className="w-10 h-10 rounded-full border border-gray-50 flex items-center justify-center text-primary">
                             <TicketPercent size={24} />
                         </div>
                         <div className="border-l border-gray-100 pl-4">
                             <div className="flex items-center gap-2">
                                 <h4 className="text-[15px] font-bold text-gray-800">Add a coupan code</h4>
-                                <span className="bg-[#33a852] text-white text-[8px] px-1.5 py-0.5 rounded font-black uppercase">New</span>
+                                <span className="bg-primary text-white text-[8px] px-1.5 py-0.5 rounded font-black uppercase">New</span>
                             </div>
                             <p className="text-[10px] text-gray-400 font-medium">* apply coupan code to get discount</p>
                         </div>
@@ -120,7 +120,7 @@ export function ReviewItemsOverlay({ isOpen, onClose }: ReviewItemsOverlayProps)
                 {/* Savings Banner */}
                 <div className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg shadow-sm">
                     <span className="text-[13px] font-bold text-gray-700">Saving on this order</span>
-                    <span className="bg-[#33a852] text-white text-[15px] px-3 py-1 rounded-md font-black">$ 12.68</span>
+                    <span className="bg-primary text-white text-[15px] px-3 py-1 rounded-md font-black">$ 12.68</span>
                 </div>
             </div>
 

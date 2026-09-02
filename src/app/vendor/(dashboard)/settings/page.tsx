@@ -402,7 +402,7 @@ function VendorSettingsContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
-        <Loader2 size={36} className="animate-spin text-[#299E60]" />
+        <Loader2 size={36} className="animate-spin text-primary" />
       </div>
     );
   }
@@ -504,7 +504,7 @@ export default function VendorSettingsPage() {
   return (
     <Suspense fallback={(
       <div className="flex items-center justify-center h-[60vh]">
-        <Loader2 size={36} className="animate-spin text-[#299E60]" />
+        <Loader2 size={36} className="animate-spin text-primary" />
       </div>
     )}>
       <VendorSettingsContent />

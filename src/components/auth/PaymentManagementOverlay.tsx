@@ -94,7 +94,7 @@ export function PaymentManagementOverlay({ isOpen, onClose }: PaymentManagementO
                                             <div className="flex items-center gap-2 mb-0.5">
                                                 <span className="text-[14px] md:text-[16px] font-[700] text-[#181725]">{method.label}</span>
                                                 {method.isDefault && (
-                                                    <CheckCircle2 size={14} className="text-[#53B175] fill-[#E8F5E9] md:w-4 md:h-4" />
+                                                    <CheckCircle2 size={14} className="text-primary fill-[#E8F5E9] md:w-4 md:h-4" />
                                                 )}
                                             </div>
                                             <p className="text-[12px] md:text-[13px] text-[#7C7C7C] font-[500]">{method.detail}</p>
@@ -103,7 +103,7 @@ export function PaymentManagementOverlay({ isOpen, onClose }: PaymentManagementO
                                             {!method.isDefault && (
                                                 <button
                                                     onClick={() => handleSetDefault(method.id)}
-                                                    className="text-[10px] md:text-[11px] font-[600] text-[#53B175] bg-[#E8F5E9] px-2.5 py-1 md:px-3 md:py-1.5 rounded-full active:scale-95 transition-all hover:bg-[#53B175] hover:text-white"
+                                                    className="text-[10px] md:text-[11px] font-[600] text-primary bg-primary-light px-2.5 py-1 md:px-3 md:py-1.5 rounded-full active:scale-95 transition-all hover:bg-primary hover:text-white"
                                                 >
                                                     Set Default
                                                 </button>
@@ -133,7 +133,7 @@ export function PaymentManagementOverlay({ isOpen, onClose }: PaymentManagementO
                                         className={cn(
                                             "px-4 py-2 md:px-5 md:py-2.5 rounded-full text-[11px] md:text-[12px] font-[700] uppercase transition-all border",
                                             newMethod.type === type
-                                                ? "bg-[#53B175] text-white border-[#53B175]"
+                                                ? "bg-primary text-white border-primary"
                                                 : "bg-white text-[#181725] border-gray-200 hover:border-gray-300"
                                         )}
                                     >
@@ -146,18 +146,18 @@ export function PaymentManagementOverlay({ isOpen, onClose }: PaymentManagementO
                                 placeholder={newMethod.type === 'upi' ? 'UPI App Name' : newMethod.type === 'card' ? 'Card Name' : 'Bank Name'}
                                 value={newMethod.label}
                                 onChange={(e) => setNewMethod(prev => ({ ...prev, label: e.target.value }))}
-                                className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-[#F7F8FA] border border-gray-100 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 transition-all"
+                                className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-[#F7F8FA] border border-gray-100 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
                             />
                             <input
                                 type="text"
                                 placeholder={newMethod.type === 'upi' ? 'UPI ID (e.g. name@upi)' : newMethod.type === 'card' ? 'Card number (last 4 digits)' : 'Account details'}
                                 value={newMethod.detail}
                                 onChange={(e) => setNewMethod(prev => ({ ...prev, detail: e.target.value }))}
-                                className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-[#F7F8FA] border border-gray-100 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 transition-all"
+                                className="w-full px-3.5 py-2.5 md:px-4 md:py-3 bg-[#F7F8FA] border border-gray-100 rounded-lg md:rounded-xl text-[13px] md:text-[14px] font-medium outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
                             />
                             <div className="flex gap-2 md:gap-3 pt-1">
                                 <button onClick={() => setIsAdding(false)} className="flex-1 py-2.5 md:py-3 border border-gray-200 rounded-xl md:rounded-2xl text-[13px] md:text-[14px] font-[600] text-[#181725] hover:bg-gray-50 transition-colors">Cancel</button>
-                                <button onClick={handleAdd} className="flex-1 py-2.5 md:py-3 bg-[#53B175] rounded-xl md:rounded-2xl text-[13px] md:text-[14px] font-[700] text-white active:bg-[#48a068] hover:bg-[#48a068] transition-colors">Save</button>
+                                <button onClick={handleAdd} className="flex-1 py-2.5 md:py-3 bg-primary rounded-xl md:rounded-2xl text-[13px] md:text-[14px] font-[700] text-white active:bg-primary-dark hover:bg-primary-dark transition-colors">Save</button>
                             </div>
                         </div>
                     )}
@@ -167,7 +167,7 @@ export function PaymentManagementOverlay({ isOpen, onClose }: PaymentManagementO
                 <div className="fixed md:static bottom-0 left-0 right-0 px-5 md:px-6 pt-3 pb-5 md:py-5 bg-white border-t border-gray-100">
                     <button
                         onClick={() => setIsAdding(true)}
-                        className="w-full bg-[#53B175] hover:bg-[#48a068] text-white font-bold py-3.5 md:py-4 rounded-xl md:rounded-2xl active:scale-[0.98] transition-all text-[14px] md:text-[15px] flex items-center justify-center gap-2 shadow-lg shadow-green-100"
+                        className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3.5 md:py-4 rounded-xl md:rounded-2xl active:scale-[0.98] transition-all text-[14px] md:text-[15px] flex items-center justify-center gap-2 shadow-lg shadow-green-100"
                     >
                         <Plus size={18} />
                         Add Payment Method

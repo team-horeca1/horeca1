@@ -330,7 +330,7 @@ export default function DisccoCreditDetailPage() {
                   {new Date(t.createdAt).toLocaleString('en-IN')}
                 </p>
               </div>
-              <p className={`text-[13px] font-bold shrink-0 ${t.type === 'REPAYMENT' || t.type === 'REVERSAL' ? 'text-[#53B175]' : 'text-[#181725]'}`}>
+              <p className={`text-[13px] font-bold shrink-0 ${t.type === 'REPAYMENT' || t.type === 'REVERSAL' ? 'text-success' : 'text-[#181725]'}`}>
                 {inr(t.amount)}
               </p>
             </div>
@@ -344,7 +344,7 @@ export default function DisccoCreditDetailPage() {
           {wallet.repayments!.map((r) => (
             <div key={r.id} className="flex justify-between text-[13px]">
               <span className="text-gray-600">{fmtDate(r.createdAt)} · {r.status}</span>
-              <span className="font-semibold text-[#53B175]">{inr(r.amount)}</span>
+              <span className="font-semibold text-success">{inr(r.amount)}</span>
             </div>
           ))}
         </div>
@@ -366,7 +366,7 @@ export default function DisccoCreditDetailPage() {
 }
 
 function Field({ label, value, accent }: { label: string; value: string; accent?: 'green' | 'red' }) {
-  const color = accent === 'green' ? 'text-[#53B175]' : accent === 'red' ? 'text-rose-600' : 'text-[#181725]';
+  const color = accent === 'green' ? 'text-success' : accent === 'red' ? 'text-rose-600' : 'text-[#181725]';
   return (
     <div>
       <p className="text-[11px] text-gray-400 font-medium">{label}</p>

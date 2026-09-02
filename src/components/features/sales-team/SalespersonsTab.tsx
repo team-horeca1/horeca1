@@ -85,7 +85,7 @@ export function SalespersonsTab({ perms, onChanged }: Props) {
         {canCreate && (
           <button
             onClick={() => setShowCreate(true)}
-            className="h-[40px] px-4 bg-[#299E60] hover:bg-[#238a54] text-white rounded-[10px] text-[13px] font-bold flex items-center gap-2 shadow-sm transition-colors"
+            className="h-[40px] px-4 bg-primary hover:bg-primary-dark text-white rounded-[10px] text-[13px] font-bold flex items-center gap-2 shadow-sm transition-colors"
           >
             <Plus size={15} /> Add Salesperson
           </button>
@@ -95,7 +95,7 @@ export function SalespersonsTab({ perms, onChanged }: Props) {
       <div className="bg-white border border-[#EEEEEE] rounded-[12px] overflow-hidden">
         {loading ? (
           <div className="py-12 flex justify-center">
-            <Loader2 size={24} className="animate-spin text-[#299E60]" />
+            <Loader2 size={24} className="animate-spin text-primary" />
           </div>
         ) : rows.length === 0 ? (
           <div className="py-12 text-center">
@@ -128,7 +128,7 @@ export function SalespersonsTab({ perms, onChanged }: Props) {
                   <td className="px-4 py-3 text-center text-[#7C7C7C]">{sp._count?.accruals ?? 0}</td>
                   <td className="px-4 py-3 text-center">
                     {sp.isActive ? (
-                      <span className="text-[10.5px] font-bold text-[#299E60] bg-[#ECFDF5] px-2 py-0.5 rounded-full">Active</span>
+                      <span className="text-[10.5px] font-bold text-primary bg-success-light px-2 py-0.5 rounded-full">Active</span>
                     ) : (
                       <span className="text-[10.5px] font-bold text-[#7C7C7C] bg-[#F5F5F5] px-2 py-0.5 rounded-full">Disabled</span>
                     )}
@@ -148,7 +148,7 @@ export function SalespersonsTab({ perms, onChanged }: Props) {
                         <button
                           onClick={() => handleToggleActive(sp)}
                           title={sp.isActive ? 'Disable' : 'Enable'}
-                          className={`p-1.5 hover:bg-[#F5F5F5] rounded-[8px] ${sp.isActive ? 'text-red-500' : 'text-[#299E60]'}`}
+                          className={`p-1.5 hover:bg-[#F5F5F5] rounded-[8px] ${sp.isActive ? 'text-red-500' : 'text-primary'}`}
                         >
                           <Power size={14} />
                         </button>
@@ -241,7 +241,7 @@ function SalespersonDialog({
               type="text" value={name} autoFocus
               onChange={(e) => setName(e.target.value)}
               placeholder="Ramesh Kumar"
-              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all"
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
@@ -250,7 +250,7 @@ function SalespersonDialog({
                 type="text" value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="SR-001"
-                className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] font-mono outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+                className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] font-mono outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all"
               />
             </Field>
             <Field label="Phone (10-digit)">
@@ -258,7 +258,7 @@ function SalespersonDialog({
                 type="tel" value={phone}
                 onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 placeholder="9876543210"
-                className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+                className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all"
               />
             </Field>
           </div>
@@ -267,7 +267,7 @@ function SalespersonDialog({
               type="email" value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="ramesh@vendor.com"
-              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all"
             />
           </Field>
           {error && (
@@ -287,7 +287,7 @@ function SalespersonDialog({
           <button
             onClick={handleSubmit}
             disabled={saving || !name.trim()}
-            className="h-[38px] px-5 bg-[#299E60] hover:bg-[#238a54] disabled:bg-gray-300 text-white rounded-[10px] text-[12.5px] font-bold flex items-center gap-2 transition-colors"
+            className="h-[38px] px-5 bg-primary hover:bg-primary-dark disabled:bg-gray-300 text-white rounded-[10px] text-[12.5px] font-bold flex items-center gap-2 transition-colors"
           >
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
             {editing ? 'Save' : 'Add'}

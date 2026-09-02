@@ -120,7 +120,7 @@ export function AccountOverviewOverlay({
         <div className="flex-1 overflow-y-auto px-4 md:px-6 pt-4 md:pt-5 pb-28 md:pb-6">
           {loading ? (
             <div className="py-12 flex justify-center">
-              <Loader2 className="animate-spin text-[#53B175]" />
+              <Loader2 className="animate-spin text-primary" />
             </div>
           ) : !account ? (
             <p className="text-[13px] text-[#666] py-12 text-center bg-white rounded-xl border border-gray-100">
@@ -135,18 +135,18 @@ export function AccountOverviewOverlay({
                     onClose();
                     onOpenOutlets?.();
                   }}
-                  className="bg-white border border-gray-100 rounded-xl p-4 hover:border-[#53B175]/30 hover:shadow-sm transition-all text-left flex flex-col justify-between"
+                  className="bg-white border border-gray-100 rounded-xl p-4 hover:border-primary/30 hover:shadow-sm transition-all text-left flex flex-col justify-between"
                 >
                   <div className="flex items-center justify-between w-full mb-2">
-                    <span className="w-8 h-8 rounded-lg bg-[#E8F5E9] flex items-center justify-center">
-                      <MapPin size={16} className="text-[#53B175]" />
+                    <span className="w-8 h-8 rounded-lg bg-primary-light flex items-center justify-center">
+                      <MapPin size={16} className="text-primary" />
                     </span>
                     <ChevronRight size={14} className="text-gray-300" />
                   </div>
                   <div>
                     <p className="text-[10px] font-semibold text-[#AEAEAE] uppercase tracking-wider">Outlets</p>
                     <p className="text-[18px] font-bold text-[#181725]">{account.outlets.length}</p>
-                    <p className={`text-[9.5px] mt-0.5 font-medium ${incomplete > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    <p className={`text-[9.5px] mt-0.5 font-medium ${incomplete > 0 ? 'text-amber-600' : 'text-primary'}`}>
                       {incomplete > 0 ? `${incomplete} need address` : 'All complete'}
                     </p>
                   </div>
@@ -157,7 +157,7 @@ export function AccountOverviewOverlay({
                     onClose();
                     onOpenMembers?.();
                   }}
-                  className="bg-white border border-gray-100 rounded-xl p-4 hover:border-[#53B175]/30 hover:shadow-sm transition-all text-left flex flex-col justify-between"
+                  className="bg-white border border-gray-100 rounded-xl p-4 hover:border-primary/30 hover:shadow-sm transition-all text-left flex flex-col justify-between"
                 >
                   <div className="flex items-center justify-between w-full mb-2">
                     <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
@@ -177,7 +177,7 @@ export function AccountOverviewOverlay({
                     onClose();
                     onOpenRoles?.();
                   }}
-                  className="bg-white border border-gray-100 rounded-xl p-4 hover:border-[#53B175]/30 hover:shadow-sm transition-all text-left flex flex-col justify-between"
+                  className="bg-white border border-gray-100 rounded-xl p-4 hover:border-primary/30 hover:shadow-sm transition-all text-left flex flex-col justify-between"
                 >
                   <div className="flex items-center justify-between w-full mb-2">
                     <span className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
@@ -196,7 +196,7 @@ export function AccountOverviewOverlay({
               {/* Business Details Section */}
               <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-4 border-b border-gray-50 pb-2.5">
-                  <Building2 size={16} className="text-[#53B175]" />
+                  <Building2 size={16} className="text-primary" />
                   <h3 className="text-[14px] font-bold text-[#181725]">Business Details</h3>
                 </div>
 

@@ -31,7 +31,7 @@ const AUTH_BADGE: Record<AuthStatus, { label: string; className: string; icon: R
   },
   approved: {
     label: 'Approved',
-    className: 'bg-[#EEF8F1] text-[#299E60]',
+    className: 'bg-primary-light text-primary',
     icon: <CheckCircle2 size={11} />,
   },
   rejected: {
@@ -72,7 +72,7 @@ export default function VendorBrandMappingsIndexPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="w-7 h-7 animate-spin text-[#53B175]" />
+        <Loader2 className="w-7 h-7 animate-spin text-primary" />
       </div>
     );
   }
@@ -82,7 +82,7 @@ export default function VendorBrandMappingsIndexPage() {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <h1 className="text-[clamp(1.125rem,2vw+0.5rem,1.375rem)] font-black text-[#181725] flex items-center gap-2">
-            <GitMerge size={20} className="text-[#53B175]" />
+            <GitMerge size={20} className="text-primary" />
             Brand Mappings
           </h1>
           <p className="text-[13px] text-gray-500 mt-1">
@@ -95,7 +95,7 @@ export default function VendorBrandMappingsIndexPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search brands…"
-            className="w-full h-10 pl-9 pr-3 border border-gray-200 rounded-xl text-[13px] bg-white outline-none focus:border-[#53B175]/50"
+            className="w-full h-10 pl-9 pr-3 border border-gray-200 rounded-xl text-[13px] bg-white outline-none focus:border-primary/50"
           />
         </div>
       </div>
@@ -126,7 +126,7 @@ export default function VendorBrandMappingsIndexPage() {
               <Link
                 key={brand.id}
                 href={`/vendor/brand-mappings/${brand.id}`}
-                className="group bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm p-5 flex flex-col gap-4 hover:border-[#53B175]/40 hover:shadow-md transition-all"
+                className="group bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm p-5 flex flex-col gap-4 hover:border-primary/40 hover:shadow-md transition-all"
               >
                 <div className="flex items-start gap-3">
                   <div className="relative w-12 h-12 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden shrink-0">
@@ -139,7 +139,7 @@ export default function VendorBrandMappingsIndexPage() {
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[15px] font-bold text-[#181725] truncate group-hover:text-[#299E60] transition-colors">
+                    <p className="text-[15px] font-bold text-[#181725] truncate group-hover:text-primary transition-colors">
                       {brand.name}
                     </p>
                     <p className="text-[12px] text-gray-400 mt-0.5">
@@ -148,7 +148,7 @@ export default function VendorBrandMappingsIndexPage() {
                   </div>
                   <ArrowRight
                     size={16}
-                    className="text-gray-300 group-hover:text-[#53B175] group-hover:translate-x-0.5 transition-all shrink-0 mt-1"
+                    className="text-gray-300 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0 mt-1"
                   />
                 </div>
 
@@ -163,7 +163,7 @@ export default function VendorBrandMappingsIndexPage() {
                     <div
                       className={cn(
                         'h-full w-full rounded-full transition-transform origin-left',
-                        progress === 100 ? 'bg-[#299E60]' : progress > 0 ? 'bg-[#53B175]' : 'bg-transparent',
+                        progress === 100 ? 'bg-primary' : progress > 0 ? 'bg-primary' : 'bg-transparent',
                       )}
                       style={{ transform: `scaleX(${progress / 100})` }}
                     />

@@ -403,7 +403,7 @@ export default function DeliveryLinkClient({ token, fulfilmentId }: DeliveryLink
 
         {(data.status === 'delivered' || data.usedAt || data.order.status === 'delivered') && (
           <div
-            className="flex items-center gap-2 rounded-[12px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] font-bold text-emerald-800"
+            className="flex items-center gap-2 rounded-[12px] border border-success/30 bg-success-light px-4 py-3 text-[13px] font-bold text-success"
             data-testid="delivery-link-delivered"
           >
             <CheckCircle2 className="h-4 w-4" />

@@ -53,14 +53,14 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
   } = props;
 
   const fieldClass = cn(
-    'w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40',
+    'w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-primary/40',
     readOnly && 'bg-gray-50 text-gray-600 cursor-not-allowed',
   );
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 pb-1 border-b border-[#F5F5F5]">
-        <Store size={18} className="text-[#299E60]" />
+        <Store size={18} className="text-primary" />
         <h2 className="text-[16px] font-bold text-[#181725]">Store profile</h2>
         {readOnly && (
           <span className="ml-auto text-[10px] font-extrabold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
@@ -89,7 +89,7 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
               rows={4}
               disabled={readOnly}
               className={cn(
-                'w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-[#299E60]/40 resize-none',
+                'w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-primary/40 resize-none',
                 readOnly && 'bg-gray-50 text-gray-600 cursor-not-allowed',
               )}
             />
@@ -129,7 +129,7 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
                 checked={creditEnabled}
                 onChange={(e) => setCreditEnabled(e.target.checked)}
                 disabled={readOnly}
-                className="w-5 h-5 accent-[#299E60]"
+                className="w-5 h-5 accent-primary"
               />
               <span className="text-[14px] font-bold text-[#181725]">Enable credit for customers</span>
             </label>
@@ -176,7 +176,7 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
               rows={2}
               disabled={readOnly}
               className={cn(
-                'w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-[#299E60]/40 resize-none',
+                'w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-primary/40 resize-none',
                 readOnly && 'bg-gray-50 text-gray-600 cursor-not-allowed',
               )}
             />

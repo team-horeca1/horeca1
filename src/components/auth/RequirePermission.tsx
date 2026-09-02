@@ -20,7 +20,7 @@ export function RequirePermission({ perm, children, fallback }: RequirePermissio
   if (perms.loading || (status === 'loading' && !perms.permissions.length)) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="animate-spin text-[#299E60]" size={32} />
+        <Loader2 className="animate-spin text-primary" size={32} />
       </div>
     );
   }

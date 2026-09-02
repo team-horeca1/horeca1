@@ -86,15 +86,15 @@ export function CompleteProfileBanner() {
               Unlock your personalised feed!
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] font-bold">
-              <span className={cn("inline-flex items-center gap-1 transition-colors duration-300", data.fields.pincode ? "text-emerald-700" : "text-orange-600 animate-pulse")}>
+              <span className={cn("inline-flex items-center gap-1 transition-colors duration-300", data.fields.pincode ? "text-success" : "text-orange-600 animate-pulse")}>
                 {data.fields.pincode ? "✓" : "○"} Pincode
               </span>
               <span className="text-orange-300 font-normal">•</span>
-              <span className={cn("inline-flex items-center gap-1 transition-colors duration-300", data.fields.businessName ? "text-emerald-700" : "text-orange-600 animate-pulse")}>
+              <span className={cn("inline-flex items-center gap-1 transition-colors duration-300", data.fields.businessName ? "text-success" : "text-orange-600 animate-pulse")}>
                 {data.fields.businessName ? "✓" : "○"} Business
               </span>
               <span className="text-orange-300 font-normal">•</span>
-              <span className={cn("inline-flex items-center gap-1 transition-colors duration-300", data.fields.fullName ? "text-emerald-700" : "text-orange-600 animate-pulse")}>
+              <span className={cn("inline-flex items-center gap-1 transition-colors duration-300", data.fields.fullName ? "text-success" : "text-orange-600 animate-pulse")}>
                 {data.fields.fullName ? "✓" : "○"} Full Name
               </span>
             </div>

@@ -30,15 +30,15 @@ export function StatusTimeline({ steps, currentKey, className }: StatusTimelineP
               <div
                 className={cn(
                   'w-[22px] h-[22px] rounded-full flex items-center justify-center shrink-0',
-                  done && 'bg-[#299E60] text-white',
-                  active && 'bg-[#EEF8F1] text-[#299E60] ring-2 ring-[#299E60]/30',
+                  done && 'bg-primary text-white',
+                  active && 'bg-primary-light text-primary ring-2 ring-primary/30',
                   pending && 'bg-[#F5F5F5] text-[#AEAEAE]',
                 )}
               >
                 {done ? <CheckCircle2 size={13} /> : <Circle size={10} fill="currentColor" />}
               </div>
               {idx < steps.length - 1 && (
-                <div className={cn('w-px flex-1 min-h-[20px] my-1', done ? 'bg-[#299E60]' : 'bg-[#EEEEEE]')} />
+                <div className={cn('w-px flex-1 min-h-[20px] my-1', done ? 'bg-primary' : 'bg-[#EEEEEE]')} />
               )}
             </div>
             <div className={cn('pb-4', idx === steps.length - 1 && 'pb-0')}>

@@ -262,7 +262,7 @@ export default function VendorBusinessesPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="animate-spin text-[#299E60]" size={28} />
+        <Loader2 className="animate-spin text-primary" size={28} />
       </div>
     );
   }
@@ -314,7 +314,7 @@ export default function VendorBusinessesPage() {
           <button
             type="button"
             onClick={() => setShowAddBusiness(true)}
-            className="inline-flex items-center gap-1.5 h-[36px] px-3.5 bg-[#299E60] hover:bg-[#238a54] text-white text-[13px] font-bold rounded-[8px] transition-colors"
+            className="inline-flex items-center gap-1.5 h-[36px] px-3.5 bg-primary hover:bg-primary-dark text-white text-[13px] font-bold rounded-[8px] transition-colors"
           >
             <Plus size={15} />
             Add Business
@@ -324,7 +324,7 @@ export default function VendorBusinessesPage() {
 
       {businesses.length === 0 ? (
         <div className="bg-white border border-[#EEEEEE] rounded-[12px] px-6 py-10 text-center">
-          <Building2 size={24} className="text-[#299E60] mx-auto mb-2" />
+          <Building2 size={24} className="text-primary mx-auto mb-2" />
           <h2 className="text-[15px] font-bold text-[#181725] mb-1">No businesses yet</h2>
           <p className="text-[13px] text-[#7C7C7C] mb-4">
             Create a business for mapping (no approval). The first online store waits for super-admin approval before customers can see it.
@@ -332,7 +332,7 @@ export default function VendorBusinessesPage() {
           <button
             type="button"
             onClick={() => setShowAddBusiness(true)}
-            className="inline-flex items-center gap-1.5 h-[36px] px-4 bg-[#299E60] hover:bg-[#238a54] text-white text-[13px] font-bold rounded-[8px]"
+            className="inline-flex items-center gap-1.5 h-[36px] px-4 bg-primary hover:bg-primary-dark text-white text-[13px] font-bold rounded-[8px]"
           >
             <Plus size={15} />
             Add Business
@@ -350,7 +350,7 @@ export default function VendorBusinessesPage() {
             return (
               <div
                 key={ba.id}
-                className="bg-white border border-[#EEEEEE] rounded-[10px] p-3.5 hover:border-[#299E60]/40 hover:shadow-sm transition-all cursor-pointer"
+                className="bg-white border border-[#EEEEEE] rounded-[10px] p-3.5 hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer"
                 data-testid="business-card"
                 onClick={() => router.push(`/vendor/businesses/${ba.id}`)}
               >
@@ -378,7 +378,7 @@ export default function VendorBusinessesPage() {
                 <div className="inline-flex items-center gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
                   <Link
                     href={`/vendor/businesses/${ba.id}`}
-                    className="inline-flex items-center gap-1 h-[30px] px-2.5 text-[12px] font-bold text-white bg-[#299E60] hover:bg-[#238a54] rounded-[6px]"
+                    className="inline-flex items-center gap-1 h-[30px] px-2.5 text-[12px] font-bold text-white bg-primary hover:bg-primary-dark rounded-[6px]"
                     data-testid="view-business"
                   >
                     View
@@ -458,7 +458,7 @@ export default function VendorBusinessesPage() {
                         <div className="inline-flex items-center gap-1 flex-wrap justify-end">
                           <Link
                             href={`/vendor/businesses/${ba.id}`}
-                            className="inline-flex items-center gap-1 h-[30px] px-2.5 text-[12px] font-bold text-white bg-[#299E60] hover:bg-[#238a54] rounded-[6px]"
+                            className="inline-flex items-center gap-1 h-[30px] px-2.5 text-[12px] font-bold text-white bg-primary hover:bg-primary-dark rounded-[6px]"
                             data-testid="view-business"
                           >
                             View
@@ -526,7 +526,7 @@ export default function VendorBusinessesPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 h-[36px] bg-[#299E60] hover:bg-[#238a54] text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 h-[36px] bg-primary hover:bg-primary-dark text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {submitting && <Loader2 size={14} className="animate-spin" />}
                   Create
@@ -572,7 +572,7 @@ export default function VendorBusinessesPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 h-[36px] bg-[#299E60] hover:bg-[#238a54] text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 h-[36px] bg-primary hover:bg-primary-dark text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {submitting && <Loader2 size={14} className="animate-spin" />}
                   Save

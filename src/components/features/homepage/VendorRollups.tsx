@@ -193,8 +193,7 @@ export function TopRatedVendors() {
             <div className="max-w-[var(--container-max)] mx-auto">
                 <div className="px-4 md:px-[var(--container-padding)]">
                     <SectionHeader
-                        title="Top Rated Suppliers"
-                        subtitle="Highest-rated verified wholesale suppliers across India"
+                        title="Popular Suppliers Near You"
                         actionLabel="View all →"
                         actionHref="/vendors?sort=rating"
                     />

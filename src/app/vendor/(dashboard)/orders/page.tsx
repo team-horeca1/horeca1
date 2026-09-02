@@ -35,7 +35,7 @@ function orderFulfillmentChip(order: VendorOrder) {
         <p className="text-[10px] text-[#7C7C7C] mt-0.5 leading-snug">
             {deliver && <span>Deliver: <span className="font-semibold text-[#181725]">{deliver}</span></span>}
             {deliver && fulfill && ' · '}
-            {fulfill && <span>Fulfill: <span className="font-semibold text-[#299E60]">{fulfill}</span></span>}
+            {fulfill && <span>Fulfill: <span className="font-semibold text-primary">{fulfill}</span></span>}
         </p>
     );
 }
@@ -44,7 +44,7 @@ function orderFulfillmentChip(order: VendorOrder) {
 
 const STATUS_STYLE: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-700 border-gray-200',
-    delivered: 'bg-[#EEF8F1] text-[#299E60] border-[#D1FAE5]',
+    delivered: 'bg-primary-light text-primary border-[#D1FAE5]',
     confirmed: 'bg-blue-50 text-blue-700 border-blue-100',
     processing: 'bg-indigo-50 text-indigo-700 border-indigo-100',
     pending: 'bg-[#FFF8EB] text-[#D97706] border-[#FEF3C7]',
@@ -56,7 +56,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 const PAYMENT_STYLE: Record<string, string> = {
-    paid: 'bg-[#EEF8F1] text-[#299E60]',
+    paid: 'bg-primary-light text-primary',
     unpaid: 'bg-[#FFF4E5] text-[#976538]',
     partial: 'bg-blue-50 text-blue-600',
     refunded: 'bg-[#F3F4F6] text-[#6B7280]',
@@ -466,7 +466,7 @@ export default function VendorOrdersPage() {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             data-testid="orders-search"
-                            className="h-[40px] w-full bg-white border border-[#EEEEEE] rounded-[10px] pl-10 pr-4 text-[13px] outline-none placeholder:text-[#AEAEAE] focus:border-[#299E60]/40 shadow-sm"
+                            className="h-[40px] w-full bg-white border border-[#EEEEEE] rounded-[10px] pl-10 pr-4 text-[13px] outline-none placeholder:text-[#AEAEAE] focus:border-primary/40 shadow-sm"
                         />
                     </div>
                     <button
@@ -490,8 +490,8 @@ export default function VendorOrdersPage() {
                         className={cn(
                             'px-4 py-2 rounded-[10px] text-[13px] font-bold transition-all',
                             activeTab === tab
-                                ? 'bg-[#299E60] text-white shadow-sm shadow-[#299E60]/30'
-                                : 'bg-white text-[#7C7C7C] border border-[#EEEEEE] hover:border-[#299E60]/30'
+                                ? 'bg-primary text-white shadow-sm shadow-primary/30'
+                                : 'bg-white text-[#7C7C7C] border border-[#EEEEEE] hover:border-primary/30'
                         )}
                     >
                         {TAB_LABELS[tab] || tab.replace(/_/g, ' ')}
@@ -507,7 +507,7 @@ export default function VendorOrdersPage() {
                     max={today}
                     onChange={e => setDateFrom(e.target.value)}
                     title="From date"
-                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#181725] outline-none focus:border-[#299E60]/40 bg-white shadow-sm"
+                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#181725] outline-none focus:border-primary/40 bg-white shadow-sm"
                 />
                 <input
                     type="date"
@@ -516,12 +516,12 @@ export default function VendorOrdersPage() {
                     max={today}
                     onChange={e => setDateTo(e.target.value)}
                     title="To date"
-                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#181725] outline-none focus:border-[#299E60]/40 bg-white shadow-sm"
+                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#181725] outline-none focus:border-primary/40 bg-white shadow-sm"
                 />
                 <select
                     value={paymentStatusFilter}
                     onChange={e => setPaymentStatusFilter(e.target.value)}
-                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#7C7C7C] outline-none focus:border-[#299E60]/40 bg-white shadow-sm"
+                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#7C7C7C] outline-none focus:border-primary/40 bg-white shadow-sm"
                 >
                     <option value="">All Payment Status</option>
                     <option value="paid">Paid</option>
@@ -533,7 +533,7 @@ export default function VendorOrdersPage() {
                     value={paymentMethodFilter}
                     onChange={(e) => setPaymentMethodFilter(e.target.value)}
                     data-testid="payment-method-filter"
-                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#7C7C7C] outline-none focus:border-[#299E60]/40 bg-white shadow-sm"
+                    className="h-[36px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] text-[#7C7C7C] outline-none focus:border-primary/40 bg-white shadow-sm"
                 >
                     <option value="">All Methods</option>
                     <option value="cod">Cash / COD</option>
@@ -554,7 +554,7 @@ export default function VendorOrdersPage() {
 
             {selectedIds.length > 0 && (
                 <div
-                    className="flex flex-wrap items-center gap-3 bg-[#EEF8F1] border border-[#D1FAE5] rounded-[12px] px-4 py-3"
+                    className="flex flex-wrap items-center gap-3 bg-primary-light border border-[#D1FAE5] rounded-[12px] px-4 py-3"
                     data-testid="bulk-actions-bar"
                 >
                     <span className="text-[13px] font-bold text-[#181725]">{selectedIds.length} selected</span>
@@ -575,7 +575,7 @@ export default function VendorOrdersPage() {
                         disabled={bulkBusy}
                         data-testid="bulk-update-status"
                         onClick={() => runBulk('update_status')}
-                        className="h-[36px] px-4 rounded-[10px] bg-[#299E60] text-white text-[12px] font-bold disabled:opacity-50"
+                        className="h-[36px] px-4 rounded-[10px] bg-primary text-white text-[12px] font-bold disabled:opacity-50"
                     >
                         Update Status
                     </button>
@@ -584,7 +584,7 @@ export default function VendorOrdersPage() {
                         disabled={bulkBusy}
                         data-testid="bulk-print-invoices"
                         onClick={() => runBulk('print_invoices')}
-                        className="h-[36px] px-4 rounded-[10px] border border-[#299E60] text-[#299E60] text-[12px] font-bold disabled:opacity-50"
+                        className="h-[36px] px-4 rounded-[10px] border border-primary text-primary text-[12px] font-bold disabled:opacity-50"
                     >
                         Print Invoices
                     </button>
@@ -602,7 +602,7 @@ export default function VendorOrdersPage() {
             <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <Loader2 className="animate-spin text-[#299E60]" size={28} />
+                        <Loader2 className="animate-spin text-primary" size={28} />
                     </div>
                 ) : (
                     <>
@@ -697,7 +697,7 @@ export default function VendorOrdersPage() {
                                                     )}
                                                     <Link
                                                         href={`/vendor/orders/${order.id}`}
-                                                        className="text-[13px] font-bold text-[#181725] hover:text-[#299E60] transition-colors"
+                                                        className="text-[13px] font-bold text-[#181725] hover:text-primary transition-colors"
                                                     >
                                                         {order.orderNumber}
                                                     </Link>
@@ -758,7 +758,7 @@ export default function VendorOrdersPage() {
                                                         <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
                                                     </div>
                                                     {busyId === order.id && (
-                                                        <Loader2 size={13} className="animate-spin text-[#299E60] ml-1.5 shrink-0" />
+                                                        <Loader2 size={13} className="animate-spin text-primary ml-1.5 shrink-0" />
                                                     )}
                                                 </div>
                                             </td>
@@ -766,7 +766,7 @@ export default function VendorOrdersPage() {
                                                 <div className="flex justify-center">
                                                     <Link
                                                         href={`/vendor/orders/${order.id}`}
-                                                        className="h-[34px] px-3.5 bg-[#EEF8F1] border border-[#299E60]/10 hover:bg-[#D1FAE5] text-[#299E60] text-[12px] font-bold rounded-[8px] transition-all flex items-center justify-center gap-1 shadow-sm active:scale-97 whitespace-nowrap"
+                                                        className="h-[34px] px-3.5 bg-primary-light border border-primary/10 hover:bg-[#D1FAE5] text-primary text-[12px] font-bold rounded-[8px] transition-all flex items-center justify-center gap-1 shadow-sm active:scale-97 whitespace-nowrap"
                                                     >
                                                         <Eye size={13} />
                                                         <span>View Details</span>

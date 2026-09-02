@@ -102,7 +102,7 @@ function CreateModal({ onClose, onCreated }: CreateModalProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Cafe Pricing, Bulk Buyers"
-              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
               autoFocus
             />
           </div>
@@ -117,7 +117,7 @@ function CreateModal({ onClose, onCreated }: CreateModalProps) {
               step="0.5"
               value={discountPercent}
               onChange={(e) => setDiscountPercent(e.target.value)}
-              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
             />
           </div>
           <div>
@@ -131,7 +131,7 @@ function CreateModal({ onClose, onCreated }: CreateModalProps) {
                   type="date"
                   value={validFrom}
                   onChange={(e) => setValidFrom(e.target.value)}
-                  className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+                  className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
                 />
               </div>
               <div>
@@ -140,7 +140,7 @@ function CreateModal({ onClose, onCreated }: CreateModalProps) {
                   type="date"
                   value={validTo}
                   onChange={(e) => setValidTo(e.target.value)}
-                  className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+                  className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
                 />
               </div>
             </div>
@@ -158,7 +158,7 @@ function CreateModal({ onClose, onCreated }: CreateModalProps) {
           <button
             onClick={handleCreate}
             disabled={saving}
-            className="px-5 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="px-5 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             {saving ? <Loader2 size={13} className="animate-spin" /> : null}
             Create
@@ -219,7 +219,7 @@ export default function VendorPriceListsPage() {
           <Link
             href="/vendor/customer-groups"
             title="Create groups of customers to give a whole group its own prices"
-            className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] bg-white border border-[#EEEEEE] text-[#7C7C7C] text-[13px] font-bold hover:border-[#299E60]/40 hover:text-[#299E60] transition-colors"
+            className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] bg-white border border-[#EEEEEE] text-[#7C7C7C] text-[13px] font-bold hover:border-primary/40 hover:text-primary transition-colors"
           >
             <Users size={15} />
             Customer groups
@@ -227,14 +227,14 @@ export default function VendorPriceListsPage() {
           <Link
             href="/vendor/price-lists/workspace"
             title="Edit prices across all your lists at once"
-            className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] bg-white border border-[#EEEEEE] text-[#7C7C7C] text-[13px] font-bold hover:border-[#299E60]/40 hover:text-[#299E60] transition-colors"
+            className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] bg-white border border-[#EEEEEE] text-[#7C7C7C] text-[13px] font-bold hover:border-primary/40 hover:text-primary transition-colors"
           >
             <Grid3x3 size={15} />
             Bulk pricing grid
           </Link>
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] transition-colors"
+            className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark transition-colors"
           >
             <Plus size={15} />
             New Price List
@@ -244,7 +244,7 @@ export default function VendorPriceListsPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="animate-spin text-[#299E60]" size={28} />
+          <Loader2 className="animate-spin text-primary" size={28} />
         </div>
       ) : priceLists.length === 0 ? (
         <div className="bg-white rounded-[14px] border border-[#EEEEEE] py-16 text-center shadow-sm">
@@ -253,7 +253,7 @@ export default function VendorPriceListsPage() {
           <p className="text-[12px] text-[#AEAEAE] mt-1">A price list lets you give chosen customers their own prices. Create one to get started.</p>
           <button
             onClick={() => setShowCreate(true)}
-            className="mt-4 flex items-center gap-2 mx-auto px-4 h-[36px] rounded-[10px] bg-[#299E60] text-white text-[12px] font-bold hover:bg-[#238a54] transition-colors"
+            className="mt-4 flex items-center gap-2 mx-auto px-4 h-[36px] rounded-[10px] bg-primary text-white text-[12px] font-bold hover:bg-primary-dark transition-colors"
           >
             <Plus size={13} />
             Create first price list
@@ -270,9 +270,9 @@ export default function VendorPriceListsPage() {
                     <p className="text-[15px] font-bold text-[#181725] truncate">{pl.name}</p>
                     <span className={cn(
                       'shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide',
-                      pl.isActive ? 'bg-[#EEF8F1] text-[#299E60]' : 'bg-[#F5F5F5] text-[#AEAEAE]',
+                      pl.isActive ? 'bg-primary-light text-primary' : 'bg-[#F5F5F5] text-[#AEAEAE]',
                     )}>
-                      <span className={cn('w-1.5 h-1.5 rounded-full', pl.isActive ? 'bg-[#299E60]' : 'bg-[#AEAEAE]')} />
+                      <span className={cn('w-1.5 h-1.5 rounded-full', pl.isActive ? 'bg-primary' : 'bg-[#AEAEAE]')} />
                       {pl.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </div>
@@ -319,7 +319,7 @@ export default function VendorPriceListsPage() {
                 </div>
                 <a
                   href={`/vendor/price-lists/${pl.id}`}
-                  className="ml-auto text-[#299E60] font-bold hover:underline flex items-center gap-1"
+                  className="ml-auto text-primary font-bold hover:underline flex items-center gap-1"
                 >
                   Edit <ArrowRight size={12} />
                 </a>

@@ -98,7 +98,7 @@ export default function CollectionDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-8 h-8 border-2 border-[#53B175] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -109,7 +109,7 @@ export default function CollectionDetailPage() {
         <Package size={40} className="text-gray-300 mb-4" />
         <h1 className="text-[22px] font-extrabold text-[#181725] mb-2">Collection not found</h1>
         <p className="text-[14px] text-gray-500 mb-6">This collection may have been removed or the link is outdated.</p>
-        <Link href="/collections" className="text-[14px] font-bold text-[#299E60] hover:opacity-80">
+        <Link href="/collections" className="text-[14px] font-bold text-primary hover:opacity-80">
           Browse all collections
         </Link>
       </div>
@@ -153,7 +153,7 @@ export default function CollectionDetailPage() {
           <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-gray-100">
             <Package size={36} className="text-gray-300 mb-3" />
             <p className="text-[15px] font-semibold text-gray-500">No products in this collection yet.</p>
-            <Link href="/vendors" className="mt-4 text-[14px] font-bold text-[#299E60] hover:opacity-80">
+            <Link href="/vendors" className="mt-4 text-[14px] font-bold text-primary hover:opacity-80">
               Browse vendors instead
             </Link>
           </div>
@@ -190,7 +190,7 @@ export default function CollectionDetailPage() {
                     {vendorName ? (
                       <p className="mt-1 text-[11px] text-gray-400 font-medium truncate">{vendorName}</p>
                     ) : null}
-                    <p className="mt-2 text-[14px] font-extrabold text-[#299E60]">
+                    <p className="mt-2 text-[14px] font-extrabold text-primary">
                       {formatPrice(product.basePrice)}
                     </p>
                   </div>

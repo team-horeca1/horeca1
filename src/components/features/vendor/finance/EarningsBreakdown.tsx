@@ -43,7 +43,7 @@ export function EarningsBreakdown({
             <span className="font-semibold text-[#181725]">{r.sign}{inr(r.value)}</span>
           </div>
         ))}
-        <div className="flex justify-between gap-2 pt-1 border-t border-[#EEEEEE] font-bold text-[#299E60]">
+        <div className="flex justify-between gap-2 pt-1 border-t border-[#EEEEEE] font-bold text-primary">
           <span>You receive</span>
           <span>{inr(net)}</span>
         </div>
@@ -64,7 +64,7 @@ export function EarningsBreakdown({
       </div>
       <div className="mt-3 pt-3 border-t border-[#EEEEEE] flex items-center justify-between">
         <span className="text-[14px] font-bold text-[#181725]">You receive</span>
-        <span className="text-[18px] font-bold text-[#299E60]">{inr(net)}</span>
+        <span className="text-[18px] font-bold text-primary">{inr(net)}</span>
       </div>
       <p className="text-[11px] text-[#AEAEAE] mt-2">
         Platform fee is set by HoReCa1. {isCustomRate ? 'Your store has a custom rate.' : 'Using the global default rate.'}
@@ -82,7 +82,7 @@ export function PlatformFeeCalculator({ pct }: { pct: number }) {
       <p className="text-[12px] font-bold text-[#475569] mb-2">Example calculation</p>
       <p className="text-[13px] text-[#334155] leading-relaxed">
         If a vendor sells <strong>{inr(gross)}</strong> at <strong>{pct}%</strong> platform fee,
-        the vendor wallet is credited <strong className="text-[#299E60]">{inr(net)}</strong>
+        the vendor wallet is credited <strong className="text-primary">{inr(net)}</strong>
         (online orders also deduct 2% gateway fee).
       </p>
     </div>

@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import { Clock, MapPin, Plus, Save, Trash2, Pencil, X, ArrowRight, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -76,7 +77,7 @@ export function DeliveryTab(props: DeliveryTabProps) {
           onClick={() => setConfigOutletId(o.id)}
           className={cn(
             'px-3 py-1.5 rounded-lg text-[12px] font-bold border',
-            configOutletId === o.id ? 'bg-[#299E60] text-white border-[#299E60]' : 'bg-white text-[#7C7C7C] border-[#EEEEEE]',
+            configOutletId === o.id ? 'bg-primary text-white border-primary' : 'bg-white text-[#7C7C7C] border-[#EEEEEE]',
           )}
         >
           {o.name}
@@ -101,9 +102,9 @@ export function DeliveryTab(props: DeliveryTabProps) {
             onChange={(e) => setNewPincode(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onAddArea()}
             placeholder="Pincode"
-            className="h-[40px] w-[140px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40"
+            className="h-[40px] w-[140px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-primary/40"
           />
-          <button type="button" onClick={onAddArea} disabled={addingArea || !newPincode.trim()} className="h-[40px] px-4 bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-50">
+          <button type="button" onClick={onAddArea} disabled={addingArea || !newPincode.trim()} className="h-[40px] px-4 bg-primary text-white rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-50">
             <Plus size={14} /> {addingArea ? 'Adding...' : 'Add'}
           </button>
         </div>
@@ -115,7 +116,7 @@ export function DeliveryTab(props: DeliveryTabProps) {
               <div key={area.id} className={cn('flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-[10px] border text-[12px] font-bold', area.isActive ? 'bg-[#FFF8E1] border-[#F59E0B]/20 text-[#976538]' : 'bg-[#F5F5F5] border-[#EEEEEE] text-[#AEAEAE]')}>
                 <MapPin size={12} />
                 {area.pincode}
-                <button type="button" onClick={() => onToggleArea(area)} className="relative ml-1 inline-flex h-[16px] w-[28px] shrink-0 cursor-pointer items-center rounded-full" style={{ backgroundColor: area.isActive ? '#299E60' : '#D1D5DB' }}>
+                <button type="button" onClick={() => onToggleArea(area)} className="relative ml-1 inline-flex h-[16px] w-[28px] shrink-0 cursor-pointer items-center rounded-full" style={{ backgroundColor: area.isActive ? CDL.primary : '#D1D5DB' }}>
                   <span className="inline-block h-[12px] w-[12px] rounded-full bg-white shadow-sm transition-transform" style={{ transform: area.isActive ? 'translateX(14px)' : 'translateX(2px)' }} />
                 </button>
                 <button type="button" onClick={() => onDeleteArea(area)} className="p-0.5 rounded hover:bg-red-50"><X size={12} className="text-[#E74C3C]" /></button>
@@ -273,7 +274,7 @@ export function DeliveryTab(props: DeliveryTabProps) {
                       <p className="text-[14px] font-bold text-[#181725]">{DAY_NAMES[slot.dayOfWeek]}</p>
                       <span className={cn(
                         'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide',
-                        slot.isActive ? 'bg-[#EEF8F1] text-[#299E60]' : 'bg-[#FDF2F2] text-[#E74C3C]',
+                        slot.isActive ? 'bg-primary-light text-primary' : 'bg-[#FDF2F2] text-[#E74C3C]',
                       )}>
                         {slot.isActive ? 'Active' : 'Paused'}
                       </span>
@@ -295,7 +296,7 @@ export function DeliveryTab(props: DeliveryTabProps) {
                     type="button"
                     onClick={() => onToggleSlot(slot)}
                     className="relative inline-flex h-[20px] w-[36px] shrink-0 items-center rounded-full"
-                    style={{ backgroundColor: slot.isActive ? '#299E60' : '#D1D5DB' }}
+                    style={{ backgroundColor: slot.isActive ? CDL.primary : '#D1D5DB' }}
                     aria-label={slot.isActive ? 'Pause slot' : 'Activate slot'}
                   >
                     <span
@@ -321,15 +322,15 @@ export function DeliveryTab(props: DeliveryTabProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-[13px] font-bold text-[#181725] mb-1.5">Default MOQ</label>
-            <input type="number" min={1} value={defaultMOQ} onChange={(e) => setDefaultMOQ(e.target.value)} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40" />
+            <input type="number" min={1} value={defaultMOQ} onChange={(e) => setDefaultMOQ(e.target.value)} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-primary/40" />
           </div>
           <div>
             <label className="block text-[13px] font-bold text-[#181725] mb-1.5">Delivery fee (₹)</label>
-            <input type="number" min={0} step={0.01} value={deliveryFeeVal} onChange={(e) => setDeliveryFeeVal(e.target.value)} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40" />
+            <input type="number" min={0} step={0.01} value={deliveryFeeVal} onChange={(e) => setDeliveryFeeVal(e.target.value)} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-primary/40" />
           </div>
           <div>
             <label className="block text-[13px] font-bold text-[#181725] mb-1.5">Free delivery above (₹)</label>
-            <input type="number" min={0} step={0.01} value={freeDeliveryAbove} onChange={(e) => setFreeDeliveryAbove(e.target.value)} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40" />
+            <input type="number" min={0} step={0.01} value={freeDeliveryAbove} onChange={(e) => setFreeDeliveryAbove(e.target.value)} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-primary/40" />
           </div>
         </div>
       </section>

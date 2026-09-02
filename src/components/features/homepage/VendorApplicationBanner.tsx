@@ -97,7 +97,7 @@ export function VendorApplicationBanner() {
   // === APPROVED BANNER ===
   if (appStatus.status === 'approved') {
     return (
-      <div className="w-full bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-500 text-white relative z-40">
+      <div className="w-full bg-gradient-to-r from-primary via-primary-dark to-primary text-white relative z-40">
         <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] flex items-center justify-between gap-3 py-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="shrink-0 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
@@ -120,7 +120,7 @@ export function VendorApplicationBanner() {
                 const setupCompleted = localStorage.getItem(setupKey) || localStorage.getItem('vendor_setup_completed');
                 router.push(setupCompleted ? '/vendor/dashboard' : '/vendor/setup');
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-bold bg-white text-green-700 hover:bg-green-50 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-bold bg-white text-success hover:bg-primary-light transition-colors"
             >
               Go to Dashboard
               <ArrowRight size={14} />

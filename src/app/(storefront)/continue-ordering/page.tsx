@@ -225,7 +225,7 @@ export default function ContinueOrderingPage() {
     const getSubtitleColor = (type: ContinueCard['subtitleIcon']) => {
         switch (type) {
             case 'cart': return 'text-[#e67e22]';
-            case 'order': return 'text-[#299e60]';
+            case 'order': return 'text-primary';
             case 'list': return 'text-[#3b82f6]';
             case 'viewed': return 'text-[#8b5cf6]';
         }
@@ -278,7 +278,7 @@ export default function ContinueOrderingPage() {
                                                 </div>
                                             ))}
                                             {card.vendorLogos.length > 4 && (
-                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 rounded-full bg-[#53B175] text-white text-[8px] md:text-[9px] font-bold flex items-center justify-center border border-white z-20">
+                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 rounded-full bg-primary text-white text-[8px] md:text-[9px] font-bold flex items-center justify-center border border-white z-20">
                                                     +{card.vendorLogos.length - 4}
                                                 </div>
                                             )}
@@ -323,7 +323,7 @@ export default function ContinueOrderingPage() {
                         </div>
                         <h2 className="text-[20px] font-bold text-[#181725] mb-2">No recent activity</h2>
                         <p className="text-[14px] text-gray-400 max-w-[280px] mx-auto">Items you view, add to cart, or order will appear here to help you quickly continue your shopping.</p>
-                        <Link href="/" className="mt-8 text-[#53B175] font-bold hover:underline">Start exploring vendors</Link>
+                        <Link href="/" className="mt-8 text-primary font-bold hover:underline">Start exploring vendors</Link>
                     </div>
                 )}
             </main>

@@ -33,7 +33,7 @@ interface AdminOrder {
 
 const STATUS_STYLE: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-700 border-gray-200',
-    delivered: 'bg-[#DCFCE7] text-[#16A34A] border-[#BBF7D0]',
+    delivered: 'bg-success-light text-success border-[#BBF7D0]',
     confirmed: 'bg-blue-50 text-blue-700 border-blue-100',
     processing: 'bg-indigo-50 text-indigo-700 border-indigo-100',
     pending: 'bg-[#FFF8EB] text-[#D97706] border-[#FEF3C7]',
@@ -145,7 +145,7 @@ export default function OrdersPage() {
 
                 {/* Stat 3: Delivered Orders */}
                 <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-5 shadow-sm hover:shadow-md transition-all flex items-center gap-4">
-                    <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-[12px] bg-[#DCFCE7] flex items-center justify-center text-[#16A34A]">
+                    <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-[12px] bg-success-light flex items-center justify-center text-success">
                         <CheckCircle2 size={22} />
                     </div>
                     <div>

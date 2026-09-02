@@ -203,7 +203,7 @@ export function CommissionsTab({ salespersons, perms }: Props) {
       <div className="bg-white border border-[#EEEEEE] rounded-[12px] overflow-hidden">
         {loading ? (
           <div className="py-12 flex justify-center">
-            <Loader2 size={24} className="animate-spin text-[#299E60]" />
+            <Loader2 size={24} className="animate-spin text-primary" />
           </div>
         ) : accruals.length === 0 ? (
           <div className="py-12 text-center">
@@ -246,7 +246,7 @@ export function CommissionsTab({ salespersons, perms }: Props) {
                         {a.status === 'pending' && (
                           <button
                             onClick={() => handleApprove(a)}
-                            className="px-2 py-1 text-[11px] font-bold bg-[#ECFDF5] hover:bg-[#D1FAE5] text-[#299E60] rounded-[6px]"
+                            className="px-2 py-1 text-[11px] font-bold bg-success-light hover:bg-[#D1FAE5] text-primary rounded-[6px]"
                           >
                             Approve
                           </button>
@@ -299,7 +299,7 @@ function Pill({ tone, children }: { tone: 'amber' | 'blue' | 'green'; children: 
   const map = {
     amber: 'bg-amber-50 text-amber-700',
     blue: 'bg-blue-50 text-blue-700',
-    green: 'bg-emerald-50 text-emerald-700',
+    green: 'bg-success-light text-success',
   };
   return <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${map[tone]}`}>{children}</span>;
 }
@@ -308,7 +308,7 @@ function StatusPill({ status }: { status: Status }) {
   const map: Record<Status, string> = {
     pending: 'bg-amber-50 text-amber-700',
     approved: 'bg-blue-50 text-blue-700',
-    paid: 'bg-emerald-50 text-emerald-700',
+    paid: 'bg-success-light text-success',
     cancelled: 'bg-gray-50 text-gray-500',
   };
   return <span className={`text-[10.5px] font-bold capitalize px-2 py-0.5 rounded-full ${map[status]}`}>{status}</span>;
@@ -375,7 +375,7 @@ function PaidDialog({
               value={reference}
               onChange={(e) => setReference(e.target.value)}
               placeholder="UPI txn ID, NEFT ref, cheque no…"
-              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all"
             />
           </div>
           {error && (
@@ -392,7 +392,7 @@ function PaidDialog({
           <button
             onClick={handleSubmit}
             disabled={saving || !reference.trim()}
-            className="h-[38px] px-5 bg-[#299E60] hover:bg-[#238a54] disabled:bg-gray-300 text-white rounded-[10px] text-[12.5px] font-bold flex items-center gap-2 transition-colors"
+            className="h-[38px] px-5 bg-primary hover:bg-primary-dark disabled:bg-gray-300 text-white rounded-[10px] text-[12.5px] font-bold flex items-center gap-2 transition-colors"
           >
             {saving ? <Loader2 size={13} className="animate-spin" /> : <IndianRupee size={13} />}
             Mark paid

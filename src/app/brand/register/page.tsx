@@ -378,7 +378,7 @@ export default function BrandRegisterPage() {
   if (sessionStatus === 'loading' && !session) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
-        <Loader2 size={28} className="animate-spin text-[#299E60]" />
+        <Loader2 size={28} className="animate-spin text-primary" />
       </div>
     );
   }
@@ -387,8 +387,8 @@ export default function BrandRegisterPage() {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center p-4">
         <div className="bg-white rounded-[24px] border border-[#EEEEEE] p-8 max-w-md w-full text-center shadow-sm">
-          <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 size={32} className="text-[#299E60]" />
+          <div className="w-16 h-16 rounded-full bg-primary-light flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 size={32} className="text-primary" />
           </div>
           <h1 className="text-[22px] font-[800] text-[#181725] mb-2">Application Submitted</h1>
           <p className="text-[14px] text-gray-500 mb-4">
@@ -433,8 +433,8 @@ export default function BrandRegisterPage() {
             <div key={s.id}
               className={cn(
                 'flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border text-[12px] font-bold transition-colors',
-                step === s.id ? 'border-[#299E60] bg-[#EEF8F1]/50 text-[#299E60]' : 'border-[#EEEEEE] bg-white text-gray-400',
-                step > s.id && 'border-emerald-200 text-emerald-700',
+                step === s.id ? 'border-primary bg-primary-light/50 text-primary' : 'border-[#EEEEEE] bg-white text-gray-400',
+                step > s.id && 'border-primary/30 text-primary',
               )}>
               <s.icon size={16} />
               {s.label}
@@ -467,7 +467,7 @@ export default function BrandRegisterPage() {
                       className={cn(
                         'flex-1 py-2.5 rounded-lg text-[12px] font-bold transition-colors',
                         verifyChannel === ch
-                          ? 'bg-white text-[#299E60] shadow-sm'
+                          ? 'bg-white text-primary shadow-sm'
                           : 'text-gray-500 hover:text-gray-700',
                       )}
                     >
@@ -490,7 +490,7 @@ export default function BrandRegisterPage() {
                     setError('');
                   }}
                   placeholder="10-digit mobile"
-                  className="w-full h-[48px] px-4 border border-[#EEEEEE] rounded-xl text-[15px] outline-none focus:border-[#299E60]/40"
+                  className="w-full h-[48px] px-4 border border-[#EEEEEE] rounded-xl text-[15px] outline-none focus:border-primary/40"
                   disabled={phoneVerified}
                 />
               </div>
@@ -506,7 +506,7 @@ export default function BrandRegisterPage() {
                     setError('');
                   }}
                   placeholder="you@example.com"
-                  className="w-full h-[48px] px-4 border border-[#EEEEEE] rounded-xl text-[15px] outline-none focus:border-[#299E60]/40"
+                  className="w-full h-[48px] px-4 border border-[#EEEEEE] rounded-xl text-[15px] outline-none focus:border-primary/40"
                   disabled={emailVerified}
                 />
               </div>
@@ -525,13 +525,13 @@ export default function BrandRegisterPage() {
                         maxLength={4}
                         value={d}
                         onChange={e => handleOtpInput(i, e.target.value)}
-                        className="w-14 h-14 text-center text-[20px] font-bold border border-[#EEEEEE] rounded-xl outline-none focus:border-[#299E60]/40"
+                        className="w-14 h-14 text-center text-[20px] font-bold border border-[#EEEEEE] rounded-xl outline-none focus:border-primary/40"
                       />
                     ))}
                   </div>
                   <p className="text-center text-[12px] text-gray-400 mt-3">
                     {resendTimer > 0 ? `Resend in ${resendTimer}s` : (
-                      <button type="button" onClick={sendOtp} className="text-[#299E60] font-bold">Resend OTP</button>
+                      <button type="button" onClick={sendOtp} className="text-primary font-bold">Resend OTP</button>
                     )}
                   </p>
                 </div>

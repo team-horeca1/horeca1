@@ -52,12 +52,12 @@ export function VendorOutletStrip() {
     if (loading) {
         return (
             <div
-                className="relative z-10 w-full bg-emerald-50/60 border-b border-emerald-100/80 px-[clamp(1rem,2.5vw,2rem)] py-[clamp(0.4rem,0.8vw,0.7rem)] flex items-center gap-3 text-[12px] text-emerald-700/70"
+                className="relative z-10 w-full bg-primary-light/60 border-b border-primary/20 px-[clamp(1rem,2.5vw,2rem)] py-[clamp(0.4rem,0.8vw,0.7rem)] flex items-center gap-3 text-[12px] text-primary/70"
                 aria-busy="true"
                 aria-label="Loading active outlet"
             >
                 <Loader2 size={14} className="animate-spin shrink-0" aria-hidden />
-                <span className="h-3 w-40 max-w-[50%] rounded bg-emerald-100/80 animate-pulse" />
+                <span className="h-3 w-40 max-w-[50%] rounded bg-primary-light animate-pulse" />
             </div>
         );
     }
@@ -87,26 +87,26 @@ export function VendorOutletStrip() {
     };
 
     return (
-        <div className="relative z-10 w-full bg-emerald-50/70 border-b border-emerald-100 px-[clamp(1rem,2.5vw,2rem)] py-[clamp(0.45rem,0.9vw,0.7rem)]">
+        <div className="relative z-10 w-full bg-primary-light/70 border-b border-primary/20 px-[clamp(1rem,2.5vw,2rem)] py-[clamp(0.45rem,0.9vw,0.7rem)]">
             <div className="flex flex-wrap items-center gap-x-[clamp(0.75rem,1.5vw,1.25rem)] gap-y-1.5">
                 <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-[28px] h-[28px] rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                        <Warehouse size={14} className="text-emerald-700" />
+                    <div className="w-[28px] h-[28px] rounded-full bg-primary-light flex items-center justify-center shrink-0">
+                        <Warehouse size={14} className="text-primary" />
                     </div>
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700/80 shrink-0">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-primary/80 shrink-0">
                         Warehouse
                     </span>
-                    <span className="text-[13px] font-bold text-emerald-900 truncate">
+                    <span className="text-[13px] font-bold text-primary truncate">
                         {currentOutlet?.name ?? 'No outlet selected'}
                     </span>
                     {currentOutlet?.pincode && (
-                        <span className="hidden sm:inline-flex items-center gap-1 text-[12px] text-emerald-800/70 font-medium">
-                            <MapPin size={11} className="text-emerald-700/70" />
+                        <span className="hidden sm:inline-flex items-center gap-1 text-[12px] text-primary/70 font-medium">
+                            <MapPin size={11} className="text-primary/70" />
                             {currentOutlet.pincode}
                         </span>
                     )}
                     {activePinCount != null && (
-                        <span className="hidden md:inline text-[11px] text-emerald-700/70 font-medium">
+                        <span className="hidden md:inline text-[11px] text-primary/70 font-medium">
                             · {activePinCount === 0 ? 'No delivery pins' : `${activePinCount} delivery pin${activePinCount === 1 ? '' : 's'}`}
                         </span>
                     )}
@@ -128,7 +128,7 @@ export function VendorOutletStrip() {
                             type="button"
                             onClick={() => setIsPickerOpen((v) => !v)}
                             disabled={switching}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 hover:bg-white border border-emerald-200 text-emerald-800 text-[12px] font-bold transition-colors disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 hover:bg-white border border-primary/30 text-primary text-[12px] font-bold transition-colors disabled:opacity-50"
                         >
                             {switching ? (
                                 <Loader2 size={12} className="animate-spin" />
@@ -144,7 +144,7 @@ export function VendorOutletStrip() {
                     ) : (
                         <Link
                             href="/vendor/outlets?action=add"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/70 hover:bg-white border border-emerald-200 text-emerald-800 text-[11px] font-bold transition-colors"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/70 hover:bg-white border border-primary/30 text-primary text-[11px] font-bold transition-colors"
                         >
                             <Plus size={11} />
                             Add warehouse
@@ -169,11 +169,11 @@ export function VendorOutletStrip() {
                                             onClick={() => handleOutletPick(o.id)}
                                             disabled={switching}
                                             className={cn(
-                                                'w-full px-4 py-2.5 hover:bg-emerald-50 flex items-center gap-3 text-left transition-colors disabled:opacity-50',
-                                                isActive && 'bg-emerald-50/50',
+                                                'w-full px-4 py-2.5 hover:bg-primary-light flex items-center gap-3 text-left transition-colors disabled:opacity-50',
+                                                isActive && 'bg-primary-light/50',
                                             )}
                                         >
-                                            <Warehouse size={14} className="text-emerald-700 shrink-0" />
+                                            <Warehouse size={14} className="text-primary shrink-0" />
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-[13px] font-semibold text-[#181725] truncate">
                                                     {o.name}
@@ -194,7 +194,7 @@ export function VendorOutletStrip() {
                                                 </span>
                                             )}
                                             {isActive && (
-                                                <Check size={14} className="text-emerald-600 shrink-0" />
+                                                <Check size={14} className="text-primary shrink-0" />
                                             )}
                                         </button>
                                     );
@@ -205,7 +205,7 @@ export function VendorOutletStrip() {
                                     <Link
                                         href={`/vendor/settings?tab=delivery&outletId=${currentOutlet.id}`}
                                         onClick={() => setIsPickerOpen(false)}
-                                        className="flex items-center gap-2 px-4 py-2.5 text-emerald-800 hover:bg-emerald-50/60 transition-colors text-[12px] font-bold"
+                                        className="flex items-center gap-2 px-4 py-2.5 text-primary hover:bg-primary-light/60 transition-colors text-[12px] font-bold"
                                     >
                                         <MapPin size={14} />
                                         Delivery pins for {currentOutlet.name}

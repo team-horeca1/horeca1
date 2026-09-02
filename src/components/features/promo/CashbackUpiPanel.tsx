@@ -180,10 +180,10 @@ export function CashbackUpiPanel({
                         }}
                         placeholder="Search ref, name, UPI…"
                         aria-label="Search payouts"
-                        className="w-full pl-8 pr-8 py-1.5 rounded-lg border border-gray-200 text-[12px] font-medium focus:outline-none focus:border-[#53B175]"
+                        className="w-full pl-8 pr-8 py-1.5 rounded-lg border border-gray-200 text-[12px] font-medium focus:outline-none focus:border-primary"
                     />
                     {refreshing ? (
-                        <Loader2 size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#53B175] animate-spin" />
+                        <Loader2 size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-primary animate-spin" />
                     ) : search ? (
                         <button
                             type="button"
@@ -200,7 +200,7 @@ export function CashbackUpiPanel({
                 </div>
                 <button
                     onClick={() => setInviteOpen(true)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#53B175] text-white text-[11px] font-bold hover:bg-[#48a068] transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-white text-[11px] font-bold hover:bg-primary-dark transition-colors cursor-pointer"
                 >
                     + Create link
                 </button>
@@ -227,7 +227,7 @@ export function CashbackUpiPanel({
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                         {(refreshing || loading) && visible.length === 0 && (
-                            <tr><td colSpan={10} className="px-3 py-14 text-center"><Loader2 size={24} className="text-[#53B175] animate-spin mx-auto" /></td></tr>
+                            <tr><td colSpan={10} className="px-3 py-14 text-center"><Loader2 size={24} className="text-primary animate-spin mx-auto" /></td></tr>
                         )}
                         {!refreshing && !loading && visible.length === 0 && (
                             <tr>
@@ -253,7 +253,7 @@ export function CashbackUpiPanel({
                                     <button
                                         type="button"
                                         onClick={() => void copyLink(e.claimUrl)}
-                                        className="inline-flex items-center gap-0.5 rounded-md border border-gray-200 bg-white px-1.5 py-1 text-[11px] font-bold text-[#181725] hover:border-[#53B175] hover:text-[#53B175] cursor-pointer"
+                                        className="inline-flex items-center gap-0.5 rounded-md border border-gray-200 bg-white px-1.5 py-1 text-[11px] font-bold text-[#181725] hover:border-primary hover:text-primary cursor-pointer"
                                         title={e.claimUrl}
                                     >
                                         <Copy size={11} /> Copy
@@ -275,7 +275,7 @@ export function CashbackUpiPanel({
                                 <td className={tdCls}>
                                     <span className={cn(
                                         'inline-block px-1.5 py-0.5 rounded-full text-[10px] font-bold',
-                                        e.status === 'paid' ? 'bg-green-50 text-[#53B175]'
+                                        e.status === 'paid' ? 'bg-primary-light text-primary'
                                             : e.status === 'cancelled' || e.status === 'expired' ? 'bg-gray-100 text-gray-400'
                                                 : e.status === 'approved' ? 'bg-blue-50 text-blue-600'
                                                     : 'bg-purple-50 text-purple-600',
@@ -296,7 +296,7 @@ export function CashbackUpiPanel({
                                         {e.status === 'approved' && e.entryId && markPaidUrl(e) && (
                                             <button
                                                 onClick={() => setPayTarget(e)}
-                                                className="shrink-0 whitespace-nowrap px-2.5 py-1 rounded-md bg-[#53B175] text-white text-[11px] font-bold hover:bg-[#48a068] cursor-pointer"
+                                                className="shrink-0 whitespace-nowrap px-2.5 py-1 rounded-md bg-primary text-white text-[11px] font-bold hover:bg-primary-dark cursor-pointer"
                                             >
                                                 Mark Paid
                                             </button>

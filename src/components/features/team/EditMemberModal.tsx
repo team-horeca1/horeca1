@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
@@ -59,7 +60,7 @@ type PermissionsMap = Record<string, Record<string, boolean>>;
 const ROLE_STYLES: Record<string, { color: string; bg: string; border: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
   'Vendor Admin': { color: '#D97706', bg: '#FFF7E6', border: '#F59E0B', Icon: Crown },
   'Vendor Manager': { color: '#2563EB', bg: '#EFF6FF', border: '#3B82F6', Icon: Shield },
-  'Sales Rep': { color: '#059669', bg: '#ECFDF5', border: '#10B981', Icon: Users },
+  'Sales Rep': { color: '#059669', bg: CDL.successLight, border: '#10B981', Icon: Users },
   'Finance Executive': { color: '#7C3AED', bg: '#F3F0FF', border: '#8B5CF6', Icon: DollarSign },
   'Order Manager': { color: '#EA580C', bg: '#FFF7ED', border: '#F97316', Icon: Package },
   'Warehouse Manager': { color: '#374151', bg: '#F3F4F6', border: '#6B7280', Icon: Archive },
@@ -87,7 +88,7 @@ export function EditMemberModal({
   initialRoleId,
   roles,
   scope = 'vendor',
-  accent = '#299E60',
+  accent = CDL.primary,
   teamMemberEndpoint,
   outletsEndpoint,
   outlets: outletsProp = [],
@@ -618,7 +619,7 @@ export function EditMemberModal({
                   <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider">Permissions</p>
                   <span
                     className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                      totalSelected > 0 ? 'bg-[#ECFDF5] text-[#299E60]' : 'bg-[#F5F5F5] text-[#AEAEAE]'
+                      totalSelected > 0 ? 'bg-success-light text-primary' : 'bg-[#F5F5F5] text-[#AEAEAE]'
                     }`}
                   >
                     {totalSelected} selected

@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, LogOut, Loader2, ShieldCheck, Store, MapPin } from 'lucide-react';
@@ -29,13 +30,13 @@ type AccountKind = 'customer' | 'vendor' | 'brand';
 
 const KIND_STYLE: Record<AccountKind, { label: string; color: string; bg: string }> = {
   customer: { label: 'Customer', color: '#2563EB', bg: '#DBEAFE' },
-  vendor:   { label: 'Supplier', color: '#299E60', bg: '#DCFCE7' },
+  vendor:   { label: 'Supplier', color: CDL.primary, bg: CDL.primaryLight },
   brand:    { label: 'Brand',    color: '#7C3AED', bg: '#EDE9FE' },
 };
 
 const ROLE_STYLE_FALLBACK: Record<string, { label: string; color: string; bg: string }> = {
   admin:    { label: 'Admin',    color: '#DC2626', bg: '#FEE2E2' },
-  vendor:   { label: 'Supplier', color: '#299E60', bg: '#DCFCE7' },
+  vendor:   { label: 'Supplier', color: CDL.primary, bg: CDL.primaryLight },
   brand:    { label: 'Brand',    color: '#7C3AED', bg: '#EDE9FE' },
   customer: { label: 'Customer', color: '#2563EB', bg: '#DBEAFE' },
   delivery: { label: 'Delivery', color: '#EA580C', bg: '#FED7AA' },

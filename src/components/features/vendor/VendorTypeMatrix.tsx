@@ -83,7 +83,7 @@ export function VendorTypeMatrix({ value, onChange, error, className }: VendorTy
               >
                 <p className={cn(
                   'text-[12.5px] font-bold mb-2 sm:mb-0',
-                  rowActive ? 'text-[#299E60]' : 'text-[#181725]',
+                  rowActive ? 'text-primary' : 'text-[#181725]',
                 )}>
                   {type}
                 </p>
@@ -98,7 +98,7 @@ export function VendorTypeMatrix({ value, onChange, error, className }: VendorTy
                         className={cn(
                           'px-2.5 py-1.5 rounded-lg text-[11.5px] font-bold border transition-colors text-left',
                           selected
-                            ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]'
+                            ? 'border-primary bg-primary-light text-primary'
                             : 'border-[#EEEEEE] bg-white text-gray-500 hover:border-gray-300',
                         )}
                       >

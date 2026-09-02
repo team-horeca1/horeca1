@@ -68,14 +68,14 @@ const STATUS_CONFIG: Record<string, { label: string; textColor: string; bgColor:
     shipped:    { label: 'Out for Delivery',      textColor: 'text-indigo-700', bgColor: 'bg-indigo-50',  borderColor: 'border-indigo-200',icon: <Truck size={14} /> },
     out_for_delivery: { label: 'Out for Delivery', textColor: 'text-indigo-700', bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200', icon: <Truck size={14} /> },
     partially_delivered: { label: 'Partially Fulfilled', textColor: 'text-amber-700', bgColor: 'bg-amber-50', borderColor: 'border-amber-200', icon: <Package size={14} /> },
-    delivered:  { label: 'Completed',             textColor: 'text-green-700',  bgColor: 'bg-green-50',   borderColor: 'border-green-200', icon: <CheckCircle2 size={14} /> },
+    delivered:  { label: 'Completed',             textColor: 'text-success',  bgColor: 'bg-success-light',   borderColor: 'border-success/30', icon: <CheckCircle2 size={14} /> },
     returned:   { label: 'Returned',              textColor: 'text-orange-700', bgColor: 'bg-orange-50',  borderColor: 'border-orange-200', icon: <RotateCcw size={14} /> },
     cancelled:  { label: 'Cancelled',             textColor: 'text-red-700',    bgColor: 'bg-red-50',     borderColor: 'border-red-200',   icon: <XCircle size={14} /> },
 };
 
 const PAYMENT_STATUS: Record<string, { label: string; color: string; bg: string }> = {
     unpaid:   { label: 'Unpaid',   color: 'text-red-600',   bg: 'bg-red-50' },
-    paid:     { label: 'Paid',     color: 'text-green-600', bg: 'bg-green-50' },
+    paid:     { label: 'Paid',     color: 'text-success', bg: 'bg-success-light' },
     partial:  { label: 'Partial',  color: 'text-amber-600', bg: 'bg-amber-50' },
     refunded: { label: 'Refunded', color: 'text-gray-500',  bg: 'bg-gray-50' },
 };
@@ -238,7 +238,7 @@ export default function OrderDetailPage() {
         return (
             <div className="min-h-screen bg-[#F2F3F2] flex items-center justify-center">
                 <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-gray-200 border-t-[#299e60] rounded-full animate-spin mx-auto mb-4" />
+                    <div className="w-12 h-12 border-4 border-gray-200 border-t-primary rounded-full animate-spin mx-auto mb-4" />
                     <p className="text-[14px] text-gray-400 font-medium">Loading order...</p>
                 </div>
             </div>
@@ -258,7 +258,7 @@ export default function OrderDetailPage() {
                 <div className="flex flex-wrap items-center justify-center gap-3">
                     <Link
                         href="/orders"
-                        className="px-5 py-2.5 rounded-xl bg-[#299e60] text-white text-[13px] font-bold hover:bg-[#238a52] transition-colors"
+                        className="px-5 py-2.5 rounded-xl bg-primary text-white text-[13px] font-bold hover:bg-primary-dark transition-colors"
                     >
                         My Orders
                     </Link>
@@ -298,11 +298,11 @@ export default function OrderDetailPage() {
                 <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)]">
                     {/* Breadcrumb — desktop */}
                     <div className="hidden md:flex items-center gap-2 text-[13px] text-gray-400 pt-4 mb-1">
-                        <Link href="/" className="hover:text-[#299e60] transition-colors flex items-center gap-1">
+                        <Link href="/" className="hover:text-primary transition-colors flex items-center gap-1">
                             <Home size={13} /><span>Home</span>
                         </Link>
                         <ChevronRight size={11} />
-                        <Link href="/orders" className="hover:text-[#299e60] transition-colors">Orders</Link>
+                        <Link href="/orders" className="hover:text-primary transition-colors">Orders</Link>
                         <ChevronRight size={11} />
                         <span className="text-[#181725] font-semibold">{order.orderNumber}</span>
                     </div>
@@ -385,11 +385,11 @@ export default function OrderDetailPage() {
 
                         {deliveryConfirmed && (
                             <div
-                                className="bg-green-50 border border-green-200 rounded-2xl px-4 py-3 flex items-center gap-2.5"
+                                className="bg-success-light border border-success/30 rounded-2xl px-4 py-3 flex items-center gap-2.5"
                                 data-testid="delivery-otp-confirmed"
                             >
-                                <CheckCircle2 size={16} className="text-green-700 shrink-0" />
-                                <p className="text-[13px] font-bold text-green-800">Delivery confirmed</p>
+                                <CheckCircle2 size={16} className="text-success shrink-0" />
+                                <p className="text-[13px] font-bold text-success">Delivery confirmed</p>
                             </div>
                         )}
 
@@ -498,11 +498,11 @@ export default function OrderDetailPage() {
                                 </p>
                                 <textarea value={ratingComment} onChange={e => setRatingComment(e.target.value)}
                                     maxLength={200} placeholder="Share your experience (optional)..." rows={3}
-                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[13px] text-[#181725] placeholder-gray-300 resize-none focus:outline-none focus:border-[#299e60] transition-colors mb-4" />
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[13px] text-[#181725] placeholder-gray-300 resize-none focus:outline-none focus:border-primary transition-colors mb-4" />
                                 <button onClick={handleSubmitRating} disabled={selectedStars === 0 || isSubmittingRating}
                                     className={cn('w-full py-3 rounded-xl text-[14px] font-black flex items-center justify-center gap-2 transition-all',
                                         selectedStars > 0 && !isSubmittingRating
-                                            ? 'bg-[#299e60] text-white shadow-md shadow-green-200/50 hover:bg-[#22844f]'
+                                            ? 'bg-primary text-white shadow-md shadow-green-200/50 hover:bg-primary-dark'
                                             : 'bg-gray-100 text-gray-400 cursor-not-allowed')}>
                                     {isSubmittingRating ? <><Loader2 size={15} className="animate-spin" /> Submitting...</> : 'Submit Review'}
                                 </button>
@@ -532,24 +532,24 @@ export default function OrderDetailPage() {
                                 {promoDiscount > 0 && (
                                     <div className="flex justify-between text-[14px]">
                                         <span className="text-gray-500 font-medium">Store discount</span>
-                                        <span className="font-bold text-[#299e60]">−{fmt(promoDiscount)}</span>
+                                        <span className="font-bold text-primary">−{fmt(promoDiscount)}</span>
                                     </div>
                                 )}
                                 {couponDiscount > 0 && (
                                     <div className="flex justify-between text-[14px]">
                                         <span className="text-gray-500 font-medium">Coupon{order.couponCode ? ` (${order.couponCode})` : ''}</span>
-                                        <span className="font-bold text-[#299e60]">−{fmt(couponDiscount)}</span>
+                                        <span className="font-bold text-primary">−{fmt(couponDiscount)}</span>
                                     </div>
                                 )}
                                 {walletApplied > 0 && (
                                     <div className="flex justify-between text-[14px]">
                                         <span className="text-gray-500 font-medium">Rewards wallet</span>
-                                        <span className="font-bold text-[#299e60]">−{fmt(walletApplied)}</span>
+                                        <span className="font-bold text-primary">−{fmt(walletApplied)}</span>
                                     </div>
                                 )}
                                 <div className="border-t border-dashed border-gray-200 pt-3 flex justify-between items-baseline">
                                     <span className="text-[15px] font-black text-[#181725]">Total</span>
-                                    <span className="text-[22px] font-black text-[#299e60]">{fmt(total)}</span>
+                                    <span className="text-[22px] font-black text-primary">{fmt(total)}</span>
                                 </div>
                             </div>
                         </div>
@@ -593,14 +593,14 @@ export default function OrderDetailPage() {
                                 <a
                                     href={`/api/v1/orders/${order.id}/invoice`}
                                     download
-                                    className="w-full flex items-center justify-center gap-2 py-3.5 border-2 border-[#299e60]/40 text-[#299e60] text-[14px] font-black rounded-2xl hover:bg-[#299e60]/5 transition-all"
+                                    className="w-full flex items-center justify-center gap-2 py-3.5 border-2 border-primary/40 text-primary text-[14px] font-black rounded-2xl hover:bg-primary/5 transition-all"
                                 >
                                     <FileDown size={16} />
                                     Download Invoice
                                 </a>
                             )}
                             <button onClick={handleReorder}
-                                className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#299e60] text-white text-[14px] font-black rounded-2xl shadow-lg shadow-green-200/50 hover:bg-[#22844f] transition-all active:scale-[0.99]">
+                                className="w-full flex items-center justify-center gap-2 py-3.5 bg-primary text-white text-[14px] font-black rounded-2xl shadow-lg shadow-green-200/50 hover:bg-primary-dark transition-all active:scale-[0.99]">
                                 <ShoppingCart size={16} />
                                 Reorder All Items
                             </button>
@@ -628,7 +628,7 @@ export default function OrderDetailPage() {
                                         }
                                     } catch { toast.error('Failed to save list'); }
                                 }}
-                                className="w-full py-3.5 border-2 border-[#299e60]/30 text-[#299e60] text-[14px] font-black rounded-2xl hover:bg-[#299e60]/5 transition-all flex items-center justify-center gap-2"
+                                className="w-full py-3.5 border-2 border-primary/30 text-primary text-[14px] font-black rounded-2xl hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
                             >
                                 <ClipboardList size={16} />
                                 Save as Order List
@@ -669,7 +669,7 @@ export default function OrderDetailPage() {
                                         onChange={(e) => setCancelReason(e.target.value)}
                                         rows={3}
                                         placeholder="Please explain (at least 10 characters)..."
-                                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-[#299e60]/40 resize-none"
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-primary/40 resize-none"
                                         data-testid="cancel-reason-input"
                                     />
                                     <div className="flex gap-2">

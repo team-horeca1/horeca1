@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 /**
  * Reusable matrix editor + custom-role CRUD UI shared by the admin, vendor,
@@ -47,7 +48,7 @@ export function TeamRolesEditor({
     isOpen,
     onClose,
     endpointBase,
-    accent = '#53B175',
+    accent = CDL.primary,
     onRolesChanged,
     scope,
 }: TeamRolesEditorProps) {

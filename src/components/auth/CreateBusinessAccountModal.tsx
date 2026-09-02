@@ -264,8 +264,8 @@ export function CreateBusinessAccountModal({
     return (
       <div className="fixed inset-0 z-[16000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-150">
         <div className="bg-white rounded-[24px] border border-[#EEEEEE] p-8 max-w-md w-full text-center shadow-[0_20px_50px_rgba(0,0,0,0.08)] animate-in zoom-in-95 duration-150">
-          <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 size={32} className="text-[#299E60]" />
+          <div className="w-16 h-16 rounded-full bg-success-light flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 size={32} className="text-primary" />
           </div>
           <h3 className="text-[22px] font-[800] text-[#181725] mb-2">Application Submitted</h3>
           <p className="text-[14px] text-gray-500 mb-6">
@@ -291,7 +291,7 @@ export function CreateBusinessAccountModal({
     <div className="fixed inset-0 z-[16000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-150">
       <div className="bg-white rounded-[20px] w-full max-w-[640px] max-h-[90vh] flex flex-col overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.08)] border border-gray-100 animate-in zoom-in-95 duration-150">
         <div className="p-6 border-b border-gray-100 flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#53B175] to-[#299E60] flex items-center justify-center shrink-0 shadow-lg shadow-emerald-100">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shrink-0 shadow-lg shadow-primary/10">
             <Building2 size={22} className="text-white" />
           </div>
           <div className="flex-1 min-w-0">
@@ -321,7 +321,7 @@ export function CreateBusinessAccountModal({
                   onClick={() => setBusinessType(t)}
                   className={`h-[42px] px-3 text-[12.5px] font-bold rounded-xl border text-center transition-all ${
                     businessType === t
-                      ? 'border-[#299E60] bg-[#EEF8F1]/40 text-[#299E60] shadow-sm shadow-[#299E60]/5'
+                      ? 'border-primary bg-primary-light/40 text-primary shadow-sm shadow-primary/5'
                       : 'border-[#EEEEEE] bg-white hover:border-gray-300 text-gray-500'
                   }`}
                 >
@@ -332,10 +332,10 @@ export function CreateBusinessAccountModal({
           </div>
 
           {businessType === 'vendor' && (
-            <div className="rounded-2xl border-2 border-[#53B175]/30 bg-green-50/40 p-5">
+            <div className="rounded-2xl border-2 border-primary/30 bg-primary-light/40 p-5">
               <div className="flex items-start gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-[#53B175]/15 flex items-center justify-center shrink-0">
-                  <ShieldCheck size={18} className="text-[#53B175]" />
+                <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                  <ShieldCheck size={18} className="text-primary" />
                 </div>
                 <div>
                   <p className="font-bold text-[13.5px] text-[#181725] mb-1">Supplier onboarding needs full KYC</p>
@@ -349,7 +349,7 @@ export function CreateBusinessAccountModal({
               <button
                 type="button"
                 onClick={() => { onClose(); router.push('/vendor/register'); }}
-                className="w-full bg-[#53B175] hover:bg-[#48a068] text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md shadow-green-100 transition-colors"
+                className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 shadow-md shadow-green-100 transition-colors"
               >
                 Continue to supplier onboarding <ArrowRight size={16} />
               </button>
@@ -405,7 +405,7 @@ export function CreateBusinessAccountModal({
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className={cn(FORM.primaryBtn, 'px-6 py-2.5 text-[13px] shadow-emerald-100')}
+              className={cn(FORM.primaryBtn, 'px-6 py-2.5 text-[13px] shadow-primary/10')}
             >
               {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
               {submitting ? 'Registering…' : 'Create Business'}

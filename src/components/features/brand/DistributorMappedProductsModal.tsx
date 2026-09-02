@@ -113,7 +113,7 @@ export default function DistributorMappedProductsModal({
         <div className="flex-1 overflow-y-auto px-5 py-4 min-h-[160px]">
           {loading ? (
             <div className="flex justify-center py-12">
-              <Loader2 size={22} className="animate-spin text-[#53B175]" />
+              <Loader2 size={22} className="animate-spin text-primary" />
             </div>
           ) : error ? (
             <p className="text-[13px] text-red-600 text-center py-10">{error}</p>
@@ -184,7 +184,7 @@ export default function DistributorMappedProductsModal({
                 type="button"
                 onClick={onApprove}
                 disabled={busy || !onApprove}
-                className="h-[36px] px-4 bg-[#53B175] text-white rounded-lg text-[13px] font-bold hover:bg-[#3d9e5f] disabled:opacity-50 flex items-center gap-1.5"
+                className="h-[36px] px-4 bg-primary text-white rounded-lg text-[13px] font-bold hover:bg-primary-dark disabled:opacity-50 flex items-center gap-1.5"
               >
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 Approve

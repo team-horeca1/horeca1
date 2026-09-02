@@ -15,7 +15,7 @@ export function GeneralInformationOverlay({ isOpen, onClose }: GeneralInformatio
     const infoItems = [
         { id: 'about', label: 'About horeca1', description: 'Learn more about us', icon: Info, color: 'bg-blue-50 text-blue-500' },
         { id: 'terms', label: 'Terms & Conditions', description: 'Our terms of service', icon: FileText, color: 'bg-orange-50 text-orange-500' },
-        { id: 'privacy', label: 'Privacy Policy', description: 'How we handle your data', icon: Shield, color: 'bg-green-50 text-[#53B175]' },
+        { id: 'privacy', label: 'Privacy Policy', description: 'How we handle your data', icon: Shield, color: 'bg-primary-light text-primary' },
         { id: 'faq', label: 'FAQ', description: 'Frequently asked questions', icon: HelpCircle, color: 'bg-purple-50 text-purple-500' },
         { id: 'feedback', label: 'Send Feedback', description: 'Help us improve', icon: MessageSquare, color: 'bg-pink-50 text-pink-500' },
         { id: 'rate', label: 'Rate Us', description: 'Rate us on the app store', icon: Star, color: 'bg-yellow-50 text-yellow-500' },

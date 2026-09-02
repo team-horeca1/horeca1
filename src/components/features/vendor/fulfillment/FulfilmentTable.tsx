@@ -30,7 +30,7 @@ function CustomerCell({ row }: { row: FulfilmentListRow }) {
           {deliver && fulfill && ' · '}
           {fulfill && (
             <span>
-              Fulfill: <span className="font-semibold text-[#299E60]">{fulfill}</span>
+              Fulfill: <span className="font-semibold text-primary">{fulfill}</span>
             </span>
           )}
         </p>

@@ -6,9 +6,8 @@
  * the admin create wizards, and the account modals).
  *
  * Before this module each form re-declared its own `Field` / `Input` / `inp`
- * with subtly different heights (42 vs 44 vs py-3), focus colours (#53B175 vs
- * #299E60 vs emerald-400), and label weights (bold vs semibold vs medium).
- * Everything now flows through one token set so the forms look identical.
+ * with subtly different heights (42 vs 44 vs py-3), focus colours, and label
+ * weights. Everything now flows through one CDL token set so the forms look identical.
  *
  * Tokens:
  *   height   44px        radius   10px
@@ -20,11 +19,12 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { CDL } from '@/lib/cdl';
 import { PasswordToggleButton } from './PasswordField';
 
 export const FORM = {
-  brand: '#6B1D2E',
-  brandHover: '#5A1926',
+  brand: CDL.primary,
+  brandHover: CDL.primaryDark,
   primaryBtn:
     'bg-primary hover:bg-primary-dark text-white font-semibold rounded-xl shadow-cdl-1 active:scale-[0.97] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[48px] px-6',
 } as const;

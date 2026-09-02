@@ -949,7 +949,7 @@ export default function VendorRegisterPage() {
   if (sessionStatus === 'loading' && !session) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 size={28} className="animate-spin text-[#299E60]" />
+        <Loader2 size={28} className="animate-spin text-primary" />
       </div>
     );
   }
@@ -959,8 +959,8 @@ export default function VendorRegisterPage() {
     return (
       <div className="min-h-screen flex items-center justify-center px-6 py-12">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
-          <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 size={48} className="text-[#299E60]" />
+          <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 size={48} className="text-primary" />
           </div>
           <h1 className="text-[24px] font-[800] text-gray-800 mb-3">Application Submitted</h1>
           <p className="text-[14px] text-gray-500 mb-6 leading-relaxed">
@@ -1010,7 +1010,7 @@ export default function VendorRegisterPage() {
   return (
     <div className="flex flex-col">
       {/* Header — strong, branded onboarding banner */}
-      <div className="bg-gradient-to-r from-[#53B175] to-[#299E60] px-4 md:px-10 py-5 md:py-7 shrink-0">
+      <div className="bg-gradient-to-r from-primary to-primary-dark px-4 md:px-10 py-5 md:py-7 shrink-0">
         <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
           <div>
             <p className="text-[11px] md:text-[12px] font-bold uppercase tracking-[0.18em] text-white/70 mb-1">
@@ -1037,10 +1037,10 @@ export default function VendorRegisterPage() {
         <div className="max-w-3xl mx-auto">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[12px] font-bold text-gray-600">Step {step} of 7</span>
-            <span className="text-[12px] font-bold text-[#299E60]">{Math.round(progress)}% complete</span>
+            <span className="text-[12px] font-bold text-primary">{Math.round(progress)}% complete</span>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-[#299E60] transition-all duration-300" style={{ width: `${progress + (100 / 7)}%` }} />
+            <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress + (100 / 7)}%` }} />
           </div>
           <div className="mt-3 hidden md:flex items-center justify-between">
             {STEP_TITLES.map((s) => {
@@ -1053,16 +1053,16 @@ export default function VendorRegisterPage() {
                 <>
                   <div className={cn(
                     'w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold transition-colors',
-                    done ? 'bg-[#299E60] text-white' :
-                    active ? 'bg-[#299E60]/10 text-[#299E60] ring-2 ring-[#299E60]' :
-                    clickable ? 'bg-[#EEF8F1] text-[#299E60]' :
+                    done ? 'bg-primary text-white' :
+                    active ? 'bg-primary/10 text-primary ring-2 ring-primary' :
+                    clickable ? 'bg-primary-light text-primary' :
                     'bg-gray-100 text-gray-400',
                   )}>
                     {done ? <CheckCircle2 size={16} /> : <Icon size={14} />}
                   </div>
                   <span className={cn(
                     'mt-1.5 text-[10px]',
-                    active ? 'text-[#299E60] font-bold' : clickable ? 'text-[#299E60]/80' : 'text-gray-400',
+                    active ? 'text-primary font-bold' : clickable ? 'text-primary/80' : 'text-gray-400',
                   )}>{s.label}</span>
                 </>
               );
@@ -1080,7 +1080,7 @@ export default function VendorRegisterPage() {
                   onClick={() => goToStep(s.id)}
                   className={cn(
                     'flex flex-col items-center text-center flex-1 rounded-lg py-1 transition-colors',
-                    active ? 'cursor-default' : 'cursor-pointer hover:bg-[#EEF8F1]/60',
+                    active ? 'cursor-default' : 'cursor-pointer hover:bg-primary-light/60',
                   )}
                   aria-current={active ? 'step' : undefined}
                   aria-label={`Go to ${s.label}`}
@@ -1103,7 +1103,7 @@ export default function VendorRegisterPage() {
               {!isAuthMode && (
                 <Link
                   href="/register"
-                  className="inline-flex items-center gap-1.5 text-[12px] font-bold text-gray-400 hover:text-[#299E60] transition-colors mb-4"
+                  className="inline-flex items-center gap-1.5 text-[12px] font-bold text-gray-400 hover:text-primary transition-colors mb-4"
                 >
                   <ArrowLeft size={14} /> Choose a different signup type
                 </Link>
@@ -1145,7 +1145,7 @@ export default function VendorRegisterPage() {
                       className={cn(
                         'flex-1 py-2.5 rounded-lg text-[12px] font-bold transition-colors',
                         verifyChannel === ch
-                          ? 'bg-white text-[#299E60] shadow-sm'
+                          ? 'bg-white text-primary shadow-sm'
                           : 'text-gray-500 hover:text-gray-700',
                       )}
                     >
@@ -1229,8 +1229,8 @@ export default function VendorRegisterPage() {
                           disabled={otpLoading || phoneVerified || emailVerified}
                           className={cn(
                             'w-[56px] h-[56px] text-center text-[22px] font-[800] border-2 rounded-xl outline-none transition-all',
-                            d ? 'border-[#299E60] bg-green-50 text-[#299E60]' : 'border-gray-200 bg-white',
-                            'focus:border-[#299E60] focus:ring-4 focus:ring-[#299E60]/10',
+                            d ? 'border-primary bg-primary-light text-primary' : 'border-gray-200 bg-white',
+                            'focus:border-primary focus:ring-4 focus:ring-primary/10',
                           )}
                         />
                       ))}
@@ -1238,11 +1238,11 @@ export default function VendorRegisterPage() {
                   </Field>
                   <div className="mt-3 flex items-center gap-4 text-[13px]">
                     {phoneVerified || emailVerified ? (
-                      <span className="text-[#299E60] font-bold flex items-center gap-1"><CheckCircle2 size={14} /> Verified</span>
+                      <span className="text-success font-bold flex items-center gap-1"><CheckCircle2 size={14} /> Verified</span>
                     ) : resendTimer > 0 ? (
                       <span className="text-gray-400">Resend OTP in <strong>{resendTimer}s</strong></span>
                     ) : (
-                      <button onClick={handleSendOtp} disabled={otpLoading} className="text-[#299E60] font-bold hover:underline">Resend OTP</button>
+                      <button onClick={handleSendOtp} disabled={otpLoading} className="text-primary font-bold hover:underline">Resend OTP</button>
                     )}
                     {/* Always available — user may circle back from a later step
                         to fix the phone. Resets step-1 state only; everything
@@ -1283,9 +1283,9 @@ export default function VendorRegisterPage() {
 
           {step === 3 && (
             <section>
-              <div className="mb-5 rounded-xl border border-[#299E60]/25 bg-[#EEF8F1] px-4 py-3">
-                <p className="text-[13px] font-bold text-[#299E60]">Create your first Online Store</p>
-                <p className="text-[12px] text-[#238a54] mt-0.5">
+              <div className="mb-5 rounded-xl border border-primary/25 bg-primary-light px-4 py-3">
+                <p className="text-[13px] font-bold text-primary">Create your first Online Store</p>
+                <p className="text-[12px] text-primary-dark mt-0.5">
                   From here on, these details belong to your store under this business — contact, GST, bank, address, and service area.
                 </p>
               </div>
@@ -1494,7 +1494,7 @@ export default function VendorRegisterPage() {
                   <h3 className="font-bold text-[15px] text-gray-800">Pickup / Warehouse Address</h3>
                   <label className="flex items-center gap-2 text-[12px] text-gray-600 cursor-pointer">
                     <input type="checkbox" checked={pickupSameAsBilling} onChange={e => setPickupSameAsBilling(e.target.checked)}
-                      className="accent-[#299E60]" />
+                      className="accent-primary" />
                     Same as billing
                   </label>
                 </div>
@@ -1569,17 +1569,17 @@ export default function VendorRegisterPage() {
                     onChange={e => setPincodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addPincode(); } }}
                     placeholder="Add 6-digit pincode"
-                    className="flex-1 px-4 py-3 bg-[#FAFAFA] focus:bg-white border border-[#EEEEEE] rounded-[10px] text-[13px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 transition-all" />
-                  <button onClick={addPincode} className="px-4 py-3 bg-[#299E60] hover:bg-[#238a54] text-white rounded-[10px] font-bold flex items-center gap-1 transition-colors">
+                    className="flex-1 px-4 py-3 bg-[#FAFAFA] focus:bg-white border border-[#EEEEEE] rounded-[10px] text-[13px] outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 transition-all" />
+                  <button onClick={addPincode} className="px-4 py-3 bg-primary hover:bg-primary-dark text-white rounded-[10px] font-bold flex items-center gap-1 transition-colors">
                     <Plus size={16} /> Add
                   </button>
                 </div>
                 {pincodes.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {pincodes.map(p => (
-                      <span key={p} className="inline-flex items-center gap-1.5 bg-[#ECFDF5] text-[#299E60] px-3 py-1.5 rounded-full text-[13px] font-bold">
+                      <span key={p} className="inline-flex items-center gap-1.5 bg-success-light text-primary px-3 py-1.5 rounded-full text-[13px] font-bold">
                         {p}
-                        <button onClick={() => removePincode(p)} className="hover:bg-[#299E60]/10 rounded-full p-0.5">
+                        <button onClick={() => removePincode(p)} className="hover:bg-primary/10 rounded-full p-0.5">
                           <X size={12} />
                         </button>
                       </span>
@@ -1600,10 +1600,10 @@ export default function VendorRegisterPage() {
                       <button key={o.id} onClick={() => setDeliveryCapability(o.id)}
                         className={cn(
                           'p-3 border-2 rounded-lg text-left transition-all',
-                          deliveryCapability === o.id ? 'border-[#299E60] bg-[#ECFDF5]' : 'border-gray-200 hover:border-gray-300',
+                          deliveryCapability === o.id ? 'border-primary bg-success-light' : 'border-gray-200 hover:border-gray-300',
                         )}>
                         <div className="flex items-center gap-1.5 mb-0.5">
-                          <Truck size={14} className="text-[#299E60]" />
+                          <Truck size={14} className="text-primary" />
                           <span className="font-bold text-[13px] text-gray-800">{o.label}</span>
                         </div>
                         <div className="text-[11px] text-gray-500">{o.desc}</div>
@@ -1704,8 +1704,8 @@ function FileField({
         className="hidden"
         onChange={e => onChange(e.target.files?.[0] ?? null)} />
       <button type="button" onClick={() => ref.current?.click()}
-        className="w-full flex items-center gap-2 px-4 py-3 bg-[#FAFAFA] border border-dashed border-[#299E60]/40 rounded-[10px] text-[13px] text-left hover:bg-[#ECFDF5]/60 transition-colors">
-        <Upload size={15} className="text-[#299E60] shrink-0" />
+        className="w-full flex items-center gap-2 px-4 py-3 bg-[#FAFAFA] border border-dashed border-primary/40 rounded-[10px] text-[13px] text-left hover:bg-success-light/60 transition-colors">
+        <Upload size={15} className="text-primary shrink-0" />
         <span className={cn('truncate', value ? 'text-gray-800 font-bold' : 'text-gray-400')}>
           {value ? value.name : 'Choose file from your computer…'}
         </span>

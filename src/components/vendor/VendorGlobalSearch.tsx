@@ -49,7 +49,7 @@ export function VendorGlobalSearch() {
         onChange={(e) => { setQ(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
         placeholder="Search products, orders, customers…"
-        className="w-full bg-[#F5F5F5] border border-[#EEEEEE] rounded-[14px] py-3 pl-11 pr-4 text-[14px] outline-none transition-all placeholder:text-[#AEAEAE] font-medium focus:border-[#299E60]/40 focus:bg-white focus:shadow-sm"
+        className="w-full bg-[#F5F5F5] border border-[#EEEEEE] rounded-[14px] py-3 pl-11 pr-4 text-[14px] outline-none transition-all placeholder:text-[#AEAEAE] font-medium focus:border-primary/40 focus:bg-white focus:shadow-sm"
       />
       {open && hasResults && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-[#EEEEEE] rounded-[12px] shadow-lg z-50 max-h-[320px] overflow-y-auto p-2">

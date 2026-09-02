@@ -20,7 +20,7 @@ export default function VendorOutletsPage() {
         </p>
         <Link
           href="/vendor/businesses"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#299E60] hover:bg-[#238a54] text-white text-[14px] font-bold rounded-[10px] transition-colors"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white text-[14px] font-bold rounded-[10px] transition-colors"
         >
           Go to Businesses
           <ArrowRight size={16} />

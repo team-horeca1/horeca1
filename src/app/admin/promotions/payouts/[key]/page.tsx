@@ -155,7 +155,7 @@ export default function AdminPayoutDetailPage() {
             </div>
             <span className={cn(
               'shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold',
-              data.status === 'credited' || data.status === 'paid' ? 'bg-green-50 text-[#6B1D2E]'
+              data.status === 'credited' || data.status === 'paid' ? 'bg-success-light text-[#6B1D2E]'
                 : data.status === 'cancelled' || data.status === 'expired' ? 'bg-gray-100 text-gray-400'
                   : data.status === 'approved' ? 'bg-blue-50 text-blue-600'
                     : data.status === 'awaiting_claim' ? 'bg-purple-50 text-purple-600'

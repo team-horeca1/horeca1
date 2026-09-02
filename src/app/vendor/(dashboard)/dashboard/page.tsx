@@ -137,8 +137,8 @@ function isOverSLA(dateStr: string): boolean {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-    delivered: 'bg-emerald-50 text-emerald-700 border-emerald-200/55',
-    confirmed: 'bg-emerald-50 text-emerald-700 border-emerald-200/55',
+    delivered: 'bg-success-light text-success border-success/30',
+    confirmed: 'bg-success-light text-success border-success/30',
     processing: 'bg-amber-50 text-amber-700 border-amber-200/55',
     pending: 'bg-amber-50 text-amber-700 border-amber-200/55',
     ready_for_dispatch: 'bg-indigo-50 text-indigo-700 border-indigo-200/55',
@@ -169,8 +169,8 @@ function PendingOrdersWidget({
     if (orders.length === 0) {
         return (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center gap-4 transition-all hover:shadow-md">
-                <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100">
-                    <CheckCircle2 size={24} className="text-emerald-600" />
+                <div className="w-12 h-12 rounded-full bg-success-light flex items-center justify-center shrink-0 border border-success/20">
+                    <CheckCircle2 size={24} className="text-success" />
                 </div>
                 <div>
                     <p className="text-[16px] font-bold text-gray-950">All caught up!</p>
@@ -255,7 +255,7 @@ function PendingOrdersWidget({
                                     <button
                                         onClick={() => handleAccept(order)}
                                         disabled={!!accepting}
-                                        className="h-9 px-4 rounded-xl bg-emerald-600 text-white text-[13px] font-bold hover:bg-emerald-700 transition-all flex items-center gap-1.5 disabled:opacity-60 shadow-sm shadow-emerald-600/10"
+                                        className="h-9 px-4 rounded-xl bg-success text-white text-[13px] font-bold hover:bg-success/90 transition-all flex items-center gap-1.5 disabled:opacity-60 shadow-sm shadow-success/10"
                                     >
                                         {isAccepting
                                             ? <Loader2 size={14} className="animate-spin" />
@@ -295,13 +295,13 @@ function SetupBanner() {
 
   if (!show || dismissed) return null;
   return (
-    <div className="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-2xl p-5 text-white mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md shadow-emerald-600/10">
+    <div className="bg-gradient-to-r from-success to-primary-dark rounded-2xl p-5 text-white mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md shadow-success/10">
       <div>
         <p className="text-[17px] font-bold">Complete your store setup</p>
-        <p className="text-[13px] text-emerald-100 font-medium mt-0.5">Finish profile, delivery, and products to go live on Horeca1.</p>
+        <p className="text-[13px] text-primary-light font-medium mt-0.5">Finish profile, delivery, and products to go live on Horeca1.</p>
       </div>
       <div className="flex items-center gap-3 w-full sm:w-auto shrink-0 justify-end">
-        <Link href="/vendor/setup" className="bg-white text-emerald-700 text-[13px] font-bold px-4 py-2 rounded-xl hover:bg-emerald-50 transition-colors shadow-sm whitespace-nowrap">
+        <Link href="/vendor/setup" className="bg-white text-success text-[13px] font-bold px-4 py-2 rounded-xl hover:bg-success-light transition-colors shadow-sm whitespace-nowrap">
           Continue Setup
         </Link>
         <button type="button" onClick={() => setDismissed(true)} className="text-white/70 hover:text-white transition-colors text-[24px] leading-none shrink-0">&times;</button>
@@ -417,7 +417,7 @@ function CreateSchemeModal({
                                 placeholder="e.g. Rice & Dairy Combo Deal"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                                 required
                             />
                         </div>
@@ -426,7 +426,7 @@ function CreateSchemeModal({
                             <select
                                 value={type}
                                 onChange={(e) => setType(e.target.value as any)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                                 required
                             >
                                 <option value="pct_discount">Percentage Discount</option>
@@ -441,7 +441,7 @@ function CreateSchemeModal({
                                 placeholder="₹ Min checkout value"
                                 value={minOrderValue}
                                 onChange={(e) => setMinOrderValue(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                             />
                         </div>
 
@@ -454,7 +454,7 @@ function CreateSchemeModal({
                                     placeholder="e.g. 15 for 15%"
                                     value={discountPct}
                                     onChange={(e) => setDiscountPct(e.target.value)}
-                                    className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                    className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                                     required
                                 />
                             </div>
@@ -468,7 +468,7 @@ function CreateSchemeModal({
                                     placeholder="₹ Flat discount value"
                                     value={discountFlat}
                                     onChange={(e) => setDiscountFlat(e.target.value)}
-                                    className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                    className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                                     required
                                 />
                             </div>
@@ -481,7 +481,7 @@ function CreateSchemeModal({
                                     <select
                                         value={buyProductId}
                                         onChange={(e) => setBuyProductId(e.target.value)}
-                                        className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                        className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                                         required
                                     >
                                         <option value="">Select Target Product</option>
@@ -497,7 +497,7 @@ function CreateSchemeModal({
                                         placeholder="Min qty to trigger reward"
                                         value={minQty}
                                         onChange={(e) => setMinQty(e.target.value)}
-                                        className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                        className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                                         required
                                     />
                                 </div>
@@ -506,7 +506,7 @@ function CreateSchemeModal({
                                     <select
                                         value={getProductId}
                                         onChange={(e) => setGetProductId(e.target.value)}
-                                        className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                        className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                                         required
                                     >
                                         <option value="">Select Free Product</option>
@@ -521,7 +521,7 @@ function CreateSchemeModal({
                                         type="number"
                                         value={getQty}
                                         onChange={(e) => setGetQty(e.target.value)}
-                                        className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                        className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                                         required
                                     />
                                 </div>
@@ -534,7 +534,7 @@ function CreateSchemeModal({
                                 type="date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                             />
                         </div>
                         <div>
@@ -543,7 +543,7 @@ function CreateSchemeModal({
                                 type="date"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                             />
                         </div>
                         <div>
@@ -553,7 +553,7 @@ function CreateSchemeModal({
                                 placeholder="Total scheme usage limit"
                                 value={usageLimit}
                                 onChange={(e) => setUsageLimit(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                             />
                         </div>
                     </div>
@@ -568,7 +568,7 @@ function CreateSchemeModal({
                         <button
                             type="submit"
                             disabled={loading}
-                            className="h-10 px-5 rounded-xl bg-emerald-600 text-white text-[13px] font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-60"
+                            className="h-10 px-5 rounded-xl bg-success text-white text-[13px] font-bold hover:bg-success/90 transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-60"
                         >
                             {loading && <Loader2 size={14} className="animate-spin" />}
                             Publish Scheme
@@ -680,7 +680,7 @@ function PushOfferModal({
                                 placeholder="e.g. MONSOON30"
                                 value={code}
                                 onChange={(e) => setCode(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold uppercase tracking-wider"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-bold uppercase tracking-wider"
                                 required
                             />
                         </div>
@@ -691,7 +691,7 @@ function PushOfferModal({
                                 placeholder="e.g. Monsoon Special Discount"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                                 required
                             />
                         </div>
@@ -700,7 +700,7 @@ function PushOfferModal({
                             <select
                                 value={discountType}
                                 onChange={(e) => setDiscountType(e.target.value as any)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                                 required
                             >
                                 <option value="percentage">Percentage Off (%)</option>
@@ -714,7 +714,7 @@ function PushOfferModal({
                                 placeholder="Value (e.g. 10)"
                                 value={discountValue}
                                 onChange={(e) => setDiscountValue(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                                 required
                             />
                         </div>
@@ -725,7 +725,7 @@ function PushOfferModal({
                                 placeholder="Limit for % discounts"
                                 value={maxDiscount}
                                 onChange={(e) => setMaxDiscount(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                             />
                         </div>
                         <div>
@@ -735,7 +735,7 @@ function PushOfferModal({
                                 placeholder="₹ Min checkout total"
                                 value={minOrderValue}
                                 onChange={(e) => setMinOrderValue(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                             />
                         </div>
                         <div>
@@ -744,7 +744,7 @@ function PushOfferModal({
                                 type="date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                             />
                         </div>
                         <div>
@@ -753,7 +753,7 @@ function PushOfferModal({
                                 type="date"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                             />
                         </div>
                         <div>
@@ -763,7 +763,7 @@ function PushOfferModal({
                                 placeholder="Global checkout usage cap"
                                 value={usageLimit}
                                 onChange={(e) => setUsageLimit(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                             />
                         </div>
                         <div>
@@ -772,7 +772,7 @@ function PushOfferModal({
                                 type="number"
                                 value={perUserLimit}
                                 onChange={(e) => setPerUserLimit(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                                className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                             />
                         </div>
                     </div>
@@ -783,7 +783,7 @@ function PushOfferModal({
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
                             rows={2}
-                            className="w-full p-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium resize-none"
+                            className="w-full p-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium resize-none"
                         />
                     </div>
                     <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
@@ -797,7 +797,7 @@ function PushOfferModal({
                         <button
                             type="submit"
                             disabled={loading}
-                            className="h-10 px-5 rounded-xl bg-emerald-600 text-white text-[13px] font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-60"
+                            className="h-10 px-5 rounded-xl bg-success text-white text-[13px] font-bold hover:bg-success/90 transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-60"
                         >
                             {loading && <Loader2 size={14} className="animate-spin" />}
                             Publish Coupon Offer
@@ -897,7 +897,7 @@ function SendPaymentReminderModal({
                                     <button
                                         onClick={() => handleSendReminder(cust.id, cust.fullName)}
                                         disabled={sendingId !== null}
-                                        className="h-8 px-3 rounded-lg bg-emerald-600 text-white text-[11px] font-extrabold hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-sm disabled:opacity-60"
+                                        className="h-8 px-3 rounded-lg bg-success text-white text-[11px] font-extrabold hover:bg-success/90 transition-colors flex items-center gap-1 shadow-sm disabled:opacity-60"
                                     >
                                         {sendingId === cust.id ? (
                                             <Loader2 size={12} className="animate-spin" />
@@ -1017,7 +1017,7 @@ function DownloadReportsModal({
                         <select
                             value={reportType}
                             onChange={(e) => setReportType(e.target.value)}
-                            className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                            className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                         >
                             <option value="sales">Sales & Revenue Report</option>
                             <option value="inventory">Inventory Alerts & Health</option>
@@ -1030,7 +1030,7 @@ function DownloadReportsModal({
                         <select
                             value={range}
                             onChange={(e) => setRange(e.target.value)}
-                            className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                            className="w-full h-10 px-3 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                         >
                             <option value="today">Today Only</option>
                             <option value="weekly">This Week (Last 7 Days)</option>
@@ -1047,7 +1047,7 @@ function DownloadReportsModal({
                                 className={cn(
                                     'h-10 rounded-xl border text-[13px] font-bold transition-all',
                                     format === 'csv'
-                                        ? 'border-emerald-500 bg-emerald-50/20 text-emerald-700'
+                                        ? 'border-primary bg-success-light/20 text-success'
                                         : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                                 )}
                             >
@@ -1059,7 +1059,7 @@ function DownloadReportsModal({
                                 className={cn(
                                     'h-10 rounded-xl border text-[13px] font-bold transition-all',
                                     format === 'pdf'
-                                        ? 'border-emerald-500 bg-emerald-50/20 text-emerald-700'
+                                        ? 'border-primary bg-success-light/20 text-success'
                                         : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                                 )}
                             >
@@ -1069,7 +1069,7 @@ function DownloadReportsModal({
                     </div>
 
                     {generating && (
-                        <div className="py-2 flex items-center gap-2 text-emerald-600 justify-center">
+                        <div className="py-2 flex items-center gap-2 text-success justify-center">
                             <Loader2 size={16} className="animate-spin" />
                             <span className="text-[12px] font-bold">Querying logs and compiling file...</span>
                         </div>
@@ -1087,7 +1087,7 @@ function DownloadReportsModal({
                             type="button"
                             onClick={handleDownload}
                             disabled={generating}
-                            className="h-10 px-5 rounded-xl bg-emerald-600 text-white text-[13px] font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-sm"
+                            className="h-10 px-5 rounded-xl bg-success text-white text-[13px] font-bold hover:bg-success/90 transition-colors flex items-center gap-1.5 shadow-sm"
                         >
                             <Download size={14} />
                             Generate & Download
@@ -1222,7 +1222,7 @@ function SalesDetailDrawer({
                         className={cn(
                             "px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all whitespace-nowrap",
                             tab === t.id
-                                ? "bg-white text-emerald-700 shadow-sm border border-emerald-100/50"
+                                ? "bg-white text-success shadow-sm border border-success/20/50"
                                 : "text-gray-500 hover:text-gray-800"
                         )}
                     >
@@ -1237,13 +1237,13 @@ function SalesDetailDrawer({
                     placeholder="Search by Order # or Customer..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full h-10 px-3.5 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                    className="w-full h-10 px-3.5 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                 />
             </div>
 
             {loading ? (
                 <div className="flex items-center justify-center py-12">
-                    <Loader2 className="animate-spin text-emerald-600" size={24} />
+                    <Loader2 className="animate-spin text-success" size={24} />
                 </div>
             ) : orders.length === 0 ? (
                 <p className="text-center py-12 text-[13px] text-gray-400 font-medium">No matching orders found.</p>
@@ -1308,7 +1308,7 @@ function OrderExpandedView({ id }: { id: string }) {
     if (loading) {
         return (
             <div className="px-4 pb-4 pt-2 border-t border-gray-50 flex items-center justify-center">
-                <Loader2 size={16} className="animate-spin text-emerald-600" />
+                <Loader2 size={16} className="animate-spin text-success" />
             </div>
         );
     }
@@ -1344,7 +1344,7 @@ function OrderExpandedView({ id }: { id: string }) {
                 </button>
                 <Link
                     href={`/vendor/orders/${detail.id}`}
-                    className="h-8 px-3 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-bold flex items-center justify-center transition-all"
+                    className="h-8 px-3 rounded-lg bg-success text-white hover:bg-success/90 font-bold flex items-center justify-center transition-all"
                 >
                     Edit / Manage Order
                 </Link>
@@ -1456,7 +1456,7 @@ function CollectionsDetailDrawer({
                         className={cn(
                             "px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all whitespace-nowrap",
                             tab === t.id
-                                ? "bg-white text-emerald-700 shadow-sm border border-emerald-100/50"
+                                ? "bg-white text-success shadow-sm border border-success/20/50"
                                 : "text-gray-500 hover:text-gray-800"
                         )}
                     >
@@ -1470,12 +1470,12 @@ function CollectionsDetailDrawer({
                 placeholder="Search by Client Name or Business..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-10 px-3.5 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                className="w-full h-10 px-3.5 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
             />
 
             {loading ? (
                 <div className="flex items-center justify-center py-12">
-                    <Loader2 className="animate-spin text-emerald-600" size={24} />
+                    <Loader2 className="animate-spin text-success" size={24} />
                 </div>
             ) : filteredAccounts.length === 0 ? (
                 <p className="text-center py-12 text-[13px] text-gray-400 font-medium">No matching client credit accounts found.</p>
@@ -1493,7 +1493,7 @@ function CollectionsDetailDrawer({
                                     <span className={cn(
                                         "px-2 py-0.5 rounded text-[10px] font-extrabold capitalize border",
                                         acc.status === 'active'
-                                            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                                            ? "bg-success-light text-success border-success/20"
                                             : "bg-rose-50 text-rose-700 border-rose-100"
                                     )}>
                                         {acc.status}
@@ -1533,7 +1533,7 @@ function CollectionsDetailDrawer({
                                         <div
                                             className={cn(
                                                 'h-full rounded-full transition-all',
-                                                utilPct >= 80 ? 'bg-rose-500' : utilPct >= 60 ? 'bg-amber-500' : 'bg-emerald-500'
+                                                utilPct >= 80 ? 'bg-rose-500' : utilPct >= 60 ? 'bg-amber-500' : 'bg-success-light0'
                                             )}
                                             style={{ width: `${Math.min(utilPct, 100)}%` }}
                                         />
@@ -1546,7 +1546,7 @@ function CollectionsDetailDrawer({
                                             type="button"
                                             onClick={() => handleSendReminder(acc.user.id, acc.user.fullName)}
                                             disabled={remindingId !== null}
-                                            className="h-8 px-3 rounded-lg bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-60"
+                                            className="h-8 px-3 rounded-lg bg-success text-white text-[11px] font-bold hover:bg-success/90 transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-60"
                                         >
                                             {remindingId === acc.user.id ? (
                                                 <Loader2 size={12} className="animate-spin" />
@@ -1688,7 +1688,7 @@ function InventoryDetailDrawer({
                         className={cn(
                             "px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all whitespace-nowrap",
                             tab === t.id
-                                ? "bg-white text-emerald-700 shadow-sm border border-emerald-100/50"
+                                ? "bg-white text-success shadow-sm border border-success/20/50"
                                 : "text-gray-500 hover:text-gray-800"
                         )}
                     >
@@ -1703,7 +1703,7 @@ function InventoryDetailDrawer({
                     placeholder="Search by Product Name or SKU..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full h-10 px-3.5 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                    className="w-full h-10 px-3.5 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
                 />
             )}
 
@@ -1714,7 +1714,7 @@ function InventoryDetailDrawer({
                     ) : (
                         fastMovers.map((item, idx) => (
                             <div key={item.productId} className="flex items-center gap-4 border border-gray-150/40 rounded-xl p-4 bg-white">
-                                <span className="text-[16px] font-black text-emerald-600 bg-emerald-50 w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
+                                <span className="text-[16px] font-black text-success bg-success-light w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
                                     #{idx + 1}
                                 </span>
                                 <div className="flex-1 min-w-0">
@@ -1722,7 +1722,7 @@ function InventoryDetailDrawer({
                                     <span className="text-[11px] text-gray-400 font-bold block mt-0.5">{item.totalQty.toLocaleString('en-IN')} Units Sold</span>
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <span className="text-[13.5px] font-extrabold text-emerald-600 block">{formatINR(item.revenue)}</span>
+                                    <span className="text-[13.5px] font-extrabold text-success block">{formatINR(item.revenue)}</span>
                                     <span className="text-[10px] text-gray-400 font-medium block mt-0.5">Revenue Generated</span>
                                 </div>
                             </div>
@@ -1731,7 +1731,7 @@ function InventoryDetailDrawer({
                 </div>
             ) : loading ? (
                 <div className="flex items-center justify-center py-12">
-                    <Loader2 className="animate-spin text-emerald-600" size={24} />
+                    <Loader2 className="animate-spin text-success" size={24} />
                 </div>
             ) : filteredInventory.length === 0 ? (
                 <p className="text-center py-12 text-[13px] text-gray-400 font-medium">No matching items found.</p>
@@ -1750,7 +1750,7 @@ function InventoryDetailDrawer({
                                         ? item.qtyAvailable <= 0
                                             ? "bg-rose-50 text-rose-700 border-rose-100"
                                             : "bg-amber-50 text-amber-700 border-amber-100"
-                                        : "bg-emerald-50 text-emerald-700 border-emerald-100"
+                                        : "bg-success-light text-success border-success/20"
                                 )}>
                                     {item.qtyAvailable <= 0 ? 'Out of Stock' : item.isLowStock ? 'Low Stock' : 'Good Stock'}
                                 </span>
@@ -1767,7 +1767,7 @@ function InventoryDetailDrawer({
                                         type="number"
                                         value={editQty[item.productId] ?? 0}
                                         onChange={(e) => setEditQty({ ...editQty, [item.productId]: parseInt(e.target.value) || 0 })}
-                                        className="w-full h-8 px-2.5 rounded-lg border border-gray-200 text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
+                                        className="w-full h-8 px-2.5 rounded-lg border border-gray-200 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary font-bold"
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -1776,7 +1776,7 @@ function InventoryDetailDrawer({
                                         type="number"
                                         value={editThreshold[item.productId] ?? 0}
                                         onChange={(e) => setEditThreshold({ ...editThreshold, [item.productId]: parseInt(e.target.value) || 0 })}
-                                        className="w-full h-8 px-2.5 rounded-lg border border-gray-200 text-[12px] focus:outline-none focus:ring-1 focus:ring-emerald-500 font-bold"
+                                        className="w-full h-8 px-2.5 rounded-lg border border-gray-200 text-[12px] focus:outline-none focus:ring-1 focus:ring-primary font-bold"
                                     />
                                 </div>
                             </div>
@@ -1786,7 +1786,7 @@ function InventoryDetailDrawer({
                                     type="button"
                                     onClick={() => handleSaveStock(item.productId, item.product.name)}
                                     disabled={savingId !== null}
-                                    className="h-8 px-4 rounded-lg bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-60"
+                                    className="h-8 px-4 rounded-lg bg-success text-white text-[11px] font-bold hover:bg-success/90 transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-60"
                                 >
                                     {savingId === item.productId && <Loader2 size={12} className="animate-spin" />}
                                     Save Updates
@@ -1883,7 +1883,7 @@ function CustomersDetailDrawer({
                         className={cn(
                             "px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all whitespace-nowrap",
                             tab === t.id
-                                ? "bg-white text-emerald-700 shadow-sm border border-emerald-100/50"
+                                ? "bg-white text-success shadow-sm border border-success/20/50"
                                 : "text-gray-500 hover:text-gray-800"
                         )}
                     >
@@ -1897,12 +1897,12 @@ function CustomersDetailDrawer({
                 placeholder="Search by Name, Phone, or Business..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-10 px-3.5 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                className="w-full h-10 px-3.5 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
             />
 
             {loading ? (
                 <div className="flex items-center justify-center py-12">
-                    <Loader2 className="animate-spin text-emerald-600" size={24} />
+                    <Loader2 className="animate-spin text-success" size={24} />
                 </div>
             ) : filtered.length === 0 ? (
                 <p className="text-center py-12 text-[13px] text-gray-400 font-medium">No matching client partners found.</p>
@@ -1934,7 +1934,7 @@ function CustomersDetailDrawer({
                                 </div>
                                 <div>
                                     <span className="text-gray-400 font-bold block text-[10px] uppercase">Purchases</span>
-                                    <span className="text-[13px] font-black text-emerald-600">{formatINR(c.totalSpend)}</span>
+                                    <span className="text-[13px] font-black text-success">{formatINR(c.totalSpend)}</span>
                                 </div>
                             </div>
                         </div>
@@ -2081,7 +2081,7 @@ function FulfillmentDetailDrawer({
                         className={cn(
                             "px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all whitespace-nowrap",
                             tab === t.id
-                                ? "bg-white text-emerald-700 shadow-sm border border-emerald-100/50"
+                                ? "bg-white text-success shadow-sm border border-success/20/50"
                                 : "text-gray-500 hover:text-gray-800"
                         )}
                     >
@@ -2095,12 +2095,12 @@ function FulfillmentDetailDrawer({
                 placeholder="Search by Order ID or Client Name..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-10 px-3.5 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium"
+                className="w-full h-10 px-3.5 rounded-xl border border-gray-200 text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
             />
 
             {loading ? (
                 <div className="flex items-center justify-center py-12">
-                    <Loader2 className="animate-spin text-emerald-600" size={24} />
+                    <Loader2 className="animate-spin text-success" size={24} />
                 </div>
             ) : filtered.length === 0 ? (
                 <p className="text-center py-12 text-[13px] text-gray-400 font-medium">No active orders in this segment.</p>
@@ -2141,7 +2141,7 @@ function FulfillmentDetailDrawer({
                                             type="button"
                                             onClick={() => handleUpdateStatus(o.id, o.orderNumber, 'confirmed')}
                                             disabled={updatingId !== null}
-                                            className="h-9 px-4 rounded-xl bg-emerald-600 text-white text-[12px] font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-sm disabled:opacity-60"
+                                            className="h-9 px-4 rounded-xl bg-success text-white text-[12px] font-bold hover:bg-success/90 transition-colors flex items-center gap-1 shadow-sm disabled:opacity-60"
                                         >
                                             {updatingId === o.id && <Loader2 size={12} className="animate-spin" />}
                                             Accept & Lock Stock
@@ -2209,7 +2209,7 @@ function FulfillmentDetailDrawer({
                                             type="button"
                                             onClick={() => handleUpdateStatus(o.id, o.orderNumber, 'delivered')}
                                             disabled={updatingId !== null}
-                                            className="h-9 px-4 rounded-xl bg-emerald-600 text-white text-[12px] font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-sm disabled:opacity-60"
+                                            className="h-9 px-4 rounded-xl bg-success text-white text-[12px] font-bold hover:bg-success/90 transition-colors flex items-center gap-1 shadow-sm disabled:opacity-60"
                                         >
                                             {updatingId === o.id && <Loader2 size={12} className="animate-spin" />}
                                             Confirm Delivery Success
@@ -2322,7 +2322,7 @@ function FinancialDetailDrawer({
                         className={cn(
                             "px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all whitespace-nowrap",
                             tab === t.id
-                                ? "bg-white text-emerald-700 shadow-sm border border-emerald-100/50"
+                                ? "bg-white text-success shadow-sm border border-success/20/50"
                                 : "text-gray-500 hover:text-gray-800"
                         )}
                     >
@@ -2333,27 +2333,27 @@ function FinancialDetailDrawer({
 
             {loading ? (
                 <div className="flex items-center justify-center py-12">
-                    <Loader2 className="animate-spin text-emerald-600" size={24} />
+                    <Loader2 className="animate-spin text-success" size={24} />
                 </div>
             ) : financeData ? (
                 <div className="space-y-5">
-                    <div className="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
+                    <div className="bg-gradient-to-br from-success to-primary-dark rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
                         <div className="absolute right-0 bottom-0 opacity-10 text-[100px] leading-none select-none">🏦</div>
-                        <span className="text-[10px] text-emerald-100 font-bold uppercase tracking-wider block">Available Balance</span>
+                        <span className="text-[10px] text-primary-light font-bold uppercase tracking-wider block">Available Balance</span>
                         <span className="text-[28px] font-black block mt-1">{formatINR(financeData.wallet?.balance || 0)}</span>
-                        <p className="text-[11px] text-emerald-100/80 font-medium mt-1">Next auto-settlement date: {financeData.wallet?.nextSettlementDate || 'Monday'}</p>
+                        <p className="text-[11px] text-primary-light/80 font-medium mt-1">Next auto-settlement date: {financeData.wallet?.nextSettlementDate || 'Monday'}</p>
 
                         {tab === 'pending_settlement' && financeData.pendingPayout > 0 && (
                             <div className="mt-4 pt-4 border-t border-white/20 flex items-center justify-between">
                                 <div>
-                                    <span className="text-[10px] text-emerald-100 uppercase block">Pending Settlement</span>
+                                    <span className="text-[10px] text-primary-light uppercase block">Pending Settlement</span>
                                     <span className="text-[15px] font-black">{formatINR(financeData.pendingPayout)}</span>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={handleRequestInstantPayout}
                                     disabled={payoutLoading}
-                                    className="bg-white text-emerald-700 px-4 py-2 rounded-xl text-[12px] font-bold hover:bg-emerald-50 transition-all shadow-sm flex items-center gap-1.5"
+                                    className="bg-white text-success px-4 py-2 rounded-xl text-[12px] font-bold hover:bg-success-light transition-all shadow-sm flex items-center gap-1.5"
                                 >
                                     {payoutLoading && <Loader2 size={12} className="animate-spin" />}
                                     Request Payout
@@ -2377,7 +2377,7 @@ function FinancialDetailDrawer({
                                             </div>
                                             <span className={cn(
                                                 "font-black text-[13px] shrink-0",
-                                                txn.amount >= 0 ? "text-emerald-600" : "text-rose-500"
+                                                txn.amount >= 0 ? "text-success" : "text-rose-500"
                                             )}>
                                                 {txn.amount >= 0 ? `+` : ``}{formatINR(Number(txn.amount))}
                                             </span>
@@ -2399,7 +2399,7 @@ function FinancialDetailDrawer({
                                         <div key={p.id} className="border border-gray-100 rounded-xl p-4 bg-white space-y-2">
                                             <div className="flex items-center justify-between">
                                                 <span className="text-[13.5px] font-black text-gray-900">{formatINR(p.amount)}</span>
-                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold capitalize bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold capitalize bg-success-light text-success border border-success/20">
                                                     {p.status}
                                                 </span>
                                             </div>
@@ -2619,14 +2619,14 @@ export default function VendorDashboardPage() {
 
             {/* Header / Systems Operations Center */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 p-6 rounded-3xl border border-slate-800 shadow-[0_15px_30px_-5px_rgba(0,0,0,0.15)] relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
-                <div className="absolute -bottom-20 left-10 w-[250px] h-[250px] bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
+                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-success/10 rounded-full blur-[120px] pointer-events-none" />
+                <div className="absolute -bottom-20 left-10 w-[250px] h-[250px] bg-success-light0/5 rounded-full blur-[80px] pointer-events-none" />
                 
                 <div className="relative z-10">
                     <div className="flex items-center gap-2.5 flex-wrap">
                         <h1 className="text-[24px] font-semibold text-white tracking-tight leading-none">Today's Operations Control Center</h1>
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-success/10 text-success border border-primary/20 uppercase tracking-wider">
+                            <span className="w-1.5 h-1.5 rounded-full bg-success-light0 animate-ping"></span>
                             Live Pulse Active
                         </span>
                     </div>
@@ -2642,7 +2642,7 @@ export default function VendorDashboardPage() {
                         onClick={() => fetchDashboard()}
                         className="h-10 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-[13px] font-medium text-slate-200 hover:text-white flex items-center gap-2 border border-slate-700/50 hover:border-slate-600 transition-all shadow-md active:scale-95 cursor-pointer"
                     >
-                        <RefreshCw size={14} className={cn(loading && "animate-spin text-emerald-400")} />
+                        <RefreshCw size={14} className={cn(loading && "animate-spin text-success")} />
                         Refresh Control
                     </button>
                 </div>
@@ -2650,7 +2650,7 @@ export default function VendorDashboardPage() {
 
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-28 gap-3">
-                    <Loader2 className="animate-spin text-emerald-600" size={36} />
+                    <Loader2 className="animate-spin text-success" size={36} />
                     <p className="text-[13px] text-gray-400 font-bold">Compiling real-time dashboard analytics...</p>
                 </div>
             ) : error ? (
@@ -2679,14 +2679,14 @@ export default function VendorDashboardPage() {
                             <>
                                 <button
                                     onClick={() => signOut()}
-                                    className="h-10 px-6 bg-emerald-600 text-white rounded-xl text-[13px] font-bold hover:bg-emerald-700 transition-colors shadow-md"
+                                    className="h-10 px-6 bg-success text-white rounded-xl text-[13px] font-bold hover:bg-success/90 transition-colors shadow-md"
                                 >
                                     Sign out
                                 </button>
                                 {activeAccountType?.isBrand && (
                                     <Link
                                         href="/brand/portal"
-                                        className="h-10 px-6 bg-[#53B175] text-white rounded-xl text-[13px] font-bold hover:bg-[#3d9e41] transition-colors shadow-md flex items-center justify-center"
+                                        className="h-10 px-6 bg-primary text-white rounded-xl text-[13px] font-bold hover:bg-primary-dark transition-colors shadow-md flex items-center justify-center"
                                     >
                                         Go to Brand Portal
                                     </Link>
@@ -2695,7 +2695,7 @@ export default function VendorDashboardPage() {
                         ) : (
                             <button
                                 onClick={() => fetchDashboard()}
-                                className="h-10 px-6 bg-emerald-600 text-white rounded-xl text-[13px] font-bold hover:bg-emerald-700 transition-colors shadow-md"
+                                className="h-10 px-6 bg-success text-white rounded-xl text-[13px] font-bold hover:bg-success/90 transition-colors shadow-md"
                             >
                                 {isNetworkError ? 'Re-connect Server' : 'Try Again'}
                             </button>
@@ -2713,18 +2713,18 @@ export default function VendorDashboardPage() {
                     {/* ── Smart Control Deck (Quick Actions) ── */}
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                         <h3 className="text-[15px] font-black text-gray-950 mb-4 tracking-tight flex items-center gap-1.5">
-                            <Activity size={16} className="text-emerald-600" />
+                            <Activity size={16} className="text-success" />
                             Smart Executive Actions
                         </h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5">
                             <Link
                                 href="/vendor/products?action=add"
-                                className="flex flex-col items-center justify-center p-4 bg-emerald-50/20 border border-emerald-100 rounded-2xl hover:bg-emerald-50 hover:shadow-sm hover:-translate-y-0.5 transition-all text-center group"
+                                className="flex flex-col items-center justify-center p-4 bg-success-light/20 border border-success/20 rounded-2xl hover:bg-success-light hover:shadow-sm hover:-translate-y-0.5 transition-all text-center group"
                             >
-                                <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                <div className="w-10 h-10 rounded-full bg-success-light text-success border border-success/20 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                                     <PlusCircle size={18} />
                                 </div>
-                                <span className="text-[12px] font-bold text-emerald-700">Add Products</span>
+                                <span className="text-[12px] font-bold text-success">Add Products</span>
                             </Link>
                             <Link
                                 href="/vendor/inventory"
@@ -2834,26 +2834,26 @@ export default function VendorDashboardPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
 
                         {/* 1. SALES HUB */}
-                        <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-3xl border border-slate-200/60 p-6 shadow-sm hover:shadow-lg hover:border-emerald-300/50 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all" />
+                        <div className="bg-gradient-to-br from-white to-slate-50/50 rounded-3xl border border-slate-200/60 p-6 shadow-sm hover:shadow-lg hover:border-primary/40 transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-success-light0/5 rounded-full blur-2xl group-hover:bg-success/10 transition-all" />
                             <div>
                                 <div className="flex items-center justify-between pb-3 border-b border-slate-105 mb-5">
                                     <h4 className="text-[14px] font-semibold text-slate-800 flex items-center gap-2">
-                                        <TrendingUp size={16} className="text-emerald-500" />
+                                        <TrendingUp size={16} className="text-success" />
                                         Sales Operations
                                     </h4>
-                                    <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-wider">Revenue</span>
+                                    <span className="px-2 py-0.5 rounded bg-success-light text-success text-[10px] font-bold uppercase tracking-wider">Revenue</span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mb-5">
-                                    <div onClick={() => openSalesDrawer('today')} className="cursor-pointer bg-white border border-slate-105 hover:border-emerald-200 hover:bg-emerald-50/10 p-3.5 rounded-2xl transition-all duration-300 shadow-sm relative group/cell">
+                                    <div onClick={() => openSalesDrawer('today')} className="cursor-pointer bg-white border border-slate-105 hover:border-success/30 hover:bg-success-light/10 p-3.5 rounded-2xl transition-all duration-300 shadow-sm relative group/cell">
                                         <span className="text-[10px] text-slate-400 font-extrabold tracking-wider block">TODAY SALES</span>
                                         <span className="text-[22px] font-semibold text-slate-900 block mt-1 tracking-tight">{formatINR(Number(data.stats.todaySales))}</span>
-                                        <ArrowUpRight size={12} className="absolute top-3 right-3 text-slate-350 group-hover/cell:text-emerald-500 group-hover/cell:translate-x-0.5 group-hover/cell:-translate-y-0.5 transition-all" />
+                                        <ArrowUpRight size={12} className="absolute top-3 right-3 text-slate-350 group-hover/cell:text-success group-hover/cell:translate-x-0.5 group-hover/cell:-translate-y-0.5 transition-all" />
                                     </div>
-                                    <div onClick={() => openSalesDrawer('month')} className="cursor-pointer bg-white border border-slate-105 hover:border-emerald-200 hover:bg-emerald-50/10 p-3.5 rounded-2xl transition-all duration-300 shadow-sm relative group/cell">
+                                    <div onClick={() => openSalesDrawer('month')} className="cursor-pointer bg-white border border-slate-105 hover:border-success/30 hover:bg-success-light/10 p-3.5 rounded-2xl transition-all duration-300 shadow-sm relative group/cell">
                                         <span className="text-[10px] text-slate-400 font-extrabold tracking-wider block">MONTH SALES</span>
                                         <span className="text-[22px] font-semibold text-slate-900 block mt-1 tracking-tight">{formatINR(Number(data.stats.mtdSales))}</span>
-                                        <ArrowUpRight size={12} className="absolute top-3 right-3 text-slate-350 group-hover/cell:text-emerald-500 group-hover/cell:translate-x-0.5 group-hover/cell:-translate-y-0.5 transition-all" />
+                                        <ArrowUpRight size={12} className="absolute top-3 right-3 text-slate-350 group-hover/cell:text-success group-hover/cell:translate-x-0.5 group-hover/cell:-translate-y-0.5 transition-all" />
                                     </div>
                                 </div>
                             </div>
@@ -2864,8 +2864,8 @@ export default function VendorDashboardPage() {
                                         <span className="text-amber-600 block text-[15px] font-semibold tracking-tight">{data.ordersByStatus.pending ?? 0}</span>
                                         <span className="text-[10px] text-slate-400 font-medium block mt-0.5">Pending</span>
                                     </div>
-                                    <div onClick={() => openSalesDrawer('delivered')} className="bg-white border border-slate-100/80 hover:border-emerald-200 hover:bg-emerald-50/20 p-2.5 rounded-xl cursor-pointer transition-all duration-300 shadow-sm">
-                                        <span className="text-emerald-600 block text-[15px] font-semibold tracking-tight">{data.ordersByStatus.delivered ?? 0}</span>
+                                    <div onClick={() => openSalesDrawer('delivered')} className="bg-white border border-slate-100/80 hover:border-success/30 hover:bg-success-light/20 p-2.5 rounded-xl cursor-pointer transition-all duration-300 shadow-sm">
+                                        <span className="text-success block text-[15px] font-semibold tracking-tight">{data.ordersByStatus.delivered ?? 0}</span>
                                         <span className="text-[10px] text-slate-400 font-medium block mt-0.5">Delivered</span>
                                     </div>
                                     <div onClick={() => openSalesDrawer('cancelled')} className="bg-white border border-slate-100/80 hover:border-rose-200 hover:bg-rose-50/20 p-2.5 rounded-xl cursor-pointer transition-all duration-300 shadow-sm">
@@ -2907,14 +2907,14 @@ export default function VendorDashboardPage() {
                                     <span className="tracking-wider">CREDIT UTILIZATION</span>
                                     <span className={cn(
                                         "px-2 py-0.5 rounded text-[10px] font-bold shadow-sm bg-white border",
-                                        data.creditUtilization.pct >= 80 ? "text-rose-650 border-rose-100 animate-pulse font-extrabold" : data.creditUtilization.pct >= 60 ? "text-amber-650 border-amber-100" : "text-emerald-650 border-emerald-100"
+                                        data.creditUtilization.pct >= 80 ? "text-rose-650 border-rose-100 animate-pulse font-extrabold" : data.creditUtilization.pct >= 60 ? "text-amber-650 border-amber-100" : "text-success border-success/20"
                                     )}>{data.creditUtilization.pct}% Used</span>
                                 </div>
                                 <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden p-0.5 border border-slate-200/50 shadow-inner">
                                     <div
                                         className={cn(
                                             'h-full rounded-full transition-all duration-500 ease-out shadow-sm',
-                                            data.creditUtilization.pct >= 80 ? 'bg-gradient-to-r from-rose-500 to-red-600' : data.creditUtilization.pct >= 60 ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-emerald-400 to-emerald-500'
+                                            data.creditUtilization.pct >= 80 ? 'bg-gradient-to-r from-rose-500 to-red-600' : data.creditUtilization.pct >= 60 ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-success to-success'
                                         )}
                                         style={{ width: `${Math.min(data.creditUtilization.pct, 100)}%` }}
                                     />
@@ -2963,7 +2963,7 @@ export default function VendorDashboardPage() {
                             </div>
                             <div onClick={() => openInventoryDrawer('fast_moving')} className="bg-slate-50/80 hover:bg-slate-100/70 border border-slate-100 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all duration-300">
                                 <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-sm">
+                                    <div className="w-8 h-8 rounded-lg bg-success-light flex items-center justify-center text-success border border-success/20 shadow-sm">
                                         <TrendingUp size={16} />
                                     </div>
                                     <div className="min-w-0">
@@ -2971,7 +2971,7 @@ export default function VendorDashboardPage() {
                                         <span className="text-[10px] text-slate-400 block truncate mt-1">Based on quantity sold 30d</span>
                                     </div>
                                 </div>
-                                <span className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-0.5">View Top 5 <ArrowRight size={12} /></span>
+                                <span className="text-[11px] font-bold text-success hover:text-success flex items-center gap-0.5">View Top 5 <ArrowRight size={12} /></span>
                             </div>
                         </div>
 
@@ -3000,8 +3000,8 @@ export default function VendorDashboardPage() {
                                 </div>
                             </div>
                             <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 flex items-center justify-between text-[11px] font-extrabold text-slate-500">
-                                <div onClick={() => openCustomersDrawer('new')} className="text-center flex-1 cursor-pointer bg-white hover:bg-emerald-50/25 p-2.5 rounded-xl border border-slate-100 shadow-sm transition-all duration-350 mr-1.5">
-                                    <span className="text-emerald-600 block text-[15px] font-semibold tracking-tight">{data.customerCounts.new}</span>
+                                <div onClick={() => openCustomersDrawer('new')} className="text-center flex-1 cursor-pointer bg-white hover:bg-success-light/25 p-2.5 rounded-xl border border-slate-100 shadow-sm transition-all duration-350 mr-1.5">
+                                    <span className="text-success block text-[15px] font-semibold tracking-tight">{data.customerCounts.new}</span>
                                     <span className="text-[9px] text-slate-400 block mt-0.5 uppercase tracking-wider font-extrabold">New (30d)</span>
                                 </div>
                                 <div onClick={() => openCustomersDrawer('dormant')} className="text-center flex-1 cursor-pointer bg-white hover:bg-rose-50/25 p-2.5 rounded-xl border border-slate-100 shadow-sm transition-all duration-350 mr-1.5">
@@ -3068,10 +3068,10 @@ export default function VendorDashboardPage() {
                                     <span className="px-2 py-0.5 rounded bg-orange-50 text-orange-705 text-[10px] font-bold uppercase tracking-wider">Payouts</span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mb-5">
-                                    <div onClick={() => openFinancialDrawer('wallet')} className="cursor-pointer bg-white border border-slate-105 hover:border-emerald-200 hover:bg-emerald-50/10 p-3.5 rounded-2xl transition-all duration-300 shadow-sm relative group/cell">
+                                    <div onClick={() => openFinancialDrawer('wallet')} className="cursor-pointer bg-white border border-slate-105 hover:border-success/30 hover:bg-success-light/10 p-3.5 rounded-2xl transition-all duration-300 shadow-sm relative group/cell">
                                         <span className="text-[10px] text-slate-400 font-extrabold tracking-wider block">WALLET BALANCE</span>
-                                        <span className="text-[22px] font-semibold text-emerald-600 block mt-1 tracking-tight">{formatINR(data.stats.walletBalance)}</span>
-                                        <ArrowUpRight size={12} className="absolute top-3 right-3 text-emerald-355 group-hover/cell:text-emerald-500 transition-colors" />
+                                        <span className="text-[22px] font-semibold text-success block mt-1 tracking-tight">{formatINR(data.stats.walletBalance)}</span>
+                                        <ArrowUpRight size={12} className="absolute top-3 right-3 text-success group-hover/cell:text-success transition-colors" />
                                     </div>
                                     <div onClick={() => openFinancialDrawer('pending_settlement')} className="cursor-pointer bg-white border border-slate-105 hover:border-orange-200 hover:bg-orange-50/10 p-3.5 rounded-2xl transition-all duration-300 shadow-sm relative group/cell">
                                         <span className="text-[10px] text-slate-400 font-extrabold tracking-wider block">PENDING SETTLE</span>
@@ -3106,7 +3106,7 @@ export default function VendorDashboardPage() {
                                 </h3>
                                 <Link
                                     href="/vendor/orders"
-                                    className="text-emerald-600 text-[12px] font-bold hover:text-emerald-700 flex items-center gap-0.5 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-150 transition-all cursor-pointer shadow-sm active:scale-95"
+                                    className="text-success text-[12px] font-bold hover:text-success flex items-center gap-0.5 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-150 transition-all cursor-pointer shadow-sm active:scale-95"
                                 >
                                     View All Log <ChevronRight size={14} />
                                 </Link>
@@ -3167,8 +3167,8 @@ export default function VendorDashboardPage() {
                         <div id="fast-movers-list" className="bg-white rounded-3xl border border-slate-150 shadow-[0_8px_30px_rgb(0,0,0,0.02)] overflow-hidden flex flex-col justify-between">
                             <div>
                                 <div className="px-6 py-4.5 border-b border-slate-100 flex items-center gap-3 bg-gradient-to-r from-white to-slate-50/40">
-                                    <div className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center">
-                                        <TrendingUp size={16} className="text-emerald-600" />
+                                    <div className="w-8 h-8 rounded-full bg-success-light border border-success/20 flex items-center justify-center">
+                                        <TrendingUp size={16} className="text-success" />
                                     </div>
                                     <h3 className="text-[15px] font-semibold text-slate-900">Fast Moving Goods (30d)</h3>
                                 </div>
@@ -3188,7 +3188,7 @@ export default function VendorDashboardPage() {
                                                     {item.totalQty.toLocaleString('en-IN')} units shipped
                                                 </span>
                                             </div>
-                                            <span className="text-[13px] font-extrabold text-emerald-600 shrink-0 w-[80px] text-right">
+                                            <span className="text-[13px] font-extrabold text-success shrink-0 w-[80px] text-right">
                                                 {formatINR(item.revenue)}
                                             </span>
                                         </div>
@@ -3196,7 +3196,7 @@ export default function VendorDashboardPage() {
                                 </div>
                             </div>
                             <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
-                                <Link href="/vendor/products" className="text-[12px] font-bold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-0.5">
+                                <Link href="/vendor/products" className="text-[12px] font-bold text-success hover:text-success inline-flex items-center gap-0.5">
                                     Modify Catalog Pricing <ArrowRight size={14} />
                                 </Link>
                             </div>

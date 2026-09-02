@@ -163,7 +163,7 @@ export function PayoutInviteModal({
                                 <p className="font-mono text-[13px] font-bold text-[#181725]">{trackingKey}</p>
                             </div>
                         )}
-                        <button onClick={onClose} className="mt-5 w-full py-2.5 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-[#48a068] cursor-pointer">
+                        <button onClick={onClose} className="mt-5 w-full py-2.5 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-primary-dark cursor-pointer">
                             Done
                         </button>
                     </div>
@@ -172,7 +172,7 @@ export function PayoutInviteModal({
                         <div className="space-y-3">
                             {enableCustomerSearch && (
                                 selected ? (
-                                    <div className="flex items-center justify-between bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
+                                    <div className="flex items-center justify-between bg-success-light border border-success/20 rounded-xl px-3 py-2.5">
                                         <div className="min-w-0">
                                             <p className="text-[13px] font-bold text-[#181725] truncate">{userLabel(selected)}</p>
                                             <p className="text-[11px] text-gray-500 truncate">{userSub(selected)}</p>
@@ -266,7 +266,7 @@ export function PayoutInviteModal({
                         <button
                             onClick={submit}
                             disabled={saving}
-                            className="mt-5 w-full py-2.5 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-[#48a068] disabled:opacity-50 transition-colors cursor-pointer"
+                            className="mt-5 w-full py-2.5 rounded-xl bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-primary-dark disabled:opacity-50 transition-colors cursor-pointer"
                         >
                             {saving ? <Loader2 size={15} className="animate-spin mx-auto" /> : 'Create payout link'}
                         </button>

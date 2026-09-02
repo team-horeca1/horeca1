@@ -139,8 +139,9 @@ export default function BusinessDetailPage() {
     // Pending approval: still allow Enter for team ops (marketplace visibility is separate).
     setEnteringId(store.id);
     try {
-      setEnteredStore(true);
       await switchOnlineStore(store.id, businessId);
+      // Set after switch — layout must not wipe sessionStorage during router.refresh()
+      setEnteredStore(true);
       toast.success(`Entered ${store.name}`);
       window.location.assign('/vendor/dashboard');
     } catch (err) {
@@ -328,7 +329,7 @@ export default function BusinessDetailPage() {
           type="button"
           disabled={!store.isActive || enteringId === store.id}
           onClick={() => void handleEnterStore(store)}
-          className="inline-flex items-center gap-1 h-[30px] px-2.5 text-[12px] font-bold text-white bg-[#299E60] hover:bg-[#238a54] disabled:opacity-50 rounded-[6px]"
+          className="inline-flex items-center gap-1 h-[30px] px-2.5 text-[12px] font-bold text-white bg-primary hover:bg-primary-dark disabled:opacity-50 rounded-[6px]"
           data-testid="enter-store"
           title={!store.isVerified ? 'Pending marketplace approval — ops access still available' : undefined}
         >
@@ -366,7 +367,7 @@ export default function BusinessDetailPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="animate-spin text-[#299E60]" size={28} />
+        <Loader2 className="animate-spin text-primary" size={28} />
       </div>
     );
   }
@@ -375,7 +376,7 @@ export default function BusinessDetailPage() {
     return (
       <div className="max-w-[720px] mx-auto text-center py-12">
         <p className="text-[13px] text-[#7C7C7C] mb-3">Business not found.</p>
-        <Link href="/vendor/businesses" className="text-[13px] font-bold text-[#299E60]">
+        <Link href="/vendor/businesses" className="text-[13px] font-bold text-primary">
           ← Businesses
         </Link>
       </div>
@@ -388,7 +389,7 @@ export default function BusinessDetailPage() {
         <div className="min-w-0">
           <Link
             href="/vendor/businesses"
-            className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#299E60] hover:text-[#238a54]"
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary hover:text-primary-dark"
             data-testid="back-to-supplier"
           >
             <ArrowLeft size={13} />
@@ -457,7 +458,7 @@ export default function BusinessDetailPage() {
           <button
             type="button"
             onClick={() => setAddStoreOpen(true)}
-            className="inline-flex items-center gap-1.5 h-[36px] px-3.5 bg-[#299E60] hover:bg-[#238a54] text-white text-[13px] font-bold rounded-[8px] transition-colors"
+            className="inline-flex items-center gap-1.5 h-[36px] px-3.5 bg-primary hover:bg-primary-dark text-white text-[13px] font-bold rounded-[8px] transition-colors"
           >
             <Plus size={15} />
             Add Online Store
@@ -481,7 +482,7 @@ export default function BusinessDetailPage() {
               <div
                 key={store.id}
                 className={cn(
-                  'border border-[#EEEEEE] rounded-[10px] p-3.5 hover:border-[#299E60]/40 hover:shadow-sm transition-all',
+                  'border border-[#EEEEEE] rounded-[10px] p-3.5 hover:border-primary/40 hover:shadow-sm transition-all',
                   !store.isVerified && 'opacity-70',
                 )}
                 data-testid="store-row"
@@ -581,7 +582,7 @@ export default function BusinessDetailPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 h-[36px] bg-[#299E60] hover:bg-[#238a54] text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 h-[36px] bg-primary hover:bg-primary-dark text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {submitting && <Loader2 size={14} className="animate-spin" />}
                   Save

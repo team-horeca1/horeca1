@@ -179,7 +179,7 @@ export function OutletsOverlay({
             <h3 className="text-[14px] font-bold text-[#181725]">Active Branches ({outlets.length})</h3>
             <button
               onClick={() => setEditing({ ...EMPTY_DRAFT })}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#53B175] text-white text-[12px] font-bold rounded-lg hover:bg-[#48a068] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-[12px] font-bold rounded-lg hover:bg-primary-dark transition-colors"
             >
               <Plus size={14} />
               Add Outlet
@@ -187,15 +187,15 @@ export function OutletsOverlay({
           </div>
 
           {loading ? (
-            <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-[#53B175]" /></div>
+            <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-primary" /></div>
           ) : outlets.length === 0 ? (
             <p className="text-[13px] text-[#666] py-12 text-center bg-white rounded-xl border border-gray-100">No outlets yet.</p>
           ) : (
             <ul className="space-y-3">
               {outlets.map((o) => (
                 <li key={o.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm flex items-start gap-3 relative">
-                  <div className="w-[36px] h-[36px] rounded-full bg-[#E8F5E9] flex items-center justify-center shrink-0 mt-0.5">
-                    <MapPin size={16} className="text-[#53B175]" />
+                  <div className="w-[36px] h-[36px] rounded-full bg-primary-light flex items-center justify-center shrink-0 mt-0.5">
+                    <MapPin size={16} className="text-primary" />
                   </div>
                   <div className="flex-1 min-w-0 pr-16">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -419,16 +419,16 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
               <p className="mt-1 text-[11px] text-amber-700">Enter a 6-digit pincode.</p>
             )}
             {pincodeValid && (
-              <p className="mt-1 text-[11px] text-emerald-700">
+              <p className="mt-1 text-[11px] text-primary">
                 ✓ Pincode set — &quot;Address needed&quot; flag will clear after save.
               </p>
             )}
           </div>
 
           {hasCoords && (
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5 flex items-center gap-2">
-              <MapPin size={14} className="text-emerald-700 shrink-0" />
-              <p className="text-[11.5px] text-emerald-900/80">
+            <div className="rounded-xl border border-primary/20 bg-primary-light/60 p-2.5 flex items-center gap-2">
+              <MapPin size={14} className="text-primary shrink-0" />
+              <p className="text-[11.5px] text-primary">
                 Map location captured · {latitude!.toFixed(5)}, {longitude!.toFixed(5)}
               </p>
             </div>
@@ -447,7 +447,7 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
           <button
             onClick={submit}
             disabled={submitting || !name.trim() || !addressLine.trim()}
-            className="px-4 py-2 bg-[#53B175] text-white text-[13px] font-bold rounded-xl hover:bg-[#48a068] disabled:opacity-50 flex items-center gap-2"
+            className="px-4 py-2 bg-primary text-white text-[13px] font-bold rounded-xl hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2"
           >
             {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
             {submitting ? 'Saving…' : isEdit ? 'Save changes' : 'Create Outlet'}
@@ -477,7 +477,7 @@ function Field({ label, value, onChange, placeholder, required, inputMode }: {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1.5 w-full px-3.5 py-2.5 text-[13px] border border-[#EEEEEE] rounded-xl outline-none focus:border-[#53B175] focus:ring-2 focus:ring-[#53B175]/10 text-gray-700 placeholder:text-gray-400 bg-[#FAFAFA] focus:bg-white transition-all"
+        className="mt-1.5 w-full px-3.5 py-2.5 text-[13px] border border-[#EEEEEE] rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 text-gray-700 placeholder:text-gray-400 bg-[#FAFAFA] focus:bg-white transition-all"
       />
     </label>
   );

@@ -45,17 +45,17 @@ function formatDate(iso: string | null) {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  ACTIVE: 'bg-[#EEF8F1] text-[#299E60]',
+  ACTIVE: 'bg-primary-light text-primary',
   BLOCKED: 'bg-amber-50 text-amber-600',
   BLACKLISTED: 'bg-red-50 text-[#E74C3C]',
 };
 
 const AGING_COLOR: Record<string, string> = {
-  current: 'text-[#299E60]', d1_30: 'text-amber-500', d31_60: 'text-orange-500', d60plus: 'text-[#E74C3C]',
+  current: 'text-primary', d1_30: 'text-amber-500', d31_60: 'text-orange-500', d60plus: 'text-[#E74C3C]',
 };
 
 const AGING_BAR_COLOR: Record<string, string> = {
-  current: 'bg-[#299E60]', d1_30: 'bg-amber-400', d31_60: 'bg-orange-400', d60plus: 'bg-[#E74C3C]',
+  current: 'bg-primary', d1_30: 'bg-amber-400', d31_60: 'bg-orange-400', d60plus: 'bg-[#E74C3C]',
 };
 
 type FilterTab = 'all' | 'overdue' | 'active' | 'blocked';
@@ -179,7 +179,7 @@ export function CreditCollectionsPanel() {
             { label: 'Total Outstanding', value: formatINR(summary.totalOutstanding), icon: IndianRupee, color: 'text-[#181725]', bg: 'bg-white' },
             { label: 'Due Today', value: formatINR(summary.dueToday), icon: Clock, color: summary.dueToday > 0 ? 'text-amber-600' : 'text-[#AEAEAE]', bg: summary.dueToday > 0 ? 'bg-amber-50 border-amber-100' : 'bg-white' },
             { label: 'Overdue', value: formatINR(summary.overdue), icon: AlertTriangle, color: summary.overdue > 0 ? 'text-[#E74C3C]' : 'text-[#AEAEAE]', bg: summary.overdue > 0 ? 'bg-red-50 border-red-100' : 'bg-white' },
-            { label: 'High Risk', value: String(summary.highRiskCount), icon: TrendingUp, color: summary.highRiskCount > 0 ? 'text-[#E74C3C]' : 'text-[#299E60]', bg: summary.highRiskCount > 0 ? 'bg-red-50 border-red-100' : 'bg-white' },
+            { label: 'High Risk', value: String(summary.highRiskCount), icon: TrendingUp, color: summary.highRiskCount > 0 ? 'text-[#E74C3C]' : 'text-primary', bg: summary.highRiskCount > 0 ? 'bg-red-50 border-red-100' : 'bg-white' },
           ].map((stat) => (
             <div key={stat.label} className={cn('rounded-[14px] border border-[#EEEEEE] shadow-sm p-4 flex items-start gap-3', stat.bg)}>
               <div className="p-2 rounded-[8px] bg-[#F5F5F5] shrink-0">
@@ -236,7 +236,7 @@ export function CreditCollectionsPanel() {
 
       <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-20"><Loader2 className="animate-spin text-[#299E60]" size={28} /></div>
+          <div className="flex items-center justify-center py-20"><Loader2 className="animate-spin text-primary" size={28} /></div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center">
             <CreditCard size={36} className="text-[#E5E7EB] mx-auto mb-3" />
@@ -265,7 +265,7 @@ export function CreditCollectionsPanel() {
                   <div className="flex flex-wrap gap-2 pt-1">
                     {row.outstanding > 0 && (
                       <>
-                        <button type="button" disabled={busyId === row.id} onClick={() => handleSendReminder(row)} className="inline-flex items-center gap-1 h-[28px] px-2.5 rounded-[6px] bg-[#299E60] text-white text-[11px] font-bold">
+                        <button type="button" disabled={busyId === row.id} onClick={() => handleSendReminder(row)} className="inline-flex items-center gap-1 h-[28px] px-2.5 rounded-[6px] bg-primary text-white text-[11px] font-bold">
                           {busyId === row.id ? <Loader2 size={10} className="animate-spin" /> : <Bell size={10} />} Remind
                         </button>
                         <button type="button" disabled={busyId === row.id} onClick={() => handleRecordPayment(row)} className="inline-flex items-center gap-1 h-[28px] px-2.5 rounded-[6px] border border-[#EEEEEE] text-[11px] font-bold">
@@ -307,7 +307,7 @@ export function CreditCollectionsPanel() {
                       <div className="flex flex-wrap items-center justify-center gap-1">
                         {row.outstanding > 0 && (
                           <>
-                            <button type="button" disabled={busyId === row.id} onClick={() => handleSendReminder(row)} className="inline-flex items-center gap-1 h-[26px] px-2 rounded-[6px] bg-[#299E60] text-white text-[10px] font-bold">
+                            <button type="button" disabled={busyId === row.id} onClick={() => handleSendReminder(row)} className="inline-flex items-center gap-1 h-[26px] px-2 rounded-[6px] bg-primary text-white text-[10px] font-bold">
                               {busyId === row.id ? <Loader2 size={10} className="animate-spin" /> : <Bell size={10} />} Remind
                             </button>
                             <button type="button" disabled={busyId === row.id} onClick={() => handleRecordPayment(row)} className="inline-flex items-center gap-1 h-[26px] px-2 rounded-[6px] border border-[#EEEEEE] text-[10px] font-bold">

@@ -67,7 +67,7 @@ export function ImageUploadField({
             <div
                 className={cn(
                     'relative border-2 border-dashed border-gray-200 rounded-2xl overflow-hidden group',
-                    'hover:border-[#53B175] transition-colors',
+                    'hover:border-primary transition-colors',
                     value ? 'h-[160px]' : 'h-[120px] flex items-center justify-center bg-gray-50 cursor-pointer'
                 )}
                 onClick={() => !value && inputRef.current?.click()}
@@ -81,14 +81,14 @@ export function ImageUploadField({
                                 onClick={(e) => { e.stopPropagation(); setEditing(true); }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white/95 rounded-lg text-[12px] font-bold text-[#181725] hover:bg-white"
                             >
-                                <Crosshair size={12} className="text-[#53B175]" /> Adjust
+                                <Crosshair size={12} className="text-primary" /> Adjust
                             </button>
                             <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white/95 rounded-lg text-[12px] font-bold text-[#181725] hover:bg-white"
                             >
-                                <Upload size={12} className="text-[#53B175]" /> Replace
+                                <Upload size={12} className="text-primary" /> Replace
                             </button>
                         </div>
                         <button
@@ -101,7 +101,7 @@ export function ImageUploadField({
                     </>
                 ) : (
                     <div className="flex flex-col items-center gap-2 text-gray-400">
-                        {uploading ? <Loader2 size={24} className="animate-spin text-[#53B175]" /> : <Upload size={24} />}
+                        {uploading ? <Loader2 size={24} className="animate-spin text-primary" /> : <Upload size={24} />}
                         <span className="text-[12px] font-medium">{uploading ? 'Uploading…' : 'Click to upload'}</span>
                     </div>
                 )}

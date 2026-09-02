@@ -57,9 +57,9 @@ export default function OrderSuccessPage() {
     return (
         <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-12">
             {/* Success Icon */}
-            <div className="w-[120px] h-[120px] md:w-[150px] md:h-[150px] bg-[#53B175]/10 rounded-full flex items-center justify-center mb-8 md:mb-10 relative">
-                <div className="absolute inset-0 bg-[#53B175]/5 rounded-full animate-ping duration-[2000ms]" />
-                <CheckCircle2 size={60} className="text-[#53B175] relative z-10 md:!w-20 md:!h-20" strokeWidth={3} />
+            <div className="w-[120px] h-[120px] md:w-[150px] md:h-[150px] bg-primary/10 rounded-full flex items-center justify-center mb-8 md:mb-10 relative">
+                <div className="absolute inset-0 bg-primary/5 rounded-full animate-ping duration-[2000ms]" />
+                <CheckCircle2 size={60} className="text-primary relative z-10 md:!w-20 md:!h-20" strokeWidth={3} />
             </div>
 
             <h1 className="text-[28px] md:text-[40px] font-black text-[#181725] leading-tight mb-4 tracking-tight text-center">
@@ -89,7 +89,7 @@ export default function OrderSuccessPage() {
                                 </span>
                             </div>
                             <div className="flex items-center gap-2 mb-2">
-                                <Store size={14} className="text-[#53B175]" />
+                                <Store size={14} className="text-primary" />
                                 <p className="text-[14px] font-black text-[#181725]">{order.vendorName}</p>
                             </div>
                             <div className="flex items-center gap-4 text-[11px] text-gray-500 font-medium">
@@ -100,13 +100,13 @@ export default function OrderSuccessPage() {
                                 )}
                             </div>
                             {order.savings > 0 && (
-                                <p className="mt-2 text-[11px] font-bold text-[#53B175]">
+                                <p className="mt-2 text-[11px] font-bold text-success">
                                     You saved ₹{Number(order.savings).toLocaleString('en-IN')} on this order
                                 </p>
                             )}
                             <Link
                                 href={`/api/v1/orders/${order.id}/invoice`}
-                                className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-black text-[#53B175] hover:text-[#489d67] transition-colors"
+                                className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-black text-primary hover:text-primary-dark transition-colors"
                             >
                                 <FileDown size={12} /> Download Invoice
                             </Link>
@@ -123,7 +123,7 @@ export default function OrderSuccessPage() {
             <div className="w-full max-w-[400px] flex flex-col gap-3">
                 <Link
                     href={lastVendorId ? `/vendor/${lastVendorId}` : '/vendors'}
-                    className="w-full bg-[#53B175] text-white py-[18px] md:py-[22px] rounded-[18px] font-black text-[16px] shadow-xl shadow-green-100/80 hover:bg-[#48a068] transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                    className="w-full bg-primary text-white py-[18px] md:py-[22px] rounded-[18px] font-black text-[16px] shadow-xl shadow-green-100/80 hover:bg-primary-dark transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
                 >
                     <ShoppingCart size={18} />
                     Place Another Order

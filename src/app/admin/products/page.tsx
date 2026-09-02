@@ -1887,7 +1887,7 @@ export default function ProductsPage() {
                                                         <span className="bg-gray-100 text-[#4B5563] text-[10px] font-bold px-2 py-0.5 rounded-[4px]">
                                                             {product.brand || 'No Brand'}
                                                         </span>
-                                                        <span className="bg-green-50 text-[#6B1D2E] text-[10px] font-bold px-2 py-0.5 rounded-[4px]">
+                                                        <span className="bg-success-light text-[#6B1D2E] text-[10px] font-bold px-2 py-0.5 rounded-[4px]">
                                                             {product.category?.name || 'Uncategorized'}
                                                         </span>
                                                     </div>

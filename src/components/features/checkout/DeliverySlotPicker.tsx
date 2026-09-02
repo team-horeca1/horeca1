@@ -81,7 +81,7 @@ export function DeliverySlotPicker({ vendorId, selectedSlotId, onChange }: Deliv
                         onClick={() => setActiveDate(d.date)}
                         className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
                             activeDate === d.date
-                                ? 'bg-[#299e60] text-white border-[#299e60]'
+                                ? 'bg-primary text-white border-primary'
                                 : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                         }`}
                     >
@@ -103,8 +103,8 @@ export function DeliverySlotPicker({ vendorId, selectedSlotId, onChange }: Deliv
                                 disabled
                                     ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed line-through'
                                     : selected
-                                        ? 'bg-[#299e60] text-white border-[#299e60] shadow-md shadow-green-100'
-                                        : 'bg-white text-gray-700 border-gray-200 hover:border-[#299e60]/40'
+                                        ? 'bg-primary text-white border-primary shadow-md shadow-green-100'
+                                        : 'bg-white text-gray-700 border-gray-200 hover:border-primary/40'
                             }`}
                         >
                             <div className="font-bold">{s.slotStart}–{s.slotEnd}</div>

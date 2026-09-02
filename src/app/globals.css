@@ -27,9 +27,13 @@
 
   /* Semantic */
   --color-success: #16a34a;
+  --color-success-light: #ecfdf5;
   --color-warning: #f59e0b;
+  --color-warning-light: #fffbeb;
   --color-error: #dc2626;
+  --color-error-light: #fef2f2;
   --color-info: #2563eb;
+  --color-info-light: #eff6ff;
 
   --font-weight-medium: 500;
   --font-weight-semibold: 600;

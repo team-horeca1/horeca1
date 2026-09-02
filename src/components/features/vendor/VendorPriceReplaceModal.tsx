@@ -219,7 +219,7 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
               type="button"
               disabled={uploading}
               onClick={() => inputRef.current?.click()}
-              className="w-full h-11 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] flex items-center justify-center gap-2 disabled:opacity-60"
+              className="w-full h-11 rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark flex items-center justify-center gap-2 disabled:opacity-60"
             >
               {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
               {uploading ? 'Reading file…' : 'Upload for preview'}
@@ -273,7 +273,7 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
                             checked={item.skip}
                             disabled={disabled && !item.matched}
                             onChange={(e) => updateItem(item.row, { skip: e.target.checked })}
-                            className="accent-[#299E60]"
+                            className="accent-primary"
                           />
                         </td>
                         <td className="px-3 py-2 text-[#7C7C7C]">{item.row}</td>
@@ -328,7 +328,7 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
                           {item.error ? (
                             <span className="text-[#E74C3C] font-semibold">{item.error}</span>
                           ) : item.matched ? (
-                            <span className="text-[#299E60] font-semibold">Ready</span>
+                            <span className="text-primary font-semibold">Ready</span>
                           ) : (
                             <span className="text-[#7C7C7C]">—</span>
                           )}
@@ -355,7 +355,7 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
                   type="button"
                   disabled={committing || readyCount === 0}
                   onClick={() => void commit()}
-                  className="h-10 px-5 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] flex items-center gap-2 disabled:opacity-60"
+                  className="h-10 px-5 rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark flex items-center gap-2 disabled:opacity-60"
                 >
                   {committing ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
                   {committing ? 'Updating…' : 'Confirm update'}
@@ -376,7 +376,7 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
                     <button
                       type="button"
                       onClick={downloadErrorReport}
-                      className="text-[#299E60] font-bold underline"
+                      className="text-primary font-bold underline"
                     >
                       Download error report
                     </button>
@@ -387,7 +387,7 @@ export default function VendorPriceReplaceModal({ open, onClose, onComplete }: P
             <button
               type="button"
               onClick={handleClose}
-              className="w-full h-10 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54]"
+              className="w-full h-10 rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark"
             >
               Done
             </button>

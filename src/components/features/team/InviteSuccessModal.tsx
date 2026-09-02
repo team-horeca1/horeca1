@@ -35,8 +35,8 @@ export function InviteSuccessModal({ inviteMeta, memberName, onClose }: InviteSu
       <div className="bg-white rounded-[20px] w-full max-w-[480px] shadow-2xl animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0F0F0]">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#ECFDF5] flex items-center justify-center">
-              <Check size={16} className="text-[#299E60]" />
+            <div className="w-8 h-8 rounded-full bg-success-light flex items-center justify-center">
+              <Check size={16} className="text-primary" />
             </div>
             <h3 className="text-[16px] font-bold text-[#181725]">Member added</h3>
           </div>
@@ -76,7 +76,7 @@ export function InviteSuccessModal({ inviteMeta, memberName, onClose }: InviteSu
         <div className="px-6 py-4 border-t border-[#F0F0F0] bg-[#FAFAFA] rounded-b-[20px]">
           <button
             onClick={onClose}
-            className="w-full h-[42px] bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold hover:bg-[#238a54] transition-colors"
+            className="w-full h-[42px] bg-primary text-white rounded-[10px] text-[13px] font-bold hover:bg-primary-dark transition-colors"
           >
             Done
           </button>

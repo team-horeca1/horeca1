@@ -188,7 +188,7 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
               </label>
               <div className="relative mt-1.5 mb-5 flex items-center">
                 {isEmail ? (
-                  <Mail size={18} className="absolute left-4 text-[#53B175] pointer-events-none" />
+                  <Mail size={18} className="absolute left-4 text-primary pointer-events-none" />
                 ) : trimmedId.length > 0 ? (
                   <span className="absolute left-4 text-[14px] font-bold text-gray-500 select-none">+91</span>
                 ) : (
@@ -200,20 +200,20 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
                   onKeyDown={e => e.key === 'Enter' && handleSendOtp()}
                   placeholder="Phone or email"
                   className={cn(
-                    'w-full pr-4 py-3.5 bg-[#F7F8FA] border border-gray-100 rounded-xl text-[14px] font-bold outline-none focus:border-[#53B175] focus:bg-white transition-all',
+                    'w-full pr-4 py-3.5 bg-[#F7F8FA] border border-gray-100 rounded-xl text-[14px] font-bold outline-none focus:border-primary focus:bg-white transition-all',
                     isEmail || trimmedId.length > 0 ? 'pl-14' : 'pl-12',
                   )}
                 />
               </div>
               <button onClick={handleSendOtp} disabled={isLoading}
-                className={cn('w-full bg-[#53B175] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-100 active:scale-[0.98] transition-all text-[15px] flex items-center justify-center gap-2',
-                  isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-[#48a068]')}>
+                className={cn('w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg shadow-green-100 active:scale-[0.98] transition-all text-[15px] flex items-center justify-center gap-2',
+                  isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary-dark')}>
                 {isLoading && <Loader2 size={18} className="animate-spin" />}
                 Send OTP
               </button>
               <p className="text-[13px] text-gray-400 text-center mt-5">
                 New here?{' '}
-                <button onClick={handleClose} className="text-[#53B175] font-bold">Register</button>
+                <button onClick={handleClose} className="text-primary font-bold">Register</button>
               </p>
             </>
           ) : (
@@ -223,7 +223,7 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
                 <button
                   type="button"
                   onClick={() => { setStep('identifier'); setOtp(['', '', '', '']); setError(''); }}
-                  className="inline-flex items-center gap-1 ml-2 align-baseline text-[12px] font-bold text-[#53B175] hover:underline"
+                  className="inline-flex items-center gap-1 ml-2 align-baseline text-[12px] font-bold text-primary hover:underline"
                 >
                   <Pencil size={12} /> Edit
                 </button>
@@ -234,15 +234,15 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
                     value={digit} onChange={e => handleOtpChange(i, e.target.value)}
                     onKeyDown={e => handleOtpKeyDown(i, e)} disabled={isLoading}
                     className={cn('w-14 h-14 text-center text-[22px] font-[800] border-2 rounded-2xl outline-none transition-all',
-                      digit ? 'border-[#53B175] bg-green-50 text-[#53B175]' : 'border-gray-200 bg-[#F7F8FA]',
-                      'focus:border-[#53B175]',
+                      digit ? 'border-primary bg-primary-light text-primary' : 'border-gray-200 bg-[#F7F8FA]',
+                      'focus:border-primary',
                       isLoading && 'opacity-60')}
                   />
                 ))}
               </div>
               <button onClick={() => handleVerifyOtp(otp.join(''))} disabled={isLoading || otp.join('').length !== 4}
-                className={cn('w-full bg-[#53B175] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-100 active:scale-[0.98] transition-all text-[15px] flex items-center justify-center gap-2',
-                  (isLoading || otp.join('').length !== 4) ? 'opacity-60 cursor-not-allowed' : 'hover:bg-[#48a068]')}>
+                className={cn('w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg shadow-green-100 active:scale-[0.98] transition-all text-[15px] flex items-center justify-center gap-2',
+                  (isLoading || otp.join('').length !== 4) ? 'opacity-60 cursor-not-allowed' : 'hover:bg-primary-dark')}>
                 {isLoading && <Loader2 size={18} className="animate-spin" />}
                 Verify & Sign In
               </button>
@@ -250,7 +250,7 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
                 {resendTimer > 0 ? (
                   <p className="text-[12px] text-gray-400">Resend in <span className="font-bold">{resendTimer}s</span></p>
                 ) : (
-                  <button onClick={handleSendOtp} disabled={isLoading} className="text-[13px] text-[#53B175] font-bold hover:underline">
+                  <button onClick={handleSendOtp} disabled={isLoading} className="text-[13px] text-primary font-bold hover:underline">
                     Resend OTP
                   </button>
                 )}

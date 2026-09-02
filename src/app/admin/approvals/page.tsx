@@ -308,7 +308,7 @@ export default function ApprovalsPage() {
                                     </div>
                                     <span className={cn(
                                         'text-[10px] font-bold px-2 py-0.5 rounded-full uppercase shrink-0',
-                                        vendor.isVerified ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FFF7E6] text-[#F59E0B]',
+                                        vendor.isVerified ? 'bg-success-light text-success' : 'bg-[#FFF7E6] text-[#F59E0B]',
                                     )}>
                                         {vendor.isVerified ? 'Verified' : 'Pending'}
                                     </span>
@@ -362,7 +362,7 @@ export default function ApprovalsPage() {
                                         <td className="px-6 py-4">
                                             <span className={cn(
                                                 'text-[11px] font-[900] px-2.5 py-1 rounded-[6px] uppercase',
-                                                vendor.isVerified ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FFF7E6] text-[#F59E0B]',
+                                                vendor.isVerified ? 'bg-success-light text-success' : 'bg-[#FFF7E6] text-[#F59E0B]',
                                             )}>
                                                 {vendor.isVerified ? 'Verified' : 'Pending'}
                                             </span>

@@ -65,7 +65,7 @@ type RowDraft = {
 const DISPLAY_STATUS: Record<CreditDisplayStatus, { label: string; cls: string }> = {
   SANCTIONED: { label: 'Sanctioned', cls: 'bg-blue-50 text-blue-700 border border-blue-100' },
   IN_PROGRESS: { label: 'In progress', cls: 'bg-amber-50 text-amber-800 border border-amber-100' },
-  COMPLETED: { label: 'Completed', cls: 'bg-[#EEF8F1] text-[#299E60] border border-[#299E60]/20' },
+  COMPLETED: { label: 'Completed', cls: 'bg-primary-light text-primary border border-primary/20' },
   BLOCKED: { label: 'Blocked', cls: 'bg-orange-50 text-orange-700 border border-orange-100' },
   SUSPENDED: { label: 'Suspended', cls: 'bg-slate-100 text-slate-700 border border-slate-200' },
   FROZEN: { label: 'Frozen', cls: 'bg-cyan-50 text-cyan-800 border border-cyan-100' },
@@ -296,7 +296,7 @@ export function CreditCustomerGrid({
   };
 
   const inputCls =
-    'w-full min-w-0 h-[34px] px-2.5 rounded-[8px] border border-[#EEEEEE] text-[12.5px] outline-none focus:border-[#299E60]/50 bg-white';
+    'w-full min-w-0 h-[34px] px-2.5 rounded-[8px] border border-[#EEEEEE] text-[12.5px] outline-none focus:border-primary/50 bg-white';
 
   return (
     <>
@@ -406,7 +406,7 @@ export function CreditCustomerGrid({
                           type="button"
                           onClick={() => void saveRow(row)}
                           disabled={saving}
-                          className="flex items-center gap-1 px-2.5 h-[30px] rounded-[8px] bg-[#299E60] text-white text-[11px] font-bold hover:bg-[#238a54] disabled:opacity-50"
+                          className="flex items-center gap-1 px-2.5 h-[30px] rounded-[8px] bg-primary text-white text-[11px] font-bold hover:bg-primary-dark disabled:opacity-50"
                         >
                           {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           Save
@@ -419,7 +419,7 @@ export function CreditCustomerGrid({
                             setRepayRow(row);
                             setRepayAmount(String(row.wallet!.outstandingAmount));
                           }}
-                          className="flex items-center gap-1 px-2.5 h-[30px] rounded-[8px] border border-[#EEEEEE] text-[11px] font-semibold hover:border-[#299E60]/40"
+                          className="flex items-center gap-1 px-2.5 h-[30px] rounded-[8px] border border-[#EEEEEE] text-[11px] font-semibold hover:border-primary/40"
                         >
                           <Banknote size={12} />
                           Pay
@@ -429,7 +429,7 @@ export function CreditCustomerGrid({
                         <button
                           type="button"
                           onClick={() => onAdvancedTerms(row)}
-                          className="flex items-center gap-1 px-2.5 h-[30px] rounded-[8px] border border-[#EEEEEE] text-[11px] font-semibold hover:border-[#299E60]/40"
+                          className="flex items-center gap-1 px-2.5 h-[30px] rounded-[8px] border border-[#EEEEEE] text-[11px] font-semibold hover:border-primary/40"
                           title="Advanced payment terms"
                         >
                           <Settings2 size={12} />
@@ -486,7 +486,7 @@ export function CreditCustomerGrid({
                 type="button"
                 onClick={() => void submitRepay()}
                 disabled={repaying}
-                className="px-4 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold disabled:opacity-50 flex items-center gap-2"
+                className="px-4 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold disabled:opacity-50 flex items-center gap-2"
               >
                 {repaying && <Loader2 size={14} className="animate-spin" />}
                 Record

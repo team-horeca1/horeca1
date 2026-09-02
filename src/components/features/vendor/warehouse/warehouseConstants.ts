@@ -5,8 +5,8 @@ export const WAREHOUSE_STATUS_STYLE: Record<string, string> = {
   cancelled: 'bg-[#FDF2F2] text-[#EF4444] border-[#FEE2E2]',
   pending: 'bg-[#FFF8EB] text-[#D97706] border-[#FEF3C7]',
   out_for_delivery: 'bg-purple-50 text-purple-700 border-purple-100',
-  delivered: 'bg-[#EEF8F1] text-[#299E60] border-[#D1FAE5]',
-  received: 'bg-[#EEF8F1] text-[#299E60] border-[#D1FAE5]',
+  delivered: 'bg-success-light text-success border-success/20',
+  received: 'bg-success-light text-success border-success/20',
 };
 
 export type WarehouseTab = 'picklists' | 'dispatches' | 'grn';

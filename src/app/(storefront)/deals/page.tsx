@@ -13,7 +13,7 @@ export default function DealsPage() {
       <div className="max-w-4xl mx-auto px-[clamp(1rem,3vw,2rem)] py-[clamp(1.25rem,4vw,2.5rem)]">
         <Link
           href="/"
-          className="inline-flex items-center gap-1 text-[13px] font-bold text-gray-400 hover:text-[#53B175] mb-4"
+          className="inline-flex items-center gap-1 text-[13px] font-bold text-gray-400 hover:text-primary mb-4"
         >
           <ChevronLeft size={16} strokeWidth={2.5} />
           Home

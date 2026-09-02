@@ -82,7 +82,7 @@ export function CouponScopeFields({
     brandNames,
     onChange,
     productSource,
-    focusBorder = 'focus:border-[#53B175]',
+    focusBorder = 'focus:border-primary',
 }: {
     categoryIds: string[];
     productIds: string[];
@@ -330,7 +330,7 @@ export function CouponScopeFields({
                     <ul className="absolute z-30 mt-1 w-full bg-white border border-gray-100 rounded-xl shadow-lg max-h-[200px] overflow-y-auto">
                         {canAddCustomBrand && (
                             <li>
-                                <button type="button" onClick={() => addBrand(brandQuery)} className="w-full text-left px-3 py-2 text-[12px] font-medium text-[#53B175] hover:bg-gray-50 cursor-pointer">
+                                <button type="button" onClick={() => addBrand(brandQuery)} className="w-full text-left px-3 py-2 text-[12px] font-medium text-primary hover:bg-gray-50 cursor-pointer">
                                     Add “{brandQuery.trim()}”
                                 </button>
                             </li>
@@ -352,7 +352,7 @@ export function CouponScopeFields({
 export function AudienceUserPicker({
     userIds,
     onChange,
-    focusBorder = 'focus:border-[#53B175]',
+    focusBorder = 'focus:border-primary',
 }: {
     userIds: string[];
     onChange: (ids: string[]) => void;

@@ -97,8 +97,8 @@ export default function SupplierAllOrdersPage() {
   const openOrder = async (order: SupplierOrderRow) => {
     setOpeningId(order.id);
     try {
-      setEnteredStore(true);
       await switchOnlineStore(order.vendorId);
+      setEnteredStore(true);
       window.location.assign(`/vendor/orders/${order.id}`);
     } catch (err) {
       setEnteredStore(false);
@@ -112,7 +112,7 @@ export default function SupplierAllOrdersPage() {
       <div>
         <Link
           href="/vendor/overview"
-          className="text-[13px] font-bold text-[#299E60] hover:text-[#238a54]"
+          className="text-[13px] font-bold text-primary hover:text-primary-dark"
         >
           ← Supplier Dashboard
         </Link>
@@ -132,20 +132,20 @@ export default function SupplierAllOrdersPage() {
               if (e.key === 'Enter') setSearch(searchInput.trim());
             }}
             placeholder="Search order # or customer…"
-            className="w-full pl-9 pr-3 py-2.5 border border-[#EEEEEE] rounded-[10px] text-[14px] outline-none focus:border-[#299E60]"
+            className="w-full pl-9 pr-3 py-2.5 border border-[#EEEEEE] rounded-[10px] text-[14px] outline-none focus:border-primary"
           />
         </div>
         <button
           type="button"
           onClick={() => setSearch(searchInput.trim())}
-          className="px-4 py-2.5 bg-[#299E60] hover:bg-[#238a54] text-white text-[13px] font-bold rounded-[10px]"
+          className="px-4 py-2.5 bg-primary hover:bg-primary-dark text-white text-[13px] font-bold rounded-[10px]"
         >
           Search
         </button>
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="px-3 py-2.5 border border-[#EEEEEE] rounded-[10px] text-[14px] outline-none focus:border-[#299E60] bg-white"
+          className="px-3 py-2.5 border border-[#EEEEEE] rounded-[10px] text-[14px] outline-none focus:border-primary bg-white"
         >
           <option value="">All statuses</option>
           <option value="pending">Pending</option>
@@ -159,7 +159,7 @@ export default function SupplierAllOrdersPage() {
 
       {loading ? (
         <div className="flex justify-center py-20">
-          <Loader2 className="animate-spin text-[#299E60]" size={32} />
+          <Loader2 className="animate-spin text-primary" size={32} />
         </div>
       ) : orders.length === 0 ? (
         <div className="bg-white border border-[#EEEEEE] rounded-[16px] p-12 text-center">
@@ -191,7 +191,7 @@ export default function SupplierAllOrdersPage() {
                   >
                     <td className="px-4 py-3 font-semibold text-[#181725]">
                       {openingId === order.id ? (
-                        <Loader2 size={14} className="animate-spin text-[#299E60]" />
+                        <Loader2 size={14} className="animate-spin text-primary" />
                       ) : (
                         order.orderNumber
                       )}
@@ -200,7 +200,7 @@ export default function SupplierAllOrdersPage() {
                     <td className="px-4 py-3 text-[#7C7C7C] truncate max-w-[140px]">{order.storeName}</td>
                     <td className="px-4 py-3 text-[#181725] truncate max-w-[140px]">{order.customerName}</td>
                     <td className="px-4 py-3">
-                      <span className="capitalize text-[12px] font-semibold text-[#299E60]">
+                      <span className="capitalize text-[12px] font-semibold text-primary">
                         {order.status.replace(/_/g, ' ')}
                       </span>
                     </td>
@@ -225,7 +225,7 @@ export default function SupplierAllOrdersPage() {
                 type="button"
                 onClick={() => void loadMore()}
                 disabled={loadingMore}
-                className="text-[13px] font-bold text-[#299E60] hover:text-[#238a54] disabled:opacity-50"
+                className="text-[13px] font-bold text-primary hover:text-primary-dark disabled:opacity-50"
               >
                 {loadingMore ? 'Loading…' : 'Load more'}
               </button>

@@ -1,3 +1,4 @@
+import { CDL } from '@/lib/cdl';
 import { Crown, Shield, Edit3, Eye } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { RoleStyle } from './RoleCardsGrid';
@@ -94,7 +95,7 @@ const BRAND_ROLE_LOOK: Record<string, RoleStyle> = {
 const ADMIN_ROLE_LOOK: Record<string, RoleStyle> = {
   'Super Admin': look('#F59E0B', '#FFF7E6', Crown),
   'Ops Admin': look('#3B82F6', '#EFF6FF', Shield),
-  'Finance Admin': look('#10B981', '#ECFDF5', Shield),
+  'Finance Admin': look('#10B981', CDL.successLight, Shield),
   'Support Agent': look('#8B5CF6', '#F3F0FF', Edit3),
   Editor: look('#8B5CF6', '#F3F0FF', Edit3),
   Viewer: look('#6B7280', '#F3F4F6', Eye),
@@ -110,8 +111,8 @@ const ACCOUNT_ROLE_LOOK: Record<string, RoleStyle> = {
 export const TEAM_PANEL_PRESETS: Record<TeamPanelScope, TeamPanelPresetConfig> = {
   vendor: {
     scope: 'vendor',
-    accent: '#299E60',
-    accentHover: '#238a54',
+    accent: CDL.primary,
+    accentHover: CDL.primaryDark,
     title: 'Team',
     subtitle: 'Manage your vendor team members and their permissions',
     addLabel: 'Add Member',
@@ -131,8 +132,8 @@ export const TEAM_PANEL_PRESETS: Record<TeamPanelScope, TeamPanelPresetConfig> =
   },
   brand: {
     scope: 'brand',
-    accent: '#53B175',
-    accentHover: '#3d9e41',
+    accent: CDL.primary,
+    accentHover: CDL.primaryDark,
     title: 'Team',
     subtitle: 'Manage your brand team members and their permissions',
     addLabel: 'Add Member',

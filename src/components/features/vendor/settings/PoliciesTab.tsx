@@ -29,7 +29,7 @@ export function PoliciesTab({
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 pb-1 border-b border-[#F5F5F5]">
-        <FileText size={18} className="text-[#299E60]" />
+        <FileText size={18} className="text-primary" />
         <h2 className="text-[16px] font-bold text-[#181725]">Store policies</h2>
       </div>
       <div>
@@ -39,7 +39,7 @@ export function PoliciesTab({
           value={returnPolicy}
           onChange={(e) => setReturnPolicy(e.target.value)}
           maxLength={2000}
-          className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-[#299E60]/40 resize-none"
+          className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-primary/40 resize-none"
         />
       </div>
       <div>
@@ -49,13 +49,13 @@ export function PoliciesTab({
           value={cancellationPolicy}
           onChange={(e) => setCancellationPolicy(e.target.value)}
           maxLength={2000}
-          className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-[#299E60]/40 resize-none"
+          className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-primary/40 resize-none"
         />
       </div>
 
       <div className="rounded-[12px] border border-[#EEEEEE] p-4 space-y-2">
         <div className="flex items-center gap-2">
-          <Package size={16} className="text-[#299E60]" />
+          <Package size={16} className="text-primary" />
           <h3 className="text-[14px] font-bold text-[#181725]">Inventory / out of stock</h3>
         </div>
         <label className="flex items-start gap-3 cursor-pointer">
@@ -63,7 +63,7 @@ export function PoliciesTab({
             type="checkbox"
             checked={autoDisableOos}
             onChange={(e) => setAutoDisableOos(e.target.checked)}
-            className="mt-1 accent-[#299E60]"
+            className="mt-1 accent-primary"
           />
           <span>
             <span className="block text-[13px] font-bold text-[#181725]">

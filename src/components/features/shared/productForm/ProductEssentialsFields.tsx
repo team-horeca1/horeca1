@@ -331,7 +331,7 @@ export function ProductEssentialsFields({
             <div>
               <FieldLabel>Gross (incl. GST)</FieldLabel>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#299E60] font-bold">₹</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-bold">₹</span>
                 <input
                   type="number"
                   min="0"
@@ -339,7 +339,7 @@ export function ProductEssentialsFields({
                   value={pricing.originalPrice}
                   onChange={(e) => handleGrossChange(e.target.value)}
                   placeholder="0.00"
-                  className={cn(inputCls, 'pl-7 font-bold text-[#299E60] bg-[#EEF8F1]/10')}
+                  className={cn(inputCls, 'pl-7 font-bold text-primary bg-primary-light/10')}
                 />
               </div>
             </div>

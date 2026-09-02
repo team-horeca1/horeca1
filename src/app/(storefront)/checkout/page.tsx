@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
@@ -60,7 +61,7 @@ function openRazorpayPopup(opts: {
             order_id: opts.order_id,
             name: 'HoReCa Hub',
             description: opts.description,
-            theme: { color: '#53B175' },
+            theme: { color: CDL.primary },
             handler: (response: RazorpaySuccessPayload) => resolve(response),
             modal: { ondismiss: () => reject(new Error('Payment cancelled')) },
         });
@@ -188,8 +189,8 @@ const PAYMENT_OPTIONS = [
     name: 'Bank Transfer',
     desc: 'NEFT / RTGS / IMPS',
     icon: Banknote,
-    badgeBg: 'bg-green-50',
-    badgeText: 'text-green-600',
+    badgeBg: 'bg-primary-light',
+    badgeText: 'text-primary',
   },
   {
     id: 'po_number',
@@ -282,8 +283,8 @@ function DeliveringToRow() {
     return (
         <div className="bg-white rounded-2xl border border-gray-100 p-4 relative" ref={dropdownRef}>
             <div className="flex items-start gap-3">
-                <div className="w-9 h-9 shrink-0 rounded-xl bg-green-50 flex items-center justify-center">
-                    <MapPin size={16} className="text-[#53B175]" />
+                <div className="w-9 h-9 shrink-0 rounded-xl bg-primary-light flex items-center justify-center">
+                    <MapPin size={16} className="text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400">Delivering to</p>
@@ -302,7 +303,7 @@ function DeliveringToRow() {
                 <button
                     type="button"
                     onClick={() => setOpen((v) => !v)}
-                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 hover:border-[#53B175] hover:bg-green-50/50 text-[12px] font-bold text-gray-700 hover:text-[#53B175] transition-colors cursor-pointer"
+                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 hover:border-primary hover:bg-primary-light/50 text-[12px] font-bold text-gray-700 hover:text-primary transition-colors cursor-pointer"
                 >
                     Change
                     <ChevronDown size={12} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
@@ -370,7 +371,7 @@ function DeliveringToRow() {
                     <div className="px-3 py-2 border-t border-gray-100">
                         <Link
                             href={`/account/${activeBusinessAccountId}/outlets`}
-                            className="text-[11px] font-bold text-[#53B175] hover:underline"
+                            className="text-[11px] font-bold text-primary hover:underline"
                             onClick={() => setOpen(false)}
                         >
                             Manage outlets →
@@ -1067,7 +1068,7 @@ function CheckoutPageContent() {
     if (draftLoading) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50/50">
-                <Loader2 size={36} className="text-[#53B175] animate-spin mb-4" />
+                <Loader2 size={36} className="text-primary animate-spin mb-4" />
                 <p className="text-[14px] text-gray-400 font-medium">Loading draft order details...</p>
             </div>
         );
@@ -1077,7 +1078,7 @@ function CheckoutPageContent() {
     if (sessionStatus === 'unauthenticated') {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50/50">
-                <Loader2 size={36} className="text-[#53B175] animate-spin mb-4" />
+                <Loader2 size={36} className="text-primary animate-spin mb-4" />
                 <p className="text-[14px] text-gray-400 font-medium">Redirecting to login...</p>
             </div>
         );
@@ -1088,7 +1089,7 @@ function CheckoutPageContent() {
     if (!draftId && (sessionStatus === 'loading' || isCartLoading)) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50/50">
-                <Loader2 size={36} className="text-[#53B175] animate-spin mb-4" />
+                <Loader2 size={36} className="text-primary animate-spin mb-4" />
                 <p className="text-[14px] text-gray-400 font-medium">Loading checkout...</p>
             </div>
         );
@@ -1100,7 +1101,7 @@ function CheckoutPageContent() {
                 <div className="text-center">
                     <p className="text-[48px] mb-3">🛒</p>
                     <p className="text-[18px] font-bold text-gray-800 mb-2">Your cart is empty</p>
-                    <Link href="/" className="text-[14px] text-[#53B175] font-semibold hover:underline">
+                    <Link href="/" className="text-[14px] text-primary font-semibold hover:underline">
                         Browse vendors
                     </Link>
                 </div>
@@ -1129,9 +1130,9 @@ function CheckoutPageContent() {
                             <React.Fragment key={s.key}>
                                 <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all ${
                                     step === s.key
-                                        ? 'bg-[#53B175] text-white shadow-md shadow-green-200'
+                                        ? 'bg-primary text-white shadow-md shadow-green-200'
                                         : (idx < ['review', 'payment', 'confirmation'].indexOf(step))
-                                            ? 'bg-green-100 text-green-700'
+                                            ? 'bg-primary-light text-primary'
                                             : 'bg-gray-100 text-gray-400'
                                 }`}>
                                     <span>{idx + 1}</span>
@@ -1186,7 +1187,7 @@ function CheckoutPageContent() {
                                             className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
                                                 belowMov
                                                     ? 'bg-gray-100 border-gray-200 cursor-not-allowed'
-                                                    : isSelected ? 'bg-[#53B175] border-[#53B175]' : 'bg-white border-gray-300'
+                                                    : isSelected ? 'bg-primary border-primary' : 'bg-white border-gray-300'
                                             }`}
                                         >
                                             {isSelected && <Check size={13} className="text-white" strokeWidth={4} />}
@@ -1301,7 +1302,7 @@ function CheckoutPageContent() {
                                                 rows={2}
                                                 maxLength={1000}
                                                 placeholder="e.g. deliver before noon, call on arrival…"
-                                                className="w-full text-[12px] rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#53B175] resize-none"
+                                                className="w-full text-[12px] rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                                             />
                                         </div>
                                         </>
@@ -1315,7 +1316,7 @@ function CheckoutPageContent() {
                                         className="w-full px-4 py-2 text-left text-[11px] text-gray-400 font-medium border-t border-gray-50 hover:bg-gray-50/50 transition-colors"
                                     >
                                         {group.items.slice(0, 3).map(i => i.product.displayName ?? i.product.name).join(', ')}{group.items.length > 3 ? ` +${group.items.length - 3} more` : ''}
-                                        <span className="text-[#53B175] ml-1 font-bold">↓ expand</span>
+                                        <span className="text-primary ml-1 font-bold">↓ expand</span>
                                     </button>
                                 )}
                             </div>
@@ -1344,7 +1345,7 @@ function CheckoutPageContent() {
                                 )}
                                 <div className="flex items-center justify-between border-t border-dashed border-gray-200 pt-2">
                                     <span className="text-[14px] font-bold text-[#181725]">Total Payable</span>
-                                    <span className={`text-[18px] font-bold text-[#53B175] ${billAmountClass}`}>₹{afterPromo.toLocaleString('en-IN')}</span>
+                                    <span className={`text-[18px] font-bold text-primary ${billAmountClass}`}>₹{afterPromo.toLocaleString('en-IN')}</span>
                                 </div>
                             </div>
                             <p className="text-[11px] text-gray-400 mt-2">
@@ -1384,7 +1385,7 @@ function CheckoutPageContent() {
                             className={`w-full py-3.5 text-[14px] font-bold rounded-xl shadow-lg transition-all ${
                                 selectedVendorCount === 0 || checkoutBlocked
                                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
-                                    : 'bg-[#53B175] text-white shadow-green-200/50 hover:bg-[#48a068] active:scale-[0.99]'
+                                    : 'bg-primary text-white shadow-green-200/50 hover:bg-primary-dark active:scale-[0.99]'
                             }`}
                         >
                             Continue to Payment →
@@ -1394,7 +1395,7 @@ function CheckoutPageContent() {
                                 <button
                                     onClick={handleSaveDraft}
                                     disabled={selectedVendorCount === 0 || isPlacingOrder || checkoutBlocked}
-                                    className="w-full mt-2 py-2.5 text-[13px] font-bold rounded-xl border border-gray-200 text-gray-500 hover:border-[#53B175] hover:text-[#53B175] hover:bg-[#53B175]/5 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                                    className="w-full mt-2 py-2.5 text-[13px] font-bold rounded-xl border border-gray-200 text-gray-500 hover:border-primary hover:text-primary hover:bg-primary/5 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                                 >
                                     <FileText size={14} />
                                     Save as Draft
@@ -1425,7 +1426,7 @@ function CheckoutPageContent() {
                                                 key={opt.id}
                                                 type="button"
                                                 onClick={() => setSelectedPayment(opt.id)}
-                                                className={`w-full px-5 md:px-7 py-4 md:py-5 flex items-center gap-4 text-left transition-all ${isSelected ? 'bg-[#53B175]/5' : 'hover:bg-gray-50/60'}`}
+                                                className={`w-full px-5 md:px-7 py-4 md:py-5 flex items-center gap-4 text-left transition-all ${isSelected ? 'bg-primary/5' : 'hover:bg-gray-50/60'}`}
                                             >
                                                 {/* Icon badge */}
                                                 <div className={`w-11 h-11 md:w-12 md:h-12 rounded-xl flex items-center justify-center shrink-0 ${opt.badgeBg} ${opt.badgeText} border border-black/5`}>
@@ -1446,7 +1447,7 @@ function CheckoutPageContent() {
 
                                                         {/* Inline Balance badges */}
                                                         {opt.id === 'wallet' && creditWalletsLoaded && platformWallet && walletBalance !== null && (
-                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${walletBalance < selectedTotal ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-[#53B175]'}`}>
+                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${walletBalance < selectedTotal ? 'bg-rose-50 text-rose-600' : 'bg-primary-light text-primary'}`}>
                                                                 ₹{walletBalance.toLocaleString('en-IN')} available
                                                             </span>
                                                         )}
@@ -1457,13 +1458,13 @@ function CheckoutPageContent() {
                                                             const avail = Number(wallet.availableCredit) || 0;
                                                             const name = wallet.vendor?.businessName ?? selectedGroups[0].vendorName;
                                                             return (
-                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${avail < selectedGroups[0].subtotal ? 'bg-rose-50 text-rose-600' : 'bg-green-50 text-[#53B175]'}`}>
+                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${avail < selectedGroups[0].subtotal ? 'bg-rose-50 text-rose-600' : 'bg-primary-light text-primary'}`}>
                                                                     {name} · ₹{avail.toLocaleString('en-IN')}
                                                                 </span>
                                                             );
                                                         })()}
                                                         {opt.id === 'credit' && creditWalletsLoaded && selectedGroups.length > 1 && (
-                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${creditEligibility.every(c => c.ok) ? 'bg-green-50 text-[#53B175]' : 'bg-rose-50 text-rose-600'}`}>
+                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${creditEligibility.every(c => c.ok) ? 'bg-primary-light text-primary' : 'bg-rose-50 text-rose-600'}`}>
                                                                 {creditEligibility.every(c => c.ok) ? 'Per supplier' : 'Not available for all POs'}
                                                             </span>
                                                         )}
@@ -1472,8 +1473,8 @@ function CheckoutPageContent() {
                                                 </div>
 
                                                 {/* Radio indicator */}
-                                                <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${isSelected ? 'border-[#53B175]' : 'border-gray-300'}`}>
-                                                    {isSelected && <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-[#53B175]" />}
+                                                <div className={`w-5 h-5 md:w-6 md:h-6 rounded-full border-2 shrink-0 flex items-center justify-center transition-colors ${isSelected ? 'border-primary' : 'border-gray-300'}`}>
+                                                    {isSelected && <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-primary" />}
                                                 </div>
                                             </button>
                                         );
@@ -1483,19 +1484,19 @@ function CheckoutPageContent() {
 
                             {/* Additional configuration panels (Bank Transfer input, PO number, etc.) on the left */}
                             {selectedPayment === 'bank_transfer' && (
-                                <div className="bg-green-50 rounded-2xl p-5 border border-green-100 shadow-sm text-left">
-                                    <p className="text-[13px] font-bold text-green-700 mb-2">Bank Account Details</p>
-                                    <p className="text-[12px] text-green-600 mb-3 leading-relaxed">
-                                        Transfer to: <strong className="text-green-800">Horeca1 Pvt Ltd</strong><br />
-                                        A/C Number: <strong className="text-green-800">1234567890</strong><br />
-                                        IFSC Code: <strong className="text-green-800">HDFC0001234</strong>
+                                <div className="bg-primary-light rounded-2xl p-5 border border-primary/20 shadow-sm text-left">
+                                    <p className="text-[13px] font-bold text-primary mb-2">Bank Account Details</p>
+                                    <p className="text-[12px] text-primary mb-3 leading-relaxed">
+                                        Transfer to: <strong className="text-primary">Horeca1 Pvt Ltd</strong><br />
+                                        A/C Number: <strong className="text-primary">1234567890</strong><br />
+                                        IFSC Code: <strong className="text-primary">HDFC0001234</strong>
                                     </p>
                                     <input 
                                         type="text" 
                                         placeholder="Enter UTR / Transaction Ref Number..." 
                                         value={bankTransferInput} 
                                         onChange={(e) => setBankTransferInput(e.target.value)}
-                                        className="w-full border border-green-200 bg-white rounded-xl px-4 py-3 text-[13px] font-bold outline-none focus:ring-1 focus:ring-[#53B175] placeholder:text-gray-400" 
+                                        className="w-full border border-primary/30 bg-white rounded-xl px-4 py-3 text-[13px] font-bold outline-none focus:ring-1 focus:ring-primary placeholder:text-gray-400" 
                                     />
                                 </div>
                             )}
@@ -1508,7 +1509,7 @@ function CheckoutPageContent() {
                                         placeholder="e.g. PO-2024-001" 
                                         value={poNumberInput} 
                                         onChange={(e) => setPoNumberInput(e.target.value)}
-                                        className="w-full border border-orange-200 bg-white rounded-xl px-4 py-3 text-[13px] font-bold outline-none focus:ring-1 focus:ring-[#53B175] placeholder:text-gray-400" 
+                                        className="w-full border border-orange-200 bg-white rounded-xl px-4 py-3 text-[13px] font-bold outline-none focus:ring-1 focus:ring-primary placeholder:text-gray-400" 
                                     />
                                 </div>
                             )}
@@ -1662,13 +1663,13 @@ function CheckoutPageContent() {
                                     {couponDiscountEst > 0 && (
                                         <div className="flex justify-between items-center text-[13px]">
                                             <span className="text-gray-500 font-medium">Coupon ({appliedCoupon?.code})</span>
-                                            <span className={`font-bold text-[#53B175] ${billAmountClass}`}>−₹{couponDiscountEst.toLocaleString('en-IN')}</span>
+                                            <span className={`font-bold text-primary ${billAmountClass}`}>−₹{couponDiscountEst.toLocaleString('en-IN')}</span>
                                         </div>
                                     )}
                                     {walletUseEst > 0 && (
                                         <div className="flex justify-between items-center text-[13px]">
                                             <span className="text-gray-500 font-medium">H1 Wallet</span>
-                                            <span className={`font-bold text-[#53B175] ${billAmountClass}`}>−₹{walletUseEst.toLocaleString('en-IN')}</span>
+                                            <span className={`font-bold text-primary ${billAmountClass}`}>−₹{walletUseEst.toLocaleString('en-IN')}</span>
                                         </div>
                                     )}
                                     {estimatedCashback && estimatedCashback.estimatedAmount > 0 && (
@@ -1684,7 +1685,7 @@ function CheckoutPageContent() {
                                     )}
                                     <div className="border-t border-dashed border-[#D0D0D0] pt-4 flex justify-between items-baseline">
                                         <span className="text-[15px] font-bold text-[#181725]">Total Payable</span>
-                                        <span className={`text-[22px] font-black text-[#53B175] ${billAmountClass}`}>₹{estimatedPayable.toLocaleString('en-IN')}</span>
+                                        <span className={`text-[22px] font-black text-primary ${billAmountClass}`}>₹{estimatedPayable.toLocaleString('en-IN')}</span>
                                     </div>
                                     <p className="text-[10px] text-gray-400 leading-normal">
                                         {checkoutCaption}
@@ -1724,7 +1725,7 @@ function CheckoutPageContent() {
                                     !isPlacingOrder && 
                                     !(selectedPayment === 'credit' && (!creditWalletsLoaded || !creditAllSelectionsValid)) &&
                                     !(selectedPayment === 'wallet' && (!creditWalletsLoaded || !walletEligibility.ok))
-                                        ? 'bg-[#53B175] hover:bg-[#48a068] text-white shadow-green-100/50 active:scale-[0.99]'
+                                        ? 'bg-primary hover:bg-primary-dark text-white shadow-green-100/50 active:scale-[0.99]'
                                         : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
                                 }`}
                             >
@@ -1743,8 +1744,8 @@ function CheckoutPageContent() {
                 {/* (kept for completeness — the success path hard-redirects to /order-success) */}
                 {step === 'confirmation' && (
                     <div className="text-center py-8">
-                        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <CheckCircle2 size={40} className="text-[#53B175]" />
+                        <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-4">
+                            <CheckCircle2 size={40} className="text-primary" />
                         </div>
                         <h2 className="text-[22px] font-bold text-[#181725] mb-1">Order Placed!</h2>
                         <p className="text-[14px] text-gray-500 mb-6">
@@ -1772,7 +1773,7 @@ function CheckoutPageContent() {
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                             <Link
                                 href="/orders"
-                                className="px-6 py-2.5 bg-[#53B175] text-white text-[13px] font-bold rounded-xl shadow-md shadow-green-200/50 hover:bg-[#48a068] transition-all"
+                                className="px-6 py-2.5 bg-primary text-white text-[13px] font-bold rounded-xl shadow-md shadow-green-200/50 hover:bg-primary-dark transition-all"
                             >
                                 View Orders
                             </Link>
@@ -1796,7 +1797,7 @@ export default function CheckoutPage() {
     return (
         <React.Suspense fallback={
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50/50">
-                <Loader2 size={36} className="text-[#53B175] animate-spin mb-4" />
+                <Loader2 size={36} className="text-primary animate-spin mb-4" />
                 <p className="text-[14px] text-gray-400 font-medium">Loading checkout...</p>
             </div>
         }>

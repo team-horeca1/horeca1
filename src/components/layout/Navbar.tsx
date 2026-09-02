@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import React from 'react';
 import Link from 'next/link';
@@ -42,7 +43,7 @@ const CATEGORY_STYLE: Record<string, { image: string; bgColor: string }> = {
     'grains-pulses': { image: '/images/category/snacks.png', bgColor: '#f5f3ff' },
     'meat-poultry': { image: '/images/category/fish & meat.png', bgColor: '#fffbeb' },
     'seafood': { image: '/images/category/fish & meat.png', bgColor: '#fff7ed' },
-    'beverages': { image: '/images/category/drink-juice.png', bgColor: '#ecfdf5' },
+    'beverages': { image: '/images/category/drink-juice.png', bgColor: CDL.successLight },
     'oils-ghee': { image: '/images/category/fruits.png', bgColor: '#f0fdf4' },
     'packaging-supplies': { image: '/images/category/vegitable.png', bgColor: '#f8fafc' },
 };
@@ -309,45 +310,38 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
 
             {/* ── Mobile Header ── */}
             <header className="lg:hidden w-full bg-white relative z-[10000] sticky top-0 border-b border-divider">
-                <div className="w-full py-3 px-4">
-                    {/* Row 1: Logo | Notifications | Cart */}
-                    <div className="flex items-center justify-between">
-                        <Link href="/" className="flex items-center shrink-0">
-                            <Image
-                                src="/Horeca1.png"
-                                alt="Horeca1"
-                                width={100}
-                                height={26}
-                                className="h-[24px] w-auto object-contain"
-                                priority
-                            />
-                        </Link>
+                <div className="w-full py-3 px-4 flex items-center justify-between">
+                    {/* Logo: Horeca1 joined simply */}
+                    <Link href="/" className="flex items-center shrink-0 select-none" aria-label="Horeca1 Home">
+                        <span className="text-[23px] font-black tracking-[-0.03em] font-sans text-primary">
+                            Horeca1
+                        </span>
+                    </Link>
 
-                        <div className="flex items-center gap-2">
-                            {(isLoggedIn || reserveAuthSlots) && (
-                                <div className="flex items-center justify-end shrink-0 h-9 min-w-[76px] gap-1">
-                                    {isLoggedIn ? (
-                                        <>
-                                            <NotificationBell accentColor="#6B1D2E" />
-                                            <PushBell />
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse" aria-hidden />
-                                            <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse" aria-hidden />
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                            <Link href="/cart" className="relative p-1.5 cursor-pointer hover:bg-ivory rounded-lg transition-colors" aria-label="Cart">
-                                <ShoppingCart size={21} className="text-text" />
-                                {badgeCount > 0 && (
-                                    <span className="absolute -top-0.5 -right-0.5 bg-primary text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full font-bold border border-white">
-                                        {badgeCount}
-                                    </span>
+                    <div className="flex items-center gap-2">
+                        {(isLoggedIn || reserveAuthSlots) && (
+                            <div className="flex items-center justify-end shrink-0 h-9 min-w-[76px] gap-1">
+                                {isLoggedIn ? (
+                                    <>
+                                        <NotificationBell accentColor="#6B1D2E" />
+                                        <PushBell />
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse" aria-hidden />
+                                        <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse" aria-hidden />
+                                    </>
                                 )}
-                            </Link>
-                        </div>
+                            </div>
+                        )}
+                        <Link href="/cart" className="relative p-1.5 cursor-pointer hover:bg-ivory rounded-lg transition-colors" aria-label="Cart">
+                            <ShoppingCart size={21} className="text-text" />
+                            {badgeCount > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 bg-primary text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full font-bold border border-white">
+                                    {badgeCount}
+                                </span>
+                            )}
+                        </Link>
                     </div>
                 </div>
             </header>

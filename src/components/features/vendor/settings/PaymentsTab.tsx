@@ -67,19 +67,19 @@ export function PaymentsTab(props: PaymentsTabProps) {
 
       <section className="border-t border-[#F5F5F5] pt-6">
         <div className="flex items-center gap-2 mb-2">
-          <Building2 size={18} className="text-[#299E60]" />
+          <Building2 size={18} className="text-primary" />
           <h2 className="text-[16px] font-bold text-[#181725]">Bank account</h2>
         </div>
         <p className="text-[12px] text-[#7C7C7C] mb-4">Settlement payouts — must match registered business account</p>
         <div className="space-y-4">
           <div>
             <label className="block text-[13px] font-bold text-[#181725] mb-1.5">Account holder name</label>
-            <input type="text" value={bankAccountName} onChange={(e) => setBankAccountName(e.target.value)} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40" />
+            <input type="text" value={bankAccountName} onChange={(e) => setBankAccountName(e.target.value)} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-primary/40" />
           </div>
           <div>
             <label className="block text-[13px] font-bold text-[#181725] mb-1.5">Account number</label>
             <div className="relative">
-              <input type={bankShowNumber ? 'text' : 'password'} value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} maxLength={30} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 pr-12 text-[14px] font-mono outline-none focus:border-[#299E60]/40" />
+              <input type={bankShowNumber ? 'text' : 'password'} value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} maxLength={30} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 pr-12 text-[14px] font-mono outline-none focus:border-primary/40" />
               <button type="button" onClick={() => setBankShowNumber((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#AEAEAE] hover:text-[#181725]">
                 {bankShowNumber ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -88,17 +88,17 @@ export function PaymentsTab(props: PaymentsTabProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-[13px] font-bold text-[#181725] mb-1.5">IFSC</label>
-              <input type="text" value={bankIfsc} onChange={(e) => setBankIfsc(e.target.value.toUpperCase())} maxLength={11} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] font-mono outline-none focus:border-[#299E60]/40" />
+              <input type="text" value={bankIfsc} onChange={(e) => setBankIfsc(e.target.value.toUpperCase())} maxLength={11} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] font-mono outline-none focus:border-primary/40" />
             </div>
             <div>
               <label className="block text-[13px] font-bold text-[#181725] mb-1.5">Bank name</label>
-              <input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#299E60]/40" />
+              <input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} className="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-primary/40" />
             </div>
           </div>
           <div className="flex items-center gap-6">
             {(['current', 'savings'] as const).map((t) => (
               <label key={t} className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="bankAccountType" checked={bankAccountType === t} onChange={() => setBankAccountType(t)} className="accent-[#299E60] w-4 h-4" />
+                <input type="radio" name="bankAccountType" checked={bankAccountType === t} onChange={() => setBankAccountType(t)} className="accent-primary w-4 h-4" />
                 <span className="text-[14px] font-medium text-[#181725] capitalize">{t}</span>
               </label>
             ))}

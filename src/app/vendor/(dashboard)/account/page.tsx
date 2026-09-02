@@ -54,7 +54,7 @@ export default function VendorAccountPage() {
   return (
     <Suspense fallback={(
       <div className="flex justify-center py-16">
-        <Loader2 className="animate-spin text-[#299E60]" size={28} />
+        <Loader2 className="animate-spin text-primary" size={28} />
       </div>
     )}>
       <VendorAccountContent />

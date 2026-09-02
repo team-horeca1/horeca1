@@ -71,7 +71,7 @@ export default function CollectionsIndexPage() {
               <ChevronLeft size={22} className="text-gray-700" />
             </Link>
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-[#EEF8F1] text-[#299E60] flex items-center justify-center">
+              <div className="w-9 h-9 rounded-xl bg-primary-light text-primary flex items-center justify-center">
                 <Layers size={18} strokeWidth={2.5} />
               </div>
               <h1 className="text-[clamp(1.25rem,2vw+0.6rem,1.75rem)] font-extrabold text-[#181725] tracking-tight">
@@ -85,12 +85,12 @@ export default function CollectionsIndexPage() {
       <div className="max-w-[var(--container-max)] mx-auto px-[clamp(1rem,3vw,2rem)] py-8">
         {loading ? (
           <div className="flex items-center justify-center py-32">
-            <div className="w-10 h-10 border-[3px] border-[#53B175]/10 border-t-[#53B175] rounded-full animate-spin" />
+            <div className="w-10 h-10 border-[3px] border-primary/10 border-t-primary rounded-full animate-spin" />
           </div>
         ) : collections.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 text-center">
             <p className="text-[15px] font-semibold text-gray-500">No collections available yet.</p>
-            <Link href="/vendors" className="mt-4 text-[14px] font-bold text-[#299E60] hover:opacity-80">
+            <Link href="/vendors" className="mt-4 text-[14px] font-bold text-primary hover:opacity-80">
               Browse vendors
             </Link>
           </div>
@@ -110,7 +110,7 @@ export default function CollectionsIndexPage() {
                       {col.category}
                     </span>
                   </div>
-                  <div className="absolute top-3 right-3 w-9 h-9 rounded-full bg-[#299E60] flex items-center justify-center z-10 group-hover:bg-[#238a52] transition-colors">
+                  <div className="absolute top-3 right-3 w-9 h-9 rounded-full bg-primary flex items-center justify-center z-10 group-hover:bg-primary-dark transition-colors">
                     <ChevronRight size={18} className="text-white" strokeWidth={2.5} />
                   </div>
                   <div className="absolute inset-x-0 bottom-0 p-5 z-10">

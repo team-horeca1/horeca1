@@ -121,7 +121,7 @@ export function BecomeVendorModal({
       <div className="bg-white rounded-[20px] w-full max-w-[520px] max-h-[90vh] flex flex-col overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.08)] border border-gray-100 animate-in zoom-in-95 duration-150">
         {/* Header with brand-style icon */}
         <div className="p-6 border-b border-gray-100 flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#53B175] to-[#299E60] flex items-center justify-center shrink-0 shadow-lg shadow-emerald-100">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shrink-0 shadow-lg shadow-primary/10">
             <Store size={22} className="text-white" />
           </div>
           <div className="flex-1 min-w-0">
@@ -198,12 +198,12 @@ export function BecomeVendorModal({
           </div>
 
           {/* What happens next */}
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4 mt-2">
-            <p className="text-[12px] font-bold text-emerald-950 mb-1.5">What happens after you submit</p>
-            <ol className="text-[11.5px] text-emerald-900/80 space-y-1.5 list-decimal list-inside">
+          <div className="rounded-xl border border-success/20 bg-success-light/40 p-4 mt-2">
+            <p className="text-[12px] font-bold text-primary mb-1.5">What happens after you submit</p>
+            <ol className="text-[11.5px] text-primary/80 space-y-1.5 list-decimal list-inside">
               <li>You stay logged in to the same account.</li>
               <li>Admin reviews your application (usually within 24 hours).</li>
-              <li>Once approved, the <strong className="text-emerald-950">Supplier</strong> portal becomes available in the navbar.</li>
+              <li>Once approved, the <strong className="text-primary">Supplier</strong> portal becomes available in the navbar.</li>
               <li>You can keep buying as a customer the whole time.</li>
             </ol>
           </div>
@@ -221,7 +221,7 @@ export function BecomeVendorModal({
           <button
             onClick={handleSubmit}
             disabled={submitting || !businessName.trim()}
-            className={cn(FORM.primaryBtn, 'px-6 py-2.5 text-[13px] shadow-emerald-100')}
+            className={cn(FORM.primaryBtn, 'px-6 py-2.5 text-[13px] shadow-primary/10')}
           >
             {submitting ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
             {submitting ? 'Submitting…' : 'Submit application'}

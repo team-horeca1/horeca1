@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import React from 'react';
 import { Check } from 'lucide-react';
@@ -97,7 +98,7 @@ export function PermissionMatrix({
   permissions,
   onChange,
   readOnly = false,
-  accent = '#53B175',
+  accent = CDL.primary,
   className = '',
 }: PermissionMatrixProps) {
   const columns = scopeActionColumns(scope);

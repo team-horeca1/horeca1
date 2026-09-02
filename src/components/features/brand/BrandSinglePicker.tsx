@@ -90,7 +90,7 @@ export function BrandSinglePicker({
                     className={cn(
                         'w-full flex items-center justify-between gap-2 text-left',
                         'border border-[#EEEEEE] rounded-[10px] font-medium bg-white hover:bg-white',
-                        'focus:outline-none focus:border-[#299E60]/40 transition-colors',
+                        'focus:outline-none focus:border-primary/40 transition-colors',
                         isCompact ? 'px-3 py-2 text-[13px] h-[36px]' : 'px-4 py-2.5 text-[14px] h-[44px]',
                         hasError && 'border-[#E74C3C] focus:border-[#E74C3C]',
                         disabled && 'opacity-60 cursor-not-allowed bg-gray-50',
@@ -127,7 +127,7 @@ export function BrandSinglePicker({
                                     value={query}
                                     onChange={e => setQuery(e.target.value)}
                                     placeholder="Search or add brand..."
-                                    className="w-full pl-8 pr-2 py-1.5 border border-[#EEEEEE] rounded-lg text-[12px] outline-none focus:border-[#299E60]/40"
+                                    className="w-full pl-8 pr-2 py-1.5 border border-[#EEEEEE] rounded-lg text-[12px] outline-none focus:border-primary/40"
                                 />
                             </div>
                         </div>
@@ -140,12 +140,12 @@ export function BrandSinglePicker({
                                         type="button"
                                         onClick={() => selectBrand(b.name)}
                                         className={cn(
-                                            'w-full flex items-center gap-2 px-3 py-2 hover:bg-[#EEF8F1] hover:text-[#299E60] text-left transition-colors text-[13px] text-[#181725]',
-                                            value === b.name && 'bg-[#EEF8F1] text-[#299E60] font-semibold',
+                                            'w-full flex items-center gap-2 px-3 py-2 hover:bg-primary-light hover:text-primary text-left transition-colors text-[13px] text-[#181725]',
+                                            value === b.name && 'bg-primary-light text-primary font-semibold',
                                         )}
                                     >
                                         <span className="flex-1 truncate">{b.name}</span>
-                                        {value === b.name && <Check size={11} className="text-[#299E60] shrink-0" />}
+                                        {value === b.name && <Check size={11} className="text-primary shrink-0" />}
                                     </button>
                                 ))
                             ) : showEmptyAddCta ? (
@@ -154,7 +154,7 @@ export function BrandSinglePicker({
                                         type="button"
                                         onClick={() => handleSuggest(query || 'New brand')}
                                         disabled={suggesting}
-                                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-[#EEF8F1] hover:bg-[#299E60] hover:text-white text-[#2e7d46] transition-colors text-[12px] font-bold"
+                                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-primary-light hover:bg-primary hover:text-white text-primary transition-colors text-[12px] font-bold"
                                     >
                                         {suggesting ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
                                         Add brand…
@@ -171,7 +171,7 @@ export function BrandSinglePicker({
                                     type="button"
                                     onClick={() => handleSuggest(trimmed)}
                                     disabled={suggesting}
-                                    className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-[#EEF8F1] hover:bg-[#299E60] hover:text-white text-[#2e7d46] transition-colors"
+                                    className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-primary-light hover:bg-primary hover:text-white text-primary transition-colors"
                                 >
                                     <span className="flex items-center gap-2 text-[12px] font-bold truncate">
                                         {suggesting ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}

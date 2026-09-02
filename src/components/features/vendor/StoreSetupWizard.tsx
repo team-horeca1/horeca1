@@ -306,9 +306,9 @@ export function StoreSetupWizard({
             const className = cn(
               'text-[11px] font-bold px-2.5 py-1 rounded-full transition-colors',
               active
-                ? 'bg-[#299E60] text-white'
+                ? 'bg-primary text-white'
                 : done || clickable
-                  ? 'bg-[#E8F7EF] text-[#299E60]'
+                  ? 'bg-[#E8F7EF] text-primary'
                   : 'bg-[#F3F4F6] text-[#AEAEAE]',
               clickable && !active && 'hover:bg-[#D1FAE5] cursor-pointer',
               !clickable && 'cursor-default',
@@ -445,7 +445,7 @@ export function StoreSetupWizard({
                 <button
                   type="button"
                   onClick={addPincode}
-                  className="px-4 py-2 bg-[#299E60] hover:bg-[#238a54] text-white rounded-[10px] font-bold flex items-center gap-1"
+                  className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-[10px] font-bold flex items-center gap-1"
                 >
                   <Plus size={16} /> Add
                 </button>
@@ -455,13 +455,13 @@ export function StoreSetupWizard({
                   {pincodes.map((p) => (
                     <span
                       key={p}
-                      className="inline-flex items-center gap-1.5 bg-[#ECFDF5] text-[#299E60] px-3 py-1.5 rounded-full text-[13px] font-bold"
+                      className="inline-flex items-center gap-1.5 bg-success-light text-primary px-3 py-1.5 rounded-full text-[13px] font-bold"
                     >
                       {p}
                       <button
                         type="button"
                         onClick={() => setPincodes((prev) => prev.filter((x) => x !== p))}
-                        className="hover:bg-[#299E60]/10 rounded-full p-0.5"
+                        className="hover:bg-primary/10 rounded-full p-0.5"
                       >
                         <X size={12} />
                       </button>
@@ -510,7 +510,7 @@ export function StoreSetupWizard({
             <button
               type="button"
               onClick={goNext}
-              className="flex-1 h-[36px] bg-[#299E60] hover:bg-[#238a54] text-white rounded-[8px] text-[13px] font-bold"
+              className="flex-1 h-[36px] bg-primary hover:bg-primary-dark text-white rounded-[8px] text-[13px] font-bold"
             >
               Next
             </button>
@@ -519,7 +519,7 @@ export function StoreSetupWizard({
               type="button"
               onClick={() => void handleSubmit()}
               disabled={submitting}
-              className="flex-1 h-[36px] bg-[#299E60] hover:bg-[#238a54] text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 h-[36px] bg-primary hover:bg-primary-dark text-white rounded-[8px] text-[13px] font-bold disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
               {isEdit ? 'Save changes' : 'Create store'}

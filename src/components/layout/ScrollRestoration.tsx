@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
@@ -224,13 +225,13 @@ function ScrollDebugOverlay() {
                 lineHeight: 1.4,
                 padding: '8px 10px',
                 borderRadius: 8,
-                border: '1px solid #53B175',
+                border: `1px solid ${CDL.primary}`,
                 pointerEvents: 'auto',
             }}
         >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: '#53B175', fontWeight: 700 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: CDL.primary, fontWeight: 700 }}>
                 <span>[scroll] debug · {entries.length}</span>
-                <button onClick={() => setHidden(true)} style={{ background: 'transparent', border: 0, color: '#53B175', cursor: 'pointer' }}>×</button>
+                <button onClick={() => setHidden(true)} style={{ background: 'transparent', border: 0, color: CDL.primary, cursor: 'pointer' }}>×</button>
             </div>
             {entries.length === 0 && <div style={{ color: '#777' }}>No events yet — navigate to see scroll trace.</div>}
             {entries.map((e, i) => (

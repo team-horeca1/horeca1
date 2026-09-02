@@ -158,7 +158,7 @@ export function BulkAssignCreditModal({
             type="button"
             onClick={() => void save()}
             disabled={saving || selected.size === 0}
-            className="px-4 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold disabled:opacity-50 flex items-center gap-2"
+            className="px-4 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold disabled:opacity-50 flex items-center gap-2"
           >
             {saving && <Loader2 size={14} className="animate-spin" />}
             Assign to {selected.size || '…'}

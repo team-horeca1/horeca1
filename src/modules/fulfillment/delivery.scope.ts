@@ -114,7 +114,7 @@ export const DELIVERY_UI_STATUS_STYLE: Record<DeliveryUiStatus, string> = {
   packed: 'bg-cyan-50 text-cyan-800 border-cyan-200',
   dispatched: 'bg-violet-50 text-violet-800 border-violet-200',
   delivery_attempt_failed: 'bg-rose-50 text-rose-800 border-rose-200',
-  delivered: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  delivered: 'bg-success-light text-success border-success/30',
 };
 
 export const DELIVERY_PROGRESS_LABELS: Record<DeliveryProgressStage, string> = {

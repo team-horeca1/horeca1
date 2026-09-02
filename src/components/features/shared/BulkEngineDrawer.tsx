@@ -99,7 +99,7 @@ const ACTIONS: ActionMeta[] = [
 
 /* ─── Styling primitives ────────────────────────────────────────────────── */
 
-const inputCls = 'w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] font-medium outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all';
+const inputCls = 'w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] font-medium outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all';
 const selectCls = inputCls;
 const inr = (n: number | null | undefined) =>
   n == null ? '—' : `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -432,8 +432,8 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
                 <ChevronLeft size={18} />
               </button>
             )}
-            <div className="w-9 h-9 rounded-[10px] bg-[#ECFDF5] flex items-center justify-center">
-              <Sparkles size={18} className="text-[#299E60]" />
+            <div className="w-9 h-9 rounded-[10px] bg-success-light flex items-center justify-center">
+              <Sparkles size={18} className="text-primary" />
             </div>
             <div>
               <h2 className="text-[16px] font-[900] text-[#181725] leading-tight">
@@ -478,7 +478,7 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
                       onChange={(e) => setSkuPaste(e.target.value)}
                       rows={4}
                       placeholder="SKU-001&#10;SKU-002"
-                      className="w-full border border-[#EEEEEE] rounded-[10px] px-3 py-2 text-[13px] font-medium outline-none focus:border-[#299E60]/40 bg-[#FAFAFA]"
+                      className="w-full border border-[#EEEEEE] rounded-[10px] px-3 py-2 text-[13px] font-medium outline-none focus:border-primary/40 bg-[#FAFAFA]"
                     />
                   </div>
                 ) : (
@@ -509,7 +509,7 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
                 )}
                 <div className="mt-3 pt-3 border-t border-[#F5F5F5] flex items-center justify-between">
                   <span className={cn('text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-[8px]',
-                    count > 0 ? 'text-[#299E60] bg-[#EEF8F1]' : 'text-amber-700 bg-amber-50')}>
+                    count > 0 ? 'text-primary bg-primary-light' : 'text-amber-700 bg-amber-50')}>
                     {count} product{count !== 1 ? 's' : ''} targeted
                   </span>
                   {overCap && <span className="text-[10.5px] font-bold text-amber-700 flex items-center gap-1"><AlertCircle size={12} /> capped at 500</span>}
@@ -531,9 +531,9 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
                               key={a.key}
                               disabled={count === 0}
                               onClick={() => setAction(a.key)}
-                              className="text-left bg-white border border-[#EEEEEE] rounded-[12px] p-3.5 hover:border-[#299E60]/40 hover:shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed group"
+                              className="text-left bg-white border border-[#EEEEEE] rounded-[12px] p-3.5 hover:border-primary/40 hover:shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed group"
                             >
-                              <a.icon size={18} className="text-[#299E60] mb-2" />
+                              <a.icon size={18} className="text-primary mb-2" />
                               <p className="text-[13px] font-bold text-[#181725] leading-none">{a.label}</p>
                               <p className="text-[11px] text-[#AEAEAE] font-medium mt-1">{a.hint}</p>
                             </button>
@@ -562,7 +562,7 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
             <button
               onClick={handleApply}
               disabled={submitting || !canApply}
-              className="h-[42px] px-7 bg-[#299E60] hover:bg-[#238a54] disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-[12px] text-[13px] font-bold flex items-center gap-2 shadow-sm transition-colors"
+              className="h-[42px] px-7 bg-primary hover:bg-primary-dark disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-[12px] text-[13px] font-bold flex items-center gap-2 shadow-sm transition-colors"
             >
               {submitting ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
               {submitting ? 'Applying…' : `Apply to ${count}`}
@@ -579,7 +579,7 @@ export default function BulkEngineDrawer({ open, onClose, onComplete, config, al
 function TargetTab({ active, onClick, icon: Icon, label }: { active: boolean; onClick: () => void; icon: React.ComponentType<{ size?: number; className?: string }>; label: string }) {
   return (
     <button onClick={onClick} className={cn('flex-1 h-[36px] rounded-[10px] text-[12px] font-bold flex items-center justify-center gap-1.5 transition-all',
-      active ? 'bg-[#299E60] text-white shadow-sm' : 'bg-[#F8F9FB] border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F0F0F0]')}>
+      active ? 'bg-primary text-white shadow-sm' : 'bg-[#F8F9FB] border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F0F0F0]')}>
       <Icon size={13} /> {label}
     </button>
   );
@@ -587,7 +587,7 @@ function TargetTab({ active, onClick, icon: Icon, label }: { active: boolean; on
 
 function PreviewBlock({ previewing, preview }: { previewing: boolean; preview: PreviewData | null }) {
   if (previewing) {
-    return <div className="flex items-center gap-2 text-[12px] font-semibold text-[#7C7C7C] pt-2 border-t border-[#F5F5F5]"><Loader2 size={13} className="animate-spin text-[#299E60]" /> Calculating preview…</div>;
+    return <div className="flex items-center gap-2 text-[12px] font-semibold text-[#7C7C7C] pt-2 border-t border-[#F5F5F5]"><Loader2 size={13} className="animate-spin text-primary" /> Calculating preview…</div>;
   }
   if (!preview || preview.sample.length === 0) return null;
   const keys = Object.keys(preview.sample[0].before);
@@ -601,7 +601,7 @@ function PreviewBlock({ previewing, preview }: { previewing: boolean; preview: P
             <span className="font-bold text-[#7C7C7C] tabular-nums whitespace-nowrap">
               {keys.map((k) => (
                 <span key={k} className="ml-2">
-                  {fmt(s.before[k])} <span className="text-[#299E60]">→</span> {fmt(s.after[k])}
+                  {fmt(s.before[k])} <span className="text-primary">→</span> {fmt(s.after[k])}
                 </span>
               ))}
             </span>
@@ -627,9 +627,9 @@ function ResultPanel({ result, onAnother, onClose }: { result: { updated: number
     <div className="flex flex-col items-center text-center py-10 gap-4">
       <div className={cn(
         'w-16 h-16 rounded-full border flex items-center justify-center',
-        ok ? 'bg-[#EBFDF2] border-[#299E60]/10' : 'bg-amber-50 border-amber-200',
+        ok ? 'bg-[#EBFDF2] border-primary/10' : 'bg-amber-50 border-amber-200',
       )}>
-        <BadgeCheck size={32} className={ok ? 'text-[#299E60]' : 'text-amber-600'} />
+        <BadgeCheck size={32} className={ok ? 'text-primary' : 'text-amber-600'} />
       </div>
       <div>
         <h3 className="text-[20px] font-black text-[#181725]">{result.updated} updated</h3>
@@ -673,7 +673,7 @@ function ConfigPanel({ action, cfg, setCfg, config, priceLists, targetProducts }
               placeholder={cfg.price.mode.includes('Pct') ? 'e.g. 5' : 'e.g. 120'} className={cn(inputCls, 'mt-2')} autoFocus />
           )}
           <label className="flex items-center gap-2 text-[12px] font-semibold text-[#181725] mt-2.5 cursor-pointer">
-            <input type="checkbox" checked={cfg.price.applyToSlabs} onChange={(e) => up('price', { applyToSlabs: e.target.checked })} className="w-4 h-4 rounded text-[#299E60]" />
+            <input type="checkbox" checked={cfg.price.applyToSlabs} onChange={(e) => up('price', { applyToSlabs: e.target.checked })} className="w-4 h-4 rounded text-primary" />
             Also adjust every bulk price slab
           </label>
         </Field>
@@ -729,7 +729,7 @@ function ConfigPanel({ action, cfg, setCfg, config, priceLists, targetProducts }
           </Field>
         )}
         <label className="flex items-center gap-2 text-[12px] font-semibold text-[#181725] cursor-pointer">
-          <input type="checkbox" checked={cfg.offer.applyToSlabs} onChange={(e) => up('offer', { applyToSlabs: e.target.checked })} className="w-4 h-4 rounded text-[#299E60]" />
+          <input type="checkbox" checked={cfg.offer.applyToSlabs} onChange={(e) => up('offer', { applyToSlabs: e.target.checked })} className="w-4 h-4 rounded text-primary" />
           {cfg.offer.mode === 'clear' ? 'Also clear slab promos' : 'Also set slab promo prices'}
         </label>
       </>
@@ -781,7 +781,7 @@ function ConfigPanel({ action, cfg, setCfg, config, priceLists, targetProducts }
   if (action === 'credit') {
     return (
       <Field label="Credit (DiSCCO) eligibility">
-        <span className="inline-flex items-center h-[36px] px-3 rounded-[9px] text-[12px] font-bold bg-[#299E60] text-white">
+        <span className="inline-flex items-center h-[36px] px-3 rounded-[9px] text-[12px] font-bold bg-primary text-white">
           Eligible
         </span>
         <p className="text-[11px] text-[#AEAEAE] font-medium mt-2">DiSCCO credit stays on for all products.</p>
@@ -815,7 +815,7 @@ function ConfigPanel({ action, cfg, setCfg, config, priceLists, targetProducts }
           <p className="text-[11px] text-[#AEAEAE] font-medium mt-1">Ctrl/Cmd-click for multiple. Leave empty to keep current.</p>
         </Field>
         <label className="flex items-center gap-2 text-[12px] font-semibold text-[#181725] cursor-pointer">
-          <input type="checkbox" checked={cfg.category.replaceTags} onChange={(e) => up('category', { replaceTags: e.target.checked })} className="w-4 h-4 rounded text-[#299E60]" />
+          <input type="checkbox" checked={cfg.category.replaceTags} onChange={(e) => up('category', { replaceTags: e.target.checked })} className="w-4 h-4 rounded text-primary" />
           Replace tags
         </label>
         {cfg.category.replaceTags && (
@@ -905,7 +905,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function Chip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
     <button type="button" onClick={onClick} className={cn('h-[36px] px-2 rounded-[9px] text-[12px] font-bold transition-all',
-      active ? 'bg-[#299E60] text-white shadow-sm' : 'bg-[#F8F9FB] border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F0F0F0]')}>
+      active ? 'bg-primary text-white shadow-sm' : 'bg-[#F8F9FB] border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F0F0F0]')}>
       {label}
     </button>
   );

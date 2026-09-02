@@ -69,7 +69,7 @@ export default function BulkProductToolbar({
       className={cn(
         'h-[40px] px-4 rounded-[10px] text-[12px] font-bold flex items-center gap-2 transition-all border shrink-0',
         opts?.active
-          ? 'bg-[#299E60] text-white border-[#299E60] shadow-sm'
+          ? 'bg-primary text-white border-primary shadow-sm'
           : 'bg-white text-[#181725] border-[#EEEEEE] hover:bg-[#F8F9FB] disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:bg-white',
       )}
     >
@@ -150,7 +150,7 @@ export default function BulkProductToolbar({
               onClick={() => { onExportCsv(); setExportOpen(false); }}
               className="w-full flex items-center gap-3 px-4 py-3 text-[12px] font-semibold text-[#181725] hover:bg-[#F8F9FB] transition-colors border-t border-[#F3F4F6]"
             >
-              <FileSpreadsheet size={15} className="text-[#299E60]" />
+              <FileSpreadsheet size={15} className="text-primary" />
               CSV
             </button>
           </div>

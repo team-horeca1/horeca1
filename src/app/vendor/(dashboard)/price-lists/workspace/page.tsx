@@ -1293,28 +1293,28 @@ export default function PricelistWorkspacePage() {
             <div className="relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search product / SKU"
-                className="h-10 pl-9 pr-3 w-[220px] bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none focus:bg-white focus:border-[#299E60] transition-all" />
+                className="h-10 pl-9 pr-3 w-[220px] bg-gray-50 border border-gray-200 rounded-xl text-[13px] outline-none focus:bg-white focus:border-primary transition-all" />
             </div>
 
             <select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setSelectedRows(new Set()); }}
-              className="h-10 px-3 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-700 outline-none focus:bg-white focus:border-[#299E60] max-w-[180px]">
+              className="h-10 px-3 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-700 outline-none focus:bg-white focus:border-primary max-w-[180px]">
               <option value="">All categories</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
 
             <select value={brandId} onChange={(e) => { setBrandId(e.target.value); setSelectedRows(new Set()); }}
-              className="h-10 px-3 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-700 outline-none focus:bg-white focus:border-[#299E60] max-w-[180px]">
+              className="h-10 px-3 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-700 outline-none focus:bg-white focus:border-primary max-w-[180px]">
               <option value="">All brands</option>
               {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
 
             <select value={collectionId} onChange={(e) => { setCollectionId(e.target.value); setSelectedRows(new Set()); }}
-              className="h-10 px-3 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-700 outline-none focus:bg-white focus:border-[#299E60] max-w-[180px]">
+              className="h-10 px-3 bg-gray-50 border border-gray-200 rounded-xl text-[13px] font-medium text-gray-700 outline-none focus:bg-white focus:border-primary max-w-[180px]">
               <option value="">All collections</option>
               {collections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
 
-            <button onClick={() => setShowNewList(true)} className="h-10 px-4 border border-gray-200 hover:border-[#299E60]/40 hover:text-[#299E60] text-gray-700 rounded-xl text-[13px] font-bold flex items-center gap-1.5 transition-colors">
+            <button onClick={() => setShowNewList(true)} className="h-10 px-4 border border-gray-200 hover:border-primary/40 hover:text-primary text-gray-700 rounded-xl text-[13px] font-bold flex items-center gap-1.5 transition-colors">
               <Plus size={14} /> New Pricelist
             </button>
 
@@ -1323,7 +1323,7 @@ export default function PricelistWorkspacePage() {
             </button>
 
             <button onClick={saveMatrix} disabled={dirtyCount === 0 || saving}
-              className="h-10 px-4 bg-[#299E60] hover:bg-[#238a53] disabled:bg-gray-100 disabled:text-gray-400 text-white rounded-xl text-[13px] font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-[#299E60]/10">
+              className="h-10 px-4 bg-primary hover:bg-primary-dark disabled:bg-gray-100 disabled:text-gray-400 text-white rounded-xl text-[13px] font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-primary/10">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Save Changes{dirtyCount > 0 ? ` (${dirtyCount})` : ''}
             </button>
@@ -1337,7 +1337,7 @@ export default function PricelistWorkspacePage() {
           className={cn(
             "flex items-center gap-2 px-4 py-2 text-[13px] font-bold rounded-lg transition-all",
             activeTab === 'matrix' 
-              ? "bg-white text-[#299E60] shadow-sm border border-gray-100" 
+              ? "bg-white text-primary shadow-sm border border-gray-100" 
               : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
           )}>
           <FileText size={15} /> Prices
@@ -1346,7 +1346,7 @@ export default function PricelistWorkspacePage() {
           className={cn(
             "flex items-center gap-2 px-4 py-2 text-[13px] font-bold rounded-lg transition-all",
             activeTab === 'assignment' 
-              ? "bg-white text-[#299E60] shadow-sm border border-gray-100" 
+              ? "bg-white text-primary shadow-sm border border-gray-100" 
               : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
           )}>
           <Users size={15} /> Who gets each list
@@ -1357,7 +1357,7 @@ export default function PricelistWorkspacePage() {
       {activeTab === 'matrix' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap text-[11px] text-gray-400 font-medium">
-            <div className="flex items-center gap-2 bg-[#299E60]/5 text-[#299E60] px-3 py-2 rounded-lg border border-[#299E60]/10">
+            <div className="flex items-center gap-2 bg-primary/5 text-primary px-3 py-2 rounded-lg border border-primary/10">
               <Info size={14} />
               <span>Click and type to set a price · drag or Shift-click to select a range · Ctrl/Cmd+C and V to copy/paste · right-click a cell for more · Enter to edit · then Save.</span>
             </div>
@@ -1377,10 +1377,10 @@ export default function PricelistWorkspacePage() {
             <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center shadow-sm">
               <p className="text-[15px] font-bold text-[#181725] mb-1">No active price lists found</p>
               <p className="text-[13px] text-gray-400 mb-4">Create a price list first, then come here to override base catalog prices.</p>
-              <Link href="/vendor/price-lists" className="inline-block px-5 py-2.5 bg-[#299E60] text-white rounded-xl text-[13px] font-bold">Manage Price Lists</Link>
+              <Link href="/vendor/price-lists" className="inline-block px-5 py-2.5 bg-primary text-white rounded-xl text-[13px] font-bold">Manage Price Lists</Link>
             </div>
           ) : loading ? (
-            <div className="flex items-center justify-center py-32"><Loader2 size={32} className="animate-spin text-[#299E60]" /></div>
+            <div className="flex items-center justify-center py-32"><Loader2 size={32} className="animate-spin text-primary" /></div>
           ) : (
             <div className="bg-white border border-[#EEEEEE] rounded-[16px] overflow-hidden shadow-sm">
               <div className="overflow-auto max-h-[600px]" onKeyDown={onGridKeyDown} onPaste={(e) => { if (editing) return; e.preventDefault(); applyPaste(e.clipboardData.getData('text')); }} tabIndex={0}>
@@ -1397,7 +1397,7 @@ export default function PricelistWorkspacePage() {
                               const all = rows.length > 0 && rows.every((rw) => selectedRows.has(rw.id));
                               setSelectedRows(all ? new Set() : new Set(rows.map((rw) => rw.id)));
                             }}
-                            className="w-3.5 h-3.5 accent-[#299E60] cursor-pointer"
+                            className="w-3.5 h-3.5 accent-primary cursor-pointer"
                           />
                           Product
                         </div>
@@ -1410,11 +1410,11 @@ export default function PricelistWorkspacePage() {
                             <span className="truncate max-w-[90px]" title={col.name}>{col.name}</span>
                             <div className="flex items-center gap-1.5">
                               <button onClick={() => { setFormulaCol(col.id); setFormulaText('=BASE'); }} title="Column Formula"
-                                className="text-gray-400 hover:text-[#299E60] transition-colors p-1 rounded hover:bg-gray-100">
+                                className="text-gray-400 hover:text-primary transition-colors p-1 rounded hover:bg-gray-100">
                                 <FunctionSquare size={14} />
                               </button>
                               <button onClick={() => setImportingList(col.id)} title="Import CSV data"
-                                className="text-gray-400 hover:text-[#299E60] transition-colors p-1 rounded hover:bg-gray-100">
+                                className="text-gray-400 hover:text-primary transition-colors p-1 rounded hover:bg-gray-100">
                                 <Upload size={14} />
                               </button>
                               <button
@@ -1424,7 +1424,7 @@ export default function PricelistWorkspacePage() {
                                 }}
                                 disabled={colBusy === col.id}
                                 title="Price list settings"
-                                className="text-gray-400 hover:text-[#299E60] transition-colors p-1 rounded hover:bg-gray-100 disabled:opacity-50">
+                                className="text-gray-400 hover:text-primary transition-colors p-1 rounded hover:bg-gray-100 disabled:opacity-50">
                                 {colBusy === col.id ? <Loader2 size={14} className="animate-spin" /> : <MoreVertical size={14} />}
                               </button>
                             </div>
@@ -1439,7 +1439,7 @@ export default function PricelistWorkspacePage() {
                       <tr key={row.id} className="hover:bg-gray-50/50 transition-colors">
                         <td className={cn(
                           'px-4 py-3 text-left sticky left-0 z-10 border-b border-r border-[#F0F0F0] font-semibold text-[#181725] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]',
-                          selectedRows.has(row.id) ? 'bg-[#EEF8F1]' : 'bg-white',
+                          selectedRows.has(row.id) ? 'bg-primary-light' : 'bg-white',
                         )}>
                           <div className="flex items-center gap-2.5">
                             <input
@@ -1450,7 +1450,7 @@ export default function PricelistWorkspacePage() {
                                 if (n.has(row.id)) n.delete(row.id); else n.add(row.id);
                                 return n;
                               })}
-                              className="w-3.5 h-3.5 accent-[#299E60] cursor-pointer shrink-0"
+                              className="w-3.5 h-3.5 accent-primary cursor-pointer shrink-0"
                             />
                             <div className="min-w-0">
                               <div className="truncate max-w-[200px]" title={row.name}>{row.name}</div>
@@ -1510,8 +1510,8 @@ export default function PricelistWorkspacePage() {
                               onContextMenu={(e) => onCellContextMenu(e, r, c)}
                               className={cn(
                                 'px-3 py-2 text-right border-b border-[#F0F0F0] cursor-cell tabular-nums relative transition-all select-none',
-                                !isActive && inSel(r, c) && 'bg-[#299E60]/10',
-                                isActive && 'ring-2 ring-[#299E60] ring-inset bg-[#299E60]/5 z-10',
+                                !isActive && inSel(r, c) && 'bg-primary/10',
+                                isActive && 'ring-2 ring-primary ring-inset bg-primary/5 z-10',
                                 isDirty && (dirtyData === null ? 'bg-red-50/50 line-through' : 'bg-amber-50/70'),
                                 isLocked && 'bg-gray-50/70'
                               )}
@@ -1520,7 +1520,7 @@ export default function PricelistWorkspacePage() {
                                 {/* Visual Indicators on Left of Price */}
                                 <div className="flex items-center gap-0.5 text-gray-400 select-none scale-[0.85] origin-left">
                                   {isLocked && <Lock size={12} className="text-[#E63946]" title="Locked Price" />}
-                                  {hasCustomValidity && <Calendar size={12} className="text-[#299E60]" title="Custom Validity Enabled" />}
+                                  {hasCustomValidity && <Calendar size={12} className="text-primary" title="Custom Validity Enabled" />}
                                   {hasScheduledChange && <Clock size={12} className="text-indigo-500" title="Scheduled Change Pending" />}
                                   {hasNote && <MessageSquare size={12} className="text-amber-500" title="Internal Notes Available" />}
                                 </div>
@@ -1544,7 +1544,7 @@ export default function PricelistWorkspacePage() {
                                         setEditing(null);
                                       }
                                     }}
-                                    className="w-full text-right outline-none bg-white border border-[#299E60] rounded px-1 py-0.5 text-[13px]" />
+                                    className="w-full text-right outline-none bg-white border border-primary rounded px-1 py-0.5 text-[13px]" />
                                 ) : (
                                   <div className="flex items-center gap-1.5 ml-auto">
                                     <span className={cn(
@@ -1575,8 +1575,8 @@ export default function PricelistWorkspacePage() {
           {nextCursor && (
             <div className="flex justify-center mt-2">
               <button onClick={() => loadWorkspace(false, nextCursor)} disabled={loadingMore}
-                className="px-5 py-2.5 bg-white border border-gray-250 rounded-xl text-[13px] font-bold text-gray-700 hover:border-[#299E60] hover:text-[#299E60] flex items-center gap-2 transition-all shadow-sm">
-                {loadingMore ? <Loader2 size={14} className="animate-spin text-[#299E60]" /> : null}
+                className="px-5 py-2.5 bg-white border border-gray-250 rounded-xl text-[13px] font-bold text-gray-700 hover:border-primary hover:text-primary flex items-center gap-2 transition-all shadow-sm">
+                {loadingMore ? <Loader2 size={14} className="animate-spin text-primary" /> : null}
                 Load More Products
               </button>
             </div>
@@ -1590,7 +1590,7 @@ export default function PricelistWorkspacePage() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2">
               <select value={targetFilterType} onChange={e => setTargetFilterType(e.target.value)}
-                className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-[13px] font-medium outline-none focus:border-[#299E60]">
+                className="h-10 px-3 bg-white border border-gray-200 rounded-xl text-[13px] font-medium outline-none focus:border-primary">
                 <option value="all">All Targets</option>
                 <option value="customer">B2B Customers</option>
                 <option value="pincode">Pincodes</option>
@@ -1602,7 +1602,7 @@ export default function PricelistWorkspacePage() {
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input value={targetSearch} onChange={e => setTargetSearch(e.target.value)} placeholder="Filter targets..."
-                  className="h-10 pl-8 pr-3 w-[220px] bg-white border border-gray-200 rounded-xl text-[13px] outline-none focus:border-[#299E60]" />
+                  className="h-10 pl-8 pr-3 w-[220px] bg-white border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary" />
               </div>
             </div>
 
@@ -1612,7 +1612,7 @@ export default function PricelistWorkspacePage() {
           </div>
 
           {loadingTargets ? (
-            <div className="flex items-center justify-center py-32"><Loader2 size={32} className="animate-spin text-[#299E60]" /></div>
+            <div className="flex items-center justify-center py-32"><Loader2 size={32} className="animate-spin text-primary" /></div>
           ) : (
             <div className="bg-white border border-[#EEEEEE] rounded-[16px] overflow-auto shadow-sm">
               <table className="border-collapse text-[13px] w-full min-w-max">
@@ -1633,7 +1633,7 @@ export default function PricelistWorkspacePage() {
                           <button onClick={() => {
                             const cObj = targets?.customers.find(cu => cu.userId === target.value);
                             if (cObj) setPreviewCustomer(cObj);
-                          }} className="text-[#299E60] hover:underline text-left">
+                          }} className="text-primary hover:underline text-left">
                             {target.name}
                           </button>
                         ) : (
@@ -1646,7 +1646,7 @@ export default function PricelistWorkspacePage() {
                           target.type === 'customer' && "bg-blue-50 text-blue-600",
                           target.type === 'pincode' && "bg-purple-50 text-purple-600",
                           target.type === 'area' && "bg-orange-50 text-orange-600",
-                          target.type === 'segment' && "bg-emerald-50 text-emerald-600",
+                          target.type === 'segment' && "bg-success-light text-success",
                           target.type === 'group' && "bg-teal-50 text-teal-600"
                         )}>
                           {target.displayType}
@@ -1659,7 +1659,7 @@ export default function PricelistWorkspacePage() {
                           <td key={col.id} className="px-5 py-3.5 text-center border-b border-[#F0F0F0]">
                             <input type="checkbox" checked={checked}
                               onChange={() => handleAssignmentToggle(target, col)}
-                              className="w-4 h-4 text-[#299E60] border-gray-300 rounded focus:ring-[#299E60] cursor-pointer" />
+                              className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer" />
                           </td>
                         );
                       })}
@@ -1729,7 +1729,7 @@ export default function PricelistWorkspacePage() {
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[540px] overflow-hidden" onClick={e => e.stopPropagation()}>
               
               {/* Modal Header */}
-              <div className="bg-[#299E60] p-5 text-white">
+              <div className="bg-primary p-5 text-white">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-[17px] font-black">{row.name}</h3>
@@ -1753,7 +1753,7 @@ export default function PricelistWorkspacePage() {
                         const val = e.target.value;
                         setCellFields(row.id, col.id, { price: val === '' ? null : parseFloat(val) });
                       }}
-                      className="flex-1 h-10 px-3 border border-gray-200 rounded-xl outline-none focus:border-[#299E60]" />
+                      className="flex-1 h-10 px-3 border border-gray-200 rounded-xl outline-none focus:border-primary" />
                     
                     <button onClick={() => setCellFields(row.id, col.id, { price: null })}
                       className="h-10 px-3 border border-red-200 hover:bg-red-50 text-red-600 rounded-xl flex items-center gap-1 transition-colors" title="Clear override, fall back to base price">
@@ -1773,7 +1773,7 @@ export default function PricelistWorkspacePage() {
                   </div>
                   <input type="checkbox" checked={isLocked}
                     onChange={e => setCellFields(row.id, col.id, { isLocked: e.target.checked })}
-                    className="w-4 h-4 text-[#299E60] border-gray-300 rounded focus:ring-[#299E60] cursor-pointer" />
+                    className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary cursor-pointer" />
                 </div>
 
                 {/* 3. Date validity */}
@@ -1784,13 +1784,13 @@ export default function PricelistWorkspacePage() {
                       <span className="block text-[10px] text-gray-400 mb-1">Effective From</span>
                       <input type="date" value={validFrom}
                         onChange={e => setCellFields(row.id, col.id, { validFrom: e.target.value ? new Date(e.target.value).toISOString() : null })}
-                        className="w-full h-10 px-3 border border-gray-200 rounded-xl outline-none focus:border-[#299E60]" />
+                        className="w-full h-10 px-3 border border-gray-200 rounded-xl outline-none focus:border-primary" />
                     </div>
                     <div>
                       <span className="block text-[10px] text-gray-400 mb-1">Effective To</span>
                       <input type="date" value={validTo}
                         onChange={e => setCellFields(row.id, col.id, { validTo: e.target.value ? new Date(e.target.value).toISOString() : null })}
-                        className="w-full h-10 px-3 border border-gray-200 rounded-xl outline-none focus:border-[#299E60]" />
+                        className="w-full h-10 px-3 border border-gray-200 rounded-xl outline-none focus:border-primary" />
                     </div>
                   </div>
                 </div>
@@ -1827,7 +1827,7 @@ export default function PricelistWorkspacePage() {
                   <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Internal Notes</label>
                   <textarea value={note ?? ''} placeholder="Add specific contract detail or reference note..."
                     onChange={e => setCellFields(row.id, col.id, { note: e.target.value })}
-                    className="w-full h-16 p-3 border border-gray-200 rounded-xl outline-none focus:border-[#299E60] resize-none" />
+                    className="w-full h-16 p-3 border border-gray-200 rounded-xl outline-none focus:border-primary resize-none" />
                 </div>
 
                 {/* 6. Change log history */}
@@ -1875,7 +1875,7 @@ export default function PricelistWorkspacePage() {
       {importingList && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-xs" onClick={() => { setImportingList(null); setCsvPreview(null); setCsvErrors([]); }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[580px] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="bg-[#299E60] p-5 text-white flex items-center justify-between">
+            <div className="bg-primary p-5 text-white flex items-center justify-between">
               <div>
                 <h3 className="text-[17px] font-black">Import Pricelist Spreadsheet</h3>
                 <p className="text-[11px] text-white/80 mt-0.5">Upload a CSV file to override multiple prices in column: {cols.find(c => c.id === importingList)?.name}</p>
@@ -1891,13 +1891,13 @@ export default function PricelistWorkspacePage() {
                   <p className="font-bold text-[#181725] mb-0.5">Need the pricing catalog sheet template?</p>
                   <p className="text-[11px] text-gray-400">Download a template containing current SKU catalog prices first.</p>
                 </div>
-                <button onClick={downloadTemplate} className="h-9 px-3.5 bg-white border border-gray-200 hover:bg-gray-50 text-[#299E60] font-bold rounded-lg flex items-center gap-1.5 transition-colors">
+                <button onClick={downloadTemplate} className="h-9 px-3.5 bg-white border border-gray-200 hover:bg-gray-50 text-primary font-bold rounded-lg flex items-center gap-1.5 transition-colors">
                   <Download size={13} /> Download Template
                 </button>
               </div>
 
               {!csvPreview ? (
-                <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-[#299E60] transition-colors cursor-pointer"
+                <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-primary transition-colors cursor-pointer"
                   onClick={() => fileInputRef.current?.click()}>
                   <Upload size={32} className="mx-auto text-gray-300 mb-3" />
                   <p className="font-bold text-[#181725] text-[13px] mb-1">Click to select CSV File</p>
@@ -1920,7 +1920,7 @@ export default function PricelistWorkspacePage() {
                         </div>
                         <div className="text-right">
                           <span className="text-gray-400 line-through">₹{item.currentPrice}</span>
-                          <span className="font-bold text-[#299E60] ml-2">₹{item.newPrice}</span>
+                          <span className="font-bold text-primary ml-2">₹{item.newPrice}</span>
                         </div>
                       </div>
                     ))}
@@ -1946,7 +1946,7 @@ export default function PricelistWorkspacePage() {
                 Cancel
               </button>
               <button onClick={applyCSVImports} disabled={!csvPreview}
-                className="px-5 py-2 bg-[#299E60] hover:bg-[#238a53] disabled:bg-gray-100 disabled:text-gray-400 text-white rounded-xl font-bold flex items-center gap-1.5 transition-colors">
+                className="px-5 py-2 bg-primary hover:bg-primary-dark disabled:bg-gray-100 disabled:text-gray-400 text-white rounded-xl font-bold flex items-center gap-1.5 transition-colors">
                 <Check size={14} /> Import Overrides
               </button>
             </div>
@@ -1959,7 +1959,7 @@ export default function PricelistWorkspacePage() {
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-xs" onClick={() => setPreviewCustomer(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[440px] overflow-hidden text-[13px] text-gray-700" onClick={e => e.stopPropagation()}>
             <div className="bg-gray-50 p-5 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-[16px] font-black text-[#181725] flex items-center gap-2"><Users size={18} className="text-[#299E60]" /> Customer Quick Profile</h3>
+              <h3 className="text-[16px] font-black text-[#181725] flex items-center gap-2"><Users size={18} className="text-primary" /> Customer Quick Profile</h3>
               <button onClick={() => setPreviewCustomer(null)} className="text-gray-400 hover:text-gray-600 bg-gray-100 p-1 rounded-lg transition-colors">
                 <X size={16} />
               </button>
@@ -1976,7 +1976,7 @@ export default function PricelistWorkspacePage() {
                   <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Credit Limit Status</div>
                   <span className={cn(
                     "px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                    previewCustomer.creditStatus === 'active' && "bg-emerald-50 text-emerald-600 border border-emerald-100",
+                    previewCustomer.creditStatus === 'active' && "bg-success-light text-success border border-success/20",
                     previewCustomer.creditStatus === 'suspended' && "bg-red-50 text-red-600 border border-red-100",
                     !previewCustomer.creditStatus && "bg-gray-50 text-gray-400 border border-gray-100"
                   )}>
@@ -2020,7 +2020,7 @@ export default function PricelistWorkspacePage() {
                       return false;
                     });
                     return (
-                      <div key={col.id} className="p-2 border border-gray-100 bg-emerald-50/20 text-[#299E60] font-bold rounded-lg flex items-center justify-between text-[11px]">
+                      <div key={col.id} className="p-2 border border-gray-100 bg-success-light/20 text-primary font-bold rounded-lg flex items-center justify-between text-[11px]">
                         <div className="flex flex-col">
                           <span>✓ {col.name}</span>
                           {matched?.assignedAt && (
@@ -2088,7 +2088,7 @@ export default function PricelistWorkspacePage() {
                       <span className="flex items-center gap-1.5 shrink-0">
                         <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-bold line-through">{conf.existingPricelist}</span>
                         <span className="text-gray-300">→</span>
-                        <span className="text-[11px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-bold border border-emerald-100">{cols.find(c => c.id === conflictModal.priceListId)?.name}</span>
+                        <span className="text-[11px] bg-success-light text-success px-2 py-0.5 rounded font-bold border border-success/20">{cols.find(c => c.id === conflictModal.priceListId)?.name}</span>
                       </span>
                     </div>
                   ))}
@@ -2105,11 +2105,11 @@ export default function PricelistWorkspacePage() {
                 ]).map((o) => (
                   <label key={o.v} className={cn(
                     'flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-colors',
-                    conflictModal.mode === o.v ? 'border-[#299E60] bg-[#EEF8F1]' : 'border-gray-200 hover:bg-gray-50',
+                    conflictModal.mode === o.v ? 'border-primary bg-primary-light' : 'border-gray-200 hover:bg-gray-50',
                   )}>
                     <input type="radio" name="conflictOption" checked={conflictModal.mode === o.v}
                       onChange={() => setConflictModal(prev => prev ? { ...prev, mode: o.v } : null)}
-                      className="mt-0.5 accent-[#299E60]" />
+                      className="mt-0.5 accent-primary" />
                     <div>
                       <span className="block font-bold text-gray-800">{o.t}</span>
                       <span className="block text-[11px] text-gray-400 mt-0.5">{o.d}</span>
@@ -2135,7 +2135,7 @@ export default function PricelistWorkspacePage() {
                   saveAssignments(conflictModal.priceListId, targetObj, conflictModal.mode === 'all' ? 'replace' : 'skip');
                 }
               }}
-                className="px-5 py-2 bg-[#299E60] hover:bg-[#238a53] text-white rounded-xl font-bold flex items-center gap-1.5 transition-colors shadow-sm">
+                className="px-5 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold flex items-center gap-1.5 transition-colors shadow-sm">
                 <Check size={14} /> Apply
               </button>
             </div>
@@ -2149,7 +2149,7 @@ export default function PricelistWorkspacePage() {
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-xs" onClick={() => setFormulaCol(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[440px] p-6 animate-in fade-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[16px] font-black text-[#181725] flex items-center gap-2"><FunctionSquare size={17} className="text-[#299E60]" /> Apply Column Formula</h3>
+              <h3 className="text-[16px] font-black text-[#181725] flex items-center gap-2"><FunctionSquare size={17} className="text-primary" /> Apply Column Formula</h3>
               <button onClick={() => setFormulaCol(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <p className="text-[12px] text-gray-500 mb-3">
@@ -2161,7 +2161,7 @@ export default function PricelistWorkspacePage() {
             <input value={formulaText} onChange={e => setFormulaText(e.target.value)} autoFocus
               onKeyDown={e => { if (e.key === 'Enter') applyFormula(); }}
               placeholder="=BASE-3%"
-              className="w-full px-3 py-2.5 border border-gray-250 rounded-xl text-[14px] font-mono outline-none focus:border-[#299E60] mb-3" />
+              className="w-full px-3 py-2.5 border border-gray-250 rounded-xl text-[14px] font-mono outline-none focus:border-primary mb-3" />
             
             <div className="flex flex-wrap gap-1.5 mb-4">
               {['=BASE-3%', '=BASE+5%', '=BASE*1.05', '=BASE-2'].map(ex => (
@@ -2170,7 +2170,7 @@ export default function PricelistWorkspacePage() {
             </div>
             <div className="flex justify-end gap-2">
               <button onClick={() => setFormulaCol(null)} className="px-4 py-2 text-[13px] font-bold text-gray-500 hover:bg-gray-50 rounded-xl">Cancel</button>
-              <button onClick={applyFormula} className="px-4 py-2 bg-[#299E60] hover:bg-[#238a53] text-white rounded-xl text-[13px] font-bold flex items-center gap-1.5 shadow-sm"><Check size={14} /> Apply Formula</button>
+              <button onClick={applyFormula} className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl text-[13px] font-bold flex items-center gap-1.5 shadow-sm"><Check size={14} /> Apply Formula</button>
             </div>
           </div>
         </div>
@@ -2181,18 +2181,18 @@ export default function PricelistWorkspacePage() {
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-xs" onClick={() => setShowNewList(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[420px] p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[16px] font-black text-[#181725] flex items-center gap-2"><Plus size={17} className="text-[#299E60]" /> New Price List</h3>
+              <h3 className="text-[16px] font-black text-[#181725] flex items-center gap-2"><Plus size={17} className="text-primary" /> New Price List</h3>
               <button onClick={() => setShowNewList(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <p className="text-[12px] text-gray-500 mb-3">It appears as a new column in the grid. Every product starts at its base price — edit the ones you want.</p>
             <input value={newListName} onChange={e => setNewListName(e.target.value)} autoFocus
               onKeyDown={e => { if (e.key === 'Enter') createPricelist(); }}
               placeholder="e.g. COD Pricing, Hotel Pricing"
-              className="w-full px-3 py-2.5 border border-gray-250 rounded-xl text-[14px] outline-none focus:border-[#299E60] mb-4" />
+              className="w-full px-3 py-2.5 border border-gray-250 rounded-xl text-[14px] outline-none focus:border-primary mb-4" />
             <div className="flex justify-end gap-2">
               <button onClick={() => setShowNewList(false)} className="px-4 py-2 text-[13px] font-bold text-gray-500 hover:bg-gray-50 rounded-xl">Cancel</button>
               <button onClick={createPricelist} disabled={newListSaving || !newListName.trim()}
-                className="px-4 py-2 bg-[#299E60] hover:bg-[#238a53] disabled:bg-gray-100 disabled:text-gray-400 text-white rounded-xl text-[13px] font-bold flex items-center gap-1.5 shadow-sm">
+                className="px-4 py-2 bg-primary hover:bg-primary-dark disabled:bg-gray-100 disabled:text-gray-400 text-white rounded-xl text-[13px] font-bold flex items-center gap-1.5 shadow-sm">
                 {newListSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Create
               </button>
             </div>
@@ -2267,18 +2267,18 @@ export default function PricelistWorkspacePage() {
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 backdrop-blur-xs" onClick={() => setRenameList(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[420px] p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[16px] font-black text-[#181725] flex items-center gap-2"><Pencil size={17} className="text-[#299E60]" /> Rename Price List</h3>
+              <h3 className="text-[16px] font-black text-[#181725] flex items-center gap-2"><Pencil size={17} className="text-primary" /> Rename Price List</h3>
               <button onClick={() => setRenameList(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <p className="text-[12px] text-gray-500 mb-3">Give this price list a clear name — it shows as the column header in the grid.</p>
             <input value={renameValue} onChange={e => setRenameValue(e.target.value)} autoFocus
               onKeyDown={e => { if (e.key === 'Enter') submitRename(); }}
               placeholder="Price list name"
-              className="w-full px-3 py-2.5 border border-gray-250 rounded-xl text-[14px] outline-none focus:border-[#299E60] mb-4" />
+              className="w-full px-3 py-2.5 border border-gray-250 rounded-xl text-[14px] outline-none focus:border-primary mb-4" />
             <div className="flex justify-end gap-2">
               <button onClick={() => setRenameList(null)} className="px-4 py-2 text-[13px] font-bold text-gray-500 hover:bg-gray-50 rounded-xl">Cancel</button>
               <button onClick={submitRename} disabled={renameSaving || !renameValue.trim()}
-                className="px-4 py-2 bg-[#299E60] hover:bg-[#238a53] disabled:bg-gray-100 disabled:text-gray-400 text-white rounded-xl text-[13px] font-bold flex items-center gap-1.5 shadow-sm">
+                className="px-4 py-2 bg-primary hover:bg-primary-dark disabled:bg-gray-100 disabled:text-gray-400 text-white rounded-xl text-[13px] font-bold flex items-center gap-1.5 shadow-sm">
                 {renameSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Save
               </button>
             </div>

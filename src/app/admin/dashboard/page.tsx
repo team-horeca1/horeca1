@@ -191,7 +191,7 @@ export default function DashboardPage() {
                                     </div>
                                     <span className={cn(
                                         'shrink-0 inline-flex items-center capitalize rounded-full px-2.5 py-1 text-[11px] font-semibold',
-                                        row.status === 'delivered' ? 'bg-[#DCFCE7] text-success'
+                                        row.status === 'delivered' ? 'bg-success-light text-success'
                                         : row.status === 'cancelled' ? 'bg-[#FEE2E2] text-error'
                                         : 'bg-[#FEF3C7] text-[#B45309]',
                                     )}>
@@ -224,7 +224,7 @@ export default function DashboardPage() {
                             ) : (
                             data?.recentOrders.map((row) => {
                                 const statusStyle = row.status === 'delivered'
-                                    ? "bg-[#DCFCE7] text-success"
+                                    ? "bg-success-light text-success"
                                     : row.status === 'cancelled'
                                     ? "bg-[#FEE2E2] text-error"
                                     : "bg-[#FEF3C7] text-[#B45309]";

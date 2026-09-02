@@ -488,7 +488,7 @@ export function CategoryHierarchyPicker({
                     
                     <div className={cn(
                         "relative flex items-center bg-white border border-[#EEEEEE] rounded-[10px] transition-all duration-200",
-                        "focus-within:border-[#299E60]/40",
+                        "focus-within:border-primary/40",
                         parentLocked && "bg-gray-50 cursor-not-allowed opacity-60"
                     )}>
                         <Search size={14} className="ml-3 text-gray-400 shrink-0" />
@@ -555,12 +555,12 @@ export function CategoryHierarchyPicker({
                                                 className={cn(
                                                     "w-full flex items-center justify-between px-3 py-2 text-left text-[13px] transition-colors",
                                                     isSelected 
-                                                        ? "bg-[#EEF8F1] text-[#2e7d46] font-semibold" 
+                                                        ? "bg-primary-light text-primary font-semibold" 
                                                         : "text-[#181725] hover:bg-gray-50"
                                                 )}
                                             >
                                                 <span>{p.name}</span>
-                                                {isSelected && <Check size={12} className="text-[#2e7d46]" />}
+                                                {isSelected && <Check size={12} className="text-primary" />}
                                             </button>
                                         );
                                     })}
@@ -577,7 +577,7 @@ export function CategoryHierarchyPicker({
                                         type="button"
                                         onClick={() => void submitParentRequest(parentQuery)}
                                         disabled={suggestingParent}
-                                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[10px] bg-[#EEF8F1] hover:bg-[#299E60] text-[#2e7d46] hover:text-white text-[12px] font-bold transition-all"
+                                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[10px] bg-primary-light hover:bg-primary text-primary hover:text-white text-[12px] font-bold transition-all"
                                     >
                                         {suggestingParent ? (
                                             <Loader2 size={12} className="animate-spin" />
@@ -597,13 +597,13 @@ export function CategoryHierarchyPicker({
                     <ChevronRight className={cn(
                         "hidden lg:block w-5 h-5 transition-all duration-300",
                         parentId 
-                            ? "text-[#53B175] drop-shadow-[0_0_6px_rgba(83,177,117,0.6)] animate-pulse" 
+                            ? "text-primary drop-shadow-[0_0_6px_rgba(107, 29, 46, )] animate-pulse" 
                             : "text-gray-300"
                     )} />
                     <ChevronDown className={cn(
                         "lg:hidden w-5 h-5 transition-all duration-300",
                         parentId 
-                            ? "text-[#53B175] drop-shadow-[0_0_6px_rgba(83,177,117,0.6)] animate-pulse" 
+                            ? "text-primary drop-shadow-[0_0_6px_rgba(107, 29, 46, )] animate-pulse" 
                             : "text-gray-300"
                     )} />
                 </div>
@@ -617,7 +617,7 @@ export function CategoryHierarchyPicker({
 
                     <div className={cn(
                         "relative flex items-center bg-white border border-[#EEEEEE] rounded-[10px] transition-all duration-200",
-                        "focus-within:border-[#299E60]/40",
+                        "focus-within:border-primary/40",
                         subLocked && "bg-gray-50 cursor-not-allowed opacity-60"
                     )}>
                         <Search size={14} className="ml-3 text-gray-400 shrink-0" />
@@ -690,12 +690,12 @@ export function CategoryHierarchyPicker({
                                                 className={cn(
                                                     "w-full flex items-center justify-between px-3 py-2 text-left text-[13px] transition-colors",
                                                     isSelected 
-                                                        ? "bg-[#EEF8F1] text-[#2e7d46] font-semibold" 
+                                                        ? "bg-primary-light text-primary font-semibold" 
                                                         : "text-[#181725] hover:bg-gray-50"
                                                 )}
                                             >
                                                 <span>{c.name}</span>
-                                                {isSelected && <Check size={12} className="text-[#2e7d46]" />}
+                                                {isSelected && <Check size={12} className="text-primary" />}
                                             </button>
                                         );
                                     })}
@@ -712,7 +712,7 @@ export function CategoryHierarchyPicker({
                                         type="button"
                                         onClick={() => void submitSubRequest(subQuery)}
                                         disabled={suggestingSub}
-                                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[10px] bg-[#EEF8F1] hover:bg-[#299E60] text-[#2e7d46] hover:text-white text-[12px] font-bold transition-all"
+                                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[10px] bg-primary-light hover:bg-primary text-primary hover:text-white text-[12px] font-bold transition-all"
                                     >
                                         {suggestingSub ? (
                                             <Loader2 size={12} className="animate-spin" />
@@ -732,13 +732,13 @@ export function CategoryHierarchyPicker({
                     <ChevronRight className={cn(
                         "hidden lg:block w-5 h-5 transition-all duration-300",
                         primarySubId 
-                            ? "text-[#53B175] drop-shadow-[0_0_6px_rgba(83,177,117,0.6)] animate-pulse" 
+                            ? "text-primary drop-shadow-[0_0_6px_rgba(107, 29, 46, )] animate-pulse" 
                             : "text-gray-300"
                     )} />
                     <ChevronDown className={cn(
                         "lg:hidden w-5 h-5 transition-all duration-300",
                         primarySubId 
-                            ? "text-[#53B175] drop-shadow-[0_0_6px_rgba(83,177,117,0.6)] animate-pulse" 
+                            ? "text-primary drop-shadow-[0_0_6px_rgba(107, 29, 46, )] animate-pulse" 
                             : "text-gray-300"
                     )} />
                 </div>
@@ -753,7 +753,7 @@ export function CategoryHierarchyPicker({
                     <div className="relative">
                         <div className={cn(
                             "relative flex items-center bg-white border border-[#EEEEEE] rounded-[10px] transition-all duration-200",
-                            "focus-within:border-[#299E60]/40",
+                            "focus-within:border-primary/40",
                             (!primarySubId || disabled || additionalIds.length >= maxAdditional) && "bg-gray-50 cursor-not-allowed opacity-60"
                         )}>
                             <Search size={14} className="ml-3 text-gray-400 shrink-0" />
@@ -804,7 +804,7 @@ export function CategoryHierarchyPicker({
                                                     setAdditionalOpen(false);
                                                     setAdditionalQuery('');
                                                 }}
-                                                className="w-full flex items-center justify-between px-3 py-2 hover:bg-[#EEF8F1] hover:text-[#2e7d46] text-[#181725] text-left transition-colors"
+                                                className="w-full flex items-center justify-between px-3 py-2 hover:bg-primary-light hover:text-primary text-[#181725] text-left transition-colors"
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <Tag size={12} className="text-gray-400 shrink-0" />
@@ -830,7 +830,7 @@ export function CategoryHierarchyPicker({
                                             type="button"
                                             onClick={submitAdditionalSuggestion}
                                             disabled={suggesting}
-                                            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[10px] bg-[#EEF8F1] hover:bg-[#299E60] text-[#2e7d46] hover:text-white text-[12px] font-bold transition-all"
+                                            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[10px] bg-primary-light hover:bg-primary text-primary hover:text-white text-[12px] font-bold transition-all"
                                         >
                                             {suggesting ? (
                                                 <Loader2 size={12} className="animate-spin" />
@@ -854,7 +854,7 @@ export function CategoryHierarchyPicker({
                             return (
                                 <span
                                     key={id}
-                                    className="flex items-center gap-1.5 bg-[#e8f5e9] text-[#2e7d46] text-[12px] font-semibold rounded-full px-3 py-1 shadow-sm"
+                                    className="flex items-center gap-1.5 bg-[#e8f5e9] text-primary text-[12px] font-semibold rounded-full px-3 py-1 shadow-sm"
                                 >
                                     {row?.name ?? id}
                                     <button

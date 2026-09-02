@@ -29,7 +29,7 @@ export function FinanceSummaryStrip({ metrics, className }: FinanceSummaryStripP
           <p
             className={cn(
               'text-[clamp(1rem,2vw+0.5rem,1.375rem)] font-bold mt-1',
-              m.accent === 'green' && 'text-[#16A34A]',
+              m.accent === 'green' && 'text-success',
               m.accent === 'amber' && 'text-amber-600',
               (!m.accent || m.accent === 'muted') && 'text-[#181725]',
             )}

@@ -78,7 +78,7 @@ export default function SalesTeamPage() {
   if ((status === 'loading' && !session) || permsLoading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 size={28} className="animate-spin text-[#299E60]" />
+        <Loader2 size={28} className="animate-spin text-primary" />
       </div>
     );
   }
@@ -102,8 +102,8 @@ export default function SalesTeamPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[12px] bg-[#ECFDF5] flex items-center justify-center">
-            <BadgeIndianRupee size={20} className="text-[#299E60]" />
+          <div className="w-10 h-10 rounded-[12px] bg-success-light flex items-center justify-center">
+            <BadgeIndianRupee size={20} className="text-primary" />
           </div>
           <div>
             <h1 className="text-[20px] font-bold text-[#181725]">Sales Team</h1>
@@ -127,11 +127,11 @@ export default function SalesTeamPage() {
               onClick={() => !disabled && setTabAndUrl(t.id)}
               disabled={disabled}
               className={`px-5 py-3 text-[13px] font-bold transition-colors relative
-                ${active ? 'text-[#299E60]' : 'text-[#7C7C7C] hover:text-[#181725]'}
+                ${active ? 'text-primary' : 'text-[#7C7C7C] hover:text-[#181725]'}
                 ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
               {t.label}
-              {active && <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-[#299E60]" />}
+              {active && <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-primary" />}
             </button>
           );
         })}

@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -66,7 +67,7 @@ export default function BrandPortalDashboard() {
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center h-[60vh] gap-3">
-                <Loader2 size={36} className="animate-spin text-[#53B175]" />
+                <Loader2 size={36} className="animate-spin text-primary" />
                 <p className="text-[14px] font-bold text-[#7C7C7C]">Loading brand dashboard...</p>
             </div>
         );
@@ -99,16 +100,16 @@ export default function BrandPortalDashboard() {
             label: 'Active Mappings',
             value: profile._count.productMappings,
             icon: GitMerge,
-            color: '#53B175',
-            bg: '#EEF8F1',
+            color: CDL.primary,
+            bg: CDL.primaryLight,
             href: '/brand/portal/mappings',
         },
         {
             label: 'Brand Status',
             value: isApproved ? 'Live' : isPending ? 'Pending' : 'Rejected',
             icon: isApproved ? ShieldCheck : isPending ? Clock : ShieldX,
-            color: isApproved ? '#53B175' : isPending ? '#F59E0B' : '#E74C3C',
-            bg: isApproved ? '#EEF8F1' : isPending ? '#FFF7E6' : '#FEF2F2',
+            color: isApproved ? CDL.primary : isPending ? '#F59E0B' : '#E74C3C',
+            bg: isApproved ? CDL.primaryLight : isPending ? '#FFF7E6' : '#FEF2F2',
             href: '/brand/portal/settings',
         },
         {
@@ -142,14 +143,14 @@ export default function BrandPortalDashboard() {
                                 {profile.logoUrl ? (
                                     <img src={profile.logoUrl} alt={profile.name} className="w-full h-full object-contain" />
                                 ) : (
-                                    <span className="text-[36px] font-[900] text-[#53B175]">
+                                    <span className="text-[36px] font-[900] text-primary">
                                         {getInitials(profile.name)}
                                     </span>
                                 )}
                             </div>
                             <Link
                                 href="/brand/portal/settings"
-                                className="mt-3 w-full py-2.5 px-4 rounded-[10px] text-[13px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 bg-[#53B175] text-white hover:bg-[#3d9e41]"
+                                className="mt-3 w-full py-2.5 px-4 rounded-[10px] text-[13px] font-bold transition-all shadow-sm flex items-center justify-center gap-2 bg-primary text-white hover:bg-primary-dark"
                             >
                                 Edit Profile
                             </Link>
@@ -161,11 +162,11 @@ export default function BrandPortalDashboard() {
                                     {profile.name}
                                 </h2>
                                 {isApproved && (
-                                    <CheckCircle2 size={20} className="text-[#53B175] shrink-0" fill="#53B175" stroke="white" />
+                                    <CheckCircle2 size={20} className="text-primary shrink-0" fill={CDL.primary} stroke="white" />
                                 )}
                                 <span className={cn(
                                     'text-[11px] font-[900] px-2.5 py-1 rounded-[6px] uppercase',
-                                    isApproved ? 'bg-[#EEF8F1] text-[#53B175]' :
+                                    isApproved ? 'bg-primary-light text-primary' :
                                     isPending  ? 'bg-[#FFF7E6] text-[#F59E0B]' :
                                                  'bg-[#FEF2F2] text-[#E74C3C]'
                                 )}>
@@ -182,7 +183,7 @@ export default function BrandPortalDashboard() {
                             <div className="space-y-2.5 mt-4">
                                 {profile.user?.fullName && (
                                     <div className="flex items-center gap-3">
-                                        <div className="w-[28px] h-[28px] rounded-full bg-[#EEF8F1] flex items-center justify-center text-[#53B175] shrink-0">
+                                        <div className="w-[28px] h-[28px] rounded-full bg-primary-light flex items-center justify-center text-primary shrink-0">
                                             <User size={13} />
                                         </div>
                                         <span className="text-[13px] font-bold text-[#4B4B4B]">{profile.user.fullName}</span>
@@ -190,7 +191,7 @@ export default function BrandPortalDashboard() {
                                 )}
                                 {profile.user?.email && (
                                     <div className="flex items-center gap-3">
-                                        <div className="w-[28px] h-[28px] rounded-full bg-[#EEF8F1] flex items-center justify-center text-[#53B175] shrink-0">
+                                        <div className="w-[28px] h-[28px] rounded-full bg-primary-light flex items-center justify-center text-primary shrink-0">
                                             <Mail size={13} />
                                         </div>
                                         <span className="text-[13px] font-bold text-[#4B4B4B]">{profile.user.email}</span>
@@ -198,20 +199,20 @@ export default function BrandPortalDashboard() {
                                 )}
                                 {profile.website && (
                                     <div className="flex items-center gap-3">
-                                        <div className="w-[28px] h-[28px] rounded-full bg-[#EEF8F1] flex items-center justify-center text-[#53B175] shrink-0">
+                                        <div className="w-[28px] h-[28px] rounded-full bg-primary-light flex items-center justify-center text-primary shrink-0">
                                             <Globe size={13} />
                                         </div>
                                         <a href={profile.website} target="_blank" rel="noopener noreferrer"
-                                            className="text-[13px] font-bold text-[#53B175] hover:underline truncate">
+                                            className="text-[13px] font-bold text-primary hover:underline truncate">
                                             {profile.website.replace(/^https?:\/\//, '')}
                                         </a>
                                     </div>
                                 )}
                                 <div className="flex items-center gap-3">
-                                    <div className="w-[28px] h-[28px] rounded-full bg-[#EEF8F1] flex items-center justify-center text-[#53B175] shrink-0">
+                                    <div className="w-[28px] h-[28px] rounded-full bg-primary-light flex items-center justify-center text-primary shrink-0">
                                         <Tag size={13} />
                                     </div>
-                                    <code className="text-[13px] font-bold text-[#53B175]">/{profile.slug}</code>
+                                    <code className="text-[13px] font-bold text-primary">/{profile.slug}</code>
                                 </div>
                             </div>
                         </div>
@@ -242,7 +243,7 @@ export default function BrandPortalDashboard() {
                         <Link
                             href={`/brand/${profile.slug}`}
                             target="_blank"
-                            className="mt-6 w-full py-2.5 px-4 rounded-[10px] text-[13px] font-bold flex items-center justify-center gap-2 border border-[#53B175] text-[#53B175] hover:bg-[#EEF8F1] transition-colors"
+                            className="mt-6 w-full py-2.5 px-4 rounded-[10px] text-[13px] font-bold flex items-center justify-center gap-2 border border-primary text-primary hover:bg-primary-light transition-colors"
                         >
                             <ExternalLink size={14} /> View Brand Store
                         </Link>
@@ -254,7 +255,7 @@ export default function BrandPortalDashboard() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {stats.map(stat => (
                     <Link key={stat.label} href={stat.href}
-                        className="bg-white p-5 rounded-[14px] border border-[#EEEEEE] shadow-sm flex items-center gap-4 hover:border-[#53B175]/30 hover:shadow-md transition-all group">
+                        className="bg-white p-5 rounded-[14px] border border-[#EEEEEE] shadow-sm flex items-center gap-4 hover:border-primary/30 hover:shadow-md transition-all group">
                         <div className="w-[48px] h-[48px] rounded-[12px] flex items-center justify-center shrink-0"
                             style={{ backgroundColor: stat.bg, color: stat.color }}>
                             <stat.icon size={22} strokeWidth={2.5} />
@@ -297,7 +298,7 @@ export default function BrandPortalDashboard() {
                     <div className="space-y-2">
                         {[
                             { label: 'Add New Product', sub: 'Expand your catalog', icon: Package, href: '/brand/portal/products', color: '#3B82F6', bg: '#EFF6FF' },
-                            { label: 'Run Auto-Mapping', sub: 'Find distributor matches', icon: GitMerge, href: '/brand/portal/mappings', color: '#53B175', bg: '#EEF8F1' },
+                            { label: 'Run Auto-Mapping', sub: 'Find distributor matches', icon: GitMerge, href: '/brand/portal/mappings', color: CDL.primary, bg: CDL.primaryLight },
                             { label: 'Edit Brand Profile', sub: 'Update logo, tagline, etc.', icon: Sparkles, href: '/brand/portal/settings', color: '#8B5CF6', bg: '#F3F0FF' },
                         ].map(action => (
                             <Link key={action.label} href={action.href}
@@ -307,10 +308,10 @@ export default function BrandPortalDashboard() {
                                     <action.icon size={16} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-[13px] font-bold text-[#181725] group-hover:text-[#53B175] transition-colors">{action.label}</p>
+                                    <p className="text-[13px] font-bold text-[#181725] group-hover:text-primary transition-colors">{action.label}</p>
                                     <p className="text-[11px] text-[#AEAEAE]">{action.sub}</p>
                                 </div>
-                                <ArrowRight size={14} className="text-[#AEAEAE] group-hover:text-[#53B175] transition-colors" />
+                                <ArrowRight size={14} className="text-[#AEAEAE] group-hover:text-primary transition-colors" />
                             </Link>
                         ))}
                     </div>
@@ -321,7 +322,7 @@ export default function BrandPortalDashboard() {
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-[16px] font-[900] text-[#181725]">Brand Products</h3>
                         <Link href="/brand/portal/products"
-                            className="text-[13px] font-bold text-[#53B175] hover:underline flex items-center gap-1">
+                            className="text-[13px] font-bold text-primary hover:underline flex items-center gap-1">
                             View all <ArrowRight size={13} />
                         </Link>
                     </div>
@@ -331,7 +332,7 @@ export default function BrandPortalDashboard() {
                             <Package size={32} className="text-[#EEEEEE] mb-2" />
                             <p className="text-[14px] font-bold text-[#AEAEAE]">No products yet</p>
                             <Link href="/brand/portal/products"
-                                className="mt-3 text-[13px] font-bold text-[#53B175] hover:underline">
+                                className="mt-3 text-[13px] font-bold text-primary hover:underline">
                                 Add your first product →
                             </Link>
                         </div>
@@ -352,7 +353,7 @@ export default function BrandPortalDashboard() {
                                     </div>
                                     <span className={cn(
                                         'text-[11px] font-[900] px-2 py-0.5 rounded-[6px] shrink-0',
-                                        p._count.mappings > 0 ? 'bg-[#EEF8F1] text-[#53B175]' : 'bg-[#F8F9FB] text-[#AEAEAE]'
+                                        p._count.mappings > 0 ? 'bg-primary-light text-primary' : 'bg-[#F8F9FB] text-[#AEAEAE]'
                                     )}>
                                         {p._count.mappings} {p._count.mappings === 1 ? 'distributor' : 'distributors'}
                                     </span>

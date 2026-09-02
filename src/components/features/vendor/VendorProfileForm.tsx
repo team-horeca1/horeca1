@@ -164,7 +164,7 @@ export function VendorProfileForm({
                       className={cn(
                         'px-3 py-1.5 rounded-lg text-[12px] font-bold border transition-colors',
                         selectedCategories.includes(cat)
-                          ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]'
+                          ? 'border-primary bg-primary-light text-primary'
                           : 'border-[#EEEEEE] bg-white text-gray-500 hover:border-gray-300',
                       )}>
                       {cat}
@@ -317,7 +317,7 @@ export function VendorProfileForm({
               <label className="flex items-center gap-2 h-[44px] text-[14px] font-medium cursor-pointer">
                 <input type="checkbox" checked={pickupSameAsBilling}
                   onChange={e => onPickupSameAsBillingChange(e.target.checked)}
-                  className="accent-[#299E60] w-4 h-4" />
+                  className="accent-primary w-4 h-4" />
                 Pickup address same as billing
               </label>
             </FormField>
@@ -359,7 +359,7 @@ export function VendorProfileForm({
                 {([true, false] as const).map(v => (
                   <label key={String(v)} className="flex items-center gap-2 text-[14px] font-medium cursor-pointer">
                     <input type="radio" checked={value.deliveryFleet === v}
-                      onChange={() => set({ deliveryFleet: v })} className="accent-[#299E60]" />
+                      onChange={() => set({ deliveryFleet: v })} className="accent-primary" />
                     {v ? 'Yes' : 'No'}
                   </label>
                 ))}

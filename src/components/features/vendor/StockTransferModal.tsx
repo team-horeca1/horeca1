@@ -86,7 +86,7 @@ export function StockTransferModal({ fromOutletId, fromOutletName, onClose, onSu
       <div className="bg-white rounded-[14px] w-full max-w-md shadow-xl border border-[#EEEEEE]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#EEEEEE]">
           <div className="flex items-center gap-2">
-            <ArrowRightLeft size={18} className="text-[#299E60]" />
+            <ArrowRightLeft size={18} className="text-primary" />
             <h2 className="text-[16px] font-bold text-[#181725]">Transfer stock</h2>
           </div>
           <button type="button" onClick={onClose} className="p-1 rounded-full hover:bg-gray-100">
@@ -99,7 +99,7 @@ export function StockTransferModal({ fromOutletId, fromOutletName, onClose, onSu
           </p>
           {loading ? (
             <div className="flex justify-center py-8">
-              <Loader2 className="animate-spin text-[#299E60]" size={24} />
+              <Loader2 className="animate-spin text-primary" size={24} />
             </div>
           ) : (
             <>
@@ -151,7 +151,7 @@ export function StockTransferModal({ fromOutletId, fromOutletName, onClose, onSu
             type="button"
             disabled={submitting || loading}
             onClick={() => void handleSubmit()}
-            className="h-[40px] px-4 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold disabled:opacity-50"
+            className="h-[40px] px-4 rounded-[10px] bg-primary text-white text-[13px] font-bold disabled:opacity-50"
           >
             {submitting ? 'Transferring…' : 'Transfer'}
           </button>

@@ -6,16 +6,16 @@ import { cn } from '@/lib/utils';
 
 const variantStyles = {
   primary:
-    'bg-primary text-white hover:bg-primary-dark active:bg-[#4A141F] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+    'bg-primary text-white hover:bg-primary-dark active:bg-primary-pressed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
   secondary:
     'bg-primary-light text-primary hover:bg-[#F0D4DC] active:bg-[#E8C4CE]',
   outline:
     'bg-transparent border border-primary text-primary hover:bg-primary-light/50',
   ghost: 'bg-transparent text-primary hover:bg-primary-light/40',
   danger:
-    'bg-error text-white hover:bg-red-700 active:bg-red-800',
+    'bg-error text-white hover:bg-error/90 active:bg-error',
   success:
-    'bg-success text-white hover:bg-green-700',
+    'bg-success text-white hover:bg-success/90 active:bg-success',
 } as const;
 
 const sizeStyles = {

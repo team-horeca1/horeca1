@@ -5,11 +5,13 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { dal } from '@/lib/dal';
 import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
+import { useStableSession } from '@/hooks/useStableSession';
 import type { Vendor } from '@/types';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { VendorCard } from '@/components/features/homepage/VendorCardShared';
 
 export function NearbyVendors() {
+    const { isAuthenticated } = useStableSession();
     const scrollRef = useRef<HTMLDivElement>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(true);
@@ -23,12 +25,14 @@ export function NearbyVendors() {
     const pincode = currentOutlet?.pincode ?? selectedAddress?.pincode;
 
     useEffect(() => {
+        if (!isAuthenticated) return;
         dal.vendors.list().then((res) => setVendors(res.vendors)).catch(console.error);
-    }, []);
+    }, [isAuthenticated]);
 
     // Pincode serviceability gate — fetch vendor ids that service the user's pincode.
     // If pincode is unknown, render the full list (no gate).
     useEffect(() => {
+        if (!isAuthenticated) return;
         if (!pincode || !/^\d{6}$/.test(pincode)) {
             queueMicrotask(() => setServicingIds(null));
             return;
@@ -47,7 +51,7 @@ export function NearbyVendors() {
         return () => {
             cancelled = true;
         };
-    }, [pincode]);
+    }, [isAuthenticated, pincode]);
 
     const checkScroll = () => {
         if (scrollRef.current) {
@@ -66,6 +70,8 @@ export function NearbyVendors() {
             setTimeout(checkScroll, 350);
         }
     };
+
+    if (!isAuthenticated || vendors.length === 0) return null;
 
     const filteredVendors = servicingIds ? vendors.filter((v) => servicingIds.has(v.id)) : vendors;
     const displayVendors = filteredVendors.slice(0, 10);

@@ -76,7 +76,7 @@ export function RulesTab({ salespersons, perms }: Props) {
         {canEdit && (
           <button
             onClick={() => setShowCreate(true)}
-            className="h-[40px] px-4 bg-[#299E60] hover:bg-[#238a54] text-white rounded-[10px] text-[13px] font-bold flex items-center gap-2 shadow-sm transition-colors"
+            className="h-[40px] px-4 bg-primary hover:bg-primary-dark text-white rounded-[10px] text-[13px] font-bold flex items-center gap-2 shadow-sm transition-colors"
           >
             <Plus size={15} /> Add Rule
           </button>
@@ -86,7 +86,7 @@ export function RulesTab({ salespersons, perms }: Props) {
       <div className="bg-white border border-[#EEEEEE] rounded-[12px] overflow-hidden">
         {loading ? (
           <div className="py-12 flex justify-center">
-            <Loader2 size={24} className="animate-spin text-[#299E60]" />
+            <Loader2 size={24} className="animate-spin text-primary" />
           </div>
         ) : rows.length === 0 ? (
           <div className="py-12 text-center">
@@ -123,7 +123,7 @@ export function RulesTab({ salespersons, perms }: Props) {
                   </td>
                   <td className="px-4 py-3 text-center">
                     {r.isActive ? (
-                      <span className="text-[10.5px] font-bold text-[#299E60] bg-[#ECFDF5] px-2 py-0.5 rounded-full">Active</span>
+                      <span className="text-[10.5px] font-bold text-primary bg-success-light px-2 py-0.5 rounded-full">Active</span>
                     ) : (
                       <span className="text-[10.5px] font-bold text-[#7C7C7C] bg-[#F5F5F5] px-2 py-0.5 rounded-full">Disabled</span>
                     )}
@@ -281,7 +281,7 @@ function RuleDialog({
             <select
               value={salespersonId}
               onChange={(e) => setSalespersonId(e.target.value)}
-              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all"
             >
               {salespersons.length === 0 && <option value="">No active salespersons</option>}
               {salespersons.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -292,7 +292,7 @@ function RuleDialog({
             <select
               value={scope}
               onChange={(e) => handleScopeChange(e.target.value as Scope)}
-              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all"
             >
               {(['default', 'customer', 'brand', 'category'] as Scope[]).map((s) => (
                 <option key={s} value={s}>{scopeLabel[s]}</option>
@@ -306,7 +306,7 @@ function RuleDialog({
                 value={scopeRefId}
                 onChange={(e) => setScopeRefId(e.target.value)}
                 disabled={refLoading}
-                className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+                className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all"
               >
                 <option value="">{refLoading ? 'Loading…' : `Select ${scope}…`}</option>
                 {refOptions.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
@@ -323,7 +323,7 @@ function RuleDialog({
                 type="button"
                 onClick={() => setRateType('percent')}
                 className={`flex-1 h-[40px] rounded-[10px] text-[12.5px] font-bold border-2 transition-all
-                  ${rateType === 'percent' ? 'border-[#299E60] bg-[#ECFDF5] text-[#299E60]' : 'border-[#EEEEEE] bg-white text-[#7C7C7C]'}`}
+                  ${rateType === 'percent' ? 'border-primary bg-success-light text-primary' : 'border-[#EEEEEE] bg-white text-[#7C7C7C]'}`}
               >
                 Percent of order
               </button>
@@ -331,7 +331,7 @@ function RuleDialog({
                 type="button"
                 onClick={() => setRateType('fixed')}
                 className={`flex-1 h-[40px] rounded-[10px] text-[12.5px] font-bold border-2 transition-all
-                  ${rateType === 'fixed' ? 'border-[#299E60] bg-[#ECFDF5] text-[#299E60]' : 'border-[#EEEEEE] bg-white text-[#7C7C7C]'}`}
+                  ${rateType === 'fixed' ? 'border-primary bg-success-light text-primary' : 'border-[#EEEEEE] bg-white text-[#7C7C7C]'}`}
               >
                 Fixed per order
               </button>
@@ -344,7 +344,7 @@ function RuleDialog({
               value={rateValue}
               onChange={(e) => setRateValue(e.target.value)}
               placeholder={rateType === 'percent' ? '5' : '50'}
-              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all"
             />
           </Field>
 
@@ -354,7 +354,7 @@ function RuleDialog({
               value={minOrderValue}
               onChange={(e) => setMinOrderValue(e.target.value)}
               placeholder="No minimum"
-              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+              className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all"
             />
           </Field>
 
@@ -364,7 +364,7 @@ function RuleDialog({
                 type="date"
                 value={validFrom}
                 onChange={(e) => setValidFrom(e.target.value)}
-                className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+                className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all"
               />
             </Field>
             <Field label="Valid until">
@@ -372,7 +372,7 @@ function RuleDialog({
                 type="date"
                 value={validTo}
                 onChange={(e) => setValidTo(e.target.value)}
-                className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all"
+                className="w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all"
               />
             </Field>
           </div>
@@ -394,7 +394,7 @@ function RuleDialog({
           <button
             onClick={handleSubmit}
             disabled={saving || !salespersonId || !rateValue}
-            className="h-[38px] px-5 bg-[#299E60] hover:bg-[#238a54] disabled:bg-gray-300 text-white rounded-[10px] text-[12.5px] font-bold flex items-center gap-2 transition-colors"
+            className="h-[38px] px-5 bg-primary hover:bg-primary-dark disabled:bg-gray-300 text-white rounded-[10px] text-[12.5px] font-bold flex items-center gap-2 transition-colors"
           >
             {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
             Add

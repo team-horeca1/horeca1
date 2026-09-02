@@ -86,7 +86,7 @@ export function ResetPasswordModal({ member, passwordEndpoint, accent, onClose, 
         <FormErrorBanner message={bannerError} className="mb-4" />
         {done ? (
           <div className="text-center py-4">
-            <p className="text-[14px] font-bold text-green-700 mb-1">Password updated</p>
+            <p className="text-[14px] font-bold text-success mb-1">Password updated</p>
             <p className="text-[12px] text-[#7C7C7C] mb-4">{member.user.fullName} can now log in with the new password.</p>
             <button onClick={onClose} className="px-6 py-2 text-white rounded-[10px] text-[13px] font-bold" style={{ backgroundColor: accent }}>Done</button>
           </div>
@@ -108,7 +108,7 @@ export function ResetPasswordModal({ member, passwordEndpoint, accent, onClose, 
                   onChange={setPassword}
                   placeholder="Min. 6 characters"
                   wrapperClassName="flex-1"
-                  inputClassName="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none bg-[#FAFAFA] focus:bg-white transition-colors focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10"
+                  inputClassName="w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none bg-[#FAFAFA] focus:bg-white transition-colors focus:border-primary/40 focus:ring-2 focus:ring-primary/10"
                 />
                 {showGenerate && (
                   <>
@@ -118,7 +118,7 @@ export function ResetPasswordModal({ member, passwordEndpoint, accent, onClose, 
                     </button>
                     <button type="button" onClick={handleCopy} disabled={!password} title="Copy password"
                       className="h-[44px] w-[44px] shrink-0 border border-[#EEEEEE] rounded-[10px] flex items-center justify-center hover:bg-gray-50 disabled:opacity-40">
-                      {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} className="text-[#7C7C7C]" />}
+                      {copied ? <Check size={16} className="text-success" /> : <Copy size={16} className="text-[#7C7C7C]" />}
                     </button>
                   </>
                 )}

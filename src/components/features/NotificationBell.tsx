@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Bell, Loader2, CheckCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CDL } from '@/lib/cdl';
 import { IMPERSONATION_CHANGED_EVENT } from '@/lib/clearImpersonation';
 
 interface AppNotification {
@@ -33,10 +34,10 @@ function accent(title: string | null, type: string): string {
   if (t.includes('reject') || t.includes('needs changes') || t.includes('not approved') || t.includes('failed')) {
     return 'bg-[#FFF0F0] text-[#E74C3C]';
   }
-  if (t.includes('approv')) return 'bg-[#DCFCE7] text-[#16A34A]';
-  if (t.includes('pending') || t.includes('suggest')) return 'bg-[#FEF3C7] text-[#B45309]';
-  if (t.includes('order')) return 'bg-[#EFF6FF] text-info';
-  if (t.includes('payment') || t.includes('credit')) return 'bg-[#DCFCE7] text-[#16A34A]';
+  if (t.includes('approv')) return 'bg-success-light text-success';
+  if (t.includes('pending') || t.includes('suggest')) return 'bg-warning-light text-warning';
+  if (t.includes('order')) return 'bg-info-light text-info';
+  if (t.includes('payment') || t.includes('credit')) return 'bg-success-light text-success';
   return 'bg-[#F5F5F5] text-[#7C7C7C]';
 }
 
@@ -50,7 +51,7 @@ function relativeTime(isoStr: string) {
   return new Date(isoStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
 }
 
-export function NotificationBell({ accentColor = '#6B1D2E' }: { accentColor?: string }) {
+export function NotificationBell({ accentColor = CDL.primary }: { accentColor?: string }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);

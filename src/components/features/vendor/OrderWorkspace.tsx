@@ -307,7 +307,7 @@ export default function OrderWorkspace() {
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Order # / customer / phone…"
                 data-testid="workspace-search"
-                className="h-9 w-full rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] pl-9 pr-3 text-[12px] outline-none focus:border-[#299E60]/40"
+                className="h-9 w-full rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] pl-9 pr-3 text-[12px] outline-none focus:border-primary/40"
               />
             </div>
             <div className="grid grid-cols-2 gap-1.5">
@@ -318,7 +318,7 @@ export default function OrderWorkspace() {
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
                   data-testid="workspace-date-from"
-                  className="h-9 w-full rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] px-2 text-[11px] text-[#181725] outline-none focus:border-[#299E60]/40"
+                  className="h-9 w-full rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] px-2 text-[11px] text-[#181725] outline-none focus:border-primary/40"
                 />
               </label>
               <label className="block">
@@ -328,7 +328,7 @@ export default function OrderWorkspace() {
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
                   data-testid="workspace-date-to"
-                  className="h-9 w-full rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] px-2 text-[11px] text-[#181725] outline-none focus:border-[#299E60]/40"
+                  className="h-9 w-full rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] px-2 text-[11px] text-[#181725] outline-none focus:border-primary/40"
                 />
               </label>
             </div>
@@ -337,7 +337,7 @@ export default function OrderWorkspace() {
                 value={paymentStatus}
                 onChange={(e) => setPaymentStatus(e.target.value)}
                 data-testid="workspace-payment-status"
-                className="h-9 rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] px-2 text-[11px] font-semibold text-[#181725] outline-none focus:border-[#299E60]/40"
+                className="h-9 rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] px-2 text-[11px] font-semibold text-[#181725] outline-none focus:border-primary/40"
               >
                 <option value="">Payment: all</option>
                 <option value="unpaid">Unpaid</option>
@@ -348,7 +348,7 @@ export default function OrderWorkspace() {
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
                 data-testid="workspace-payment-method"
-                className="h-9 rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] px-2 text-[11px] font-semibold text-[#181725] outline-none focus:border-[#299E60]/40"
+                className="h-9 rounded-[10px] border border-[#EEEEEE] bg-[#FAFAFA] px-2 text-[11px] font-semibold text-[#181725] outline-none focus:border-primary/40"
               >
                 <option value="">Method: all</option>
                 <option value="cod">COD / Cash</option>
@@ -371,7 +371,7 @@ export default function OrderWorkspace() {
                   className={cn(
                     'inline-flex shrink-0 items-center gap-1.5 rounded-[10px] px-2.5 py-2 text-[11px] font-bold transition-colors',
                     stage === s.key
-                      ? 'bg-[#299E60] text-white'
+                      ? 'bg-primary text-white'
                       : 'bg-[#F5F5F5] text-[#7C7C7C] hover:bg-[#EEEEEE]',
                   )}
                 >
@@ -418,7 +418,7 @@ export default function OrderWorkspace() {
                         className={cn(
                           'w-full rounded-[12px] border px-3 py-2.5 text-left transition-colors',
                           active
-                            ? 'border-[#299E60]/40 bg-[#EEF8F1]'
+                            ? 'border-primary/40 bg-primary-light'
                             : 'border-transparent bg-[#FAFAFA] hover:border-[#EEEEEE] hover:bg-white',
                         )}
                       >

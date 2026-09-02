@@ -71,27 +71,27 @@ function VendorsContent() {
             <div className="bg-white/95 backdrop-blur-md sticky top-0 z-40 border-b border-divider">
                 <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)] py-4">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3.5 min-w-0">
                             <button
                                 type="button"
                                 onClick={() => router.push('/')}
-                                className="p-2 hover:bg-primary-light rounded-xl text-text transition-colors group active:scale-95 shrink-0"
+                                className="size-10 rounded-xl bg-[#F8F7F4] hover:bg-white border border-[#ECE8E1] hover:border-primary/40 flex items-center justify-center text-text transition-all group active:scale-95 shadow-sm shrink-0"
                                 aria-label="Go back"
                             >
-                                <ChevronLeft size={20} className="text-text group-hover:-translate-x-0.5 transition-transform" />
+                                <ChevronLeft size={20} className="text-text group-hover:-translate-x-0.5 transition-transform" strokeWidth={2.4} />
                             </button>
-                            <div>
-                                <h1 className="text-xl md:text-2xl font-bold text-primary tracking-tight">
-                                    Wholesale Suppliers &amp; Distributors
+                            <div className="min-w-0">
+                                <h1 className="text-xl lg:text-2xl font-bold text-primary tracking-tight">
+                                    Suppliers
                                 </h1>
-                                <p className="text-xs md:text-sm text-text-secondary">
-                                    {isLoading ? 'Loading verified suppliers...' : `${sortedVendors.length} suppliers available for direct dispatch`}
+                                <p className="text-xs md:text-sm text-text-secondary mt-0.5">
+                                    {isLoading ? 'Loading...' : `${sortedVendors.length} suppliers`}
                                 </p>
                             </div>
                         </div>
 
                         {/* Sort selector for desktop / mobile */}
-                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 shrink-0">
                             {SORT_TABS.map((tab) => {
                                 const isActive = activeSort === tab.id;
                                 const Icon = tab.icon;
@@ -101,7 +101,7 @@ function VendorsContent() {
                                         type="button"
                                         onClick={() => handleSortChange(tab.id)}
                                         className={cn(
-                                            "flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 shrink-0",
+                                            "flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 shrink-0 cursor-pointer",
                                             isActive
                                                 ? "bg-primary text-white shadow-cdl-1"
                                                 : "bg-white border border-divider text-text-secondary hover:border-primary/40 hover:text-primary"

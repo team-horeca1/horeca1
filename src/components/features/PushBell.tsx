@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import { Bell, BellOff, Loader2 } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -26,7 +27,7 @@ export function PushBell() {
         title="Disable push notifications"
         className="relative p-2 rounded-full hover:bg-gray-50 transition-colors"
       >
-        <Bell size={20} className="text-[#299E60]" fill="#299E60" />
+        <Bell size={20} className="text-primary" fill={CDL.primary} />
       </button>
     );
   }

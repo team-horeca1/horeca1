@@ -28,7 +28,7 @@ interface Props {
 
 // Deterministic colour per vendor name so initials stay stable across renders.
 const PALETTE = [
-  'bg-emerald-100 text-emerald-700',
+  'bg-success-light text-success',
   'bg-blue-100 text-blue-700',
   'bg-orange-100 text-orange-700',
   'bg-purple-100 text-purple-700',
@@ -66,7 +66,7 @@ export default function AlternateVendorsStrip({ productId }: Props) {
   return (
     <section className="my-6 px-4 md:px-0">
       <div className="flex items-center gap-2 mb-4">
-        <Store size={18} className="text-[#53B175]" />
+        <Store size={18} className="text-primary" />
         <h2 className="text-[18px] md:text-[20px] font-extrabold text-[#181725] tracking-tight">
           Also Available From
         </h2>
@@ -103,12 +103,12 @@ export default function AlternateVendorsStrip({ productId }: Props) {
                 </div>
                 <ArrowRight
                   size={18}
-                  className="text-[#7C7C7C] group-hover:text-[#53B175] group-hover:translate-x-0.5 transition-all shrink-0"
+                  className="text-[#7C7C7C] group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0"
                 />
               </div>
 
               <div className="flex items-center justify-between text-[12px] pt-3 border-t border-gray-50">
-                <span className="font-bold text-[#53B175]">
+                <span className="font-bold text-primary">
                   {qty} in stock
                 </span>
                 <span className="font-semibold text-[#7C7C7C]">

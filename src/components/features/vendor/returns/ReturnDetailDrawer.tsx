@@ -233,7 +233,7 @@ export function ReturnDetailDrawer({ open, returnId, onClose, onUpdated }: Props
                   <p
                     className={cn(
                       'font-semibold',
-                      detail.inspection.passed ? 'text-emerald-700' : 'text-rose-600',
+                      detail.inspection.passed ? 'text-success' : 'text-rose-600',
                     )}
                   >
                     {detail.inspection.passed ? 'Passed' : 'Failed'}

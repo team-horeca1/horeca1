@@ -549,7 +549,7 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
                       key={t} type="button"
                       onClick={() => setBankAccountType(t)}
                       className={`flex-1 h-[40px] rounded-[10px] text-[12.5px] font-bold border-2 capitalize transition-all
-                        ${bankAccountType === t ? 'border-[#6B1D2E] bg-[#ECFDF5] text-[#6B1D2E]' : 'border-[#EEEEEE] bg-white text-[#7C7C7C]'}`}
+                        ${bankAccountType === t ? 'border-[#6B1D2E] bg-success-light text-[#6B1D2E]' : 'border-[#EEEEEE] bg-white text-[#7C7C7C]'}`}
                     >
                       {t}
                     </button>
@@ -671,7 +671,7 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
                   {pincodes.length === 0 ? (
                     <p className="text-[11.5px] text-[#AEAEAE] italic">No pincodes added yet</p>
                   ) : pincodes.map((p) => (
-                    <span key={p} className="inline-flex items-center gap-1.5 text-[11.5px] font-mono font-bold bg-[#ECFDF5] text-[#6B1D2E] px-2 py-1 rounded-full">
+                    <span key={p} className="inline-flex items-center gap-1.5 text-[11.5px] font-mono font-bold bg-success-light text-[#6B1D2E] px-2 py-1 rounded-full">
                       {p}
                       <button type="button" onClick={() => handleRemovePincode(p)} className="hover:text-[#181725]">
                         <X size={11} />
@@ -692,7 +692,7 @@ export function AddVendorWizard({ onClose, onCreated, createEndpoint = '/api/v1/
                       }}
                       className={`p-3 rounded-[10px] text-[12px] font-bold border-2 text-left transition-all
                         ${deliveryCapability === d
-                          ? 'border-[#6B1D2E] bg-[#ECFDF5] text-[#6B1D2E]'
+                          ? 'border-[#6B1D2E] bg-success-light text-[#6B1D2E]'
                           : fieldErrors.deliveryCapability
                             ? 'border-red-400 bg-white text-[#7C7C7C]'
                             : 'border-[#EEEEEE] bg-white text-[#7C7C7C]'}`}

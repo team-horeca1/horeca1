@@ -69,7 +69,7 @@ export function ActivityRail({
             onClick={() => setTab(id)}
             className={cn(
               'flex-1 rounded-[8px] px-2 py-1.5 text-[11px] font-bold transition-colors',
-              tab === id ? 'bg-[#299E60] text-white' : 'bg-[#F5F5F5] text-[#7C7C7C] hover:bg-[#EEEEEE]',
+              tab === id ? 'bg-primary text-white' : 'bg-[#F5F5F5] text-[#7C7C7C] hover:bg-[#EEEEEE]',
             )}
           >
             {label}
@@ -83,7 +83,7 @@ export function ActivityRail({
         ) : (
           rows.map((ev) => (
             <div key={ev.id} className="flex gap-2 border-b border-[#F5F5F5] pb-2 last:border-0">
-              <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#299E60]" />
+              <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
               <div className="min-w-0">
                 <p className="text-[12px] font-semibold text-[#181725]">
                   {WORKBENCH_EVENT_LABELS[ev.action] ?? ev.action}

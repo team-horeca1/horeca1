@@ -20,7 +20,7 @@ export default function AccountOutletsPage() {
 
   return (
     <div className="py-12 flex justify-center">
-      <Loader2 className="animate-spin text-[#299E60]" />
+      <Loader2 className="animate-spin text-primary" />
     </div>
   );
 }

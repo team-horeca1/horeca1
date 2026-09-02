@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -62,7 +63,7 @@ function fmt(n: number) { return `₹${n.toLocaleString('en-IN')}`; }
 
 const STATUS_COLOR: Record<string, string> = {
     pending: '#F59E0B', confirmed: '#3B82F6', processing: '#8B5CF6',
-    out_for_delivery: '#F97316', delivered: '#299E60', cancelled: '#EF4444', shipped: '#06B6D4',
+    out_for_delivery: '#F97316', delivered: CDL.primary, cancelled: '#EF4444', shipped: '#06B6D4',
 };
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -204,7 +205,7 @@ export default function VendorReportsPage() {
 
             {loading && !data ? (
                 <div className="flex justify-center items-center h-[40vh]">
-                    <Loader2 size={28} className="animate-spin text-[#299E60]" />
+                    <Loader2 size={28} className="animate-spin text-primary" />
                 </div>
             ) : !data ? (
                 <div className="flex justify-center items-center h-[40vh] text-[#AEAEAE] text-[13px]">
@@ -215,7 +216,7 @@ export default function VendorReportsPage() {
                     {/* ─── Summary cards ─── */}
                     <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                         {[
-                            { label: `Revenue (${PERIOD_LABELS[period]})`, value: fmt(data.totals.revenue), icon: IndianRupee, color: '#299E60' },
+                            { label: `Revenue (${PERIOD_LABELS[period]})`, value: fmt(data.totals.revenue), icon: IndianRupee, color: CDL.primary },
                             { label: 'Orders', value: String(data.totals.orders), icon: ShoppingBag, color: '#3B82F6' },
                             { label: 'Platform fees', value: fmt(data.totals.platformFees ?? 0), icon: TrendingUp, color: '#F59E0B' },
                             { label: 'Delivered', value: String(data.statusBreakdown['delivered'] ?? 0), icon: Package, color: '#10B981' },
@@ -244,8 +245,8 @@ export default function VendorReportsPage() {
                                 <AreaChart data={data.revenueByPeriod} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#299E60" stopOpacity={0.18} />
-                                            <stop offset="95%" stopColor="#299E60" stopOpacity={0} />
+                                            <stop offset="5%" stopColor={CDL.primary} stopOpacity={0.18} />
+                                            <stop offset="95%" stopColor={CDL.primary} stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F5" />
@@ -254,8 +255,8 @@ export default function VendorReportsPage() {
                                         tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
                                     <Tooltip formatter={(v) => [fmt(Number(v ?? 0)), 'Revenue']}
                                         contentStyle={{ borderRadius: 10, border: '1px solid #EEEEEE', fontSize: 12 }} />
-                                    <Area type="monotone" dataKey="revenue" stroke="#299E60" strokeWidth={2.5}
-                                        fill="url(#revGrad)" dot={{ fill: '#299E60', r: 3 }} activeDot={{ r: 5 }} />
+                                    <Area type="monotone" dataKey="revenue" stroke={CDL.primary} strokeWidth={2.5}
+                                        fill="url(#revGrad)" dot={{ fill: CDL.primary, r: 3 }} activeDot={{ r: 5 }} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         )}
@@ -295,7 +296,7 @@ export default function VendorReportsPage() {
                                         <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#AEAEAE' }} axisLine={false} tickLine={false} />
                                         <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#AEAEAE' }} axisLine={false} tickLine={false} />
                                         <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #EEEEEE', fontSize: 12 }} />
-                                        <Bar dataKey="orders" fill="#299E60" radius={[5, 5, 0, 0]} maxBarSize={36} />
+                                        <Bar dataKey="orders" fill={CDL.primary} radius={[5, 5, 0, 0]} maxBarSize={36} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             )}
@@ -344,10 +345,10 @@ export default function VendorReportsPage() {
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between mb-1">
                                                     <p className="text-[13px] font-bold text-[#181725] truncate">{p.name}</p>
-                                                    <span className="text-[13px] font-bold text-[#299E60] ml-3 shrink-0">{fmt(p.revenue)}</span>
+                                                    <span className="text-[13px] font-bold text-primary ml-3 shrink-0">{fmt(p.revenue)}</span>
                                                 </div>
                                                 <div className="h-[5px] bg-[#F5F5F5] rounded-full overflow-hidden">
-                                                    <div className="h-full bg-[#299E60] rounded-full" style={{ width: `${Math.round((p.revenue / max) * 100)}%` }} />
+                                                    <div className="h-full bg-primary rounded-full" style={{ width: `${Math.round((p.revenue / max) * 100)}%` }} />
                                                 </div>
                                                 <p className="text-[11px] text-[#AEAEAE] mt-0.5">{p.qty} units sold</p>
                                             </div>
@@ -365,7 +366,7 @@ export default function VendorReportsPage() {
                             <div className="grid grid-cols-2 gap-3 mb-5">
                                 {[
                                     { label: 'Unique Customers', value: data.customerAnalytics.totalCustomers, icon: Users, color: '#3B82F6' },
-                                    { label: 'Repeat Customers', value: data.customerAnalytics.repeatCustomers, icon: TrendingUp, color: '#299E60' },
+                                    { label: 'Repeat Customers', value: data.customerAnalytics.repeatCustomers, icon: TrendingUp, color: CDL.primary },
                                     { label: 'Avg Order Value', value: fmt(data.customerAnalytics.aov), icon: IndianRupee, color: '#8B5CF6' },
                                     { label: 'Dormant', value: data.customerAnalytics.dormantCount, icon: AlertTriangle, color: '#F59E0B' },
                                 ].map(stat => (
@@ -392,7 +393,7 @@ export default function VendorReportsPage() {
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-[12px] font-bold text-[#299E60]">{fmt(c.totalSpend)}</p>
+                                                    <p className="text-[12px] font-bold text-primary">{fmt(c.totalSpend)}</p>
                                                     <p className="text-[10px] text-[#AEAEAE]">{c.orderCount} orders</p>
                                                 </div>
                                             </div>
@@ -407,7 +408,7 @@ export default function VendorReportsPage() {
                             <h2 className="text-[15px] font-bold text-[#181725] mb-4">Inventory Health</h2>
                             <div className="grid grid-cols-2 gap-3 mb-5">
                                 {[
-                                    { label: 'Fill Rate', value: `${data.inventoryAnalytics.fillRate}%`, color: data.inventoryAnalytics.fillRate >= 90 ? '#299E60' : '#F59E0B' },
+                                    { label: 'Fill Rate', value: `${data.inventoryAnalytics.fillRate}%`, color: data.inventoryAnalytics.fillRate >= 90 ? CDL.primary : '#F59E0B' },
                                     { label: 'Total SKUs', value: String(data.inventoryAnalytics.totalSkus), color: '#181725' },
                                     { label: 'Low Stock', value: String(data.inventoryAnalytics.lowStockCount), color: '#F59E0B' },
                                     { label: 'Out of Stock', value: String(data.inventoryAnalytics.outOfStockCount), color: '#E74C3C' },
@@ -462,7 +463,7 @@ export default function VendorReportsPage() {
                                 <div className="flex items-center justify-between mb-3">
                                     <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wide">Collection Efficiency</p>
                                     <div className="w-[34px] h-[34px] rounded-[10px] flex items-center justify-center"
-                                        style={{ backgroundColor: `${data.creditAnalytics.collectionEfficiency >= 80 ? '#299E60' : '#F59E0B'}18`, color: data.creditAnalytics.collectionEfficiency >= 80 ? '#299E60' : '#F59E0B' }}>
+                                        style={{ backgroundColor: `${data.creditAnalytics.collectionEfficiency >= 80 ? CDL.primary : '#F59E0B'}18`, color: data.creditAnalytics.collectionEfficiency >= 80 ? CDL.primary : '#F59E0B' }}>
                                         <TrendingUp size={16} />
                                     </div>
                                 </div>
@@ -479,7 +480,7 @@ export default function VendorReportsPage() {
                                 <ResponsiveContainer width="100%" height={220}>
                                     <BarChart
                                         data={[
-                                            { bucket: 'Current',  amount: data.creditAnalytics.aging.current,   fill: '#299E60' },
+                                            { bucket: 'Current',  amount: data.creditAnalytics.aging.current,   fill: CDL.primary },
                                             { bucket: '1-30d',    amount: data.creditAnalytics.aging['1-30'],   fill: '#F59E0B' },
                                             { bucket: '31-60d',   amount: data.creditAnalytics.aging['31-60'],  fill: '#F97316' },
                                             { bucket: '61-90d',   amount: data.creditAnalytics.aging['61-90'],  fill: '#EF4444' },
@@ -496,7 +497,7 @@ export default function VendorReportsPage() {
                                             contentStyle={{ borderRadius: 10, border: '1px solid #EEEEEE', fontSize: 12 }}
                                         />
                                         <Bar dataKey="amount" radius={[5, 5, 0, 0]} maxBarSize={48}>
-                                            {(['#299E60', '#F59E0B', '#F97316', '#EF4444', '#991B1B'] as const).map((color, index) => (
+                                            {([CDL.primary, '#F59E0B', '#F97316', '#EF4444', '#991B1B'] as const).map((color, index) => (
                                                 <Cell key={index} fill={color} />
                                             ))}
                                         </Bar>
@@ -564,7 +565,7 @@ export default function VendorReportsPage() {
                                                     <span className="text-[#7C7C7C] ml-2 shrink-0">₹{c.revenue.toFixed(0)}</span>
                                                 </div>
                                                 <div className="h-1.5 bg-[#F0F0F0] rounded-full overflow-hidden">
-                                                    <div className="h-full bg-[#299E60] rounded-full transition-all" style={{ width: `${(c.revenue / maxRevenue) * 100}%` }} />
+                                                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(c.revenue / maxRevenue) * 100}%` }} />
                                                 </div>
                                             </div>
                                         );

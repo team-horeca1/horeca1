@@ -168,7 +168,7 @@ function getStatusBadgeClasses(status: string): string {
     switch (status) {
         case 'delivered':
         case 'confirmed':
-            return 'bg-[#EEF8F1] text-[#299E60] border-[#D1FAE5]';
+            return 'bg-primary-light text-primary border-[#D1FAE5]';
         case 'processing':
         case 'pending':
             return 'bg-[#FFF8EB] text-[#D97706] border-[#FEF3C7]';
@@ -184,7 +184,7 @@ function getStatusBadgeClasses(status: string): string {
 function getPaymentStatusBadgeClasses(status: string): string {
     switch (status) {
         case 'paid':
-            return 'bg-[#EEF8F1] text-[#299E60] border-[#D1FAE5]';
+            return 'bg-primary-light text-primary border-[#D1FAE5]';
         case 'pending':
             return 'bg-[#FFF8EB] text-[#D97706] border-[#FEF3C7]';
         case 'failed':
@@ -257,7 +257,7 @@ function OrderEventsPanel({
                             onClick={() => setTab(id)}
                             className={cn(
                                 'px-3 py-1.5 rounded-[8px] text-[12px] font-bold transition-colors',
-                                tab === id ? 'bg-[#299E60] text-white' : 'bg-[#F5F5F5] text-[#7C7C7C] hover:bg-[#EEEEEE]',
+                                tab === id ? 'bg-primary text-white' : 'bg-[#F5F5F5] text-[#7C7C7C] hover:bg-[#EEEEEE]',
                             )}
                         >
                             {label}
@@ -271,7 +271,7 @@ function OrderEventsPanel({
                 ) : (
                     rows.map((ev) => (
                         <div key={ev.id} className="flex gap-3 items-start border-b border-[#F5F5F5] last:border-0 pb-2 last:pb-0">
-                            <div className="w-2 h-2 rounded-full bg-[#299E60] mt-1.5 shrink-0" />
+                            <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
                             <div className="min-w-0 flex-1">
                                 <p className="text-[13px] font-semibold text-[#181725]">
                                     {ACTION_LABELS[ev.action] ?? ev.action}
@@ -348,7 +348,7 @@ function StatusTimeline({
             <div className="flex items-start justify-between relative">
                 <div className="absolute top-[18px] left-[18px] right-[18px] h-[2px] bg-[#EEEEEE] -z-0" />
                 <div
-                    className="absolute top-[18px] left-[18px] h-[2px] bg-[#299E60] -z-0 transition-all duration-500"
+                    className="absolute top-[18px] left-[18px] h-[2px] bg-primary -z-0 transition-all duration-500"
                     style={{ width: currentIdx > 0 ? `${(currentIdx / (STATUS_FLOW.length - 1)) * 100}%` : '0%' }}
                 />
                 {STATUS_FLOW.map((step, idx) => {
@@ -367,23 +367,23 @@ function StatusTimeline({
                         >
                             <div className={cn(
                                 'w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all',
-                                done ? 'bg-[#299E60] border-[#299E60]' :
-                                    current ? 'bg-white border-[#299E60] ring-4 ring-[#299E60]/20' :
+                                done ? 'bg-primary border-primary' :
+                                    current ? 'bg-white border-primary ring-4 ring-primary/20' :
                                         'bg-white border-[#DDDDDD]',
                                 isUpdating && 'ring-4 ring-yellow-400/30 border-yellow-400'
                             )}>
                                 {isUpdating ? (
-                                    <Loader2 size={16} className="animate-spin text-[#299E60]" />
+                                    <Loader2 size={16} className="animate-spin text-primary" />
                                 ) : done ? (
                                     <CheckCircle2 size={18} className="text-white" />
                                 ) : current ? (
-                                    <div className="w-3 h-3 rounded-full bg-[#299E60] animate-pulse" />
+                                    <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />
                                 ) : (
                                     <div className="w-3 h-3 rounded-full bg-[#DDDDDD]" />
                                 )}
                             </div>
                             <div className="text-center">
-                                <p className={cn('text-[11px] font-bold transition-colors', done || current ? 'text-[#181725]' : 'text-[#AEAEAE]', step !== status && !updatingStep && !disabled && "hover:text-[#299E60]")}>
+                                <p className={cn('text-[11px] font-bold transition-colors', done || current ? 'text-[#181725]' : 'text-[#AEAEAE]', step !== status && !updatingStep && !disabled && "hover:text-primary")}>
                                     {STATUS_LABELS[step]}
                                 </p>
                                 {ts && (done || current) && (
@@ -451,8 +451,8 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
             <div className="p-6">
 
                 {shipDirty && (
-                    <div className="mb-4 p-3 rounded-[10px] bg-[#EEF8F1] border border-[#299E60]/30 flex items-start gap-2.5">
-                        <Info size={16} className="text-[#299E60] shrink-0 mt-0.5" />
+                    <div className="mb-4 p-3 rounded-[10px] bg-primary-light border border-primary/30 flex items-start gap-2.5">
+                        <Info size={16} className="text-primary shrink-0 mt-0.5" />
                         <div className="text-[12px]">
                             <p className="font-bold text-[#181725]">Ship {shipTotal} unit(s) now</p>
                             <p className="text-[#7C7C7C]">
@@ -516,7 +516,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
                                 onClick={() => void runShip()}
                                 disabled={busy}
                                 data-testid="ship-qty-now"
-                                className="h-[48px] px-8 rounded-[12px] bg-[#299E60] text-white text-[15px] font-bold hover:bg-[#238a54] transition-all shadow-sm flex items-center gap-2 disabled:opacity-60"
+                                className="h-[48px] px-8 rounded-[12px] bg-primary text-white text-[15px] font-bold hover:bg-primary-dark transition-all shadow-sm flex items-center gap-2 disabled:opacity-60"
                             >
                                 {busy ? <Loader2 size={18} className="animate-spin" /> : <Truck size={18} />}
                                 Ship this qty now
@@ -526,7 +526,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
                             <button
                                 onClick={() => run('confirmed')}
                                 disabled={busy}
-                                className="h-[48px] px-6 rounded-[12px] border border-[#299E60] text-[#299E60] text-[14px] font-bold hover:bg-[#EEF8F1] transition-all flex items-center gap-2 disabled:opacity-60"
+                                className="h-[48px] px-6 rounded-[12px] border border-primary text-primary text-[14px] font-bold hover:bg-primary-light transition-all flex items-center gap-2 disabled:opacity-60"
                             >
                                 {busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
                                 Mark as Accepted
@@ -565,7 +565,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
                             <button
                                 onClick={() => setShowProofModal(true)}
                                 disabled={busy}
-                                className="h-[48px] px-8 rounded-[12px] bg-[#299E60] text-white text-[15px] font-bold hover:bg-[#238a54] transition-all shadow-sm flex items-center gap-2 disabled:opacity-60"
+                                className="h-[48px] px-8 rounded-[12px] bg-primary text-white text-[15px] font-bold hover:bg-primary-dark transition-all shadow-sm flex items-center gap-2 disabled:opacity-60"
                             >
                                 {busy ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
                                 Confirm Delivery
@@ -576,7 +576,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
                             <button
                                 onClick={() => setShowProofModal(true)}
                                 disabled={busy}
-                                className="h-[48px] px-8 rounded-[12px] bg-[#299E60] text-white text-[15px] font-bold hover:bg-[#238a54] flex items-center gap-2 disabled:opacity-60"
+                                className="h-[48px] px-8 rounded-[12px] bg-primary text-white text-[15px] font-bold hover:bg-primary-dark flex items-center gap-2 disabled:opacity-60"
                             >
                                 Mark Delivered
                             </button>
@@ -608,7 +608,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
                                                         className={cn(
                                                             'py-2.5 rounded-[10px] border text-[12px] font-semibold transition-colors',
                                                             proofType === t
-                                                                ? 'border-[#299E60] bg-[#EEF8F1] text-[#299E60]'
+                                                                ? 'border-primary bg-primary-light text-primary'
                                                                 : 'border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5]',
                                                         )}
                                                     >
@@ -634,7 +634,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
                                                     maxLength={proofType === 'otp' ? 4 : undefined}
                                                     inputMode={proofType === 'otp' ? 'numeric' : undefined}
                                                     placeholder={proofType === 'otp' ? '4-digit code' : 'e.g. Left at reception'}
-                                                    className="w-full h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/50 tracking-widest"
+                                                    className="w-full h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-primary/50 tracking-widest"
                                                     data-testid={proofType === 'otp' ? 'proof-otp-input' : 'proof-notes-input'}
                                                 />
                                             </div>
@@ -644,7 +644,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
                                                 <label className="block text-[11px] font-bold text-[#7C7C7C] uppercase mb-1">Photo URL (ImageKit)</label>
                                                 <input type="url" value={proofUrl} onChange={e => setProofUrl(e.target.value)}
                                                     placeholder="https://..."
-                                                    className="w-full h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/50" />
+                                                    className="w-full h-[38px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-primary/50" />
                                             </div>
                                         )}
                                     </div>
@@ -679,7 +679,7 @@ function ActionPanel({ order, shipQtys, shipDirty, totalBalance, onAction, onShi
                                                 });
                                             }}
                                             disabled={busy || (proofType === 'otp' && proofNotes.trim().length < 4)}
-                                            className="h-[38px] px-5 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] disabled:opacity-50 flex items-center gap-2"
+                                            className="h-[38px] px-5 rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2"
                                         >
                                             {busy && <Loader2 size={12} className="animate-spin" />}
                                             {proofType === 'none' ? 'Deliver without OTP' : 'Confirm'}
@@ -1039,7 +1039,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
     if (loading) {
         return (
             <div className="flex items-center justify-center h-[60vh]">
-                <Loader2 size={36} className="animate-spin text-[#299E60]" />
+                <Loader2 size={36} className="animate-spin text-primary" />
             </div>
         );
     }
@@ -1048,7 +1048,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
             <div className="flex flex-col items-center justify-center h-[60vh] gap-3">
                 <AlertCircle size={36} className="text-red-400" />
                 <p className="text-[16px] font-bold text-[#7C7C7C]">{error || 'Order not found'}</p>
-                <button onClick={() => router.back()} className="text-[14px] font-bold text-[#299E60] hover:underline">Go Back</button>
+                <button onClick={() => router.back()} className="text-[14px] font-bold text-primary hover:underline">Go Back</button>
             </div>
         );
     }
@@ -1152,8 +1152,8 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
 
             {/* Delivery proof banner */}
             {order.status === 'delivered' && (order.deliveryProofType || order.deliveredAt) && (
-                <div className="bg-[#EEF8F1] border border-[#299E60]/20 rounded-[14px] p-5 flex gap-3 print:hidden">
-                    <CheckCircle2 size={18} className="text-[#299E60] shrink-0 mt-0.5" />
+                <div className="bg-primary-light border border-primary/20 rounded-[14px] p-5 flex gap-3 print:hidden">
+                    <CheckCircle2 size={18} className="text-primary shrink-0 mt-0.5" />
                     <div className="space-y-0.5">
                         <p className="text-[13px] font-bold text-[#181725]">Delivery Confirmed</p>
                         {order.deliveredAt && (
@@ -1211,7 +1211,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                         {/* Customer Profile */}
                         <div className="bg-white rounded-[14px] border border-[#EEEEEE] p-5 shadow-sm flex flex-col justify-between">
                             <div className="flex items-start gap-3">
-                                <div className="w-9 h-9 rounded-[10px] bg-[#EEF8F1] flex items-center justify-center text-[#299E60] shrink-0 border border-[#D1FAE5]">
+                                <div className="w-9 h-9 rounded-[10px] bg-primary-light flex items-center justify-center text-primary shrink-0 border border-[#D1FAE5]">
                                     <User size={16} />
                                 </div>
                                 <div className="min-w-0">
@@ -1289,7 +1289,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                             {order.vendor && (
                                 <div className="mt-3 pt-2 border-t border-[#F3F4F6] text-[12px] text-[#4B5563]">
                                     <span className="text-[10px] uppercase font-bold text-[#9CA3AF] block mb-1">Vendor Partner:</span>
-                                    <span className="font-bold text-[#299E60] block truncate">{order.vendor.businessName}</span>
+                                    <span className="font-bold text-primary block truncate">{order.vendor.businessName}</span>
                                     {(() => {
                                         const vendorAddress = [
                                             order.vendor.addressLine,
@@ -1318,14 +1318,14 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                             className="md:hidden w-full px-5 py-4 border-b border-[#EEEEEE] bg-[#FAFAFA] flex items-center justify-between"
                         >
                             <h3 className="text-[14px] font-black text-[#111827] flex items-center gap-1.5">
-                                <Package size={16} className="text-[#299E60]" />
+                                <Package size={16} className="text-primary" />
                                 Products ({order.items.length})
                             </h3>
                             <ChevronRight size={16} className={cn('text-[#AEAEAE] transition-transform', itemsExpanded && 'rotate-90')} />
                         </button>
                         <div className="hidden md:flex px-5 py-4 border-b border-[#EEEEEE] bg-[#FAFAFA] items-center justify-between">
                             <h3 className="text-[14px] font-black text-[#111827] flex items-center gap-1.5">
-                                <Package size={16} className="text-[#299E60]" />
+                                <Package size={16} className="text-primary" />
                                 Products Sub-items List ({order.items.length})
                             </h3>
                             {canEditQty && (
@@ -1356,7 +1356,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                 <button
                                                     type="button"
                                                     onClick={() => setFulfilledQty(item.id, Math.min(item.stockAvailable ?? 0, bal), bal)}
-                                                    className="mt-1.5 text-[#299E60] font-bold"
+                                                    className="mt-1.5 text-primary font-bold"
                                                 >
                                                     Ship {Math.min(item.stockAvailable ?? 0, bal)} now
                                                 </button>
@@ -1387,7 +1387,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                         <th className="px-5 py-3 font-bold text-center">Fulfilled</th>
                                         <th className="px-5 py-3 font-bold text-center text-amber-700">Balance</th>
                                         {canEditQty && (
-                                            <th className="px-5 py-3 font-bold text-center text-[#299E60]">Ship now</th>
+                                            <th className="px-5 py-3 font-bold text-center text-primary">Ship now</th>
                                         )}
                                         <th className="px-5 py-3 font-bold text-center print:hidden">GST</th>
                                         <th className="px-5 py-3 font-bold text-right">Total Price</th>
@@ -1431,7 +1431,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => setFulfilledQty(item.id, Math.min(item.stockAvailable ?? 0, bal), bal)}
-                                                                        className="mt-1 text-[#299E60] font-bold hover:underline"
+                                                                        className="mt-1 text-primary font-bold hover:underline"
                                                                     >
                                                                         Ship {Math.min(item.stockAvailable ?? 0, bal)} now
                                                                     </button>
@@ -1453,7 +1453,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                 <td className="px-5 py-4 text-center font-extrabold text-[#111827]">
                                                     {item.quantity}
                                                 </td>
-                                                <td className="px-5 py-4 text-center font-bold text-[#299E60]">
+                                                <td className="px-5 py-4 text-center font-bold text-primary">
                                                     {item.fulfilledQty}
                                                 </td>
                                                 <td className="px-5 py-4 text-center font-extrabold text-amber-700">
@@ -1476,7 +1476,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                                         max={bal}
                                                                         value={shipQty}
                                                                         onChange={(e) => setFulfilledQty(item.id, parseInt(e.target.value) || 0, bal)}
-                                                                        className="w-12 h-7 text-center text-[13px] font-bold rounded-[6px] border border-[#299E60] text-[#299E60] bg-[#F0FBF5] outline-none"
+                                                                        className="w-12 h-7 text-center text-[13px] font-bold rounded-[6px] border border-primary text-primary bg-[#F0FBF5] outline-none"
                                                                     />
                                                                     <button
                                                                         onClick={() => setFulfilledQty(item.id, shipQty + 1, bal)}
@@ -1490,7 +1490,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                                                 </p>
                                                             </>
                                                         ) : (
-                                                            <span className="text-[11px] font-bold text-[#299E60]">Done</span>
+                                                            <span className="text-[11px] font-bold text-primary">Done</span>
                                                         )}
                                                     </td>
                                                 )}
@@ -1542,7 +1542,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                 <span className="text-[#111827] font-bold">{formatPrice(order.subtotal)}</span>
                             </div>
                             {order.promoDiscount > 0 && (
-                                <div className="flex justify-between text-[#299E60]">
+                                <div className="flex justify-between text-primary">
                                     <span>Promo Discount</span>
                                     <span className="font-bold">−{formatPrice(order.promoDiscount)}</span>
                                 </div>
@@ -1555,7 +1555,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                             )}
                             <div className="flex justify-between items-center pt-1.5 border-t border-dashed border-[#D1D5DB]">
                                 <span className="text-[14px] font-black text-[#111827]">Grand Total</span>
-                                <span className="text-[20px] font-black text-[#299E60]">{formatPrice(order.totalAmount)}</span>
+                                <span className="text-[20px] font-black text-primary">{formatPrice(order.totalAmount)}</span>
                             </div>
                             {totalBalance > 0 && (
                                 <div className="flex justify-between text-amber-700 pt-1 border-t border-dashed border-[#D1D5DB]">
@@ -1569,7 +1569,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                             <a
                                 href={`/api/v1/vendor/orders/${order.id}/invoice`}
                                 download
-                                className="w-full h-[38px] rounded-[8px] text-[12px] font-bold border border-[#299E60]/40 text-[#299E60] hover:bg-[#EEF8F1] transition-colors flex items-center justify-center gap-1.5"
+                                className="w-full h-[38px] rounded-[8px] text-[12px] font-bold border border-primary/40 text-primary hover:bg-primary-light transition-colors flex items-center justify-center gap-1.5"
                             >
                                 <FileDown size={14} />
                                 Download Invoice
@@ -1596,12 +1596,12 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                             value={ewayBill}
                                             onChange={e => setEwayBill(e.target.value)}
                                             placeholder="Enter E-Way Bill no."
-                                            className="flex-1 h-[38px] px-3 rounded-[8px] border border-[#D1D5DB] text-[13px] outline-none focus:border-[#299E60]/50"
+                                            className="flex-1 h-[38px] px-3 rounded-[8px] border border-[#D1D5DB] text-[13px] outline-none focus:border-primary/50"
                                         />
                                         <button
                                             onClick={saveEwayBill}
                                             disabled={ewaySaving || !ewayBill.trim()}
-                                            className="h-[38px] px-4 rounded-[8px] bg-[#299E60] hover:bg-[#238a54] text-white text-[13px] font-bold disabled:opacity-40 transition-colors"
+                                            className="h-[38px] px-4 rounded-[8px] bg-primary hover:bg-primary-dark text-white text-[13px] font-bold disabled:opacity-40 transition-colors"
                                         >
                                             {ewaySaving ? '...' : 'Save'}
                                         </button>

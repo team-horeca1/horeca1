@@ -1,3 +1,4 @@
+import { CDL } from '@/lib/cdl';
 // Invite-email template helper.
 // Builds the subject / text / HTML payload sent to a new team member when
 // an admin / vendor / brand owner creates their account.
@@ -84,7 +85,7 @@ export function buildInviteEmail(p: InviteEmailParams): {
       <td align="center">
         <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e3e8e5;">
           <tr>
-            <td style="padding:24px 32px;border-top:4px solid #53B175;">
+            <td style="padding:24px 32px;border-top:4px solid ${CDL.primary};">
               <h1 style="margin:0;font-size:22px;line-height:1.3;color:#1f2a24;">You're invited to ${safeBusiness}</h1>
               <p style="margin:8px 0 0;font-size:14px;color:#6b7770;">on HoReCa Hub</p>
             </td>
@@ -104,7 +105,7 @@ export function buildInviteEmail(p: InviteEmailParams): {
                 <tr>
                   <td style="padding:14px 16px;border-bottom:1px solid #e3ece6;">
                     <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:#6b7770;">Login URL</div>
-                    <div style="margin-top:4px;font-size:14px;word-break:break-all;"><a href="${safeLoginUrl}" style="color:#53B175;text-decoration:none;">${safeLoginUrl}</a></div>
+                    <div style="margin-top:4px;font-size:14px;word-break:break-all;"><a href="${safeLoginUrl}" style="color:${CDL.primary};text-decoration:none;">${safeLoginUrl}</a></div>
                   </td>
                 </tr>
                 <tr>
@@ -124,7 +125,7 @@ export function buildInviteEmail(p: InviteEmailParams): {
           </tr>
           <tr>
             <td align="center" style="padding:24px 32px 8px;">
-              <a href="${safeLoginUrl}" style="display:inline-block;background:#53B175;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px;">Sign in to HoReCa Hub</a>
+              <a href="${safeLoginUrl}" style="display:inline-block;background:${CDL.primary};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px;">Sign in to HoReCa Hub</a>
             </td>
           </tr>
           <tr>

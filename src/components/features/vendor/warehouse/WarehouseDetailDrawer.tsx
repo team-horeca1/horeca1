@@ -233,7 +233,7 @@ export function WarehouseDetailDrawer({
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {loading ? (
             <div className="flex justify-center py-16">
-              <Loader2 className="animate-spin text-[#299E60]" size={28} />
+              <Loader2 className="animate-spin text-primary" size={28} />
             </div>
           ) : (
             <>
@@ -249,7 +249,7 @@ export function WarehouseDetailDrawer({
                       })}
                     </span>
                   </p>
-                  <Link href={`/vendor/orders/${picklist.order.id}`} className="text-[#299E60] font-bold text-[12px] hover:underline">
+                  <Link href={`/vendor/orders/${picklist.order.id}`} className="text-primary font-bold text-[12px] hover:underline">
                     View order →
                   </Link>
                 </div>
@@ -260,7 +260,7 @@ export function WarehouseDetailDrawer({
                   {dispatch.driverName && <p><span className="text-[#7C7C7C]">Driver:</span> <strong>{dispatch.driverName}</strong></p>}
                   {dispatch.vehicleNumber && <p><span className="text-[#7C7C7C]">Vehicle:</span> <strong>{dispatch.vehicleNumber}</strong></p>}
                   {dispatch.order && (
-                    <Link href={`/vendor/orders/${dispatch.order.id}`} className="text-[#299E60] font-bold text-[12px] hover:underline block">
+                    <Link href={`/vendor/orders/${dispatch.order.id}`} className="text-primary font-bold text-[12px] hover:underline block">
                       Order {dispatch.order.orderNumber} →
                     </Link>
                   )}
@@ -303,7 +303,7 @@ export function WarehouseDetailDrawer({
                     onChange={(e) => setDeliveryNotes(e.target.value)}
                     rows={2}
                     placeholder="Optional proof notes for customer order"
-                    className="w-full border border-[#EEEEEE] rounded-[10px] px-3 py-2 text-[13px] resize-none outline-none focus:border-[#299E60]/40"
+                    className="w-full border border-[#EEEEEE] rounded-[10px] px-3 py-2 text-[13px] resize-none outline-none focus:border-primary/40"
                   />
                 </div>
               )}
@@ -328,7 +328,7 @@ export function WarehouseDetailDrawer({
                     type="button"
                     disabled={busy}
                     onClick={() => patchPicklist('picked')}
-                    className="h-[40px] px-4 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-50"
+                    className="h-[40px] px-4 rounded-[10px] bg-primary text-white text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-50"
                   >
                     {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                     Mark picked
@@ -369,7 +369,7 @@ export function WarehouseDetailDrawer({
                 type="button"
                 disabled={busy}
                 onClick={() => patchDispatch('delivered')}
-                className="h-[40px] px-4 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-50"
+                className="h-[40px] px-4 rounded-[10px] bg-primary text-white text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-50"
               >
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                 Mark delivered
@@ -393,7 +393,7 @@ export function WarehouseDetailDrawer({
                   type="button"
                   disabled={busy}
                   onClick={() => patchGrn('received')}
-                  className="h-[40px] px-4 rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-50"
+                  className="h-[40px] px-4 rounded-[10px] bg-primary text-white text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-50"
                 >
                   {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                   Receive stock

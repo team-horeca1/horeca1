@@ -78,7 +78,10 @@ export default function VendorLayout({
     const [adminVendorName, setAdminVendorName] = useState<string | null>(null);
     const [isApplicationPending, setIsApplicationPending] = useState(false);
     const [checkingApplication, setCheckingApplication] = useState(true);
-    const [enteredStore, setEnteredStoreState] = useState(false);
+    const [enteredStore, setEnteredStoreState] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return readEnteredStore();
+    });
 
     const sessionUser = session?.user;
     const userRole = sessionUser?.role;
@@ -112,11 +115,12 @@ export default function VendorLayout({
     const supplierPersonName = sessionUser?.name?.trim() || null;
     const onBusinessesList = pathname === '/vendor/businesses';
 
-    // Sync enter-store flag from sessionStorage (and clear when on supplier/business panels)
+    // Sync enter-store UI from sessionStorage. Do not clear sessionStorage here —
+    // supplier/business pages reset on mount; clearing here races with Enter Store
+    // (switchOnlineStore → router.refresh while still on /vendor/businesses/…).
     React.useEffect(() => {
         if (typeof window === 'undefined') return;
         if (isSupplierLevelPath(pathname)) {
-            setEnteredStore(false);
             setEnteredStoreState(false);
             return;
         }
@@ -125,7 +129,12 @@ export default function VendorLayout({
 
     const portalLevel = resolvePortalLevel(pathname, {
         isStoreScopedOnly,
-        enteredStore,
+        // Trust sessionStorage on store-ops routes immediately after Enter Store hard nav
+        enteredStore:
+            enteredStore
+            || (typeof window !== 'undefined'
+                && isStoreOpsPath(pathname)
+                && readEnteredStore()),
         allowStorePicker,
     });
     const showStoreNav = portalLevel === 'store';
@@ -182,6 +191,8 @@ export default function VendorLayout({
         // Allow businesses list + detail under supplier nav (avoid store-nav race → dashboard)
         if (pathname === '/vendor/businesses' || pathname.startsWith('/vendor/businesses/')) return;
         if (pathname === '/vendor/setup') return;
+        // Enter Store sets sessionStorage before hard nav — do not bounce to overview
+        if (isStoreOpsPath(pathname) && readEnteredStore()) return;
         const allHrefs = visibleGroups.flatMap((g) => g.links.map((l) => l.href));
         if (!allHrefs.some((h) => pathname === h || pathname.startsWith(`${h}/`))) {
             router.replace(firstAllowedRoute);
@@ -420,7 +431,7 @@ export default function VendorLayout({
             </header>
 
             {/* Hierarchy breadcrumbs + context */}
-            <div className="w-full bg-emerald-50/70 border-b border-emerald-100 px-[clamp(1rem,2.5vw,2rem)] py-2.5 flex items-center gap-3 text-[13px]">
+            <div className="w-full bg-success-light/70 border-b border-success/20 px-[clamp(1rem,2.5vw,2rem)] py-2.5 flex items-center gap-3 text-[13px]">
                 <Building2 size={14} className="text-primary shrink-0" />
                 <nav className="flex items-center gap-1.5 min-w-0 flex-wrap" aria-label="Portal level">
                     <>

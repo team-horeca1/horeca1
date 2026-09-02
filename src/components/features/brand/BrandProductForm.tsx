@@ -121,7 +121,7 @@ function ChipInput({
           {values.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#EEF8F1] text-[#299E60] text-[12px] font-bold rounded-[8px]"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-light text-primary text-[12px] font-bold rounded-[8px]"
             >
               {tag}
               <button
@@ -288,7 +288,7 @@ export default function BrandProductForm({
                 </div>
               )}
               {form.masterProductId && (
-                <div className="rounded-[10px] bg-[#EEF8F1] border border-[#53B175]/30 px-4 py-3 text-[12px] font-medium text-[#299E60]">
+                <div className="rounded-[10px] bg-primary-light border border-primary/30 px-4 py-3 text-[12px] font-medium text-primary">
                   Linked to master catalog — will be added to your brand storefront instantly.
                 </div>
               )}
@@ -315,7 +315,7 @@ export default function BrandProductForm({
                     />
                     {searchingMasters && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <Loader2 size={16} className="animate-spin text-[#53B175]" />
+                        <Loader2 size={16} className="animate-spin text-primary" />
                       </div>
                     )}
                     {showMasterSuggestions && masterSuggestions.length > 0 && (
@@ -328,7 +328,7 @@ export default function BrandProductForm({
                             key={m.id}
                             type="button"
                             onClick={() => handleSelectMasterProduct(m)}
-                            className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-[#EEF8F1] transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
+                            className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-primary-light transition-colors flex items-center justify-between gap-3 border-b border-[#F5F5F5] last:border-0"
                           >
                             <div className="min-w-0">
                               <p className="font-bold text-[#181725] truncate">{m.name}</p>
@@ -672,7 +672,7 @@ export default function BrandProductForm({
               type="button"
               onClick={onSubmit}
               disabled={saving}
-              className="flex-1 h-[48px] bg-[#299E60] text-white rounded-[12px] text-[14px] font-bold hover:bg-[#238a54] transition-all flex items-center justify-center gap-2 shadow-sm shadow-[#299E60]/20 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="flex-1 h-[48px] bg-primary text-white rounded-[12px] text-[14px] font-bold hover:bg-primary-dark transition-all flex items-center justify-center gap-2 shadow-sm shadow-primary/20 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
               {editingId ? 'Save Changes' : 'Submit Product'}

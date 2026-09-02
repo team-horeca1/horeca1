@@ -103,7 +103,7 @@ export default function BrandSettingsPage() {
     const [uploadingShowcase, setUploadingShowcase] = useState(false);
 
     if (loading) {
-        return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 animate-spin text-[#53B175]" /></div>;
+        return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
     }
 
     // ── Image upload helper ──────────────────────────────────
@@ -149,9 +149,9 @@ export default function BrandSettingsPage() {
             {profile && (
                 <div className="flex items-center gap-3 p-3 bg-[#F8F9FB] rounded-[12px] border border-[#EEEEEE]">
                     <div className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider">Brand Slug</div>
-                    <code className="text-[13px] font-bold text-[#53B175]">{profile.slug}</code>
+                    <code className="text-[13px] font-bold text-primary">{profile.slug}</code>
                     <div className={cn('ml-auto text-[11px] font-[900] px-2 py-0.5 rounded-[6px]',
-                        profile.approvalStatus === 'approved' ? 'bg-[#EEF8F1] text-[#53B175]' : 'bg-[#FFF7E6] text-amber-600')}>
+                        profile.approvalStatus === 'approved' ? 'bg-primary-light text-primary' : 'bg-[#FFF7E6] text-amber-600')}>
                         {profile.approvalStatus.toUpperCase()}
                     </div>
                 </div>
@@ -170,7 +170,7 @@ export default function BrandSettingsPage() {
                         <input type="text" value={(form as Record<string, unknown>)[f.key] as string}
                             onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                             placeholder={f.placeholder}
-                            className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-2.5 text-[14px] font-medium outline-none focus:border-[#53B175]/50 bg-[#FAFAFA] focus:bg-white transition-colors" />
+                            className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-2.5 text-[14px] font-medium outline-none focus:border-primary/50 bg-[#FAFAFA] focus:bg-white transition-colors" />
                     </div>
                 ))}
                 <div>
@@ -178,7 +178,7 @@ export default function BrandSettingsPage() {
                     <textarea value={form.description}
                         onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
                         placeholder="Tell buyers about your brand..." rows={3}
-                        className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] font-medium outline-none focus:border-[#53B175]/50 bg-[#FAFAFA] focus:bg-white transition-colors resize-none" />
+                        className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] font-medium outline-none focus:border-primary/50 bg-[#FAFAFA] focus:bg-white transition-colors resize-none" />
                 </div>
             </div>
 
@@ -193,17 +193,17 @@ export default function BrandSettingsPage() {
                     <label className="block text-[12px] font-bold text-[#7C7C7C] uppercase tracking-wider">Brand Logo <span className="font-normal normal-case text-gray-400">(square, 200×200px)</span></label>
                     <div className="flex items-center gap-4">
                         <div onClick={() => logoRef.current?.click()}
-                            className="w-[80px] h-[80px] rounded-xl border-2 border-dashed border-gray-200 hover:border-[#53B175] transition-colors cursor-pointer flex items-center justify-center overflow-hidden bg-gray-50 shrink-0">
-                            {uploadingLogo ? <Loader2 size={20} className="animate-spin text-[#53B175]" /> :
+                            className="w-[80px] h-[80px] rounded-xl border-2 border-dashed border-gray-200 hover:border-primary transition-colors cursor-pointer flex items-center justify-center overflow-hidden bg-gray-50 shrink-0">
+                            {uploadingLogo ? <Loader2 size={20} className="animate-spin text-primary" /> :
                                 form.logoUrl ? <Image src={form.logoUrl} alt="logo" width={80} height={80} className="object-cover w-full h-full" /> :
                                 <Upload size={20} className="text-gray-400" />}
                         </div>
                         <div className="flex-1 space-y-2">
                             <button type="button" onClick={() => logoRef.current?.click()}
-                                className="block text-[13px] font-bold text-[#53B175] hover:underline">Upload file</button>
+                                className="block text-[13px] font-bold text-primary hover:underline">Upload file</button>
                             <input type="url" value={form.logoUrl ?? ''} onChange={e => setForm(p => ({ ...p, logoUrl: e.target.value || null }))}
                                 placeholder="Or paste URL…"
-                                className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-[12px] focus:outline-none focus:border-[#53B175]/50 bg-[#FAFAFA]" />
+                                className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-[12px] focus:outline-none focus:border-primary/50 bg-[#FAFAFA]" />
                         </div>
                         {form.logoUrl && <button type="button" onClick={() => setForm(p => ({ ...p, logoUrl: null }))} className="text-gray-400 hover:text-red-500"><X size={16} /></button>}
                     </div>
@@ -215,9 +215,9 @@ export default function BrandSettingsPage() {
                 <div className="space-y-2">
                     <label className="block text-[12px] font-bold text-[#7C7C7C] uppercase tracking-wider">Store Banner <span className="font-normal normal-case text-gray-400">(1200×400px)</span></label>
                     <div onClick={() => bannerRef.current?.click()}
-                        className={cn('relative border-2 border-dashed border-gray-200 hover:border-[#53B175] transition-colors cursor-pointer rounded-xl overflow-hidden',
+                        className={cn('relative border-2 border-dashed border-gray-200 hover:border-primary transition-colors cursor-pointer rounded-xl overflow-hidden',
                             form.bannerUrl ? 'h-[120px]' : 'h-[80px] flex items-center justify-center bg-gray-50')}>
-                        {uploadingBanner ? <Loader2 size={20} className="animate-spin text-[#53B175]" /> :
+                        {uploadingBanner ? <Loader2 size={20} className="animate-spin text-primary" /> :
                             form.bannerUrl ? <>
                                 <Image src={form.bannerUrl} alt="banner" fill className="object-cover" sizes="700px" />
                                 <button type="button" onClick={e => { e.stopPropagation(); setForm(p => ({ ...p, bannerUrl: null })); }}
@@ -229,16 +229,16 @@ export default function BrandSettingsPage() {
                         onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerFile(f); e.target.value = ''; }} />
                     <input type="url" value={form.bannerUrl ?? ''} onChange={e => setForm(p => ({ ...p, bannerUrl: e.target.value || null }))}
                         placeholder="Or paste banner URL…"
-                        className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-[12px] focus:outline-none focus:border-[#53B175]/50 bg-[#FAFAFA]" />
+                        className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-[12px] focus:outline-none focus:border-primary/50 bg-[#FAFAFA]" />
                 </div>
 
                 {/* Card Banner Image — single image shown on the brand card */}
                 <div className="space-y-2">
                     <label className="block text-[12px] font-bold text-[#7C7C7C] uppercase tracking-wider">Card Banner Image <span className="font-normal normal-case text-gray-400">(shows on brand card top section)</span></label>
                     <div onClick={() => showcaseRef.current?.click()}
-                        className={cn('relative border-2 border-dashed border-gray-200 hover:border-[#53B175] transition-colors cursor-pointer rounded-xl overflow-hidden',
+                        className={cn('relative border-2 border-dashed border-gray-200 hover:border-primary transition-colors cursor-pointer rounded-xl overflow-hidden',
                             form.showcaseImages[0] ? 'h-[120px]' : 'h-[80px] flex items-center justify-center bg-gray-50')}>
-                        {uploadingShowcase ? <Loader2 size={20} className="animate-spin text-[#53B175]" /> :
+                        {uploadingShowcase ? <Loader2 size={20} className="animate-spin text-primary" /> :
                             form.showcaseImages[0] ? <>
                                 <Image src={form.showcaseImages[0]} alt="card banner" fill className="object-cover" sizes="700px" />
                                 <button type="button" onClick={e => { e.stopPropagation(); setForm(p => ({ ...p, showcaseImages: [] })); }}
@@ -282,7 +282,7 @@ export default function BrandSettingsPage() {
             <div className="flex items-center justify-between gap-4">
                 <p className="text-[13px] text-[#E74C3C] font-bold px-1">{error ?? ''}</p>
                 <button onClick={handleSave} disabled={saving}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-[#53B175] text-white rounded-[10px] text-[13px] font-bold disabled:opacity-60 hover:bg-[#3d9e41] transition-colors shrink-0">
+                    className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-[10px] text-[13px] font-bold disabled:opacity-60 hover:bg-primary-dark transition-colors shrink-0">
                     {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : <Save size={14} />}
                     {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Changes'}
                 </button>
@@ -291,7 +291,7 @@ export default function BrandSettingsPage() {
             {/* ── TEAM MEMBERS REDIRECT ── */}
             <div className="bg-white rounded-[20px] border border-[#EEEEEE] p-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#EEF8F1] flex items-center justify-center text-[#53B175] shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-primary shrink-0">
                         <Users size={20} />
                     </div>
                     <div>
@@ -299,7 +299,7 @@ export default function BrandSettingsPage() {
                         <p className="text-[13px] text-[#7C7C7C] mt-0.5">Invite staff, manage permissions and roles</p>
                     </div>
                 </div>
-                <Link href="/brand/portal/team" className="h-[36px] px-4 bg-[#EEF8F1] hover:bg-[#E2F4E7] text-[#53B175] rounded-[10px] text-[13px] font-bold transition-colors flex items-center justify-center shrink-0">
+                <Link href="/brand/portal/team" className="h-[36px] px-4 bg-primary-light hover:bg-[#E2F4E7] text-primary rounded-[10px] text-[13px] font-bold transition-colors flex items-center justify-center shrink-0">
                     Manage Team
                 </Link>
             </div>

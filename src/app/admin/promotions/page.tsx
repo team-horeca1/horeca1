@@ -486,7 +486,7 @@ function GrantModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
                 </div>
 
                 {selected ? (
-                    <div className="flex items-center justify-between bg-green-50 border border-green-100 rounded-xl px-3 py-2.5 mb-4">
+                    <div className="flex items-center justify-between bg-success-light border border-success/20 rounded-xl px-3 py-2.5 mb-4">
                         <div className="min-w-0">
                             <p className="text-[13px] font-bold text-[#181725] truncate">{selected.fullName || selected.businessName || '—'}</p>
                             <p className="text-[11px] text-gray-500 truncate">{selected.phone || selected.email}</p>
@@ -711,7 +711,7 @@ export default function AdminPromotionsPage() {
                                         <span title="Clubs with H1 Wallet" className={c.stacksWithWallet ? 'text-[#6B1D2E]' : 'text-gray-300'}>W</span>
                                     </td>
                                     <td className={tdCls}>
-                                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-green-50 text-[#6B1D2E]' : 'bg-gray-100 text-gray-400')}>
+                                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-success-light text-[#6B1D2E]' : 'bg-gray-100 text-gray-400')}>
                                             {c.isActive ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
@@ -758,7 +758,7 @@ export default function AdminPromotionsPage() {
                                     <td className={tdCls}>{fmtDate(c.startDate)} → {fmtDate(c.endDate)}</td>
                                     <td className={tdCls}>{c.usedCount}</td>
                                     <td className={tdCls}>
-                                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-green-50 text-[#6B1D2E]' : 'bg-gray-100 text-gray-400')}>
+                                        <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold', c.isActive ? 'bg-success-light text-[#6B1D2E]' : 'bg-gray-100 text-gray-400')}>
                                             {c.isActive ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>

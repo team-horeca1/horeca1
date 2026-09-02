@@ -151,7 +151,7 @@ export default function FinancePage() {
                             <h3 className="text-[16px] lg:text-[24px] font-bold text-[#181725] leading-none tabular-nums truncate">{stat.value}</h3>
                             <p className={cn(
                                 'mt-1.5 text-[11px] font-semibold truncate',
-                                stat.isPositive ? 'text-[#16A34A]' : 'text-[#DC2626]',
+                                stat.isPositive ? 'text-success' : 'text-[#DC2626]',
                             )}>
                                 {stat.trend}
                             </p>
@@ -352,7 +352,7 @@ export default function FinancePage() {
                                         <span className={cn(
                                             "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-[11px] font-[900] uppercase tracking-wider border capitalize",
                                             p.status === 'captured' || p.status === 'settled'
-                                                ? "bg-[#DCFCE7] text-[#16A34A] border-[#16A34A]/15"
+                                                ? "bg-success-light text-success border-[#16A34A]/15"
                                                 : p.status === 'created'
                                                 ? "bg-[#FFF7E6] text-[#F59E0B] border-[#F59E0B]/10"
                                                 : "bg-[#EFF6FF] text-[#3B82F6] border-[#3B82F6]/10"

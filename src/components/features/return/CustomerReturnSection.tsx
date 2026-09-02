@@ -264,7 +264,7 @@ export default function CustomerReturnSection({ orderId, orderStatus, items }: P
                     key={item.id}
                     className={cn(
                       'rounded-xl border p-3 transition-colors',
-                      draft.selected ? 'border-[#299e60]/40 bg-[#299e60]/5' : 'border-gray-100',
+                      draft.selected ? 'border-primary/40 bg-primary/5' : 'border-gray-100',
                     )}
                   >
                     <label className="flex items-start gap-3 cursor-pointer">
@@ -277,7 +277,7 @@ export default function CustomerReturnSection({ orderId, orderStatus, items }: P
                             [item.id]: { ...prev[item.id], selected: e.target.checked },
                           }))
                         }
-                        className="mt-1 accent-[#299e60]"
+                        className="mt-1 accent-primary"
                         data-testid={`return-item-check-${item.id}`}
                       />
                       <div className="flex-1 min-w-0">
@@ -358,7 +358,7 @@ export default function CustomerReturnSection({ orderId, orderStatus, items }: P
                                 },
                               }))
                             }
-                            className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-[#299e60]/40 bg-white"
+                            className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-primary/40 bg-white"
                             data-testid={`return-item-reason-${item.id}`}
                           >
                             {RETURN_ITEM_REASONS.map((r) => (
@@ -383,7 +383,7 @@ export default function CustomerReturnSection({ orderId, orderStatus, items }: P
               onChange={(e) => setHeaderReason(e.target.value)}
               rows={3}
               placeholder="Describe the issue (at least 10 characters)..."
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-[#299e60]/40 resize-none"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] outline-none focus:border-primary/40 resize-none"
               data-testid="return-reason-input"
             />
           </div>
@@ -393,7 +393,7 @@ export default function CustomerReturnSection({ orderId, orderStatus, items }: P
             onClick={() => void handleSubmit()}
             disabled={isSubmitting || !canSubmit}
             data-testid="submit-return-request"
-            className="w-full py-2.5 bg-[#299e60] text-white text-[13px] font-black rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-primary text-white text-[13px] font-black rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isSubmitting ? (
               <>

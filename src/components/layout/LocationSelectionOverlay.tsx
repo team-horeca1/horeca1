@@ -183,7 +183,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
 
                     {/* Search Bar */}
                     <div className="mb-4 relative">
-                        <div className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-lg w-full shadow-sm focus-within:border-[#33a852]/50 transition-colors">
+                        <div className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-lg w-full shadow-sm focus-within:border-primary/50 transition-colors">
                             <Search size={20} className="text-gray-400 shrink-0" />
                             <input
                                 type="text"
@@ -230,18 +230,18 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                     <button
                         onClick={handleUseCurrentLocation}
                         disabled={isDetectingLocation}
-                        className="w-full flex items-center gap-4 p-4 bg-[#e9f9e9] border border-[#d1f2d1] rounded-lg mb-6 active:scale-[0.98] transition-transform text-left disabled:opacity-60"
+                        className="w-full flex items-center gap-4 p-4 bg-primary-light border border-primary/20 rounded-lg mb-6 active:scale-[0.98] transition-transform text-left disabled:opacity-60"
                     >
                         <div className="w-10 h-10 shrink-0 bg-white rounded-full flex items-center justify-center shadow-sm">
                             {isDetectingLocation
-                                ? <Loader2 size={20} className="animate-spin text-[#33a852]" />
-                                : <Navigation size={20} className="text-[#33a852]" />}
+                                ? <Loader2 size={20} className="animate-spin text-primary" />
+                                : <Navigation size={20} className="text-primary" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h3 className="text-[15px] font-bold text-[#33a852]">
+                            <h3 className="text-[15px] font-bold text-primary">
                                 {isDetectingLocation ? 'Detecting location...' : 'Use current location'}
                             </h3>
-                            <p className="text-[11px] text-[#33a852]/70 font-medium truncate mt-0.5">
+                            <p className="text-[11px] text-primary/70 font-medium truncate mt-0.5">
                                 {selectedAddress?.shortAddress || 'Using GPS'}
                             </p>
                         </div>
@@ -250,7 +250,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                     {/* Saved Addresses */}
                     {isLoadingAddresses && (
                         <div className="flex items-center justify-center py-6">
-                            <Loader2 size={20} className="animate-spin text-[#33a852]" />
+                            <Loader2 size={20} className="animate-spin text-primary" />
                             <span className="text-sm text-gray-400 ml-2">Loading delivery addresses...</span>
                         </div>
                     )}
@@ -278,15 +278,15 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                                             className={cn(
                                                 'flex items-center gap-3 p-4 bg-white border rounded-xl shadow-sm cursor-pointer transition-all active:scale-[0.98]',
                                                 isSelected
-                                                    ? 'border-[#33a852] ring-1 ring-[#33a852]/20'
+                                                    ? 'border-primary ring-1 ring-primary/20'
                                                     : 'border-gray-100 hover:border-gray-200'
                                             )}
                                         >
                                             <div className={cn(
                                                 'w-10 h-10 shrink-0 rounded-xl flex items-center justify-center',
-                                                isSelected ? 'bg-[#e9f9e9]' : 'bg-gray-50'
+                                                isSelected ? 'bg-primary-light' : 'bg-gray-50'
                                             )}>
-                                                <MapPin size={20} className={isSelected ? 'text-[#33a852]' : 'text-gray-400'} />
+                                                <MapPin size={20} className={isSelected ? 'text-primary' : 'text-gray-400'} />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-[14px] font-bold text-gray-800 truncate leading-tight">
@@ -308,10 +308,10 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                                                         e.stopPropagation();
                                                         setEditingAddress(addr);
                                                     }}
-                                                    className="p-2 hover:bg-green-50 rounded-full transition-colors"
+                                                    className="p-2 hover:bg-primary-light rounded-full transition-colors"
                                                     aria-label="Edit address"
                                                 >
-                                                    <Pencil size={14} className="text-gray-300 hover:text-[#33a852]" />
+                                                    <Pencil size={14} className="text-gray-300 hover:text-primary" />
                                                 </button>
                                                 <button
                                                     onClick={async (e) => {
@@ -355,7 +355,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                             setInitialCoords({});
                             setIsAddNewOpen(true);
                         }}
-                        className="w-full bg-[#33a852] hover:bg-[#2d9548] text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                     >
                         <Store size={18} />
                         Add Delivery Address

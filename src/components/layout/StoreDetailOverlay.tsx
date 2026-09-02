@@ -96,7 +96,7 @@ export function StoreDetailOverlay({ isOpen, onClose, store }: StoreDetailOverla
                             </button>
                         </div>
                         <div className="flex items-center gap-4 mt-3">
-                            <div className="flex items-center gap-1 bg-[#33a852] text-white text-[12px] px-2 py-0.5 rounded-full font-bold">
+                            <div className="flex items-center gap-1 bg-primary text-white text-[12px] px-2 py-0.5 rounded-full font-bold">
                                 <Star size={12} fill="currentColor" />
                                 <span>{store.rating}</span>
                             </div>
@@ -128,12 +128,12 @@ export function StoreDetailOverlay({ isOpen, onClose, store }: StoreDetailOverla
                             onClick={() => setActiveCategory(cat)}
                             className={cn(
                                 "flex-shrink-0 py-3 text-sm font-bold transition-all relative",
-                                activeCategory === cat ? "text-[#33a852]" : "text-gray-400"
+                                activeCategory === cat ? "text-primary" : "text-gray-400"
                             )}
                         >
                             {cat}
                             {activeCategory === cat && (
-                                <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#33a852] rounded-full" />
+                                <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary rounded-full" />
                             )}
                         </button>
                     ))}
@@ -154,7 +154,7 @@ export function StoreDetailOverlay({ isOpen, onClose, store }: StoreDetailOverla
                                     <span className="text-[10px] text-gray-400 line-through">$ {item.originalPrice.toFixed(2)} {item.weight.split(' ')[1]}</span>
                                 </div>
                             </div>
-                            <button className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-[#33a852] font-bold text-xs hover:bg-gray-50 transition-colors shadow-sm">
+                            <button className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-primary font-bold text-xs hover:bg-gray-50 transition-colors shadow-sm">
                                 <Plus size={14} className="stroke-[3]" />
                                 <span>ADD</span>
                             </button>

@@ -146,7 +146,7 @@ export function FeaturedProducts() {
 
                             {/* Vendor */}
                             <div className="flex items-center gap-2 mb-4">
-                                <div className="p-1 bg-green-50 rounded">
+                                <div className="p-1 bg-primary-light rounded">
                                     <Store size={12} className="text-primary" />
                                 </div>
                                 <span className="text-[11px] text-text-muted font-medium italic">{product.vendor}</span>

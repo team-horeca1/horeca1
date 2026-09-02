@@ -171,12 +171,12 @@ export function PromoSavingsSummary({
       )}
       {hasDiscount && (
         <div className="flex justify-between items-center text-[14px]">
-          <span className="text-[#53B175] font-medium">Store Offer{promoLabel ? ` (${promoLabel})` : ''}</span>
-          <span className="font-bold text-[#53B175]">−₹{promoDiscount!.toFixed(2)}</span>
+          <span className="text-success font-medium">Store Offer{promoLabel ? ` (${promoLabel})` : ''}</span>
+          <span className="font-bold text-primary">−₹{promoDiscount!.toFixed(2)}</span>
         </div>
       )}
       {contractPricing && (
-        <p className="text-[11px] text-[#299E60] font-medium">Contract pricing applied for this order</p>
+        <p className="text-[11px] text-primary font-medium">Contract pricing applied for this order</p>
       )}
     </div>
   );
@@ -187,7 +187,7 @@ export function YourPriceChip({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        'text-[9px] font-black uppercase tracking-wide bg-gradient-to-r from-[#299E60] to-[#53B175] text-white px-1.5 py-0.5 rounded-full',
+        'text-[9px] font-black uppercase tracking-wide bg-gradient-to-r from-primary to-primary-dark text-white px-1.5 py-0.5 rounded-full',
         className,
       )}
     >

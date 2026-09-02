@@ -30,7 +30,7 @@ export default function DeprecatedCategoryVendorPage() {
     return (
         <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
-                <div className="w-8 h-8 border-2 border-[#53B175] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                 <p className="text-[14px] text-gray-500">Redirecting…</p>
             </div>
         </div>

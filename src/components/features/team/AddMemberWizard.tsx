@@ -1,4 +1,5 @@
 'use client';
+import { CDL } from '@/lib/cdl';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
@@ -74,7 +75,7 @@ type Scope = 'vendor' | 'account' | 'brand' | 'admin';
 export interface AddMemberWizardConfig {
   scope?: Scope;             // default 'vendor'
   accountId?: string;        // required for scope='account'
-  accent?: string;           // default '#299E60'
+  accent?: string;           // default CDL.primary
   outletsEndpoint?: string;  // overrides /api/v1/vendor/outlets
   teamEndpoint?: string;     // overrides /api/v1/vendor/team
   showStorefront?: boolean;  // vendor-only concept; default true for vendor, false otherwise
@@ -96,7 +97,7 @@ type PermissionsMap = Record<string, Record<string, boolean>>;
 const ROLE_STYLES: Record<string, { color: string; bg: string; border: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
   'Vendor Admin':      { color: '#D97706', bg: '#FFF7E6', border: '#F59E0B', Icon: Crown },
   'Vendor Manager':    { color: '#2563EB', bg: '#EFF6FF', border: '#3B82F6', Icon: Shield },
-  'Sales Rep':         { color: '#059669', bg: '#ECFDF5', border: '#10B981', Icon: Users },
+  'Sales Rep':         { color: '#059669', bg: CDL.successLight, border: '#10B981', Icon: Users },
   'Finance Executive': { color: '#7C3AED', bg: '#F3F0FF', border: '#8B5CF6', Icon: DollarSign },
   'Order Manager':     { color: '#EA580C', bg: '#FFF7ED', border: '#F97316', Icon: Package },
   'Warehouse Manager': { color: '#374151', bg: '#F3F4F6', border: '#6B7280', Icon: Archive },
@@ -534,8 +535,8 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0F0F0] shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-[#ECFDF5] rounded-[10px] flex items-center justify-center">
-              <UserPlus size={17} className="text-[#299E60]" />
+            <div className="w-9 h-9 bg-success-light rounded-[10px] flex items-center justify-center">
+              <UserPlus size={17} className="text-primary" />
             </div>
             <div>
               <h3 className="text-[16px] font-bold text-[#181725]">Add Team Member</h3>
@@ -553,19 +554,19 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
             {Array.from({ length: totalSteps }, (_, i) => i + 1).map((s, i) => (
               <React.Fragment key={s}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold transition-all ${
-                  s < step  ? 'bg-[#299E60] text-white' :
-                  s === step ? 'bg-[#299E60] text-white ring-4 ring-[#299E60]/20' :
+                  s < step  ? 'bg-primary text-white' :
+                  s === step ? 'bg-primary text-white ring-4 ring-primary/20' :
                                'bg-[#F0F0F0] text-[#AEAEAE]'
                 }`}>
                   {s < step ? <Check size={14} /> : s}
                 </div>
                 {i < totalSteps - 1 && (
                   <div className="flex-1 flex items-center gap-1 mx-2">
-                    <div className={`flex-1 h-[2px] rounded transition-colors ${s < step ? 'bg-[#299E60]' : 'bg-[#F0F0F0]'}`} />
-                    <span className={`text-[10px] font-bold whitespace-nowrap ${s < step ? 'text-[#299E60]' : 'text-[#AEAEAE]'}`}>
+                    <div className={`flex-1 h-[2px] rounded transition-colors ${s < step ? 'bg-primary' : 'bg-[#F0F0F0]'}`} />
+                    <span className={`text-[10px] font-bold whitespace-nowrap ${s < step ? 'text-primary' : 'text-[#AEAEAE]'}`}>
                       {stepLabels[s - 1]}
                     </span>
-                    <div className={`flex-1 h-[2px] rounded transition-colors ${s < step ? 'bg-[#299E60]' : 'bg-[#F0F0F0]'}`} />
+                    <div className={`flex-1 h-[2px] rounded transition-colors ${s < step ? 'bg-primary' : 'bg-[#F0F0F0]'}`} />
                   </div>
                 )}
               </React.Fragment>
@@ -645,12 +646,12 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
 
           {step < totalSteps ? (
             <button onClick={handleNext}
-              className="h-[42px] px-6 bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold hover:bg-[#238a54] flex items-center gap-2 transition-colors shadow-sm">
+              className="h-[42px] px-6 bg-primary text-white rounded-[10px] text-[13px] font-bold hover:bg-primary-dark flex items-center gap-2 transition-colors shadow-sm">
               Next <ChevronRight size={15} />
             </button>
           ) : (
             <button onClick={handleSave} disabled={submitting}
-              className="h-[42px] px-6 bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold hover:bg-[#238a54] disabled:opacity-50 flex items-center gap-2 transition-colors shadow-sm">
+              className="h-[42px] px-6 bg-primary text-white rounded-[10px] text-[13px] font-bold hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2 transition-colors shadow-sm">
               {submitting && <Loader2 size={14} className="animate-spin" />}
               {submitting ? 'Adding member…' : 'Add Member'}
             </button>
@@ -711,7 +712,7 @@ function Step1UserInfo({
           className={`w-full h-[46px] border rounded-[10px] px-4 text-[14px] outline-none focus:ring-2 bg-[#FAFAFA] focus:bg-white transition-all ${
             identifierError
               ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-              : 'border-[#EEEEEE] focus:border-[#299E60]/40 focus:ring-[#299E60]/10'
+              : 'border-[#EEEEEE] focus:border-primary/40 focus:ring-primary/10'
           }`}
         />
         {identifierError && (
@@ -731,7 +732,7 @@ function Step1UserInfo({
             value={fullName} onChange={e => setFullName(e.target.value)}
             placeholder="e.g. Rahul Sharma"
             className={`w-full h-[46px] border rounded-[10px] px-4 text-[14px] outline-none focus:ring-2 bg-[#FAFAFA] focus:bg-white transition-all ${
-              fieldErrors.fullName ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-[#EEEEEE] focus:border-[#299E60]/40 focus:ring-[#299E60]/10'
+              fieldErrors.fullName ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-[#EEEEEE] focus:border-primary/40 focus:ring-primary/10'
             }`}
           />
           {fieldErrors.fullName && <p className="text-[11px] text-red-600 mt-1.5">{fieldErrors.fullName}</p>}
@@ -746,7 +747,7 @@ function Step1UserInfo({
             inputClassName={`w-full h-[46px] border rounded-[10px] px-4 text-[14px] outline-none focus:ring-2 bg-[#FAFAFA] focus:bg-white transition-all ${
               fieldErrors.password
                 ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-                : 'border-[#EEEEEE] focus:border-[#299E60]/40 focus:ring-[#299E60]/10'
+                : 'border-[#EEEEEE] focus:border-primary/40 focus:ring-primary/10'
             }`}
           />
           {fieldErrors.password && <p className="text-[11px] text-red-600 mt-1.5">{fieldErrors.password}</p>}
@@ -789,7 +790,7 @@ function StoreRow({
         muted ? 'bg-[#FAFAFA]/80 hover:bg-[#F5F5F5]' : 'hover:bg-[#FAFAFA]'
       }`}
     >
-      <Checkbox checked={checked} accent="#299E60" />
+      <Checkbox checked={checked} accent={CDL.primary} />
       <div className="min-w-0 flex-1">
         <p className={`text-[13px] font-bold truncate ${muted ? 'text-[#4B5563]' : 'text-[#181725]'}`}>
           {outlet.name}
@@ -861,7 +862,7 @@ export function Step2Outlets({
         </p>
         {outletsLoading ? (
           <div className="flex-1 flex items-center justify-center border border-[#EEEEEE] rounded-[12px]">
-            <Loader2 size={20} className="animate-spin text-[#299E60]" />
+            <Loader2 size={20} className="animate-spin text-primary" />
           </div>
         ) : isSupplier && businesses.length > 0 ? (
           <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5">
@@ -874,12 +875,12 @@ export function Step2Outlets({
                   onClick={() => onToggleBusiness?.(biz.id)}
                   className={`w-full text-left rounded-[10px] px-3 py-2.5 flex items-center gap-2.5 border transition-colors ${
                     selected
-                      ? 'border-[#299E60] bg-[#F0FBF5]'
-                      : 'border-[#EEEEEE] bg-white hover:border-[#299E60]/40 hover:bg-[#FAFAFA]'
+                      ? 'border-primary bg-[#F0FBF5]'
+                      : 'border-[#EEEEEE] bg-white hover:border-primary/40 hover:bg-[#FAFAFA]'
                   }`}
                 >
                   <div className={`w-7 h-7 rounded-[8px] flex items-center justify-center shrink-0 ${
-                    selected ? 'bg-[#299E60]' : 'bg-[#F3F4F6]'
+                    selected ? 'bg-primary' : 'bg-[#F3F4F6]'
                   }`}>
                     <Building2 size={13} className={selected ? 'text-white' : 'text-[#7C7C7C]'} />
                   </div>
@@ -890,21 +891,21 @@ export function Step2Outlets({
                       {biz.isPrimary ? ' · Primary' : ''}
                     </p>
                   </div>
-                  <Checkbox checked={selected} accent="#299E60" />
+                  <Checkbox checked={selected} accent={CDL.primary} />
                 </button>
               );
             })}
           </div>
         ) : (
-          <div className="border border-[#299E60] bg-[#F0FBF5] rounded-[10px] px-3 py-2.5 flex items-center gap-2.5">
-            <div className="w-7 h-7 bg-[#299E60] rounded-[8px] flex items-center justify-center shrink-0">
+          <div className="border border-primary bg-[#F0FBF5] rounded-[10px] px-3 py-2.5 flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-primary rounded-[8px] flex items-center justify-center shrink-0">
               <Building2 size={13} className="text-white" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-bold text-[#181725] truncate">{baName || 'Vendor Account'}</p>
               <p className="text-[10px] text-[#AEAEAE] mt-0.5">Primary</p>
             </div>
-            <Checkbox checked accent="#299E60" />
+            <Checkbox checked accent={CDL.primary} />
           </div>
         )}
         {isSupplier && (
@@ -922,11 +923,11 @@ export function Step2Outlets({
             {flatStores.length > 0 ? ` (${flatStores.length})` : ''}
           </p>
           {allOutlets ? (
-            <span className="text-[10px] font-bold text-[#299E60] bg-[#ECFDF5] px-2 py-0.5 rounded-full shrink-0">
+            <span className="text-[10px] font-bold text-primary bg-success-light px-2 py-0.5 rounded-full shrink-0">
               All included
             </span>
           ) : visibleSelectedCount > 0 ? (
-            <span className="text-[10px] font-bold text-[#299E60] bg-[#ECFDF5] px-2 py-0.5 rounded-full shrink-0">
+            <span className="text-[10px] font-bold text-primary bg-success-light px-2 py-0.5 rounded-full shrink-0">
               {visibleSelectedCount} selected
             </span>
           ) : null}
@@ -934,7 +935,7 @@ export function Step2Outlets({
 
         {outletsLoading ? (
           <div className="flex-1 flex items-center justify-center border border-[#EEEEEE] rounded-[12px]">
-            <Loader2 size={22} className="animate-spin text-[#299E60]" />
+            <Loader2 size={22} className="animate-spin text-primary" />
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto border border-[#EEEEEE] rounded-[12px]">
@@ -945,12 +946,12 @@ export function Step2Outlets({
                 allOutlets ? 'bg-[#F0FBF5]' : 'hover:bg-[#FAFAFA]'
               }`}
             >
-              <Checkbox checked={allOutlets} accent="#299E60" />
+              <Checkbox checked={allOutlets} accent={CDL.primary} />
               <div className="min-w-0">
                 <p className="text-[13px] font-bold text-[#181725]">{allLabel}</p>
                 <p className="text-[11px] text-[#7C7C7C] leading-snug">{allHint}</p>
                 {allOutlets && (
-                  <p className="text-[10px] text-[#299E60] font-medium mt-1">
+                  <p className="text-[10px] text-primary font-medium mt-1">
                     Click a store below to limit access
                   </p>
                 )}
@@ -1064,7 +1065,7 @@ function Step3Role({
           <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider">
             Permissions
           </p>
-          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${totalSelected > 0 ? 'bg-[#ECFDF5] text-[#299E60]' : 'bg-[#F5F5F5] text-[#AEAEAE]'}`}>
+          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${totalSelected > 0 ? 'bg-success-light text-primary' : 'bg-[#F5F5F5] text-[#AEAEAE]'}`}>
             {totalSelected} selected
           </span>
         </div>
@@ -1072,7 +1073,7 @@ function Step3Role({
           scope={matrixScope}
           permissions={permissions}
           onChange={onPermissionsChange}
-          accent="#299E60"
+          accent={CDL.primary}
         />
         <p className="text-[10px] text-[#AEAEAE] mt-1.5">
           Click any checkbox to add or remove a permission. Templates above auto-fill this matrix.

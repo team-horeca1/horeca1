@@ -308,7 +308,7 @@ export default function BrandProductsPage() {
                     </button>
                     <button
                         onClick={openAdd}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-[#53B175] text-white rounded-[10px] text-[13px] font-bold hover:bg-[#3d9e41] transition-colors"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-[10px] text-[13px] font-bold hover:bg-primary-dark transition-colors"
                     >
                         <Plus size={16} /> Add Product
                     </button>
@@ -324,14 +324,14 @@ export default function BrandProductsPage() {
             <div className="bg-white rounded-[20px] border border-[#EEEEEE] shadow-sm overflow-hidden">
                 {loading ? (
                     <div className="flex items-center justify-center py-16">
-                        <Loader2 className="w-8 h-8 animate-spin text-[#53B175]" />
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
                 ) : products.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
                         <Package size={40} className="text-[#EEEEEE] mb-3" />
                         <p className="text-[16px] font-bold text-[#AEAEAE]">No products yet</p>
                         <p className="text-[13px] text-[#AEAEAE] mt-1 mb-5">Add your first brand product to get started</p>
-                        <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2.5 bg-[#53B175] text-white rounded-[10px] text-[13px] font-bold">
+                        <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-[10px] text-[13px] font-bold">
                             <Plus size={14} /> Add Product
                         </button>
                     </div>
@@ -378,7 +378,7 @@ export default function BrandProductsPage() {
                                                     'text-[11px] font-[900] px-2.5 py-1 rounded-[6px]',
                                                     status === 'pending' && 'bg-[#FFF8E6] text-[#B45309]',
                                                     status === 'rejected' && 'bg-[#FEF2F2] text-[#E74C3C]',
-                                                    status === 'approved' && 'bg-[#EEF8F1] text-[#53B175]',
+                                                    status === 'approved' && 'bg-primary-light text-primary',
                                                 )}
                                                 title={status === 'rejected' && product.approvalNote ? product.approvalNote : undefined}
                                             >
@@ -395,7 +395,7 @@ export default function BrandProductsPage() {
                                             ) : (
                                                 <span className={cn(
                                                     'text-[12px] font-[900] px-2.5 py-1 rounded-[6px]',
-                                                    product._count.mappings > 0 ? 'bg-[#EEF8F1] text-[#53B175]' : 'bg-[#F8F9FB] text-[#AEAEAE]'
+                                                    product._count.mappings > 0 ? 'bg-primary-light text-primary' : 'bg-[#F8F9FB] text-[#AEAEAE]'
                                                 )}>
                                                     {product._count.mappings} matched
                                                 </span>

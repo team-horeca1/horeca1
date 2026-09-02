@@ -21,7 +21,7 @@ const STATUS_STYLE: Record<string, string> = {
     pending:  'bg-amber-50 text-amber-700',
     new: 'bg-amber-50 text-amber-700',
     under_review: 'bg-amber-50 text-amber-700',
-    approved: 'bg-green-50 text-green-700',
+    approved: 'bg-success-light text-success',
     rejected: 'bg-red-50 text-red-700',
     refund_processing: 'bg-blue-50 text-blue-700',
     refunded: 'bg-blue-50 text-blue-700',

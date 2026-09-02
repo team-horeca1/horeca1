@@ -653,7 +653,7 @@ export default function VendorStorePage() {
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div className="p-6 bg-gray-50/50 rounded-[24px] border border-gray-100 text-center">
-                                    <div className="bg-white p-3 rounded-2xl w-fit mx-auto mb-4 shadow-sm text-emerald-600">
+                                    <div className="bg-white p-3 rounded-2xl w-fit mx-auto mb-4 shadow-sm text-success">
                                         <CheckCircle size={24} strokeWidth={2.5} />
                                     </div>
                                     <h4 className="font-black text-[14px] text-gray-800 uppercase tracking-tight">Verified</h4>

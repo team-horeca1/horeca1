@@ -305,7 +305,7 @@ export function OrderWorkbenchPanel({
         <button
           type="button"
           onClick={() => void fetchOrder()}
-          className="text-[13px] font-bold text-[#299E60] hover:underline"
+          className="text-[13px] font-bold text-primary hover:underline"
         >
           Retry
         </button>
@@ -338,7 +338,7 @@ export function OrderWorkbenchPanel({
                   ? 'border-red-200 bg-red-50 text-red-600'
                   : order.status === 'pending'
                     ? 'border-amber-200 bg-amber-50 text-amber-700'
-                    : 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                    : 'border-success/30 bg-success-light text-success',
               )}
               data-testid="workbench-status"
             >
@@ -382,7 +382,7 @@ export function OrderWorkbenchPanel({
               disabled={busy}
               data-testid="workbench-next-status"
               onClick={() => void advanceStatus(next.status)}
-              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#299E60] px-4 text-[13px] font-bold text-white hover:bg-[#248a54] disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-primary px-4 text-[13px] font-bold text-white hover:bg-[#248a54] disabled:opacity-50"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               {next.label}
@@ -394,7 +394,7 @@ export function OrderWorkbenchPanel({
               disabled={busy}
               data-testid="workbench-next-status"
               onClick={() => setShowDeliverProof(true)}
-              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#299E60] px-4 text-[13px] font-bold text-white hover:bg-[#248a54] disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-primary px-4 text-[13px] font-bold text-white hover:bg-[#248a54] disabled:opacity-50"
             >
               <CheckCircle2 className="h-4 w-4" />
               {next.label}
@@ -433,7 +433,7 @@ export function OrderWorkbenchPanel({
             maxLength={4}
             inputMode="numeric"
             data-testid="workbench-deliver-otp"
-            className="w-full h-10 px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] tracking-widest outline-none focus:border-[#299E60]/50"
+            className="w-full h-10 px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] tracking-widest outline-none focus:border-primary/50"
           />
           <div className="flex flex-wrap gap-2">
             <button
@@ -441,7 +441,7 @@ export function OrderWorkbenchPanel({
               disabled={busy || deliverOtp.trim().length < 4}
               data-testid="workbench-deliver-with-otp"
               onClick={() => void confirmDeliveredWithOtp()}
-              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-[#299E60] px-4 text-[12px] font-bold text-[#299E60] hover:bg-[#EEF8F1] disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-primary px-4 text-[12px] font-bold text-primary hover:bg-primary-light disabled:opacity-50"
             >
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
               Confirm with OTP
@@ -451,7 +451,7 @@ export function OrderWorkbenchPanel({
               disabled={busy}
               data-testid="workbench-deliver-without-otp"
               onClick={() => void confirmDeliveredWithoutOtp()}
-              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-[#299E60] px-4 text-[12px] font-bold text-white hover:bg-[#248a54] disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-primary px-4 text-[12px] font-bold text-white hover:bg-[#248a54] disabled:opacity-50"
             >
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
               Deliver without OTP
@@ -493,13 +493,13 @@ export function OrderWorkbenchPanel({
           <p className="mt-1 text-[14px] font-bold text-[#181725]">{customerName}</p>
           <div className="mt-2 flex flex-wrap gap-3 text-[12px]">
             {order.user.phone && (
-              <a href={`tel:${order.user.phone}`} className="inline-flex items-center gap-1 font-semibold text-[#299E60] hover:underline">
+              <a href={`tel:${order.user.phone}`} className="inline-flex items-center gap-1 font-semibold text-primary hover:underline">
                 <Phone className="h-3.5 w-3.5" />
                 {order.user.phone}
               </a>
             )}
             {order.user.email && (
-              <a href={`mailto:${order.user.email}`} className="inline-flex items-center gap-1 font-semibold text-[#299E60] hover:underline">
+              <a href={`mailto:${order.user.email}`} className="inline-flex items-center gap-1 font-semibold text-primary hover:underline">
                 <Mail className="h-3.5 w-3.5" />
                 Email
               </a>
@@ -541,7 +541,7 @@ export function OrderWorkbenchPanel({
               disabled={busy}
               data-testid="workbench-ship-qty"
               onClick={() => void shipSelected()}
-              className="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-[#299E60] px-3 text-[12px] font-bold text-white disabled:opacity-50 shrink-0"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary px-3 text-[12px] font-bold text-white disabled:opacity-50 shrink-0"
             >
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
               Ship fulfillment qty
@@ -563,7 +563,7 @@ export function OrderWorkbenchPanel({
                       <span
                         className={cn(
                           'rounded-full px-2 py-0.5 text-[10px] font-bold',
-                          lineStatus === 'FULFILLED' && 'bg-green-50 text-green-700',
+                          lineStatus === 'FULFILLED' && 'bg-success-light text-success',
                           lineStatus === 'PARTIALLY_FULFILLED' && 'bg-amber-50 text-amber-800',
                           lineStatus === 'CANCELLED' && 'bg-red-50 text-red-600',
                           lineStatus === 'OPEN' && 'bg-gray-50 text-gray-600',
@@ -732,7 +732,7 @@ export function OrderWorkbenchPanel({
             <button
               type="button"
               onClick={() => setActivityTab((v) => !v)}
-              className="text-[12px] font-bold text-[#299E60] hover:underline"
+              className="text-[12px] font-bold text-primary hover:underline"
             >
               {activityTab ? 'Show less' : 'Activity Log'}
             </button>
@@ -743,7 +743,7 @@ export function OrderWorkbenchPanel({
             ) : (
               shownEvents.map((ev) => (
                 <div key={ev.id} className="flex gap-2 border-b border-[#F5F5F5] pb-2 last:border-0">
-                  <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#299E60]" />
+                  <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                   <div className="min-w-0">
                     <p className="text-[12px] font-semibold text-[#181725]">
                       {WORKBENCH_EVENT_LABELS[ev.action] ?? ev.action}

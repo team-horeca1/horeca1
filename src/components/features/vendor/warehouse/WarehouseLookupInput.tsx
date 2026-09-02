@@ -86,7 +86,7 @@ export function WarehouseLookupInput({ type, value, onChange, placeholder, disab
           onFocus={() => setOpen(true)}
           placeholder={placeholder ?? (type === 'orders' ? 'Search order number…' : 'Search product name or SKU…')}
           disabled={disabled}
-          className="w-full h-[40px] pl-9 pr-9 border border-[#EEEEEE] rounded-[10px] text-[13px] outline-none focus:border-[#299E60]/40 disabled:opacity-50"
+          className="w-full h-[40px] pl-9 pr-9 border border-[#EEEEEE] rounded-[10px] text-[13px] outline-none focus:border-primary/40 disabled:opacity-50"
         />
         {value && (
           <button
@@ -105,7 +105,7 @@ export function WarehouseLookupInput({ type, value, onChange, placeholder, disab
         <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-[#EEEEEE] rounded-[10px] shadow-lg max-h-[240px] overflow-y-auto">
           {loading ? (
             <div className="flex justify-center py-4">
-              <Loader2 size={18} className="animate-spin text-[#299E60]" />
+              <Loader2 size={18} className="animate-spin text-primary" />
             </div>
           ) : results.length === 0 ? (
             <p className="px-3 py-3 text-[12px] text-[#AEAEAE]">

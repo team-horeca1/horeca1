@@ -40,7 +40,7 @@ export function AccountTypeSelection({ isOpen, onClose, onContinue }: AccountTyp
                         className={cn(
                             "w-full flex items-center gap-5 p-4 rounded-lg border transition-all duration-300 text-left",
                             selectedType === 'customer'
-                                ? "bg-[#33a852] border-[#33a852] text-white"
+                                ? "bg-primary border-primary text-white"
                                 : "bg-white border-gray-100 text-gray-500 hover:border-gray-200 hover:bg-gray-50 active:bg-gray-100"
                         )}
                     >
@@ -63,7 +63,7 @@ export function AccountTypeSelection({ isOpen, onClose, onContinue }: AccountTyp
                         className={cn(
                             "w-full flex items-center gap-5 p-4 rounded-lg border transition-all duration-300 text-left",
                             selectedType === 'vendor'
-                                ? "bg-[#33a852] border-[#33a852] text-white"
+                                ? "bg-primary border-primary text-white"
                                 : "bg-white border-gray-100 text-gray-500 hover:border-gray-200 hover:bg-gray-50 active:bg-gray-100"
                         )}
                     >
@@ -94,7 +94,7 @@ export function AccountTypeSelection({ isOpen, onClose, onContinue }: AccountTyp
                     className={cn(
                         "w-full font-bold py-4 rounded-lg active:scale-[0.98] transition-all text-[18px]",
                         selectedType
-                            ? "bg-[#33a852] text-white shadow-lg shadow-green-100 hover:bg-[#2d9448]"
+                            ? "bg-primary text-white shadow-lg shadow-green-100 hover:bg-primary-dark"
                             : "bg-gray-100 text-gray-400 cursor-not-allowed"
                     )}
                 >

@@ -111,7 +111,7 @@ export default function PayoutClaimClient({ token }: { token: string }) {
       <div className="rounded-2xl bg-white p-[clamp(1rem,3vw,1.5rem)] shadow-sm ring-1 ring-gray-100">
         {view === 'loading' && (
           <div className="flex flex-col items-center gap-3 py-10 text-[#7C7C7C]">
-            <Loader2 className="h-8 w-8 animate-spin text-[#53B175]" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p>Loading payout…</p>
           </div>
         )}
@@ -126,7 +126,7 @@ export default function PayoutClaimClient({ token }: { token: string }) {
 
         {view === 'done' && (
           <div className="flex flex-col items-center gap-4 py-6 text-center">
-            <CheckCircle2 className="h-10 w-10 text-[#53B175]" />
+            <CheckCircle2 className="h-10 w-10 text-primary" />
             <h1 className="text-[clamp(1.25rem,3vw,1.75rem)] font-semibold text-[#181725]">Claim received</h1>
             <p className="text-[#7C7C7C]">
               We will transfer ₹{preview ? preview.amount.toLocaleString('en-IN') : ''} to your UPI ID after confirmation.
@@ -162,7 +162,7 @@ export default function PayoutClaimClient({ token }: { token: string }) {
                 maxLength={255}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-[#53B175]"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-primary"
                 autoComplete="given-name"
               />
             </label>
@@ -173,7 +173,7 @@ export default function PayoutClaimClient({ token }: { token: string }) {
                 maxLength={255}
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
-                className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-[#53B175]"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-primary"
                 autoComplete="organization"
               />
             </label>
@@ -185,7 +185,7 @@ export default function PayoutClaimClient({ token }: { token: string }) {
                 value={upiId}
                 onChange={(e) => setUpiId(e.target.value)}
                 placeholder="name@upi"
-                className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-[#53B175]"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-3 outline-none focus:border-primary"
                 autoComplete="off"
                 inputMode="email"
               />
@@ -194,7 +194,7 @@ export default function PayoutClaimClient({ token }: { token: string }) {
             <button
               type="submit"
               disabled={submitting}
-              className="flex w-full items-center justify-center rounded-2xl bg-[#53B175] px-6 py-3 font-medium text-white disabled:opacity-60"
+              className="flex w-full items-center justify-center rounded-2xl bg-primary px-6 py-3 font-medium text-white disabled:opacity-60"
             >
               {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Submit'}
             </button>

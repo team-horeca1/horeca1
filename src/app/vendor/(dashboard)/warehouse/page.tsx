@@ -307,7 +307,7 @@ function WarehousePageInner() {
                 type="button"
                 onClick={() => createPicklist(false)}
                 disabled={submitting || !selectedOrder}
-                className="h-[40px] px-4 bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold disabled:opacity-50"
+                className="h-[40px] px-4 bg-primary text-white rounded-[10px] text-[13px] font-bold disabled:opacity-50"
               >
                 {submitting ? 'Creating…' : 'Create picklist'}
               </button>
@@ -315,7 +315,7 @@ function WarehousePageInner() {
                 type="button"
                 onClick={() => createPicklist(true)}
                 disabled={submitting || !selectedOrder}
-                className="h-[40px] px-4 border border-[#299E60] text-[#299E60] rounded-[10px] text-[13px] font-bold disabled:opacity-50"
+                className="h-[40px] px-4 border border-primary text-primary rounded-[10px] text-[13px] font-bold disabled:opacity-50"
               >
                 Create &amp; print
               </button>
@@ -326,7 +326,7 @@ function WarehousePageInner() {
         {tab === 'dispatches' && (
           <div className="space-y-3">
             {picklistIdForDispatch && (
-              <p className="text-[12px] text-[#299E60] font-semibold bg-[#EEF8F1] border border-[#D1FAE5] rounded-[8px] px-3 py-2">
+              <p className="text-[12px] text-primary font-semibold bg-primary-light border border-[#D1FAE5] rounded-[8px] px-3 py-2">
                 Linked to picklist {picklistIdForDispatch.slice(0, 8)}… — mark picklist as picked first if dispatch fails.
               </p>
             )}
@@ -354,7 +354,7 @@ function WarehousePageInner() {
               type="button"
               onClick={createDispatch}
               disabled={submitting || (!dispatchOrder && !picklistIdForDispatch)}
-              className="h-[40px] px-4 bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold disabled:opacity-50"
+              className="h-[40px] px-4 bg-primary text-white rounded-[10px] text-[13px] font-bold disabled:opacity-50"
             >
               {submitting ? 'Creating…' : 'Create dispatch'}
             </button>
@@ -391,7 +391,7 @@ function WarehousePageInner() {
               type="button"
               onClick={createGrn}
               disabled={submitting || grnLines.length === 0}
-              className="h-[40px] px-4 bg-[#299E60] text-white rounded-[10px] text-[13px] font-bold disabled:opacity-50"
+              className="h-[40px] px-4 bg-primary text-white rounded-[10px] text-[13px] font-bold disabled:opacity-50"
             >
               {submitting ? 'Saving…' : 'Save GRN'}
             </button>
@@ -402,7 +402,7 @@ function WarehousePageInner() {
       <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-16">
-            <Loader2 className="animate-spin text-[#299E60]" />
+            <Loader2 className="animate-spin text-primary" />
           </div>
         ) : rows.length === 0 ? (
           <div className="py-12 px-5 text-center space-y-4">
@@ -425,7 +425,7 @@ function WarehousePageInner() {
                 </div>
               </div>
             )}
-            <Link href="/vendor/orders" className="text-[#299E60] font-bold text-[13px]">
+            <Link href="/vendor/orders" className="text-primary font-bold text-[13px]">
               View orders →
             </Link>
           </div>
@@ -478,7 +478,7 @@ function WarehousePageInner() {
                         {r.vehicleNumber && <span className="ml-1">· {r.vehicleNumber}</span>}
                         {r.itemCount != null && !r.driverName && <span>{r.itemCount} items</span>}
                         {r.canDispatch && (
-                          <span className="ml-2 text-[10px] font-bold text-[#299E60]">Ready to dispatch</span>
+                          <span className="ml-2 text-[10px] font-bold text-primary">Ready to dispatch</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-[#AEAEAE]">
@@ -513,7 +513,7 @@ export default function VendorWarehousePage() {
     <Suspense
       fallback={
         <div className="flex justify-center py-16">
-          <Loader2 className="animate-spin text-[#299E60]" />
+          <Loader2 className="animate-spin text-primary" />
         </div>
       }
     >

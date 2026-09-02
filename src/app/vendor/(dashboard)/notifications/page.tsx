@@ -221,7 +221,7 @@ export default function VendorNotificationsPage() {
                 <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
                     {loading ? (
                         <div className="flex items-center justify-center py-20">
-                            <Loader2 className="animate-spin text-[#299E60]" size={28} />
+                            <Loader2 className="animate-spin text-primary" size={28} />
                         </div>
                     ) : notifications.length === 0 ? (
                         <div className="py-16 text-center">
@@ -263,7 +263,7 @@ export default function VendorNotificationsPage() {
                                             <p className="text-[12px] text-[#AEAEAE] mt-0.5 line-clamp-2">{n.body}</p>
                                         )}
                                         {href && (
-                                            <p className="text-[11px] font-bold text-[#299E60] mt-1">Open product</p>
+                                            <p className="text-[11px] font-bold text-primary mt-1">Open product</p>
                                         )}
                                         {n.status === 'failed' && (
                                             <div className="flex items-center gap-1 mt-1">
@@ -284,7 +284,7 @@ export default function VendorNotificationsPage() {
                 <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
                     {prefsLoading ? (
                         <div className="flex items-center justify-center py-20">
-                            <Loader2 className="animate-spin text-[#299E60]" size={28} />
+                            <Loader2 className="animate-spin text-primary" size={28} />
                         </div>
                     ) : (
                         <>

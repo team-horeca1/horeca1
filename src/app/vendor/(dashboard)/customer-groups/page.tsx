@@ -68,13 +68,13 @@ function MemberPicker({ customers, loadingCustomers, selected, onChange }: Membe
             return (
               <span
                 key={userId}
-                className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-[#EEF8F1] text-[#299E60] text-[12px] font-semibold"
+                className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full bg-primary-light text-primary text-[12px] font-semibold"
               >
                 {cust?.label ?? userId}
                 <button
                   type="button"
                   onClick={() => remove(userId)}
-                  className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-[#299E60]/15 transition-colors"
+                  className="w-4 h-4 flex items-center justify-center rounded-full hover:bg-primary/15 transition-colors"
                   title="Remove"
                 >
                   <X size={11} />
@@ -93,7 +93,7 @@ function MemberPicker({ customers, loadingCustomers, selected, onChange }: Membe
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search customers by name…"
-          className="w-full h-[40px] pl-9 pr-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+          className="w-full h-[40px] pl-9 pr-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
         />
       </div>
 
@@ -101,7 +101,7 @@ function MemberPicker({ customers, loadingCustomers, selected, onChange }: Membe
       <div className="mt-2 max-h-[200px] overflow-y-auto rounded-[10px] border border-[#F0F0F0]">
         {loadingCustomers ? (
           <div className="flex items-center justify-center py-6">
-            <Loader2 className="animate-spin text-[#299E60]" size={18} />
+            <Loader2 className="animate-spin text-primary" size={18} />
           </div>
         ) : results.length === 0 ? (
           <p className="text-[12px] text-[#AEAEAE] text-center py-6">
@@ -120,7 +120,7 @@ function MemberPicker({ customers, loadingCustomers, selected, onChange }: Membe
               className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-[#F8FAFC] transition-colors border-b border-[#F5F5F5] last:border-b-0"
             >
               <span className="text-[13px] text-[#181725] truncate">{c.label}</span>
-              <Plus size={13} className="text-[#299E60] shrink-0" />
+              <Plus size={13} className="text-primary shrink-0" />
             </button>
           ))
         )}
@@ -219,14 +219,14 @@ function GroupModal({ group, customers, loadingCustomers, onClose, onSaved }: Gr
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Premium Cafes, North Zone Hotels"
-              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-[#299E60]/50 bg-white"
+              className="w-full h-[40px] px-3 rounded-[10px] border border-[#EEEEEE] text-[13px] outline-none focus:border-primary/50 bg-white"
               autoFocus
             />
           </div>
 
           {loadingMembers ? (
             <div className="flex items-center justify-center py-6">
-              <Loader2 className="animate-spin text-[#299E60]" size={20} />
+              <Loader2 className="animate-spin text-primary" size={20} />
             </div>
           ) : (
             <MemberPicker
@@ -250,7 +250,7 @@ function GroupModal({ group, customers, loadingCustomers, onClose, onSaved }: Gr
           <button
             onClick={handleSave}
             disabled={saving || loadingMembers}
-            className="px-5 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="px-5 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             {saving ? <Loader2 size={13} className="animate-spin" /> : null}
             {isEdit ? 'Save changes' : 'Create'}
@@ -336,7 +336,7 @@ export default function VendorCustomerGroupsPage() {
         </div>
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] bg-[#299E60] text-white text-[13px] font-bold hover:bg-[#238a54] transition-colors"
+          className="flex items-center gap-2 px-4 h-[38px] rounded-[10px] bg-primary text-white text-[13px] font-bold hover:bg-primary-dark transition-colors"
         >
           <Plus size={15} />
           New group
@@ -345,7 +345,7 @@ export default function VendorCustomerGroupsPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="animate-spin text-[#299E60]" size={28} />
+          <Loader2 className="animate-spin text-primary" size={28} />
         </div>
       ) : groups.length === 0 ? (
         <div className="bg-white rounded-[14px] border border-[#EEEEEE] py-16 text-center shadow-sm">
@@ -356,7 +356,7 @@ export default function VendorCustomerGroupsPage() {
           </p>
           <button
             onClick={openCreate}
-            className="mt-4 flex items-center gap-2 mx-auto px-4 h-[36px] rounded-[10px] bg-[#299E60] text-white text-[12px] font-bold hover:bg-[#238a54] transition-colors"
+            className="mt-4 flex items-center gap-2 mx-auto px-4 h-[36px] rounded-[10px] bg-primary text-white text-[12px] font-bold hover:bg-primary-dark transition-colors"
           >
             <Plus size={13} />
             Create first group
@@ -369,8 +369,8 @@ export default function VendorCustomerGroupsPage() {
               {/* Title + actions */}
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex items-center gap-2">
-                  <span className="shrink-0 w-9 h-9 rounded-[10px] bg-[#EEF8F1] flex items-center justify-center">
-                    <Users size={16} className="text-[#299E60]" />
+                  <span className="shrink-0 w-9 h-9 rounded-[10px] bg-primary-light flex items-center justify-center">
+                    <Users size={16} className="text-primary" />
                   </span>
                   <p className="text-[15px] font-bold text-[#181725] truncate">{g.name}</p>
                 </div>

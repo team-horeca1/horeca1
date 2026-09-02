@@ -149,7 +149,7 @@ export default function RecentlyViewedPage() {
                     <p className="text-[14px] text-gray-400 font-medium mb-8">Browse vendor stores to see your recently viewed products here.</p>
                     <Link
                         href="/"
-                        className="inline-block w-full bg-[#53B175] text-white py-4 rounded-2xl font-bold shadow-lg shadow-green-100 text-center"
+                        className="inline-block w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-lg shadow-green-100 text-center"
                     >
                         Back to Home
                     </Link>
@@ -175,7 +175,7 @@ export default function RecentlyViewedPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-[32px] font-black text-text tracking-tight leading-none mb-2">Recently Viewed</h1>
-                            <p className="text-[16px] text-[#299e60] font-black flex items-center gap-2">
+                            <p className="text-[16px] text-primary font-black flex items-center gap-2">
                                 <Building2 size={18} />
                                 {vendorName}
                             </p>
@@ -276,7 +276,7 @@ export default function RecentlyViewedPage() {
                                                     </div>
                                                     <button
                                                         onClick={() => updateQty(product.id, 1)}
-                                                        className="w-7 h-7 min-[340px]:w-8 min-[340px]:h-8 md:w-10 md:h-10 flex items-center justify-center text-primary hover:bg-green-50 transition-colors"
+                                                        className="w-7 h-7 min-[340px]:w-8 min-[340px]:h-8 md:w-10 md:h-10 flex items-center justify-center text-primary hover:bg-primary-light transition-colors"
                                                     >
                                                         <Plus className="w-3 h-3 min-[340px]:w-3.5 min-[340px]:h-3.5 md:w-4 md:h-4" strokeWidth={2.5} />
                                                     </button>
@@ -347,7 +347,7 @@ export default function RecentlyViewedPage() {
                         {/* Add to Cart Button */}
                         <button
                             onClick={handleAddAllToCart}
-                            className="w-full bg-[#53B175] text-white py-5 rounded-2xl font-bold text-[18px] transition-all hover:bg-[#48a068] active:scale-[0.98] shadow-lg shadow-[#53B175]/20 flex items-center justify-center gap-3"
+                            className="w-full bg-primary text-white py-5 rounded-2xl font-bold text-[18px] transition-all hover:bg-primary-dark active:scale-[0.98] shadow-lg shadow-primary/20 flex items-center justify-center gap-3"
                         >
                             <ShoppingCart size={22} strokeWidth={2.5} />
                             Add to Cart
@@ -398,7 +398,7 @@ export default function RecentlyViewedPage() {
             <div className="lg:hidden fixed bottom-0 left-0 right-0 px-5 pb-6 pt-3 bg-gradient-to-t from-white via-white to-transparent z-50">
                 <button
                     onClick={handleAddAllToCart}
-                    className="w-full bg-[#53B175] text-white py-[18px] rounded-[16px] font-bold text-[18px] transition-all active:scale-[0.98] shadow-lg shadow-[#53B175]/20 flex items-center justify-center gap-3"
+                    className="w-full bg-primary text-white py-[18px] rounded-[16px] font-bold text-[18px] transition-all active:scale-[0.98] shadow-lg shadow-primary/20 flex items-center justify-center gap-3"
                 >
                     <ShoppingCart size={22} strokeWidth={2.5} />
                     Add to Cart

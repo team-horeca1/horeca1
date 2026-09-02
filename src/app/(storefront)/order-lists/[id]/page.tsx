@@ -246,7 +246,7 @@ export default function OrderListDetailPage() {
     if (isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="w-10 h-10 border-4 border-[#299e60] border-t-transparent rounded-full animate-spin" />
+                <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
         );
     }
@@ -262,7 +262,7 @@ export default function OrderListDetailPage() {
                     <p className="text-[14px] text-gray-400 font-medium mb-8">This list might have been deleted or is no longer available.</p>
                     <Link
                         href="/order-lists"
-                        className="inline-block w-full bg-[#53B175] text-white py-4 rounded-2xl font-bold shadow-lg shadow-green-100"
+                        className="inline-block w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-lg shadow-green-100"
                     >
                         Back to lists
                     </Link>
@@ -372,7 +372,7 @@ export default function OrderListDetailPage() {
                                             </div>
                                             <button
                                                 onClick={() => updateQty(item.productId, 1)}
-                                                className="w-7 h-7 min-[340px]:w-8 min-[340px]:h-8 md:w-10 md:h-10 flex items-center justify-center text-primary hover:bg-green-50 transition-colors"
+                                                className="w-7 h-7 min-[340px]:w-8 min-[340px]:h-8 md:w-10 md:h-10 flex items-center justify-center text-primary hover:bg-primary-light transition-colors"
                                             >
                                                 <Plus className="w-3 h-3 min-[340px]:w-3.5 min-[340px]:h-3.5 md:w-4 md:h-4" strokeWidth={2.5} />
                                             </button>
@@ -413,8 +413,8 @@ export default function OrderListDetailPage() {
                                                             exceedsStock
                                                                 ? 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed'
                                                                 : active
-                                                                    ? 'bg-[#53B175] border-[#53B175] text-white shadow-sm'
-                                                                    : 'bg-[#F7FBF8] border-[#EAF5ED] text-[#1B5E20] hover:bg-[#53B175] hover:text-white hover:border-[#53B175]'
+                                                                    ? 'bg-primary border-primary text-white shadow-sm'
+                                                                    : 'bg-[#F7FBF8] border-[#EAF5ED] text-[#1B5E20] hover:bg-primary hover:text-white hover:border-primary'
                                                         }`}
                                                     >
                                                         {slab.minQty}+ @ ₹{slab.price}
@@ -450,7 +450,7 @@ export default function OrderListDetailPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-[32px] font-black text-text tracking-tight leading-none mb-2">{orderList.name}</h1>
-                            <p className="text-[16px] text-[#299e60] font-black flex items-center gap-2">
+                            <p className="text-[16px] text-primary font-black flex items-center gap-2">
                                 <Building2 size={18} />
                                 {orderList.vendorName}
                             </p>
@@ -459,7 +459,7 @@ export default function OrderListDetailPage() {
                         <div className="lg:hidden">
                             <button
                                 onClick={handleFillLastQty}
-                                className="bg-white text-[#299e60] px-5 py-3 border border-[#299e60]/20 rounded-xl text-[14px] font-bold shadow-sm hover:bg-[#299e60]/5 transition-all flex items-center gap-2"
+                                className="bg-white text-primary px-5 py-3 border border-primary/20 rounded-xl text-[14px] font-bold shadow-sm hover:bg-primary/5 transition-all flex items-center gap-2"
                             >
                                 <RotateCcw size={16} />
                                 Re-fill Last Qty
@@ -483,13 +483,13 @@ export default function OrderListDetailPage() {
                             </button>
                             <div className="min-w-0">
                                 <h1 className="text-[17px] min-[340px]:text-[19px] font-bold text-[#181725] truncate">{orderList.name}</h1>
-                                <p className="text-[11px] min-[340px]:text-[13px] text-[#299e60] font-black mt-0.5 truncate">{orderList.vendorName}</p>
+                                <p className="text-[11px] min-[340px]:text-[13px] text-primary font-black mt-0.5 truncate">{orderList.vendorName}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                             <button
                                 onClick={handleFillLastQty}
-                                className="text-[11px] min-[340px]:text-[12px] font-bold text-[#299e60] px-2 min-[340px]:px-3 py-1.5 border border-[#299e60]/20 rounded-lg hover:bg-[#299e60]/5 transition-colors flex items-center gap-1 min-[340px]:gap-1.5"
+                                className="text-[11px] min-[340px]:text-[12px] font-bold text-primary px-2 min-[340px]:px-3 py-1.5 border border-primary/20 rounded-lg hover:bg-primary/5 transition-colors flex items-center gap-1 min-[340px]:gap-1.5"
                             >
                                 <RotateCcw size={14} />
                                 <span className="hidden min-[320px]:inline">Re-fill</span>
@@ -519,7 +519,7 @@ export default function OrderListDetailPage() {
                         {/* Re-fill Button */}
                         <button
                             onClick={handleFillLastQty}
-                            className="w-full bg-white text-[#299e60] px-6 py-4 border-2 border-[#299e60]/15 rounded-2xl text-[15px] font-black shadow-sm hover:bg-[#299e60]/5 transition-all flex items-center justify-center gap-2"
+                            className="w-full bg-white text-primary px-6 py-4 border-2 border-primary/15 rounded-2xl text-[15px] font-black shadow-sm hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
                         >
                             <RotateCcw size={17} />
                             Re-fill Last Qty
@@ -565,7 +565,7 @@ export default function OrderListDetailPage() {
                         {/* Add to Cart Button */}
                         <button
                             onClick={handleAddAllToCart}
-                            className="w-full bg-[#53B175] text-white py-5 rounded-2xl font-bold text-[18px] transition-all hover:bg-[#48a068] active:scale-[0.98] shadow-lg shadow-[#53B175]/20 flex items-center justify-center gap-3"
+                            className="w-full bg-primary text-white py-5 rounded-2xl font-bold text-[18px] transition-all hover:bg-primary-dark active:scale-[0.98] shadow-lg shadow-primary/20 flex items-center justify-center gap-3"
                         >
                             <ShoppingCart size={22} strokeWidth={2.5} />
                             Add to Cart
@@ -616,7 +616,7 @@ export default function OrderListDetailPage() {
             <div className="lg:hidden fixed bottom-0 left-0 right-0 px-5 pb-6 pt-3 bg-gradient-to-t from-white via-white to-transparent z-50">
                 <button
                     onClick={handleAddAllToCart}
-                    className="w-full bg-[#53B175] text-white py-[18px] rounded-[16px] font-bold text-[18px] transition-all active:scale-[0.98] shadow-lg shadow-[#53B175]/20 flex items-center justify-center gap-3"
+                    className="w-full bg-primary text-white py-[18px] rounded-[16px] font-bold text-[18px] transition-all active:scale-[0.98] shadow-lg shadow-primary/20 flex items-center justify-center gap-3"
                 >
                     <ShoppingCart size={22} strokeWidth={2.5} />
                     Add to Cart

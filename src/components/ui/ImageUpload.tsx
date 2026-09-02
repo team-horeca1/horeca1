@@ -152,14 +152,14 @@ export function ImageUpload({
                     )}
                     {uploading && (
                         <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                            <Loader2 size={20} className="animate-spin text-[#299E60]" />
+                            <Loader2 size={20} className="animate-spin text-primary" />
                         </div>
                     )}
                 </div>
             ) : showUrlInput ? (
                 <div className={cn('rounded-[12px] border border-[#DCDCDC] p-3 flex flex-col gap-2', size === 'sm' ? 'w-[200px]' : size === 'md' ? 'w-[280px]' : 'w-full')}>
                     <div className="flex items-center gap-2">
-                        <Link2 size={14} className="text-[#299E60] shrink-0" />
+                        <Link2 size={14} className="text-primary shrink-0" />
                         <span className="text-[12px] font-semibold text-[#555]">Paste image URL</span>
                     </div>
                     <div className="flex gap-1.5">
@@ -169,13 +169,13 @@ export function ImageUpload({
                             onChange={(e) => { setUrlValue(e.target.value); setError(''); }}
                             onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
                             placeholder="https://..."
-                            className="flex-1 min-w-0 px-2.5 py-1.5 text-[12px] border border-[#DCDCDC] rounded-[8px] outline-none focus:border-[#299E60] transition-colors"
+                            className="flex-1 min-w-0 px-2.5 py-1.5 text-[12px] border border-[#DCDCDC] rounded-[8px] outline-none focus:border-primary transition-colors"
                             autoFocus
                         />
                         <button
                             type="button"
                             onClick={handleUrlSubmit}
-                            className="px-2.5 py-1.5 rounded-[8px] bg-[#299E60] text-white hover:bg-[#238551] transition-colors"
+                            className="px-2.5 py-1.5 rounded-[8px] bg-primary text-white hover:bg-primary-dark transition-colors"
                         >
                             <Check size={14} />
                         </button>
@@ -199,14 +199,14 @@ export function ImageUpload({
                             'rounded-[12px] border-2 border-dashed flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all',
                             s.box,
                             dragOver
-                                ? 'border-[#299E60] bg-[#EEF8F1]'
-                                : 'border-[#DCDCDC] hover:border-[#299E60]/40 hover:bg-[#F8F9FB]',
+                                ? 'border-primary bg-primary-light'
+                                : 'border-[#DCDCDC] hover:border-primary/40 hover:bg-[#F8F9FB]',
                             uploading && 'pointer-events-none opacity-60',
                             disabled && 'pointer-events-none opacity-60 cursor-not-allowed',
                         )}
                     >
                         {uploading ? (
-                            <Loader2 size={s.icon} className="animate-spin text-[#299E60]" />
+                            <Loader2 size={s.icon} className="animate-spin text-primary" />
                         ) : (
                             <>
                                 <ImageIcon size={s.icon} className="text-[#AEAEAE]" />
@@ -220,7 +220,7 @@ export function ImageUpload({
                         <button
                             type="button"
                             onClick={() => setShowUrlInput(true)}
-                            className="flex items-center justify-center gap-1.5 text-[11px] text-[#AEAEAE] hover:text-[#299E60] font-medium transition-colors"
+                            className="flex items-center justify-center gap-1.5 text-[11px] text-[#AEAEAE] hover:text-primary font-medium transition-colors"
                         >
                             <Link2 size={12} />
                             <span>Use image URL</span>
@@ -339,12 +339,12 @@ export function MultiImageUpload({
                         <div
                             onClick={() => !uploading && inputRef.current?.click()}
                             className={cn(
-                                'w-[80px] h-[80px] rounded-[10px] border-2 border-dashed border-[#DCDCDC] flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-[#299E60]/40 hover:bg-[#F8F9FB] transition-all',
+                                'w-[80px] h-[80px] rounded-[10px] border-2 border-dashed border-[#DCDCDC] flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary/40 hover:bg-[#F8F9FB] transition-all',
                                 uploading && 'pointer-events-none opacity-60',
                             )}
                         >
                             {uploading ? (
-                                <Loader2 size={16} className="animate-spin text-[#299E60]" />
+                                <Loader2 size={16} className="animate-spin text-primary" />
                             ) : (
                                 <>
                                     <Plus size={16} className="text-[#AEAEAE]" />
@@ -355,7 +355,7 @@ export function MultiImageUpload({
                         <button
                             type="button"
                             onClick={() => setShowUrlInput(true)}
-                            className="flex items-center justify-center gap-1 text-[10px] text-[#AEAEAE] hover:text-[#299E60] font-medium transition-colors"
+                            className="flex items-center justify-center gap-1 text-[10px] text-[#AEAEAE] hover:text-primary font-medium transition-colors"
                         >
                             <Link2 size={10} />
                             <span>URL</span>
@@ -371,10 +371,10 @@ export function MultiImageUpload({
                             onChange={(e) => { setUrlValue(e.target.value); setError(''); }}
                             onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
                             placeholder="https://..."
-                            className="flex-1 min-w-0 px-2.5 py-1.5 text-[12px] border border-[#DCDCDC] rounded-[8px] outline-none focus:border-[#299E60] transition-colors"
+                            className="flex-1 min-w-0 px-2.5 py-1.5 text-[12px] border border-[#DCDCDC] rounded-[8px] outline-none focus:border-primary transition-colors"
                             autoFocus
                         />
-                        <button type="button" onClick={handleUrlSubmit} className="p-1.5 rounded-[8px] bg-[#299E60] text-white hover:bg-[#238551] transition-colors">
+                        <button type="button" onClick={handleUrlSubmit} className="p-1.5 rounded-[8px] bg-primary text-white hover:bg-primary-dark transition-colors">
                             <Check size={14} />
                         </button>
                         <button type="button" onClick={() => { setShowUrlInput(false); setUrlValue(''); setError(''); }} className="p-1.5 rounded-[8px] text-[#AEAEAE] hover:text-[#555] transition-colors">

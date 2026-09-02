@@ -8,7 +8,7 @@ export default function VendorError({ error, reset }: { error: Error; reset: () 
             </div>
             <h2 className="text-xl font-bold text-[#181725]">Something went wrong</h2>
             <p className="text-sm text-[#7C7C7C] max-w-md text-center">{error.message}</p>
-            <button onClick={reset} className="px-6 py-3 bg-[#299E60] text-white rounded-[10px] font-bold hover:bg-[#238a54] transition-colors">
+            <button onClick={reset} className="px-6 py-3 bg-primary text-white rounded-[10px] font-bold hover:bg-primary-dark transition-colors">
                 Try Again
             </button>
         </div>

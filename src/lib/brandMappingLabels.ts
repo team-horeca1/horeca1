@@ -43,10 +43,10 @@ export function distributorAuthLabel(status: string | null | undefined): { label
 
 // Tailwind colour tokens for each tone — keeps the look consistent across pages.
 export const TONE_STYLES: Record<ConfidenceTone | MappingStatusTone, { text: string; bg: string; border: string }> = {
-  high:     { text: 'text-[#53B175]', bg: 'bg-[#EEF8F1]', border: 'border-[#53B175]/30' },
+  high:     { text: 'text-success', bg: 'bg-success-light', border: 'border-success/30' },
   medium:   { text: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200' },
   low:      { text: 'text-gray-500',   bg: 'bg-gray-50',   border: 'border-gray-200' },
-  live:     { text: 'text-[#53B175]', bg: 'bg-[#EEF8F1]', border: 'border-[#53B175]/30' },
+  live:     { text: 'text-success', bg: 'bg-success-light', border: 'border-success/30' },
   pending:  { text: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200' },
   rejected: { text: 'text-gray-500',   bg: 'bg-gray-50',   border: 'border-gray-200' },
 };

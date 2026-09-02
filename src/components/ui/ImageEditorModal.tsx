@@ -94,7 +94,7 @@ export function ImageEditorModal({
                 <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                     <div>
                         <h3 className="text-[16px] font-bold text-[#181725] flex items-center gap-2">
-                            <Crosshair size={16} className="text-[#53B175]" />
+                            <Crosshair size={16} className="text-primary" />
                             {title ?? 'Adjust image'}
                         </h3>
                         <p className="text-[12px] text-gray-500 mt-0.5">
@@ -112,7 +112,7 @@ export function ImageEditorModal({
                     <div className="p-5 overflow-y-auto bg-gray-50">
                         {!baseSrc ? (
                             <div className="flex items-center justify-center h-[400px]">
-                                <Loader2 size={24} className="animate-spin text-[#53B175]" />
+                                <Loader2 size={24} className="animate-spin text-primary" />
                             </div>
                         ) : (
                             <>
@@ -145,7 +145,7 @@ export function ImageEditorModal({
                                                 className="absolute pointer-events-none"
                                                 style={{ left: `${meta.x}%`, top: `${meta.y}%`, transform: 'translate(-50%, -50%)' }}
                                             >
-                                                <div className="w-10 h-10 rounded-full border-2 border-white shadow-[0_0_0_2px_rgba(83,177,117,0.9)] bg-[#53B175]/30 flex items-center justify-center">
+                                                <div className="w-10 h-10 rounded-full border-2 border-white shadow-[0_0_0_2px_rgba(107, 29, 46, )] bg-primary/30 flex items-center justify-center">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-white" />
                                                 </div>
                                             </div>
@@ -172,13 +172,13 @@ export function ImageEditorModal({
                                                 step={0.1}
                                                 value={meta.zoom}
                                                 onChange={(e) => setMeta(m => ({ ...m, zoom: Number(e.target.value) }))}
-                                                className="w-full accent-[#53B175]"
+                                                className="w-full accent-primary"
                                             />
                                         </div>
                                         <button
                                             type="button"
                                             onClick={reset}
-                                            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-gray-500 hover:text-[#53B175] hover:bg-white rounded-lg transition-colors"
+                                            className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold text-gray-500 hover:text-primary hover:bg-white rounded-lg transition-colors"
                                         >
                                             <RotateCcw size={11} /> Reset
                                         </button>
@@ -191,7 +191,7 @@ export function ImageEditorModal({
                                             </div>
                                             <input type="range" min={0} max={100} value={meta.x}
                                                 onChange={e => setMeta(m => ({ ...m, x: Number(e.target.value) }))}
-                                                className="w-full accent-[#53B175]" />
+                                                className="w-full accent-primary" />
                                         </div>
                                         <div>
                                             <div className="flex items-center justify-between mb-1">
@@ -200,7 +200,7 @@ export function ImageEditorModal({
                                             </div>
                                             <input type="range" min={0} max={100} value={meta.y}
                                                 onChange={e => setMeta(m => ({ ...m, y: Number(e.target.value) }))}
-                                                className="w-full accent-[#53B175]" />
+                                                className="w-full accent-primary" />
                                         </div>
                                     </div>
                                 </div>
@@ -231,7 +231,7 @@ export function ImageEditorModal({
                         Cancel
                     </button>
                     <button onClick={save} disabled={!baseSrc}
-                        className="h-[36px] px-5 bg-[#53B175] text-white rounded-lg text-[13px] font-bold disabled:opacity-60 hover:bg-[#3d9e5f] flex items-center gap-1.5">
+                        className="h-[36px] px-5 bg-primary text-white rounded-lg text-[13px] font-bold disabled:opacity-60 hover:bg-primary-dark flex items-center gap-1.5">
                         <Check size={14} /> Save image
                     </button>
                 </div>

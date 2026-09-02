@@ -50,14 +50,14 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
     ready_for_dispatch:   { label: 'Ready for Dispatch',  color: 'text-cyan-600',    bg: 'bg-cyan-50',    icon: <Package size={10} /> },
     shipped:              { label: 'Out for Delivery',    color: 'text-purple-600',  bg: 'bg-purple-50',  icon: <Truck size={10} /> },
     partially_delivered:  { label: 'Partially Delivered', color: 'text-orange-600',  bg: 'bg-orange-50',  icon: <Truck size={10} /> },
-    delivered:            { label: 'Delivered',           color: 'text-green-600',   bg: 'bg-green-50',   icon: <CheckCircle2 size={10} /> },
+    delivered:            { label: 'Delivered',           color: 'text-primary',   bg: 'bg-primary-light',   icon: <CheckCircle2 size={10} /> },
     returned:             { label: 'Returned',            color: 'text-rose-600',    bg: 'bg-rose-50',    icon: <XCircle size={10} /> },
     cancelled:            { label: 'Cancelled',           color: 'text-red-500',     bg: 'bg-red-50',     icon: <XCircle size={10} /> },
 };
 
 const PAYMENT_STATUS: Record<string, { label: string; color: string }> = {
     unpaid:   { label: 'Unpaid',   color: 'text-red-500' },
-    paid:     { label: 'Paid',     color: 'text-green-600' },
+    paid:     { label: 'Paid',     color: 'text-primary' },
     partial:  { label: 'Partial',  color: 'text-amber-500' },
     refunded: { label: 'Refunded', color: 'text-gray-400' },
 };
@@ -236,7 +236,7 @@ function OrdersPageContent() {
             <div className="hidden md:block bg-white border-b border-gray-100">
                 <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] py-5">
                     <div className="flex items-center gap-2 text-[13px] text-gray-400 mb-3">
-                        <Link href="/" className="hover:text-[#53B175] flex items-center gap-1 transition-colors">
+                        <Link href="/" className="hover:text-primary flex items-center gap-1 transition-colors">
                             <Home size={14} /><span>Home</span>
                         </Link>
                         <ChevronRight size={12} />
@@ -245,7 +245,7 @@ function OrdersPageContent() {
                         </span>
                     </div>
                     <h1 className="text-[28px] font-black text-[#181725] tracking-tight flex items-center gap-3">
-                        <Package size={26} className="text-[#53B175]" />
+                        <Package size={26} className="text-primary" />
                         {statusParam === 'draft' ? 'Draft Orders' : 'My Orders'}
                     </h1>
                 </div>
@@ -265,8 +265,8 @@ function OrdersPageContent() {
                                     className={cn(
                                         'shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-bold transition-colors border',
                                         active
-                                            ? 'bg-[#53B175] text-white border-[#53B175]'
-                                            : 'bg-white text-gray-500 border-gray-200 hover:border-[#53B175] hover:text-[#53B175]'
+                                            ? 'bg-primary text-white border-primary'
+                                            : 'bg-white text-gray-500 border-gray-200 hover:border-primary hover:text-primary'
                                     )}
                                 >
                                     {tab.label}
@@ -278,7 +278,7 @@ function OrdersPageContent() {
 
                 {(isLoading || ordersLoading) ? (
                     <div className="flex flex-col items-center justify-center py-24">
-                        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#53B175] rounded-full animate-spin mb-5" />
+                        <div className="w-10 h-10 border-4 border-gray-200 border-t-primary rounded-full animate-spin mb-5" />
                         <p className="text-[14px] text-gray-400 font-medium">Loading orders...</p>
                     </div>
                 ) : !isLoggedIn ? (
@@ -291,7 +291,7 @@ function OrdersPageContent() {
                             Log in to see your order history and reorder items.
                         </p>
                         <button onClick={() => router.push('/login')}
-                            className="px-8 py-3 bg-[#53B175] text-white font-bold rounded-2xl shadow-lg shadow-green-200/50 hover:bg-[#48a068]">
+                            className="px-8 py-3 bg-primary text-white font-bold rounded-2xl shadow-lg shadow-green-200/50 hover:bg-primary-dark">
                             Log In
                         </button>
                     </div>
@@ -310,7 +310,7 @@ function OrdersPageContent() {
                             }
                         </p>
                         <button onClick={() => router.push('/')}
-                            className="px-8 py-3 bg-[#53B175] text-white font-bold rounded-2xl shadow-lg shadow-green-200/50 hover:bg-[#48a068]">
+                            className="px-8 py-3 bg-primary text-white font-bold rounded-2xl shadow-lg shadow-green-200/50 hover:bg-primary-dark">
                             Browse Vendors
                         </button>
                     </div>
@@ -340,10 +340,10 @@ function OrdersPageContent() {
                                             <tr
                                                 key={order.id}
                                                 onClick={() => router.push(`/orders/${order.id}`)}
-                                                className="border-b border-gray-50 last:border-0 hover:bg-green-50/30 cursor-pointer transition-colors group"
+                                                className="border-b border-gray-50 last:border-0 hover:bg-primary-light/30 cursor-pointer transition-colors group"
                                             >
                                                 <td className="px-4 py-3">
-                                                    <span className="text-[13px] font-black text-[#181725] group-hover:text-[#53B175] transition-colors">{order.orderNumber}</span>
+                                                    <span className="text-[13px] font-black text-[#181725] group-hover:text-primary transition-colors">{order.orderNumber}</span>
                                                     {hasReview && (
                                                         <span className="flex items-center gap-0.5 mt-0.5">
                                                             {[1,2,3,4,5].map(s => (
@@ -396,7 +396,7 @@ function OrdersPageContent() {
                                                             <>
                                                                 <button
                                                                     onClick={() => router.push(`/checkout?draft=${order.id}`)}
-                                                                    className="px-3 py-1.5 rounded-lg bg-[#53B175] text-white text-[11px] font-black hover:bg-[#48a068] transition-colors whitespace-nowrap"
+                                                                    className="px-3 py-1.5 rounded-lg bg-primary text-white text-[11px] font-black hover:bg-primary-dark transition-colors whitespace-nowrap"
                                                                 >
                                                                     Submit
                                                                 </button>
@@ -418,11 +418,11 @@ function OrdersPageContent() {
                                                                     </button>
                                                                 )}
                                                                 <button onClick={(e) => handleSaveAsOrderList(order, e)} title="Save as list"
-                                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-[#53B175] hover:bg-green-50 transition-colors">
+                                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-primary-light transition-colors">
                                                                     <ListPlus size={14} />
                                                                 </button>
                                                                 <button onClick={(e) => handleOrderAgain(order, e)} title="Reorder"
-                                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-[#53B175] hover:bg-green-50 transition-colors">
+                                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-primary-light transition-colors">
                                                                     <RotateCcw size={14} />
                                                                 </button>
                                                                 <button
@@ -466,7 +466,7 @@ function OrdersPageContent() {
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between gap-2">
                                                     <p className="text-[13px] font-black text-[#181725] truncate">{order.orderNumber}</p>
-                                                    <span className="text-[13px] font-black text-[#53B175] whitespace-nowrap">{formatAmount(order.totalAmount)}</span>
+                                                    <span className="text-[13px] font-black text-primary whitespace-nowrap">{formatAmount(order.totalAmount)}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between gap-2 mt-0.5">
                                                     <p className="text-[11px] text-gray-400 font-medium truncate">
@@ -483,7 +483,7 @@ function OrdersPageContent() {
                                                     <>
                                                         <button
                                                             onClick={() => router.push(`/checkout?draft=${order.id}`)}
-                                                            className="px-3 py-1.5 rounded-lg bg-[#53B175] text-white text-[11px] font-black"
+                                                            className="px-3 py-1.5 rounded-lg bg-primary text-white text-[11px] font-black"
                                                         >
                                                             Submit
                                                         </button>
@@ -504,11 +504,11 @@ function OrdersPageContent() {
                                                             </button>
                                                         )}
                                                         <button onClick={(e) => handleSaveAsOrderList(order, e)}
-                                                            className="p-1.5 rounded-lg text-gray-400 active:text-[#53B175]">
+                                                            className="p-1.5 rounded-lg text-gray-400 active:text-primary">
                                                             <ListPlus size={15} />
                                                         </button>
                                                         <button onClick={(e) => handleOrderAgain(order, e)}
-                                                            className="p-1.5 rounded-lg text-gray-400 active:text-[#53B175]">
+                                                            className="p-1.5 rounded-lg text-gray-400 active:text-primary">
                                                             <RotateCcw size={15} />
                                                         </button>
                                                         <button
@@ -553,11 +553,11 @@ function OrdersPageContent() {
                         </p>
                         <textarea value={ratingComment} onChange={e => setRatingComment(e.target.value)}
                             maxLength={200} placeholder="Add a comment (optional)..." rows={3}
-                            className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-[13px] text-[#181725] placeholder-gray-300 resize-none focus:outline-none focus:border-[#53B175] transition-colors mb-4" />
+                            className="w-full border border-gray-200 rounded-2xl px-4 py-3 text-[13px] text-[#181725] placeholder-gray-300 resize-none focus:outline-none focus:border-primary transition-colors mb-4" />
                         <button onClick={handleSubmitRating} disabled={selectedStars === 0 || isSubmittingRating}
                             className={cn('w-full py-3.5 rounded-2xl text-[14px] font-black flex items-center justify-center gap-2 transition-all',
                                 selectedStars > 0 && !isSubmittingRating
-                                    ? 'bg-[#53B175] text-white shadow-lg shadow-green-200/50 hover:bg-[#48a068]'
+                                    ? 'bg-primary text-white shadow-lg shadow-green-200/50 hover:bg-primary-dark'
                                     : 'bg-gray-100 text-gray-400 cursor-not-allowed')}>
                             {isSubmittingRating ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : 'Submit Review'}
                         </button>
@@ -618,7 +618,7 @@ export default function OrderHistoryPage() {
     return (
         <React.Suspense fallback={
             <div className="min-h-screen bg-[#F2F3F2] flex flex-col items-center justify-center">
-                <div className="w-10 h-10 border-4 border-gray-200 border-t-[#53B175] rounded-full animate-spin mb-5" />
+                <div className="w-10 h-10 border-4 border-gray-200 border-t-primary rounded-full animate-spin mb-5" />
                 <p className="text-[14px] text-gray-400 font-medium">Loading...</p>
             </div>
         }>

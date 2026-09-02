@@ -139,7 +139,7 @@ export default function SetupWizardPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
-        <Loader2 className="animate-spin text-[#299E60]" size={32} />
+        <Loader2 className="animate-spin text-primary" size={32} />
       </div>
     );
   }
@@ -153,13 +153,13 @@ export default function SetupWizardPage() {
   return (
     <div className="min-h-screen bg-[#F8F9FB] flex flex-col items-center justify-start py-10 px-4">
       <div className="mb-8">
-        <span className="text-[22px] font-extrabold text-[#299E60]">Horeca1</span>
+        <span className="text-[22px] font-extrabold text-primary">Horeca1</span>
         <span className="text-[14px] text-[#7C7C7C] ml-2">Vendor Setup</span>
       </div>
 
       <div className="w-full max-w-2xl mb-8">
         <div className="h-2 bg-[#EEEEEE] rounded-full overflow-hidden mb-2">
-          <div className="h-full bg-[#299E60] transition-all duration-500" style={{ width: `${progressPct}%` }} />
+          <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progressPct}%` }} />
         </div>
         <p className="text-[12px] text-[#AEAEAE] text-center">
           Step {step} of {STEPS.length} · {completedCount}/{API_STEPS.length} completed
@@ -170,9 +170,9 @@ export default function SetupWizardPage() {
         <div className="flex flex-col items-center text-center mb-8">
           <div className={cn(
             'w-16 h-16 rounded-full flex items-center justify-center mb-4',
-            isGoLivePending ? 'bg-[#FFF7E6]' : 'bg-[#EEF8F1]',
+            isGoLivePending ? 'bg-[#FFF7E6]' : 'bg-primary-light',
           )}>
-            <Icon size={28} className={isGoLivePending ? 'text-[#F59E0B]' : 'text-[#299E60]'} />
+            <Icon size={28} className={isGoLivePending ? 'text-[#F59E0B]' : 'text-primary'} />
           </div>
           <h1 className="text-[24px] font-extrabold text-[#181725]">{headerTitle}</h1>
           <p className="text-[14px] text-[#7C7C7C] mt-1">{headerSubtitle}</p>
@@ -205,7 +205,7 @@ export default function SetupWizardPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 placeholder="Tell buyers what you sell..."
-                className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-[#299E60]/40 resize-none"
+                className="w-full border border-[#EEEEEE] rounded-[10px] px-4 py-3 text-[14px] outline-none focus:border-primary/40 resize-none"
               />
             </div>
           </div>
@@ -214,7 +214,7 @@ export default function SetupWizardPage() {
         {current.key === 'delivery' && (
           <div className="text-center">
             <p className="text-[14px] text-[#7C7C7C] mb-6">Configure pincodes and delivery time slots.</p>
-            <Link href="/vendor/settings?tab=delivery" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
+            <Link href="/vendor/settings?tab=delivery" className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-primary-dark">
               Configure Delivery <ChevronRight size={16} />
             </Link>
           </div>
@@ -222,7 +222,7 @@ export default function SetupWizardPage() {
 
         {current.key === 'products' && (
           <div className="text-center space-y-3">
-            <Link href="/vendor/products" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
+            <Link href="/vendor/products" className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-primary-dark">
               Add Products <ChevronRight size={16} />
             </Link>
             <p className="text-[12px] text-[#AEAEAE]">Use bulk import for large catalogs</p>
@@ -231,7 +231,7 @@ export default function SetupWizardPage() {
 
         {current.key === 'inventory' && (
           <div className="text-center">
-            <Link href="/vendor/inventory" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
+            <Link href="/vendor/inventory" className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-primary-dark">
               Manage Inventory <ChevronRight size={16} />
             </Link>
           </div>
@@ -239,7 +239,7 @@ export default function SetupWizardPage() {
 
         {current.key === 'credit' && (
           <div className="text-center">
-            <Link href="/vendor/credit" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
+            <Link href="/vendor/credit" className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-primary-dark">
               Credit & Collections <ChevronRight size={16} />
             </Link>
           </div>
@@ -247,7 +247,7 @@ export default function SetupWizardPage() {
 
         {current.key === 'payment_modes' && (
           <div className="text-center">
-            <Link href="/vendor/settings?tab=payments" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
+            <Link href="/vendor/settings?tab=payments" className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-primary-dark">
               Payment Settings <ChevronRight size={16} />
             </Link>
           </div>
@@ -255,7 +255,7 @@ export default function SetupWizardPage() {
 
         {current.key === 'team' && (
           <div className="text-center">
-            <Link href="/vendor/team" className="inline-flex items-center gap-2 bg-[#299E60] text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-[#238a54]">
+            <Link href="/vendor/team" className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-[12px] text-[14px] font-bold hover:bg-primary-dark">
               Invite Team <ChevronRight size={16} />
             </Link>
           </div>
@@ -265,12 +265,12 @@ export default function SetupWizardPage() {
           <div className="text-center">
             {isVerified ? (
               <>
-                <div className="w-20 h-20 rounded-full bg-[#EEF8F1] flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle2 size={40} className="text-[#299E60]" />
+                <div className="w-20 h-20 rounded-full bg-primary-light flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 size={40} className="text-primary" />
                 </div>
                 <p className="text-[16px] font-bold text-[#181725] mb-2">Your store is ready!</p>
                 <p className="text-[14px] text-[#7C7C7C] mb-6">Buyers in your service area can find and order from you.</p>
-                <button type="button" onClick={() => void finish()} className="inline-flex items-center gap-2 bg-[#299E60] text-white px-8 py-3 rounded-[12px] text-[15px] font-bold hover:bg-[#238a54] shadow-md">
+                <button type="button" onClick={() => void finish()} className="inline-flex items-center gap-2 bg-primary text-white px-8 py-3 rounded-[12px] text-[15px] font-bold hover:bg-primary-dark shadow-md">
                   Go to Dashboard <ChevronRight size={18} />
                 </button>
               </>
@@ -286,7 +286,7 @@ export default function SetupWizardPage() {
                 <p className="text-[13px] text-[#B45309] mb-6">
                   You can manage businesses and team in the supplier panel while you wait.
                 </p>
-                <button type="button" onClick={() => void finish()} className="inline-flex items-center gap-2 bg-[#299E60] text-white px-8 py-3 rounded-[12px] text-[15px] font-bold hover:bg-[#238a54] shadow-md">
+                <button type="button" onClick={() => void finish()} className="inline-flex items-center gap-2 bg-primary text-white px-8 py-3 rounded-[12px] text-[15px] font-bold hover:bg-primary-dark shadow-md">
                   Go to Supplier Panel <ChevronRight size={18} />
                 </button>
               </>
@@ -303,7 +303,7 @@ export default function SetupWizardPage() {
               <button type="button" onClick={() => void skip()} className="text-[13px] text-[#AEAEAE] hover:text-[#7C7C7C]">Skip</button>
             )}
             {current.key !== 'go_live' && (
-              <button type="button" onClick={() => void next()} disabled={saving} className="flex items-center gap-2 bg-[#299E60] text-white px-6 py-2.5 rounded-[10px] text-[14px] font-bold hover:bg-[#238a54] disabled:opacity-50">
+              <button type="button" onClick={() => void next()} disabled={saving} className="flex items-center gap-2 bg-primary text-white px-6 py-2.5 rounded-[10px] text-[14px] font-bold hover:bg-primary-dark disabled:opacity-50">
                 {saving ? 'Saving...' : 'Continue'} <ChevronRight size={16} />
               </button>
             )}

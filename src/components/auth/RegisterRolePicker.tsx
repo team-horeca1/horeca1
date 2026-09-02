@@ -47,7 +47,7 @@ export function RegisterRolePicker({ redirectTo = null }: RegisterRolePickerProp
         <div className="px-5 sm:px-7 pt-6 sm:pt-7 pb-5 border-b border-[#F5F5F5]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#299E60] mb-1">Get started</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-primary mb-1">Get started</p>
               <h1 className="text-[clamp(1.25rem,2vw+0.5rem,1.75rem)] font-[800] text-[#181725] leading-tight">
                 How do you want to join Horeca1?
               </h1>
@@ -57,7 +57,7 @@ export function RegisterRolePicker({ redirectTo = null }: RegisterRolePickerProp
             </div>
             <p className="text-[13px] text-gray-500 lg:text-right shrink-0">
               Already have an account?{' '}
-              <Link href={loginHref} className="text-[#299E60] font-[800] hover:underline">
+              <Link href={loginHref} className="text-primary font-[800] hover:underline">
                 Login
               </Link>
             </p>
@@ -74,17 +74,17 @@ export function RegisterRolePicker({ redirectTo = null }: RegisterRolePickerProp
                   href={role.href(redirectTo)}
                   className={cn(
                     'group flex flex-col gap-3 rounded-[14px] border border-[#EEEEEE] bg-[#FAFAFA] px-4 py-4',
-                    'hover:border-[#299E60]/30 hover:bg-[#F7FBF8] transition-all duration-200',
+                    'hover:border-primary/30 hover:bg-[#F7FBF8] transition-all duration-200',
                   )}
                 >
-                  <div className="w-10 h-10 rounded-xl bg-white border border-[#EEEEEE] flex items-center justify-center shrink-0 shadow-sm group-hover:border-[#299E60]/20 transition-colors">
-                    <Icon size={16} className="text-[#299E60]" />
+                  <div className="w-10 h-10 rounded-xl bg-white border border-[#EEEEEE] flex items-center justify-center shrink-0 shadow-sm group-hover:border-primary/20 transition-colors">
+                    <Icon size={16} className="text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-[13px] text-[#181725] leading-tight">{role.title}</p>
                     <p className="text-[11.5px] text-gray-500 mt-0.5 leading-relaxed">{role.subtitle}</p>
                   </div>
-                  <span className="flex items-center gap-1 text-[12px] font-bold text-[#299E60] group-hover:gap-1.5 transition-all">
+                  <span className="flex items-center gap-1 text-[12px] font-bold text-primary group-hover:gap-1.5 transition-all">
                     Start <ArrowRight size={14} />
                   </span>
                 </Link>

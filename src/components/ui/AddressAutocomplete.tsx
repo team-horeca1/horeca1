@@ -143,7 +143,7 @@ export function AddressAutocomplete({
       <label className="block">
         {label && <span className={LABEL_CLASS}>{label}</span>}
         <div className="relative group">
-          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#AEAEAE] group-focus-within:text-[#299E60] transition-colors z-10" />
+          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#AEAEAE] group-focus-within:text-primary transition-colors z-10" />
           <input
             ref={inputRef}
             type="text"
@@ -174,9 +174,9 @@ export function AddressAutocomplete({
                   type="button"
                   onClick={() => handlePick(p.placeId, p.mainText)}
                   disabled={isPicking}
-                  className="w-full text-left px-4 py-3 hover:bg-[#ECFDF5]/50 flex items-start gap-2.5 disabled:opacity-50 transition-colors border-b border-[#F9F9F9] last:border-b-0"
+                  className="w-full text-left px-4 py-3 hover:bg-success-light/50 flex items-start gap-2.5 disabled:opacity-50 transition-colors border-b border-[#F9F9F9] last:border-b-0"
                 >
-                  <MapPin size={14} className="text-[#299E60] mt-0.5 shrink-0" />
+                  <MapPin size={14} className="text-primary mt-0.5 shrink-0" />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13px] font-semibold text-[#181725] truncate">{p.mainText}</span>
                     <span className="block text-[11px] text-[#AEAEAE] truncate">{p.secondaryText}</span>

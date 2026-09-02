@@ -111,7 +111,7 @@ export function RewardsOverlay({ isOpen, onClose }: RewardsOverlayProps) {
                                         <p className="text-[13px] md:text-[14px] font-[500] text-[#181725] mb-0.5">{item.title}</p>
                                         <p className="text-[10px] md:text-[12px] text-[#7C7C7C] font-[500]">{item.date}</p>
                                     </div>
-                                    <span className={`text-[14px] md:text-[16px] font-[700] ${item.type === 'earned' ? 'text-emerald-600' : 'text-red-400'}`}>
+                                    <span className={`text-[14px] md:text-[16px] font-[700] ${item.type === 'earned' ? 'text-success' : 'text-red-400'}`}>
                                         {item.points}
                                     </span>
                                 </div>

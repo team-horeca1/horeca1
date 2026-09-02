@@ -1450,7 +1450,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                             <span className={cn(
                                 'shrink-0 text-[10px] font-[900] px-2.5 py-1 rounded-[6px] uppercase',
                                 isApproved
-                                    ? 'bg-[#DCFCE7] text-[#16A34A]'
+                                    ? 'bg-success-light text-success'
                                     : statusLabel === 'Edit Pending' || vendorProduct?.approvalStatus === 'pending_edit'
                                         ? 'bg-[#FFF8E1] text-[#8B6914]'
                                         : 'bg-[#FFF7E6] text-[#F59E0B]',

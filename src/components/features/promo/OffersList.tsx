@@ -102,12 +102,12 @@ export function OffersList({
   if (status === 'unauthenticated') {
     return (
       <div className="text-center py-10 px-4">
-        <Gift size={36} className="text-[#53B175] mx-auto mb-3" strokeWidth={1.5} />
+        <Gift size={36} className="text-primary mx-auto mb-3" strokeWidth={1.5} />
         <p className="text-[16px] font-bold text-[#181725] mb-1">Sign in to see deals</p>
         <p className="text-[13px] text-gray-400 font-medium mb-4">Coupons and store offers are saved to your account.</p>
         <Link
           href="/login"
-          className="inline-flex rounded-2xl bg-[#53B175] px-5 py-2.5 text-[13px] font-bold text-white hover:bg-[#48a068]"
+          className="inline-flex rounded-2xl bg-primary px-5 py-2.5 text-[13px] font-bold text-white hover:bg-primary-dark"
         >
           Sign in
         </Link>
@@ -118,7 +118,7 @@ export function OffersList({
   if (loading || status === 'loading') {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 size={28} className="text-[#53B175] animate-spin" />
+        <Loader2 size={28} className="text-primary animate-spin" />
       </div>
     );
   }
@@ -152,7 +152,7 @@ export function OffersList({
                     {c.vendorName ? c.vendorName : 'Platform'}
                   </p>
                   <p className="text-[16px] font-black text-[#181725] leading-tight">{c.name}</p>
-                  <p className="text-[13px] font-bold text-[#53B175] mt-0.5">{couponHeadline(c)}</p>
+                  <p className="text-[13px] font-bold text-primary mt-0.5">{couponHeadline(c)}</p>
                   {c.description && (
                     <p className="text-[12px] text-gray-500 font-medium mt-1 line-clamp-2">{c.description}</p>
                   )}
@@ -162,13 +162,13 @@ export function OffersList({
                     {until ? ` · Until ${until}` : ''}
                   </p>
                   <div className="mt-3 flex items-center gap-2">
-                    <span className="flex-1 min-w-0 rounded-xl border border-dashed border-[#53B175]/40 bg-white px-3 py-2 text-[13px] font-black tracking-widest text-[#181725] truncate">
+                    <span className="flex-1 min-w-0 rounded-xl border border-dashed border-primary/40 bg-white px-3 py-2 text-[13px] font-black tracking-widest text-[#181725] truncate">
                       {c.code}
                     </span>
                     <button
                       type="button"
                       onClick={() => copyCode(c.code)}
-                      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#53B175] px-3.5 py-2 text-[12px] font-bold text-white hover:bg-[#48a068] cursor-pointer"
+                      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-[12px] font-bold text-white hover:bg-primary-dark cursor-pointer"
                     >
                       <Copy size={13} strokeWidth={2.5} />
                       Copy
@@ -197,7 +197,7 @@ export function OffersList({
                   <div className="flex items-start gap-3">
                     <div
                       className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        o.kind === 'cashback' ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-[#53B175]'
+                        o.kind === 'cashback' ? 'bg-amber-50 text-amber-600' : 'bg-primary-light text-primary'
                       }`}
                     >
                       {o.kind === 'cashback' ? <Gift size={18} strokeWidth={2} /> : o.type === 'bxgy' ? <Percent size={18} strokeWidth={2} /> : <Store size={18} strokeWidth={2} />}
@@ -208,7 +208,7 @@ export function OffersList({
                         {o.vendorName ? ` · ${o.vendorName}` : ' · Platform'}
                       </p>
                       <p className="text-[15px] font-black text-[#181725] leading-tight mt-0.5">{o.name}</p>
-                      <p className="text-[13px] font-bold text-[#53B175] mt-0.5">{o.badgeLabel}</p>
+                      <p className="text-[13px] font-bold text-primary mt-0.5">{o.badgeLabel}</p>
                       {o.kind === 'cashback' && (
                         <p className="text-[11px] text-gray-400 font-medium mt-0.5">
                           Final amount depends on your cart — confirmed at checkout.
@@ -222,7 +222,7 @@ export function OffersList({
                       )}
                       <Link
                         href={href}
-                        className="inline-flex mt-3 text-[12px] font-bold text-[#53B175] hover:underline"
+                        className="inline-flex mt-3 text-[12px] font-bold text-primary hover:underline"
                       >
                         {o.vendorId ? 'Shop this vendor' : 'Browse vendors'}
                       </Link>

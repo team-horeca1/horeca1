@@ -313,7 +313,7 @@ export default function LoginPageInner() {
                   Don&apos;t have an account?{' '}
                   <Link
                     href={`/register${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`}
-                    className="text-[#53B175] font-[800] hover:underline"
+                    className="text-primary font-[800] hover:underline"
                   >
                     Register
                   </Link>

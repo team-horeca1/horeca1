@@ -782,7 +782,7 @@ export default function CustomersPage() {
                         <>
                             <AdminRegistryOverflowMenuItem
                                 onClick={() => toggleUserActive(u.id, u.isActive)}
-                                icon={u.isActive ? <UserX size={14} className="text-red-400" /> : <UserCheck size={14} className="text-green-400" />}
+                                icon={u.isActive ? <UserX size={14} className="text-red-400" /> : <UserCheck size={14} className="text-success" />}
                                 label={u.isActive ? 'Deactivate' : 'Activate'}
                             />
                             <AdminRegistryOverflowMenuItem
@@ -970,9 +970,9 @@ function ImportCustomersModal({ onClose, onImported }: { onClose: () => void; on
                     {preview && (
                         <div className="space-y-4 animate-in fade-in duration-200">
                             <div className="grid grid-cols-3 gap-3">
-                                <div className="p-3 bg-green-50 border border-green-100 rounded-lg text-center">
-                                    <div className="text-[20px] font-black text-green-700">{preview.creates}</div>
-                                    <div className="text-[11px] font-bold text-green-600 uppercase">To Create</div>
+                                <div className="p-3 bg-success-light border border-success/20 rounded-lg text-center">
+                                    <div className="text-[20px] font-black text-success">{preview.creates}</div>
+                                    <div className="text-[11px] font-bold text-success uppercase">To Create</div>
                                 </div>
                                 <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg text-center">
                                     <div className="text-[20px] font-black text-blue-700">{preview.updates}</div>
@@ -1013,7 +1013,7 @@ function ImportCustomersModal({ onClose, onImported }: { onClose: () => void; on
                                                     <td className="p-2">
                                                         <span className={cn(
                                                             "px-1.5 py-0.5 rounded text-[10px] font-bold capitalize",
-                                                            item.action === 'create' ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"
+                                                            item.action === 'create' ? "bg-success-light text-success" : "bg-blue-50 text-blue-600"
                                                         )}>
                                                             {item.action}
                                                         </span>

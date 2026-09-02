@@ -39,12 +39,12 @@ const TYPE_LABELS: Record<LedgerEntry['type'], string> = {
 };
 
 const TYPE_COLORS: Record<LedgerEntry['type'], string> = {
-  earnings: 'bg-[#EEF8F1] text-[#299E60]',
+  earnings: 'bg-primary-light text-primary',
   refund: 'bg-[#FFF0F0] text-[#E74C3C]',
   settlement: 'bg-purple-50 text-purple-600',
   adjustment: 'bg-blue-50 text-blue-600',
   credit_debit: 'bg-amber-50 text-amber-600',
-  credit_payment: 'bg-[#EEF8F1] text-[#299E60]',
+  credit_payment: 'bg-primary-light text-primary',
 };
 
 const FILTERS: { id: LedgerFilter; label: string }[] = [
@@ -141,7 +141,7 @@ export default function VendorLedgerPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-[14px] border border-[#EEEEEE] p-4">
           <p className="text-[11px] text-[#AEAEAE] font-semibold uppercase tracking-wide">Available balance</p>
-          <p className="text-[20px] font-bold text-[#299E60] mt-0.5">
+          <p className="text-[20px] font-bold text-primary mt-0.5">
             ₹{summary.walletBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </p>
         </div>
@@ -173,7 +173,7 @@ export default function VendorLedgerPage() {
             onClick={() => { setFilter(f.id); setPage(1); }}
             className={cn(
               'px-3 py-1.5 rounded-full text-[12px] font-bold transition-colors',
-              filter === f.id ? 'bg-[#299E60] text-white' : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5]',
+              filter === f.id ? 'bg-primary text-white' : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:bg-[#F5F5F5]',
             )}
           >
             {f.label}
@@ -185,14 +185,14 @@ export default function VendorLedgerPage() {
         <div className="flex items-center gap-2">
           <label className="text-[12px] font-semibold text-[#7C7C7C]">From</label>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-            className="h-[36px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/40 bg-white" />
+            className="h-[36px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-primary/40 bg-white" />
         </div>
         <div className="flex items-center gap-2">
           <label className="text-[12px] font-semibold text-[#7C7C7C]">To</label>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-            className="h-[36px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-[#299E60]/40 bg-white" />
+            className="h-[36px] px-3 rounded-[10px] border border-[#EEEEEE] text-[12px] outline-none focus:border-primary/40 bg-white" />
         </div>
-        <button type="submit" className="h-[36px] px-4 rounded-[10px] bg-[#299E60] text-white text-[12px] font-bold hover:bg-[#238a54]">
+        <button type="submit" className="h-[36px] px-4 rounded-[10px] bg-primary text-white text-[12px] font-bold hover:bg-primary-dark">
           Apply
         </button>
       </form>
@@ -200,14 +200,14 @@ export default function VendorLedgerPage() {
       <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="animate-spin text-[#299E60]" size={28} />
+            <Loader2 className="animate-spin text-primary" size={28} />
           </div>
         ) : entries.length === 0 ? (
           <div className="py-14 text-center px-6">
             <BookOpen size={36} className="text-[#E5E7EB] mx-auto mb-3" />
             <p className="text-[13px] font-bold text-[#AEAEAE]">No ledger entries yet</p>
             <p className="text-[12px] text-[#AEAEAE] mt-1">Earnings appear when orders are marked delivered</p>
-            <Link href="/vendor/wallet" className="inline-block mt-4 text-[12px] font-bold text-[#299E60] hover:underline">
+            <Link href="/vendor/wallet" className="inline-block mt-4 text-[12px] font-bold text-primary hover:underline">
               View wallet →
             </Link>
           </div>
@@ -252,7 +252,7 @@ export default function VendorLedgerPage() {
                           <td className="px-4 py-3 text-right text-[#E74C3C]">
                             {fees > 0 ? `−₹${fees.toLocaleString('en-IN')}` : '—'}
                           </td>
-                          <td className="px-4 py-3 text-right font-semibold text-[#299E60]">
+                          <td className="px-4 py-3 text-right font-semibold text-primary">
                             {entry.credit > 0 ? `+₹${entry.credit.toLocaleString('en-IN')}` : entry.debit > 0 ? `−₹${entry.debit.toLocaleString('en-IN')}` : '—'}
                           </td>
                           <td className="px-4 py-3 text-right font-bold text-[#181725]">

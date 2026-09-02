@@ -161,18 +161,18 @@ function TabBar({
                     onClick={() => onTabChange(tab.key)}
                     className={cn(
                         'pb-3 pt-3 text-[15px] font-bold transition-all relative flex items-center gap-2',
-                        activeTab === tab.key ? 'text-[#53B175]' : 'text-gray-400 hover:text-gray-700'
+                        activeTab === tab.key ? 'text-primary' : 'text-gray-400 hover:text-gray-700'
                     )}
                 >
                     {tab.label}
                     <span className={cn(
                         'text-[11px] font-black px-2 py-0.5 rounded-full',
-                        activeTab === tab.key ? 'bg-[#53B175]/10 text-[#53B175]' : 'bg-gray-100 text-gray-400'
+                        activeTab === tab.key ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-400'
                     )}>
                         {counts[tab.key]}
                     </span>
                     {activeTab === tab.key && (
-                        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#53B175] rounded-full" />
+                        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-primary rounded-full" />
                     )}
                 </button>
             ))}
@@ -439,7 +439,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="w-8 h-8 border-2 border-[#53B175] border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
         );
     }
@@ -452,7 +452,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                     <p className="text-[14px] text-gray-400 font-bold mb-6">
                         This brand store is not available yet.
                     </p>
-                    <Link href="/" className="px-6 py-3 bg-[#53B175] text-white rounded-2xl font-black text-[14px]">
+                    <Link href="/" className="px-6 py-3 bg-primary text-white rounded-2xl font-black text-[14px]">
                         Back to Home
                     </Link>
                 </div>
@@ -497,7 +497,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                     <div>
                         <div className="max-w-[var(--container-max)] mx-auto md:px-[var(--container-padding)] md:pt-6">
                             {/* ─── Banner image — full-bleed hero ─── */}
-                            <div className="relative w-full h-[200px] sm:h-[260px] md:h-[280px] lg:h-[320px] md:rounded-t-[28px] overflow-hidden bg-gradient-to-br from-[#EEF8F1] to-[#d9efe1] md:border md:border-b-0 md:border-[#53B175]/20">
+                            <div className="relative w-full h-[200px] sm:h-[260px] md:h-[280px] lg:h-[320px] md:rounded-t-[28px] overflow-hidden bg-gradient-to-br from-primary-light to-[#d9efe1] md:border md:border-b-0 md:border-primary/20">
                                 {bannerParsed.src ? (
                                     /* eslint-disable-next-line @next/next/no-img-element */
                                     <img
@@ -508,7 +508,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                     />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center">
-                                        <Store size={48} className="text-[#53B175]/40" />
+                                        <Store size={48} className="text-primary/40" />
                                     </div>
                                 )}
                                 {/* Brand-color tint at bottom for clean transition into the info card */}
@@ -525,7 +525,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
 
                                 {/* Brand-store ribbon — green for site theme */}
                                 <div className="absolute top-3 right-3 md:top-4 md:right-4 z-20">
-                                    <span className="inline-flex items-center gap-1.5 bg-[#53B175] text-white text-[10px] md:text-[11px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-md">
+                                    <span className="inline-flex items-center gap-1.5 bg-primary text-white text-[10px] md:text-[11px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-md">
                                         <Store size={11} /> Brand Store
                                     </span>
                                 </div>
@@ -535,7 +535,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                             <div className="relative px-4 md:px-0 -mt-10 md:-mt-12">
                                 {/* Logo bubble — absolute, breaks out above the card so it isn't clipped by overflow-hidden */}
                                 <div className="absolute z-20 -top-12 md:-top-16 left-9 md:left-8">
-                                    <div className="w-[72px] h-[72px] md:w-[100px] md:h-[100px] rounded-2xl overflow-hidden bg-white border-4 border-white shadow-[0_8px_24px_rgba(0,0,0,0.15)] ring-2 ring-[#53B175]/20 flex items-center justify-center">
+                                    <div className="w-[72px] h-[72px] md:w-[100px] md:h-[100px] rounded-2xl overflow-hidden bg-white border-4 border-white shadow-[0_8px_24px_rgba(0,0,0,0.15)] ring-2 ring-primary/20 flex items-center justify-center">
                                         {logoParsed.src ? (
                                             /* eslint-disable-next-line @next/next/no-img-element */
                                             <img
@@ -545,16 +545,16 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                                 style={logoStyle}
                                             />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#EEF8F1] to-[#d9efe1]">
-                                                <span className="text-[30px] md:text-[42px] font-black text-[#53B175]">{brand.name[0]}</span>
+                                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-light to-[#d9efe1]">
+                                                <span className="text-[30px] md:text-[42px] font-black text-primary">{brand.name[0]}</span>
                                             </div>
                                         )}
                                     </div>
                                 </div>
 
-                                <div className="bg-white rounded-2xl md:rounded-b-[28px] md:rounded-t-none border border-[#53B175]/20 md:border-t-0 shadow-[0_10px_30px_rgba(83,177,117,0.12)] overflow-hidden">
+                                <div className="bg-white rounded-2xl md:rounded-b-[28px] md:rounded-t-none border border-primary/20 md:border-t-0 shadow-[0_10px_30px_rgba(107, 29, 46, )] overflow-hidden">
                                     {/* Thin green accent line at top — ties to site theme */}
-                                    <div className="h-1 bg-gradient-to-r from-[#53B175] via-[#22844f] to-[#53B175]" />
+                                    <div className="h-1 bg-gradient-to-r from-primary via-primary-dark to-primary" />
 
                                     {/* Content padded on left to clear the absolute logo */}
                                     <div className="pl-[110px] md:pl-[150px] pr-5 md:pr-8 py-5 md:py-6">
@@ -570,18 +570,18 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                                     </p>
                                                 )}
                                                 <div className="flex items-center gap-2 md:gap-3 mt-3 flex-wrap">
-                                                    <span className="inline-flex items-center gap-1.5 bg-[#EEF8F1] border border-[#53B175]/20 px-2.5 py-1 rounded-full text-[11px] md:text-[12px] font-bold">
-                                                        <Store size={11} className="text-[#53B175]" />
+                                                    <span className="inline-flex items-center gap-1.5 bg-primary-light border border-primary/20 px-2.5 py-1 rounded-full text-[11px] md:text-[12px] font-bold">
+                                                        <Store size={11} className="text-primary" />
                                                         <span className="text-[#181725] font-[900]">{brand.products.length}</span>
-                                                        <span className="text-[#2e7d46]">products</span>
+                                                        <span className="text-primary">products</span>
                                                     </span>
-                                                    <span className="inline-flex items-center gap-1.5 bg-[#EEF8F1] border border-[#53B175]/20 px-2.5 py-1 rounded-full text-[11px] md:text-[12px] font-bold">
-                                                        <MapPin size={11} className="text-[#53B175]" />
+                                                    <span className="inline-flex items-center gap-1.5 bg-primary-light border border-primary/20 px-2.5 py-1 rounded-full text-[11px] md:text-[12px] font-bold">
+                                                        <MapPin size={11} className="text-primary" />
                                                         <span className="text-[#181725] font-[900]">{brand.vendors.length}</span>
-                                                        <span className="text-[#2e7d46]">distributors</span>
+                                                        <span className="text-primary">distributors</span>
                                                     </span>
                                                     {pincode && brand.coverage && brand.coverage.servicedVendorCount > 0 && (
-                                                        <span className="inline-flex items-center gap-1.5 bg-[#53B175] text-white px-2.5 py-1 rounded-full text-[11px] md:text-[12px] font-bold">
+                                                        <span className="inline-flex items-center gap-1.5 bg-primary text-white px-2.5 py-1 rounded-full text-[11px] md:text-[12px] font-bold">
                                                             <Check size={11} strokeWidth={3} />
                                                             <span className="font-[900]">{brand.coverage.servicedVendorCount}</span>
                                                             <span className="hidden md:inline">in {pincode}</span>
@@ -594,7 +594,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                             <div className="hidden md:block shrink-0">
                                                 <button
                                                     onClick={() => handleTabChange('items')}
-                                                    className="bg-gradient-to-br from-[#53B175] to-[#3d9e5f] text-white px-5 lg:px-7 py-2.5 lg:py-3 rounded-xl flex items-center gap-1.5 text-[13px] lg:text-[14px] font-bold hover:from-[#3d9e5f] hover:to-[#2e7d46] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_8px_20px_rgba(83,177,117,0.35)]"
+                                                    className="bg-gradient-to-br from-primary to-primary-dark-dark text-white px-5 lg:px-7 py-2.5 lg:py-3 rounded-xl flex items-center gap-1.5 text-[13px] lg:text-[14px] font-bold hover:from-primary-dark hover:to-primary hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_8px_20px_rgba(107, 29, 46, )]"
                                                 >
                                                     Explore Items
                                                     <ChevronLeft size={16} strokeWidth={3} className="rotate-180" />
@@ -605,7 +605,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                         {/* Mobile CTA — full width below */}
                                         <button
                                             onClick={() => handleTabChange('items')}
-                                            className="md:hidden mt-4 w-full bg-gradient-to-br from-[#53B175] to-[#3d9e5f] text-white py-3 rounded-xl flex items-center justify-center gap-1.5 text-[13px] font-bold active:scale-[0.98] transition-transform shadow-[0_6px_16px_rgba(83,177,117,0.3)]"
+                                            className="md:hidden mt-4 w-full bg-gradient-to-br from-primary to-primary-dark-dark text-white py-3 rounded-xl flex items-center justify-center gap-1.5 text-[13px] font-bold active:scale-[0.98] transition-transform shadow-[0_6px_16px_rgba(107, 29, 46, )]"
                                         >
                                             Explore Items
                                             <ChevronLeft size={14} strokeWidth={3} className="rotate-180" />
@@ -651,14 +651,14 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                             </div>
                         </div>
                     ) : (
-                        <div className="mb-5 px-4 py-2.5 bg-[#EEF8F1] border border-[#53B175]/20 rounded-2xl flex items-center gap-2">
-                            <span className="text-[12px] text-[#2e7d46] font-semibold">
+                        <div className="mb-5 px-4 py-2.5 bg-primary-light border border-primary/20 rounded-2xl flex items-center gap-2">
+                            <span className="text-[12px] text-primary font-semibold">
                                 Showing {brand.coverage.servicedVendorCount} distributor{brand.coverage.servicedVendorCount !== 1 ? 's' : ''} delivering to {pincode}
                             </span>
                             {brand.coverage.totalVendorCount > brand.coverage.servicedVendorCount && (
                                 <button
                                     onClick={() => setShowAllVendors(true)}
-                                    className="ml-auto text-[12px] font-bold text-[#53B175] hover:underline"
+                                    className="ml-auto text-[12px] font-bold text-primary hover:underline"
                                 >
                                     Show all {brand.coverage.totalVendorCount}
                                 </button>
@@ -673,7 +673,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                         </span>
                         <button
                             onClick={() => setShowAllVendors(false)}
-                            className="text-[12px] font-bold text-[#53B175] hover:underline"
+                            className="text-[12px] font-bold text-primary hover:underline"
                         >
                             Filter to my pincode
                         </button>
@@ -687,13 +687,13 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                         <div className="relative flex-1 md:max-w-[450px] lg:max-w-[600px] flex items-center gap-2 md:gap-3">
                             <div className="relative flex-1">
-                                <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 focus-within:text-[#53B175] transition-colors" strokeWidth={3} />
+                                <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 focus-within:text-primary transition-colors" strokeWidth={3} />
                                 <input
                                     type="text"
                                     placeholder={`Search in ${brand.name}...`}
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-11 pr-10 py-3 bg-white border border-gray-100 rounded-2xl text-[14px] font-bold text-gray-800 placeholder:text-gray-400 placeholder:font-bold focus:outline-none focus:border-[#53B175]/50 focus:bg-white focus:ring-8 focus:ring-[#53B175]/5 transition-all duration-300 shadow-sm"
+                                    className="w-full pl-11 pr-10 py-3 bg-white border border-gray-100 rounded-2xl text-[14px] font-bold text-gray-800 placeholder:text-gray-400 placeholder:font-bold focus:outline-none focus:border-primary/50 focus:bg-white focus:ring-8 focus:ring-primary/5 transition-all duration-300 shadow-sm"
                                 />
                                 {searchQuery && (
                                     <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-xl bg-gray-100 text-gray-400 hover:bg-gray-200 transition">
@@ -709,7 +709,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                     aria-label="Grid view"
                                     className={cn(
                                         'p-2 rounded-xl transition-all',
-                                        layoutMode === 'grid' ? 'bg-[#53B175] text-white shadow-sm' : 'text-gray-400 hover:text-[#53B175]'
+                                        layoutMode === 'grid' ? 'bg-primary text-white shadow-sm' : 'text-gray-400 hover:text-primary'
                                     )}
                                 >
                                     <LayoutGrid size={16} strokeWidth={2.5} />
@@ -719,7 +719,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                     aria-label="List view"
                                     className={cn(
                                         'p-2 rounded-xl transition-all',
-                                        layoutMode === 'list' ? 'bg-[#53B175] text-white shadow-sm' : 'text-gray-400 hover:text-[#53B175]'
+                                        layoutMode === 'list' ? 'bg-primary text-white shadow-sm' : 'text-gray-400 hover:text-primary'
                                     )}
                                 >
                                     <LayoutList size={16} strokeWidth={2.5} />
@@ -738,19 +738,19 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                     onClick={() => setCatalogTab('all')}
                                     className={cn(
                                         "w-full rounded-xl transition-all text-left flex flex-col items-center md:flex-row md:items-center md:justify-between px-1 md:px-3 py-2 md:py-2.5",
-                                        catalogTab === 'all' ? "bg-[#53B175]/10" : "hover:bg-gray-50"
+                                        catalogTab === 'all' ? "bg-primary/10" : "hover:bg-gray-50"
                                     )}
                                 >
                                     <div className="flex flex-col items-center md:flex-row md:items-center md:gap-3 min-w-0 w-full">
                                         <div className={cn(
                                             "w-12 h-12 md:w-9 md:h-9 rounded-lg flex items-center justify-center transition-all shrink-0",
-                                            catalogTab === 'all' ? "bg-white border border-[#53B175]/30 shadow-sm" : "bg-gray-50"
+                                            catalogTab === 'all' ? "bg-white border border-primary/30 shadow-sm" : "bg-gray-50"
                                         )}>
-                                            <LayoutGrid className={cn('w-5 h-5 md:w-4 md:h-4', catalogTab === 'all' ? 'text-[#53B175]' : 'text-gray-400')} strokeWidth={2} />
+                                            <LayoutGrid className={cn('w-5 h-5 md:w-4 md:h-4', catalogTab === 'all' ? 'text-primary' : 'text-gray-400')} strokeWidth={2} />
                                         </div>
                                         <span className={cn(
                                             "text-[10px] md:text-[13px] font-semibold md:font-bold leading-tight text-center md:text-left mt-1 md:mt-0 line-clamp-2 md:line-clamp-none md:truncate w-full md:flex-1",
-                                            catalogTab === 'all' ? "text-[#53B175]" : "text-[#181725]"
+                                            catalogTab === 'all' ? "text-primary" : "text-[#181725]"
                                         )}>
                                             All Products
                                         </span>
@@ -767,12 +767,12 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                             onClick={() => setCatalogTab(`cat:${parent.name}`)}
                                             className={cn(
                                                 "w-full mt-1 rounded-xl transition-all text-left flex flex-col items-center md:flex-row md:items-center md:gap-3 px-1 md:px-3 py-2 md:py-2.5 min-w-0",
-                                                isParentActive ? "bg-[#53B175]/10" : "hover:bg-gray-50"
+                                                isParentActive ? "bg-primary/10" : "hover:bg-gray-50"
                                             )}
                                         >
                                             <div className={cn(
                                                 "w-12 h-12 md:w-9 md:h-9 rounded-lg flex items-center justify-center overflow-hidden relative transition-all shrink-0",
-                                                isParentActive ? "bg-white border border-[#53B175]/30 shadow-sm" : "bg-gray-50"
+                                                isParentActive ? "bg-white border border-primary/30 shadow-sm" : "bg-gray-50"
                                             )}>
                                                 {parent.image ? (
                                                     <Image src={parent.image} alt={parent.name} width={36} height={36} className="object-contain w-full h-full p-1" />
@@ -782,7 +782,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                             </div>
                                             <span className={cn(
                                                 "text-[10px] md:text-[13px] font-semibold md:font-bold leading-tight text-center md:text-left mt-1 md:mt-0 line-clamp-2 md:line-clamp-none md:truncate w-full md:flex-1",
-                                                isParentActive ? "text-[#53B175]" : "text-[#181725]"
+                                                isParentActive ? "text-primary" : "text-[#181725]"
                                             )}>
                                                 {parent.name}
                                             </span>
@@ -804,7 +804,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                                 key={child.id}
                                                 type="button"
                                                 onClick={() => setCatalogTab(`cat:${child.name}`)}
-                                                className="group bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:border-[#53B175]/40 transition-all flex flex-col items-center text-center"
+                                                className="group bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:border-primary/40 transition-all flex flex-col items-center text-center"
                                             >
                                                 <div className="w-20 h-20 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden mb-3">
                                                     {child.image ? (
@@ -813,7 +813,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                                         <Package size={28} className="text-gray-300" strokeWidth={1.5} />
                                                     )}
                                                 </div>
-                                                <span className="text-[13px] font-bold text-[#181725] group-hover:text-[#53B175] transition-colors line-clamp-2">{child.name}</span>
+                                                <span className="text-[13px] font-bold text-[#181725] group-hover:text-primary transition-colors line-clamp-2">{child.name}</span>
                                                 <span className="text-[11px] font-bold text-gray-400 mt-1">{child.count} items</span>
                                             </button>
                                         ))}
@@ -918,7 +918,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                     <div>
                         {/* Selected product context bar */}
                         {selectedProduct && (
-                            <div className="flex items-center gap-3 mb-5 p-4 bg-white rounded-[16px] border border-[#53B175]/20">
+                            <div className="flex items-center gap-3 mb-5 p-4 bg-white rounded-[16px] border border-primary/20">
                                 <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden shrink-0">
                                     <img
                                         src={resolveProductImage(selectedProduct)}
@@ -933,7 +933,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                 </div>
                                 <button
                                     onClick={() => handleTabChange('items')}
-                                    className="flex items-center gap-1.5 text-[12px] font-black text-[#53B175] shrink-0 hover:underline"
+                                    className="flex items-center gap-1.5 text-[12px] font-black text-primary shrink-0 hover:underline"
                                 >
                                     <ArrowLeft size={13} strokeWidth={3} />
                                     All Items
@@ -953,11 +953,11 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                     <Link
                                         key={vendor.id}
                                         href={`/vendor/${vendor.id}`}
-                                        className="flex items-center gap-4 p-5 bg-white rounded-[20px] border border-gray-100 hover:border-[#53B175]/30 hover:shadow-lg hover:shadow-gray-100 transition-all duration-200 group"
+                                        className="flex items-center gap-4 p-5 bg-white rounded-[20px] border border-gray-100 hover:border-primary/30 hover:shadow-lg hover:shadow-gray-100 transition-all duration-200 group"
                                     >
                                         <VendorAvatar name={vendor.name} logo={vendor.logo} size={80} rounded="18px" fit="cover" />
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-[16px] font-black text-[#181725] group-hover:text-[#53B175] transition-colors truncate">
+                                            <p className="text-[16px] font-black text-[#181725] group-hover:text-primary transition-colors truncate">
                                                 {vendor.name}
                                             </p>
                                             <p className="text-[12px] text-gray-400 font-bold flex items-center gap-1 mt-1">
@@ -966,11 +966,11 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                             </p>
                                             {selectedProduct && vendor.prices[selectedProduct.id] ? (
                                                 <div className="flex items-center gap-2 mt-2">
-                                                    <span className="text-[18px] font-[1000] text-[#53B175]">
+                                                    <span className="text-[18px] font-[1000] text-primary">
                                                         ₹{vendor.prices[selectedProduct.id]}
                                                     </span>
-                                                    <span className="flex items-center gap-1 text-[11px] font-black text-green-600">
-                                                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                                                    <span className="flex items-center gap-1 text-[11px] font-black text-success">
+                                                        <span className="w-1.5 h-1.5 bg-success-light0 rounded-full" />
                                                         In Stock
                                                     </span>
                                                 </div>
@@ -1017,7 +1017,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-[13px] font-bold text-[#181725] truncate">{dist.vendorName}</p>
                                                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                                    <span className="text-[16px] font-[1000] text-[#53B175]">₹{dist.price}</span>
+                                                    <span className="text-[16px] font-[1000] text-primary">₹{dist.price}</span>
                                                     {!dist.inStock && <span className="text-[10px] font-bold text-red-500">Out of stock</span>}
                                                     {nonServiceable && (
                                                         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md">
@@ -1031,7 +1031,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                                 <Link
                                                     href={`/vendor/${dist.vendorId}`}
                                                     onClick={() => setVendorPickerProduct(null)}
-                                                    className="px-3 py-1.5 rounded-lg text-[12px] font-bold flex items-center gap-1 bg-white border border-[#53B175]/30 text-[#53B175] hover:bg-[#EEF8F1] shrink-0"
+                                                    className="px-3 py-1.5 rounded-lg text-[12px] font-bold flex items-center gap-1 bg-white border border-primary/30 text-primary hover:bg-primary-light shrink-0"
                                                 >
                                                     View vendor
                                                     <ChevronRight size={12} strokeWidth={3} />
@@ -1042,7 +1042,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                                     disabled={addDisabled}
                                                     className={cn(
                                                         'px-3 py-1.5 rounded-lg text-[12px] font-bold flex items-center gap-1 transition-colors shrink-0',
-                                                        dist.inStock ? 'bg-[#53B175] text-white hover:bg-[#3d9e5f]' : 'bg-gray-100 text-gray-400 cursor-not-allowed',
+                                                        dist.inStock ? 'bg-primary text-white hover:bg-primary-dark' : 'bg-gray-100 text-gray-400 cursor-not-allowed',
                                                         isAdding && 'opacity-60'
                                                     )}
                                                 >

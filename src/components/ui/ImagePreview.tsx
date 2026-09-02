@@ -107,7 +107,7 @@ export function ImagePreviewStack({
     return (
         <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 space-y-4">
             <p className="text-[12px] font-bold text-gray-700 flex items-center gap-1.5">
-                <Eye size={12} className="text-[#53B175]" /> {title}
+                <Eye size={12} className="text-primary" /> {title}
             </p>
             <div className="flex flex-wrap gap-4">
                 {items.map((it, i) => (

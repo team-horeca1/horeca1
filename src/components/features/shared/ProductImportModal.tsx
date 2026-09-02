@@ -609,7 +609,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                     <React.Fragment key={s}>
                       <div className={cn(
                         'w-[8px] h-[8px] rounded-full transition-colors',
-                        step === s ? 'bg-[#299E60]' : i < ['upload', 'review', 'result'].indexOf(step) ? 'bg-[#299E60]/40' : 'bg-[#DCDCDC]',
+                        step === s ? 'bg-primary' : i < ['upload', 'review', 'result'].indexOf(step) ? 'bg-primary/40' : 'bg-[#DCDCDC]',
                       )} />
                       {i < 2 && <div className="w-[16px] h-[2px] bg-[#EEEEEE]" />}
                     </React.Fragment>
@@ -658,7 +658,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                     onClick={() => fileRef.current?.click()}
                     className={cn(
                       'border-2 border-dashed rounded-[12px] p-10 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[220px]',
-                      isDragOver ? 'border-[#299E60] bg-[#EEF8F1]/40' : 'border-[#EEEEEE] hover:border-[#299E60]/50 hover:bg-[#EEF8F1]/10',
+                      isDragOver ? 'border-primary bg-primary-light/40' : 'border-[#EEEEEE] hover:border-primary/50 hover:bg-primary-light/10',
                     )}
                   >
                     <Upload size={32} className="text-[#AEAEAE] mb-3" />
@@ -679,7 +679,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
 
                 <div className="flex items-center justify-end gap-3 pt-2">
                   <button onClick={handleClose} className="h-[44px] px-6 text-[13px] font-bold text-[#7C7C7C] hover:text-[#181725] transition-colors">Cancel</button>
-                  <button onClick={handlePreview} disabled={!file || parsing} className="h-[44px] px-8 bg-[#299E60] hover:bg-[#238a54] disabled:bg-[#DCDCDC] text-white rounded-[12px] text-[13px] font-bold flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed">
+                  <button onClick={handlePreview} disabled={!file || parsing} className="h-[44px] px-8 bg-primary hover:bg-primary-dark disabled:bg-[#DCDCDC] text-white rounded-[12px] text-[13px] font-bold flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed">
                     {parsing ? <Loader2 size={15} className="animate-spin" /> : <ArrowRight size={15} />}
                     {parsing ? 'Parsing file...' : 'Next'}
                   </button>
@@ -694,7 +694,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                 <div className="flex items-center justify-between py-2 px-4 bg-white border border-[#EEEEEE] rounded-[10px] shadow-sm flex-wrap gap-3">
                   <div className="flex items-center gap-6">
                     <p className="text-[13px] text-[#7C7C7C] font-semibold">Total: <strong className="text-[#181725]">{preview.totalRows}</strong></p>
-                    <p className="text-[13px] text-emerald-600 font-semibold">Create: <strong>{preview.creates}</strong></p>
+                    <p className="text-[13px] text-success font-semibold">Create: <strong>{preview.creates}</strong></p>
                     <p className="text-[13px] text-blue-600 font-semibold">Update: <strong>{preview.updates}</strong></p>
                     {skipRows.size > 0 && <p className="text-[13px] text-amber-600 font-semibold">Skip: <strong>{skipRows.size}</strong></p>}
                   </div>
@@ -750,10 +750,10 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                             const rowBg = skipped
                               ? 'bg-[#FAFAFA]'
                               : hasLocalEdits ? 'bg-amber-50/50'
-                              : item.action === 'create' ? 'bg-emerald-50/25'
+                              : item.action === 'create' ? 'bg-success-light/25'
                               : 'bg-white';
                             return (
-                              <tr key={item.row} className={cn(rowBg, skipped && 'opacity-40', 'border-b border-[#EFEFEF] hover:bg-[#299E60]/[0.04]')}>
+                              <tr key={item.row} className={cn(rowBg, skipped && 'opacity-40', 'border-b border-[#EFEFEF] hover:bg-primary/[0.04]')}>
                                 <td className={cn('px-2 py-1 text-center font-semibold text-[#9CA3AF] sticky left-0 z-20 border-r border-[#EFEFEF]', rowBg)}>{item.row}</td>
                                 <td className={cn('px-1 py-0.5 sticky left-[44px] z-20 border-r border-[#EFEFEF]', rowBg)}>
                                   <input type="text" value={getVal(item, 'name')} onChange={e => setVal(item.row, 'name', e.target.value)} className={cellInput} />
@@ -764,7 +764,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                                       return (
                                         <td key={col.key} className="px-2 py-1 text-center">
                                           <span className={cn('inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide',
-                                            item.action === 'create' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-700')}>
+                                            item.action === 'create' ? 'bg-success-light text-success' : 'bg-blue-100 text-blue-700')}>
                                             {item.action === 'create' ? 'New' : 'Upd'}
                                           </span>
                                         </td>
@@ -868,7 +868,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                                             type="checkbox"
                                             checked={getVal(item, col.key) === true || String(getVal(item, col.key)).toLowerCase() === 'true'}
                                             onChange={(e) => setVal(item.row, col.key, e.target.checked)}
-                                            className="w-4 h-4 accent-[#299E60] cursor-pointer"
+                                            className="w-4 h-4 accent-primary cursor-pointer"
                                           />
                                         </div>
                                       </td>
@@ -878,7 +878,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                                   if (col.type === 'select') {
                                     const val = getVal(item, col.key);
                                     return (
-                                      <td key={col.key} className={cn("px-1 py-0.5 focus-within:ring-1 focus-within:ring-[#299E60]", col.width, col.bg || '')}>
+                                      <td key={col.key} className={cn("px-1 py-0.5 focus-within:ring-1 focus-within:ring-primary", col.width, col.bg || '')}>
                                         <select
                                           value={val}
                                           onChange={e => setVal(item.row, col.key, e.target.value || undefined)}
@@ -897,7 +897,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
 
                                   // Default inputs
                                   return (
-                                    <td key={col.key} className={cn("p-0 focus-within:ring-1 focus-within:ring-[#299E60]", col.width, col.bg || '')}>
+                                    <td key={col.key} className={cn("p-0 focus-within:ring-1 focus-within:ring-primary", col.width, col.bg || '')}>
                                       <input
                                         type={col.type}
                                         value={getVal(item, col.key)}
@@ -944,7 +944,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                           <h4 className="text-[18px] font-black text-[#181725]">{currentItem.name}</h4>
                         </div>
                         <span className={cn('px-2.5 py-1 rounded text-[11px] font-extrabold uppercase tracking-wide',
-                          currentItem.action === 'create' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800')}>
+                          currentItem.action === 'create' ? 'bg-success-light text-success' : 'bg-blue-100 text-blue-800')}>
                           {currentItem.action === 'create' ? 'Create new item' : 'Update existing'}
                         </span>
                       </div>
@@ -1063,7 +1063,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-3 pt-3">
                   <button onClick={() => setStep('upload')} className="h-[44px] px-6 text-[13px] font-bold text-[#7C7C7C] hover:text-[#181725] transition-colors">Back</button>
-                  <button onClick={() => handleCommit()} disabled={committing || activeItems.length === 0} className="h-[44px] px-8 bg-[#299E60] hover:bg-[#238a54] disabled:bg-[#DCDCDC] text-white rounded-[12px] text-[13px] font-bold flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed">
+                  <button onClick={() => handleCommit()} disabled={committing || activeItems.length === 0} className="h-[44px] px-8 bg-primary hover:bg-primary-dark disabled:bg-[#DCDCDC] text-white rounded-[12px] text-[13px] font-bold flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed">
                     {committing ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
                     {committing ? 'Importing…' : `Import ${activeItems.length} product${activeItems.length === 1 ? '' : 's'}`}
                   </button>
@@ -1085,7 +1085,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                     </>
                   ) : (
                     <>
-                      <div className="w-[64px] h-[64px] rounded-full bg-[#EBFDF2] flex items-center justify-center text-[#299E60] border border-[#299E60]/10 shadow-sm">
+                      <div className="w-[64px] h-[64px] rounded-full bg-[#EBFDF2] flex items-center justify-center text-primary border border-primary/10 shadow-sm">
                         <Check size={32} strokeWidth={3} />
                       </div>
                       <h3 className="text-[22px] font-black text-[#181725]">Import complete</h3>
@@ -1096,7 +1096,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
 
                 <div className="grid grid-cols-2 gap-4 bg-white border border-[#EEEEEE] rounded-[16px] p-6 shadow-sm">
                   <div className="text-center border-r border-[#EEEEEE]">
-                    <p className="text-[32px] font-black text-[#299E60]">{result.created}</p>
+                    <p className="text-[32px] font-black text-primary">{result.created}</p>
                     <p className="text-[12px] font-bold text-[#AEAEAE] uppercase tracking-wider mt-1">Created new</p>
                   </div>
                   <div className="text-center">
@@ -1121,7 +1121,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                 )}
 
                 {result.blocked && (
-                  <button onClick={() => handleCommit(true)} disabled={committing} className="h-[44px] w-full px-8 bg-[#299E60] hover:bg-[#238a54] disabled:bg-[#DCDCDC] text-white rounded-[12px] text-[13px] font-bold flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed">
+                  <button onClick={() => handleCommit(true)} disabled={committing} className="h-[44px] w-full px-8 bg-primary hover:bg-primary-dark disabled:bg-[#DCDCDC] text-white rounded-[12px] text-[13px] font-bold flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed">
                     {committing ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} strokeWidth={3} />}
                     {committing ? 'Committing…' : 'Commit valid rows anyway'}
                   </button>
@@ -1163,9 +1163,9 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
   );
 }
 
-const selectCls = 'w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] font-medium outline-none focus:border-[#299E60]/40 focus:ring-2 focus:ring-[#299E60]/10 bg-[#FAFAFA] focus:bg-white transition-all';
+const selectCls = 'w-full h-[40px] border border-[#EEEEEE] rounded-[10px] px-3 text-[13px] font-medium outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/10 bg-[#FAFAFA] focus:bg-white transition-all';
 const inputCls = selectCls;
-const cellInput = 'bg-transparent border border-transparent hover:border-[#D1D5DB] focus:border-[#299E60] focus:bg-white focus:ring-1 focus:ring-[#299E60]/20 px-1.5 py-1 rounded-[4px] outline-none w-full text-[11.5px] tabular-nums';
+const cellInput = 'bg-transparent border border-transparent hover:border-[#D1D5DB] focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary/20 px-1.5 py-1 rounded-[4px] outline-none w-full text-[11.5px] tabular-nums';
 
 function FieldGroup({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
   return (

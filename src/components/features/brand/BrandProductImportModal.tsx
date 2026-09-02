@@ -98,11 +98,11 @@ export default function BrandProductImportModal({ open, onClose, onComplete }: P
           </div>
 
           <div
-            className="border-2 border-dashed border-[#EEEEEE] rounded-[12px] p-8 text-center cursor-pointer hover:border-[#53B175] transition-colors"
+            className="border-2 border-dashed border-[#EEEEEE] rounded-[12px] p-8 text-center cursor-pointer hover:border-primary transition-colors"
             onClick={() => !uploading && fileRef.current?.click()}
           >
             {uploading ? (
-              <Loader2 className="w-8 h-8 animate-spin text-[#53B175] mx-auto" />
+              <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
             ) : (
               <>
                 <Upload className="w-8 h-8 text-[#AEAEAE] mx-auto mb-2" />

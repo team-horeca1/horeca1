@@ -285,7 +285,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 <button
                     onClick={(e) => handleAdd(e, 1)}
                     className={cn(
-                        "w-full rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all duration-300 active:scale-[0.98] border bg-gradient-to-r from-primary to-primary-dark text-white border-primary shadow-[0_6px_18px_-6px_rgba(107,29,46,0.45)] hover:shadow-[0_10px_24px_-6px_rgba(107,29,46,0.55)]",
+                        "w-full rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all duration-300 active:scale-[0.98] border bg-gradient-to-r from-primary to-primary-dark-dark text-white border-primary shadow-[0_6px_18px_-6px_rgba(107,29,46,0.45)] hover:shadow-[0_10px_24px_-6px_rgba(107,29,46,0.55)]",
                         compact ? "text-[12px] py-2" : "text-[13px] py-3 rounded-2xl"
                     )}
                 >
@@ -419,7 +419,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 ) : (
                     <>
                         {product.customerPriceApplied ? (
-                            <span className="bg-gradient-to-r from-primary to-primary-dark text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-primary/20 tracking-wide">
+                            <span className="bg-gradient-to-r from-primary to-primary-dark-dark text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-primary/20 tracking-wide">
                                 Your price
                             </span>
                         ) : product.storePromotion ? (
@@ -626,7 +626,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         ) : (
                             <div className="flex flex-col gap-2">
                                 <div className="flex items-center gap-2 text-gray-600">
-                                    <div className="w-5 h-5 rounded-full bg-green-50 flex items-center justify-center text-primary shrink-0">
+                                    <div className="w-5 h-5 rounded-full bg-success-light flex items-center justify-center text-primary shrink-0">
                                         <CheckCircle size={12} strokeWidth={3} />
                                     </div>
                                     <span className="text-[12px] font-bold">100% Quality Assured</span>
@@ -1099,7 +1099,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                                 {alt.inventory && (
                                                     <span className={cn(
                                                         'text-[10px] font-bold',
-                                                        alt.inventory.qtyAvailable > 0 ? 'text-green-600' : 'text-red-500'
+                                                        alt.inventory.qtyAvailable > 0 ? 'text-success' : 'text-red-500'
                                                     )}>
                                                         {alt.inventory.qtyAvailable > 0 ? `${alt.inventory.qtyAvailable} in stock` : 'Out of stock'}
                                                     </span>
