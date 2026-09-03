@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { Share2, ArrowRight } from 'lucide-react';
 import { SectionHeader } from '@/components/ui/SectionHeader';
@@ -48,23 +49,37 @@ export function VoicesSection() {
   };
 
   return (
-    <section className="w-full py-6 bg-white">
+    <section className="w-full py-6 md:py-8 bg-white">
       <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
-        <SectionHeader title="Horeca1 Voices" subtitle="Stories from the industry, for the industry" actionLabel="Meet more →" actionHref="/voices" />
+        <SectionHeader
+          title="Horeca1 Voices"
+          subtitle="Stories from the industry, for the industry"
+          actionLabel="Meet more →"
+          actionHref="/voices"
+        />
         <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
           {stories.map((s) => (
             <article
               key={s.id}
               className="min-w-[240px] max-w-[280px] shrink-0 bg-ivory border border-divider rounded-xl overflow-hidden shadow-cdl-1"
             >
-              <div className="h-[120px] bg-gradient-to-br from-beige to-cream relative">
-                <span className="absolute top-2 left-2 bg-primary text-white text-[9px] font-bold px-2 py-1 rounded-md">
+              <div className="relative h-[120px] bg-gradient-to-br from-[#E9E3DD] to-[#FAF5EC]">
+                {s.photoUrl ? (
+                  <Image
+                    src={s.photoUrl}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    sizes="280px"
+                  />
+                ) : null}
+                <span className="absolute top-2 left-2 bg-primary text-white text-[9px] font-bold px-2 py-1 rounded-md z-[1]">
                   {s.badge}
                 </span>
                 <button
                   type="button"
                   onClick={() => share(s.slug, s.name)}
-                  className="absolute top-2 right-2 size-8 rounded-full bg-white/95 flex items-center justify-center border border-divider"
+                  className="absolute top-2 right-2 size-8 rounded-full bg-white/95 flex items-center justify-center border border-divider z-[1]"
                   aria-label="Share story"
                 >
                   <Share2 size={14} className="text-primary" />

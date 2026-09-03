@@ -43,6 +43,8 @@ const CATEGORY_IMAGE_MAP: Record<string, string> = {
   'seafood': '/images/category/fish & meat.png',
   'beverages-drinks': '/images/category/drink-juice.png',
   'soft-drinks-water': '/images/category/drink-juice.png',
+  'water': '/images/category/drink-juice.png',
+  'mineral-water': '/images/category/drink-juice.png',
   'tea-coffee': '/images/category/drink-juice.png',
   'juices-energy': '/images/category/drink-juice.png',
   'bakery-frozen': '/images/category/desset.png',
@@ -54,6 +56,14 @@ const CATEGORY_IMAGE_MAP: Record<string, string> = {
   'snacks-confectionery': '/images/category/candy.png',
   'snacks-namkeen': '/images/category/snacks.png',
   'sweets-confectionery': '/images/category/candy.png',
+};
+
+// Direct image overrides for bad/corrupt database entries (e.g. webpage screenshots)
+const OVERRIDE_CATEGORY_IMAGES: Record<string, string> = {
+  'water': '/images/category/drink-juice.png',
+  'soft-drinks-water': '/images/category/drink-juice.png',
+  'beverages-drinks': '/images/category/drink-juice.png',
+  'mineral-water': '/images/category/drink-juice.png',
 };
 
 interface CategoryShowcaseProps {
@@ -254,7 +264,9 @@ interface MobileCategoryCardProps {
 
 function MobileCategoryCard({ cat, activeCategory, onCategoryClick }: MobileCategoryCardProps) {
   const isActive = activeCategory === cat.name || activeCategory === `cat:${cat.name}`;
-  const imageSrc = CATEGORY_IMAGE_MAP[cat.slug] || cat.image || '/images/category/vegitable.png';
+  const normalizedSlug = cat.slug || cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const isBadImage = cat.image && (cat.image.includes('screenshot') || cat.image.includes('localhost') || cat.image.includes('66789-1788356520630_0xlKolVR5') || cat.image.length > 300);
+  const imageSrc = OVERRIDE_CATEGORY_IMAGES[normalizedSlug] || OVERRIDE_CATEGORY_IMAGES[cat.slug] || (!isBadImage && cat.image ? cat.image : null) || CATEGORY_IMAGE_MAP[normalizedSlug] || CATEGORY_IMAGE_MAP[cat.slug] || '/images/category/vegitable.png';
 
   const content = (
     <div className="w-full flex flex-col items-center text-center">
@@ -311,30 +323,35 @@ interface DesktopCategoryCardProps {
 
 const DesktopCategoryCard = ({ cat, activeCategory, onCategoryClick }: DesktopCategoryCardProps) => {
   const isActive = activeCategory === `cat:${cat.name}` || activeCategory === cat.name;
-  const sharedClass = "flex flex-col items-center group transition-transform active:scale-95 w-full";
+  const sharedClass = "flex flex-col items-center group transition-all w-full cursor-pointer";
+  
+  // Resolve crisp product cutout and filter out bad/screenshot images
+  const normalizedSlug = cat.slug || cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const isBadImage = cat.image && (cat.image.includes('screenshot') || cat.image.includes('localhost') || cat.image.includes('66789-1788356520630_0xlKolVR5') || cat.image.length > 300);
+  const imageSrc = OVERRIDE_CATEGORY_IMAGES[normalizedSlug] || OVERRIDE_CATEGORY_IMAGES[cat.slug] || (!isBadImage && cat.image ? cat.image : null) || CATEGORY_IMAGE_MAP[normalizedSlug] || CATEGORY_IMAGE_MAP[cat.slug] || '/images/category/vegitable.png';
+
   const content = (
     <>
       <div
         className={cn(
-          "w-full aspect-square rounded-xl flex items-center justify-center mb-2 overflow-hidden relative border transition-all duration-200",
+          "w-full aspect-square rounded-2xl flex items-center justify-center mb-2.5 overflow-hidden relative border transition-all duration-300",
           isActive
-            ? "border-primary shadow-cdl-2 ring-2 ring-primary/10 bg-white"
-            : "border-divider shadow-cdl-1 group-hover:shadow-cdl-2 group-hover:border-primary/40"
+            ? "border-primary shadow-cdl-2 ring-2 ring-primary/20 bg-white"
+            : "bg-[#FBF9F5] border-border/80 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] group-hover:border-primary/40 group-hover:bg-white group-hover:shadow-[0_12px_24px_-4px_rgba(107,29,46,0.12)] group-hover:-translate-y-1.5"
         )}
-        style={{ backgroundColor: isActive ? 'white' : cat.bgColor }}
       >
-        <div className="relative w-[72%] h-[72%]">
+        <div className="relative w-[72%] h-[72%] transition-transform duration-300 ease-out group-hover:scale-110">
           <Image
-            src={cat.image || '/images/category/vegitable.png'}
+            src={imageSrc}
             alt={cat.name}
             fill
-            sizes="120px"
+            sizes="130px"
             className="object-contain"
           />
         </div>
       </div>
       <h3 className={cn(
-        "text-[11px] md:text-[12px] text-center font-semibold leading-tight px-0.5 line-clamp-2 min-h-[2.4em] transition-colors",
+        "text-[12px] md:text-[13px] text-center font-semibold leading-snug px-0.5 line-clamp-2 min-h-[2.4em] transition-colors",
         isActive ? "text-primary font-bold" : "text-text group-hover:text-primary"
       )}>
         {cat.name}

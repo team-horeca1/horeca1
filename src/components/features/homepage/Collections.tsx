@@ -40,9 +40,16 @@ export function Collections() {
 
     useEffect(() => {
         dal.collections.list().then((data) => {
-            const mapped = (data as unknown as Collection[]).map((c) => {
+            const mapped = data.map((c) => {
                 const style = COLLECTION_STYLE[c.slug] || FALLBACK_STYLE;
-                return { ...c, ...style };
+                return {
+                    id: c.id,
+                    name: c.name,
+                    slug: c.slug,
+                    description: c.description || '',
+                    image: c.imageUrl || style.image,
+                    category: style.category,
+                };
             });
             setCollections(mapped);
         }).catch(() => {});
@@ -51,18 +58,17 @@ export function Collections() {
     if (collections.length === 0) return null;
 
     return (
-        <section className="w-full py-8 md:py-12">
+        <section className="w-full py-6 md:py-8 bg-background">
             <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)]">
                 <SectionHeader
                     title="Curated Collections"
-                    subtitle="Explore wholesale bundles tailored for high-volume commercial kitchens"
+                    subtitle="Wholesale bundles for commercial kitchens"
                     actionLabel="View all →"
                     actionHref="/collections"
-                    className="mb-5 md:mb-8"
+                    className="mb-4 md:mb-5"
                 />
 
-                {/* Mobile: 2-col side-by-side | Desktop: 3-col */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                     {collections.map((col) => (
                         <Link
                             key={col.id}

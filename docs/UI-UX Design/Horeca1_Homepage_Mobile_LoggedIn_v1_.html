@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Horeca1 — Logged-in Mobile Homepage (Frozen UX v1.0)</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px 0; background:#EDEDED; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+  .note { max-width:380px; margin:0 auto 16px; text-align:center; font-size:11px; color:#888; }
+  .phone { max-width:380px; margin:0 auto; background:#FAFAF9; border-radius:20px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.12); }
+  p { margin:0; }
+</style>
+</head>
+<body>
+
+<p class="note">Horeca1 — Logged-in / Returning User Mobile Homepage — Frozen UX v1.0</p>
+
+<div class="phone">
+
+  <!-- Header - logged in state -->
+  <div style="background:#FFFFFF; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; border-bottom:0.5px solid #E5E5E2;">
+    <span style="font-size:15px; font-weight:700; color:#222;">Horeca1</span>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <span style="font-size:15px; position:relative;">🔔<span style="position:absolute; top:-3px; right:-4px; width:7px; height:7px; background:#B3261E; border-radius:50%;"></span></span>
+      <span style="font-size:15px;">🛒</span>
+      <span style="width:24px; height:24px; border-radius:50%; background:#DDD; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#666;">RM</span>
+    </div>
+  </div>
+
+  <!-- Outlet/Account switcher -->
+  <div style="background:#222222; padding:10px 14px; display:flex; align-items:center; gap:8px;">
+    <span style="font-size:14px;">🏬</span>
+    <span style="font-size:11px; color:#fff; flex:1;">Ordering for: <strong>Spice Route Kitchen — Andheri West</strong></span>
+    <span style="font-size:10px; color:#ccc;">▾</span>
+  </div>
+
+  <!-- Hero - kept in same position as guest, so Zone 1 sits lower, in easier thumb reach -->
+  <div style="padding:14px;">
+    <div style="background:#E9F3EA; border-radius:16px; padding:16px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+      <div>
+        <p style="font-size:13px; font-weight:700; margin-bottom:8px; line-height:1.3; color:#222;">World Food Festival, Bring the world to your Kitchen!</p>
+        <span style="background:#2F7D4F; color:#fff; font-size:10px; font-weight:600; padding:6px 14px; border-radius:20px; display:inline-block;">Shop Now</span>
+      </div>
+      <div style="width:70px; height:70px; background:#D8E9DA; border-radius:10px; flex-shrink:0;"></div>
+    </div>
+  </div>
+
+  <!-- ============ ZONE 1 : TASK RAIL ============ -->
+
+  <!-- Resume cart prompt -->
+  <div style="padding:12px 14px 0;">
+    <div style="background:#FFF7E8; border:1px solid #F0DDB0; border-radius:12px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between;">
+      <span style="font-size:9px; color:#5A4A20;">🛒 <strong>3 items in cart · ₹4,850</strong> — Continue where you left off</span>
+      <span style="font-size:9px; font-weight:700; color:#222;">Resume →</span>
+    </div>
+  </div>
+
+  <!-- Quick Order Lists -->
+  <div style="padding:12px 14px 0;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+      <p style="font-size:13px; font-weight:700; color:#222;">Your Quick Order Lists</p>
+      <span style="font-size:9px; color:#888;">Manage lists</span>
+    </div>
+    <div style="background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:14px; padding:12px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <p style="font-size:11px; font-weight:700; margin-bottom:2px;">Weekly Kitchen Restock</p>
+        <p style="font-size:9px; color:#888;">32 items · mapped across 4 vendors</p>
+      </div>
+      <span style="background:#6B1D2E; color:#fff; font-size:9px; font-weight:600; padding:6px 12px; border-radius:8px; white-space:nowrap;">Reorder All</span>
+    </div>
+    <div style="background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:14px; padding:12px; display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <p style="font-size:11px; font-weight:700; margin-bottom:2px;">Weekend Bar Stock</p>
+        <p style="font-size:9px; color:#888;">11 items · mapped across 2 vendors</p>
+      </div>
+      <span style="background:#6B1D2E; color:#fff; font-size:9px; font-weight:600; padding:6px 12px; border-radius:8px; white-space:nowrap;">Reorder All</span>
+    </div>
+  </div>
+
+  <!-- Credit & Payments strip -->
+  <div style="padding:12px 14px 0;">
+    <div style="background:#EEF3ED; border-radius:12px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between;">
+      <span style="font-size:9px; color:#2A4A2E;"><strong>DiSCCO Credit:</strong> ₹1,25,600 available &nbsp;·&nbsp; <strong style="color:#8A2E1E;">₹25,430 due in 3 days</strong></span>
+      <span style="font-size:9px; font-weight:700; color:#222;">View →</span>
+    </div>
+  </div>
+
+  <!-- Frequently Reordered -->
+  <div style="padding:12px 14px 14px;">
+    <p style="font-size:13px; font-weight:700; margin-bottom:8px; color:#222;">Frequently Reordered</p>
+    <div style="display:flex; gap:8px; overflow-x:auto;">
+      <div style="min-width:88px; background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:10px; padding:6px;">
+        <div style="height:44px; background:#EDEDEA; border-radius:6px; margin-bottom:4px;"></div>
+        <p style="font-size:8px;">Basmati Rice 5kg</p>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;"><span style="font-size:9px; font-weight:700; color:#6B1D2E;">₹1,250</span><span style="font-size:13px; color:#6B1D2E;">+</span></div>
+      </div>
+      <div style="min-width:88px; background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:10px; padding:6px;">
+        <div style="height:44px; background:#EDEDEA; border-radius:6px; margin-bottom:4px;"></div>
+        <p style="font-size:8px;">Refined Oil 5L</p>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;"><span style="font-size:9px; font-weight:700; color:#6B1D2E;">₹1,849</span><span style="font-size:13px; color:#6B1D2E;">+</span></div>
+      </div>
+      <div style="min-width:88px; background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:10px; padding:6px;">
+        <div style="height:44px; background:#EDEDEA; border-radius:6px; margin-bottom:4px;"></div>
+        <p style="font-size:8px;">Toor Dal 1kg</p>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;"><span style="font-size:9px; font-weight:700; color:#6B1D2E;">₹142</span><span style="font-size:13px; color:#6B1D2E;">+</span></div>
+      </div>
+      <div style="min-width:88px; background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:10px; padding:6px; position:relative;">
+        <div style="height:44px; background:#EDEDEA; border-radius:6px; margin-bottom:4px;"></div>
+        <p style="font-size:8px;">Amul Butter 1kg</p>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;"><span style="font-size:9px; font-weight:700; color:#6B1D2E;">₹535</span><span style="font-size:13px; color:#6B1D2E;">+</span></div>
+        <p style="font-size:7px; color:#2F7D4F; margin-top:4px; line-height:1.3;">🌿 Your usual supplier also has fresh basil at 12% off</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:6px; background:#F1F1EE;"></div>
+
+  <!-- ============ ZONE 2 : STOREFRONT / ABUNDANCE ============ -->
+
+  <div style="padding:0 14px 14px; display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+    <div style="background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:12px; padding:10px 6px; text-align:center;">
+      <p style="font-size:16px; margin-bottom:4px;">💳</p>
+      <p style="font-size:8px; font-weight:600; color:#222;">Credit Line</p>
+    </div>
+    <div style="background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:12px; padding:10px 6px; text-align:center;">
+      <p style="font-size:16px; margin-bottom:4px;">🏷️</p>
+      <p style="font-size:8px; font-weight:600; color:#222;">Brand Store</p>
+    </div>
+    <div style="background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:12px; padding:10px 6px; text-align:center;">
+      <p style="font-size:16px; margin-bottom:4px;">📋</p>
+      <p style="font-size:8px; font-weight:600; color:#222;">Quick Order List</p>
+    </div>
+  </div>
+
+  <div style="padding:0 14px 14px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+    <div style="background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:14px; padding:12px; text-align:center;">
+      <p id="tp" style="font-size:16px; font-weight:700; color:#222;">2,10,26,374</p>
+      <p style="font-size:9px; color:#888; margin-top:2px;">Products Sold</p>
+    </div>
+    <div style="background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:14px; padding:12px; text-align:center;">
+      <p id="tc" style="font-size:16px; font-weight:700; color:#222;">1,237</p>
+      <p style="font-size:9px; color:#888; margin-top:2px;">Customers</p>
+    </div>
+  </div>
+
+  <div style="background:#FFFFFF; padding:10px 14px; display:grid; grid-template-columns:repeat(4,1fr); gap:6px; border-top:0.5px solid #E5E5E2; border-bottom:0.5px solid #E5E5E2;">
+    <p style="font-size:8px; text-align:center; color:#555;">Best Wholesale Rates</p>
+    <p style="font-size:8px; text-align:center; color:#555;">Up to 90 Days Credit</p>
+    <p style="font-size:8px; text-align:center; color:#555;">Pan-India Delivery</p>
+    <p style="font-size:8px; text-align:center; color:#555;">Trusted by 50,000+</p>
+  </div>
+
+  <div style="padding:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+      <p style="font-size:13px; font-weight:700; color:#222;">Shop by Category</p>
+      <span style="font-size:9px; color:#888;">View all 40+</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;">
+      <div style="text-align:center;"><div style="aspect-ratio:1; background:#EDEDEA; border-radius:12px; margin-bottom:3px;"></div><p style="font-size:7px; color:#666;">Rice &amp; Grains</p></div>
+      <div style="text-align:center;"><div style="aspect-ratio:1; background:#EDEDEA; border-radius:12px; margin-bottom:3px;"></div><p style="font-size:7px; color:#666;">Edible Oils</p></div>
+      <div style="text-align:center;"><div style="aspect-ratio:1; background:#EDEDEA; border-radius:12px; margin-bottom:3px;"></div><p style="font-size:7px; color:#666;">Spices</p></div>
+      <div style="text-align:center;"><div style="aspect-ratio:1; background:#EDEDEA; border-radius:12px; margin-bottom:3px;"></div><p style="font-size:7px; color:#666;">Dairy</p></div>
+      <div style="text-align:center;"><div style="aspect-ratio:1; background:#EDEDEA; border-radius:12px; margin-bottom:3px;"></div><p style="font-size:7px; color:#666;">Frozen Foods</p></div>
+      <div style="text-align:center;"><div style="aspect-ratio:1; background:#EDEDEA; border-radius:12px; margin-bottom:3px;"></div><p style="font-size:7px; color:#666;">Custom Packaging</p></div>
+      <div style="text-align:center;"><div style="aspect-ratio:1; background:#EDEDEA; border-radius:12px; margin-bottom:3px;"></div><p style="font-size:7px; color:#666;">Kitchenware</p></div>
+      <div style="text-align:center;"><div style="aspect-ratio:1; background:#F1F1EE; border-radius:12px; margin-bottom:3px; display:flex; align-items:center; justify-content:center; font-size:9px; color:#888;">+33</div><p style="font-size:7px; color:#666;">More</p></div>
+    </div>
+  </div>
+
+  <div style="padding:0 14px 14px;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+      <p style="font-size:13px; font-weight:700; color:#222;">Popular Vendors Near You</p>
+      <span style="font-size:9px; color:#888;">128 nearby</span>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:14px; overflow:hidden;">
+        <div style="height:80px; background:#DCE8DD;"></div>
+        <div style="padding:10px;">
+          <p style="font-size:11px; font-weight:700; margin-bottom:4px;">Patel Enterprise</p>
+          <p style="font-size:9px; color:#888; margin-bottom:6px;"><span style="background:#2F7D4F; color:#fff; padding:1px 5px; border-radius:4px; font-size:8px;">4.3★</span>&nbsp; MOV ₹1,000</p>
+          <div style="display:flex; gap:5px; flex-wrap:wrap;">
+            <span style="font-size:8px; border:0.5px solid #ccc; border-radius:10px; padding:2px 8px; color:#666;">Seasoning Mixes</span>
+            <span style="font-size:8px; border:0.5px solid #ccc; border-radius:10px; padding:2px 8px; color:#666;">Tomato Ketchup</span>
+          </div>
+        </div>
+      </div>
+      <div style="background:#FFFFFF; border:0.5px solid #E5E5E2; border-radius:14px; overflow:hidden;">
+        <div style="height:80px; background:#E3DCE8;"></div>
+        <div style="padding:10px;">
+          <p style="font-size:11px; font-weight:700; margin-bottom:4px;">Anand Traders</p>
+          <p style="font-size:9px; color:#888; margin-bottom:6px;"><span style="background:#2F7D4F; color:#fff; padding:1px 5px; border-radius:4px; font-size:8px;">4.6★</span>&nbsp; MOV ₹1,500</p>
+          <div style="display:flex; gap:5px; flex-wrap:wrap;">
+            <span style="font-size:8px; border:0.5px solid #ccc; border-radius:10px; padding:2px 8px; color:#666;">Dairy</span>
+            <span style="font-size:8px; border:0.5px solid #ccc; border-radius:10px; padding:2px 8px; color:#666;">Frozen Foods</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center; font-size:10px; color:#222; font-weight:600; margin-top:10px; text-decoration:underline;">View all 128 vendors near you →</p>
+  </div>
+
+  <div style="padding:14px 0; background:#FFFFFF; border-top:0.5px solid #E5E5E2; border-bottom:0.5px solid #E5E5E2;">
+    <p style="font-size:13px; font-weight:700; margin:0 14px 8px; color:#222;">Brand Store — shop direct from the source</p>
+    <div style="display:flex; gap:10px; overflow-x:auto; padding:0 14px;">
+      <div style="min-width:150px; height:225px; border-radius:16px; background:#1E5C3A; position:relative; overflow:hidden; flex-shrink:0;">
+        <div style="position:absolute; inset:0; background:linear-gradient(0deg, rgba(0,0,0,0.6), transparent 65%);"></div>
+        <div style="position:absolute; top:10px; left:10px; width:32px; height:32px; background:#fff; border-radius:8px;"></div>
+        <div style="position:absolute; bottom:0; padding:10px; color:#fff;">
+          <p style="font-size:12px; font-weight:700; margin-bottom:4px;">Amul</p>
+          <p style="font-size:8px; margin-bottom:4px; opacity:0.85;">Butter · Cheese · Fresh Cream</p>
+          <p style="font-size:7px; margin-bottom:8px; opacity:0.75;">Available via 42 vendors near you</p>
+          <span style="font-size:8px; background:#fff; color:#222; padding:4px 9px; border-radius:14px; font-weight:600; display:inline-block;">Explore Store</span>
+        </div>
+      </div>
+      <div style="min-width:150px; height:225px; border-radius:16px; background:#8A1E2B; position:relative; overflow:hidden; flex-shrink:0;">
+        <div style="position:absolute; inset:0; background:linear-gradient(0deg, rgba(0,0,0,0.6), transparent 65%);"></div>
+        <div style="position:absolute; top:10px; left:10px; width:32px; height:32px; background:#fff; border-radius:8px;"></div>
+        <div style="position:absolute; bottom:0; padding:10px; color:#fff;">
+          <p style="font-size:12px; font-weight:700; margin-bottom:4px;">East Made Spice Co.</p>
+          <p style="font-size:8px; margin-bottom:4px; opacity:0.85;">Masalas · Blends · Pickles</p>
+          <p style="font-size:7px; margin-bottom:8px; opacity:0.75;">Available via 19 vendors near you</p>
+          <span style="font-size:8px; background:#fff; color:#222; padding:4px 9px; border-radius:14px; font-weight:600; display:inline-block;">Explore Store</span>
+        </div>
+      </div>
+      <div style="min-width:75px; height:225px; border-radius:16px; background:#C7B79A; flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+        <p style="font-size:9px; color:#5A4A3D; writing-mode:vertical-rl;">+38 more brands</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:14px;">
+    <p style="font-size:13px; font-weight:700; margin-bottom:8px; color:#222;">Trusted Brands</p>
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;">
+      <div style="aspect-ratio:1; background:#2C5EAD; border-radius:12px;"></div>
+      <div style="aspect-ratio:1; background:#C9A227; border-radius:12px;"></div>
+      <div style="aspect-ratio:1; background:#B3261E; border-radius:12px;"></div>
+      <div style="aspect-ratio:1; background:#2F7D4F; border-radius:12px;"></div>
+      <div style="aspect-ratio:1; background:#6A3FA0; border-radius:12px;"></div>
+      <div style="aspect-ratio:1; background:#E8E8E8; border-radius:12px; display:flex; align-items:center; justify-content:center;"><p style="font-size:10px; color:#888;">+120</p></div>
+    </div>
+  </div>
+
+  <!-- Horeca1 Voices -->
+  <div style="padding:16px 0; background:#FFFFFF; border-top:0.5px solid #E5E5E2; border-bottom:0.5px solid #E5E5E2;">
+    <div style="padding:0 14px 4px;">
+      <p style="font-size:13px; font-weight:700; margin-bottom:2px; color:#222;">Horeca1 Voices</p>
+      <p style="font-size:9px; color:#999; margin-bottom:10px;">Stories from the industry, for the industry</p>
+    </div>
+    <div style="display:flex; gap:10px; overflow-x:auto; padding:0 14px;">
+      <div style="min-width:200px; background:#FAFAF9; border-radius:14px; overflow:hidden; flex-shrink:0;">
+        <div style="height:110px; background:#D9C9A3; position:relative;">
+          <span style="position:absolute; top:8px; left:8px; background:#222; color:#fff; font-size:7px; font-weight:600; padding:3px 8px; border-radius:10px;">CHEF OF THE WEEK</span>
+          <span style="position:absolute; top:8px; right:8px; background:rgba(255,255,255,0.9); width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px;">🔗</span>
+        </div>
+        <div style="padding:10px;">
+          <p style="font-size:10px; font-weight:700; margin-bottom:2px;">Chef Arvind Rao</p>
+          <p style="font-size:8px; color:#888; margin-bottom:6px;">Executive Chef, The Copper Ladle</p>
+          <p style="font-size:8px; color:#555; margin-bottom:8px; line-height:1.4;">"My Sunday-special mutton biryani — and why I only trust <span style="color:#6B1D2E; text-decoration:underline;">Daawat</span> rice for it."</p>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:8px; font-weight:600; text-decoration:underline;">Read full story</span>
+            <span style="font-size:12px;">↗️</span>
+          </div>
+        </div>
+      </div>
+      <div style="min-width:200px; background:#FAFAF9; border-radius:14px; overflow:hidden; flex-shrink:0;">
+        <div style="height:110px; background:#C9D3E0; position:relative;">
+          <span style="position:absolute; top:8px; left:8px; background:#222; color:#fff; font-size:7px; font-weight:600; padding:3px 8px; border-radius:10px;">RESTAURATEUR SPOTLIGHT</span>
+          <span style="position:absolute; top:8px; right:8px; background:rgba(255,255,255,0.9); width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px;">🔗</span>
+        </div>
+        <div style="padding:10px;">
+          <p style="font-size:10px; font-weight:700; margin-bottom:2px;">Rakesh Mehta</p>
+          <p style="font-size:8px; color:#888; margin-bottom:6px;">Owner, Spice Route Kitchen</p>
+          <p style="font-size:8px; color:#555; margin-bottom:8px; line-height:1.4;">"From a single tiffin stall to three outlets — the supplier calls that nearly broke us."</p>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:8px; font-weight:600; text-decoration:underline;">Read full story</span>
+            <span style="font-size:12px;">↗️</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center; font-size:9px; color:#222; font-weight:600; margin:12px 14px 0; text-decoration:underline;">Know someone with a story worth featuring? Nominate them →</p>
+  </div>
+
+  <div style="background:#FFFFFF; padding:14px;">
+    <p style="font-size:13px; font-weight:700; margin-bottom:10px;">🔥 Trending Now</p>
+    <div style="display:flex; gap:10px; overflow-x:auto;">
+      <div style="min-width:140px; background:#FAFAF9; border:0.5px solid rgba(0,0,0,0.06); border-radius:14px; padding:10px;">
+        <span style="background:#6B1D2E; color:#fff; font-size:8px; padding:2px 6px; border-radius:4px;">Bestseller</span>
+        <div style="height:52px; background:#EDEDEA; border-radius:6px; margin:6px 0;"></div>
+        <p style="font-size:9px; margin-bottom:3px;">Basmati Rice 5kg</p>
+        <p style="font-size:7px; color:#2F7D4F; margin-bottom:4px;">2,700+ recent buyers</p>
+        <p style="font-size:11px; font-weight:700;">₹1,250 <span style="font-size:8px; font-weight:400; color:#888;">/ ₹250 per kg</span></p>
+        <div style="background:#F1EFE6; border-radius:5px; padding:4px; margin:6px 0;"><div style="height:3px; background:#DDD; border-radius:2px;"><div style="width:40%; height:100%; background:#6E7B3B; border-radius:2px;"></div></div></div>
+        <div style="background:#6B1D2E; color:#fff; text-align:center; font-size:9px; padding:5px; border-radius:6px;">Add to Cart</div>
+      </div>
+      <div style="min-width:140px; background:#FAFAF9; border:0.5px solid rgba(0,0,0,0.06); border-radius:14px; padding:10px;">
+        <span style="background:#6E7B3B; color:#fff; font-size:8px; padding:2px 6px; border-radius:4px;">Verified</span>
+        <div style="height:52px; background:#EDEDEA; border-radius:6px; margin:6px 0;"></div>
+        <p style="font-size:9px; margin-bottom:3px;">Refined Oil 5L</p>
+        <p style="font-size:7px; color:#2F7D4F; margin-bottom:4px;">1,150+ recent buyers</p>
+        <p style="font-size:11px; font-weight:700;">₹1,849 <span style="font-size:8px; font-weight:400; color:#888;">/ ₹370 per L</span></p>
+        <div style="background:#F1EFE6; border-radius:5px; padding:4px; margin:6px 0;"><div style="height:3px; background:#DDD; border-radius:2px;"><div style="width:80%; height:100%; background:#6E7B3B; border-radius:2px;"></div></div></div>
+        <div style="background:#6B1D2E; color:#fff; text-align:center; font-size:9px; padding:5px; border-radius:6px;">Add to Cart</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:#FFFFFF; padding-bottom:4px;">
+    <div style="padding:14px 14px 0;">
+      <p style="font-size:12px; font-weight:700; margin-bottom:8px;">Dal &amp; Pulses <span style="font-weight:400; color:#999; font-size:9px;">restocked daily</span></p>
+      <div style="display:flex; gap:6px; overflow-x:auto; margin-bottom:12px;">
+        <div style="min-width:66px; background:#FAFAF9; border-radius:8px; padding:5px;"><div style="height:34px; background:#EDEDEA; border-radius:5px; margin-bottom:3px;"></div><p style="font-size:7px;">Toor Dal</p></div>
+        <div style="min-width:66px; background:#FAFAF9; border-radius:8px; padding:5px;"><div style="height:34px; background:#EDEDEA; border-radius:5px; margin-bottom:3px;"></div><p style="font-size:7px;">Chana Dal</p></div>
+        <div style="min-width:66px; background:#FAFAF9; border-radius:8px; padding:5px;"><div style="height:34px; background:#EDEDEA; border-radius:5px; margin-bottom:3px;"></div><p style="font-size:7px;">Moong Dal</p></div>
+      </div>
+    </div>
+    <div style="padding:0 14px 14px;">
+      <p style="font-size:12px; font-weight:700; margin-bottom:8px;">Oils &amp; Ghee <span style="font-weight:400; color:#999; font-size:9px;">bulk-rate friendly</span></p>
+      <div style="display:flex; gap:6px; overflow-x:auto;">
+        <div style="min-width:66px; background:#FAFAF9; border-radius:8px; padding:5px;"><div style="height:34px; background:#EDEDEA; border-radius:5px; margin-bottom:3px;"></div><p style="font-size:7px;">Sunflower Oil</p></div>
+        <div style="min-width:66px; background:#FAFAF9; border-radius:8px; padding:5px;"><div style="height:34px; background:#EDEDEA; border-radius:5px; margin-bottom:3px;"></div><p style="font-size:7px;">Desi Ghee</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:14px;">
+    <p style="font-size:13px; font-weight:700; margin-bottom:8px; color:#222;">Curated Collections</p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <div style="height:100px; background:#E5DCE0; border-radius:14px; display:flex; align-items:flex-end; padding:10px;"><p style="font-size:11px; font-weight:700; color:#3A2A30;">Cafe Essentials</p></div>
+      <div style="height:100px; background:#DCE5DE; border-radius:14px; display:flex; align-items:flex-end; padding:10px;"><p style="font-size:11px; font-weight:700; color:#2A3A2D;">Italian Must-Haves</p></div>
+    </div>
+  </div>
+
+  <!-- Promo section - DiSCCO banner reworded for logged-in / credit-approved context -->
+  <div style="padding:0 14px 14px;">
+    <div style="background:#222222; border-radius:14px; padding:14px; margin-bottom:10px;">
+      <p style="font-size:11px; font-weight:700; color:#fff; margin-bottom:4px;">Your DiSCCO Credit Line is active — ₹1,25,600 ready to use</p>
+      <p style="font-size:9px; color:#ccc; margin-bottom:8px;">Place your next order without waiting on cash flow — up to 60 more days to pay.</p>
+      <span style="font-size:9px; background:#fff; color:#222; padding:5px 10px; border-radius:6px; font-weight:600; display:inline-block;">Use it on your next order →</span>
+    </div>
+    <div style="background:#EDEDEA; border-radius:14px; padding:12px;"><p style="font-size:10px; font-weight:600;">Mega Savings — up to 20% off bulk orders</p></div>
+  </div>
+
+  <div style="padding:6px 0 16px; background:#FFFFFF; border-top:0.5px solid #E5E5E2;">
+    <p style="font-size:13px; font-weight:700; margin:14px 14px 8px; color:#222;">What Our Buyers Say</p>
+    <div style="display:flex; gap:10px; overflow-x:auto; padding:0 14px;">
+      <div style="min-width:230px; background:#FAFAF9; border-left:3px solid #6E7B3B; border-radius:0 14px 14px 0; padding:14px;">
+        <p style="font-size:20px; color:#C9C4B8; margin-bottom:4px; line-height:1;">"</p>
+        <p style="font-size:9px; color:#444; margin-bottom:10px;">Cut our ordering time in half — no more calling five suppliers every morning.</p>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="width:28px; height:28px; border-radius:50%; background:#DDD;"></div>
+          <div><p style="font-size:9px; font-weight:700;">Rakesh Mehta</p><p style="font-size:8px; color:#888;">Owner, Spice Route Kitchen</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:#F1F1EE; padding:16px 14px;">
+    <p style="font-size:10px; font-weight:600; margin-bottom:8px; color:#222;">Become a Horeca1 Distributor →</p>
+    <p style="font-size:8px; color:#999; margin-bottom:4px;">About · Contact · Terms · Privacy</p>
+    <p style="font-size:8px; color:#bbb;">© 2026 Horeca1</p>
+  </div>
+
+  <div style="background:#FFFFFF; border-top:0.5px solid #E5E5E2; padding:10px 0; display:grid; grid-template-columns:repeat(5,1fr); text-align:center;">
+    <div><p style="font-size:14px;">⌂</p><p style="font-size:8px; margin-top:2px; color:#222; font-weight:600;">Home</p></div>
+    <div><p style="font-size:14px;">🔍</p><p style="font-size:8px; margin-top:2px; color:#888;">Search</p></div>
+    <div><p style="font-size:14px;">📦</p><p style="font-size:8px; margin-top:2px; color:#888;">Orders</p></div>
+    <div><p style="font-size:14px;">💳</p><p style="font-size:8px; margin-top:2px; color:#888;">Credit</p></div>
+    <div><p style="font-size:14px;">👤</p><p style="font-size:8px; margin-top:2px; color:#888;">Account</p></div>
+  </div>
+
+</div>
+
+<script>
+  function fmt(n){ return n.toLocaleString('en-IN'); }
+  var p = document.getElementById('tp'), c = document.getElementById('tc');
+  var pVal = 21026374, cVal = 1237;
+  setInterval(function(){
+    pVal += Math.floor(Math.random()*5)+1;
+    if (p) p.textContent = fmt(pVal);
+    if (Math.random() < 0.2) { cVal += 1; if (c) c.textContent = fmt(cVal); }
+  }, 1800);
+</script>
+
+</body>
+</html>

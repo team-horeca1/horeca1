@@ -5,34 +5,45 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { dal } from '@/lib/dal';
 import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
-import { useStableSession } from '@/hooks/useStableSession';
 import type { Vendor } from '@/types';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { VendorCard } from '@/components/features/homepage/VendorCardShared';
 
 export function NearbyVendors() {
-    const { isAuthenticated } = useStableSession();
     const scrollRef = useRef<HTMLDivElement>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(true);
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [servicingIds, setServicingIds] = useState<Set<string> | null>(null);
+    const [loading, setLoading] = useState(true);
     const { selectedAddress } = useAddress();
-    // V2.2: when the customer has an active outlet, that outlet's pincode is the
-    // single source of truth. Fall back to the localStorage-backed address pincode
-    // only for guests (and for logged-in users while the outlet pincode is loading).
     const { currentOutlet } = useBusinessAccountSwitcher();
     const pincode = currentOutlet?.pincode ?? selectedAddress?.pincode;
 
     useEffect(() => {
-        if (!isAuthenticated) return;
-        dal.vendors.list().then((res) => setVendors(res.vendors)).catch(console.error);
-    }, [isAuthenticated]);
+        let isCancelled = false;
+        dal.vendors
+            .list()
+            .then((res) => {
+                if (!isCancelled) {
+                    setVendors(res.vendors || []);
+                    setLoading(false);
+                }
+            })
+            .catch(() => {
+                if (!isCancelled) {
+                    setVendors([]);
+                    setLoading(false);
+                }
+            });
+        return () => {
+            isCancelled = true;
+        };
+    }, []);
 
     // Pincode serviceability gate — fetch vendor ids that service the user's pincode.
     // If pincode is unknown, render the full list (no gate).
     useEffect(() => {
-        if (!isAuthenticated) return;
         if (!pincode || !/^\d{6}$/.test(pincode)) {
             queueMicrotask(() => setServicingIds(null));
             return;
@@ -51,7 +62,7 @@ export function NearbyVendors() {
         return () => {
             cancelled = true;
         };
-    }, [isAuthenticated, pincode]);
+    }, [pincode]);
 
     const checkScroll = () => {
         if (scrollRef.current) {
@@ -71,17 +82,17 @@ export function NearbyVendors() {
         }
     };
 
-    if (!isAuthenticated || vendors.length === 0) return null;
+    if (!loading && vendors.length === 0) return null;
 
     const filteredVendors = servicingIds ? vendors.filter((v) => servicingIds.has(v.id)) : vendors;
     const displayVendors = filteredVendors.slice(0, 10);
 
     return (
-        <section id="vendors" className="w-full py-6 bg-white overflow-hidden">
+        <section id="vendors" className="w-full py-4 md:py-6 bg-white overflow-hidden">
             <div className="max-w-[var(--container-max)] mx-auto">
                 <div className="px-4 md:px-[var(--container-padding)]">
                     <SectionHeader
-                        title="Shop by Vendor"
+                        title="Popular Suppliers Near You"
                         subtitle={pincode ? `Verified suppliers delivering to ${pincode}` : 'Explore verified hospitality suppliers'}
                         actionLabel="View all →"
                         actionHref="/vendors"
@@ -91,11 +102,13 @@ export function NearbyVendors() {
                 {/* Horizontal Scroll Cards with Side Arrows */}
                 <div className="relative w-full">
                     <button
+                        type="button"
                         onClick={() => scroll('left')}
                         disabled={!canScrollLeft}
-                        className="hidden md:flex absolute -left-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 bg-white rounded-full shadow-[0_10px_30px_-5px_rgba(0,0,0,0.15)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-gray-100 disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 size-11 bg-white rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.12)] items-center justify-center hover:scale-105 active:scale-95 transition-all border border-divider disabled:opacity-0 disabled:pointer-events-none"
+                        aria-label="Scroll left"
                     >
-                        <ChevronLeft size={24} className="text-[#181725]" strokeWidth={2.5} />
+                        <ChevronLeft size={22} className="text-text" strokeWidth={2.5} />
                     </button>
 
                     <div
@@ -103,7 +116,7 @@ export function NearbyVendors() {
                         onScroll={checkScroll}
                         className="overflow-x-auto no-scrollbar scroll-smooth w-full"
                     >
-                        <div className="flex gap-4 md:gap-6 py-4 px-6 md:px-[var(--container-padding)] w-max">
+                        <div className="flex gap-3.5 md:gap-5 py-3 px-4 md:px-[var(--container-padding)] w-max">
                             {displayVendors.map((vendor, index) => (
                                 <VendorCard key={vendor.id} vendor={vendor} index={index} />
                             ))}
@@ -111,11 +124,13 @@ export function NearbyVendors() {
                     </div>
 
                     <button
+                        type="button"
                         onClick={() => scroll('right')}
                         disabled={!canScrollRight}
-                        className="hidden md:flex absolute -right-2 top-1/2 -translate-y-1/2 z-20 w-11 h-11 bg-white rounded-full shadow-[0_10px_30px_-5px_rgba(0,0,0,0.15)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all border border-gray-100 disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 size-11 bg-white rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.12)] items-center justify-center hover:scale-105 active:scale-95 transition-all border border-divider disabled:opacity-0 disabled:pointer-events-none"
+                        aria-label="Scroll right"
                     >
-                        <ChevronRight size={24} className="text-[#181725]" strokeWidth={2.5} />
+                        <ChevronRight size={22} className="text-text" strokeWidth={2.5} />
                     </button>
                 </div>
             </div>

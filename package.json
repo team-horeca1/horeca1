@@ -35,7 +35,8 @@
     "test:e2e:prod:lifecycle": "playwright test e2e/prod-vendor-lifecycle.spec.ts --workers=1",
     "test:e2e:enter-buy": "playwright test e2e/supplier-business-store-enter-buy.spec.ts --workers=1",
     "test:e2e:credit": "playwright test e2e/credit-full-flow.spec.ts e2e/credit-section6.spec.ts --workers=1",
-    "verify:credit-wallet": "npx tsx prisma/scripts/verify-credit-wallet.ts"
+    "verify:credit-wallet": "npx tsx prisma/scripts/verify-credit-wallet.ts",
+    "seed:multi-vendor": "npx tsx prisma/scripts/seed-multi-vendor-offers.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

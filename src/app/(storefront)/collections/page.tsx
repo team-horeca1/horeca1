@@ -50,7 +50,8 @@ export default function CollectionsIndexPage() {
               name: c.name,
               slug: c.slug,
               description: c.description || '',
-              ...style,
+              image: c.imageUrl || style.image,
+              category: style.category,
             };
           }),
         );

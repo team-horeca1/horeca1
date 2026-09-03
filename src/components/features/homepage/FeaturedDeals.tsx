@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { dal } from '@/lib/dal';
 import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
@@ -51,7 +51,7 @@ export function FeaturedDeals() {
       <div className="max-w-[var(--container-max)] mx-auto">
         <div className="px-4 md:px-[var(--container-padding)]">
           <SectionHeader
-            title="Mega Savings & Deals"
+            title="Trending Now"
             subtitle={products.length > 0 ? `${products.length} bulk offers currently available` : 'Volume discounts and limited-time savings'}
             actionLabel="View all →"
             actionHref="/deals"
