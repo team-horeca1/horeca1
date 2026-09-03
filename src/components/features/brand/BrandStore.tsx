@@ -594,7 +594,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                             <div className="hidden md:block shrink-0">
                                                 <button
                                                     onClick={() => handleTabChange('items')}
-                                                    className="bg-gradient-to-br from-primary to-primary-dark-dark text-white px-5 lg:px-7 py-2.5 lg:py-3 rounded-xl flex items-center gap-1.5 text-[13px] lg:text-[14px] font-bold hover:from-primary-dark hover:to-primary hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_8px_20px_rgba(107, 29, 46, )]"
+                                                    className="bg-primary text-white px-5 lg:px-7 py-2.5 lg:py-3 rounded-xl flex items-center gap-1.5 text-[13px] lg:text-[14px] font-bold hover:bg-primary-dark hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_8px_20px_rgba(107,29,46,0.35)]"
                                                 >
                                                     Explore Items
                                                     <ChevronLeft size={16} strokeWidth={3} className="rotate-180" />
@@ -605,7 +605,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                         {/* Mobile CTA — full width below */}
                                         <button
                                             onClick={() => handleTabChange('items')}
-                                            className="md:hidden mt-4 w-full bg-gradient-to-br from-primary to-primary-dark-dark text-white py-3 rounded-xl flex items-center justify-center gap-1.5 text-[13px] font-bold active:scale-[0.98] transition-transform shadow-[0_6px_16px_rgba(107, 29, 46, )]"
+                                            className="md:hidden mt-4 w-full bg-primary text-white py-3 rounded-xl flex items-center justify-center gap-1.5 text-[13px] font-bold active:scale-[0.98] transition-transform shadow-[0_6px_16px_rgba(107,29,46,0.35)]"
                                         >
                                             Explore Items
                                             <ChevronLeft size={14} strokeWidth={3} className="rotate-180" />

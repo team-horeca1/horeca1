@@ -242,7 +242,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                                     </span>
                                 )}
                             </div>
-                            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold leading-tight tracking-tight drop-shadow-sm line-clamp-1">
+                            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold leading-tight tracking-tight text-white drop-shadow-sm line-clamp-1">
                                 {vendor.name}
                             </h1>
                             <p className="text-xs md:text-sm font-medium text-white/80 mt-1 line-clamp-1">

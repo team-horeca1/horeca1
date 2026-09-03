@@ -62,18 +62,20 @@ export function BrandStoreCard({
 
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
 
-            <div className="absolute top-2.5 left-2.5 z-10 size-10 md:size-11 rounded-[10px] bg-white shadow-cdl-1 overflow-hidden flex items-center justify-center">
-                {logoSrc ? (
+            <div className="absolute top-2.5 left-2.5 z-10 size-10 md:size-11 rounded-[10px] bg-white overflow-hidden ring-4 ring-white shadow-md">
+                {logoSrc || cover ? (
                     <Image
-                        src={logoSrc}
+                        src={logoSrc || cover!}
                         alt={name}
-                        width={44}
-                        height={44}
-                        className="object-contain w-full h-full p-1"
-                        style={logoStyle}
+                        fill
+                        sizes="44px"
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        style={logoSrc ? logoStyle : img ? imgStyle : logoStyle}
                     />
                 ) : (
-                    <span className="text-[15px] font-bold text-primary select-none">{name[0]}</span>
+                    <div className="w-full h-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center">
+                        <span className="text-[15px] font-bold text-white select-none">{name[0]}</span>
+                    </div>
                 )}
             </div>
 

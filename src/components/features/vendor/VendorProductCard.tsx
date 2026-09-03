@@ -9,7 +9,6 @@ import { useSession } from 'next-auth/react';
 import { cn, formatPackSize } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
 import { useCart } from '@/context/CartContext';
-import { BulkSlabJourney } from '@/components/features/vendor/BulkSlabJourney';
 
 interface VendorProductCardProps {
     product: VendorProduct;
@@ -285,7 +284,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 <button
                     onClick={(e) => handleAdd(e, 1)}
                     className={cn(
-                        "w-full rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all duration-300 active:scale-[0.98] border bg-gradient-to-r from-primary to-primary-dark-dark text-white border-primary shadow-[0_6px_18px_-6px_rgba(107,29,46,0.45)] hover:shadow-[0_10px_24px_-6px_rgba(107,29,46,0.55)]",
+                        "w-full rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all duration-300 active:scale-[0.98] border bg-primary text-white border-primary hover:bg-primary-dark shadow-[0_6px_18px_-6px_rgba(107,29,46,0.45)] hover:shadow-[0_10px_24px_-6px_rgba(107,29,46,0.55)]",
                         compact ? "text-[12px] py-2" : "text-[13px] py-3 rounded-2xl"
                     )}
                 >
@@ -419,7 +418,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 ) : (
                     <>
                         {product.customerPriceApplied ? (
-                            <span className="bg-gradient-to-r from-primary to-primary-dark-dark text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-primary/20 tracking-wide">
+                            <span className="bg-primary text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-primary/20 tracking-wide">
                                 Your price
                             </span>
                         ) : product.storePromotion ? (
@@ -899,14 +898,6 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             <span className="text-[12px] font-medium text-gray-500">/ unit</span>
                         </div>
                     </div>
-
-                    {bulkTiers.length > 0 && !isOutOfStock && (
-                        <BulkSlabJourney
-                            tiers={bulkTiers}
-                            currentQty={currentQty}
-                            unitLabel={product.packSize?.split(' ').pop() ?? 'Pc'}
-                        />
-                    )}
 
                     {bulkTiers.length > 0 && (
                         <div className="flex flex-col gap-1.5 mt-0.5 relative z-20">

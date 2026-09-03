@@ -2,7 +2,8 @@
 // WHY: When a product is out of stock on the PDP, surface alternate vendors
 //      that carry the SAME product (or a closely-matching one) so the buyer
 //      doesn't bounce. Match hierarchy:
-//        1. Same BrandMasterProduct via verified BrandProductMapping (best — exact SKU)
+//        0. Same MasterProduct (platform canonical SKU — fairest)
+//        1. Same BrandMasterProduct via verified BrandProductMapping
 //        2. Same barcode (exact SKU, no brand mapping needed)
 //        3. Same brand + same category + same pack size (e.g. "Veeba 250ml")
 //        4. Same category + name has 2+ overlapping tokens (≥4 chars)
@@ -72,11 +73,28 @@ export async function GET(
         brand: true,
         barcode: true,
         packSize: true,
+        masterProductId: true,
       },
     });
 
     if (!source) {
       return NextResponse.json({ success: true, data: { alternates: [] } });
+    }
+
+    // ── Tier 0: Same MasterProduct (canonical platform SKU — fairest match) ──
+    if (source.masterProductId) {
+      const byMaster = await prisma.product.findMany({
+        where: {
+          ...baseFilter,
+          id: { not: productId },
+          masterProductId: source.masterProductId,
+        },
+        include: productInclude,
+        take: 8,
+      });
+      if (byMaster.length > 0) {
+        return respond(byMaster.slice(0, 3), 'master_product');
+      }
     }
 
     // ── Tier 1: Brand-mapping match (same BrandMasterProduct → same SKU) ──

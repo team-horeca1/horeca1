@@ -3,7 +3,6 @@
 import React from 'react';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/Badge';
-import { BulkSlabJourney } from '@/components/features/vendor/BulkSlabJourney';
 import type { BulkPriceTier } from '@/types';
 
 export interface ProductPreviewFormState {
@@ -62,9 +61,6 @@ export function ProductCreatePreviewPanel({
           </p>
           {savings != null && savings > 0 && (
             <p className="text-[11px] text-success font-medium">Save ₹{savings.toFixed(0)}</p>
-          )}
-          {form.bulkEnabled && form.priceSlabs.length > 0 && (
-            <BulkSlabJourney tiers={form.priceSlabs} currentQty={0} unitLabel={form.unit ?? 'Pc'} />
           )}
           {form.creditEligible && (
             <Badge variant="verified" className="text-[10px]">DiSCCO Eligible</Badge>
