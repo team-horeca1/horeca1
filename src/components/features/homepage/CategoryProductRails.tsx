@@ -350,6 +350,9 @@ export function CategoryProductRails() {
   const activeParent = tabs.find((t) => t.id === activeTab);
   const showEmptyAisle = !loading && rails.length === 0 && activeTab !== ALL_TAB_ID;
 
+  // If there are no category tabs to render, don't show the rails loader/skeleton.
+  // (This can happen when the category tree returns children but no valid root tabs.)
+  if (treeReady && tabs.length === 0) return null;
   if (treeReady && allEmpty && activeTab === ALL_TAB_ID && !loading) return null;
 
   return (
