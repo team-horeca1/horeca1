@@ -485,13 +485,42 @@ async function main() {
     await prisma.customerVendor.upsert({ where: { businessAccountId_vendorId: { businessAccountId: customerBAs[0], vendorId: vendorIds[i] } }, update: {}, create: { userId: customerIds[0], businessAccountId: customerBAs[0], vendorId: vendorIds[i], isFavorite: i < 2 } });
   }
 
-  // ═══ COLLECTIONS ═══
+  // ═══ COLLECTIONS (curated MasterProducts — fair multi-vendor) ═══
+  const seededCollections = [];
   for (const col of [
     { name: 'Weekend Specials', slug: 'weekend-specials', description: 'Top picks for weekend menu prep', sortOrder: 1 },
     { name: 'Kitchen Essentials', slug: 'kitchen-essentials', description: 'Must-have staples for every kitchen', sortOrder: 2 },
     { name: 'New Arrivals', slug: 'new-arrivals', description: 'Fresh additions from our vendors', sortOrder: 3 },
   ]) {
-    await prisma.collection.upsert({ where: { slug: col.slug }, update: {}, create: col });
+    seededCollections.push(
+      await prisma.collection.upsert({ where: { slug: col.slug }, update: {}, create: col }),
+    );
+  }
+  const mastersForCollections = await prisma.masterProduct.findMany({
+    where: { isActive: true, approvalStatus: 'approved' },
+    select: { id: true },
+    orderBy: { updatedAt: 'desc' },
+    take: 24,
+  });
+  if (mastersForCollections.length > 0 && seededCollections.length > 0) {
+    for (let i = 0; i < mastersForCollections.length; i++) {
+      const collection = seededCollections[i % seededCollections.length];
+      const masterProductId = mastersForCollections[i].id;
+      await prisma.collectionMasterProduct.upsert({
+        where: {
+          collectionId_masterProductId: {
+            collectionId: collection.id,
+            masterProductId,
+          },
+        },
+        update: { sortOrder: Math.floor(i / seededCollections.length) },
+        create: {
+          collectionId: collection.id,
+          masterProductId,
+          sortOrder: Math.floor(i / seededCollections.length),
+        },
+      });
+    }
   }
 
   // ═══ BRANDS ═══

@@ -641,6 +641,7 @@ model MasterProduct {
   vendorProducts      Product[]               @relation("MasterToVendorProduct")
   brandMasterProducts BrandMasterProduct[]
   revisions           MasterProductRevision[]
+  collectionLinks     CollectionMasterProduct[]
 
   @@index([categoryId])
   @@index([sku])
@@ -693,7 +694,9 @@ model Collection {
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  products CollectionProduct[]
+  /// @deprecated Prefer masterProducts — vendor Product slots are unfair for multi-vendor.
+  products       CollectionProduct[]
+  masterProducts CollectionMasterProduct[]
 
   @@map("collections")
 }
@@ -711,6 +714,21 @@ model CollectionProduct {
 
   @@unique([collectionId, productId])
   @@map("collection_products")
+}
+
+/// Curated collection ↔ Horeca1 MasterProduct (fair multi-vendor discovery).
+model CollectionMasterProduct {
+  id              String @id @default(uuid()) @db.Uuid
+  collectionId    String @map("collection_id") @db.Uuid
+  masterProductId String @map("master_product_id") @db.Uuid
+  sortOrder       Int    @default(0) @map("sort_order")
+
+  collection    Collection    @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  masterProduct MasterProduct @relation(fields: [masterProductId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, masterProductId])
+  @@index([masterProductId])
+  @@map("collection_master_products")
 }
 
 // ═══ COMBO / BUNDLE ═══════════════════════════════════

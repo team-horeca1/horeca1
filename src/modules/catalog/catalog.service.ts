@@ -1060,17 +1060,21 @@ export class CatalogService {
   }
 
   async getCategoryVendors(categoryId: string, pincode?: string) {
-    // Items map only to SUB-categories, so a top-level category matches nothing directly.
-    // Match products in this category OR in any of its sub-categories (category.parentId).
+    // Items map to leaf sub-categories (primary categoryId + M2M categoryLinks).
+    // A parent category must also match products on any of its children.
+    const productInCategory = {
+      isActive: true,
+      approvalStatus: 'approved' as const,
+      OR: [
+        { categoryId },
+        { category: { parentId: categoryId } },
+        { categoryLinks: { some: { categoryId } } },
+        { categoryLinks: { some: { category: { parentId: categoryId } } } },
+      ],
+    };
     const where: Record<string, unknown> = {
       isActive: true,
-      isVerified: true,
-      products: {
-        some: {
-          isActive: true,
-          OR: [{ categoryId }, { category: { parentId: categoryId } }],
-        },
-      },
+      products: { some: productInCategory },
     };
 
     if (pincode) {
@@ -1091,25 +1095,252 @@ export class CatalogService {
     });
   }
 
+  /** Homepage / index — collection tiles + MasterProduct previews (no vendor prices). */
   async getCollections() {
-    return prisma.collection.findMany({
+    const collections = await prisma.collection.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
       include: {
-        products: {
-          include: {
-            product: {
-              include: { brandMappings: productBrandMappingsInclude },
-            },
-            vendor: {
-              select: { id: true, businessName: true, logoUrl: true },
-            },
-          },
+        masterProducts: {
           orderBy: { sortOrder: 'asc' },
           take: 10,
+          include: {
+            masterProduct: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                packSize: true,
+                uom: true,
+                imageUrl: true,
+                images: true,
+              },
+            },
+          },
         },
       },
     });
+
+    const masterIds = Array.from(
+      new Set(
+        collections.flatMap((c) => c.masterProducts.map((mp) => mp.masterProductId)),
+      ),
+    );
+
+    const vendorCounts =
+      masterIds.length === 0
+        ? []
+        : await prisma.product.groupBy({
+            by: ['masterProductId'],
+            where: {
+              masterProductId: { in: masterIds },
+              isActive: true,
+              approvalStatus: 'approved',
+              inventories: { some: { qtyAvailable: { gt: 0 } } },
+            },
+            _count: { _all: true },
+          });
+
+    const countByMaster = new Map(
+      vendorCounts
+        .filter((row) => row.masterProductId != null)
+        .map((row) => [row.masterProductId as string, row._count._all]),
+    );
+
+    return collections.map((c) => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      description: c.description,
+      imageUrl: c.imageUrl,
+      sortOrder: c.sortOrder,
+      masters: c.masterProducts.map((link) => {
+        const m = link.masterProduct;
+        return {
+          id: m.id,
+          name: m.name,
+          sku: m.sku,
+          packSize: m.packSize,
+          unit: m.uom,
+          imageUrl: m.imageUrl ?? m.images[0] ?? null,
+          vendorCount: countByMaster.get(m.id) ?? 0,
+        };
+      }),
+    }));
+  }
+
+  /**
+   * Collection detail — curated MasterProducts with competing vendor offers.
+   * Prices live only on offers (fair multi-vendor); identity on master cards.
+   */
+  async getCollectionBySlug(slug: string, options?: { pincode?: string }) {
+    const { attachCustomerPricing } = await import('@/modules/pricing/catalog-pricing');
+    const { attachActivePromotions } = await import('@/modules/promotion/promotion-catalog');
+    const { totalStockQty } = await import('@/lib/inventoryHelpers');
+
+    const collection = await prisma.collection.findFirst({
+      where: {
+        isActive: true,
+        slug: { equals: slug, mode: 'insensitive' },
+      },
+      include: {
+        masterProducts: {
+          orderBy: { sortOrder: 'asc' },
+          include: {
+            masterProduct: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                packSize: true,
+                uom: true,
+                imageUrl: true,
+                images: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!collection) throw Errors.notFound('Collection');
+
+    const masterIds = collection.masterProducts.map((m) => m.masterProductId);
+    if (masterIds.length === 0) {
+      return {
+        id: collection.id,
+        name: collection.name,
+        slug: collection.slug,
+        description: collection.description,
+        imageUrl: collection.imageUrl,
+        items: [] as Array<{
+          master: {
+            id: string;
+            name: string;
+            sku: string;
+            imageUrl: string | null;
+            images: string[];
+            packSize: string | null;
+            unit: string | null;
+          };
+          vendorCount: number;
+          defaultOffer: unknown | null;
+          offers: unknown[];
+        }>,
+      };
+    }
+
+    let vendorIdFilter: string[] | null = null;
+    const pincode = options?.pincode?.trim();
+    if (pincode && /^\d{6}$/.test(pincode)) {
+      const areas = await prisma.serviceArea.findMany({
+        where: { pincode },
+        select: { vendorId: true },
+      });
+      vendorIdFilter = Array.from(new Set(areas.map((a) => a.vendorId)));
+    }
+
+    const listings =
+      vendorIdFilter && vendorIdFilter.length === 0
+        ? []
+        : await prisma.product.findMany({
+            where: {
+              masterProductId: { in: masterIds },
+              isActive: true,
+              approvalStatus: 'approved',
+              ...(vendorIdFilter ? { vendorId: { in: vendorIdFilter } } : {}),
+            },
+            include: {
+              vendor: {
+                select: {
+                  id: true,
+                  businessName: true,
+                  logoUrl: true,
+                  minOrderValue: true,
+                  rating: true,
+                },
+              },
+              inventories: { select: { qtyAvailable: true, qtyReserved: true } },
+              category: { select: { id: true, name: true, slug: true } },
+              priceSlabs: { orderBy: { minQty: 'asc' }, take: 3 },
+              brandMappings: productBrandMappingsInclude,
+              masterProduct: {
+                select: {
+                  id: true,
+                  name: true,
+                  sku: true,
+                  imageUrl: true,
+                  images: true,
+                  packSize: true,
+                  uom: true,
+                },
+              },
+            },
+            orderBy: [{ updatedAt: 'desc' }],
+          });
+
+    type Listing = (typeof listings)[number] & {
+      customerPricing?: { unitPrice: number } | null;
+      promoPrice?: unknown;
+    };
+
+    let priced = (await attachCustomerPricing(listings)) as Listing[];
+    priced = (await attachActivePromotions(priced)) as Listing[];
+
+    const unitPrice = (p: Listing): number => {
+      if (p.customerPricing != null && Number.isFinite(Number(p.customerPricing.unitPrice))) {
+        return Number(p.customerPricing.unitPrice);
+      }
+      const base = Number(p.basePrice) || 0;
+      const promo = p.promoPrice != null ? Number(p.promoPrice) : null;
+      if (promo != null && promo < base) return promo;
+      return base;
+    };
+
+    const sortOffers = (a: Listing, b: Listing): number => {
+      const stockA = totalStockQty(a.inventories) > 0 ? 1 : 0;
+      const stockB = totalStockQty(b.inventories) > 0 ? 1 : 0;
+      if (stockB !== stockA) return stockB - stockA;
+      return unitPrice(a) - unitPrice(b);
+    };
+
+    const byMaster = new Map<string, Listing[]>();
+    for (const p of priced) {
+      if (!p.masterProductId) continue;
+      const list = byMaster.get(p.masterProductId) ?? [];
+      list.push(p);
+      byMaster.set(p.masterProductId, list);
+    }
+
+    const OFFERS_CAP = 12;
+    const items = collection.masterProducts.map((link) => {
+      const master = link.masterProduct;
+      const offers = (byMaster.get(master.id) ?? []).slice().sort(sortOffers).slice(0, OFFERS_CAP);
+      const defaultOffer = offers[0] ?? null;
+      return {
+        master: {
+          id: master.id,
+          name: master.name,
+          sku: master.sku,
+          imageUrl: master.imageUrl,
+          images: master.images,
+          packSize: master.packSize,
+          unit: master.uom,
+        },
+        vendorCount: offers.length,
+        defaultOffer,
+        offers,
+      };
+    });
+
+    return {
+      id: collection.id,
+      name: collection.name,
+      slug: collection.slug,
+      description: collection.description,
+      imageUrl: collection.imageUrl,
+      items,
+    };
   }
 
   async createProduct(vendorId: string, data: {

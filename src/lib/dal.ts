@@ -408,6 +408,66 @@ export const dal = {
       return data.map(toCategory);
     },
 
+    /** Roots with nested children (raw API shape — for homepage rails). */
+    async listTree() {
+      return apiFetch<
+        Array<
+          Record<string, unknown> & {
+            children?: Array<Record<string, unknown>>;
+          }
+        >
+      >('/api/v1/categories');
+    },
+
+    /** Fair category aisle rails — one item per MasterProduct with competing offers. */
+    async getProducts(categoryId: string, options?: { pincode?: string; limit?: number }) {
+      const params = new URLSearchParams();
+      if (options?.pincode) params.set('pincode', options.pincode);
+      if (options?.limit) params.set('limit', String(options.limit));
+      const qs = params.toString() ? `?${params}` : '';
+      const data = await apiFetch<{
+        items: Array<{
+          master: {
+            id: string;
+            name: string;
+            sku?: string;
+            imageUrl: string | null;
+            images?: string[];
+            packSize: string | null;
+            unit: string | null;
+          } | null;
+          vendorCount: number;
+          defaultOffer: Record<string, unknown>;
+          offers: Record<string, unknown>[];
+        }>;
+      }>(`/api/v1/categories/${categoryId}/products${qs}`);
+
+      return {
+        items: (data.items ?? []).map((item) => {
+          const defaultOffer = toVendorProduct(item.defaultOffer);
+          // Prefer master identity on the card when available
+          if (item.master) {
+            if (item.master.name) defaultOffer.displayName = item.master.name;
+            if (item.master.imageUrl || (item.master.images && item.master.images[0])) {
+              const imgs = [
+                ...(item.master.imageUrl ? [item.master.imageUrl] : []),
+                ...(item.master.images ?? []),
+              ].filter(Boolean);
+              if (imgs.length > 0) defaultOffer.images = imgs;
+            }
+            if (item.master.packSize) defaultOffer.packSize = item.master.packSize;
+            if (item.master.unit) defaultOffer.unit = item.master.unit;
+          }
+          return {
+            master: item.master,
+            vendorCount: item.vendorCount,
+            defaultOffer,
+            offers: (item.offers ?? []).map((o) => toVendorProduct(o)),
+          };
+        }),
+      };
+    },
+
     /** Get vendors for a category */
     async getVendors(categoryId: string, pincode?: string) {
       const qs = pincode ? `?pincode=${pincode}` : '';
@@ -447,9 +507,66 @@ export const dal = {
   },
 
   collections: {
-    /** List all collections */
+    /** List curated collections (MasterProduct previews, no prices). */
     async list() {
-      return apiFetch<Array<{ id: string; name: string; slug: string; description: string; products: Record<string, unknown>[] }>>('/api/v1/collections');
+      return apiFetch<
+        Array<{
+          id: string;
+          name: string;
+          slug: string;
+          description: string | null;
+          imageUrl: string | null;
+          masters?: Array<{
+            id: string;
+            name: string;
+            packSize: string | null;
+            imageUrl: string | null;
+            vendorCount: number;
+          }>;
+        }>
+      >('/api/v1/collections');
+    },
+
+    /** Collection detail — masters + competing vendor offers. */
+    async getBySlug(slug: string, options?: { pincode?: string }) {
+      const params = new URLSearchParams();
+      if (options?.pincode) params.set('pincode', options.pincode);
+      const qs = params.toString() ? `?${params}` : '';
+      const data = await apiFetch<{
+        id: string;
+        name: string;
+        slug: string;
+        description: string | null;
+        imageUrl: string | null;
+        items: Array<{
+          master: {
+            id: string;
+            name: string;
+            sku?: string;
+            imageUrl: string | null;
+            images?: string[];
+            packSize: string | null;
+            unit: string | null;
+          };
+          vendorCount: number;
+          defaultOffer: Record<string, unknown> | null;
+          offers: Record<string, unknown>[];
+        }>;
+      }>(`/api/v1/collections/${encodeURIComponent(slug)}${qs}`);
+
+      return {
+        id: data.id,
+        name: data.name,
+        slug: data.slug,
+        description: data.description,
+        imageUrl: data.imageUrl,
+        items: (data.items ?? []).map((item) => ({
+          master: item.master,
+          vendorCount: item.vendorCount,
+          defaultOffer: item.defaultOffer ? toVendorProduct(item.defaultOffer) : null,
+          offers: (item.offers ?? []).map((o) => toVendorProduct(o)),
+        })),
+      };
     },
   },
 
