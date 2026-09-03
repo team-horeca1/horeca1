@@ -25,6 +25,7 @@ import {
   UserCircle,
   ScrollText,
   Truck,
+  Layers,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions/registry';
 import type { Module, RoleScope } from '@/lib/permissions/portalFeatures';
@@ -61,6 +62,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
       { name: 'Suppliers', icon: Store, href: '/admin/vendors', feature: 'vendors', requiredPerm: 'vendors.view' },
       { name: 'Products', icon: Package, href: '/admin/products', feature: 'products', requiredPerm: 'products.view' },
       { name: 'Categories', icon: Tag, href: '/admin/categories', feature: 'products', requiredPerm: 'products.view' },
+      { name: 'Collections', icon: Layers, href: '/admin/collections', feature: 'products', requiredPerm: 'products.view' },
       { name: 'Brands', icon: Sparkles, href: '/admin/brands', feature: 'brands', requiredPerm: 'brands.view' },
     ],
   },

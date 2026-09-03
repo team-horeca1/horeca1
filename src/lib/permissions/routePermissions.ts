@@ -33,6 +33,7 @@ const ADMIN_EXTRA: RouteRule[] = [
   { prefix: '/admin/orders', perm: 'orders.view' },
   { prefix: '/admin/returns', perm: 'orders.view' },
   { prefix: '/admin/categories', perm: 'products.view' },
+  { prefix: '/admin/collections', perm: 'products.view' },
 ];
 
 const VENDOR_EXTRA: RouteRule[] = [

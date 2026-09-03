@@ -41,6 +41,9 @@ export const AUDIT_ACTIONS = {
   priceListBulkApply: 'price_list.bulk_apply',
   comboCreate: 'combo.create',
   userPasswordReset: 'user.password_reset',
+  collectionCreate: 'collection.create',
+  collectionUpdate: 'collection.update',
+  collectionDelete: 'collection.delete',
 } as const;
 
 export type AuditAction = typeof AUDIT_ACTIONS[keyof typeof AUDIT_ACTIONS];

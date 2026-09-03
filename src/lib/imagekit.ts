@@ -13,6 +13,7 @@ export const IMAGEKIT_FOLDERS = {
   vendors: '/horeca/vendors',
   brands: '/horeca/brands',
   banners: '/horeca/banners',
+  collections: '/horeca/collections',
   misc: '/horeca/misc',
 } as const;
 
