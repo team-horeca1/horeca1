@@ -7,13 +7,16 @@
  * across logout/login in the same tab.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useBusinessAccountSwitcher, type AccountSummary } from '@/hooks/useBusinessAccountSwitcher';
 import {
   DISMISS_KEY,
   readForcePickerCookie,
+  clearForcePickerCookie,
   completePostLoginPicker,
+  isPickerSettled,
+  markPickerSettled,
 } from '@/lib/postLoginPicker';
 import { broadcastAuthEvent } from '@/lib/authTabSync';
 import { CDL } from '@/lib/cdl';
@@ -40,24 +43,44 @@ export function PostLoginAccountSelector() {
   const [outletStep, setOutletStep] = useState<AccountSummary | null>(null);
   const [mandatoryPick, setMandatoryPick] = useState(false);
   const accountChangedRef = useRef(false);
+  // Answered in this page life — blocks the effect from reopening when the
+  // session refresh that follows a pick hands us a new `accounts` array.
+  const settledRef = useRef(false);
 
   const u = (session?.user ?? {}) as Record<string, unknown>;
   const accessibleOutletIds = Array.isArray(u.accessibleOutletIds) ? (u.accessibleOutletIds as string[]) : [];
+  const armedAt = typeof u.pickerArmedAt === 'number' ? u.pickerArmedAt : null;
 
   function filterOutlets(a: AccountSummary) {
     if (accessibleOutletIds.length === 0) return a.outlets;
     return a.outlets.filter((o) => accessibleOutletIds.includes(o.id));
   }
 
+  const settle = useCallback(() => {
+    settledRef.current = true;
+    markPickerSettled(armedAt);
+    clearForcePickerCookie();
+  }, [armedAt]);
+
   useEffect(() => {
     if (status !== 'authenticated') return;
     if (accounts.length === 0) return;
     if (u.role === 'admin') return;
+    if (settledRef.current) return;
 
     const hasForceCookie = readForcePickerCookie();
     const forcePick = hasForceCookie || u.forceAccountPicker === true;
     const totalCount = (u.totalAccountCount as number | undefined) ?? accounts.length;
     const mustPick = forcePick && totalCount > 1;
+
+    // This login was already answered — stay quiet through any number of
+    // reloads. The next login stamps a new armedAt and arms the picker again.
+    if (forcePick && isPickerSettled(armedAt)) {
+      settledRef.current = true;
+      clearForcePickerCookie();
+      return;
+    }
+
     Promise.resolve().then(() => setMandatoryPick(mustPick));
 
     let dismissed = false;
@@ -75,32 +98,53 @@ export function PostLoginAccountSelector() {
           setOpen(true);
         });
       } else if (forcePick) {
-        void update({ accountPickerCompleted: true }).catch(() => {});
-        void completePostLoginPicker(false);
+        settle();
+        void update({ accountPickerCompleted: true })
+          .catch(() => {})
+          .then(() => completePostLoginPicker(false, accounts[0]));
       }
       return;
     }
     Promise.resolve().then(() => setOpen(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, accounts, session?.user?.id, activeOutletId, accessibleOutletIds.join(',')]);
+  }, [status, accounts, session?.user?.id, activeOutletId, accessibleOutletIds.join(','), armedAt]);
+
+  const finishPicker = useCallback(
+    async (contextChanged: boolean, chosen?: AccountSummary | null) => {
+      // Settle first, synchronously: the navigation below aborts in-flight
+      // requests, so the local record of the decision must already be written.
+      settle();
+      setOpen(false);
+      setOutletStep(null);
+      setPickingId(null);
+      if (!contextChanged) {
+        broadcastAuthEvent('session-changed', { userId: session?.user?.id });
+      }
+      // switchAccount / switchOutlet already broadcast 'account-switched'.
+      try {
+        await update({ accountPickerCompleted: true });
+      } catch {
+        /* the JWT flag expires on its own — see PICKER_TTL_MS */
+      }
+      await completePostLoginPicker(contextChanged, chosen ?? undefined);
+    },
+    [settle, session?.user?.id, update],
+  );
+
+  const handleDismiss = useCallback(() => {
+    void finishPicker(false, currentAccount);
+  }, [finishPicker, currentAccount]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleDismiss();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, handleDismiss]);
 
   if (!open) return null;
-
-  const finishPicker = (contextChanged: boolean) => {
-    setOpen(false);
-    setOutletStep(null);
-    setPickingId(null);
-    void update({ accountPickerCompleted: true }).catch(() => {});
-    if (contextChanged) {
-      broadcastAuthEvent('account-switched', {
-        userId: session?.user?.id,
-        activeBusinessAccountId: (session?.user as { activeBusinessAccountId?: string } | undefined)?.activeBusinessAccountId,
-      });
-    } else {
-      broadcastAuthEvent('session-changed', { userId: session?.user?.id });
-    }
-    void completePostLoginPicker(contextChanged);
-  };
 
   const handlePick = async (a: AccountSummary) => {
     setPickingId(a.id);
@@ -110,7 +154,8 @@ export function PostLoginAccountSelector() {
     let contextChanged = false;
     if (a.id !== currentAccount?.id) {
       try {
-        await switchAccount(a.id);
+        // redirect: false — completePostLoginPicker owns the single navigation.
+        await switchAccount(a.id, undefined, { redirect: false });
         contextChanged = true;
       } catch {
         setPickingId(null);
@@ -122,24 +167,28 @@ export function PostLoginAccountSelector() {
       setOutletStep(a);
       setPickingId(null);
     } else {
-      finishPicker(contextChanged);
+      await finishPicker(contextChanged, a);
     }
   };
 
-  const handleDismiss = () => {
-    if (mandatoryPick) return;
-    setOpen(false);
-    setOutletStep(null);
-    finishPicker(false);
-  };
+  // Dismissing is always allowed: the session already holds a valid active
+  // account, so "close" simply means "continue with this one" — and it is
+  // remembered, so it never pops back up for this login.
+  const closeLabel = `Continue with ${currentAccount?.displayName ?? currentAccount?.legalName ?? 'current account'}`;
 
   if (outletStep !== null) {
     return (
-      <div className="fixed inset-0 bg-black/40 z-[10010] flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl w-full max-w-[480px] max-h-[90vh] flex flex-col">
+      <div
+        className="fixed inset-0 bg-black/40 z-[10010] flex items-center justify-center p-4"
+        onClick={handleDismiss}
+      >
+        <div
+          className="bg-white rounded-2xl w-full max-w-[480px] max-h-[90vh] flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="p-5 border-b border-divider flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {!mandatoryPick && (
+              {accounts.length > 1 && (
                 <button
                   onClick={() => setOutletStep(null)}
                   className="p-1 rounded hover:bg-gray-100"
@@ -155,15 +204,13 @@ export function PostLoginAccountSelector() {
                 </p>
               </div>
             </div>
-            {!mandatoryPick && activeOutletId && (
-              <button
-                onClick={handleDismiss}
-                className="p-1 rounded hover:bg-gray-100"
-                aria-label="Close"
-              >
-                <X size={16} />
-              </button>
-            )}
+            <button
+              onClick={handleDismiss}
+              className="p-1 rounded hover:bg-gray-100"
+              aria-label={closeLabel}
+            >
+              <X size={16} />
+            </button>
           </div>
 
           <ul className="p-2 overflow-y-auto flex-1">
@@ -184,7 +231,10 @@ export function PostLoginAccountSelector() {
                           return;
                         }
                       }
-                      finishPicker(outletChanged || accountChangedRef.current);
+                      await finishPicker(
+                        outletChanged || accountChangedRef.current,
+                        outletStep,
+                      );
                     }}
                     disabled={switching || isPicking}
                     className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-ivory transition-colors text-left disabled:opacity-60"
@@ -213,7 +263,7 @@ export function PostLoginAccountSelector() {
             <p className="text-[11px] text-text-muted flex items-center gap-1">
               <ShieldCheck size={11} /> Delivery and inventory are scoped to your outlet.
             </p>
-            {!mandatoryPick && activeOutletId && (
+            {!mandatoryPick && (
               <button
                 onClick={handleDismiss}
                 className="px-3 py-1.5 text-[12px] font-semibold text-text-secondary hover:bg-ivory rounded-lg"
@@ -228,9 +278,15 @@ export function PostLoginAccountSelector() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-[10010] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-[480px] max-h-[90vh] flex flex-col">
-        <div className="p-5 border-b border-divider flex items-center justify-between">
+    <div
+      className="fixed inset-0 bg-black/40 z-[10010] flex items-center justify-center p-4"
+      onClick={handleDismiss}
+    >
+      <div
+        className="bg-white rounded-2xl w-full max-w-[480px] max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-5 border-b border-divider flex items-center justify-between gap-3">
           <div>
             <h2 className="text-[16px] font-bold text-text">Welcome back</h2>
             <p className="text-[12px] text-text-secondary mt-0.5">
@@ -239,15 +295,13 @@ export function PostLoginAccountSelector() {
                 : `You belong to ${accounts.length} business accounts. Pick one to continue.`}
             </p>
           </div>
-          {!mandatoryPick && (
-            <button
-              onClick={handleDismiss}
-              className="p-1 rounded hover:bg-gray-100"
-              aria-label="Continue with current account"
-            >
-              <X size={16} />
-            </button>
-          )}
+          <button
+            onClick={handleDismiss}
+            className="p-1 rounded hover:bg-gray-100 shrink-0"
+            aria-label={closeLabel}
+          >
+            <X size={16} />
+          </button>
         </div>
 
         <ul className="p-2 overflow-y-auto flex-1">

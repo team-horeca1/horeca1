@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { defaultPortalPath } from '@/lib/portalRouting';
+import { isPickerPending } from '@/lib/postLoginPicker';
 import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
 import { VendorNotificationBell } from '@/components/features/vendor/VendorNotificationBell';
@@ -293,6 +294,9 @@ export default function VendorLayout({
             router.replace('/login');
             return;
         }
+        // Wait for the fresh-login picker: auto-switching here would fight the
+        // account the user is choosing and re-arm the picker.
+        if (isPickerPending(session?.user)) return;
         const vendorAccount = switcherAccounts.find((a) => a.isVendor);
         if (vendorAccount) {
             if (vendorAutoSwitchAttempted.current) return;
@@ -314,6 +318,7 @@ export default function VendorLayout({
         switcherAccounts,
         switchAccount,
         router,
+        session?.user,
     ]);
 
     // Show loading while checking auth or application status.

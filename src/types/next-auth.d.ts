@@ -20,6 +20,8 @@ declare module 'next-auth' {
       activeVendorId?: string | null;
       activeBrandId?: string | null;
       forceAccountPicker?: boolean;
+      /** ms timestamp the fresh-login picker was armed at (see PICKER_TTL_MS) */
+      pickerArmedAt?: number;
       availableAccounts?: Array<{
         id: string;
         displayName: string | null;
@@ -57,7 +59,10 @@ declare module 'next-auth/jwt' {
     activeBrandId?: string | null;
     activeVendorTeamRole?: TeamRole | 'owner' | null;
     activeBrandTeamRole?: TeamRole | 'owner' | null;
+    /** Legacy: superseded by pickerArmedAt, still read so pre-existing tokens clear */
     forceAccountPicker?: boolean;
+    /** ms timestamp the fresh-login picker was armed at (see PICKER_TTL_MS) */
+    pickerArmedAt?: number;
     availableAccounts?: Array<{
       id: string;
       displayName: string | null;

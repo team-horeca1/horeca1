@@ -332,7 +332,11 @@ export function useBusinessAccountSwitcher() {
       : activeOutletId;
 
   const switchAccount = useCallback(
-    async (businessAccountId: string, outletId?: string) => {
+    async (
+      businessAccountId: string,
+      outletId?: string,
+      opts?: { redirect?: boolean },
+    ) => {
       if (switching) return;
 
       // Admin View: switch to primary Online Store under the target Business
@@ -403,8 +407,10 @@ export function useBusinessAccountSwitcher() {
           activeOutletId: outletId ?? null,
         });
 
+        // redirect: false lets a caller that navigates itself (the post-login
+        // picker) avoid a second, competing navigation.
         const target = accounts.find((a) => a.id === businessAccountId);
-        if (target && pathname) {
+        if (opts?.redirect !== false && target && pathname) {
           const dest = redirectIfPortalMismatch(pathname, target);
           if (dest) router.replace(dest);
         }

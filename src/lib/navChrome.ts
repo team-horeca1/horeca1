@@ -34,6 +34,8 @@ export function resolvePortalNav(input: {
   hasVendorAccount: boolean;
   vendorAppApproved: boolean;
   hasBrandAccount: boolean;
+  activeIsVendor?: boolean;
+  activeIsBrand?: boolean;
 }): NavPortalItem[] {
   if (!input.isLoggedIn) return [];
   if (input.userRole === 'admin' && input.impersonationMode === 'vendor') {
@@ -45,15 +47,21 @@ export function resolvePortalNav(input: {
   if (input.userRole === 'admin' && !input.isCustomerImpersonating) {
     return [{ name: 'Dashboard', href: '/admin/dashboard' }];
   }
-  const items: NavPortalItem[] = [];
-  if (!input.isAdminImpersonating && input.hasVendorAccount && input.vendorAppApproved) {
-    items.push({
-      name: input.hasBrandAccount ? 'Supplier' : 'Dashboard',
-      href: '/vendor/dashboard',
-    });
+
+  const canVendor = !input.isAdminImpersonating && input.hasVendorAccount && input.vendorAppApproved;
+  const canBrand = !input.isAdminImpersonating && input.hasBrandAccount;
+
+  if (canVendor && canBrand) {
+    if (input.activeIsBrand && !input.activeIsVendor) {
+      return [{ name: 'Brand', href: '/brand/portal' }];
+    }
+    return [{ name: 'Supplier', href: '/vendor/dashboard' }];
   }
-  if (!input.isAdminImpersonating && input.hasBrandAccount) {
-    items.push({ name: 'Brand Portal', href: '/brand/portal' });
+  if (canVendor) {
+    return [{ name: 'Dashboard', href: '/vendor/dashboard' }];
   }
-  return items;
+  if (canBrand) {
+    return [{ name: 'Dashboard', href: '/brand/portal' }];
+  }
+  return [];
 }

@@ -8,14 +8,22 @@
 
 import { getSession } from 'next-auth/react';
 import { broadcastAuthEvent } from '@/lib/authTabSync';
-import { defaultPortalPath, type AccountPortalCaps } from '@/lib/portalRouting';
+import { accountCanAccessPath, defaultPortalPath, type AccountPortalCaps } from '@/lib/portalRouting';
 import { setEnteredStore } from '@/lib/supplierPortalLevel';
 
 export const FORCE_PICKER_COOKIE = 'horeca_force_account_picker';
 export const PENDING_REDIRECT_KEY = 'horeca_pending_post_login_redirect';
 export const DISMISS_KEY = 'horeca_post_login_selector_dismissed';
+export const SETTLED_KEY = 'horeca_picker_settled_at';
 
-const COOKIE_MAX_AGE_SEC = 5 * 60;
+/**
+ * How long a fresh login stays "must pick". The JWT stores only an armed-at
+ * timestamp, so the requirement expires by itself — a dropped clear can never
+ * strand the user in a picker that reopens on every reload.
+ */
+export const PICKER_TTL_MS = 5 * 60 * 1000;
+
+const COOKIE_MAX_AGE_SEC = PICKER_TTL_MS / 1000;
 
 export function readForcePickerCookie(): boolean {
   if (typeof document === 'undefined') return false;
@@ -52,6 +60,45 @@ export function clearDismissFlag(): void {
   } catch {
     /* ignore */
   }
+  try {
+    localStorage.removeItem(SETTLED_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Remember that this specific login's picker was answered. Keyed to the
+ * armed-at stamp so a reload stays quiet while the next login (new stamp)
+ * arms the picker again. Written synchronously before any navigation, so it
+ * holds even if the session update that clears the JWT flag never lands.
+ */
+export function markPickerSettled(armedAt: number | null | undefined): void {
+  try {
+    localStorage.setItem(SETTLED_KEY, String(armedAt ?? 0));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function isPickerSettled(armedAt: number | null | undefined): boolean {
+  try {
+    return localStorage.getItem(SETTLED_KEY) === String(armedAt ?? 0);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * True while a fresh-login pick is still owed. Portal layouts check this before
+ * auto-switching the active business, so their auto-switch never overrides the
+ * account the user is about to choose (which would re-arm the picker).
+ */
+export function isPickerPending(
+  user: { forceAccountPicker?: boolean; pickerArmedAt?: number } | null | undefined,
+): boolean {
+  if (user?.forceAccountPicker !== true) return false;
+  return !isPickerSettled(user.pickerArmedAt);
 }
 
 export function sanitizeRedirect(url: string | null | undefined): string | null {
@@ -187,18 +234,41 @@ export async function prepareFreshLoginNavigation(
   window.location.href = resolvePostLoginDestination(redirectTo, caps, role);
 }
 
+/** The picked account's own capabilities, when the caller knows them. */
+function normalizeChosenCaps(
+  chosen: Partial<AccountPortalCaps> | null | undefined,
+): AccountPortalCaps | null {
+  if (!chosen) return null;
+  const isVendor = chosen.isVendor === true;
+  const isBrand = chosen.isBrand === true;
+  return { isCustomer: chosen.isCustomer ?? (!isVendor && !isBrand), isVendor, isBrand };
+}
+
 /**
  * Called when the picker finishes (or when no pick is needed).
  * Honors a pending deep-link; otherwise lands on the portal for the chosen account.
+ *
+ * `chosen` is the account the user just picked. Passing it matters twice: a
+ * pending deep-link into a portal the picked account cannot serve is dropped
+ * (otherwise the portal layout auto-switches straight back and re-arms the
+ * picker), and the destination follows the pick instead of
+ * `capsFromSessionUser`, which prefers any supplier account the user belongs to.
  */
-export async function completePostLoginPicker(contextChanged = true): Promise<void> {
+export async function completePostLoginPicker(
+  contextChanged = true,
+  chosen?: Partial<AccountPortalCaps> | null,
+): Promise<void> {
   clearForcePickerCookie();
   try {
     sessionStorage.setItem(DISMISS_KEY, '1');
   } catch {
     /* ignore */
   }
-  const pending = sanitizeRedirect(consumePendingRedirect());
+  const chosenCaps = normalizeChosenCaps(chosen);
+  let pending = sanitizeRedirect(consumePendingRedirect());
+  if (pending && chosenCaps && !accountCanAccessPath(pending, chosenCaps)) {
+    pending = null;
+  }
   const here =
     typeof window !== 'undefined'
       ? window.location.pathname + window.location.search
@@ -223,7 +293,7 @@ export async function completePostLoginPicker(contextChanged = true): Promise<vo
   }
   const dest = resolvePostLoginDestination(
     null,
-    capsFromSessionUser(session?.user ?? null),
+    chosenCaps ?? capsFromSessionUser(session?.user ?? null),
     session?.user?.role ?? null,
   );
   if (dest !== here) {

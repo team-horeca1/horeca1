@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { defaultPortalPath } from '@/lib/portalRouting';
+import { isPickerPending } from '@/lib/postLoginPicker';
 import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
 import { signOut } from 'next-auth/react';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
@@ -140,6 +141,9 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
         if (status !== 'authenticated' || isAdmin || isActiveBrand) return;
         if (accountsLoading || switchingAccount) return;
         if (!activeAccountType) return;
+        // Wait for the fresh-login picker: auto-switching here would fight the
+        // account the user is choosing and re-arm the picker.
+        if (isPickerPending(session?.user)) return;
         const brandAccount = switcherAccounts.find((a) => a.isBrand);
         if (brandAccount) {
             if (brandAutoSwitchAttempted.current) return;
@@ -161,6 +165,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
         switcherAccounts,
         switchAccount,
         router,
+        session?.user,
     ]);
 
     const handleExitAdminView = async () => {

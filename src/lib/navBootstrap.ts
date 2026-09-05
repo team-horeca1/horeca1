@@ -76,6 +76,8 @@ export async function resolveInitialNav(): Promise<InitialNav> {
     hasVendorAccount,
     vendorAppApproved,
     hasBrandAccount,
+    activeIsVendor: activeAccountType?.isVendor === true,
+    activeIsBrand: activeAccountType?.isBrand === true,
   });
 
   return {

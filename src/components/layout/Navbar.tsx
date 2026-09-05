@@ -30,8 +30,7 @@ import { PushBell } from '../features/PushBell';
 import { NotificationBell } from '../features/NotificationBell';
 import { dalClient as dal } from '@/lib/dalClient';
 import type { Category } from '@/types';
-import { NavDeliverySelector } from './NavDeliverySelector';
-import { NavBusinessSelector } from './NavBusinessSelector';
+import { NavContextSelector } from './NavContextSelector';
 import { OutletContextStrip } from './OutletContextStrip';
 import { isAdminCustomerImpersonationActive, isAnyAdminImpersonationActive, readImpersonationMode, type ImpersonationMode } from '@/lib/clearImpersonation';
 import { resolvePortalNav, type InitialNav } from '@/lib/navChrome';
@@ -102,7 +101,7 @@ function styleCategories(cats: Category[]): NavStyledCategory[] {
 function DesktopNavSlotPlaceholder() {
     return (
         <div
-            className="flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl shrink-0 animate-pulse"
+            className="flex flex-col items-center gap-[3px] px-2.5 py-1.5 rounded-xl shrink-0 animate-pulse"
             aria-hidden
         >
             <div className="w-[21px] h-[21px] rounded-md bg-gray-200" />
@@ -268,8 +267,10 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
             hasVendorAccount,
             vendorAppApproved,
             hasBrandAccount,
+            activeIsVendor: activeAccountType?.isVendor === true,
+            activeIsBrand: activeAccountType?.isBrand === true,
         }),
-        [isLoggedIn, hasVendorAccount, hasBrandAccount, vendorAppApproved, userRole, isAdminImpersonating, isCustomerImpersonating, impersonationMode],
+        [isLoggedIn, hasVendorAccount, hasBrandAccount, vendorAppApproved, userRole, isAdminImpersonating, isCustomerImpersonating, impersonationMode, activeAccountType],
     );
 
     const seededFallback = !isResolved && Boolean(initialNav);
@@ -349,6 +350,7 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
 
             <OutletContextStrip
                 className="lg:hidden sticky top-[calc(var(--mobile-header-offset,0px)+0px)] z-[9999]"
+                fallbackLabel={selectedAddress?.shortAddress || 'Select Location'}
                 onGuestLocationClick={() => setIsLocationOverlayOpen(true)}
                 onLoggedInSwitchClick={() => setIsLocationOverlayOpen(true)}
             />
@@ -360,7 +362,7 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
             )}>
                 <nav className="w-full">
                     <div className="w-full max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
-                        <div className="flex items-center gap-4 lg:gap-6 py-4">
+                        <div className="flex items-center gap-3 xl:gap-4 py-4">
 
                             {/* Logo */}
                             <Link href="/" className="shrink-0">
@@ -382,10 +384,7 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
                                 onSubmit={submitDesktopSearch}
                             />
 
-                            <NavBusinessSelector variant="desktop" />
-
-                            {/* Deliver to — account + outlet selector for logged-in users */}
-                            <NavDeliverySelector
+                            <NavContextSelector
                                 variant="desktop"
                                 fallbackLabel={selectedAddress?.shortAddress || 'Select Location'}
                                 onFallbackClick={() => setIsLocationOverlayOpen(true)}
@@ -407,7 +406,7 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
                                                 key={item.href}
                                                 href={item.href}
                                                 className={cn(
-                                                    "flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl transition-colors shrink-0",
+                                                    "flex flex-col items-center gap-[3px] px-2.5 py-1.5 rounded-xl transition-colors shrink-0",
                                                     isActive ? "text-primary bg-primary/5" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
                                                 )}
                                             >
@@ -424,7 +423,7 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
                                             key={name}
                                             href={href}
                                             className={cn(
-                                                "flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl transition-colors shrink-0",
+                                                "flex flex-col items-center gap-[3px] px-2.5 py-1.5 rounded-xl transition-colors shrink-0",
                                                 isActive ? "text-primary bg-primary/5" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
                                             )}
                                         >
@@ -443,7 +442,7 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
                                         <Link
                                             href="/rewards"
                                             className={cn(
-                                                "flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl transition-colors shrink-0",
+                                                "flex flex-col items-center gap-[3px] px-2.5 py-1.5 rounded-xl transition-colors shrink-0",
                                                 pathname === '/rewards' ? "text-primary bg-primary/5" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
                                             )}
                                         >
@@ -453,7 +452,7 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
                                         <Link
                                             href="/wallet"
                                             className={cn(
-                                                "flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl transition-colors shrink-0",
+                                                "flex flex-col items-center gap-[3px] px-2.5 py-1.5 rounded-xl transition-colors shrink-0",
                                                 pathname?.startsWith('/wallet') ? "text-primary bg-primary/5" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
                                             )}
                                         >

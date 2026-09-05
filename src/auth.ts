@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { loadActiveContext, type ActiveContext } from '@/lib/activeContext';
-import { FORCE_PICKER_COOKIE } from '@/lib/postLoginPicker';
+import { FORCE_PICKER_COOKIE, PICKER_TTL_MS } from '@/lib/postLoginPicker';
 import { redis } from '@/lib/redis';
 import { clearSessionRevoked, isSessionRevoked } from '@/lib/sessionStale';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
@@ -357,7 +357,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           // Multi-account users must pick an active business on every fresh login.
           const totalAccounts = (token.totalAccountCount as number | undefined) ?? 0;
           if (totalAccounts > 1 && token.role !== 'admin') {
-            token.forceAccountPicker = true;
+            // Timestamp, not a boolean: the flag expires on its own (PICKER_TTL_MS)
+            // so a lost "picker completed" update can never trap the user in a
+            // picker that reopens on every reload.
+            token.pickerArmedAt = Date.now();
+            delete token.forceAccountPicker;
             try {
               const cookieStore = await cookies();
               cookieStore.set(FORCE_PICKER_COOKIE, '1', {
@@ -451,8 +455,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           accountPickerCompleted?: boolean;
         };
 
-        if (u.accountPickerCompleted === true) {
+        // An explicit pick OR an explicit account switch both mean the user has
+        // chosen — either way the fresh-login picker is done.
+        if (u.accountPickerCompleted === true || typeof u.activeBusinessAccountId === 'string') {
+          delete token.pickerArmedAt;
           delete token.forceAccountPicker;
+          try {
+            const cookieStore = await cookies();
+            cookieStore.delete(FORCE_PICKER_COOKIE);
+          } catch {
+            /* not writable during an RSC render — client clears it too */
+          }
         }
 
         const targetAccountId = u.activeBusinessAccountId ?? (token.activeBusinessAccountId as string | undefined) ?? null;
@@ -527,7 +540,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (token.availableAccounts) u.availableAccounts = token.availableAccounts as unknown[];
         if (typeof token.availableAccountsTruncated === 'boolean') u.availableAccountsTruncated = token.availableAccountsTruncated;
         if (typeof token.totalAccountCount === 'number') u.totalAccountCount = token.totalAccountCount;
-        if (token.forceAccountPicker === true) u.forceAccountPicker = true;
+        const pickerArmedAt = typeof token.pickerArmedAt === 'number' ? token.pickerArmedAt : null;
+        if (pickerArmedAt !== null) {
+          u.pickerArmedAt = pickerArmedAt;
+          if (Date.now() - pickerArmedAt < PICKER_TTL_MS) u.forceAccountPicker = true;
+        } else if (token.forceAccountPicker === true) {
+          u.forceAccountPicker = true;
+        }
         if (token.activeVendorId) u.activeVendorId = token.activeVendorId as string;
         if (token.activeBrandId) u.activeBrandId = token.activeBrandId as string;
         if (Array.isArray(token.availableStores)) u.availableStores = token.availableStores;
