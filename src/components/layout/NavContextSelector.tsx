@@ -6,6 +6,7 @@ import { CDL } from '@/lib/cdl';
 import { useStableSession } from '@/hooks/useStableSession';
 import { useBusinessAccountSwitcher, type AccountSummary } from '@/hooks/useBusinessAccountSwitcher';
 import { useAddress } from '@/context/AddressContext';
+import { toast } from 'sonner';
 
 interface Props {
   fallbackLabel: string;
@@ -294,7 +295,13 @@ export function NavContextSelector({ fallbackLabel, onFallbackClick, variant }: 
 
   const handleSwitchOutlet = async (id: string) => {
     setPickingId(id);
-    await switchOutlet(id);
+    try {
+      await switchOutlet(id);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not switch outlet');
+      setPickingId(null);
+      return;
+    }
     const match = savedAddresses.find((a) => a.outletId === id);
     if (match) {
       setSelectedAddress(match);

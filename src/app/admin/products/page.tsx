@@ -196,6 +196,27 @@ interface ProductFormData {
     activeOnlineStore: boolean;
 }
 
+/** Snapshot of commerce values seeded into a master-row edit, used to send only dirty fields. */
+type MasterCommerceSeed = {
+    hsn: string;
+    basePrice: string;
+    originalPrice: string;
+    taxPercent: string;
+    packSize: string;
+    minOrderQty: string;
+    barcode: string;
+    description: string;
+    countryOfOrigin: string;
+    storageType: string;
+    shelfLifeDays: string;
+    vegNonVeg: string;
+    fssaiRef: string;
+    unit: string;
+    isFeatured: boolean;
+    tags: string[];
+    aliasNames: string[];
+};
+
 // GST slabs are government-fixed — not mock data.
 const TAX_OPTIONS = ['0', '5', '12', '18', '28'];
 
@@ -442,6 +463,7 @@ export default function ProductsPage() {
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [formData, setFormData] = useState<ProductFormData>(EMPTY_FORM);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+    const masterSeedRef = useRef<MasterCommerceSeed | null>(null);
 
     // Import modal
     const [importOpen, setImportOpen] = useState(false);
@@ -1021,6 +1043,7 @@ export default function ProductsPage() {
         setLoadingProduct(true);
         setFormErrors({});
         setDraftSaveError(null);
+        masterSeedRef.current = null;
 
         try {
             const isMaster = product.isMasterRow;
@@ -1039,16 +1062,95 @@ export default function ProductsPage() {
             const att = meta.attributes || {};
 
             if (isMaster) {
+                const listing = Array.isArray(p.vendorProducts) ? p.vendorProducts[0] as {
+                    hsn?: string | null;
+                    basePrice?: unknown;
+                    originalPrice?: unknown;
+                    taxPercent?: unknown;
+                    minOrderQty?: unknown;
+                    unit?: string | null;
+                    packSize?: string | null;
+                    barcode?: string | null;
+                    description?: string | null;
+                    countryOfOrigin?: string | null;
+                    storageType?: string | null;
+                    shelfLifeDays?: unknown;
+                    vegNonVeg?: string | null;
+                    fssaiRef?: string | null;
+                    creditEligible?: boolean;
+                    isFeatured?: boolean;
+                    tags?: string[] | null;
+                    aliasNames?: string[] | null;
+                    priceSlabs?: { minQty: number; price: number }[];
+                    vendor?: { id: string; businessName: string } | null;
+                } | undefined : undefined;
+                const links = Array.isArray(p.categoryLinks)
+                    ? (p.categoryLinks as Array<{ categoryId: string; isPrimary: boolean }>)
+                    : [];
+                const primaryLink = links.find((l) => l.isPrimary)?.categoryId ?? p.category?.id ?? '';
+                const extraLinks = links.map((l) => l.categoryId).filter((id) => id !== primaryLink);
+                const masterCategoryIds = primaryLink ? [primaryLink, ...extraLinks] : extraLinks;
+
+                const taxSource = listing?.taxPercent ?? p.taxPercent;
+                const packSize = listing?.packSize ?? p.packSize ?? '';
+                const unit = listing?.unit ?? p.uom ?? 'piece';
+                const aliasNames = Array.isArray(listing?.aliasNames)
+                    ? listing.aliasNames
+                    : (Array.isArray(p.aliasNames) ? p.aliasNames : []);
+                const veg = (listing?.vegNonVeg as '' | 'veg' | 'nonveg' | 'egg') || '';
+                const seed: MasterCommerceSeed = {
+                    hsn: listing?.hsn ?? '',
+                    basePrice: listing?.basePrice != null ? String(listing.basePrice) : '',
+                    originalPrice: listing?.originalPrice != null ? String(listing.originalPrice) : '',
+                    taxPercent: taxSource != null ? String(taxSource) : '0',
+                    packSize: packSize || '',
+                    minOrderQty: listing?.minOrderQty != null ? String(listing.minOrderQty) : '1',
+                    barcode: listing?.barcode ?? '',
+                    description: listing?.description ?? '',
+                    countryOfOrigin: listing?.countryOfOrigin ?? '',
+                    storageType: listing?.storageType ?? '',
+                    shelfLifeDays: listing?.shelfLifeDays != null ? String(listing.shelfLifeDays) : '',
+                    vegNonVeg: veg,
+                    fssaiRef: listing?.fssaiRef ?? '',
+                    unit,
+                    isFeatured: !!listing?.isFeatured,
+                    tags: Array.isArray(listing?.tags) ? listing.tags : [],
+                    aliasNames,
+                };
+                masterSeedRef.current = seed;
+
                 setFormData({
                     ...EMPTY_FORM,
                     name: p.name || '',
                     sku: p.sku ?? '',
                     brand: p.brand ?? '',
-                    categoryIds: p.category?.id ? [p.category.id] : [],
-                    description: '',
+                    categoryIds: masterCategoryIds,
                     imageUrl: p.imageUrl ?? '',
-                    unit: p.uom ?? 'piece',
                     images: Array.isArray(p.images) ? p.images.filter(Boolean) : [],
+                    hsn: seed.hsn,
+                    barcode: seed.barcode,
+                    description: seed.description,
+                    basePrice: seed.basePrice,
+                    originalPrice: seed.originalPrice,
+                    vendorId: listing?.vendor?.id ?? '',
+                    taxPercent: seed.taxPercent,
+                    unit: seed.unit,
+                    minOrderQty: seed.minOrderQty,
+                    packSize: seed.packSize,
+                    tags: seed.tags,
+                    fssaiRef: seed.fssaiRef,
+                    aliasNames: seed.aliasNames,
+                    vegNonVeg: veg,
+                    storageType: seed.storageType,
+                    shelfLifeDays: seed.shelfLifeDays,
+                    countryOfOrigin: seed.countryOfOrigin,
+                    isFeatured: seed.isFeatured,
+                    priceSlabs: Array.isArray(listing?.priceSlabs)
+                        ? listing.priceSlabs.map((s) => ({
+                            minQty: String(s.minQty),
+                            price: String(s.price),
+                        }))
+                        : [],
                     account: acc.account || '',
                     accountCode: acc.accountCode || '',
                     taxable: acc.taxable ?? true,
@@ -1198,6 +1300,7 @@ export default function ProductsPage() {
             setEditingProduct(null);
             setFormData(EMPTY_FORM);
             setFormErrors({});
+            masterSeedRef.current = null;
         }, 300);
     };
 
@@ -1468,13 +1571,56 @@ export default function ProductsPage() {
                     name: formData.name.trim(),
                     brand: formData.brand.trim(),
                     categoryId: formData.categoryIds[0],
+                    categoryIds: formData.categoryIds,
                     metadata,
+                    packSize: formData.packSize.trim() || null,
+                    aliasNames: formData.aliasNames,
                 };
                 if (formData.imageUrl) masterPayload.imageUrl = formData.imageUrl;
                 const additionalImages = formData.images.filter(Boolean);
                 if (additionalImages.length > 0) masterPayload.images = additionalImages;
                 if (formData.unit) masterPayload.uom = formData.unit;
                 if (Number(formData.taxPercent)) masterPayload.taxPercent = Number(formData.taxPercent);
+
+                if (isMasterEdit) {
+                    const seed = masterSeedRef.current;
+                    const sameList = (a: string[], b: string[]) => JSON.stringify(a) === JSON.stringify(b);
+                    const dirty = (key: keyof MasterCommerceSeed, current: string | boolean | string[]) => {
+                        if (!seed) return true;
+                        const prev = seed[key];
+                        if (Array.isArray(current) && Array.isArray(prev)) return !sameList(current, prev);
+                        return current !== prev;
+                    };
+                    if (dirty('hsn', formData.hsn)) masterPayload.hsn = formData.hsn.trim();
+                    if (dirty('basePrice', formData.basePrice) && formData.basePrice !== '') {
+                        masterPayload.basePrice = Number(formData.basePrice);
+                    }
+                    if (dirty('originalPrice', formData.originalPrice)) {
+                        masterPayload.originalPrice = formData.originalPrice === '' ? null : Number(formData.originalPrice);
+                    }
+                    if (dirty('taxPercent', formData.taxPercent)) {
+                        masterPayload.taxPercent = Number(formData.taxPercent);
+                    }
+                    if (dirty('minOrderQty', formData.minOrderQty) && formData.minOrderQty !== '') {
+                        masterPayload.minOrderQty = Number(formData.minOrderQty);
+                    }
+                    if (dirty('barcode', formData.barcode)) masterPayload.barcode = formData.barcode.trim() || null;
+                    if (dirty('description', formData.description)) masterPayload.description = formData.description.trim() || null;
+                    if (dirty('countryOfOrigin', formData.countryOfOrigin)) {
+                        masterPayload.countryOfOrigin = formData.countryOfOrigin.trim() || null;
+                    }
+                    if (dirty('storageType', formData.storageType)) {
+                        masterPayload.storageType = formData.storageType.trim() || null;
+                    }
+                    if (dirty('shelfLifeDays', formData.shelfLifeDays)) {
+                        masterPayload.shelfLifeDays = formData.shelfLifeDays === '' ? null : Number(formData.shelfLifeDays);
+                    }
+                    if (dirty('vegNonVeg', formData.vegNonVeg)) masterPayload.vegNonVeg = formData.vegNonVeg || null;
+                    if (dirty('fssaiRef', formData.fssaiRef)) masterPayload.fssaiRef = formData.fssaiRef.trim() || null;
+                    if (dirty('unit', formData.unit)) masterPayload.unit = formData.unit;
+                    if (dirty('isFeatured', formData.isFeatured)) masterPayload.isFeatured = formData.isFeatured;
+                    if (dirty('tags', formData.tags)) masterPayload.tags = formData.tags;
+                }
 
                 const isEdit = !!editingProduct;
                 const url = isEdit

@@ -263,13 +263,12 @@ export async function loadActiveContext(
     )];
     const accessibleOutletIds = hasAccountWideRole ? [] : outletScopedIds;
 
-    // Pick the active outlet: for supplier Online Stores prefer the store default outlet.
-    // Customer BAs keep primary / first outlet behavior.
+    // Honour an explicit session pick first (marketplace "Deliver to").
+    // Vendor.defaultOutletId is the fallback for a fresh login with no pick —
+    // vendor portal stock still comes from resolveVendorOutletContext, not this.
     let activeOutletId: string | null = null;
 
-    if (vendorTenant?.defaultOutletId) {
-      activeOutletId = vendorTenant.defaultOutletId;
-    } else if (targetOutletId) {
+    if (targetOutletId) {
       const canUse = accessibleOutletIds.length === 0 || accessibleOutletIds.includes(targetOutletId);
       if (canUse) {
         const ok = await prisma.outlet.findFirst({
@@ -278,6 +277,9 @@ export async function loadActiveContext(
         });
         if (ok) activeOutletId = ok.id;
       }
+    }
+    if (!activeOutletId && vendorTenant?.defaultOutletId) {
+      activeOutletId = vendorTenant.defaultOutletId;
     }
 
     if (!activeOutletId) {

@@ -26,7 +26,36 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       where: { id },
       include: {
         category: { select: { id: true, name: true } },
+        categoryLinks: { select: { categoryId: true, isPrimary: true } },
         _count: { select: { vendorProducts: true } },
+        vendorProducts: {
+          where: { slug: { not: { startsWith: '_deleted_' } } },
+          orderBy: { updatedAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            hsn: true,
+            basePrice: true,
+            originalPrice: true,
+            taxPercent: true,
+            minOrderQty: true,
+            unit: true,
+            packSize: true,
+            barcode: true,
+            description: true,
+            countryOfOrigin: true,
+            storageType: true,
+            shelfLifeDays: true,
+            vegNonVeg: true,
+            fssaiRef: true,
+            creditEligible: true,
+            isFeatured: true,
+            tags: true,
+            aliasNames: true,
+            priceSlabs: { orderBy: { sortOrder: 'asc' } },
+            vendor: { select: { id: true, businessName: true } },
+          },
+        },
       },
     });
     if (!master) throw Errors.notFound('Master product not found');
@@ -63,10 +92,19 @@ const updateSchema = z.object({
   unit: z.string().optional(),
   hsn: z.string().optional(),
   basePrice: z.number().optional(),
+  originalPrice: z.number().nullable().optional(),
   minOrderQty: z.number().optional(),
   creditEligible: z.boolean().optional().transform(() => true),
   vegNonVeg: z.string().optional(),
   storageType: z.string().optional(),
+  packSize: z.string().max(100).nullable().optional(),
+  countryOfOrigin: z.string().max(100).nullable().optional(),
+  shelfLifeDays: z.number().int().nullable().optional(),
+  barcode: z.string().max(100).nullable().optional(),
+  description: z.string().nullable().optional(),
+  fssaiRef: z.string().max(50).nullable().optional(),
+  isFeatured: z.boolean().optional(),
+  tags: z.array(z.string()).optional(),
 });
 
 export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
@@ -108,10 +146,18 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       unit,
       hsn,
       basePrice,
+      originalPrice,
       minOrderQty,
       creditEligible,
       vegNonVeg,
       storageType,
+      countryOfOrigin,
+      shelfLifeDays,
+      barcode,
+      description,
+      fssaiRef,
+      isFeatured,
+      tags,
       ...rest
     } = data;
     const resolvedCategoryIds = categoryIds?.length
@@ -154,16 +200,41 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
 
     const updated = await prisma.masterProduct.update({ where: { id }, data: updateData });
 
-    if (hsn !== undefined || basePrice !== undefined || minOrderQty !== undefined || creditEligible !== undefined || vegNonVeg !== undefined || storageType !== undefined) {
+    const hasVendorCommerce =
+      hsn !== undefined
+      || basePrice !== undefined
+      || originalPrice !== undefined
+      || minOrderQty !== undefined
+      || creditEligible !== undefined
+      || vegNonVeg !== undefined
+      || storageType !== undefined
+      || countryOfOrigin !== undefined
+      || shelfLifeDays !== undefined
+      || barcode !== undefined
+      || description !== undefined
+      || fssaiRef !== undefined
+      || unit !== undefined
+      || isFeatured !== undefined
+      || tags !== undefined;
+    if (hasVendorCommerce) {
       const vendorUpdate: Prisma.ProductUpdateManyMutationInput = {};
       if (hsn !== undefined) vendorUpdate.hsn = hsn;
       if (basePrice !== undefined) vendorUpdate.basePrice = basePrice;
+      if (originalPrice !== undefined) vendorUpdate.originalPrice = originalPrice;
       if (minOrderQty !== undefined) vendorUpdate.minOrderQty = minOrderQty;
       if (creditEligible !== undefined) vendorUpdate.creditEligible = true;
       if (vegNonVeg !== undefined) {
-        vendorUpdate.vegNonVeg = ['veg', 'nonveg', 'egg'].includes(vegNonVeg) ? (vegNonVeg as any) : null;
+        vendorUpdate.vegNonVeg = ['veg', 'nonveg', 'egg'].includes(vegNonVeg) ? (vegNonVeg as 'veg' | 'nonveg' | 'egg') : null;
       }
       if (storageType !== undefined) vendorUpdate.storageType = storageType;
+      if (countryOfOrigin !== undefined) vendorUpdate.countryOfOrigin = countryOfOrigin;
+      if (shelfLifeDays !== undefined) vendorUpdate.shelfLifeDays = shelfLifeDays;
+      if (barcode !== undefined) vendorUpdate.barcode = barcode;
+      if (description !== undefined) vendorUpdate.description = description;
+      if (fssaiRef !== undefined) vendorUpdate.fssaiRef = fssaiRef;
+      if (unit !== undefined) vendorUpdate.unit = unit;
+      if (isFeatured !== undefined) vendorUpdate.isFeatured = isFeatured;
+      if (tags !== undefined) vendorUpdate.tags = tags;
 
       await prisma.product.updateMany({
         where: { masterProductId: id, slug: { not: { startsWith: '_deleted_' } } },
