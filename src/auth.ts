@@ -2,8 +2,10 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { loadActiveContext, type ActiveContext } from '@/lib/activeContext';
+import { FORCE_PICKER_COOKIE } from '@/lib/postLoginPicker';
 import { redis } from '@/lib/redis';
 import { clearSessionRevoked, isSessionRevoked } from '@/lib/sessionStale';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
@@ -352,6 +354,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             null,
           );
           applyActiveContext(token, active);
+          // Multi-account users must pick an active business on every fresh login.
+          const totalAccounts = (token.totalAccountCount as number | undefined) ?? 0;
+          if (totalAccounts > 1 && token.role !== 'admin') {
+            token.forceAccountPicker = true;
+            try {
+              const cookieStore = await cookies();
+              cookieStore.set(FORCE_PICKER_COOKIE, '1', {
+                maxAge: 5 * 60,
+                path: '/',
+                sameSite: 'lax',
+                secure: process.env.NODE_ENV === 'production',
+              });
+            } catch (err) {
+              console.error('[auth.jwt] failed to set force account picker cookie:', err);
+            }
+          }
         } catch (err) {
           console.error('[auth.jwt] loadActiveContext failed on sign-in:', err);
           applyActiveContext(token, null);

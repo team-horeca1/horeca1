@@ -31,6 +31,7 @@ import { NotificationBell } from '../features/NotificationBell';
 import { dalClient as dal } from '@/lib/dalClient';
 import type { Category } from '@/types';
 import { NavDeliverySelector } from './NavDeliverySelector';
+import { NavBusinessSelector } from './NavBusinessSelector';
 import { OutletContextStrip } from './OutletContextStrip';
 import { isAdminCustomerImpersonationActive, isAnyAdminImpersonationActive, readImpersonationMode, type ImpersonationMode } from '@/lib/clearImpersonation';
 import { resolvePortalNav, type InitialNav } from '@/lib/navChrome';
@@ -257,7 +258,7 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
         || userRole === 'brand'
         || (availableAccounts?.some((a) => a.isBrand === true) ?? false);
 
-    const livePortalItem = React.useMemo(
+    const livePortalItems = React.useMemo(
         () => resolvePortalNav({
             isLoggedIn,
             userRole,
@@ -272,7 +273,7 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
     );
 
     const seededFallback = !isResolved && Boolean(initialNav);
-    const portalNavItem = seededFallback ? (initialNav?.portal ?? null) : livePortalItem;
+    const portalNavItems = seededFallback ? (initialNav?.portals ?? []) : livePortalItems;
     const showRewardsLink = seededFallback ? Boolean(initialNav?.showWallet) : isLoggedIn;
     const reserveAuthSlots = !isResolved && !initialNav;
 
@@ -381,6 +382,8 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
                                 onSubmit={submitDesktopSearch}
                             />
 
+                            <NavBusinessSelector variant="desktop" />
+
                             {/* Deliver to — account + outlet selector for logged-in users */}
                             <NavDeliverySelector
                                 variant="desktop"
@@ -396,17 +399,23 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
                             <div className="flex items-center gap-1 shrink-0">
                                 {reserveAuthSlots ? (
                                     <DesktopNavSlotPlaceholder />
-                                ) : portalNavItem ? (
-                                    <Link
-                                        href={portalNavItem.href}
-                                        className={cn(
-                                            "flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl transition-colors shrink-0",
-                                            pathname === portalNavItem.href ? "text-primary bg-primary/5" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
-                                        )}
-                                    >
-                                        <LayoutDashboard size={21} strokeWidth={pathname === portalNavItem.href ? 2 : 1.5} />
-                                        <span className="text-[10px] font-medium leading-none">{portalNavItem.name}</span>
-                                    </Link>
+                                ) : portalNavItems.length > 0 ? (
+                                    portalNavItems.map((item) => {
+                                        const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+                                        return (
+                                            <Link
+                                                key={item.href}
+                                                href={item.href}
+                                                className={cn(
+                                                    "flex flex-col items-center gap-[3px] px-3 py-1.5 rounded-xl transition-colors shrink-0",
+                                                    isActive ? "text-primary bg-primary/5" : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                                                )}
+                                            >
+                                                <LayoutDashboard size={21} strokeWidth={isActive ? 2 : 1.5} />
+                                                <span className="text-[10px] font-medium leading-none">{item.name}</span>
+                                            </Link>
+                                        );
+                                    })
                                 ) : null}
                                 {DESKTOP_NAV.map(({ name, href, Icon }) => {
                                     const isActive = pathname === href;

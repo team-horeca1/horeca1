@@ -30,6 +30,7 @@ function isVendorPortalRoute(pathname: string): boolean {
 type TokenUser = {
   role?: string;
   activeBusinessAccountType?: { isVendor?: boolean; isBrand?: boolean };
+  availableAccounts?: Array<{ isVendor?: boolean; isBrand?: boolean }>;
 };
 
 export async function proxy(req: NextRequest) {
@@ -71,7 +72,11 @@ export async function proxy(req: NextRequest) {
   }
 
   if (isVendorPortal) {
-    const isVendorActor = role === 'vendor' || role === 'admin' || token.activeBusinessAccountType?.isVendor === true;
+    const isVendorActor =
+      role === 'vendor'
+      || role === 'admin'
+      || token.activeBusinessAccountType?.isVendor === true
+      || (token.availableAccounts?.some((a) => a.isVendor === true) ?? false);
     if (!isVendorActor) {
       const url = req.nextUrl.clone();
       url.pathname = '/';
@@ -80,7 +85,11 @@ export async function proxy(req: NextRequest) {
   }
 
   if (isBrandPortal) {
-    const isBrandActor = role === 'brand' || role === 'admin' || token.activeBusinessAccountType?.isBrand === true;
+    const isBrandActor =
+      role === 'brand'
+      || role === 'admin'
+      || token.activeBusinessAccountType?.isBrand === true
+      || (token.availableAccounts?.some((a) => a.isBrand === true) ?? false);
     if (!isBrandActor) {
       const url = req.nextUrl.clone();
       url.pathname = '/';

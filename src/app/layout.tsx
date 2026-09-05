@@ -8,6 +8,7 @@ import { Toaster } from 'sonner';
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 import { ScrollRestoration } from '@/components/layout/ScrollRestoration';
 import { CallbackUrlRedirect } from '@/components/auth/CallbackUrlRedirect';
+import { PostLoginAccountSelector } from '@/components/auth/PostLoginAccountSelector';
 
 // Only weights used by UI tokens — fewer font files on cold start.
 const inter = Inter({
@@ -49,6 +50,7 @@ export default async function RootLayout({
             </Suspense>
             <Toaster position="top-center" richColors />
             {children}
+            <PostLoginAccountSelector />
           </ConfirmProvider>
         </AuthProvider>
       </body>

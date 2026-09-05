@@ -1,10 +1,9 @@
 /**
- * Post-login navigation helpers.
+ * Fresh-login account picker — cookie + sessionStorage coordination.
  *
- * Account-picker UI was removed — after sign-in we land on an explicit
- * redirect (when safe) or the portal default for the active account type.
- * Legacy force-picker cookie / dismiss helpers remain so old cookies and
- * sessionStorage keys can still be cleared.
+ * sessionStorage dismiss alone survives logout/login in the same tab; the
+ * short-lived force-pick cookie is set on sign-in (server + client) so every
+ * fresh login with 2+ business accounts must pick before redirect.
  */
 
 import { getSession } from 'next-auth/react';
@@ -16,12 +15,24 @@ export const FORCE_PICKER_COOKIE = 'horeca_force_account_picker';
 export const PENDING_REDIRECT_KEY = 'horeca_pending_post_login_redirect';
 export const DISMISS_KEY = 'horeca_post_login_selector_dismissed';
 
+const COOKIE_MAX_AGE_SEC = 5 * 60;
+
 export function readForcePickerCookie(): boolean {
   if (typeof document === 'undefined') return false;
   try {
     return document.cookie.split(';').some((c) => c.trim().startsWith(`${FORCE_PICKER_COOKIE}=1`));
   } catch {
     return false;
+  }
+}
+
+export function setForcePickerCookie(): void {
+  if (typeof document === 'undefined') return;
+  try {
+    const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; secure' : '';
+    document.cookie = `${FORCE_PICKER_COOKIE}=1; path=/; max-age=${COOKIE_MAX_AGE_SEC}; samesite=lax${secure}`;
+  } catch {
+    /* ignore */
   }
 }
 
@@ -50,6 +61,28 @@ export function sanitizeRedirect(url: string | null | undefined): string | null 
   return trimmed;
 }
 
+export function setPendingRedirect(url: string | null): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    const safe = sanitizeRedirect(url);
+    if (safe) sessionStorage.setItem(PENDING_REDIRECT_KEY, safe);
+    else sessionStorage.removeItem(PENDING_REDIRECT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function consumePendingRedirect(): string | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const url = sessionStorage.getItem(PENDING_REDIRECT_KEY);
+    sessionStorage.removeItem(PENDING_REDIRECT_KEY);
+    return url;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Prefer an explicit safe redirect; otherwise role/portal default.
  * Admin role wins over inherited shopping BA caps (isCustomer) so admins
@@ -67,17 +100,14 @@ export function resolvePostLoginDestination(
   return '/';
 }
 
-function capsFromSessionUser(user: {
+export function capsFromSessionUser(user: {
   role?: string;
   activeBusinessAccountType?: AccountPortalCaps | null;
   availableAccounts?: Array<{ isVendor?: boolean; isBrand?: boolean }> | null;
 } | null | undefined): AccountPortalCaps | null {
-  // Never derive portal caps from BA for admins — they inherit a shopping BA.
   if (user?.role === 'admin') return null;
   const active = user?.activeBusinessAccountType;
   if (active?.isVendor || active?.isBrand) return active;
-  // Team members may briefly have a shopping BA active while availableAccounts
-  // already lists their vendor membership — prefer portal work on login.
   const accounts = user?.availableAccounts ?? [];
   if (accounts.some((a) => a.isVendor)) {
     return { isCustomer: true, isVendor: true, isBrand: false };
@@ -94,14 +124,12 @@ function capsFromSessionUser(user: {
 }
 
 /** Called after OTP/password sign-in on the login page. */
-export async function prepareFreshLoginNavigation(redirectTo: string | null): Promise<void> {
+export async function prepareFreshLoginNavigation(
+  redirectTo: string | null,
+  opts?: { picker?: boolean },
+): Promise<void> {
+  const allowPicker = opts?.picker !== false;
   clearDismissFlag();
-  clearForcePickerCookie();
-  try {
-    sessionStorage.removeItem(PENDING_REDIRECT_KEY);
-  } catch {
-    /* ignore */
-  }
   // Never resume a previous "Entered Store" session after a fresh login —
   // multi-store team members must land on the business/store picker.
   setEnteredStore(false);
@@ -117,7 +145,25 @@ export async function prepareFreshLoginNavigation(redirectTo: string | null): Pr
   const caps = capsFromSessionUser(session?.user ?? null);
   const user = session?.user as {
     isStoreScopedOnly?: boolean;
+    totalAccountCount?: number;
+    availableAccounts?: unknown[];
   } | null | undefined;
+  const totalAccountCount = user?.totalAccountCount
+    ?? (Array.isArray(user?.availableAccounts) ? user.availableAccounts.length : 0);
+
+  if (allowPicker && role !== 'admin' && totalAccountCount > 1) {
+    setPendingRedirect(redirectTo);
+    setForcePickerCookie();
+    window.location.href = '/';
+    return;
+  }
+
+  clearForcePickerCookie();
+  try {
+    sessionStorage.removeItem(PENDING_REDIRECT_KEY);
+  } catch {
+    /* ignore */
+  }
 
   // New / unapproved suppliers: stay on marketplace until admin Approve & Verify.
   if (role !== 'admin' && (caps?.isVendor || role === 'vendor' || user?.isStoreScopedOnly)) {
@@ -141,7 +187,58 @@ export async function prepareFreshLoginNavigation(redirectTo: string | null): Pr
   window.location.href = resolvePostLoginDestination(redirectTo, caps, role);
 }
 
-/** Clear any leftover picker state after overlay / in-page login. */
+/**
+ * Called when the picker finishes (or when no pick is needed).
+ * Honors a pending deep-link; otherwise lands on the portal for the chosen account.
+ */
+export async function completePostLoginPicker(contextChanged = true): Promise<void> {
+  clearForcePickerCookie();
+  try {
+    sessionStorage.setItem(DISMISS_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+  const pending = sanitizeRedirect(consumePendingRedirect());
+  const here =
+    typeof window !== 'undefined'
+      ? window.location.pathname + window.location.search
+      : '';
+
+  if (pending) {
+    if (contextChanged || pending !== here) {
+      window.location.href = pending;
+    }
+    return;
+  }
+
+  let session = await getSession();
+  if (!session?.user) {
+    await new Promise((r) => setTimeout(r, 150));
+    session = await getSession();
+  }
+  const user = session?.user as { isStoreScopedOnly?: boolean; role?: string } | null | undefined;
+  if (user?.role !== 'admin' && user?.isStoreScopedOnly) {
+    window.location.href = '/vendor/businesses';
+    return;
+  }
+  const dest = resolvePostLoginDestination(
+    null,
+    capsFromSessionUser(session?.user ?? null),
+    session?.user?.role ?? null,
+  );
+  if (dest !== here) {
+    window.location.href = dest;
+  }
+}
+
+/** Overlay / in-page login — arm the picker without navigating away. */
+export function markFreshLoginPendingPicker(): void {
+  clearDismissFlag();
+  setForcePickerCookie();
+  broadcastAuthEvent('session-changed');
+}
+
+/** Clear leftover picker state after overlay / in-page login (single-account). */
 export function clearPostLoginPickerState(): void {
   clearDismissFlag();
   clearForcePickerCookie();

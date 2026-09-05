@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { FormErrorBanner } from '@/components/ui/form';
 import { toast } from 'sonner';
-import { signIn } from 'next-auth/react';
-import { clearPostLoginPickerState } from '@/lib/postLoginPicker';
+import { getSession, signIn } from 'next-auth/react';
+import { clearPostLoginPickerState, markFreshLoginPendingPicker } from '@/lib/postLoginPicker';
 
 interface LoginOverlayProps {
   isOpen: boolean;
@@ -146,7 +146,14 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
         setOtp(['', '', '', '']);
         setTimeout(() => otpRefs[0].current?.focus(), 50);
       } else {
-        clearPostLoginPickerState();
+        const session = await getSession();
+        const count = session?.user?.totalAccountCount
+          ?? (session?.user?.availableAccounts?.length ?? 0);
+        if (count > 1 && session?.user?.role !== 'admin') {
+          markFreshLoginPendingPicker();
+        } else {
+          clearPostLoginPickerState();
+        }
         router.refresh();
         onLoginSuccess();
       }

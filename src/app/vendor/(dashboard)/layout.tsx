@@ -87,14 +87,18 @@ export default function VendorLayout({
     const userRole = sessionUser?.role;
     const activeAccountType = sessionUser?.activeBusinessAccountType;
     const isActiveVendor = activeAccountType?.isVendor === true;
-    const isActiveBrand = activeAccountType?.isBrand === true;
     const isAdmin = userRole === 'admin';
     const {
       currentAccount,
+      accounts: switcherAccounts,
+      switchAccount,
+      switching: switchingAccount,
+      loading: accountsLoading,
       availableStores: switcherStores,
       activeVendorId: switcherVendorId,
       isStoreScopedOnly: switcherStoreScoped,
     } = useBusinessAccountSwitcher();
+    const vendorAutoSwitchAttempted = React.useRef(false);
     const isStoreScopedOnly = switcherStoreScoped || sessionUser?.isStoreScopedOnly === true;
     const availableStores = switcherStores.length > 0
       ? switcherStores
@@ -284,12 +288,33 @@ export default function VendorLayout({
 
     React.useEffect(() => {
         if (status !== 'authenticated' || isAdmin || isActiveVendor) return;
+        if (accountsLoading || switchingAccount) return;
         if (!activeAccountType) {
             router.replace('/login');
             return;
         }
+        const vendorAccount = switcherAccounts.find((a) => a.isVendor);
+        if (vendorAccount) {
+            if (vendorAutoSwitchAttempted.current) return;
+            vendorAutoSwitchAttempted.current = true;
+            void switchAccount(vendorAccount.id).catch(() => {
+                vendorAutoSwitchAttempted.current = false;
+                router.replace(defaultPortalPath(activeAccountType));
+            });
+            return;
+        }
         router.replace(defaultPortalPath(activeAccountType));
-    }, [status, isAdmin, isActiveVendor, activeAccountType, router]);
+    }, [
+        status,
+        isAdmin,
+        isActiveVendor,
+        activeAccountType,
+        accountsLoading,
+        switchingAccount,
+        switcherAccounts,
+        switchAccount,
+        router,
+    ]);
 
     // Show loading while checking auth or application status.
     // IMPORTANT: only gate on the *initial* load (no session yet). A background

@@ -26,6 +26,7 @@ import { defaultPortalPath } from '@/lib/portalRouting';
 import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
 import { signOut } from 'next-auth/react';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
+import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { NotificationBell } from '@/components/features/NotificationBell';
 import { usePermissions } from '@/hooks/usePermissions';
 import { BRAND_NAV_LINKS, filterNavLinks } from '@/lib/permissions/portalNav';
@@ -53,8 +54,14 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
         activeBusinessAccountType?: { isCustomer: boolean; isVendor: boolean; isBrand: boolean };
     } | undefined)?.activeBusinessAccountType;
     const isActiveBrand = activeAccountType?.isBrand === true;
-    const isActiveVendor = activeAccountType?.isVendor === true;
     const isAdmin = userRole === 'admin';
+    const {
+        accounts: switcherAccounts,
+        switchAccount,
+        switching: switchingAccount,
+        loading: accountsLoading,
+    } = useBusinessAccountSwitcher();
+    const brandAutoSwitchAttempted = React.useRef(false);
 
     React.useEffect(() => {
         if (status !== 'authenticated') return;
@@ -131,9 +138,30 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
 
     React.useEffect(() => {
         if (status !== 'authenticated' || isAdmin || isActiveBrand) return;
+        if (accountsLoading || switchingAccount) return;
         if (!activeAccountType) return;
+        const brandAccount = switcherAccounts.find((a) => a.isBrand);
+        if (brandAccount) {
+            if (brandAutoSwitchAttempted.current) return;
+            brandAutoSwitchAttempted.current = true;
+            void switchAccount(brandAccount.id).catch(() => {
+                brandAutoSwitchAttempted.current = false;
+                router.replace(defaultPortalPath(activeAccountType));
+            });
+            return;
+        }
         router.replace(defaultPortalPath(activeAccountType));
-    }, [status, isAdmin, isActiveBrand, activeAccountType, router]);
+    }, [
+        status,
+        isAdmin,
+        isActiveBrand,
+        activeAccountType,
+        accountsLoading,
+        switchingAccount,
+        switcherAccounts,
+        switchAccount,
+        router,
+    ]);
 
     const handleExitAdminView = async () => {
         await clearAllAdminImpersonation();

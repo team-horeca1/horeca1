@@ -5,6 +5,7 @@ import { Crosshair, ChevronDown, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStableSession } from '@/hooks/useStableSession';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
+import { NavBusinessSelector } from './NavBusinessSelector';
 
 interface OutletContextStripProps {
   onGuestLocationClick?: () => void;
@@ -36,7 +37,8 @@ export function OutletContextStrip({
 
   if (isAuthenticated) {
     return (
-      <div className={cn('w-full bg-white px-3.5 py-1.5 border-b border-divider/60', className)}>
+      <div className={cn('w-full bg-white px-3.5 py-1.5 border-b border-divider/60 space-y-1.5', className)}>
+        <NavBusinessSelector variant="mobile" />
         <button
           type="button"
           onClick={onLoggedInSwitchClick}

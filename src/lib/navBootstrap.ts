@@ -67,7 +67,7 @@ export async function resolveInitialNav(): Promise<InitialNav> {
     }
   }
 
-  const portal = resolvePortalNav({
+  const portals = resolvePortalNav({
     isLoggedIn: true,
     userRole,
     impersonationMode,
@@ -80,7 +80,7 @@ export async function resolveInitialNav(): Promise<InitialNav> {
 
   return {
     isLoggedIn: true,
-    portal,
+    portals,
     showWallet: true,
     impersonationMode,
     isAdminImpersonating,

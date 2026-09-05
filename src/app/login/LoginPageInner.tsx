@@ -10,7 +10,9 @@ import {
 import { cn } from '@/lib/utils';
 import {
   prepareFreshLoginNavigation,
+  readForcePickerCookie,
   sanitizeRedirect,
+  setPendingRedirect,
 } from '@/lib/postLoginPicker';
 
 const RESEND_COOLDOWN = 60;
@@ -38,10 +40,15 @@ export default function LoginPageInner() {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  // Already signed in — same portal landing as fresh OTP/password login.
+  // Already signed in — defer to the picker when a fresh-login cookie is armed.
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
-    void prepareFreshLoginNavigation(redirectTo);
+    if (readForcePickerCookie()) {
+      setPendingRedirect(redirectTo);
+      window.location.href = '/';
+      return;
+    }
+    void prepareFreshLoginNavigation(redirectTo, { picker: false });
   }, [sessionStatus, redirectTo]);
 
   const [identifier, setIdentifier] = useState(prefilledPhone || prefilledEmail);

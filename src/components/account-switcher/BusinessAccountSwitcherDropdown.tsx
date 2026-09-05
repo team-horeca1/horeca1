@@ -2,10 +2,11 @@
 import { CDL } from '@/lib/cdl';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, LogOut, Loader2, ShieldCheck, Store, MapPin } from 'lucide-react';
+import { Check, ChevronDown, LogOut, Loader2, ShieldCheck, Store, MapPin } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
+import { ACCOUNT_SWITCHER_OPEN_EVENT } from '@/lib/accountSwitcherEvents';
 
 type Portal = 'vendor' | 'brand' | 'customer' | 'admin';
 
@@ -49,8 +50,8 @@ function classifyAccount(a: { isVendor: boolean; isBrand: boolean; isCustomer: b
 }
 
 /**
- * Top-right portal identity menu — identity summary + Sign out only.
- * Business / online-store switching UI was removed.
+ * Top-right portal identity menu — identity summary, business switcher,
+ * and Sign out.
  */
 export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdminMode?: boolean }) {
   const pathname = usePathname();
@@ -58,9 +59,10 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
   const { data: session } = useSession();
   const {
     loading, switching,
-    currentAccount, currentOutlet,
+    accounts, currentAccount, currentOutlet,
     hcidDisplay,
     availableStores, activeVendorId,
+    switchAccount,
     signOut,
   } = useBusinessAccountSwitcher();
 
@@ -78,6 +80,14 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
       return () => document.removeEventListener('mousedown', onMouseDown);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    function onOpen() {
+      setIsOpen(true);
+    }
+    window.addEventListener(ACCOUNT_SWITCHER_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(ACCOUNT_SWITCHER_OPEN_EVENT, onOpen);
+  }, []);
 
   const isVendorPortal = portal === 'vendor';
   const supplierPersonName = session?.user?.name?.trim() || null;
@@ -190,6 +200,60 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
               </span>
             </div>
           </div>
+          {accounts.length > 1 && (
+            <div className="py-1 border-b border-[#F0F0F0] max-h-[240px] overflow-y-auto">
+              <p className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#AEAEAE]">
+                Switch business
+              </p>
+              {accounts.map((a) => {
+                const kind = classifyAccount(a);
+                const badge = KIND_STYLE[kind];
+                const isCurrent = a.id === currentAccount?.id;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    disabled={switching || isCurrent}
+                    onClick={async () => {
+                      if (isCurrent) return;
+                      try {
+                        await switchAccount(a.id);
+                        setIsOpen(false);
+                      } catch {
+                        /* hook toasts / throws */
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-ivory transition-colors text-left disabled:opacity-70"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: badge.bg }}
+                    >
+                      {switching && !isCurrent ? (
+                        <Loader2 size={13} className="animate-spin" style={{ color: badge.color }} />
+                      ) : (
+                        <span className="text-[10px] font-bold" style={{ color: badge.color }}>
+                          {initialsOf(a.displayName ?? a.legalName)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-[#181725] truncate">
+                        {a.displayName ?? a.legalName}
+                      </p>
+                      <span
+                        className="inline-block mt-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider"
+                        style={{ color: badge.color, backgroundColor: badge.bg }}
+                      >
+                        {badge.label}
+                      </span>
+                    </div>
+                    {isCurrent && <Check size={14} className="text-primary shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="py-1">
             <button
               type="button"

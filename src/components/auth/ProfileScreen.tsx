@@ -25,6 +25,8 @@ import {
     Mail,
     LayoutDashboard,
     Loader2,
+    ArrowLeftRight,
+    Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -86,6 +88,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const [isTeamOpen, setIsTeamOpen] = useState(false);
     const [isRolesOpen, setIsRolesOpen] = useState(false);
     const [isOverviewOpen, setIsOverviewOpen] = useState(false);
+    const [isSwitchBusinessOpen, setIsSwitchBusinessOpen] = useState(false);
     const [signingOut, setSigningOut] = useState(false);
     const [hasVendorApplication, setHasVendorApplication] = useState<boolean | null>(null);
     const [vendorAppApproved, setVendorAppApproved] = useState(false);
@@ -109,6 +112,10 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     } = useAddress();
     const {
         activeBusinessAccountId: switcherAccountId,
+        accounts: switcherAccounts,
+        currentAccount: switcherCurrentAccount,
+        switchAccount,
+        switching: switchingAccount,
         customerImpersonating,
         buyerImpersonating,
     } = useBusinessAccountSwitcher();
@@ -393,10 +400,12 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const canSeeTeam = hasAny('users.view', 'users.create', 'users.edit', 'users.delete');
     const canSeeOverview = has('settings.view');
     const hideBusinessAccountForAdmin = sessionRole === 'admin' && !viewingAsBuyer;
-    const businessAccountItems = (!hideBusinessAccountForAdmin && activeAccountIdForLinks) ? [
-        ...(canSeeOutlets ? [{ id: 'outlets', label: 'Outlets & Delivery', desc: 'Branches and where orders are delivered', icon: MapPin, onClick: () => setIsOutletsOpen(true) }] : []),
-        ...(!viewingAsBuyer && canSeeTeam ? [{ id: 'team-members', label: 'Team Members', desc: 'Invite users, manage roles & access', icon: Users, onClick: () => router.push('/profile/team') }] : []),
-        ...(canSeeOverview ? [{ id: 'account-overview', label: 'Account Overview', desc: 'GST, business type, members', icon: Building2, onClick: () => setIsOverviewOpen(true) }] : []),
+    const canSwitchBusiness = !hideBusinessAccountForAdmin && !viewingAsBuyer && switcherAccounts.length > 1;
+    const businessAccountItems = (!hideBusinessAccountForAdmin && (activeAccountIdForLinks || canSwitchBusiness)) ? [
+        ...(canSwitchBusiness ? [{ id: 'switch-business', label: 'Switch business', desc: 'Move between your brand and supplier accounts', icon: ArrowLeftRight, onClick: () => setIsSwitchBusinessOpen(true) }] : []),
+        ...(activeAccountIdForLinks && canSeeOutlets ? [{ id: 'outlets', label: 'Outlets & Delivery', desc: 'Branches and where orders are delivered', icon: MapPin, onClick: () => setIsOutletsOpen(true) }] : []),
+        ...(activeAccountIdForLinks && !viewingAsBuyer && canSeeTeam ? [{ id: 'team-members', label: 'Team Members', desc: 'Invite users, manage roles & access', icon: Users, onClick: () => router.push('/profile/team') }] : []),
+        ...(activeAccountIdForLinks && canSeeOverview ? [{ id: 'account-overview', label: 'Account Overview', desc: 'GST, business type, members', icon: Building2, onClick: () => setIsOverviewOpen(true) }] : []),
     ] : [];
 
     const adminPortalItem = hideBusinessAccountForAdmin
@@ -431,8 +440,25 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
             onClick: () => { onClose(); router.push('/vendor/dashboard'); },
           }]
         : [];
+    const showBrandPortalCta =
+        !viewingAsBuyer
+        && !hideBusinessAccountForAdmin
+        && (
+            sessionAcctType?.activeBusinessAccountType?.isBrand === true
+            || sessionRole === 'brand'
+            || (sessionAcctType?.availableAccounts?.some((a) => a.isBrand === true) ?? false)
+        );
+    const brandPortalItem = showBrandPortalCta
+        ? [{
+            id: 'brand-portal',
+            label: 'Brand Portal',
+            desc: 'Brand profile, catalog & mappings',
+            icon: Store,
+            onClick: () => { onClose(); router.push('/brand/portal'); },
+          }]
+        : [];
 
-    const portalItems = [...adminPortalItem, ...vendorPortalItem];
+    const portalItems = [...adminPortalItem, ...vendorPortalItem, ...brandPortalItem];
 
     const otherInfoItems = [
         { id: 'notifications', label: 'Notification', desc: 'Push & email preferences', icon: Bell, onClick: () => setIsNotificationOpen(true) },
@@ -1255,6 +1281,61 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                     window.dispatchEvent(new CustomEvent(ACCOUNTS_REFRESH_EVENT));
                 }}
             />
+
+            {isSwitchBusinessOpen && (
+                <div className="fixed inset-0 z-[12000] flex items-end sm:items-center justify-center p-4">
+                    <button
+                        type="button"
+                        className="absolute inset-0 bg-black/40"
+                        aria-label="Close switch business"
+                        onClick={() => setIsSwitchBusinessOpen(false)}
+                    />
+                    <div className="relative bg-white rounded-2xl w-full max-w-[440px] max-h-[80vh] flex flex-col shadow-xl">
+                        <div className="p-4 border-b border-gray-100">
+                            <h3 className="text-[16px] font-bold text-[#181725]">Switch business</h3>
+                            <p className="text-[12px] text-gray-500 mt-0.5">Choose which account you want to use.</p>
+                        </div>
+                        <ul className="p-2 overflow-y-auto">
+                            {switcherAccounts.map((a) => {
+                                const isCurrent = a.id === switcherCurrentAccount?.id;
+                                const kindLabel = a.isVendor ? 'Supplier' : a.isBrand ? 'Brand' : 'Customer';
+                                return (
+                                    <li key={a.id}>
+                                        <button
+                                            type="button"
+                                            disabled={switchingAccount || isCurrent}
+                                            onClick={async () => {
+                                                try {
+                                                    await switchAccount(a.id);
+                                                    setIsSwitchBusinessOpen(false);
+                                                } catch {
+                                                    /* hook surfaces the error */
+                                                }
+                                            }}
+                                            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 text-left disabled:opacity-70"
+                                        >
+                                            <span className="w-9 h-9 rounded-full bg-primary-light text-primary flex items-center justify-center shrink-0">
+                                                {switchingAccount && !isCurrent
+                                                    ? <Loader2 size={15} className="animate-spin" />
+                                                    : <Building2 size={15} />}
+                                            </span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[14px] font-bold text-[#181725] truncate">
+                                                    {a.displayName ?? a.legalName}
+                                                </p>
+                                                <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">
+                                                    {kindLabel}
+                                                </p>
+                                            </div>
+                                            {isCurrent && <Check size={16} className="text-primary shrink-0" />}
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
+                </div>
+            )}
 
             {/* Become a Vendor Modal — prefer active BA display name over User.businessName */}
             <BecomeVendorModal

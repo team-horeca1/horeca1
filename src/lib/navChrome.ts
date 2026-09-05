@@ -7,7 +7,7 @@ export type NavPortalItem = {
 
 export type InitialNav = {
   isLoggedIn: boolean;
-  portal: NavPortalItem | null;
+  portals: NavPortalItem[];
   showWallet: boolean;
   impersonationMode: ImpersonationMode | null;
   isAdminImpersonating: boolean;
@@ -17,7 +17,7 @@ export type InitialNav = {
 
 export const GUEST_INITIAL_NAV: InitialNav = {
   isLoggedIn: false,
-  portal: null,
+  portals: [],
   showWallet: false,
   impersonationMode: null,
   isAdminImpersonating: false,
@@ -34,22 +34,26 @@ export function resolvePortalNav(input: {
   hasVendorAccount: boolean;
   vendorAppApproved: boolean;
   hasBrandAccount: boolean;
-}): NavPortalItem | null {
-  if (!input.isLoggedIn) return null;
+}): NavPortalItem[] {
+  if (!input.isLoggedIn) return [];
   if (input.userRole === 'admin' && input.impersonationMode === 'vendor') {
-    return { name: 'Supplier Portal', href: '/vendor/overview' };
+    return [{ name: 'Supplier Portal', href: '/vendor/overview' }];
   }
   if (input.userRole === 'admin' && input.impersonationMode === 'brand') {
-    return { name: 'Brand Portal', href: '/brand/portal' };
+    return [{ name: 'Brand Portal', href: '/brand/portal' }];
   }
   if (input.userRole === 'admin' && !input.isCustomerImpersonating) {
-    return { name: 'Dashboard', href: '/admin/dashboard' };
+    return [{ name: 'Dashboard', href: '/admin/dashboard' }];
   }
+  const items: NavPortalItem[] = [];
   if (!input.isAdminImpersonating && input.hasVendorAccount && input.vendorAppApproved) {
-    return { name: 'Dashboard', href: '/vendor/dashboard' };
+    items.push({
+      name: input.hasBrandAccount ? 'Supplier' : 'Dashboard',
+      href: '/vendor/dashboard',
+    });
   }
   if (!input.isAdminImpersonating && input.hasBrandAccount) {
-    return { name: 'Brand Portal', href: '/brand/portal' };
+    items.push({ name: 'Brand Portal', href: '/brand/portal' });
   }
-  return null;
+  return items;
 }
