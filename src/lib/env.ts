@@ -10,11 +10,22 @@ function optionalEnv(name: string, defaultValue: string = ''): string {
   return process.env[name] || defaultValue;
 }
 
-// Validate on first import — fails fast if anything is missing
+// Lazy getters — Docker `next build` has no secrets. Eager requiredEnv() at
+// import time crashed CI as soon as otpVerification pulled this module in.
 export const env = {
-  DATABASE_URL: requiredEnv('DATABASE_URL'),
-  AUTH_SECRET: requiredEnv('AUTH_SECRET'),
-  NEXTAUTH_URL: optionalEnv('NEXTAUTH_URL', 'http://localhost:3000'),
-  GOOGLE_MAPS_API_KEY: optionalEnv('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY'),
-  NODE_ENV: optionalEnv('NODE_ENV', 'development'),
-} as const;
+  get DATABASE_URL(): string {
+    return requiredEnv('DATABASE_URL');
+  },
+  get AUTH_SECRET(): string {
+    return requiredEnv('AUTH_SECRET');
+  },
+  get NEXTAUTH_URL(): string {
+    return optionalEnv('NEXTAUTH_URL', 'http://localhost:3000');
+  },
+  get GOOGLE_MAPS_API_KEY(): string {
+    return optionalEnv('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY');
+  },
+  get NODE_ENV(): string {
+    return optionalEnv('NODE_ENV', 'development');
+  },
+};
