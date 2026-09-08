@@ -235,7 +235,7 @@ export default function PriceListDetailPage() {
     searchTimer.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await fetch(`/api/v1/vendor/products?search=${encodeURIComponent(productSearch)}&limit=10`);
+        const res = await fetch(`/api/v1/vendor/products?search=${encodeURIComponent(productSearch)}&limit=10&sellable=1`);
         const json = await res.json();
         if (!json.success) return;
         const alreadyAdded = new Set(items.map((i) => i.productId));

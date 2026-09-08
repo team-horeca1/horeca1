@@ -13,10 +13,9 @@ import {
   FormField, FormInput, FormSelect, FormTextarea, TextField, SectionLabel, inputClass, PasswordField,
 } from '@/components/ui/form';
 import {
-  BUSINESS_SIZES, COVERAGE_OPTIONS, MONTHLY_SUPPLY_BANDS, VENDOR_LEAD_STATUSES,
+  BUSINESS_SIZES, COVERAGE_OPTIONS, VENDOR_LEAD_STATUSES,
   categoryPresetsForSelections,
 } from '@/lib/constants/vendorProfile';
-import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 import {
   validateFieldBlur,
   type VendorProfileInput,
@@ -99,7 +98,6 @@ export function VendorProfileForm({
     ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3'
     : 'grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4';
   const SPAN_FULL = isWide ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2';
-  const relaxedContact = isRegisterEmailOtpEnabled();
   const typeSelections = getEffectiveVendorTypeSelections(value);
   const categoryPresets = categoryPresetsForSelections(typeSelections);
   const selectedCategories = value.categoriesHandled ?? [];
@@ -138,10 +136,12 @@ export function VendorProfileForm({
             <SectionHeader icon={Building2} spanClass={SPAN_FULL}>Business Identity</SectionHeader>
             <TextField label="Legal Business Name" required value={value.legalName ?? value.businessName ?? ''}
               dataField="legalName"
+              className={!showDisplayName ? SPAN_FULL : undefined}
               error={errors.legalName}
               onChange={v => set({ legalName: v, businessName: v })}
               onBlur={() => blur('legalName', value.legalName ?? value.businessName ?? '')}
-              placeholder="Registered company name" />
+              placeholder="Company name"
+              autoComplete="organization" />
             {showDisplayName && (
               <TextField label="Display Name (optional)" value={value.displayName ?? value.tradeName ?? ''}
                 dataField="displayName"
@@ -216,8 +216,8 @@ export function VendorProfileForm({
             </FormField>
             <TextField
               dataField="authorizedPersonPhone"
-              label={relaxedContact ? 'Mobile (optional if email provided)' : 'Mobile'}
-              required={!relaxedContact}
+              label="Mobile"
+              required
               value={value.phone ?? value.mobilePhone ?? value.authorizedPersonPhone ?? ''}
               error={errors.phone || errors.authorizedPersonPhone}
               onChange={v => {
@@ -227,7 +227,7 @@ export function VendorProfileForm({
               placeholder="10-digit mobile" inputMode="numeric" />
             <TextField
               dataField="email"
-              label={relaxedContact ? 'Email (optional if mobile provided)' : 'Email'}
+              label="Email (optional)"
               required={false}
               value={value.email ?? value.authorizedPersonEmail ?? ''}
               error={errors.email}
@@ -354,23 +354,6 @@ export function VendorProfileForm({
             <TextField label="Warehouse Count" value={value.warehouseCount != null ? String(value.warehouseCount) : ''}
               inputMode="numeric"
               onChange={v => set({ warehouseCount: v.replace(/\D/g, '') || undefined })} />
-            <FormField label="Delivery Fleet">
-              <div className="flex gap-4 h-[44px] items-center">
-                {([true, false] as const).map(v => (
-                  <label key={String(v)} className="flex items-center gap-2 text-[14px] font-medium cursor-pointer">
-                    <input type="radio" checked={value.deliveryFleet === v}
-                      onChange={() => set({ deliveryFleet: v })} className="accent-primary" />
-                    {v ? 'Yes' : 'No'}
-                  </label>
-                ))}
-              </div>
-            </FormField>
-            <FormField label="Monthly Supply Band">
-              <FormSelect value={value.monthlySupplyBand ?? ''} onChange={v => set({ monthlySupplyBand: v })}>
-                <option value="">Select band</option>
-                {MONTHLY_SUPPLY_BANDS.map(s => <option key={s} value={s}>{s}</option>)}
-              </FormSelect>
-            </FormField>
           </>
         )}
 

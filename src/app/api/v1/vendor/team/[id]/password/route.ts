@@ -8,6 +8,7 @@ import { resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { assertCanManageMemberPassword } from '@/lib/teamMembership';
 import type { AuthContext } from '@/middleware/auth';
 import type { TeamRole } from '@prisma/client';
 
@@ -54,6 +55,14 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     const callerRank = await vendorMemberRank(ctx, vendorId);
     if (callerRank <= ENUM_RANK[member.role]) {
       throw Errors.forbidden('You cannot reset the password of a peer or higher-ranked team member');
+    }
+
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { businessAccountId: true },
+    });
+    if (vendor?.businessAccountId) {
+      await assertCanManageMemberPassword(member.userId, vendor.businessAccountId);
     }
 
     const { password } = schema.parse(await req.json());

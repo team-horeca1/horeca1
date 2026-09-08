@@ -1,5 +1,4 @@
 'use client';
-import { CDL } from '@/lib/cdl';
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
@@ -12,6 +11,12 @@ import { dal } from '@/lib/dal';
 import { DeliverySlotPicker } from '@/components/features/checkout/DeliverySlotPicker';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { useAddress } from '@/context/AddressContext';
+import {
+    clearExcludedVendorIds,
+    getExcludedVendorIds,
+    pruneExcludedVendorIds,
+    setExcludedVendorIds as persistExcludedVendorIds,
+} from '@/lib/checkoutSelection';
 import type { VendorCartGroup, CartItem, VendorProduct } from '@/types';
 import {
     VendorPromoBanner,
@@ -25,49 +30,10 @@ import {
     CheckoutOffersPanel,
     type CheckoutOfferChoicesView,
 } from '@/components/features/promo/CheckoutOffersPanel';
+import { loadRazorpayScript, openRazorpayPopup, type RazorpaySuccessPayload } from '@/lib/razorpayClient';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 // window.Razorpay is typed in src/types/razorpay.d.ts
-
-interface RazorpaySuccessPayload {
-    razorpay_payment_id: string;
-    razorpay_order_id: string;
-    razorpay_signature: string;
-}
-
-function loadRazorpayScript(): Promise<void> {
-    return new Promise((resolve, reject) => {
-        if (typeof window !== 'undefined' && typeof window.Razorpay !== 'undefined') { resolve(); return; }
-        const script = document.createElement('script');
-        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('Failed to load Razorpay checkout'));
-        document.body.appendChild(script);
-    });
-}
-
-function openRazorpayPopup(opts: {
-    key: string;
-    amount: number;
-    currency: string;
-    order_id: string;
-    description: string;
-}): Promise<RazorpaySuccessPayload> {
-    return new Promise((resolve, reject) => {
-        const rzp = new window.Razorpay({
-            key: opts.key,
-            amount: opts.amount,
-            currency: opts.currency,
-            order_id: opts.order_id,
-            name: 'HoReCa Hub',
-            description: opts.description,
-            theme: { color: CDL.primary },
-            handler: (response: RazorpaySuccessPayload) => resolve(response),
-            modal: { ondismiss: () => reject(new Error('Payment cancelled')) },
-        });
-        rzp.open();
-    });
-}
 
 type CheckoutStep = 'review' | 'payment' | 'confirmation';
 
@@ -422,7 +388,24 @@ function CheckoutPageContent() {
     const [isPlacingOrder, setIsPlacingOrder] = useState(false);
     const [orderError, setOrderError] = useState<string | null>(null);
     const [placedOrderIds, setPlacedOrderIds] = useState<string[]>([]);
-    const [excludedVendorIds, setExcludedVendorIds] = useState<Set<string>>(new Set());
+    const [excludedVendorIds, setExcludedVendorIds] = useState<Set<string>>(() => new Set(getExcludedVendorIds()));
+
+    useEffect(() => {
+        if (isCartLoading) return;
+        const cartIds = groups.map((g) => g.vendorId);
+        if (cartIds.length === 0) {
+            clearExcludedVendorIds();
+            if (excludedVendorIds.size > 0) setExcludedVendorIds(new Set());
+            return;
+        }
+        const pruned = pruneExcludedVendorIds(cartIds);
+        const same =
+            pruned.length === excludedVendorIds.size
+            && pruned.every((id) => excludedVendorIds.has(id));
+        if (!same) setExcludedVendorIds(new Set(pruned));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isCartLoading, groups.map((g) => g.vendorId).join(',')]);
+
     const [slotByVendor, setSlotByVendor] = useState<Record<string, string | null>>({});
     // Per-vendor order notes / delivery instructions (Req 7).
     const [notesByVendor, setNotesByVendor] = useState<Record<string, string>>({});
@@ -596,6 +579,7 @@ function CheckoutPageContent() {
             const next = new Set(prev);
             if (next.has(vendorId)) next.delete(vendorId);
             else next.add(vendorId);
+            persistExcludedVendorIds(next);
             return next;
         });
     };
@@ -1012,6 +996,7 @@ function CheckoutPageContent() {
             // 3. Show confirmation
             setPlacedOrderIds(createdOrders.map(o => o.orderNumber || o.id));
             setOrderSnapshot({ groups: [...selectedGroups], total: selectedTotal, count: selectedVendorCount });
+            clearExcludedVendorIds();
             
             // Remove only the placed vendor groups from cart; leave unselected ones intact.
             if (!draftId) {

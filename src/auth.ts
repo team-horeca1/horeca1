@@ -11,7 +11,8 @@ import { clearSessionRevoked, isSessionRevoked } from '@/lib/sessionStale';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
 import { ensureAdminInheritsShoppingAccount } from '@/lib/adminShoppingInherit';
 import { uniqueHcid } from '@/lib/hcid';
-import { phoneLookupVariants } from '@/lib/phone';
+import { normalizePhone } from '@/lib/phone';
+import { findUserByPhoneLookup } from '@/lib/auth/checkPhoneLookup';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 import type { PermissionKey, PermissionsJson } from '@/lib/permissions/registry';
 import { ALL_PERMISSION_KEYS } from '@/lib/permissions/registry';
@@ -83,8 +84,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         placeId: {},
       },
       async authorize(credentials) {
-        const phoneRaw = String(credentials?.phone ?? '').replace(/\D/g, '');
-        const phone = phoneRaw.length === 12 ? phoneRaw.replace(/^91/, '') : phoneRaw;
+        const phone = normalizePhone(String(credentials?.phone ?? ''));
         const loginEmail = String(credentials?.loginEmail ?? '').trim().toLowerCase();
         const code = String(credentials?.code ?? '').trim();
         const isRegister = credentials?.isRegister === 'true' || credentials?.isRegister === true;
@@ -106,9 +106,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         await prisma.otpCode.update({ where: { id: record.id }, data: { used: true } });
 
         let user = usePhone
-          ? await prisma.user.findFirst({
-              where: { phone: { in: phoneLookupVariants(phone) } },
-              select: { id: true, email: true, fullName: true, role: true, image: true, isActive: true },
+          ? await findUserByPhoneLookup(phone, {
+              id: true, email: true, fullName: true, role: true, image: true, isActive: true,
             })
           : await prisma.user.findUnique({
               where: { email: loginEmail },
@@ -283,8 +282,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!identifier || !password) return null;
 
         const looksEmail = identifier.includes('@');
-        const phoneRawDigits = identifier.replace(/\D/g, '');
-        const phoneDigits = phoneRawDigits.length === 12 ? phoneRawDigits.replace(/^91/, '') : phoneRawDigits;
+        const phoneDigits = normalizePhone(identifier);
 
         const userSelect = {
           id: true,
@@ -302,12 +300,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               where: { email: identifier.toLowerCase() },
               select: userSelect,
             })
-          : (phoneDigits.length === 10
-              ? await prisma.user.findFirst({
-                  where: { phone: { in: phoneLookupVariants(phoneDigits) } },
-                  select: userSelect,
-                })
-              : null);
+          : await findUserByPhoneLookup(phoneDigits, userSelect);
 
         if (!user || !user.password || !user.isActive) return null;
 
@@ -549,6 +542,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
         if (token.activeVendorId) u.activeVendorId = token.activeVendorId as string;
         if (token.activeBrandId) u.activeBrandId = token.activeBrandId as string;
+        if (token.activeVendorTeamRole) u.activeVendorTeamRole = token.activeVendorTeamRole as string;
+        if (token.activeBrandTeamRole) u.activeBrandTeamRole = token.activeBrandTeamRole as string;
         if (Array.isArray(token.availableStores)) u.availableStores = token.availableStores;
         if (typeof token.isStoreScopedOnly === 'boolean') u.isStoreScopedOnly = token.isStoreScopedOnly;
       }

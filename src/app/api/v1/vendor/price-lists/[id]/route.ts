@@ -136,7 +136,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     let skuMap = new Map<string, string>();
     if (skusToResolve.length > 0) {
       const found = await prisma.product.findMany({
-        where: { sku: { in: skusToResolve }, vendorId },
+        where: { sku: { in: skusToResolve }, vendorId, isActive: true, approvalStatus: 'approved' },
         select: { id: true, sku: true },
       });
       skuMap = new Map(found.filter((p) => p.sku).map((p) => [p.sku!, p.id]));

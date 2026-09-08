@@ -10,6 +10,19 @@ export const AUDIT_ACTIONS = {
   vendorDelete: 'vendor.delete',
   productApprove: 'product.approve',
   productReject: 'product.reject',
+  productCreate: 'product.create',
+  productUpdate: 'product.update',
+  productDelete: 'product.delete',
+  masterProductCreate: 'master_product.create',
+  masterProductUpdate: 'master_product.update',
+  masterProductDelete: 'master_product.delete',
+  brandUpdate: 'brand.update',
+  brandStorefrontCreate: 'brand.storefront_create',
+  categoryUpdate: 'category.update',
+  categoryDelete: 'category.delete',
+  userUpdate: 'user.update',
+  userDelete: 'user.delete',
+  settingsUpdate: 'settings.update',
   adminTeamInvite: 'admin_team.invite',
   adminTeamRoleChange: 'admin_team.role_change',
   adminTeamRemove: 'admin_team.remove',
@@ -44,6 +57,7 @@ export const AUDIT_ACTIONS = {
   collectionCreate: 'collection.create',
   collectionUpdate: 'collection.update',
   collectionDelete: 'collection.delete',
+  orderMarkPaid: 'order.mark_paid',
 } as const;
 
 export type AuditAction = typeof AUDIT_ACTIONS[keyof typeof AUDIT_ACTIONS];

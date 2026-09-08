@@ -13,6 +13,8 @@ import { emitEvent } from '@/events/emitter';
 import { BrandProfileSchema, validateBrandProfile, derivedLegalName } from '@/lib/validators/brand-profile';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 import { stripNulls } from '@/lib/stripNulls';
+import { assertVerificationToken } from '@/lib/otpVerification';
+import { normalizePhone, phoneLookupVariants } from '@/lib/phone';
 import {
   mapToBusinessAccount,
   mapToBrandFields,
@@ -25,6 +27,7 @@ const BodyBase = BrandProfileSchema.extend({
   phone: z.string().optional().or(z.literal('')),
   verifiedEmail: z.string().optional().or(z.literal('')),
   password: z.string().min(6).optional().or(z.literal('')),
+  verificationToken: z.string().min(1).optional(),
 });
 
 function slugify(name: string, suffix: string): string {
@@ -39,8 +42,7 @@ function parseBody(raw: unknown) {
   const relaxed = isRegisterEmailOtpEnabled();
   const parsed = BodyBase.parse(stripNulls((raw ?? {}) as Record<string, unknown>));
 
-  const phoneRaw = (parsed.phone ?? '').replace(/\D/g, '');
-  const phone = phoneRaw.length === 12 ? phoneRaw.replace(/^91/, '') : phoneRaw;
+  const phone = normalizePhone(parsed.phone) ?? '';
   const verifiedEmail = (parsed.verifiedEmail || parsed.email || '').trim().toLowerCase();
   const ownerEmail = (parsed.email || verifiedEmail).trim().toLowerCase();
 
@@ -75,6 +77,7 @@ function parseBody(raw: unknown) {
     phone: PHONE_RE.test(phone) ? phone : '',
     email: ownerEmail || null,
     verifiedEmail: verifiedEmail || ownerEmail || null,
+    verificationToken: parsed.verificationToken,
     relaxed,
   };
 }
@@ -95,45 +98,24 @@ async function postHandler(req: NextRequest) {
     const email = input.email;
     const verifyEmail = input.verifiedEmail;
 
-    const otpWhere = input.relaxed
-      ? {
-          OR: [
-            ...(phone ? [{ phone, used: true as const }] : []),
-            ...(verifyEmail ? [{ email: verifyEmail, used: true as const }] : []),
-          ],
-          createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
-        }
-      : {
-          phone: phone!,
-          used: true as const,
-          createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
-        };
-
-    const verifiedOtp = await prisma.otpCode.findFirst({
-      where: otpWhere,
-      orderBy: { createdAt: 'desc' },
-      select: { id: true },
+    await assertVerificationToken(input.verificationToken, {
+      phone,
+      email: verifyEmail,
     });
-    if (!verifiedOtp) {
-      throw Errors.badRequest(
-        input.relaxed
-          ? 'Contact is not verified. Please verify your mobile or email first.'
-          : 'Phone number is not verified. Please verify your number first.',
-      );
-    }
 
     const existing = await prisma.user.findFirst({
       where: {
         OR: [
-          ...(phone ? [{ phone }] : []),
+          ...(phone ? [{ phone: { in: phoneLookupVariants(phone) } }] : []),
           ...(email ? [{ email }] : []),
         ],
       },
+      orderBy: { createdAt: 'asc' },
       select: { id: true, phone: true, email: true },
     });
     if (existing) {
-      const dupField = phone && existing.phone === phone ? 'Phone' : 'Email';
-      throw Errors.duplicate(dupField);
+      const phoneHit = phone && phoneLookupVariants(existing.phone).includes(phone);
+      throw Errors.duplicate(phoneHit ? 'Phone' : 'Email');
     }
 
     const brandAdminTemplate = await prisma.accountRole.findFirst({

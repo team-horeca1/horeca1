@@ -4,15 +4,8 @@ import React, { useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { loadRazorpayScript, openRazorpayPopup } from '@/lib/razorpayClient';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-
-// window.Razorpay is typed in src/types/razorpay.d.ts
-
-interface RazorpaySuccessPayload {
-    razorpay_payment_id: string;
-    razorpay_order_id: string;
-    razorpay_signature: string;
-}
 
 // Shape returned by POST /api/v1/promotions/preview (no coupon code from cart).
 interface PromoPreview {
@@ -29,45 +22,17 @@ interface PromoPreview {
         promotionName: string;
     }>;
 }
-
-function loadRazorpayScript(): Promise<void> {
-    return new Promise((resolve, reject) => {
-        if (typeof window !== 'undefined' && typeof window.Razorpay !== 'undefined') { resolve(); return; }
-        const script = document.createElement('script');
-        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('Failed to load Razorpay checkout'));
-        document.body.appendChild(script);
-    });
-}
-
-function openRazorpayPopup(opts: {
-    key: string;
-    amount: number;
-    currency: string;
-    order_id: string;
-    description: string;
-}): Promise<RazorpaySuccessPayload> {
-    return new Promise((resolve, reject) => {
-        const rzp = new window.Razorpay({
-            key: opts.key,
-            amount: opts.amount,
-            currency: opts.currency,
-            order_id: opts.order_id,
-            name: 'HoReCa Hub',
-            description: opts.description,
-            theme: { color: '#6B1D2E' },
-            handler: (response: RazorpaySuccessPayload) => resolve(response),
-            modal: { ondismiss: () => reject(new Error('Payment cancelled')) },
-        });
-        rzp.open();
-    });
-}
 import { ArrowLeft, Search, ChevronRight, ChevronDown, ChevronUp, Plus, Minus, X, Percent, FileText, AlertTriangle, Check, Home, ShoppingCart, CreditCard, Trash2, Store, Zap, FileCheck, Banknote, BadgePercent, Wallet, Loader2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCart } from '@/context/CartContext';
 import { dal } from '@/lib/dal';
 import { cn } from '@/lib/utils';
+import {
+    clearExcludedVendorIds,
+    pruneExcludedVendorIds,
+    selectedVendorsFromExclusions,
+    setExcludedVendorIds,
+} from '@/lib/checkoutSelection';
 import {
     VendorPromoBanner,
     FreeGiftLine,
@@ -191,14 +156,29 @@ export default function CartPage() {
 
     // Default: select every vendor whenever the set of vendors in cart changes.
     // If the URL carries ?vendor=<id>, pre-select only that vendor (deep-link from shipment-detail page).
+    // Otherwise restore skipped POs from sessionStorage so checkout round-trips keep the same selection.
     React.useEffect(() => {
-        if (initialVendorParam && groups.some(g => g.vendorId === initialVendorParam)) {
-            setSelectedVendors(new Set([initialVendorParam]));
-        } else {
-            setSelectedVendors(new Set(groups.map(g => g.vendorId)));
+        if (isCartLoading) return;
+        const cartIds = groups.map(g => g.vendorId);
+        if (cartIds.length === 0) {
+            clearExcludedVendorIds();
+            setSelectedVendors(new Set());
+            return;
         }
+        if (initialVendorParam && groups.some(g => g.vendorId === initialVendorParam)) {
+            const next = new Set([initialVendorParam]);
+            setSelectedVendors(next);
+            setExcludedVendorIds(cartIds.filter((id) => id !== initialVendorParam));
+            return;
+        }
+        const excluded = pruneExcludedVendorIds(cartIds);
+        setSelectedVendors(selectedVendorsFromExclusions(cartIds, excluded));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [vendorIdsKey, initialVendorParam]);
+    }, [vendorIdsKey, initialVendorParam, isCartLoading]);
+
+    const persistSelection = (selected: Set<string>) => {
+        setExcludedVendorIds(groups.map((g) => g.vendorId).filter((id) => !selected.has(id)));
+    };
 
     // Deep-link to payment step if URL carries ?step=payment and we have a valid selection.
     const jumpedToPayment = React.useRef(false);
@@ -216,8 +196,14 @@ export default function CartPage() {
             const next = new Set(prev);
             if (next.has(vendorId)) next.delete(vendorId);
             else next.add(vendorId);
+            persistSelection(next);
             return next;
         });
+    };
+
+    const goToCheckout = () => {
+        persistSelection(selectedVendors);
+        router.push('/checkout');
     };
 
     const selectedGroups = groups.filter(g => selectedVendors.has(g.vendorId));
@@ -1068,7 +1054,11 @@ export default function CartPage() {
                                     </span>
                                     {groups.length > 1 && (
                                         <button
-                                            onClick={() => setSelectedVendors(fullCartSelected ? new Set() : new Set(groups.map(g => g.vendorId)))}
+                                            onClick={() => {
+                                                const next = fullCartSelected ? new Set<string>() : new Set(groups.map(g => g.vendorId));
+                                                setSelectedVendors(next);
+                                                persistSelection(next);
+                                            }}
                                             className="text-[12px] font-bold text-primary hover:underline"
                                         >
                                             {fullCartSelected ? 'Deselect all' : 'Select all'}
@@ -1172,7 +1162,7 @@ export default function CartPage() {
 
                         {/* Checkout Button */}
                         <button
-                            onClick={() => router.push('/checkout')}
+                            onClick={goToCheckout}
                             disabled={selectedGroups.length === 0}
                             className="w-full bg-primary text-white py-5 rounded-2xl font-bold text-[18px] transition-all hover:bg-primary-dark active:scale-[0.98] shadow-lg shadow-primary/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
                         >
@@ -1231,7 +1221,7 @@ export default function CartPage() {
             {/* Fixed Checkout Bar - Mobile + Tablet */}
             <div className="lg:hidden fixed bottom-0 left-0 right-0 px-5 pb-6 pt-3 bg-gradient-to-t from-white via-white to-transparent z-50">
                 <button
-                    onClick={() => router.push('/checkout')}
+                    onClick={goToCheckout}
                     disabled={selectedGroups.length === 0}
                     className="w-full bg-primary text-white py-[18px] rounded-[16px] font-bold text-[18px] transition-all active:scale-[0.98] shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary-dark"
                 >

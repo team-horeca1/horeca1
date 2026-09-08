@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
+import { publicStorefrontBrandWhere } from '@/modules/brand/brand.service';
 import {
   loadFulfillmentStockContext,
   sellableForContext,
@@ -186,8 +187,7 @@ export class SearchService {
     // 4th block: Brands matching the query (name, slug, or category tag)
     const brands = await prisma.brand.findMany({
       where: {
-        isActive: true,
-        approvalStatus: 'approved',
+        ...publicStorefrontBrandWhere(),
         OR: [
           { name: { contains: query, mode: 'insensitive' } },
           { slug: { contains: query, mode: 'insensitive' } },

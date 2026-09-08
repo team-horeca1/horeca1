@@ -10,9 +10,17 @@ import {
     Tag,
     Sparkles,
     Eye,
+    Pencil,
+    Check,
+    X,
+    MoreVertical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ApprovalReviewDrawer, type ReviewTarget } from '@/components/features/admin/ApprovalReviewDrawer';
+import {
+    AdminRegistryOverflowMenu,
+    AdminRegistryOverflowMenuItem,
+} from '@/components/features/admin/entity';
 
 // ── Interfaces ──
 
@@ -88,11 +96,48 @@ function formatINR(n: number): string {
     return `₹${n.toLocaleString('en-IN')}`;
 }
 
+const reviewBtnCls =
+    'flex items-center justify-center gap-1.5 min-h-12 lg:min-h-[38px] px-4 bg-primary text-white rounded-[12px] text-[13px] font-semibold hover:bg-primary-dark transition-colors w-full lg:w-auto';
+
+function ApprovalsRowActions({
+    menuId,
+    activeMenu,
+    onToggle,
+    onReview,
+}: {
+    menuId: string;
+    activeMenu: { id: string; top: number; right: number } | null;
+    onToggle: (e: React.MouseEvent<HTMLButtonElement>, id: string) => void;
+    onReview: () => void;
+}) {
+    return (
+        <div className="flex items-center gap-2 w-full lg:w-auto" onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={onReview} className={reviewBtnCls}>
+                <Eye size={14} /> Review
+            </button>
+            <button
+                type="button"
+                onClick={(e) => onToggle(e, menuId)}
+                className={cn(
+                    'size-12 lg:size-[34px] shrink-0 flex items-center justify-center rounded-[10px] border',
+                    activeMenu?.id === menuId
+                        ? 'bg-gray-100 text-gray-900 border-gray-200'
+                        : 'bg-white border-[#EEEEEE] text-[#7C7C7C] hover:bg-gray-50',
+                )}
+                aria-label="More actions"
+            >
+                <MoreVertical size={16} />
+            </button>
+        </div>
+    );
+}
+
 export default function ApprovalsPage() {
     const [sectionTab, setSectionTab] = useState<SectionTab>('Vendors');
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
+    const [activeMenu, setActiveMenu] = useState<{ id: string; top: number; right: number } | null>(null);
 
     // Vendor state
     const [pendingVendors, setPendingVendors] = useState<Vendor[]>([]);
@@ -170,6 +215,27 @@ export default function ApprovalsPage() {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
+    useEffect(() => {
+        const handleClickOutside = () => setActiveMenu(null);
+        if (activeMenu !== null) window.addEventListener('click', handleClickOutside);
+        return () => window.removeEventListener('click', handleClickOutside);
+    }, [activeMenu]);
+
+    const toggleMenu = (e: React.MouseEvent<HTMLButtonElement>, id: string) => {
+        e.stopPropagation();
+        if (activeMenu?.id === id) {
+            setActiveMenu(null);
+            return;
+        }
+        const rect = e.currentTarget.getBoundingClientRect();
+        setActiveMenu({ id, top: rect.bottom + 6, right: window.innerWidth - rect.right });
+    };
+
+    const openReview = (target: ReviewTarget) => {
+        setActiveMenu(null);
+        setReviewTarget(target);
+    };
+
     // ── Filter logic ──
     const q = searchQuery.toLowerCase();
     const allVendors = [...pendingVendors, ...approvedVendors];
@@ -191,9 +257,6 @@ export default function ApprovalsPage() {
             (b.user?.fullName.toLowerCase().includes(q) ?? false) ||
             (b.user?.email.toLowerCase().includes(q) ?? false))
         : pendingBrands;
-
-    const reviewBtnCls =
-        'flex items-center justify-center gap-1.5 min-h-12 lg:min-h-[38px] px-4 bg-primary text-white rounded-[12px] text-[13px] font-semibold hover:bg-primary-dark transition-colors w-full lg:w-auto';
 
     if (loading) {
         return (
@@ -313,13 +376,12 @@ export default function ApprovalsPage() {
                                         {vendor.isVerified ? 'Verified' : 'Pending'}
                                     </span>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setReviewTarget({ type: 'vendor', id: vendor.id })}
-                                    className={reviewBtnCls}
-                                >
-                                    <Eye size={14} /> Review
-                                </button>
+                                <ApprovalsRowActions
+                                    menuId={`sup-${vendor.id}`}
+                                    activeMenu={activeMenu}
+                                    onToggle={toggleMenu}
+                                    onReview={() => openReview({ type: 'vendor', id: vendor.id })}
+                                />
                             </div>
                         ))}
                         {getDisplayVendors().length === 0 && (
@@ -368,12 +430,12 @@ export default function ApprovalsPage() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => setReviewTarget({ type: 'vendor', id: vendor.id })}
-                                                className={reviewBtnCls}
-                                            >
-                                                <Eye size={14} /> Review
-                                            </button>
+                                            <ApprovalsRowActions
+                                                menuId={`sup-${vendor.id}`}
+                                                activeMenu={activeMenu}
+                                                onToggle={toggleMenu}
+                                                onReview={() => openReview({ type: 'vendor', id: vendor.id })}
+                                            />
                                         </td>
                                     </tr>
                                 ))}
@@ -423,17 +485,16 @@ export default function ApprovalsPage() {
                                             {typeLabel}
                                         </span>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setReviewTarget({
+                                    <ApprovalsRowActions
+                                        menuId={`prd-${product.kind ?? 'vendor'}-${product.id}`}
+                                        activeMenu={activeMenu}
+                                        onToggle={toggleMenu}
+                                        onReview={() => openReview({
                                             type: 'product',
                                             id: product.id,
                                             kind: product.kind ?? 'vendor',
                                         })}
-                                        className={reviewBtnCls}
-                                    >
-                                        <Eye size={14} /> Review
-                                    </button>
+                                    />
                                 </div>
                             );
                         })}
@@ -514,16 +575,16 @@ export default function ApprovalsPage() {
                                         </td>
                                         <td className="px-6 py-4 text-[13px] text-[#7C7C7C]">{formatDate(product.createdAt)}</td>
                                         <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => setReviewTarget({
+                                            <ApprovalsRowActions
+                                                menuId={`prd-${product.kind ?? 'vendor'}-${product.id}`}
+                                                activeMenu={activeMenu}
+                                                onToggle={toggleMenu}
+                                                onReview={() => openReview({
                                                     type: 'product',
                                                     id: product.id,
                                                     kind: product.kind ?? 'vendor',
                                                 })}
-                                                className={reviewBtnCls}
-                                            >
-                                                <Eye size={14} /> Review
-                                            </button>
+                                            />
                                         </td>
                                     </tr>
                                     );
@@ -555,13 +616,12 @@ export default function ApprovalsPage() {
                                         <p className="text-[12px] text-[#6B7280]">{cat.parent?.name || 'Top-level'} · {formatDate(cat.createdAt)}</p>
                                     </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setReviewTarget({ type: 'category', id: cat.id })}
-                                    className={reviewBtnCls}
-                                >
-                                    <Eye size={14} /> Review
-                                </button>
+                                <ApprovalsRowActions
+                                    menuId={`cat-${cat.id}`}
+                                    activeMenu={activeMenu}
+                                    onToggle={toggleMenu}
+                                    onReview={() => openReview({ type: 'category', id: cat.id })}
+                                />
                             </div>
                         ))}
                         {filteredCategories.length === 0 && (
@@ -595,12 +655,12 @@ export default function ApprovalsPage() {
                                         <td className="px-6 py-4 text-[13px] text-[#7C7C7C]">{cat.parent?.name || 'Top-level'}</td>
                                         <td className="px-6 py-4 text-[13px] text-[#7C7C7C]">{formatDate(cat.createdAt)}</td>
                                         <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => setReviewTarget({ type: 'category', id: cat.id })}
-                                                className={reviewBtnCls}
-                                            >
-                                                <Eye size={14} /> Review
-                                            </button>
+                                            <ApprovalsRowActions
+                                                menuId={`cat-${cat.id}`}
+                                                activeMenu={activeMenu}
+                                                onToggle={toggleMenu}
+                                                onReview={() => openReview({ type: 'category', id: cat.id })}
+                                            />
                                         </td>
                                     </tr>
                                 ))}
@@ -636,13 +696,12 @@ export default function ApprovalsPage() {
                                         <p className="text-[12px] text-[#6B7280] truncate">{brand.user?.email ?? 'Label-only brand'}</p>
                                     </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setReviewTarget({ type: 'brand', id: brand.id })}
-                                    className={reviewBtnCls}
-                                >
-                                    <Eye size={14} /> Review
-                                </button>
+                                <ApprovalsRowActions
+                                    menuId={`brd-${brand.id}`}
+                                    activeMenu={activeMenu}
+                                    onToggle={toggleMenu}
+                                    onReview={() => openReview({ type: 'brand', id: brand.id })}
+                                />
                             </div>
                         ))}
                         {filteredBrands.length === 0 && (
@@ -682,12 +741,12 @@ export default function ApprovalsPage() {
                                         <td className="px-6 py-4 text-[13px] text-[#7C7C7C]">{brand.user?.email ?? 'Label-only brand'}</td>
                                         <td className="px-6 py-4 text-[13px] text-[#7C7C7C]">{formatDate(brand.createdAt)}</td>
                                         <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => setReviewTarget({ type: 'brand', id: brand.id })}
-                                                className={reviewBtnCls}
-                                            >
-                                                <Eye size={14} /> Review
-                                            </button>
+                                            <ApprovalsRowActions
+                                                menuId={`brd-${brand.id}`}
+                                                activeMenu={activeMenu}
+                                                onToggle={toggleMenu}
+                                                onReview={() => openReview({ type: 'brand', id: brand.id })}
+                                            />
                                         </td>
                                     </tr>
                                 ))}
@@ -713,6 +772,110 @@ export default function ApprovalsPage() {
                     </p>
                 </div>
             </div>
+
+            <AdminRegistryOverflowMenu active={activeMenu}>
+                {(() => {
+                    const id = activeMenu?.id;
+                    if (!id) return null;
+                    const openEdit = (target: ReviewTarget) => openReview({ ...target, startInEdit: true });
+                    if (id.startsWith('sup-')) {
+                        const vendorId = id.slice(4);
+                        return (
+                            <>
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => openEdit({ type: 'vendor', id: vendorId })}
+                                    icon={<Pencil size={14} />}
+                                    label="Edit"
+                                />
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => openReview({ type: 'vendor', id: vendorId })}
+                                    icon={<Check size={14} />}
+                                    label="Accept"
+                                />
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => openReview({ type: 'vendor', id: vendorId })}
+                                    icon={<X size={14} />}
+                                    label="Reject"
+                                    danger
+                                />
+                            </>
+                        );
+                    }
+                    if (id.startsWith('prd-')) {
+                        const rest = id.slice(4);
+                        const sep = rest.indexOf('-');
+                        const kind = (sep >= 0 ? rest.slice(0, sep) : 'vendor') as 'master' | 'vendor';
+                        const productId = sep >= 0 ? rest.slice(sep + 1) : rest;
+                        return (
+                            <>
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => openEdit({ type: 'product', id: productId, kind })}
+                                    icon={<Pencil size={14} />}
+                                    label="Edit"
+                                />
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => openReview({ type: 'product', id: productId, kind })}
+                                    icon={<Check size={14} />}
+                                    label="Accept"
+                                />
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => openReview({ type: 'product', id: productId, kind })}
+                                    icon={<X size={14} />}
+                                    label="Reject"
+                                    danger
+                                />
+                            </>
+                        );
+                    }
+                    if (id.startsWith('cat-')) {
+                        const categoryId = id.slice(4);
+                        return (
+                            <>
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => openEdit({ type: 'category', id: categoryId })}
+                                    icon={<Pencil size={14} />}
+                                    label="Edit"
+                                />
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => openReview({ type: 'category', id: categoryId })}
+                                    icon={<Check size={14} />}
+                                    label="Accept"
+                                />
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => openReview({ type: 'category', id: categoryId })}
+                                    icon={<X size={14} />}
+                                    label="Reject"
+                                    danger
+                                />
+                            </>
+                        );
+                    }
+                    if (id.startsWith('brd-')) {
+                        const brandId = id.slice(4);
+                        return (
+                            <>
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => openEdit({ type: 'brand', id: brandId })}
+                                    icon={<Pencil size={14} />}
+                                    label="Edit"
+                                />
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => openReview({ type: 'brand', id: brandId })}
+                                    icon={<Check size={14} />}
+                                    label="Accept"
+                                />
+                                <AdminRegistryOverflowMenuItem
+                                    onClick={() => openReview({ type: 'brand', id: brandId })}
+                                    icon={<X size={14} />}
+                                    label="Reject"
+                                    danger
+                                />
+                            </>
+                        );
+                    }
+                    return null;
+                })()}
+            </AdminRegistryOverflowMenu>
 
             <ApprovalReviewDrawer
                 target={reviewTarget}

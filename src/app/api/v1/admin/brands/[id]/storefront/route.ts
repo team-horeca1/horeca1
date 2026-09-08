@@ -25,6 +25,7 @@ import {
   slugifyBrandName,
   upgradePlaceholderBrandOwner,
 } from '@/modules/brand/brand.provisioning';
+import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
 export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
@@ -150,6 +151,20 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
         },
         select: BRAND_LIST_SELECT,
       });
+    });
+
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.brandStorefrontCreate,
+      entity: 'Brand',
+      entityId: brand.id,
+      before: { userId: brand.userId, name: brand.name, slug: brand.slug },
+      after: {
+        userId: result.user?.id ?? null,
+        name: result.name,
+        slug: result.slug,
+        approvalStatus: result.approvalStatus,
+        isActive: result.isActive,
+      },
     });
 
     return NextResponse.json({ success: true, data: result });

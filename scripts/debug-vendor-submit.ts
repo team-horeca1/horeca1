@@ -67,7 +67,11 @@ async function main() {
   console.log('code', code);
   const verify = await api('/api/v1/auth/otp/verify', { email, code });
   console.log('verify', verify);
-  const submit = await api('/api/v1/vendor/onboarding/submit', payload);
+  const verificationToken =
+    typeof verify.data === 'object' && verify.data && 'verificationToken' in verify.data
+      ? (verify.data as { verificationToken?: string }).verificationToken
+      : undefined;
+  const submit = await api('/api/v1/vendor/onboarding/submit', { ...payload, verificationToken });
   console.log('submit', submit);
 }
 

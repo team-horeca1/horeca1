@@ -23,8 +23,21 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       await ensureInventoryRowsForOutlet(voc.vendorId, voc.outletId);
     }
 
+    const includeInactive = req.nextUrl.searchParams.get('includeInactive') === '1';
     const inventory = await prisma.inventory.findMany({
-      where: { vendorId: voc.vendorId, ...outletWhere },
+      where: {
+        vendorId: voc.vendorId,
+        ...outletWhere,
+        ...(includeInactive
+          ? {}
+          : {
+              product: {
+                isActive: true,
+                approvalStatus: 'approved',
+                listingStatus: 'submitted',
+              },
+            }),
+      },
       include: {
         product: {
           select: { id: true, name: true, sku: true, vendorSku: true },

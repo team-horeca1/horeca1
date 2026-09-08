@@ -1,22 +1,22 @@
 // POST /api/v1/auth/otp/verify
 // Verifies a 4-digit OTP for a phone number WITHOUT creating a session.
-// Used by the multi-step vendor onboarding wizard where phone is verified
-// at step 1 and the user-creation transaction happens only at final submit.
-// On success, marks the OtpCode used=true. The /vendor/onboarding/submit
-// route trusts a recently-used OTP for that phone as proof of verification.
+// Used by the multi-step vendor/brand onboarding wizards and profile phone change.
+// On success, marks the OtpCode used=true and returns a signed verificationToken
+// that submit routes must present as proof of this verification.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withRateLimit } from '@/middleware/withRateLimit';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
+import { normalizePhone } from '@/lib/phone';
+import { issueVerificationToken } from '@/lib/otpVerification';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function postHandler(req: NextRequest) {
   try {
     const body = await req.json();
-    const rawPhone = String(body.phone ?? '').replace(/\D/g, '');
-    const phone = rawPhone.length === 12 ? rawPhone.replace(/^91/, '') : rawPhone;
+    const phone = normalizePhone(String(body.phone ?? ''));
     const email = String(body.email ?? '').trim().toLowerCase();
     const code = String(body.code ?? '').trim();
 
@@ -37,7 +37,7 @@ async function postHandler(req: NextRequest) {
       );
     }
 
-    if (usePhone && !/^\d{10}$/.test(phone)) {
+    if (usePhone && !phone) {
       return NextResponse.json({ success: false, error: 'Invalid phone number' }, { status: 400 });
     }
 
@@ -54,7 +54,7 @@ async function postHandler(req: NextRequest) {
         ? { phone, code, used: false, expiresAt: { gt: new Date() } }
         : { email, code, used: false, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
-      select: { id: true },
+      select: { id: true, phone: true, email: true },
     });
 
     if (!otp) {
@@ -66,7 +66,14 @@ async function postHandler(req: NextRequest) {
 
     await prisma.otpCode.update({ where: { id: otp.id }, data: { used: true } });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      verificationToken: issueVerificationToken({
+        otpId: otp.id,
+        phone: otp.phone ?? phone,
+        email: otp.email ?? (useEmail ? email : null),
+      }),
+    });
   } catch (err) {
     console.error('[otp/verify]', err);
     return NextResponse.json({ success: false, error: 'Verification failed' }, { status: 500 });

@@ -128,11 +128,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       });
       if (existing) {
         invitee = existing;
-        if (body.password) {
-          const hashed = await bcrypt.hash(body.password, 12);
-          await prisma.user.update({ where: { id: existing.id }, data: { password: hashed } });
-          tempPassword = body.password;
-        }
+        // Existing users keep their own login credentials.
       } else {
         if (!body.fullName || !body.password) {
           throw Errors.badRequest('fullName and password are required when inviting a new user by email');
@@ -157,15 +153,12 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     } else if (normalizedPhone) {
       const existing = await prisma.user.findFirst({
         where: { phone: { in: phoneLookupVariants(normalizedPhone) } },
+        orderBy: { createdAt: 'asc' },
         select: { id: true, email: true, fullName: true, phone: true },
       });
       if (existing) {
         invitee = existing;
-        if (body.password) {
-          const hashed = await bcrypt.hash(body.password, 12);
-          await prisma.user.update({ where: { id: existing.id }, data: { password: hashed } });
-          tempPassword = body.password;
-        }
+        // Existing users keep their own login credentials.
       } else {
         if (!body.fullName || !body.password) {
           throw Errors.badRequest('fullName and password are required when inviting a new user by phone');
@@ -315,6 +308,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       success: true,
       data: {
         ...result,
+        existingUser: !isNewUser,
         ...(tempPassword
           ? {
               inviteMeta: {

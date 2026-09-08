@@ -28,7 +28,7 @@ async function jsonFetch(path: string, init?: RequestInit) {
   return { status: res.status, json, headers: res.headers };
 }
 
-async function verifyPhone(phone: string): Promise<void> {
+async function verifyPhone(phone: string): Promise<string> {
   const send = await jsonFetch('/api/v1/auth/otp/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -49,6 +49,9 @@ async function verifyPhone(phone: string): Promise<void> {
     body: JSON.stringify({ phone, code: otpRow.code }),
   });
   if (!verify.json.success) throw new Error(`OTP verify failed: ${JSON.stringify(verify.json)}`);
+  const token = verify.json.verificationToken as string | undefined;
+  if (!token) throw new Error('OTP verify did not return verificationToken');
+  return token;
 }
 
 async function adminSessionCookie(): Promise<string> {
@@ -90,7 +93,7 @@ async function testBrandPublicRegister(): Promise<void> {
   const phone = testPhone('9');
   const email = `brand-test-${s}@example.com`;
 
-  await verifyPhone(phone);
+  const verificationToken = await verifyPhone(phone);
 
   const payload = {
     phone,
@@ -116,6 +119,7 @@ async function testBrandPublicRegister(): Promise<void> {
     website: 'https://example.com',
     tagline: 'Test tagline',
     description: 'Test brand description',
+    verificationToken,
   };
 
   const { status, json } = await jsonFetch('/api/v1/brand/onboarding/submit', {
@@ -142,7 +146,7 @@ async function testVendorPublicRegister(): Promise<void> {
   const phone = testPhone('8');
   const email = `vendor-test-${s}@example.com`;
 
-  await verifyPhone(phone);
+  const verificationToken = await verifyPhone(phone);
 
   const addr = {
     addressLine: '456 Warehouse Road, Andheri',
@@ -187,6 +191,7 @@ async function testVendorPublicRegister(): Promise<void> {
     fssaiNumber: '',
     udyamNumber: '',
     cinNumber: '',
+    verificationToken,
   };
 
   const { status, json } = await jsonFetch('/api/v1/vendor/onboarding/submit', {

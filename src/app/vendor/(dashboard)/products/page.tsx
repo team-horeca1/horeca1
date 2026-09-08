@@ -34,6 +34,7 @@ import {
     type ProductValidationField,
 } from '@/components/features/shared/productFormValidation';
 import { brandOverrideDeviations } from '@/lib/brandOverrideFields';
+import { DEFAULT_GST_SLABS, gstSlabSelectOptions } from '@/lib/constants/gstSlabs';
 import {
     ProductCreatePreviewPanel,
     type ProductPreviewChecklist,
@@ -175,7 +176,6 @@ interface ProductForm {
     creditEligible: boolean;
     isFeatured: boolean;
     fssaiRef: string;
-    substituteIds: string[];
     priceSlabs: PriceSlabRow[];
     // Zoho Metadata
     account: string;
@@ -189,13 +189,9 @@ interface ProductForm {
     lastSync: string;
     inventoryAccount: string;
     inventoryAccountCode: string;
-    valuationMethod: string;
-    reorderPoint: string;
-    openingStock: string;
     itemType: string;
     sellable: boolean;
     purchasable: boolean;
-    trackInventory: boolean;
     packageWeight: string;
     packageLength: string;
     packageWidth: string;
@@ -241,7 +237,6 @@ const EMPTY_FORM: ProductForm = {
     creditEligible: true,
     isFeatured: false,
     fssaiRef: '',
-    substituteIds: [],
     priceSlabs: [],
     account: '',
     accountCode: '',
@@ -254,13 +249,9 @@ const EMPTY_FORM: ProductForm = {
     lastSync: '',
     inventoryAccount: '',
     inventoryAccountCode: '',
-    valuationMethod: 'FIFO',
-    reorderPoint: '',
-    openingStock: '',
     itemType: 'standard',
     sellable: true,
     purchasable: true,
-    trackInventory: true,
     packageWeight: '',
     packageLength: '',
     packageWidth: '',
@@ -537,76 +528,6 @@ function TagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[
 }
 
 /* ------------------------------------------------------------------ */
-/*  Substitute Product Picker                                          */
-/* ------------------------------------------------------------------ */
-
-function SubstituteProductPicker({
-    selectedIds,
-    currentProductId,
-    products,
-    onChange,
-}: {
-    selectedIds: string[];
-    currentProductId?: string;
-    products: VendorProduct[];
-    onChange: (ids: string[]) => void;
-}) {
-    const [query, setQuery] = useState('');
-
-    const candidates = products.filter(p =>
-        p.id !== currentProductId &&
-        !selectedIds.includes(p.id) &&
-        (query.length === 0 || p.name.toLowerCase().includes(query.toLowerCase()))
-    ).slice(0, 6);
-
-    const selected = products.filter(p => selectedIds.includes(p.id));
-
-    const add = (id: string) => { onChange([...selectedIds, id]); setQuery(''); };
-    const remove = (id: string) => onChange(selectedIds.filter(s => s !== id));
-
-    return (
-        <div className="space-y-2">
-            {selected.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                    {selected.map(p => (
-                        <span key={p.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 text-[12px] font-bold rounded-[8px]">
-                            {p.name}
-                            <button type="button" onClick={() => remove(p.id)} className="hover:text-[#E74C3C]"><X size={12} /></button>
-                        </span>
-                    ))}
-                </div>
-            )}
-            <input
-                type="text"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                placeholder="Search products to add as substitutes..."
-                className={inputCls}
-            />
-            {query.length > 0 && candidates.length > 0 && (
-                <div className="border border-[#EEEEEE] rounded-[10px] overflow-hidden">
-                    {candidates.map(p => (
-                        <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => add(p.id)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#F5F5F5] text-left transition-colors border-b border-[#F5F5F5] last:border-0"
-                        >
-                            <Package size={14} className="text-[#AEAEAE] shrink-0" />
-                            <span className="text-[13px] text-[#181725] truncate">{p.name}</span>
-                            {p.packSize && <span className="text-[11px] text-[#AEAEAE] ml-auto shrink-0">{p.packSize}</span>}
-                        </button>
-                    ))}
-                </div>
-            )}
-            {query.length > 0 && candidates.length === 0 && (
-                <p className="text-[12px] text-[#AEAEAE] py-2">No matching products found</p>
-            )}
-        </div>
-    );
-}
-
-/* ------------------------------------------------------------------ */
 /*  Main Page Component                                                */
 /* ------------------------------------------------------------------ */
 
@@ -684,6 +605,7 @@ export default function VendorProductsPage() {
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<VendorProduct | null>(null);
     const [form, setForm] = useState<ProductForm>(EMPTY_FORM);
+    const [gstSlabs, setGstSlabs] = useState<number[]>([...DEFAULT_GST_SLABS]);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -790,9 +712,12 @@ export default function VendorProductsPage() {
     const canAutosaveDraft = useCallback(() => {
         if (!isPanelOpen || loadingProduct || saving || draftSaving) return false;
         if (editingProduct?.listingStatus === 'submitted') return false;
-        // Never autosave placeholder drafts — require a real product name.
-        return form.name.trim().length > 0;
-    }, [isPanelOpen, loadingProduct, saving, draftSaving, editingProduct?.listingStatus, form.name]);
+        return (
+            form.name.trim().length > 0 &&
+            (form.sku.trim().length > 0 || form.vendorSku.trim().length > 0) &&
+            form.hsn.trim().length > 0
+        );
+    }, [isPanelOpen, loadingProduct, saving, draftSaving, editingProduct?.listingStatus, form.name, form.sku, form.vendorSku, form.hsn]);
 
     const isFormEffectivelyEmpty = useCallback(() => {
         return (
@@ -1461,12 +1386,6 @@ export default function VendorProductsPage() {
                 inventoryAccountCode: form.inventoryAccountCode.trim(),
                 platformCommission: form.platformCommission ? Number(form.platformCommission) : undefined,
             },
-            inventory: {
-                reorderPoint: form.reorderPoint ? Number(form.reorderPoint) : undefined,
-                openingStock: form.openingStock ? Number(form.openingStock) : undefined,
-                valuationMethod: form.valuationMethod.trim(),
-                trackInventory: form.trackInventory,
-            },
             packaging: {
                 packageWeight: form.packageWeight ? Number(form.packageWeight) : undefined,
                 packageLength: form.packageLength ? Number(form.packageLength) : undefined,
@@ -1523,7 +1442,6 @@ export default function VendorProductsPage() {
             minOrderQty: form.minOrderQty ? parseInt(form.minOrderQty, 10) : 1,
             tags: form.tags.length > 0 ? form.tags : undefined,
             aliasNames: form.aliasNames.length > 0 ? form.aliasNames : undefined,
-            substituteIds: form.substituteIds.length > 0 ? form.substituteIds : undefined,
             shelfLifeDays: form.shelfLifeDays.trim() !== '' && !Number.isNaN(Number(form.shelfLifeDays))
                 ? parseInt(form.shelfLifeDays, 10)
                 : undefined,
@@ -1712,9 +1630,12 @@ export default function VendorProductsPage() {
 
     const saveDraft = useCallback(async (force = false): Promise<boolean> => {
         if (skipDraftAutosaveRef.current && !force) return false;
-        if (!form.name.trim()) {
-            // Clearing the name must not POST/PATCH "Untitled product".
-            if (force) setDraftSaveError('Enter a product name to save a draft');
+        const hasDraftEssentials =
+            form.name.trim().length > 0 &&
+            (form.sku.trim().length > 0 || form.vendorSku.trim().length > 0) &&
+            form.hsn.trim().length > 0;
+        if (!hasDraftEssentials) {
+            if (force) setDraftSaveError('Enter product name, SKU and HSN code to save a draft');
             return false;
         }
         if (!force) {
@@ -1807,7 +1728,7 @@ export default function VendorProductsPage() {
         } finally {
             setDraftSaving(false);
         }
-    }, [canAutosaveDraft, isFormDirty, buildProductBody, editingProduct, products, adoptDraftProduct, syncSavedSnapshot, form.name]);
+    }, [canAutosaveDraft, isFormDirty, buildProductBody, editingProduct, products, adoptDraftProduct, syncSavedSnapshot, form.name, form.sku, form.vendorSku, form.hsn]);
 
     const discardEmptyDraft = useCallback(async (): Promise<boolean> => {
         if (skipDraftAutosaveRef.current) return false;
@@ -1971,7 +1892,6 @@ export default function VendorProductsPage() {
 
             const meta = (p.metadata && typeof p.metadata === 'object' ? p.metadata : {}) as Record<string, any>;
             const acc = meta.accounting || {};
-            const inv = meta.inventory || {};
             const pkg = meta.packaging || {};
             const ids = meta.identifiers || {};
             const att = meta.attributes || {};
@@ -1997,7 +1917,6 @@ export default function VendorProductsPage() {
                     images: Array.isArray(p.images) ? p.images : [],
                     tags: Array.isArray(p.tags) ? p.tags : [],
                     aliasNames: Array.isArray(p.aliasNames) ? p.aliasNames : [],
-                    substituteIds: Array.isArray(p.substituteIds) ? p.substituteIds : [],
                     vegNonVeg: (p.vegNonVeg || listLogistics.vegNonVeg || '') as '' | 'veg' | 'nonveg' | 'egg',
                     storageType: p.storageType || listLogistics.storageType || '',
                     shelfLifeDays:
@@ -2029,13 +1948,9 @@ export default function VendorProductsPage() {
                     lastSync: att.lastSync || '',
                     inventoryAccount: acc.inventoryAccount || '',
                     inventoryAccountCode: acc.inventoryAccountCode || '',
-                    valuationMethod: inv.valuationMethod || 'FIFO',
-                    reorderPoint: inv.reorderPoint != null ? String(inv.reorderPoint) : '',
-                    openingStock: inv.openingStock != null ? String(inv.openingStock) : '',
                     itemType: att.itemType || 'standard',
                     sellable: att.sellable ?? true,
                     purchasable: att.purchasable ?? true,
-                    trackInventory: inv.trackInventory ?? true,
                     packageWeight: pkg.packageWeight != null ? String(pkg.packageWeight) : '',
                     packageLength: pkg.packageLength != null ? String(pkg.packageLength) : '',
                     packageWidth: pkg.packageWidth != null ? String(pkg.packageWidth) : '',
@@ -2115,7 +2030,6 @@ export default function VendorProductsPage() {
                     minOrderQty: listLogistics.minOrderQty,
                     creditEligible: true,
                     isFeatured: product.isFeatured,
-                    substituteIds: product.substituteIds ?? [],
                     priceSlabs: product.priceSlabs
                         ? product.priceSlabs.map((s) => ({
                             minQty: String(s.minQty),
@@ -2283,6 +2197,18 @@ export default function VendorProductsPage() {
         editingProduct?.listingStatus,
         lastSavedSnapshot,
     ]);
+
+    useEffect(() => {
+        if (!isPanelOpen) return;
+        fetch('/api/v1/config/gst-slabs')
+            .then((r) => r.json())
+            .then((json: { success?: boolean; data?: { slabs?: number[] } }) => {
+                if (json.success && Array.isArray(json.data?.slabs) && json.data.slabs.length > 0) {
+                    setGstSlabs(json.data.slabs);
+                }
+            })
+            .catch(() => {});
+    }, [isPanelOpen]);
 
     /* ---- Form field helpers ---- */
 
@@ -3224,7 +3150,7 @@ export default function VendorProductsPage() {
                     {/* Panel */}
                     <div
                         ref={panelRef}
-                        className="fixed top-0 right-0 h-full w-full xl:max-w-[min(100%,1200px)] bg-white z-[70] shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
+                        className="fixed top-0 right-0 h-full w-full bg-white z-[70] shadow-2xl flex flex-col animate-in slide-in-from-right duration-300"
                     >
                         {/* Panel Header */}
                         <div className="flex items-center justify-between px-4 lg:px-6 py-4 border-b border-[#EEEEEE] shrink-0">
@@ -3444,6 +3370,7 @@ export default function VendorProductsPage() {
                                         errors={fieldErrors}
                                         taxAmount={taxAmount}
                                         savings={savings}
+                                        taxPercentOptions={gstSlabSelectOptions(gstSlabs, form.taxPercent)}
                                     >
                                             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                                                 <div id="ff-countryOfOrigin">
@@ -3480,17 +3407,6 @@ export default function VendorProductsPage() {
                                                 </div>
                                             </div>
 
-                                            <div id="ff-substituteIds">
-                                                <FieldLabel>Substitute Mapping</FieldLabel>
-                                                <p className="text-[11px] text-[#AEAEAE] mb-2">Optional — suggest alternate products if out of stock</p>
-                                                <SubstituteProductPicker
-                                                    selectedIds={form.substituteIds}
-                                                    currentProductId={editingProduct?.id}
-                                                    products={products}
-                                                    onChange={(ids) => updateField('substituteIds', ids)}
-                                                />
-                                                {fieldErrors.substituteIds && <p className="text-[11px] text-[#E74C3C] font-semibold mt-1.5">{fieldErrors.substituteIds}</p>}
-                                            </div>
                                     </ProductEssentialsFields>
 
                                 <FormSection title="Bulk pricing tiers" icon={<Tag size={16} />} sectionId="bulk" className="!p-4 !space-y-3">
@@ -3690,61 +3606,6 @@ export default function VendorProductsPage() {
                                                         className={inputCls}
                                                     />
                                                     <p className="mt-1 text-[11px] text-[#7C7C7C]">Accounting metadata only — does not change settlement math.</p>
-                                                </div>
-                                            </div>
-                                </FormSection>
-
-                                <FormSection title="Inventory" icon={<BarChart3 size={16} />} sectionId="inventory" className="!p-4 !space-y-3">
-                                            
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <FieldLabel>Opening Stock</FieldLabel>
-                                                    <input
-                                                        type="number"
-                                                        value={form.openingStock}
-                                                        onChange={e => updateField('openingStock', e.target.value)}
-                                                        placeholder="0"
-                                                        className={inputCls}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <FieldLabel>Reorder Point</FieldLabel>
-                                                    <input
-                                                        type="number"
-                                                        value={form.reorderPoint}
-                                                        onChange={e => updateField('reorderPoint', e.target.value)}
-                                                        placeholder="e.g. 10"
-                                                        className={inputCls}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#EEEEEE]">
-                                                <div>
-                                                    <FieldLabel>Valuation Method</FieldLabel>
-                                                    <select
-                                                        value={form.valuationMethod}
-                                                        onChange={e => updateField('valuationMethod', e.target.value)}
-                                                        className={selectCls}
-                                                    >
-                                                        <option value="FIFO">First In First Out (FIFO)</option>
-                                                        <option value="LIFO">Last In First Out (LIFO)</option>
-                                                        <option value="WAC">Weighted Average Cost (WAC)</option>
-                                                    </select>
-                                                </div>
-                                                <div className="flex items-center pt-6">
-                                                    <label className="flex items-center gap-3 cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={form.trackInventory}
-                                                            onChange={(e) => updateField('trackInventory', e.target.checked)}
-                                                            className="w-5 h-5 accent-primary"
-                                                        />
-                                                        <div>
-                                                            <span className="text-[13.5px] font-bold text-[#181725]">Track Inventory</span>
-                                                            <p className="text-[11px] text-[#AEAEAE]">Enable stock levels monitoring</p>
-                                                        </div>
-                                                    </label>
                                                 </div>
                                             </div>
                                 </FormSection>
@@ -4100,7 +3961,12 @@ export default function VendorProductsPage() {
                             <button
                                 type="button"
                                 onClick={() => void saveDraft(true)}
-                                disabled={draftSaving || saving || loadingProduct}
+                                disabled={draftSaving || saving || loadingProduct || !canAutosaveDraft()}
+                                title={
+                                    canAutosaveDraft()
+                                        ? undefined
+                                        : 'Enter product name, SKU and HSN code to save a draft'
+                                }
                                 className="flex-1 h-[48px] bg-[#FFCF4D] border border-[#E6B800] text-[#4A3800] rounded-[12px] text-[14px] font-bold hover:bg-[#F5C542] transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                             >
                                 {draftSaving && <Loader2 size={16} className="animate-spin" />}

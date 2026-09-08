@@ -114,6 +114,7 @@ export function useBusinessAccountSwitcher() {
         displayName: string;
         isPrimaryStore: boolean;
         isActive: boolean;
+        defaultOutletId?: string | null;
       }>)
     : [];
   const isStoreScopedOnly = u.isStoreScopedOnly === true;
@@ -733,6 +734,7 @@ export function useBusinessAccountSwitcher() {
         displayName: s.displayName,
         isPrimaryStore: s.isPrimaryStore,
         isActive: s.isActive,
+        defaultOutletId: null as string | null,
       }))
     : availableStores;
 

@@ -11,6 +11,7 @@ const DISMISS_KEY = 'horeca1:profile-nudge-dismissed-until';
 
 type ProfileStatus = {
   isComplete: boolean;
+  needsCompleteProfile?: boolean;
   hasCorePersonalization: boolean;
   fields: {
     fullName: boolean;
@@ -41,8 +42,9 @@ export function CompleteProfileBanner() {
       .then((json) => {
         if (cancelled || !json?.success) return;
         setData(json.data);
-        // Hide banner when user has core info (name + business + pincode), even if profileCompletedAt isn't explicitly set
-        if (!json.data.isComplete && !json.data.hasCorePersonalization) {
+        const needsExtras = !!json.data.needsCompleteProfile;
+        const needsBasics = !json.data.isComplete && !json.data.hasCorePersonalization;
+        if (needsExtras || needsBasics) {
           setHidden(false);
         } else {
           setHidden(true);
@@ -54,7 +56,7 @@ export function CompleteProfileBanner() {
     };
   }, [status, selectedAddress, savedAddresses]);
 
-  if (hidden || !data || data.isComplete || data.hasCorePersonalization) return null;
+  if (hidden || !data) return null;
 
   const snooze = () => {
     if (typeof window === 'undefined') return;
@@ -83,27 +85,33 @@ export function CompleteProfileBanner() {
           {/* Copy */}
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-bold text-orange-900 leading-tight">
-              Unlock your personalised feed!
+              {data.needsCompleteProfile ? 'Complete your profile' : 'Unlock your personalised feed!'}
             </p>
             <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] font-bold">
-              <span className={cn("inline-flex items-center gap-1 transition-colors duration-300", data.fields.pincode ? "text-success" : "text-orange-600 animate-pulse")}>
-                {data.fields.pincode ? "✓" : "○"} Pincode
-              </span>
-              <span className="text-orange-300 font-normal">•</span>
-              <span className={cn("inline-flex items-center gap-1 transition-colors duration-300", data.fields.businessName ? "text-success" : "text-orange-600 animate-pulse")}>
-                {data.fields.businessName ? "✓" : "○"} Business
-              </span>
-              <span className="text-orange-300 font-normal">•</span>
-              <span className={cn("inline-flex items-center gap-1 transition-colors duration-300", data.fields.fullName ? "text-success" : "text-orange-600 animate-pulse")}>
-                {data.fields.fullName ? "✓" : "○"} Full Name
-              </span>
+              {data.needsCompleteProfile ? (
+                <span className="text-orange-700 font-medium">Add business type, tax, and more — or skip anytime.</span>
+              ) : (
+                <>
+                  <span className={cn("inline-flex items-center gap-1 transition-colors duration-300", data.fields.pincode ? "text-success" : "text-orange-600 animate-pulse")}>
+                    {data.fields.pincode ? "✓" : "○"} Pincode
+                  </span>
+                  <span className="text-orange-300 font-normal">•</span>
+                  <span className={cn("inline-flex items-center gap-1 transition-colors duration-300", data.fields.businessName ? "text-success" : "text-orange-600 animate-pulse")}>
+                    {data.fields.businessName ? "✓" : "○"} Business
+                  </span>
+                  <span className="text-orange-300 font-normal">•</span>
+                  <span className={cn("inline-flex items-center gap-1 transition-colors duration-300", data.fields.fullName ? "text-success" : "text-orange-600 animate-pulse")}>
+                    {data.fields.fullName ? "✓" : "○"} Full Name
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
           {/* CTA + dismiss */}
           <div className="flex shrink-0 items-center gap-1.5">
             <Link
-              href="/profile"
+              href={data.needsCompleteProfile ? '/profile?open=complete' : '/profile'}
               className="rounded-full bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-1.5 text-[12px] font-bold text-white shadow-md shadow-orange-200/60 transition hover:shadow-lg hover:-translate-y-0.5 active:scale-95"
             >
               Complete

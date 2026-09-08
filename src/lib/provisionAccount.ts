@@ -81,6 +81,15 @@ export async function provisionDefaultAccount(
         });
       }
     }
+    if (input.kind === 'vendor' || input.kind === 'brand') {
+      await db.businessAccount.update({
+        where: { id: existing.businessAccountId },
+        data: {
+          ...(input.kind === 'vendor' ? { isVendor: true } : {}),
+          ...(input.kind === 'brand' ? { isBrand: true } : {}),
+        },
+      });
+    }
     return {
       businessAccountId: existing.businessAccountId,
       outletId: existing.businessAccount.primaryOutletId,

@@ -34,7 +34,7 @@ export interface ProductEssentialsForm {
   storageType: string;
   shelfLifeDays: string;
   minOrderQty: string;
-  substituteIds: string[];
+  substituteIds?: string[];
   basePrice?: string;
   vendorId?: string;
 }
@@ -45,6 +45,8 @@ export interface ValidateProductEssentialsOptions {
   requireVendorSku?: boolean;
   /** Admin: validate master SKU format on catalog-only create */
   validateMasterSkuFormat?: boolean;
+  /** Admin: SKU may be blank (auto-generated as H1-SKU-*) */
+  skuOptional?: boolean;
   /** Admin: require base price when vendor listing */
   requireBasePriceForVendorListing?: boolean;
   /** Vendor: always require base price */
@@ -67,16 +69,16 @@ export function validateProductEssentials(
 
   if (options.requireVendorSku) {
     req(errors, 'vendorSku', form.vendorSku, 'Your POS SKU is required when listing a catalog item');
-  } else {
+  } else if (!options.skuOptional) {
     req(errors, 'sku', form.sku, 'SKU is required');
-    if (
-      options.validateMasterSkuFormat &&
-      form.sku.trim() &&
-      !errors.sku
-    ) {
-      const skuCheck = validateMasterSku(form.sku);
-      if (!skuCheck.ok) errors.sku = skuCheck.message;
-    }
+  }
+  if (
+    options.validateMasterSkuFormat &&
+    form.sku.trim() &&
+    !errors.sku
+  ) {
+    const skuCheck = validateMasterSku(form.sku);
+    if (!skuCheck.ok) errors.sku = skuCheck.message;
   }
 
   req(errors, 'hsn', form.hsn, 'HSN code is required');

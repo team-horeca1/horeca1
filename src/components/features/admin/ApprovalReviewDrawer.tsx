@@ -16,14 +16,23 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { BrandSinglePicker } from '@/components/features/brand/BrandSinglePicker';
-import { CategorySinglePicker } from '@/components/features/brand/CategorySinglePicker';
+import { ImageUpload } from '@/components/ui/ImageUpload';
+import { DEFAULT_GST_SLABS } from '@/lib/constants/gstSlabs';
+import { validateProductEssentials, focusFirstProductFormError } from '@/components/features/shared/productFormValidation';
+import {
+    ApprovalProductEditForm,
+    EMPTY_APPROVAL_PRODUCT_FORM,
+    buildMasterProductPatch,
+    buildVendorProductPatch,
+    seedApprovalProductForm,
+    type ApprovalProductFormData,
+} from '@/components/features/admin/ApprovalProductEditForm';
 
 export type ReviewTarget =
-    | { type: 'vendor'; id: string }
-    | { type: 'product'; id: string; kind: 'master' | 'vendor' }
-    | { type: 'category'; id: string }
-    | { type: 'brand'; id: string };
+    | { type: 'vendor'; id: string; startInEdit?: boolean }
+    | { type: 'product'; id: string; kind: 'master' | 'vendor'; startInEdit?: boolean }
+    | { type: 'category'; id: string; startInEdit?: boolean }
+    | { type: 'brand'; id: string; startInEdit?: boolean };
 
 interface Props {
     target: ReviewTarget | null;
@@ -60,8 +69,15 @@ interface MasterProductDetail {
     sku: string;
     brand: string | null;
     imageUrl: string | null;
+    images?: string[];
+    packSize?: string | null;
+    uom?: string | null;
+    taxPercent?: unknown;
+    aliasNames?: string[];
     approvalStatus: string;
     category: { id: string; name: string } | null;
+    categoryLinks?: Array<{ categoryId: string; isPrimary: boolean; category?: { id: string; name: string } | null }>;
+    vendorProducts?: Array<Record<string, unknown>>;
 }
 
 interface VendorProductDetail {
@@ -249,9 +265,21 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
     const [allCategories, setAllCategories] = useState<Array<{ id: string; name: string }>>([]);
 
     // Edit form state
-    const [vendorForm, setVendorForm] = useState({ businessName: '', fullName: '', email: '', phone: '' });
-    const [masterForm, setMasterForm] = useState({ name: '', brand: '', sku: '', categoryId: '', categoryName: '', imageUrl: '' });
-    const [productForm, setProductForm] = useState({ name: '', brand: '', basePrice: '', categoryId: '', categoryName: '', imageUrl: '' });
+    const [vendorForm, setVendorForm] = useState({
+        businessName: '',
+        fullName: '',
+        email: '',
+        phone: '',
+        gstNumber: '',
+        addressLine: '',
+        city: '',
+        state: '',
+        addressPincode: '',
+    });
+    const [productEditForm, setProductEditForm] = useState<ApprovalProductFormData>(EMPTY_APPROVAL_PRODUCT_FORM);
+    const [productFormErrors, setProductFormErrors] = useState<Record<string, string>>({});
+    const [gstSlabs, setGstSlabs] = useState<string[]>(DEFAULT_GST_SLABS.map(String));
+    const [brandSuggesting, setBrandSuggesting] = useState(false);
     const [catalogSkuInput, setCatalogSkuInput] = useState('');
     const [linkMasterId, setLinkMasterId] = useState('');
     const [catalogSkuLookup, setCatalogSkuLookup] = useState<{
@@ -261,6 +289,9 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
     const [confirmLinkAnyway, setConfirmLinkAnyway] = useState(false);
     const [categoryForm, setCategoryForm] = useState({ name: '', slug: '', parentId: '', imageUrl: '', isActive: true });
     const [brandForm, setBrandForm] = useState({ name: '', tagline: '', logoUrl: '' });
+
+    const onCloseRef = React.useRef(onClose);
+    onCloseRef.current = onClose;
 
     const resetState = useCallback(() => {
         setIsEditing(false);
@@ -280,7 +311,30 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
         setTitle('');
         setStatusLabel('');
         setIsApproved(false);
+        setProductEditForm(EMPTY_APPROVAL_PRODUCT_FORM);
+        setProductFormErrors({});
+        setBrandSuggesting(false);
     }, []);
+
+    const loadGstSlabs = async () => {
+        try {
+            const res = await fetch('/api/v1/config/gst-slabs');
+            const json = await res.json();
+            const slabs = Array.isArray(json.data) ? json.data.map((n: unknown) => String(n)) : null;
+            if (slabs && slabs.length > 0) setGstSlabs(slabs);
+        } catch {
+            /* keep fallback */
+        }
+    };
+
+    const loadBrandOptions = async () => {
+        const bRes = await fetch('/api/v1/brands?limit=100&scope=picker');
+        const bJson = await bRes.json();
+        if (bJson.success) {
+            const list = bJson.data?.brands ?? bJson.data ?? [];
+            setBrands(Array.isArray(list) ? list.map((x: { id: string; name: string }) => ({ id: x.id, name: x.name })) : []);
+        }
+    };
 
     const loadEntity = useCallback(async (t: ReviewTarget) => {
         setLoading(true);
@@ -305,6 +359,11 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                     fullName: v.user.fullName,
                     email: v.user.email,
                     phone: v.user.phone,
+                    gstNumber: v.gstNumber ?? '',
+                    addressLine: v.addressLine ?? '',
+                    city: v.city ?? '',
+                    state: v.state ?? '',
+                    addressPincode: v.addressPincode ?? '',
                 });
             } else if (t.type === 'product' && t.kind === 'master') {
                 const res = await fetch(`/api/v1/admin/master-products/${t.id}`);
@@ -315,28 +374,28 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                 setTitle(p.name);
                 setStatusLabel(p.approvalStatus);
                 setIsApproved(p.approvalStatus === 'approved');
-                setMasterForm({
+                const listing = Array.isArray(p.vendorProducts) ? p.vendorProducts[0] : undefined;
+                setProductEditForm(seedApprovalProductForm({
+                    ...p,
+                    unit: p.uom,
+                    ...(listing ?? {}),
                     name: p.name,
-                    brand: p.brand ?? '',
                     sku: p.sku,
-                    categoryId: p.category?.id ?? '',
-                    categoryName: p.category?.name ?? '',
-                    imageUrl: p.imageUrl ?? '',
-                });
-                const bRes = await fetch('/api/v1/brands?limit=100&scope=picker');
-                const bJson = await bRes.json();
-                if (bJson.success) {
-                    const list = bJson.data?.brands ?? bJson.data ?? [];
-                    setBrands(Array.isArray(list) ? list.map((x: { id: string; name: string }) => ({ id: x.id, name: x.name })) : []);
-                }
+                    brand: p.brand,
+                    imageUrl: p.imageUrl,
+                    images: p.images,
+                    packSize: p.packSize,
+                    aliasNames: p.aliasNames,
+                    category: p.category,
+                    categoryLinks: p.categoryLinks,
+                }));
+                await Promise.all([loadBrandOptions(), loadGstSlabs()]);
             } else if (t.type === 'product' && t.kind === 'vendor') {
-                const [res, bRes, cRes] = await Promise.all([
+                const [res, cRes] = await Promise.all([
                     fetch(`/api/v1/admin/products/${t.id}`),
-                    fetch('/api/v1/brands?limit=100&scope=picker'),
                     fetch('/api/v1/admin/categories'),
                 ]);
                 const json = await res.json();
-                const bJson = await bRes.json();
                 const cJson = await cRes.json();
 
                 if (!json.success) throw new Error(json.error?.message || 'Failed to load product');
@@ -349,24 +408,14 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                         : p.approvalStatus,
                 );
                 setIsApproved(p.approvalStatus === 'approved');
-                setProductForm({
-                    name: p.name,
-                    brand: p.brand ?? '',
-                    basePrice: String(p.basePrice),
-                    categoryId: p.category?.id ?? '',
-                    categoryName: p.category?.name ?? '',
-                    imageUrl: p.imageUrl ?? '',
-                });
+                setProductEditForm(seedApprovalProductForm(p));
                 setCatalogSkuInput(p.masterProduct?.sku ?? '');
                 setLinkMasterId(p.masterProduct?.id ?? '');
-                if (bJson.success) {
-                    const list = bJson.data?.brands ?? bJson.data ?? [];
-                    setBrands(Array.isArray(list) ? list.map((x: { id: string; name: string }) => ({ id: x.id, name: x.name })) : []);
-                }
                 if (cJson.success) {
                     const list = cJson.data ?? [];
                     setAllCategories(Array.isArray(list) ? list.map((x: { id: string; name: string }) => ({ id: x.id, name: x.name })) : []);
                 }
+                await Promise.all([loadBrandOptions(), loadGstSlabs()]);
             } else if (t.type === 'category') {
                 const [cRes, listRes] = await Promise.all([
                     fetch(`/api/v1/admin/categories/${t.id}`),
@@ -406,13 +455,14 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                 setIsApproved(b.approvalStatus === 'approved');
                 setBrandForm({ name: b.name, tagline: b.tagline ?? '', logoUrl: b.logoUrl ?? '' });
             }
+            setIsEditing(Boolean(t.startInEdit));
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : 'Failed to load details');
-            onClose();
+            onCloseRef.current();
         } finally {
             setLoading(false);
         }
-    }, [onClose, resetState]);
+    }, [resetState]);
 
     useEffect(() => {
         if (target) void loadEntity(target);
@@ -476,8 +526,62 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
         !!catalogSkuLookup.master &&
         vendorProduct.name.trim().toLowerCase() !== catalogSkuLookup.master.name.trim().toLowerCase();
 
+    const suggestBrand = async (name: string) => {
+        const trimmed = name.trim();
+        if (trimmed.length < 2 || brandSuggesting) return;
+        if (brands.some((b) => b.name.toLowerCase() === trimmed.toLowerCase())) {
+            setProductEditForm((f) => ({ ...f, brand: trimmed }));
+            return;
+        }
+        setBrandSuggesting(true);
+        try {
+            const res = await fetch('/api/v1/admin/brands/quick-add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: trimmed }),
+            });
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error?.message || 'Failed to add brand');
+            setBrands((prev) =>
+                prev.some((b) => b.id === json.data.id) ? prev : [...prev, { id: json.data.id, name: json.data.name }],
+            );
+            setProductEditForm((f) => ({ ...f, brand: json.data.name }));
+            toast.success(
+                json.alreadyExists ? `Using existing brand "${json.data.name}"` : `Added brand "${json.data.name}"`,
+            );
+        } catch (e: unknown) {
+            toast.error(e instanceof Error ? e.message : 'Failed to add brand');
+        } finally {
+            setBrandSuggesting(false);
+        }
+    };
+
     const handleSave = async () => {
         if (!target) return;
+        if (target.type === 'product' && target.kind === 'vendor') {
+            const errors = validateProductEssentials(productEditForm, {
+                portal: 'admin',
+                requireVendorSku: !!vendorProduct?.masterProduct,
+                requireBasePriceForVendorListing: true,
+            });
+            setProductFormErrors(errors);
+            if (Object.keys(errors).length > 0) {
+                focusFirstProductFormError(errors);
+                return;
+            }
+        }
+        if (target.type === 'product' && target.kind === 'master') {
+            const errors: Record<string, string> = {};
+            if (!productEditForm.name.trim()) errors.name = 'Product name is required';
+            if (!productEditForm.sku.trim()) errors.sku = 'SKU is required';
+            if (!productEditForm.brand.trim()) errors.brand = 'Brand is required';
+            if (productEditForm.categoryIds.length === 0) errors.categoryIds = 'Pick a parent and sub-category';
+            setProductFormErrors(errors);
+            if (Object.keys(errors).length > 0) {
+                focusFirstProductFormError(errors);
+                return;
+            }
+        }
         setSaving(true);
         try {
             if (target.type === 'vendor' && vendor) {
@@ -489,21 +593,20 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                         fullName: vendorForm.fullName.trim(),
                         email: vendorForm.email.trim(),
                         phone: vendorForm.phone.trim(),
+                        gstNumber: vendorForm.gstNumber.trim() || null,
+                        addressLine: vendorForm.addressLine.trim() || null,
+                        city: vendorForm.city.trim() || null,
+                        state: vendorForm.state.trim() || null,
+                        addressPincode: vendorForm.addressPincode.trim() || null,
                     }),
                 });
                 const json = await res.json();
                 if (!json.success && !res.ok) throw new Error(json.error?.message || 'Save failed');
                 toast.success('Vendor updated');
             } else if (target.type === 'product' && target.kind === 'master' && masterProduct) {
-                const body: Record<string, unknown> = {
-                    name: masterForm.name.trim(),
-                    brand: masterForm.brand.trim(),
-                    imageUrl: masterForm.imageUrl.trim() || null,
-                };
-                if (masterForm.categoryId) body.categoryId = masterForm.categoryId;
-                if (masterProduct.approvalStatus === 'pending' && masterForm.sku.trim()) {
-                    body.sku = masterForm.sku.trim();
-                }
+                const body = buildMasterProductPatch(productEditForm, {
+                    skuEditable: masterProduct.approvalStatus === 'pending',
+                });
                 const res = await fetch(`/api/v1/admin/master-products/${masterProduct.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
@@ -513,17 +616,10 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                 if (!json.success && !res.ok) throw new Error(json.error?.message || 'Save failed');
                 toast.success('Product updated');
             } else if (target.type === 'product' && target.kind === 'vendor' && vendorProduct) {
-                const body: Record<string, unknown> = {
-                    name: productForm.name.trim(),
-                    brand: productForm.brand.trim(),
-                    imageUrl: productForm.imageUrl.trim() || undefined,
-                    basePrice: Number(productForm.basePrice),
-                };
-                if (productForm.categoryId) body.primaryCategoryId = productForm.categoryId;
                 const res = await fetch(`/api/v1/admin/products/${vendorProduct.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body),
+                    body: JSON.stringify(buildVendorProductPatch(productEditForm)),
                 });
                 const json = await res.json();
                 if (!json.success && !res.ok) throw new Error(json.error?.message || 'Save failed');
@@ -558,7 +654,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                 toast.success('Brand updated');
             }
             setIsEditing(false);
-            if (target) await loadEntity(target);
+            if (target) await loadEntity({ ...target, startInEdit: false });
         } catch (e: unknown) {
             toast.error(e instanceof Error ? e.message : 'Save failed');
         } finally {
@@ -582,21 +678,10 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                 onComplete();
             } else if (target.type === 'product') {
                 if (target.kind === 'vendor' && vendorProduct?.approvalStatus === 'pending') {
-                    const hasMaster =
-                        !!linkMasterId ||
-                        !!vendorProduct.masterProduct?.id;
-                    if (!hasMaster && !catalogSkuInput.trim()) {
-                        toast.error('Assign a catalog SKU before approving this vendor listing.');
-                        return;
-                    }
                     if (catalogNameMismatch && !confirmLinkAnyway) {
                         toast.error('Catalog SKU matches a different product name — confirm the link before approving.');
                         return;
                     }
-                }
-                if (target.kind === 'master' && masterProduct?.approvalStatus === 'pending' && !masterForm.sku.trim()) {
-                    toast.error('Enter a catalog SKU before approving this master item.');
-                    return;
                 }
 
                 const approvalBody: Record<string, unknown> = { action: 'approve' };
@@ -609,8 +694,8 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                     if (confirmLinkAnyway) {
                         approvalBody.confirmLink = true;
                     }
-                } else if (target.kind === 'master' && masterForm.sku.trim()) {
-                    approvalBody.catalogSku = masterForm.sku.trim().toUpperCase();
+                } else if (target.kind === 'master' && productEditForm.sku.trim()) {
+                    approvalBody.catalogSku = productEditForm.sku.trim().toUpperCase();
                 }
                 const url = target.kind === 'master'
                     ? `/api/v1/admin/master-products/${target.id}/approval`
@@ -815,6 +900,28 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                             <FieldLabel>Phone</FieldLabel>
                             <input className={inputCls} value={vendorForm.phone} onChange={(e) => setVendorForm((f) => ({ ...f, phone: e.target.value }))} />
                         </div>
+                        <div>
+                            <FieldLabel>GST</FieldLabel>
+                            <input className={inputCls} value={vendorForm.gstNumber} onChange={(e) => setVendorForm((f) => ({ ...f, gstNumber: e.target.value }))} />
+                        </div>
+                        <div>
+                            <FieldLabel>Address</FieldLabel>
+                            <input className={inputCls} value={vendorForm.addressLine} onChange={(e) => setVendorForm((f) => ({ ...f, addressLine: e.target.value }))} placeholder="Street / building" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-3">
+                            <div>
+                                <FieldLabel>City</FieldLabel>
+                                <input className={inputCls} value={vendorForm.city} onChange={(e) => setVendorForm((f) => ({ ...f, city: e.target.value }))} />
+                            </div>
+                            <div>
+                                <FieldLabel>State</FieldLabel>
+                                <input className={inputCls} value={vendorForm.state} onChange={(e) => setVendorForm((f) => ({ ...f, state: e.target.value }))} />
+                            </div>
+                            <div>
+                                <FieldLabel>Pincode</FieldLabel>
+                                <input className={inputCls} value={vendorForm.addressPincode} onChange={(e) => setVendorForm((f) => ({ ...f, addressPincode: e.target.value }))} />
+                            </div>
+                        </div>
                     </div>
                 );
             }
@@ -872,40 +979,19 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
         if (target?.type === 'product' && target.kind === 'master' && masterProduct) {
             if (isEditing) {
                 return (
-                    <div className="space-y-4 p-6">
-                        <div>
-                            <FieldLabel>Product Name</FieldLabel>
-                            <input className={inputCls} value={masterForm.name} onChange={(e) => setMasterForm((f) => ({ ...f, name: e.target.value }))} />
-                        </div>
-                        <div>
-                            <FieldLabel>SKU</FieldLabel>
-                            {masterProduct.approvalStatus === 'pending' ? (
-                                <input
-                                    className={inputCls}
-                                    value={masterForm.sku}
-                                    onChange={(e) => setMasterForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
-                                    placeholder="e.g., RIC-BAS-001"
-                                />
-                            ) : (
-                                <input className={cn(inputCls, 'bg-[#F8F9FB] cursor-not-allowed')} value={masterProduct.sku} readOnly />
-                            )}
-                        </div>
-                        <div>
-                            <FieldLabel>Brand</FieldLabel>
-                            <BrandSinglePicker value={masterForm.brand} onChange={(v) => setMasterForm((f) => ({ ...f, brand: v }))} brands={brands} />
-                        </div>
-                        <div>
-                            <CategorySinglePicker
-                                valueId={masterForm.categoryId || null}
-                                valueName={masterForm.categoryName || null}
-                                onChange={(c) => setMasterForm((f) => ({ ...f, categoryId: c.id ?? '', categoryName: c.name ?? '' }))}
-                            />
-                        </div>
-                        <div>
-                            <FieldLabel>Image URL</FieldLabel>
-                            <input className={inputCls} value={masterForm.imageUrl} onChange={(e) => setMasterForm((f) => ({ ...f, imageUrl: e.target.value }))} />
-                        </div>
-                    </div>
+                    <ApprovalProductEditForm
+                        form={productEditForm}
+                        onChange={(patch) => setProductEditForm((f) => ({ ...f, ...patch }))}
+                        brands={brands}
+                        onSuggestBrand={(name) => void suggestBrand(name)}
+                        brandSuggesting={brandSuggesting}
+                        errors={productFormErrors}
+                        gstSlabs={gstSlabs}
+                        identityMode="standalone"
+                        skuReadOnly={masterProduct.approvalStatus !== 'pending'}
+                        pickerKey={masterProduct.id}
+                        showVendorCommerce={false}
+                    />
                 );
             }
             return (
@@ -929,15 +1015,15 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                     </div>
                     {masterProduct.approvalStatus === 'pending' && (
                         <div>
-                            <FieldLabel required>Catalog SKU</FieldLabel>
+                            <FieldLabel>Catalog SKU</FieldLabel>
                             <input
                                 className={inputCls}
-                                value={masterForm.sku}
-                                onChange={(e) => setMasterForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
-                                placeholder="e.g., RIC-BAS-001"
+                                value={productEditForm.sku}
+                                onChange={(e) => setProductEditForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
+                                placeholder="Auto (H1-SKU-xxxxx)"
                             />
                             <p className="text-[11px] text-[#AEAEAE] font-medium mt-1.5">
-                                Admin-assigned global catalog identifier. Required before approval.
+                                Auto-generated. Edit to override before approval.
                             </p>
                         </div>
                     )}
@@ -947,32 +1033,61 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
 
         if (target?.type === 'product' && target.kind === 'vendor' && vendorProduct) {
             if (isEditing) {
+                const catalogLinked = !!vendorProduct.masterProduct;
                 return (
-                    <div className="space-y-4 p-6">
-                        <div>
-                            <FieldLabel>Product Name</FieldLabel>
-                            <input className={inputCls} value={productForm.name} onChange={(e) => setProductForm((f) => ({ ...f, name: e.target.value }))} />
-                        </div>
-                        <div>
-                            <FieldLabel>Brand</FieldLabel>
-                            <BrandSinglePicker value={productForm.brand} onChange={(v) => setProductForm((f) => ({ ...f, brand: v }))} brands={brands} />
-                        </div>
-                        <div>
-                            <FieldLabel>Base Price (₹)</FieldLabel>
-                            <input type="number" className={inputCls} value={productForm.basePrice} onChange={(e) => setProductForm((f) => ({ ...f, basePrice: e.target.value }))} />
-                        </div>
-                        <div>
-                            <CategorySinglePicker
-                                valueId={productForm.categoryId || null}
-                                valueName={productForm.categoryName || null}
-                                onChange={(c) => setProductForm((f) => ({ ...f, categoryId: c.id ?? '', categoryName: c.name ?? '' }))}
-                            />
-                        </div>
-                        <div>
-                            <FieldLabel>Image URL</FieldLabel>
-                            <input className={inputCls} value={productForm.imageUrl} onChange={(e) => setProductForm((f) => ({ ...f, imageUrl: e.target.value }))} />
-                        </div>
-                    </div>
+                    <ApprovalProductEditForm
+                        form={productEditForm}
+                        onChange={(patch) => setProductEditForm((f) => ({ ...f, ...patch }))}
+                        brands={brands}
+                        onSuggestBrand={(name) => void suggestBrand(name)}
+                        brandSuggesting={brandSuggesting}
+                        errors={productFormErrors}
+                        gstSlabs={gstSlabs}
+                        identityMode={catalogLinked ? 'catalog-linked' : 'standalone'}
+                        skuReadOnly={catalogLinked}
+                        pickerKey={vendorProduct.id}
+                        showVendorCommerce
+                        catalogBanner={
+                            vendorProduct.approvalStatus === 'pending' && !vendorProduct.masterProduct ? (
+                                <div className="rounded-[12px] border border-[#F0D8A8] bg-[#FFF8E1] p-4 space-y-2">
+                                    <FieldLabel>Catalog SKU (optional)</FieldLabel>
+                                    <input
+                                        className={inputCls}
+                                        value={catalogSkuInput}
+                                        onChange={(e) => {
+                                            setCatalogSkuInput(e.target.value.toUpperCase());
+                                            setLinkMasterId('');
+                                            setConfirmLinkAnyway(false);
+                                        }}
+                                        placeholder="Auto (H1-SKU-xxxxx)"
+                                    />
+                                    <p className="text-[11px] text-[#8B6914] font-medium">
+                                        Leave blank to auto-generate a new catalog SKU, or enter an existing SKU to link this listing to it.
+                                    </p>
+                                    {catalogSkuLookup.status === 'idle' && (
+                                        <p className="text-[11px] text-[#8B6914] font-semibold">
+                                            Will auto-generate a new Horeca One catalog SKU on Accept.
+                                        </p>
+                                    )}
+                                    {catalogSkuLookup.status === 'loading' && (
+                                        <p className="text-[11px] text-[#7C7C7C] font-semibold flex items-center gap-1.5">
+                                            <Loader2 size={12} className="animate-spin" /> Checking catalog…
+                                        </p>
+                                    )}
+                                    {catalogSkuLookup.status === 'new' && (
+                                        <p className="text-[11px] text-[#6B1D2E] font-bold">
+                                            Creates new master catalog item for this listing.
+                                        </p>
+                                    )}
+                                    {catalogSkuLookup.status === 'link' && catalogSkuLookup.master && (
+                                        <p className="text-[11px] text-[#1A6BB5] font-bold">
+                                            Links to existing master: {catalogSkuLookup.master.name} ({catalogSkuLookup.master.sku})
+                                        </p>
+                                    )}
+                                </div>
+                            ) : undefined
+                        }
+                    />
                 );
             }
             return (
@@ -1257,7 +1372,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                     {vendorProduct.approvalStatus === 'pending' && !vendorProduct.masterProduct && (
                         <div className="space-y-3 pt-2 border-t border-[#F5F5F5]">
                             <div>
-                                <FieldLabel required>Assign Catalog SKU</FieldLabel>
+                                <FieldLabel>Catalog SKU (optional)</FieldLabel>
                                 <input
                                     className={inputCls}
                                     value={catalogSkuInput}
@@ -1266,11 +1381,16 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                                         setLinkMasterId('');
                                         setConfirmLinkAnyway(false);
                                     }}
-                                    placeholder="e.g., RIC-BAS-001"
+                                    placeholder="Auto (H1-SKU-xxxxx)"
                                 />
                                 <p className="text-[11px] text-[#AEAEAE] font-medium mt-1.5">
-                                    Creates a new master when the SKU is unused, or links to the existing catalog item when it already exists.
+                                    Leave blank to auto-generate a new catalog SKU, or enter an existing SKU to link this listing to it.
                                 </p>
+                                {catalogSkuLookup.status === 'idle' && (
+                                    <p className="text-[11px] text-[#6B1D2E] font-semibold mt-2">
+                                        Will auto-generate a new Horeca One catalog SKU on Accept.
+                                    </p>
+                                )}
                                 {catalogSkuLookup.status === 'loading' && (
                                     <p className="text-[11px] text-[#7C7C7C] font-semibold mt-2 flex items-center gap-1.5">
                                         <Loader2 size={12} className="animate-spin" /> Checking catalog…
@@ -1336,8 +1456,13 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                             </select>
                         </div>
                         <div>
-                            <FieldLabel>Image URL</FieldLabel>
-                            <input className={inputCls} value={categoryForm.imageUrl} onChange={(e) => setCategoryForm((f) => ({ ...f, imageUrl: e.target.value }))} />
+                            <FieldLabel>Image</FieldLabel>
+                            <ImageUpload
+                                value={categoryForm.imageUrl}
+                                onChange={(url) => setCategoryForm((f) => ({ ...f, imageUrl: url }))}
+                                folder="categories"
+                                label="Category image"
+                            />
                         </div>
                         <label className="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" checked={categoryForm.isActive} onChange={(e) => setCategoryForm((f) => ({ ...f, isActive: e.target.checked }))} className="rounded" />
@@ -1380,8 +1505,13 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                             <input className={inputCls} value={brandForm.tagline} onChange={(e) => setBrandForm((f) => ({ ...f, tagline: e.target.value }))} />
                         </div>
                         <div>
-                            <FieldLabel>Logo URL</FieldLabel>
-                            <input className={inputCls} value={brandForm.logoUrl} onChange={(e) => setBrandForm((f) => ({ ...f, logoUrl: e.target.value }))} />
+                            <FieldLabel>Logo</FieldLabel>
+                            <ImageUpload
+                                value={brandForm.logoUrl}
+                                onChange={(url) => setBrandForm((f) => ({ ...f, logoUrl: url }))}
+                                folder="brands"
+                                label="Brand logo"
+                            />
                         </div>
                     </div>
                 );
@@ -1413,6 +1543,8 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
         return null;
     };
 
+    const productEditing = isEditing && target?.type === 'product';
+
     return (
         <>
             <div
@@ -1427,7 +1559,8 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                 className={cn(
                     'fixed z-[70] bg-white shadow-2xl transition-transform duration-300 ease-in-out flex flex-col',
                     'inset-x-0 bottom-0 top-auto h-[min(92dvh,100dvh)] rounded-t-[20px] pb-[env(safe-area-inset-bottom)]',
-                    'lg:inset-y-0 lg:right-0 lg:left-auto lg:h-full lg:w-full lg:max-w-[560px] lg:rounded-none',
+                    'lg:inset-y-0 lg:right-0 lg:left-auto lg:h-full lg:w-full lg:rounded-none',
+                    productEditing ? 'lg:max-w-none lg:left-0' : 'lg:max-w-[560px]',
                     open
                         ? 'translate-y-0 lg:translate-x-0'
                         : 'translate-y-full lg:translate-y-0 lg:translate-x-full',
@@ -1444,7 +1577,9 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                             <p className="text-[11px] font-bold text-[#AEAEAE] uppercase tracking-wider">
                                 {target ? typeLabel(target) : 'Review'}
                             </p>
-                            <h2 className="text-[18px] font-[900] text-[#181725] truncate">{title || 'Loading…'}</h2>
+                            <h2 className="text-[18px] font-[900] text-[#181725] truncate">
+                                {isEditing && target?.type === 'product' ? `Edit ${title}` : (title || 'Loading…')}
+                            </h2>
                         </div>
                         {statusLabel && (
                             <span className={cn(
@@ -1474,7 +1609,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                         {isEditing ? (
                             <>
                                 <button
-                                    onClick={() => { setIsEditing(false); if (target) void loadEntity(target); }}
+                                    onClick={() => { setIsEditing(false); setProductFormErrors({}); if (target) void loadEntity({ ...target, startInEdit: false }); }}
                                     className="flex-1 min-w-[100px] min-h-12 bg-[#F8F9FB] border border-[#EEEEEE] text-[#181725] rounded-[12px] text-[13px] font-semibold hover:bg-[#EEEEEE]"
                                 >
                                     Cancel Edit
@@ -1490,7 +1625,7 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                             </>
                         ) : (
                             <button
-                                onClick={() => setIsEditing(true)}
+                                onClick={() => { setProductFormErrors({}); setIsEditing(true); }}
                                 className="min-h-12 px-4 bg-[#F8F9FB] border border-[#EEEEEE] text-[#181725] rounded-[12px] text-[13px] font-semibold hover:bg-[#F8E8EC] hover:border-[#6B1D2E]/40 flex items-center gap-1.5"
                             >
                                 <Pencil size={14} /> Edit

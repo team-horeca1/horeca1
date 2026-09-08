@@ -98,7 +98,7 @@ function useProductSearch() {
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/v1/vendor/products?search=${encodeURIComponent(query)}&limit=8`);
+        const res = await fetch(`/api/v1/vendor/products?search=${encodeURIComponent(query)}&limit=8&sellable=1`);
         const json = await res.json();
         if (json.success) setResults(json.data.products ?? json.data ?? []);
       } finally { setLoading(false); }

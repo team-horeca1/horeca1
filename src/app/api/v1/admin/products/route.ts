@@ -15,6 +15,7 @@ import { assertLeafCategory, findOrCreateMaster } from '@/modules/catalog/catalo
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import { totalStockQty } from '@/lib/inventoryHelpers';
 import { ensureInventoryForAllOutlets } from '@/lib/inventoryOutlet';
+import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
 // Validation schema for admin product creation
 // vendorId is optional — admin can create catalog products without a vendor
@@ -492,6 +493,19 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
         product.id,
       ).catch(console.error);
     }
+
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.productCreate,
+      entity: 'Product',
+      entityId: product.id,
+      after: {
+        name: product.name,
+        vendorId: product.vendorId,
+        sku: product.sku,
+        listingStatus: product.listingStatus,
+        approvalStatus: product.approvalStatus,
+      },
+    });
 
     return NextResponse.json({ success: true, data: product }, { status: 201 });
   } catch (error) {

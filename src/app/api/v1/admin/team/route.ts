@@ -26,7 +26,7 @@ import { deliverInviteCredentials } from '@/lib/inviteDelivery';
 import { markSessionStale } from '@/lib/sessionStale';
 import { resolveTeamMemberRoleFromPermissions } from '@/lib/teamRoleWrites';
 import { ensureAdminInheritsShoppingAccount } from '@/lib/adminShoppingInherit';
-import { passwordFieldsWithReveal, setUserPasswordWithReveal } from '@/lib/adminPasswordCipher';
+import { passwordFieldsWithReveal } from '@/lib/adminPasswordCipher';
 import type { AuthContext } from '@/middleware/auth';
 import type { TeamRole } from '@prisma/client';
 
@@ -121,11 +121,15 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
     const looksEmail = identifierTrim.includes('@');
     let user = looksEmail
       ? await prisma.user.findUnique({ where: { email: identifierTrim.toLowerCase() } })
-      : await prisma.user.findFirst({ where: { phone: { in: phoneLookupVariants(identifierTrim) } } });
+      : await prisma.user.findFirst({
+          where: { phone: { in: phoneLookupVariants(identifierTrim) } },
+          orderBy: { createdAt: 'asc' },
+        });
 
     // Capture plain-text password BEFORE bcrypt.hash so we can email it. Only
     // set for the new-user creation path; existing users keep their password.
     let tempPassword = '';
+    let isNewUser = false;
 
     if (!user) {
       if (!looksEmail) {
@@ -148,16 +152,11 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
           hcidDisplay,
         },
       });
+      isNewUser = true;
     } else {
-      // Existing user — promote to admin if needed, and update password if supplied.
-      if (input.password) {
-        tempPassword = input.password;
-        await setUserPasswordWithReveal(user.id, input.password, 12);
-      }
+      // Existing user — promote to admin if needed. Never overwrite their login password.
       if (user.role !== 'admin') {
         user = await prisma.user.update({ where: { id: user.id }, data: { role: 'admin' } });
-      } else if (input.password) {
-        user = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
       }
     }
 
@@ -234,6 +233,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
       success: true,
       data: {
         ...dto,
+        existingUser: !isNewUser,
         ...(tempPassword
           ? {
               inviteMeta: {

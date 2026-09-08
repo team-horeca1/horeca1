@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Search, Star, Clock, ShoppingBag, ChevronRight, LayoutGrid, Package } from 'lucide-react';
+import { ArrowLeft, Search, Star, Clock, ShoppingBag, ChevronRight, ChevronDown, LayoutGrid, Package } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { dal } from '@/lib/dal';
@@ -51,6 +51,63 @@ function findBySlug(nodes: CatNode[], slug: string): { parent: CatNode; child: C
         if (child) return { parent, child };
     }
     return null;
+}
+
+function CategoryRailLink({
+    href,
+    name,
+    image,
+    active,
+    nested = false,
+    trailing,
+}: {
+    href: string;
+    name: string;
+    image?: string;
+    active: boolean;
+    nested?: boolean;
+    trailing?: React.ReactNode;
+}) {
+    return (
+        <Link
+            href={href}
+            className={cn(
+                'w-full rounded-xl transition-all text-left flex flex-col items-center md:flex-row md:items-center min-w-0',
+                nested
+                    ? 'mt-0.5 px-1 md:px-2 py-2 md:py-1.5 md:gap-2'
+                    : 'mt-1 px-1 md:px-3 py-2 md:py-2.5 md:gap-3',
+                active ? 'bg-primary-light' : 'hover:bg-gray-50',
+            )}
+        >
+            <div
+                className={cn(
+                    'rounded-lg overflow-hidden relative shrink-0 bg-white ring-2 ring-white shadow-sm',
+                    nested ? 'w-9 h-9 md:w-7 md:h-7' : 'w-12 h-12 md:w-9 md:h-9',
+                    active ? 'border border-primary/30' : 'border border-divider',
+                )}
+            >
+                {image ? (
+                    <Image src={image} alt={name} fill sizes={nested ? '36px' : '48px'} className="object-cover" />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                        <Package size={nested ? 12 : 16} className="text-gray-300" strokeWidth={1.5} />
+                    </div>
+                )}
+            </div>
+            <span
+                className={cn(
+                    'leading-tight text-center md:text-left mt-1 md:mt-0 line-clamp-2 md:truncate w-full md:flex-1',
+                    nested
+                        ? 'text-[9px] md:text-[12px] font-medium md:font-semibold'
+                        : 'text-[10px] md:text-[13px] font-semibold md:font-bold',
+                    active ? 'text-primary' : nested ? 'text-[#667085]' : 'text-[#181725]',
+                )}
+            >
+                {name}
+            </span>
+            {trailing}
+        </Link>
+    );
 }
 
 function CategoryVendorsContent() {
@@ -210,7 +267,6 @@ function CategoryVendorsContent() {
 
             <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)] pt-4 md:pt-6">
                 <div className="flex gap-2 md:gap-4 lg:gap-6 items-start">
-                    {/* Same pattern as vendor store: parent rail only; click drills into sub-categories. */}
                     <aside className="w-[76px] md:w-[200px] lg:w-[260px] shrink-0 sticky top-24">
                         <div className="bg-white rounded-2xl border border-gray-100 p-1 md:p-3 shadow-sm max-h-[calc(100vh-120px)] overflow-y-auto">
                             <Link
@@ -231,50 +287,47 @@ function CategoryVendorsContent() {
                             </Link>
 
                             {tree.map((parent) => {
-                                const isParentActive =
-                                    activeParent?.id === parent.id ||
-                                    parent.children.some((c) => c.id === activeChild?.id);
+                                const isOpen = activeParent?.id === parent.id;
+                                const parentActive = isOpen && viewingParentTiles;
+                                const childCount = parent.children.length;
                                 return (
-                                    <Link
-                                        key={parent.id}
-                                        href={`/category/${parent.slug}`}
-                                        className={cn(
-                                            'w-full mt-1 rounded-xl transition-all text-left flex flex-col items-center md:flex-row md:items-center md:gap-3 px-1 md:px-3 py-2 md:py-2.5 min-w-0',
-                                            isParentActive ? 'bg-primary-light' : 'hover:bg-gray-50',
-                                        )}
-                                    >
-                                        <div
-                                            className={cn(
-                                                'w-12 h-12 md:w-9 md:h-9 rounded-lg overflow-hidden relative shrink-0 bg-white ring-2 ring-white shadow-sm',
-                                                isParentActive ? 'border border-primary/30' : 'border border-divider',
-                                            )}
-                                        >
-                                            {parent.image ? (
-                                                <Image
-                                                    src={parent.image}
-                                                    alt={parent.name}
-                                                    fill
-                                                    sizes="48px"
-                                                    className="object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                                                    <Package size={16} className="text-gray-300" strokeWidth={1.5} />
-                                                </div>
-                                            )}
-                                        </div>
-                                        <span
-                                            className={cn(
-                                                'text-[10px] md:text-[13px] font-semibold md:font-bold leading-tight text-center md:text-left mt-1 md:mt-0 line-clamp-2 md:truncate w-full md:flex-1',
-                                                isParentActive ? 'text-primary' : 'text-[#181725]',
-                                            )}
-                                        >
-                                            {parent.name}
-                                        </span>
-                                        <span className="hidden md:inline text-[11px] font-bold text-gray-400 shrink-0 ml-auto">
-                                            {parent.children.length || ''}
-                                        </span>
-                                    </Link>
+                                    <div key={parent.id}>
+                                        <CategoryRailLink
+                                            href={`/category/${parent.slug}`}
+                                            name={parent.name}
+                                            image={parent.image}
+                                            active={parentActive}
+                                            trailing={
+                                                childCount > 0 ? (
+                                                    <span className="hidden md:inline-flex items-center gap-1 shrink-0 ml-auto text-[11px] font-bold text-gray-400">
+                                                        {childCount}
+                                                        {isOpen ? (
+                                                            <ChevronDown size={14} className="text-primary" strokeWidth={2} />
+                                                        ) : (
+                                                            <ChevronRight size={14} strokeWidth={2} />
+                                                        )}
+                                                    </span>
+                                                ) : null
+                                            }
+                                        />
+                                        {isOpen && childCount > 0 ? (
+                                            <div className="ml-1 pl-0.5 md:ml-3 md:pl-3 border-l-2 border-primary/20">
+                                                <p className="hidden md:block px-2 pt-1.5 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#667085]">
+                                                    Sub-categories
+                                                </p>
+                                                {parent.children.map((child) => (
+                                                    <CategoryRailLink
+                                                        key={child.id}
+                                                        href={`/category/${child.slug}`}
+                                                        name={child.name}
+                                                        image={child.image}
+                                                        active={activeChild?.id === child.id}
+                                                        nested
+                                                    />
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                    </div>
                                 );
                             })}
                         </div>

@@ -13,6 +13,7 @@ import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { CatalogService, assertLeafCategory, findOrCreateMaster } from '@/modules/catalog/catalog.service';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
+import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
 // Helper: extract the [id] segment from the URL
 function extractId(req: NextRequest): string {
@@ -34,6 +35,7 @@ const updateProductSchema = z.object({
   packSize: z.string().optional(),
   unit: z.string().optional(),
   sku: z.string().optional(),
+  vendorSku: z.string().optional(),
   hsn: z.string().optional(),
   brand: z.string().optional(),
   barcode: z.string().optional(),
@@ -106,7 +108,20 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     // Check product exists
     const existing = await prisma.product.findUnique({
       where: { id },
-      select: { id: true, vendorId: true, listingStatus: true, name: true, brand: true, masterProductId: true, categoryId: true },
+      select: {
+        id: true,
+        vendorId: true,
+        listingStatus: true,
+        name: true,
+        brand: true,
+        masterProductId: true,
+        categoryId: true,
+        sku: true,
+        isActive: true,
+        approvalStatus: true,
+        taxPercent: true,
+        basePrice: true,
+      },
     });
     if (!existing) throw Errors.notFound('Product');
 
@@ -240,6 +255,32 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       ).catch(console.error);
     }
 
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.productUpdate,
+      entity: 'Product',
+      entityId: id,
+      before: {
+        name: existing.name,
+        brand: existing.brand,
+        sku: existing.sku,
+        listingStatus: existing.listingStatus,
+        isActive: existing.isActive,
+        taxPercent: existing.taxPercent,
+        basePrice: existing.basePrice,
+        categoryId: existing.categoryId,
+      },
+      after: {
+        name: product.name,
+        brand: product.brand,
+        sku: product.sku,
+        listingStatus: product.listingStatus,
+        isActive: product.isActive,
+        taxPercent: product.taxPercent,
+        basePrice: product.basePrice,
+        categoryId: product.categoryId,
+      },
+    });
+
     return NextResponse.json({ success: true, data: product });
   } catch (error) {
     return errorResponse(error);
@@ -255,6 +296,13 @@ export const DELETE = adminOnly(async (req: NextRequest, ctx) => {
 
     const catalogService = new CatalogService();
     const result = await catalogService.deleteProduct(id);
+
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.productDelete,
+      entity: 'Product',
+      entityId: id,
+      after: { id, ...result },
+    });
 
     return NextResponse.json({ success: true, data: { id, ...result } });
   } catch (error) {

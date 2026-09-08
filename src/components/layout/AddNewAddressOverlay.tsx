@@ -73,29 +73,71 @@ interface FormFieldsProps {
     shortAddress: string;
     fullAddress: string;
     pincode: string;
+    setPincode: (v: string) => void;
     city: string;
     isGeocoding: boolean;
     isLocating: boolean;
+    showFieldErrors: boolean;
 }
 
 function FormFields({
     flatInfo, setFlatInfo, landmark, setLandmark,
-    shortAddress, fullAddress, pincode, city, isGeocoding, isLocating,
+    shortAddress, fullAddress, pincode, setPincode, city, isGeocoding, isLocating,
+    showFieldErrors,
 }: FormFieldsProps) {
+    const flatError = showFieldErrors && !flatInfo.trim();
+    const pinError = showFieldErrors && !/^\d{6}$/.test(pincode);
+
     return (
         <div className="space-y-4">
             <div>
                 <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
-                    Floor / Unit / Building
+                    Shop no. / Floor / Building <span className="text-primary">*</span>
                 </label>
                 <input
                     type="text"
                     value={flatInfo}
                     onChange={(e) => setFlatInfo(e.target.value)}
-                    placeholder="e.g. Ground Floor, Shop 4"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-[13px] outline-none focus:border-primary transition-colors"
+                    placeholder="e.g. Shop 4, Ground Floor"
+                    className={cn(
+                        'w-full px-4 py-3 border rounded-xl text-[13px] outline-none focus:border-primary transition-colors',
+                        flatError ? 'border-red-400' : 'border-gray-200',
+                    )}
                 />
+                {flatError && (
+                    <p className="mt-1 text-[11px] font-medium text-red-600">Shop / unit number is required</p>
+                )}
             </div>
+            <div>
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Pincode <span className="text-primary">*</span>
+                </label>
+                <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={pincode}
+                    onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="6-digit PIN"
+                    className={cn(
+                        'w-full px-4 py-3 border rounded-xl text-[13px] outline-none focus:border-primary transition-colors tabular-nums',
+                        pinError ? 'border-red-400' : 'border-gray-200',
+                    )}
+                />
+                {pinError && (
+                    <p className="mt-1 text-[11px] font-medium text-red-600">Enter a 6-digit pincode</p>
+                )}
+            </div>
+            {fullAddress && !isLocating && !isGeocoding && (
+                <div>
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                        Street / Area
+                    </label>
+                    <p className="w-full px-4 py-3 border border-gray-100 bg-gray-50 rounded-xl text-[13px] text-gray-600 leading-snug">
+                        {fullAddress}
+                    </p>
+                </div>
+            )}
             <div>
                 <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
                     Landmark <span className="text-gray-400 normal-case font-normal">(optional)</span>
@@ -136,7 +178,8 @@ function BusinessSearchBar({
     query, onQueryChange, onSelect, onClear, isFetchingDetails, isSearching, predictions,
     showDropdown, setShowDropdown,
     overlay = false,
-}: BusinessSearchBarProps & { overlay?: boolean }) {
+    hasInteracted = true,
+}: BusinessSearchBarProps & { overlay?: boolean; hasInteracted?: boolean }) {
     return (
         <div className={cn(
             'relative z-20',
@@ -144,8 +187,19 @@ function BusinessSearchBar({
                 ? 'absolute top-3 left-3 right-3'
                 : 'shrink-0 px-3 py-2.5 bg-white border-b border-gray-100'
         )}>
-            <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus-within:border-primary focus-within:bg-white transition-all">
-                <Search size={17} className="text-gray-400 shrink-0" />
+            {overlay && (
+                <p className="mb-1.5 inline-flex items-center rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm">
+                    Start here — search your business
+                </p>
+            )}
+            <div className={cn(overlay && !hasInteracted && 'animate-pulse rounded-xl')}>
+            <div className={cn(
+                'flex items-center gap-2 px-4 py-3 rounded-xl focus-within:border-primary focus-within:bg-white transition-all',
+                overlay
+                    ? 'bg-white border-2 border-primary shadow-lg ring-4 ring-primary/15'
+                    : 'bg-gray-50 border-2 border-gray-200',
+            )}>
+                <Search size={17} className={cn('shrink-0', overlay ? 'text-primary' : 'text-gray-400')} />
                 <input
                     type="text"
                     placeholder="Search your restaurant, hotel, cafe..."
@@ -169,6 +223,7 @@ function BusinessSearchBar({
                         <X size={15} className="text-gray-400" />
                     </button>
                 )}
+            </div>
             </div>
 
             {showDropdown && query.length >= 2 && (
@@ -246,6 +301,8 @@ export function AddNewAddressOverlay({
     const [isDragging, setIsDragging] = useState(false);
     const [saving, setSaving] = useState(false);
     const savingRef = useRef(false);
+    const [hasInteracted, setHasInteracted] = useState(false);
+    const [showFieldErrors, setShowFieldErrors] = useState(false);
 
     const { predictions, isSearching, getPlaceDetails, clearPredictions } =
         useGooglePlacesAutocomplete(searchQuery, { businessMode: true, countryCode: 'in' });
@@ -274,6 +331,7 @@ export function AddNewAddressOverlay({
         setSearchQuery('');
 
         const details = await getPlaceDetails(placeId);
+        setHasInteracted(true);
         if (details) applyPlaceDetails(details);
         setIsFetchingDetails(false);
     }, [applyPlaceDetails, clearPredictions, getPlaceDetails]);
@@ -300,6 +358,8 @@ export function AddNewAddressOverlay({
         setIsDragging(false);
         allowGeocodeRef.current = false;
         geocodingRef.current = false;
+        setHasInteracted(false);
+        setShowFieldErrors(false);
     }, [initialLat, initialLng]);
 
     // Sync coords when props change while open
@@ -418,6 +478,7 @@ export function AddNewAddressOverlay({
         map.addListener('dragstart', () => {
             setIsDragging(true);
             allowGeocodeRef.current = true;
+            setHasInteracted(true);
         });
 
         idleListenerRef.current = map.addListener('idle', async () => {
@@ -510,7 +571,21 @@ export function AddNewAddressOverlay({
         }
     }, [mapAddress, mapShortAddress, mapLatLng, mapPincode, mapCity, mapState, mapPlaceId, selectedPlace, flatInfo, landmark, onSave]);
 
-    const canSave = !!mapAddress && !isGeocodingPin && !isLocatingGps && !saving;
+    const pinOk = /^\d{6}$/.test(mapPincode);
+    const isAreaLevel = !!selectedPlace?.isAreaLevel;
+    const canSave = !!mapAddress && !!flatInfo.trim() && pinOk && !isAreaLevel && !isGeocodingPin && !isLocatingGps && !saving;
+
+    const trySave = () => {
+        if (!canSave) {
+            setShowFieldErrors(true);
+            return;
+        }
+        void handleSave();
+    };
+
+    const saveHint = !canSave && !isGeocodingPin && !isLocatingGps && !saving
+        ? 'Add shop/unit number and a 6-digit pincode to continue'
+        : null;
 
     const formProps: FormFieldsProps = {
         flatInfo,
@@ -520,9 +595,11 @@ export function AddNewAddressOverlay({
         shortAddress: mapShortAddress,
         fullAddress: mapAddress,
         pincode: mapPincode,
+        setPincode: setMapPincode,
         city: mapCity,
         isGeocoding: isGeocodingPin,
         isLocating: isLocatingGps,
+        showFieldErrors,
     };
 
     if (!isOpen) return null;
@@ -580,9 +657,12 @@ export function AddNewAddressOverlay({
                         <div className="px-4 pb-4 pt-3 border-t border-gray-50 shrink-0">
                             <button
                                 type="button"
-                                onClick={() => void handleSave()}
-                                disabled={!canSave}
-                                className="w-full bg-primary hover:bg-primary-dark disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]"
+                                onClick={trySave}
+                                disabled={isGeocodingPin || isLocatingGps || saving}
+                                className={cn(
+                                    'w-full text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]',
+                                    canSave ? 'bg-primary hover:bg-primary-dark' : 'bg-gray-200 text-gray-400',
+                                )}
                             >
                                 {saving || isGeocodingPin || isLocatingGps
                                     ? (
@@ -597,6 +677,9 @@ export function AddNewAddressOverlay({
                                     )
                                     : 'Confirm This Location'}
                             </button>
+                            {saveHint && (
+                                <p className="mt-2 text-center text-[12px] font-medium text-gray-500">{saveHint}</p>
+                            )}
                             {allowSkip && !dismissible && (
                                 <button
                                     type="button"
@@ -620,8 +703,12 @@ export function AddNewAddressOverlay({
 
                         <BusinessSearchBar
                             overlay
+                            hasInteracted={hasInteracted}
                             query={searchQuery}
-                            onQueryChange={setSearchQuery}
+                            onQueryChange={(v) => {
+                                setSearchQuery(v);
+                                if (v) setHasInteracted(true);
+                            }}
                             onSelect={handleSelectBusiness}
                             onClear={() => { setSearchQuery(''); clearPredictions(); setShowSearchDropdown(false); }}
                             isFetchingDetails={isFetchingDetails}
@@ -692,9 +779,12 @@ export function AddNewAddressOverlay({
                             <FormFields {...formProps} />
                             <button
                                 type="button"
-                                onClick={() => void handleSave()}
-                                disabled={!canSave}
-                                className="w-full mt-4 bg-primary hover:bg-primary-dark disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]"
+                                onClick={trySave}
+                                disabled={isGeocodingPin || isLocatingGps || saving}
+                                className={cn(
+                                    'w-full mt-4 text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all text-[15px]',
+                                    canSave ? 'bg-primary hover:bg-primary-dark' : 'bg-gray-200 text-gray-400',
+                                )}
                             >
                                 {saving || isGeocodingPin || isLocatingGps
                                     ? (
@@ -709,6 +799,9 @@ export function AddNewAddressOverlay({
                                     )
                                     : 'Confirm This Location'}
                             </button>
+                            {saveHint && (
+                                <p className="mt-2 text-center text-[12px] font-medium text-gray-500">{saveHint}</p>
+                            )}
                             {allowSkip && !dismissible && (
                                 <button
                                     type="button"

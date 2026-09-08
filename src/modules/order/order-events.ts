@@ -17,6 +17,7 @@ export const ORDER_EVENT_ACTIONS = {
   CANCEL_APPROVED: 'cancel.approved',
   CANCEL_REJECTED: 'cancel.rejected',
   INVOICE_GENERATED: 'invoice.generated',
+  PAYMENT_RECORDED: 'payment.recorded',
 } as const;
 
 export type OrderEventAction =

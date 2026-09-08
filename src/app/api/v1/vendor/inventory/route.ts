@@ -38,10 +38,40 @@ const bulkUpdateSchema = z.object({
   { message: 'Provide items[], or productIds[] with a mode and/or lowStockThreshold' },
 );
 
+const SELLABLE_PRODUCT = {
+  isActive: true,
+  approvalStatus: 'approved' as const,
+  listingStatus: 'submitted' as const,
+};
+
+const INACTIVE_PRODUCT = {
+  OR: [
+    { isActive: false },
+    { approvalStatus: { not: 'approved' as const } },
+    { listingStatus: { not: 'submitted' as const } },
+  ],
+};
+
+const INVENTORY_PRODUCT_SELECT = {
+  id: true,
+  name: true,
+  sku: true,
+  unit: true,
+  imageUrl: true,
+  isActive: true,
+  approvalStatus: true,
+  listingStatus: true,
+  basePrice: true,
+  brand: true,
+  tags: true,
+  category: { select: { id: true, name: true } },
+} as const;
+
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
     requirePermission(ctx, 'inventory.view');
     const allOutlets = req.nextUrl.searchParams.get('outletId') === 'all';
+    const includeInactive = req.nextUrl.searchParams.get('includeInactive') === '1';
     const voc = await resolveVendorOutletContext(ctx, req, { allowAllOutlets: true });
     const outletWhere = buildInventoryOutletWhere(voc, allOutlets);
 
@@ -49,34 +79,31 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       await ensureInventoryRowsForOutlet(voc.vendorId, voc.outletId);
     }
 
-    const inventory = await prisma.inventory.findMany({
-      where: { vendorId: voc.vendorId, ...outletWhere },
-      include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-            sku: true,
-            unit: true,
-            imageUrl: true,
-            isActive: true,
-            basePrice: true,
-            brand: true,
-            tags: true,
-            category: { select: { id: true, name: true } },
-          },
+    const baseWhere = { vendorId: voc.vendorId, ...outletWhere };
+
+    const [inventory, inactiveCount] = await Promise.all([
+      prisma.inventory.findMany({
+        where: {
+          ...baseWhere,
+          ...(includeInactive ? {} : { product: SELLABLE_PRODUCT }),
         },
-        outlet: { select: { id: true, name: true } },
-      },
-      orderBy: { updatedAt: 'desc' },
-    });
+        include: {
+          product: { select: INVENTORY_PRODUCT_SELECT },
+          outlet: { select: { id: true, name: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      prisma.inventory.count({
+        where: { ...baseWhere, product: INACTIVE_PRODUCT },
+      }),
+    ]);
 
     const data = inventory.map((item) => ({
       ...item,
       isLowStock: item.qtyAvailable - item.qtyReserved <= item.lowStockThreshold,
     }));
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data, inactiveCount });
   } catch (error) {
     return errorResponse(error);
   }

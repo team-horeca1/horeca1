@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 
 interface OrderVendor {
     id: string;
@@ -85,6 +86,7 @@ interface OrderData {
     deliveryFee: number;
     totalAmount: number;
     paymentStatus: string;
+    paymentMethod: string | null;
     deliveryAddressSnapshot: any;
     notes: string | null;
     createdAt: string;
@@ -199,6 +201,10 @@ export default function OrderDetailsPage() {
     const [vendorOptions, setVendorOptions] = useState<{ id: string; businessName: string }[]>([]);
     const [opsBusy, setOpsBusy] = useState(false);
     const [emailingInvoice, setEmailingInvoice] = useState(false);
+    const [markPaidOpen, setMarkPaidOpen] = useState(false);
+    const [markPaidReference, setMarkPaidReference] = useState('');
+    const [markPaidNote, setMarkPaidNote] = useState('');
+    const [markingPaid, setMarkingPaid] = useState(false);
 
     useEffect(() => {
         fetch('/api/v1/admin/vendors?limit=200')
@@ -264,6 +270,34 @@ export default function OrderDetailsPage() {
             setSelectedStatus(order.status);
         } finally {
             setUpdatingStatus(false);
+        }
+    }
+
+    async function handleMarkPaid() {
+        if (!order) return;
+        try {
+            setMarkingPaid(true);
+            const res = await fetch(`/api/v1/admin/orders/${orderId}/mark-paid`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...(markPaidReference.trim() ? { reference: markPaidReference.trim() } : {}),
+                    ...(markPaidNote.trim() ? { note: markPaidNote.trim() } : {}),
+                }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) {
+                throw new Error(json.error?.message || json.message || 'Failed to mark as paid');
+            }
+            setOrder((prev) => (prev ? { ...prev, paymentStatus: 'paid' } : prev));
+            setMarkPaidOpen(false);
+            setMarkPaidReference('');
+            setMarkPaidNote('');
+            toast.success('Order marked as paid');
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to mark as paid');
+        } finally {
+            setMarkingPaid(false);
         }
     }
 
@@ -349,7 +383,11 @@ export default function OrderDetailsPage() {
         );
     }
 
-    const paymentMethod = order.payments.length > 0 ? order.payments[0].method : null;
+    const paymentMethod = order.paymentMethod || (order.payments.length > 0 ? order.payments[0].method : null);
+    const canMarkPaid =
+        order.paymentStatus !== 'paid' &&
+        order.status !== 'cancelled' &&
+        isOfflinePaymentMethod(order.paymentMethod);
 
     return (
         <div className="space-y-6 pb-12 px-4 md:px-0">
@@ -459,6 +497,54 @@ export default function OrderDetailsPage() {
                                         <p className="text-[12px] text-[#4B5563] font-semibold">
                                             <span className="text-[#9CA3AF] font-medium">Method:</span> {paymentMethod}
                                         </p>
+                                    )}
+                                    {canMarkPaid && (
+                                        <div className="pt-2 space-y-2">
+                                            {!markPaidOpen ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setMarkPaidOpen(true)}
+                                                    className="inline-flex items-center justify-center min-h-8 px-3 rounded-lg bg-[#6B1D2E] text-white text-[11px] font-bold hover:bg-[#5A1926] transition-colors"
+                                                >
+                                                    Mark as paid
+                                                </button>
+                                            ) : (
+                                                <div className="rounded-xl border border-[#EEEEEE] bg-[#FAFAFA] p-3 space-y-2">
+                                                    <input
+                                                        type="text"
+                                                        value={markPaidReference}
+                                                        onChange={(e) => setMarkPaidReference(e.target.value)}
+                                                        placeholder="Reference no. (optional)"
+                                                        className="w-full h-9 px-3 rounded-lg border border-[#E5E7EB] text-[12px] outline-none focus:border-[#6B1D2E]/40 bg-white"
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={markPaidNote}
+                                                        onChange={(e) => setMarkPaidNote(e.target.value)}
+                                                        placeholder="Note (optional)"
+                                                        className="w-full h-9 px-3 rounded-lg border border-[#E5E7EB] text-[12px] outline-none focus:border-[#6B1D2E]/40 bg-white"
+                                                    />
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => void handleMarkPaid()}
+                                                            disabled={markingPaid}
+                                                            className="inline-flex items-center justify-center min-h-8 px-3 rounded-lg bg-[#6B1D2E] text-white text-[11px] font-bold hover:bg-[#5A1926] disabled:opacity-60"
+                                                        >
+                                                            {markingPaid ? 'Saving…' : 'Confirm paid'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setMarkPaidOpen(false)}
+                                                            disabled={markingPaid}
+                                                            className="text-[11px] font-semibold text-[#6B7280] hover:text-[#111827]"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             </div>

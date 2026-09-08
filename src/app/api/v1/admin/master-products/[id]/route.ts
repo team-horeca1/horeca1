@@ -17,6 +17,7 @@ import {
 } from '@/modules/catalog/master-sync.service';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import { validateMasterSku } from '@/lib/sku';
+import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
 export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
@@ -117,7 +118,6 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       where: { id },
       select: {
         id: true,
-        approvalStatus: true,
         sku: true,
         name: true,
         brand: true,
@@ -178,20 +178,19 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     }
 
     if (rawSku !== undefined) {
-      if (current.approvalStatus !== 'pending') {
-        throw Errors.badRequest('Catalog SKU is immutable after approval. Create a new master item to change SKU.');
-      }
       const skuCheck = validateMasterSku(rawSku);
       if (!skuCheck.ok) throw Errors.badRequest(skuCheck.message);
-      const taken = await prisma.masterProduct.findFirst({
-        where: {
-          sku: { equals: skuCheck.normalized, mode: 'insensitive' },
-          id: { not: id },
-        },
-        select: { id: true },
-      });
-      if (taken) throw Errors.conflict(`SKU "${skuCheck.normalized}" is already in use`);
-      updateData.sku = skuCheck.normalized;
+      if (skuCheck.normalized !== current.sku.trim().toUpperCase()) {
+        const taken = await prisma.masterProduct.findFirst({
+          where: {
+            sku: { equals: skuCheck.normalized, mode: 'insensitive' },
+            id: { not: id },
+          },
+          select: { id: true },
+        });
+        if (taken) throw Errors.conflict(`SKU "${skuCheck.normalized}" is already in use`);
+        updateData.sku = skuCheck.normalized;
+      }
     }
 
     if (touchesSyncFields && linkedCount > 0) {
@@ -268,6 +267,31 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       updated.id
     ).catch(console.error);
 
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.masterProductUpdate,
+      entity: 'MasterProduct',
+      entityId: id,
+      before: {
+        sku: current.sku,
+        name: current.name,
+        brand: current.brand,
+        categoryId: current.categoryId,
+        taxPercent: current.taxPercent,
+        imageUrl: current.imageUrl,
+      },
+      after: {
+        sku: updated.sku,
+        name: updated.name,
+        brand: updated.brand,
+        categoryId: updated.categoryId,
+        taxPercent: updated.taxPercent,
+        imageUrl: updated.imageUrl,
+        packSize: updated.packSize,
+        uom: updated.uom,
+      },
+      metadata: { linkedVendorProducts: linkedCount },
+    });
+
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     return errorResponse(error);
@@ -293,7 +317,17 @@ export const DELETE = adminOnly(async (req: NextRequest, ctx) => {
       throw Errors.conflict('Cannot delete: this master SKU has order history.');
     }
 
+    const toDelete = await prisma.masterProduct.findUnique({
+      where: { id },
+      select: { sku: true, name: true, brand: true },
+    });
     await prisma.masterProduct.delete({ where: { id } });
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.masterProductDelete,
+      entity: 'MasterProduct',
+      entityId: id,
+      before: toDelete,
+    });
     return NextResponse.json({ success: true, data: { id } });
   } catch (error) {
     return errorResponse(error);

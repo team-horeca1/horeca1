@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
 import { useBusinessAccountSwitcher, type AccountSummary } from '@/hooks/useBusinessAccountSwitcher';
 import {
   DISMISS_KEY,
@@ -20,6 +21,7 @@ import {
 } from '@/lib/postLoginPicker';
 import { broadcastAuthEvent } from '@/lib/authTabSync';
 import { CDL } from '@/lib/cdl';
+import { setEnteredStore } from '@/lib/supplierPortalLevel';
 import { ShieldCheck, Store, Sparkles, User, MapPin, Loader2, X, ChevronLeft, Check } from 'lucide-react';
 
 type Kind = 'customer' | 'vendor' | 'brand';
@@ -37,7 +39,9 @@ function classify(a: AccountSummary): Kind {
 
 export function PostLoginAccountSelector() {
   const { data: session, status, update } = useSession();
-  const { accounts, currentAccount, switchAccount, switchOutlet, activeOutletId, switching } = useBusinessAccountSwitcher();
+  const pathname = usePathname();
+  const onAddBusinessRegister = pathname === '/brand/register' || pathname === '/vendor/register';
+  const { accounts, currentAccount, switchAccount, switchOutlet, switchOnlineStore, activeOutletId, switching, availableStores, activeVendorId } = useBusinessAccountSwitcher();
   const [open, setOpen] = useState(false);
   const [pickingId, setPickingId] = useState<string | null>(null);
   const [outletStep, setOutletStep] = useState<AccountSummary | null>(null);
@@ -67,6 +71,11 @@ export function PostLoginAccountSelector() {
     if (accounts.length === 0) return;
     if (u.role === 'admin') return;
     if (settledRef.current) return;
+    // Stay on add-business register so OTP-login can continue the form.
+    if (onAddBusinessRegister) {
+      settle();
+      return;
+    }
 
     const hasForceCookie = readForcePickerCookie();
     const forcePick = hasForceCookie || u.forceAccountPicker === true;
@@ -107,7 +116,7 @@ export function PostLoginAccountSelector() {
     }
     Promise.resolve().then(() => setOpen(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, accounts, session?.user?.id, activeOutletId, accessibleOutletIds.join(','), armedAt]);
+  }, [status, accounts, session?.user?.id, activeOutletId, accessibleOutletIds.join(','), armedAt, onAddBusinessRegister, settle]);
 
   const finishPicker = useCallback(
     async (contextChanged: boolean, chosen?: AccountSummary | null) => {
@@ -132,8 +141,9 @@ export function PostLoginAccountSelector() {
   );
 
   const handleDismiss = useCallback(() => {
+    if (mandatoryPick) return;
     void finishPicker(false, currentAccount);
-  }, [finishPicker, currentAccount]);
+  }, [finishPicker, currentAccount, mandatoryPick]);
 
   useEffect(() => {
     if (!open) return;
@@ -171,16 +181,15 @@ export function PostLoginAccountSelector() {
     }
   };
 
-  // Dismissing is always allowed: the session already holds a valid active
-  // account, so "close" simply means "continue with this one" — and it is
-  // remembered, so it never pops back up for this login.
+  // Dismissing is allowed when the picker is not mandatory: the session already
+  // holds a valid active account, so "close" means "continue with this one".
   const closeLabel = `Continue with ${currentAccount?.displayName ?? currentAccount?.legalName ?? 'current account'}`;
 
   if (outletStep !== null) {
     return (
       <div
         className="fixed inset-0 bg-black/40 z-[10010] flex items-center justify-center p-4"
-        onClick={handleDismiss}
+        onClick={mandatoryPick ? undefined : handleDismiss}
       >
         <div
           className="bg-white rounded-2xl w-full max-w-[480px] max-h-[90vh] flex flex-col"
@@ -204,13 +213,15 @@ export function PostLoginAccountSelector() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={handleDismiss}
-              className="p-1 rounded hover:bg-gray-100"
-              aria-label={closeLabel}
-            >
-              <X size={16} />
-            </button>
+            {!mandatoryPick && (
+              <button
+                onClick={handleDismiss}
+                className="p-1 rounded hover:bg-gray-100"
+                aria-label={closeLabel}
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
 
           <ul className="p-2 overflow-y-auto flex-1">
@@ -223,13 +234,36 @@ export function PostLoginAccountSelector() {
                     onClick={async () => {
                       setPickingId(o.id);
                       const outletChanged = o.id !== activeOutletId;
-                      if (outletChanged) {
-                        try {
+                      try {
+                        if (outletChanged) {
                           await switchOutlet(o.id);
-                        } catch {
+                        }
+                        const vendorAccount = outletStep.isVendor;
+                        const stores = availableStores.filter((s) => s.isActive);
+                        const matchedStore =
+                          stores.find((s) => s.defaultOutletId === o.id)
+                          ?? stores.find((s) => s.displayName.trim().toLowerCase() === o.name.trim().toLowerCase())
+                          ?? stores.find((s) => s.id === activeVendorId)
+                          ?? stores[0]
+                          ?? null;
+                        if (vendorAccount && matchedStore) {
+                          await switchOnlineStore(matchedStore.id, outletStep.id);
+                          settle();
+                          setEnteredStore(true);
+                          setOpen(false);
+                          setOutletStep(null);
                           setPickingId(null);
+                          try {
+                            await update({ accountPickerCompleted: true });
+                          } catch {
+                            /* JWT flag expires on its own */
+                          }
+                          window.location.assign('/vendor/dashboard');
                           return;
                         }
+                      } catch {
+                        setPickingId(null);
+                        return;
                       }
                       await finishPicker(
                         outletChanged || accountChangedRef.current,
@@ -280,7 +314,7 @@ export function PostLoginAccountSelector() {
   return (
     <div
       className="fixed inset-0 bg-black/40 z-[10010] flex items-center justify-center p-4"
-      onClick={handleDismiss}
+      onClick={mandatoryPick ? undefined : handleDismiss}
     >
       <div
         className="bg-white rounded-2xl w-full max-w-[480px] max-h-[90vh] flex flex-col"
@@ -295,13 +329,15 @@ export function PostLoginAccountSelector() {
                 : `You belong to ${accounts.length} business accounts. Pick one to continue.`}
             </p>
           </div>
-          <button
-            onClick={handleDismiss}
-            className="p-1 rounded hover:bg-gray-100 shrink-0"
-            aria-label={closeLabel}
-          >
-            <X size={16} />
-          </button>
+          {!mandatoryPick && (
+            <button
+              onClick={handleDismiss}
+              className="p-1 rounded hover:bg-gray-100 shrink-0"
+              aria-label={closeLabel}
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         <ul className="p-2 overflow-y-auto flex-1">

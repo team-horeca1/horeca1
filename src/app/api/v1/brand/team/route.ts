@@ -127,11 +127,15 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
     const looksEmail = identifierTrim.includes('@');
     let user = looksEmail
       ? await prisma.user.findUnique({ where: { email: identifierTrim.toLowerCase() } })
-      : await prisma.user.findFirst({ where: { phone: { in: phoneLookupVariants(identifierTrim) } } });
+      : await prisma.user.findFirst({
+          where: { phone: { in: phoneLookupVariants(identifierTrim) } },
+          orderBy: { createdAt: 'asc' },
+        });
 
     // Capture plain-text password BEFORE bcrypt.hash so we can email it. Only
     // set on the new-user creation path; existing users keep their password.
     let tempPassword = '';
+    let isNewUser = false;
 
     if (!user) {
       if (!looksEmail) throw Errors.badRequest('New brand invites require an email identifier');
@@ -151,6 +155,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
           hcidDisplay,
         },
       });
+      isNewUser = true;
     }
 
     const existingMember = await prisma.brandTeamMember.findUnique({
@@ -272,6 +277,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
       success: true,
       data: {
         ...dto,
+        existingUser: !isNewUser,
         ...(tempPassword
           ? {
               inviteMeta: {

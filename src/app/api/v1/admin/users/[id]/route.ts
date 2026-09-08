@@ -13,6 +13,7 @@ import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { hardDeleteUserById } from '@/lib/userHardDelete';
 import { getAdminRevealedPasswordForRole } from '@/lib/adminPasswordReveal';
 import { clearSessionRevoked, markSessionRevoked } from '@/lib/sessionStale';
+import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -483,6 +484,28 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     if (deactivating) await markSessionRevoked(id);
     if (reactivating) await clearSessionRevoked(id);
 
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.userUpdate,
+      entity: 'User',
+      entityId: id,
+      before: {
+        fullName: existing.fullName,
+        email: existing.email,
+        phone: existing.phone,
+        role: existing.role,
+        isActive: existing.isActive,
+        businessName: existing.businessName,
+      },
+      after: {
+        fullName: updated.fullName,
+        email: updated.email,
+        phone: updated.phone,
+        role: updated.role,
+        isActive: updated.isActive,
+        businessName: updated.businessName,
+      },
+    });
+
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     return errorResponse(error);
@@ -534,6 +557,13 @@ export const DELETE = adminOnly(async (req: NextRequest, ctx) => {
       }
       await prisma.user.update({ where: { id }, data: { isActive: false } });
       await markSessionRevoked(id);
+      logAction(ctx, req, {
+        action: AUDIT_ACTIONS.userDelete,
+        entity: 'User',
+        entityId: id,
+        before: { role: existing.role, isActive: existing.isActive },
+        after: { deactivated: true },
+      });
       return NextResponse.json({ success: true, data: { id, deactivated: true } });
     }
 
@@ -546,6 +576,14 @@ export const DELETE = adminOnly(async (req: NextRequest, ctx) => {
     // exist on every environment (legacy) — never to mask a real FK failure
     // on the critical path.
     await hardDeleteUserById(id);
+
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.userDelete,
+      entity: 'User',
+      entityId: id,
+      before: { role: existing.role, isActive: existing.isActive },
+      after: { hardDeleted: true },
+    });
 
     return NextResponse.json({ success: true, data: { id, hardDeleted: true } });
   } catch (error) {

@@ -6,11 +6,11 @@ import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
 import { runMappingForProduct, runMappingForBrand, embedBrandMasterProduct } from './brand-mapper';
-import { validateMasterSku } from '@/lib/sku';
-import { assertLeafCategory, syncMasterProductCategories } from '@/modules/catalog/catalog.service';
+import { assertLeafCategory, createMasterProductWithSku, syncMasterProductCategories } from '@/modules/catalog/catalog.service';
 import { pushMasterCategoriesToVendorListings } from '@/modules/catalog/master-sync.service';
 import type {
   BrandMasterSubmitInput,
+  BrandMasterUpdateInput,
   CreateBrandProductInput,
 } from './brand.validator';
 import {
@@ -73,22 +73,27 @@ export function productPickerBrandWhere() {
   return approvedActiveBrandWhere();
 }
 
-/** Public brand store / homepage carousel — hides internal admin placeholder accounts. */
+const INTERNAL_BRAND_EMAIL = 'brand.internal.horeca1';
+
+/** Brand store = approved brand with a real owner login (not a name-only label). */
+export function brandStoreOwnerWhere() {
+  return {
+    userId: { not: null },
+    user: {
+      email: {
+        not: {
+          contains: INTERNAL_BRAND_EMAIL,
+        },
+      },
+    },
+  };
+}
+
+/** Public brand store / homepage carousel — owned storefronts only, not catalog labels. */
 export function publicStorefrontBrandWhere() {
   return {
     ...approvedActiveBrandWhere(),
-    OR: [
-      { userId: null },
-      {
-        user: {
-          email: {
-            not: {
-              contains: 'brand.internal.horeca1',
-            },
-          },
-        },
-      },
-    ],
+    ...brandStoreOwnerWhere(),
   };
 }
 
@@ -191,15 +196,7 @@ export class BrandService {
     const brand = await prisma.brand.findFirst({
       where: {
         slug,
-        isActive: true,
-        approvalStatus: 'approved',
-        user: {
-          email: {
-            not: {
-              contains: 'brand.internal.horeca1',
-            },
-          },
-        },
+        ...publicStorefrontBrandWhere(),
       },
       include: {
         masterProducts: {
@@ -869,20 +866,6 @@ export class BrandService {
     const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { name: true } });
     if (!brand) throw Errors.notFound('Brand profile not found');
 
-    const skuCheck = validateMasterSku(input.sku);
-    if (!skuCheck.ok) throw Errors.badRequest(skuCheck.message);
-
-    const existingSku = await prisma.masterProduct.findFirst({
-      where: { sku: { equals: skuCheck.normalized, mode: 'insensitive' } },
-      select: { id: true, approvalStatus: true },
-    });
-    if (existingSku) {
-      if (existingSku.approvalStatus === 'approved') {
-        throw Errors.conflict(`SKU "${skuCheck.normalized}" already exists in the master catalog`);
-      }
-      throw Errors.conflict(`SKU "${skuCheck.normalized}" is already pending approval`);
-    }
-
     await assertLeafCategory([input.categoryId]);
 
     // Detail fields have no MasterProduct columns — stash for BrandMasterProduct on approve.
@@ -895,23 +878,22 @@ export class BrandService {
         : {}),
     };
 
-    const master = await prisma.masterProduct.create({
-      data: {
-        sku: skuCheck.normalized,
+    const master = await createMasterProductWithSku(
+      {
         name: input.name.trim(),
         brand: brand.name,
         categoryId: input.categoryId,
         imageUrl: input.imageUrl ?? null,
         packSize: input.packSize?.trim() || null,
         uom: input.uom?.trim() || null,
-        // Promote list-shaped fields onto native MasterProduct columns when present.
         ...(brandDetails.images ? { images: brandDetails.images } : {}),
         ...(brandDetails.aliasNames ? { aliasNames: brandDetails.aliasNames } : {}),
         approvalStatus: 'pending',
         suggestedBy: userId,
         metadata,
       },
-    });
+      input.sku,
+    );
 
     emitEvent('ProductSubmitted', {
       productId: master.id,
@@ -920,6 +902,72 @@ export class BrandService {
     });
 
     return master;
+  }
+
+  async updatePendingMasterProduct(userId: string, productId: string, input: BrandMasterUpdateInput) {
+    const brandId = await this.getBrandIdForUser(userId);
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
+      select: {
+        id: true,
+        userId: true,
+        teamMembers: { select: { userId: true } },
+      },
+    });
+    if (!brand) throw Errors.notFound('Brand profile not found');
+
+    const brandUserIds = Array.from(
+      new Set([
+        ...(brand.userId ? [brand.userId] : []),
+        ...brand.teamMembers.map((m) => m.userId),
+      ]),
+    );
+
+    const master = await prisma.masterProduct.findFirst({
+      where: {
+        id: productId,
+        approvalStatus: { in: ['pending', 'rejected', 'needs_changes'] },
+        OR: [
+          ...(brandUserIds.length > 0 ? [{ suggestedBy: { in: brandUserIds } }] : []),
+          { metadata: { path: ['brandId'], equals: brandId } },
+        ],
+      },
+    });
+    if (!master) throw Errors.notFound('Product not found');
+
+    const categoryId = input.categoryId ?? input.categoryIds?.[0];
+    if (categoryId) await assertLeafCategory([categoryId]);
+
+    const existingMeta =
+      master.metadata && typeof master.metadata === 'object' && !Array.isArray(master.metadata)
+        ? { ...(master.metadata as Record<string, unknown>) }
+        : {};
+    const brandDetails = {
+      ...readBrandSubmitDetails(master.metadata),
+      ...pickBrandSubmitDetails(input),
+    };
+
+    const resubmit = master.approvalStatus === 'rejected' || master.approvalStatus === 'needs_changes';
+
+    return prisma.masterProduct.update({
+      where: { id: productId },
+      data: {
+        ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+        ...(input.packSize !== undefined ? { packSize: input.packSize?.trim() || null } : {}),
+        ...(input.uom !== undefined ? { uom: input.uom?.trim() || null } : {}),
+        ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl || null } : {}),
+        ...(input.sku !== undefined ? { sku: input.sku.trim() } : {}),
+        ...(categoryId ? { categoryId } : {}),
+        ...(resubmit ? { approvalStatus: 'pending' as const } : {}),
+        metadata: {
+          ...existingMeta,
+          brandId,
+          ...(Object.keys(brandDetails).length > 0
+            ? { [BRAND_SUBMIT_DETAILS_META_KEY]: brandDetails }
+            : {}),
+        } as Prisma.InputJsonValue,
+      },
+    });
   }
 
   // ── Brand: update master product ──────────────────────────

@@ -364,18 +364,23 @@ export default function BrandProductForm({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <FieldLabel required={!form.masterProductId && !editingId}>SKU</FieldLabel>
+                    <FieldLabel>SKU</FieldLabel>
                     <input
                       type="text"
                       value={form.sku}
                       onChange={(e) => setField('sku', e.target.value.toUpperCase())}
-                      placeholder="e.g. MAN-SYR-001"
+                      placeholder="Auto (H1-SKU-xxxxx)"
                       readOnly={!!form.masterProductId}
                       className={cn(
                         productFormInputCls,
                         form.masterProductId && 'bg-[#F8F9FB] cursor-not-allowed',
                       )}
                     />
+                    {!form.masterProductId && !editingId && (
+                      <p className="text-[11px] text-[#AEAEAE] font-medium mt-1.5">
+                        Leave blank to auto-generate. Enter a custom SKU to override.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <FieldLabel>HSN</FieldLabel>

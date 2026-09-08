@@ -31,7 +31,7 @@ const approvalSchema = z
   .object({
     action: z.enum(['approve', 'reject']),
     note: z.string().optional(),
-    /** Admin-entered catalog SKU when approving a vendor listing without a master link. */
+    /** Optional catalog SKU when approving a vendor listing without a master link. Blank auto-generates H1-SKU-*. */
     catalogSku: z.string().min(2).max(40).optional(),
     /** Link to an existing approved master instead of creating one. */
     masterProductId: z.string().uuid().optional(),

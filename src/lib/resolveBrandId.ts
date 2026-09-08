@@ -32,10 +32,18 @@ export async function resolveBrandContext(ctx: AuthContext, req: NextRequest): P
   }
 
   if (ctx.activeBrandId) {
-    return {
-      brandId: ctx.activeBrandId,
-      teamRole: ctx.activeBrandTeamRole ?? 'owner',
-    };
+    const brand = await prisma.brand.findUnique({
+      where: { id: ctx.activeBrandId },
+      select: { id: true, userId: true, businessAccountId: true },
+    });
+    const baOk = !ctx.activeBusinessAccountId
+      || brand?.businessAccountId === ctx.activeBusinessAccountId;
+    if (brand && baOk) {
+      return {
+        brandId: brand.id,
+        teamRole: await resolveBrandTeamRole(ctx, brand.id, brand.userId),
+      };
+    }
   }
 
   // Check direct ownership first — scoped to the active business account
@@ -46,6 +54,7 @@ export async function resolveBrandContext(ctx: AuthContext, req: NextRequest): P
       userId: ctx.userId,
       ...(ctx.activeBusinessAccountId ? { businessAccountId: ctx.activeBusinessAccountId } : {}),
     },
+    orderBy: { createdAt: 'asc' },
     select: { id: true },
   });
   if (ownBrand) return { brandId: ownBrand.id, teamRole: 'owner' };
@@ -56,10 +65,25 @@ export async function resolveBrandContext(ctx: AuthContext, req: NextRequest): P
       userId: ctx.userId,
       ...(ctx.activeBusinessAccountId ? { brand: { businessAccountId: ctx.activeBusinessAccountId } } : {}),
     },
+    orderBy: { createdAt: 'asc' },
     select: { brandId: true, role: true },
   });
   if (!membership) throw Errors.forbidden('No brand profile linked to your account');
   return { brandId: membership.brandId, teamRole: membership.role };
+}
+
+async function resolveBrandTeamRole(
+  ctx: AuthContext,
+  brandId: string,
+  brandOwnerUserId: string | null,
+): Promise<TeamRole | 'owner'> {
+  if (ctx.activeBrandTeamRole) return ctx.activeBrandTeamRole;
+  if (brandOwnerUserId === ctx.userId) return 'owner';
+  const m = await prisma.brandTeamMember.findFirst({
+    where: { brandId, userId: ctx.userId },
+    select: { role: true },
+  });
+  return m?.role ?? 'viewer';
 }
 
 // Backward-compatible wrappers
@@ -100,7 +124,11 @@ export async function resolveUserId(ctx: AuthContext, req: NextRequest): Promise
 
   // Team member — return the brand owner's userId
   const membership = await prisma.brandTeamMember.findFirst({
-    where: { userId: ctx.userId },
+    where: {
+      userId: ctx.userId,
+      ...(ctx.activeBusinessAccountId ? { brand: { businessAccountId: ctx.activeBusinessAccountId } } : {}),
+    },
+    orderBy: { createdAt: 'asc' },
     select: { brand: { select: { userId: true } } },
   });
   if (!membership) throw Errors.forbidden('No brand profile linked to your account');

@@ -19,7 +19,6 @@ import {
   type VendorBusinessType,
   type VendorTypeSelection,
 } from '@/lib/constants/vendorProfile';
-import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -199,29 +198,14 @@ export function contactChannelErrors(
   const authPhone = trim(data.authorizedPersonPhone || data.mobilePhone || data.phone)
     .replace(/\D/g, '').slice(-10);
   const email = trim(data.email || data.authorizedPersonEmail);
-  const relaxed = isRegisterEmailOtpEnabled() && context === 'selfRegister';
 
-  if (relaxed) {
-    const hasPhone = authPhone.length === 10;
-    const hasEmail = !!email && EMAIL_RE.test(email);
-    if (!hasPhone && !hasEmail) {
-      errors.authorizedPersonPhone = 'Enter a mobile number or email address';
-      errors.email = 'Enter a mobile number or email address';
-    } else {
-      if (!hasEmail && authPhone && authPhone.length !== 10) {
-        errors.authorizedPersonPhone = 'Enter a valid 10-digit mobile number';
-      }
-      if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
-    }
-  } else {
-    if (!authPhone || authPhone.length !== 10) {
-      errors.authorizedPersonPhone = 'Enter a valid 10-digit mobile number';
-    }
-    if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
-    if (context === 'adminCreate') {
-      if (!trim(data.email) || !EMAIL_RE.test(trim(data.email))) {
-        errors.email = 'Enter a valid owner email';
-      }
+  if (!authPhone || authPhone.length !== 10) {
+    errors.authorizedPersonPhone = 'Enter a valid 10-digit mobile number';
+  }
+  if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
+  if (context === 'adminCreate') {
+    if (!trim(data.email) || !EMAIL_RE.test(trim(data.email))) {
+      errors.email = 'Enter a valid owner email';
     }
   }
   return errors;

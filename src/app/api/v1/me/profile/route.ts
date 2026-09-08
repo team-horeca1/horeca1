@@ -46,12 +46,17 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
   const hasFullName = !!user.fullName;
 
   const hasCorePersonalization = hasPincode && hasBusinessName && hasFullName;
+  const businessType = member?.businessAccount?.businessType ?? null;
+  const kindDefaultType = businessType === 'customer' || businessType === 'vendor' || businessType === 'brand' || !businessType;
+  // Skip during signup leaves profileCompletedAt null and the kind-default type.
+  const needsCompleteProfile = !user.profileCompletedAt && kindDefaultType;
 
   return NextResponse.json({
     success: true,
     data: {
       profileCompletedAt: user.profileCompletedAt,
       isComplete: !!user.profileCompletedAt,
+      needsCompleteProfile,
       hasCorePersonalization,
       fields: {
         fullName: hasFullName,

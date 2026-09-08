@@ -54,6 +54,26 @@ interface AdminUser {
     businessName: string | null;
     isActive: boolean;
     createdAt: string;
+    accountMemberships?: Array<{
+        businessAccount?: {
+            isCustomer?: boolean;
+            isVendor?: boolean;
+            isBrand?: boolean;
+        };
+    }>;
+}
+
+function customerRoleLabel(user: AdminUser): string {
+    const flags = (user.accountMemberships ?? []).map((m) => m.businessAccount);
+    const isCustomer = user.role === 'customer' || flags.some((ba) => ba?.isCustomer);
+    const isVendor = user.role === 'vendor' || flags.some((ba) => ba?.isVendor);
+    const isBrand = user.role === 'brand' || flags.some((ba) => ba?.isBrand);
+    const parts: string[] = [];
+    if (isCustomer) parts.push('Customer');
+    if (isVendor) parts.push('Vendor');
+    if (isBrand) parts.push('Brand');
+    if (user.role === 'admin') return 'Admin';
+    return parts.length > 0 ? parts.join(' + ') : user.role;
 }
 
 export default function CustomersPage() {
@@ -64,6 +84,10 @@ export default function CustomersPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [nextCursor, setNextCursor] = useState<string | null>(null);
+    const [hasMore, setHasMore] = useState(false);
+    const [totals, setTotals] = useState({ total: 0, active: 0, inactive: 0 });
     const [initialLoad, setInitialLoad] = useState(true);
     const [activeMenu, setActiveMenu] = useState<{ id: string; top: number; right: number } | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -94,10 +118,13 @@ export default function CustomersPage() {
     const [bulkTags, setBulkTags] = useState('');
     const [bulkTagsAction, setBulkTagsAction] = useState<'add' | 'remove' | 'set'>('add');
 
-    const refetch = useCallback(() => {
-        setLoading(true);
+    const refetch = useCallback((opts?: { cursor?: string | null }) => {
+        const append = Boolean(opts?.cursor);
+        if (append) setLoadingMore(true);
+        else setLoading(true);
         const url = new URL('/api/v1/admin/users', window.location.origin);
         url.searchParams.set('limit', '50');
+        if (opts?.cursor) url.searchParams.set('cursor', opts.cursor);
         if (searchQuery.trim()) url.searchParams.set('search', searchQuery.trim());
         if (filterRole !== 'all') url.searchParams.set('role', filterRole);
         if (filterPincode.trim()) url.searchParams.set('pincode', filterPincode.trim());
@@ -106,10 +133,6 @@ export default function CustomersPage() {
         if (filterArea.trim()) url.searchParams.set('area', filterArea.trim());
         if (filterTag.trim()) url.searchParams.set('tag', filterTag.trim());
 
-        // Don't silently treat API failures (401/403/500) as "no users yet".
-        // Surface the real reason via toast and clear the list so the admin
-        // can see something went wrong (most commonly a stale JWT after a
-        // role change — fix: sign out + sign back in).
         fetch(url.toString())
             .then(async (res) => {
                 const json = await res.json().catch(() => null);
@@ -119,18 +142,32 @@ export default function CustomersPage() {
                         ?? (res.status === 401 ? 'Session expired — please sign in again'
                             : res.status === 403 ? 'Your account does not have admin access. If you just changed roles, sign out and sign back in to refresh the session.'
                             : `Failed to load users (HTTP ${res.status})`);
-                    setUsers([]);
+                    if (!append) setUsers([]);
                     toast.error(typeof msg === 'string' ? msg : 'Failed to load users');
                     return;
                 }
-                setUsers(json.data.users);
+                const nextUsers = json.data.users as AdminUser[];
+                setUsers((prev) => append ? [...prev, ...nextUsers] : nextUsers);
+                setNextCursor(json.data.nextCursor ?? null);
+                setHasMore(Boolean(json.data.hasMore));
+                if (json.data.totals) {
+                    setTotals({
+                        total: json.data.totals.total ?? 0,
+                        active: json.data.totals.active ?? 0,
+                        inactive: json.data.totals.inactive ?? 0,
+                    });
+                }
             })
             .catch((err) => {
                 console.error(err);
-                setUsers([]);
+                if (!append) setUsers([]);
                 toast.error('Network error loading users');
             })
-            .finally(() => { setLoading(false); setInitialLoad(false); });
+            .finally(() => {
+                setLoading(false);
+                setLoadingMore(false);
+                setInitialLoad(false);
+            });
     }, [searchQuery, filterRole, filterPincode, filterSalespersonId, filterCreditStatus, filterArea, filterTag]);
 
     useEffect(() => {
@@ -161,9 +198,9 @@ export default function CustomersPage() {
 
     const filteredUsers = users;
 
-    const totalCustomers = users.filter(u => u.role === 'customer').length;
-    const activeCustomers = users.filter(u => u.role === 'customer' && u.isActive).length;
-    const inactiveUsers = users.filter(u => !u.isActive).length;
+    const totalCustomers = totals.total;
+    const activeCustomers = totals.active;
+    const inactiveUsers = totals.inactive;
 
     const registryStats = [
         { label: 'Total Customers', value: totalCustomers, icon: UserCheck, iconBg: 'bg-[#F8E8EC]', iconColor: 'text-[#6B1D2E]' },
@@ -511,7 +548,7 @@ export default function CustomersPage() {
                                         user.role === 'vendor' ? 'bg-blue-50 text-blue-600' :
                                         'bg-[#F8E8EC] text-[#6B1D2E]',
                                     )}>
-                                        {user.role}
+                                        {customerRoleLabel(user)}
                                     </span>
                                 </div>
 
@@ -626,7 +663,7 @@ export default function CustomersPage() {
                                                     user.role === 'vendor' ? 'bg-blue-50 text-blue-600' :
                                                     'bg-[#F8E8EC] text-[#6B1D2E]',
                                                 )}>
-                                                    {user.role}
+                                                    {customerRoleLabel(user)}
                                                 </span>
                                             </div>
                                         </div>
@@ -682,6 +719,20 @@ export default function CustomersPage() {
                         ))}
                     </AdminRegistryTableBody>
                 </AdminRegistryTableShell>
+            )}
+
+            {hasMore && (
+                <div className="flex justify-center pt-2">
+                    <button
+                        type="button"
+                        disabled={loadingMore}
+                        onClick={() => refetch({ cursor: nextCursor })}
+                        className="min-h-12 px-5 rounded-[12px] border border-[#E5E7EB] bg-white text-[13px] font-bold text-[#374151] hover:bg-[#F9FAFB] disabled:opacity-60 flex items-center gap-2"
+                    >
+                        {loadingMore && <Loader2 size={14} className="animate-spin" />}
+                        Load more
+                    </button>
+                </div>
             )}
 
             {selectedIds.size > 0 && (

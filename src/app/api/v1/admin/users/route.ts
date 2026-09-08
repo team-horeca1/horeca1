@@ -49,7 +49,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
     // and the runtime call validates the shape anyway.
     const where: Record<string, unknown> = {};
 
-    if (role) {
+    if (role && role !== 'customer') {
       where.role = role;
     }
 
@@ -64,6 +64,15 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
     }
 
     const andConditions: Record<string, unknown>[] = [];
+
+    if (role === 'customer') {
+      andConditions.push({
+        OR: [
+          { role: 'customer' },
+          { accountMemberships: { some: { businessAccount: { isCustomer: true } } } },
+        ],
+      });
+    }
 
     if (pincode) {
       andConditions.push({
@@ -181,6 +190,9 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
                 billingState: true,
                 billingPincode: true,
                 status: true,
+                isCustomer: true,
+                isVendor: true,
+                isBrand: true,
                 businessType: true,
                 subType: true,
                 cuisine: true,
@@ -240,12 +252,23 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
 
     const nextCursor = hasMore ? users[users.length - 1].id : null;
 
+    const countWhere = where as Prisma.UserWhereInput;
+    const [total, active] = await Promise.all([
+      prisma.user.count({ where: countWhere }),
+      prisma.user.count({ where: { AND: [countWhere, { isActive: true }] } }),
+    ]);
+
     return NextResponse.json({
       success: true,
       data: {
         users,
         nextCursor,
         hasMore,
+        totals: {
+          total,
+          active,
+          inactive: Math.max(0, total - active),
+        },
       },
     });
   } catch (error) {

@@ -39,22 +39,17 @@ export async function resolveVendorContext(ctx: AuthContext, req: NextRequest): 
   }
 
   if (ctx.activeVendorId) {
-    // Validate store still belongs to active Business when BA is set.
-    if (ctx.activeBusinessAccountId) {
-      const ok = await prisma.vendor.findFirst({
-        where: { id: ctx.activeVendorId, businessAccountId: ctx.activeBusinessAccountId },
-        select: { id: true },
-      });
-      if (ok) {
-        return {
-          vendorId: ctx.activeVendorId,
-          teamRole: ctx.activeVendorTeamRole ?? 'owner',
-        };
-      }
-    } else {
+    const vendor = await prisma.vendor.findFirst({
+      where: {
+        id: ctx.activeVendorId,
+        ...(ctx.activeBusinessAccountId ? { businessAccountId: ctx.activeBusinessAccountId } : {}),
+      },
+      select: { id: true, userId: true },
+    });
+    if (vendor) {
       return {
-        vendorId: ctx.activeVendorId,
-        teamRole: ctx.activeVendorTeamRole ?? 'owner',
+        vendorId: vendor.id,
+        teamRole: await resolveVendorTeamRole(ctx, vendor.id, vendor.userId),
       };
     }
   }
@@ -77,10 +72,25 @@ export async function resolveVendorContext(ctx: AuthContext, req: NextRequest): 
         ? { vendor: { businessAccountId: ctx.activeBusinessAccountId } }
         : {}),
     },
+    orderBy: { createdAt: 'asc' },
     select: { vendorId: true, role: true },
   });
   if (!membership) throw Errors.forbidden('No Online Store linked to your account');
   return { vendorId: membership.vendorId, teamRole: membership.role };
+}
+
+async function resolveVendorTeamRole(
+  ctx: AuthContext,
+  vendorId: string,
+  vendorOwnerUserId: string,
+): Promise<TeamRole | 'owner'> {
+  if (ctx.activeVendorTeamRole) return ctx.activeVendorTeamRole;
+  if (vendorOwnerUserId === ctx.userId) return 'owner';
+  const m = await prisma.vendorTeamMember.findFirst({
+    where: { vendorId, userId: ctx.userId },
+    select: { role: true },
+  });
+  return m?.role ?? 'viewer';
 }
 
 /**

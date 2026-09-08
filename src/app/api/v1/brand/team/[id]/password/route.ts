@@ -8,6 +8,7 @@ import { resolveBrandContext } from '@/lib/resolveBrandId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { assertCanManageMemberPassword } from '@/lib/teamMembership';
 
 const schema = z.object({
   password: z.string().min(6).max(72),
@@ -29,6 +30,14 @@ export const PATCH = brandOnly(async (req: NextRequest, ctx) => {
       select: { userId: true },
     });
     if (!member) throw Errors.notFound('Team member not found');
+
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
+      select: { businessAccountId: true },
+    });
+    if (brand?.businessAccountId) {
+      await assertCanManageMemberPassword(member.userId, brand.businessAccountId);
+    }
 
     const { password } = schema.parse(await req.json());
     const hashed = await bcrypt.hash(password, 12);

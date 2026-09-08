@@ -145,10 +145,10 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
     const relaxedContact = isRegisterEmailOtpEnabled();
     const body = createAccountBodySchema(relaxedContact).parse(await req.json());
 
-    // One Vendor / Brand row per BusinessAccount is still enforced
-    // (Vendor.businessAccountId @unique), but a single User can now own many
-    // Vendor / Brand rows — each in its own BusinessAccount — under the V2.2
-    // HCID multi-account architecture. No duplicate check on userId.
+    // One Vendor / Brand row per Brand.businessAccountId (@unique). A supplier
+    // BusinessAccount may have N Online Stores (Vendor.businessAccountId is
+    // NOT unique). A single User can own many Vendor / Brand rows — each in
+    // its own BusinessAccount — under the V2.2 HCID multi-account architecture.
 
     // Lookup the seeded templates we need up-front so the transaction can
     // fail fast if backfill hasn't run.

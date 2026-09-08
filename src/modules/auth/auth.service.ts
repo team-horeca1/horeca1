@@ -6,6 +6,7 @@ import { Errors } from '@/middleware/errorHandler';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
 import { uniqueHcid } from '@/lib/hcid';
 import { normalizePhone, phoneLookupVariants } from '@/lib/phone';
+import { assertVerificationToken } from '@/lib/otpVerification';
 
 interface SignupInput {
   email: string;
@@ -166,10 +167,14 @@ export class AuthService {
       businessName: string;
       gstNumber: string;
       image: string;
+      verificationToken: string;
     }>
   ) {
-    if (data.phone !== undefined) {
-      const phone = normalizePhone(data.phone);
+    const { verificationToken, ...rest } = data;
+    let profileFields = rest;
+
+    if (profileFields.phone !== undefined) {
+      const phone = normalizePhone(profileFields.phone);
       if (!phone) throw Errors.badRequest('Invalid phone number');
 
       const current = await prisma.user.findUnique({
@@ -178,7 +183,6 @@ export class AuthService {
       });
       if (!current) throw Errors.notFound('User');
 
-      // Treat legacy "+91…" / "91…" rows as the same number as bare 10-digit.
       const phoneChanged = !phoneLookupVariants(current.phone).includes(phone);
 
       if (phoneChanged) {
@@ -187,34 +191,21 @@ export class AuthService {
             id: { not: userId },
             phone: { in: phoneLookupVariants(phone) },
           },
+          orderBy: { createdAt: 'asc' },
           select: { id: true },
         });
         if (taken) {
           throw Errors.fieldError('phone', 'Phone already exists', 409);
         }
 
-        // Same trust window as vendor/brand onboarding: a used OTP within 30 min.
-        const verifiedOtp = await prisma.otpCode.findFirst({
-          where: {
-            phone,
-            used: true,
-            createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
-          },
-          orderBy: { createdAt: 'desc' },
-          select: { id: true },
-        });
-        if (!verifiedOtp) {
-          throw Errors.badRequest(
-            'Phone number is not verified. Please verify your number first.',
-          );
-        }
+        await assertVerificationToken(verificationToken, { phone });
       }
 
-      data = { ...data, phone };
+      profileFields = { ...profileFields, phone };
     }
     return prisma.user.update({
       where: { id: userId },
-      data,
+      data: profileFields,
       select: {
         id: true,
         email: true,

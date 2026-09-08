@@ -203,6 +203,8 @@ model Vendor {
   // Customer-facing / portal display name (falls back to businessName).
   displayName       String?  @map("display_name") @db.VarChar(255)
   // First Online Store created under the Business (migration backfill = true).
+  // At most one primary per BA is enforced by partial unique index
+  // vendors_one_primary_store_per_ba (raw SQL — Prisma cannot express it).
   isPrimaryStore    Boolean  @default(false) @map("is_primary_store")
   // Silent default warehouse outlet for this Online Store (inventory/fulfillment FKs).
   defaultOutletId   String?  @unique @map("default_outlet_id") @db.Uuid
@@ -615,7 +617,7 @@ model MasterProductRevision {
 // sub-category — enforced by assertLeafCategory in catalog.service.ts.
 model MasterProduct {
   id             String         @id @default(uuid()) @db.Uuid
-  sku            String         @unique @db.VarChar(40) // Admin-entered canonical SKU (e.g. RIC-BAS-001)
+  sku            String         @unique @db.VarChar(40) // Auto H1-SKU-NNNNN; admin may override (e.g. RIC-BAS-001)
   name           String         @db.VarChar(255)
   aliasNames     String[]       @default([]) @map("alias_names")
   brand          String?        @db.VarChar(150)
@@ -3658,6 +3660,7 @@ model PlatformSetting {
   emailNotifications    Boolean  @default(true) @map("email_notifications")
   smsNotifications      Boolean  @default(true) @map("sms_notifications")
   pushNotifications     Boolean  @default(false) @map("push_notifications")
+  gstSlabs              Int[]    @default([0, 5, 12, 18, 28]) @map("gst_slabs")
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 

@@ -11,6 +11,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { friendlyErrorMessage } from '../../src/middleware/errorHandler';
 import { POST } from '../../src/app/api/v1/vendor/onboarding/submit/route';
+import { issueVerificationToken } from '../../src/lib/otpVerification';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -102,7 +103,7 @@ async function main() {
   let userId: string | null = null;
 
   try {
-    await prisma.otpCode.create({
+    const otp = await prisma.otpCode.create({
       data: {
         phone: PHONE,
         email: EMAIL,
@@ -110,6 +111,12 @@ async function main() {
         used: true,
         expiresAt: new Date(Date.now() + 30 * 60 * 1000),
       },
+      select: { id: true },
+    });
+    const verificationToken = issueVerificationToken({
+      otpId: otp.id,
+      phone: PHONE,
+      email: EMAIL,
     });
     check('Created used OTP for smoke phone/email', true, PHONE);
 
@@ -144,6 +151,7 @@ async function main() {
       },
       serviceablePincodes: [PIN, '560002'],
       deliveryCapability: 'own_fleet',
+      verificationToken,
     };
 
     const req = new NextRequest('http://localhost:3000/api/v1/vendor/onboarding/submit', {

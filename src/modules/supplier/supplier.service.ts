@@ -313,12 +313,13 @@ export async function createOnlineStore(
     throw Errors.fieldError('storeName', 'An Online Store with a similar name already exists.', 409);
   }
 
-  const existingCount = await prisma.vendor.count({ where: { businessAccountId } });
   const uniquePincodes = Array.from(
     new Set((input.serviceablePincodes ?? []).map((p) => p.trim()).filter(Boolean)),
   );
 
   return prisma.$transaction(async (tx) => {
+    const countInTx = await tx.vendor.count({ where: { businessAccountId } });
+    const isPrimary = countInTx === 0;
     const vendor = await tx.vendor.create({
       data: {
         userId,
@@ -327,7 +328,7 @@ export async function createOnlineStore(
         displayName: input.storeDisplayName?.trim() || storeName,
         tradeName: input.storeDisplayName?.trim() || storeName,
         slug,
-        isPrimaryStore: existingCount === 0,
+        isPrimaryStore: isPrimary,
         isActive: false,
         isVerified: false,
         multiWarehouseEnabled: false,
@@ -356,6 +357,13 @@ export async function createOnlineStore(
         setupProgress: { business: true, online_store: true },
       },
     });
+
+    if (isPrimary) {
+      await tx.vendor.updateMany({
+        where: { businessAccountId, id: { not: vendor.id }, isPrimaryStore: true },
+        data: { isPrimaryStore: false },
+      });
+    }
 
     const outletId = await ensureDefaultOutletForStore(tx, {
       businessAccountId,

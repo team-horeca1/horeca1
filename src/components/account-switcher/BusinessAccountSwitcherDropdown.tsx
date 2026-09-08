@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { ACCOUNT_SWITCHER_OPEN_EVENT } from '@/lib/accountSwitcherEvents';
+import { setEnteredStore } from '@/lib/supplierPortalLevel';
 
 type Portal = 'vendor' | 'brand' | 'customer' | 'admin';
 
@@ -63,6 +64,7 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
     hcidDisplay,
     availableStores, activeVendorId,
     switchAccount,
+    switchOnlineStore,
     signOut,
   } = useBusinessAccountSwitcher();
 
@@ -247,6 +249,42 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
                       >
                         {badge.label}
                       </span>
+                    </div>
+                    {isCurrent && <Check size={14} className="text-primary shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {isVendorPortal && activeStores.length > 0 && (
+            <div className="py-1 border-b border-[#F0F0F0] max-h-[240px] overflow-y-auto">
+              <p className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#AEAEAE]">
+                Switch store
+              </p>
+              {activeStores.map((store) => {
+                const isCurrent = store.id === activeStore?.id;
+                return (
+                  <button
+                    key={store.id}
+                    type="button"
+                    disabled={switching}
+                    onClick={async () => {
+                      try {
+                        await switchOnlineStore(store.id, currentAccount?.id);
+                        setEnteredStore(true);
+                        setIsOpen(false);
+                        window.location.assign('/vendor/dashboard');
+                      } catch {
+                        /* hook toasts / throws */
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-ivory transition-colors text-left disabled:opacity-70"
+                  >
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-primary-light">
+                      <Store size={13} className="text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-[#181725] truncate">{store.displayName}</p>
                     </div>
                     {isCurrent && <Check size={14} className="text-primary shrink-0" />}
                   </button>

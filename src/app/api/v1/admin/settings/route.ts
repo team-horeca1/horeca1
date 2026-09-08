@@ -8,6 +8,8 @@ import { requirePermission } from '@/lib/permissions/engine';
 import { prisma } from '@/lib/prisma';
 import { errorResponse } from '@/middleware/errorHandler';
 import type { PlatformSetting } from '@prisma/client';
+import { normalizeGstSlabs } from '@/lib/constants/gstSlabs';
+import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
 function serialize(s: PlatformSetting) {
   return {
@@ -20,6 +22,7 @@ function serialize(s: PlatformSetting) {
     emailNotifications: s.emailNotifications,
     smsNotifications: s.smsNotifications,
     pushNotifications: s.pushNotifications,
+    gstSlabs: normalizeGstSlabs(s.gstSlabs),
     updatedAt: s.updatedAt,
   };
 }
@@ -48,6 +51,7 @@ const patchSchema = z.object({
   emailNotifications: z.boolean().optional(),
   smsNotifications: z.boolean().optional(),
   pushNotifications: z.boolean().optional(),
+  gstSlabs: z.array(z.number().min(0).max(100)).min(1).optional(),
 });
 
 export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
@@ -68,7 +72,15 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         ...(input.emailNotifications !== undefined && { emailNotifications: input.emailNotifications }),
         ...(input.smsNotifications !== undefined && { smsNotifications: input.smsNotifications }),
         ...(input.pushNotifications !== undefined && { pushNotifications: input.pushNotifications }),
+        ...(input.gstSlabs !== undefined && { gstSlabs: normalizeGstSlabs(input.gstSlabs) }),
       },
+    });
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.settingsUpdate,
+      entity: 'PlatformSetting',
+      entityId: current.id,
+      before: serialize(current),
+      after: serialize(updated),
     });
     return NextResponse.json({ success: true, data: serialize(updated) });
   } catch (error) {

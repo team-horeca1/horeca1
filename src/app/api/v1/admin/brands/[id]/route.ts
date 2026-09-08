@@ -12,6 +12,7 @@ import { errorResponse, Errors } from '@/middleware/errorHandler';
 import type { AuthContext } from '@/middleware/auth';
 import { getAdminRevealedPasswordForRole } from '@/lib/adminPasswordReveal';
 import { hardDeleteBrandById } from '@/lib/userHardDelete';
+import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
 // Lenient — admin should be able to save partial/legacy data.
 // Empty strings → null (frontend already does this). URLs not strictly validated
@@ -94,11 +95,39 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
     const body = await req.json();
     const input = patchSchema.parse(body);
 
+    const existing = await prisma.brand.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        isActive: true,
+        marketplaceVisibility: true,
+        logoUrl: true,
+        bannerUrl: true,
+      },
+    });
+    if (!existing) throw Errors.notFound('Brand');
+
     const updated = await prisma.brand.update({
       where: { id },
       data: {
         ...input,
         ...(input.name ? { slug: slugify(input.name) } : {}),
+      },
+    });
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.brandUpdate,
+      entity: 'Brand',
+      entityId: id,
+      before: existing,
+      after: {
+        name: updated.name,
+        slug: updated.slug,
+        isActive: updated.isActive,
+        marketplaceVisibility: updated.marketplaceVisibility,
+        logoUrl: updated.logoUrl,
+        bannerUrl: updated.bannerUrl,
       },
     });
     return NextResponse.json({ success: true, data: updated });

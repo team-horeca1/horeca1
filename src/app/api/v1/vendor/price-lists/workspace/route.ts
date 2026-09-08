@@ -40,6 +40,8 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     const where: Prisma.ProductWhereInput = {
       vendorId,
       isActive: true,
+      approvalStatus: 'approved',
+      listingStatus: 'submitted',
       ...NOT_TOMBSTONED,
       ...(categoryId ? { categoryId } : {}),
       // Brand filter: product is mapped to this brand via a verified or
@@ -185,7 +187,7 @@ export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {
     const productIds = [...new Set(cells.map((c) => c.productId))];
     const [validLists, validProducts] = await Promise.all([
       prisma.priceList.findMany({ where: { id: { in: listIds }, vendorId }, select: { id: true } }),
-      prisma.product.findMany({ where: { id: { in: productIds }, vendorId }, select: { id: true } }),
+      prisma.product.findMany({ where: { id: { in: productIds }, vendorId, isActive: true, approvalStatus: 'approved' }, select: { id: true } }),
     ]);
     const okList = new Set(validLists.map((l) => l.id));
     const okProduct = new Set(validProducts.map((p) => p.id));

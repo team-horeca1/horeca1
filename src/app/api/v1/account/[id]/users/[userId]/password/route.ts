@@ -10,6 +10,7 @@ import { withAuth } from '@/middleware/auth';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { assertCanMutateAccount } from '@/lib/accountAccess';
+import { assertCanManageMemberPassword } from '@/lib/teamMembership';
 
 const schema = z.object({
   password: z.string().min(6).max(72),
@@ -34,6 +35,8 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
       select: { id: true },
     });
     if (!membership) throw Errors.notFound('Member not found in this account');
+
+    await assertCanManageMemberPassword(userId, id);
 
     const { password } = schema.parse(await req.json());
     const hashed = await bcrypt.hash(password, 12);

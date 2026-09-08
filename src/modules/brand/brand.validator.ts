@@ -86,7 +86,7 @@ export type BrandSubmitDetail = z.infer<typeof brandSubmitDetailSchema>;
 export const brandMasterSubmitSchema = z
   .object({
     name: z.string().min(2).max(255),
-    sku: z.string().min(2).max(40),
+    sku: z.string().max(40).optional(),
     categoryId: z.string().uuid(),
     imageUrl: z.string().url().optional(),
     /** Brand form sends `uom`; maps to MasterProduct.uom / BrandMasterProduct.unit. */
@@ -96,6 +96,12 @@ export const brandMasterSubmitSchema = z
   .merge(brandSubmitDetailSchema);
 
 export type BrandMasterSubmitInput = z.infer<typeof brandMasterSubmitSchema>;
+
+export const brandMasterUpdateSchema = brandMasterSubmitSchema.partial().extend({
+  categoryIds: z.array(z.string().uuid()).max(12).optional(),
+});
+
+export type BrandMasterUpdateInput = z.infer<typeof brandMasterUpdateSchema>;
 
 export const BRAND_SUBMIT_DETAILS_META_KEY = 'brandDetails' as const;
 

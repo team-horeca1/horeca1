@@ -494,7 +494,7 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
       });
       const json = await parseJsonResponse<{
         success?: boolean;
-        data?: TeamMember & { inviteMeta?: InviteMeta };
+        data?: TeamMember & { inviteMeta?: InviteMeta; existingUser?: boolean };
         error?: { message?: string; details?: { field?: string } };
       }>(res);
       if (!json.success) {
@@ -515,6 +515,9 @@ export function AddMemberWizard({ roles, onClose, onInvited, config }: AddMember
         setInviteMeta(meta);
         setSavedMemberData(json.data);
       } else {
+        if (json.data?.existingUser) {
+          toast.success('Member added. They already have a Horeca1 account — they log in with their own credentials.');
+        }
         onInvited(json.data);
         onClose();
       }

@@ -263,10 +263,15 @@ export async function assertVendorCouponScope(
 ): Promise<void> {
   if (scope.productIds && scope.productIds.length > 0) {
     const owned = await db.product.count({
-      where: { id: { in: scope.productIds }, vendorId },
+      where: {
+        id: { in: scope.productIds },
+        vendorId,
+        isActive: true,
+        approvalStatus: 'approved',
+      },
     });
     if (owned !== scope.productIds.length) {
-      throw Errors.badRequest('One or more selected products do not belong to your store');
+      throw Errors.badRequest('One or more selected products are not approved or do not belong to your store');
     }
   }
 

@@ -13,6 +13,7 @@ export function defaultPortalPath(account: AccountPortalCaps): string {
 
 /** Whether this account may use routes under the given pathname prefix. */
 export function accountCanAccessPath(pathname: string, account: AccountPortalCaps): boolean {
+  if (pathname === '/brand/register' || pathname === '/vendor/register') return true;
   if (pathname.startsWith('/vendor')) return account.isVendor;
   if (pathname.startsWith('/brand')) return account.isBrand;
   return true;

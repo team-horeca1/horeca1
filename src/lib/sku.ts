@@ -1,7 +1,7 @@
 import type { PrismaClient, Prisma } from '@prisma/client';
 
-// Horeca1 auto-SKU format: "H1-SKU-00001" (fallback for imports/backfill only).
-// Admin-entered SKUs (e.g. RIC-BAS-001) are the canonical identifier for new masters.
+// Horeca1 auto-SKU format: "H1-SKU-00001" — default for new master catalog items.
+// Admin-entered SKUs (e.g. RIC-BAS-001) are an optional override.
 export const MASTER_SKU_PREFIX = 'H1-SKU-';
 
 /** Valid admin-entered master SKU: 2–40 chars, alphanumeric + hyphens/underscores. */
@@ -29,23 +29,20 @@ export function formatMasterSku(n: number): string {
 type Db = PrismaClient | Prisma.TransactionClient;
 
 /**
- * Next available master SKU. Reads the highest existing sku and increments.
+ * Next available master SKU. Reads the highest numeric H1-SKU-* suffix and increments.
  * Call inside the same transaction as the create to avoid a race under
  * concurrent master-product creation.
  */
 export async function nextMasterSku(db: Db): Promise<string> {
-  const last = await db.masterProduct.findFirst({
-    where: {
-      sku: {
-        startsWith: MASTER_SKU_PREFIX,
-      },
-    },
-    orderBy: { sku: 'desc' },
-    select: { sku: true },
-  });
-  const lastNum = last?.sku.match(/(\d+)\s*$/)?.[1];
-  const next = lastNum ? parseInt(lastNum, 10) + 1 : 1;
-  return formatMasterSku(next);
+  const rows = await db.$queryRaw<Array<{ max: number | bigint | null }>>`
+    SELECT MAX(CAST(SUBSTRING(sku FROM 8) AS INTEGER)) AS max
+    FROM master_products
+    WHERE sku LIKE 'H1-SKU-%'
+      AND sku ~ '^H1-SKU-[0-9]+$'
+  `;
+  const raw = rows[0]?.max;
+  const last = raw == null ? 0 : Number(raw);
+  return formatMasterSku(Number.isFinite(last) ? last + 1 : 1);
 }
 
 // Vendor listing SKU: `{vendorCode}-{posSku}` (e.g. MAN-MANJRSYP123).

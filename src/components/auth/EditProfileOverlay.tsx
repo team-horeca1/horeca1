@@ -20,6 +20,7 @@ export interface EditProfileFormData {
     latitude?: number | null;
     longitude?: number | null;
     placeId?: string;
+    verificationToken?: string;
 }
 
 interface EditProfileOverlayProps {
@@ -57,6 +58,7 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
     // Phone-change OTP state
     const [otpSent, setOtpSent] = useState(false);
     const [phoneVerified, setPhoneVerified] = useState(false);
+    const [verificationToken, setVerificationToken] = useState<string | null>(null);
     const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '']);
     const [otpLoading, setOtpLoading] = useState(false);
     const [resendTimer, setResendTimer] = useState(0);
@@ -73,6 +75,7 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
     const resetOtpState = useCallback(() => {
         setOtpSent(false);
         setPhoneVerified(false);
+        setVerificationToken(null);
         setOtpDigits(['', '', '', '']);
         setResendTimer(0);
         if (timerRef.current) clearInterval(timerRef.current);
@@ -137,6 +140,7 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
         latitude,
         longitude,
         placeId: placeId || undefined,
+        ...(verificationToken ? { verificationToken } : {}),
     });
 
     const persistSave = async () => {
@@ -213,6 +217,9 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                 setOtpDigits(['', '', '', '']);
                 setTimeout(() => otpRefs[0].current?.focus(), 50);
                 return;
+            }
+            if (typeof data.verificationToken === 'string') {
+                setVerificationToken(data.verificationToken);
             }
             setPhoneVerified(true);
             // Verified — persist profile including the new phone

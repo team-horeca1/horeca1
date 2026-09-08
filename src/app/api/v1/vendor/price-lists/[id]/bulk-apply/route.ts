@@ -53,7 +53,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
 
     // Only operate on products that belong to this vendor.
     const products = await prisma.product.findMany({
-      where: { id: { in: body.productIds }, vendorId },
+      where: { id: { in: body.productIds }, vendorId, isActive: true, approvalStatus: 'approved' },
       select: { id: true, basePrice: true },
     });
 

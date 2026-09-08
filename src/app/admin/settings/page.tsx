@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { Settings, Bell, Building2, User, Save, Check, AlertCircle } from 'lucide-react';
+import { Settings, Bell, Building2, User, Save, Check, AlertCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PlatformFeeCalculator } from '@/components/features/vendor/finance/EarningsBreakdown';
+import { DEFAULT_GST_SLABS, normalizeGstSlabs } from '@/lib/constants/gstSlabs';
 
 export default function SettingsPage() {
     const { data: session } = useSession();
@@ -23,6 +24,8 @@ export default function SettingsPage() {
     const [emailNotifications, setEmailNotifications] = useState(true);
     const [smsNotifications, setSmsNotifications] = useState(true);
     const [pushNotifications, setPushNotifications] = useState(false);
+    const [gstSlabs, setGstSlabs] = useState<number[]>([...DEFAULT_GST_SLABS]);
+    const [gstDraft, setGstDraft] = useState('');
 
     // Toast state
     const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' } | null>(null);
@@ -48,6 +51,7 @@ export default function SettingsPage() {
                 setEmailNotifications(!!d.emailNotifications);
                 setSmsNotifications(!!d.smsNotifications);
                 setPushNotifications(!!d.pushNotifications);
+                if (Array.isArray(d.gstSlabs)) setGstSlabs(normalizeGstSlabs(d.gstSlabs));
             })
             .catch(() => { /* keep defaults if the fetch fails */ });
     }, []);
@@ -76,6 +80,7 @@ export default function SettingsPage() {
                 defaultCommissionPct: Number(platformFeePct) || 0,
                 minOrderValue: Number(minOrderValue) || 0,
                 freeDeliveryThreshold: Number(freeDeliveryThreshold) || 0,
+                gstSlabs: normalizeGstSlabs(gstSlabs),
             },
             'Business settings saved',
         );
@@ -192,6 +197,66 @@ export default function SettingsPage() {
                             onChange={(e) => setFreeDeliveryThreshold(e.target.value)}
                             className="w-full bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-3 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#6B1D2E]/40 focus:bg-white transition-all"
                         />
+                    </div>
+                    <div>
+                        <label className="block text-[13px] font-bold text-[#4B4B4B] mb-1.5">GST slabs (%)</label>
+                        <p className="text-[11px] text-[#AEAEAE] mb-2">
+                            Options shown in the product Tax % dropdown. Government rates by default.
+                        </p>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                            {gstSlabs.map((slab) => (
+                                <span
+                                    key={slab}
+                                    className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-[#F8E8EC] text-[#6B1D2E] text-[13px] font-bold"
+                                >
+                                    {slab}%
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (gstSlabs.length <= 1) return;
+                                            setGstSlabs((prev) => prev.filter((n) => n !== slab));
+                                        }}
+                                        className="hover:text-[#DC2626] disabled:opacity-30"
+                                        disabled={gstSlabs.length <= 1}
+                                        aria-label={`Remove ${slab}%`}
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </span>
+                            ))}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                value={gstDraft}
+                                onChange={(e) => setGstDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key !== 'Enter') return;
+                                    e.preventDefault();
+                                    const n = Number(gstDraft);
+                                    if (!Number.isFinite(n) || n < 0 || n > 100) return;
+                                    setGstSlabs((prev) => normalizeGstSlabs([...prev, n]));
+                                    setGstDraft('');
+                                }}
+                                placeholder="Add slab, e.g. 18"
+                                className="flex-1 bg-[#F8F9FB] border border-[#EEEEEE] rounded-[10px] py-2.5 px-4 text-[14px] font-medium text-[#181725] outline-none focus:border-[#6B1D2E]/40 focus:bg-white transition-all"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const n = Number(gstDraft);
+                                    if (!Number.isFinite(n) || n < 0 || n > 100) return;
+                                    setGstSlabs((prev) => normalizeGstSlabs([...prev, n]));
+                                    setGstDraft('');
+                                }}
+                                className="h-11 px-4 rounded-[10px] border border-[#EEEEEE] text-[13px] font-bold text-[#181725] hover:bg-[#F5F5F5]"
+                            >
+                                Add
+                            </button>
+                        </div>
                     </div>
                 </div>
 

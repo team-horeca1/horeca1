@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import {
   ArrowLeft, ArrowRight, Loader2, CheckCircle2, Phone, Building2, Sparkles,
@@ -59,6 +59,7 @@ export default function BrandRegisterPage() {
   const [verifyChannel, setVerifyChannel] = useState<'phone' | 'email'>('phone');
   const [registerEmail, setRegisterEmail] = useState('');
   const [emailVerified, setEmailVerified] = useState(false);
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '']);
   const [otpLoading, setOtpLoading] = useState(false);
@@ -82,6 +83,7 @@ export default function BrandRegisterPage() {
     suggestedAction: 'login_to_link' | 'login_only';
     contactType?: 'phone' | 'email';
   } | null>(null);
+  const [linkExistingUser, setLinkExistingUser] = useState(false);
 
   const authSeedDone = useRef(false);
   useEffect(() => {
@@ -129,6 +131,7 @@ export default function BrandRegisterPage() {
     setOtpSent(false);
     setPhoneVerified(false);
     setEmailVerified(false);
+    setVerificationToken(null);
     setOtpDigits(['', '', '', '']);
   };
 
@@ -176,8 +179,14 @@ export default function BrandRegisterPage() {
           });
           const checkData = await checkRes.json();
           if (checkData.success && checkData.data?.exists) {
-            openExistingPhoneModal(email, checkData.data as PhoneCheckResult, 'email');
-            return;
+            const check = checkData.data as PhoneCheckResult;
+            if (check.suggestedAction === 'login_only') {
+              openExistingPhoneModal(email, check, 'email');
+              return;
+            }
+            setLinkExistingUser(check.suggestedAction === 'login_to_link');
+          } else {
+            setLinkExistingUser(false);
           }
         } else {
           const checkRes = await fetch('/api/v1/auth/check-phone', {
@@ -187,8 +196,14 @@ export default function BrandRegisterPage() {
           });
           const checkData = await checkRes.json();
           if (checkData.success && checkData.data?.exists) {
-            openExistingPhoneModal(digits, checkData.data as PhoneCheckResult, 'phone');
-            return;
+            const check = checkData.data as PhoneCheckResult;
+            if (check.suggestedAction === 'login_only') {
+              openExistingPhoneModal(digits, check, 'phone');
+              return;
+            }
+            setLinkExistingUser(check.suggestedAction === 'login_to_link');
+          } else {
+            setLinkExistingUser(false);
           }
         }
       }
@@ -204,6 +219,10 @@ export default function BrandRegisterPage() {
       });
       const data = await res.json();
       if (!data.success) {
+        if (data.code === 'EMAIL_EXISTS' && data.data) {
+          openExistingPhoneModal(email, data.data as PhoneCheckResult, 'email');
+          return;
+        }
         setError(data.error || 'Failed to send OTP');
         return;
       }
@@ -229,6 +248,30 @@ export default function BrandRegisterPage() {
     setOtpLoading(true);
     setError('');
     try {
+      if (linkExistingUser) {
+        const result = await signIn('otp', {
+          phone: useEmail ? '' : digits,
+          loginEmail: useEmail ? email : '',
+          code,
+          isRegister: 'false',
+          redirect: false,
+        });
+        if (result?.error) {
+          setError('Invalid or expired OTP');
+          setOtpDigits(['', '', '', '']);
+          otpRefs[0].current?.focus();
+          return;
+        }
+        if (useEmail) {
+          setEmailVerified(true);
+          setProfile(prev => ({ ...prev, email }));
+        } else {
+          setPhoneVerified(true);
+          setProfile(prev => ({ ...prev, phone: digits, mobilePhone: digits }));
+        }
+        setStep(2);
+        return;
+      }
       const res = await fetch('/api/v1/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -244,6 +287,9 @@ export default function BrandRegisterPage() {
         setOtpDigits(['', '', '', '']);
         otpRefs[0].current?.focus();
         return;
+      }
+      if (typeof data.verificationToken === 'string') {
+        setVerificationToken(data.verificationToken);
       }
       if (useEmail) {
         setEmailVerified(true);
@@ -350,6 +396,7 @@ export default function BrandRegisterPage() {
         verifiedEmail: emailVerified ? verifiedEmail : '',
         email: profile.email?.trim().toLowerCase() || (emailVerified ? verifiedEmail : ''),
         password: password || undefined,
+        verificationToken: verificationToken || undefined,
       };
 
       const res = await fetch('/api/v1/brand/onboarding/submit', {

@@ -11,7 +11,6 @@
  */
 
 import { z } from 'zod';
-import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 
 export const GST_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 export const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
@@ -76,32 +75,16 @@ const VendorDetailsSchemaBase = z.object({
   monthlySupplyBand: z.string().max(50).optional(),
 });
 
-export function vendorDetailsSchema(relaxedContact = isRegisterEmailOtpEnabled()) {
+export function vendorDetailsSchema(_relaxedContact?: boolean) {
   return VendorDetailsSchemaBase.superRefine((data, ctx) => {
     const authPhone = (data.authorizedPersonPhone ?? '').replace(/\D/g, '').slice(-10);
     const authEmail = (data.authorizedPersonEmail ?? '').trim().toLowerCase();
 
-    if (relaxedContact) {
-      const hasPhone = authPhone.length === 10;
-      const hasEmail = !!authEmail && EMAIL_RE.test(authEmail);
-      if (!hasPhone && !hasEmail) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['authorizedPersonPhone'],
-          message: 'Enter a mobile number or email for the authorized person',
-        });
-      } else if (authPhone && authPhone.length !== 10) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['authorizedPersonPhone'],
-          message: 'Invalid authorized person phone',
-        });
-      }
-    } else if (!PHONE_RE.test(authPhone)) {
+    if (!PHONE_RE.test(authPhone)) {
       ctx.addIssue({
         code: 'custom',
         path: ['authorizedPersonPhone'],
-        message: 'Invalid authorized person phone',
+        message: 'Enter a valid 10-digit mobile number',
       });
     }
 

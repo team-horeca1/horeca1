@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signOut, useSession } from 'next-auth/react';
+import { signIn, signOut, useSession } from 'next-auth/react';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import {
   ArrowLeft, ArrowRight, Loader2, CheckCircle2, Phone, Building2, FileText, Landmark,
@@ -166,6 +166,7 @@ export default function VendorRegisterPage() {
   const [verifyChannel, setVerifyChannel] = useState<'phone' | 'email'>('phone');
   const [registerEmail, setRegisterEmail] = useState('');
   const [emailVerified, setEmailVerified] = useState(false);
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
   const [otpDigits, setOtpDigits] = useState(['', '', '', '']);
   const [otpLoading, setOtpLoading] = useState(false);
@@ -220,6 +221,7 @@ export default function VendorRegisterPage() {
     suggestedAction: 'login_to_link' | 'login_only';
     contactType?: 'phone' | 'email';
   } | null>(null);
+  const [linkExistingUser, setLinkExistingUser] = useState(false);
 
   const getMergedVendorProfile = useCallback((): VendorProfileInput => ({
     ...vendorProfile,
@@ -273,9 +275,48 @@ export default function VendorRegisterPage() {
     fetch('/api/v1/auth/me').then(r => r.json()).then(j => {
       if (!j.success) return;
       const me = j.data ?? {};
-      if (me.phone) setPhone(prev => prev || String(me.phone));
-      if (me.fullName) setFullName(prev => prev || String(me.fullName));
-      if (me.email) setEmail(prev => prev || String(me.email));
+      const digits = String(me.phone ?? '').replace(/\D/g, '').slice(-10);
+      const name = String(me.fullName ?? '').trim();
+      const emailFromMe = String(me.email ?? '').trim();
+      const nameParts = name ? name.split(/\s+/) : [];
+      const firstFromName = nameParts[0] ?? '';
+      const lastFromName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+      if (digits.length === 10) {
+        setPhone(prev => prev || digits);
+        setAuthorizedPersonPhone(prev => prev || digits);
+      }
+      if (name) {
+        setFullName(prev => prev || name);
+        setAuthorizedPersonName(prev => prev || name);
+      }
+      if (emailFromMe) {
+        setEmail(prev => prev || emailFromMe);
+        setAuthorizedPersonEmail(prev => prev || emailFromMe);
+      }
+
+      setVendorProfile(prev => {
+        const phoneToUse = prev.phone || prev.mobilePhone || prev.authorizedPersonPhone
+          || (digits.length === 10 ? digits : '');
+        return {
+          ...prev,
+          ...(phoneToUse ? {
+            phone: phoneToUse,
+            mobilePhone: phoneToUse,
+            authorizedPersonPhone: phoneToUse,
+          } : {}),
+          ...(emailFromMe && !prev.email && !prev.authorizedPersonEmail ? {
+            email: emailFromMe,
+            authorizedPersonEmail: emailFromMe,
+          } : {}),
+          ...(name && !prev.authorizedPersonName && !prev.fullName ? {
+            authorizedPersonName: name,
+            fullName: name,
+          } : {}),
+          ...(firstFromName && !prev.firstName ? { firstName: firstFromName } : {}),
+          ...(lastFromName && !prev.lastName ? { lastName: lastFromName } : {}),
+        };
+      });
     }).catch(() => { /* prefill is optional */ });
   }, [isAuthMode]);
 
@@ -383,6 +424,7 @@ export default function VendorRegisterPage() {
     setOtpSent(false);
     setPhoneVerified(false);
     setEmailVerified(false);
+    setVerificationToken(null);
     setOtpDigits(['', '', '', '']);
   };
 
@@ -427,8 +469,14 @@ export default function VendorRegisterPage() {
           });
           const checkData = await checkRes.json();
           if (checkData.success && checkData.data?.exists) {
-            openExistingPhoneModal(email, checkData.data as PhoneCheckResult, 'email');
-            return;
+            const check = checkData.data as PhoneCheckResult;
+            if (check.suggestedAction === 'login_only') {
+              openExistingPhoneModal(email, check, 'email');
+              return;
+            }
+            setLinkExistingUser(check.suggestedAction === 'login_to_link');
+          } else {
+            setLinkExistingUser(false);
           }
         } else {
           const checkRes = await fetch('/api/v1/auth/check-phone', {
@@ -438,8 +486,14 @@ export default function VendorRegisterPage() {
           });
           const checkData = await checkRes.json();
           if (checkData.success && checkData.data?.exists) {
-            openExistingPhoneModal(phone, checkData.data as PhoneCheckResult, 'phone');
-            return;
+            const check = checkData.data as PhoneCheckResult;
+            if (check.suggestedAction === 'login_only') {
+              openExistingPhoneModal(phone, check, 'phone');
+              return;
+            }
+            setLinkExistingUser(check.suggestedAction === 'login_to_link');
+          } else {
+            setLinkExistingUser(false);
           }
         }
       }
@@ -456,8 +510,11 @@ export default function VendorRegisterPage() {
       const data = await res.json();
       if (!data.success) {
         if (data.code === 'EMAIL_EXISTS' && data.data) {
-          openExistingPhoneModal(email, data.data as PhoneCheckResult, 'email');
-          return;
+          const check = data.data as PhoneCheckResult;
+          if (check.suggestedAction === 'login_only') {
+            openExistingPhoneModal(email, check, 'email');
+            return;
+          }
         }
         setError(data.error || 'Failed to send OTP');
         return;
@@ -481,6 +538,40 @@ export default function VendorRegisterPage() {
     });
     const useEmail = channel === 'email';
     try {
+      if (linkExistingUser) {
+        const result = await signIn('otp', {
+          phone: useEmail ? '' : phone,
+          loginEmail: useEmail ? email : '',
+          code,
+          isRegister: 'false',
+          redirect: false,
+        });
+        if (result?.error) {
+          setError('Invalid or expired OTP');
+          setOtpDigits(['', '', '', '']);
+          setTimeout(() => otpRefs[0].current?.focus(), 50);
+          return;
+        }
+        if (useEmail) {
+          setEmailVerified(true);
+          setEmail(email);
+          setAuthorizedPersonEmail(email);
+        } else {
+          setPhoneVerified(true);
+        }
+        const supplierName = fullName.trim();
+        if (supplierName.length >= 2) {
+          setAuthorizedPersonName(prev => prev.trim() || supplierName);
+          setVendorProfile(prev => ({
+            ...prev,
+            fullName: supplierName,
+            authorizedPersonName: (prev.authorizedPersonName ?? '').trim() || supplierName,
+          }));
+        }
+        setStep(2);
+        setMaxReached((m) => Math.max(m, 2));
+        return;
+      }
       const res = await fetch('/api/v1/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -496,6 +587,9 @@ export default function VendorRegisterPage() {
         setOtpDigits(['', '', '', '']);
         setTimeout(() => otpRefs[0].current?.focus(), 50);
         return;
+      }
+      if (typeof data.verificationToken === 'string') {
+        setVerificationToken(data.verificationToken);
       }
       if (useEmail) {
         setEmailVerified(true);
@@ -726,6 +820,7 @@ export default function VendorRegisterPage() {
         fd.append('vendorId', vendorId);
         fd.append('type', type);
         fd.append('file', file);
+        if (verificationToken) fd.append('verificationToken', verificationToken);
         return fetch('/api/v1/vendor/onboarding/documents', { method: 'POST', body: fd });
       }),
     );
@@ -812,8 +907,6 @@ export default function VendorRegisterPage() {
             businessSize: vendorProfile.businessSize,
             coverage: vendorProfile.coverage,
             warehouseCount: vendorProfile.warehouseCount,
-            deliveryFleet: vendorProfile.deliveryFleet,
-            monthlySupplyBand: vendorProfile.monthlySupplyBand,
             panNumber: (panNumber || vendorProfile.pan || '').toUpperCase().trim(),
             authorizedPersonName: derivedAuthorizedPersonName(vendorProfile),
             authorizedPersonPhone: authPhone.length === 10 ? authPhone : '',
@@ -875,8 +968,6 @@ export default function VendorRegisterPage() {
         businessSize: vendorProfile.businessSize,
         coverage: vendorProfile.coverage,
         warehouseCount: vendorProfile.warehouseCount,
-        deliveryFleet: vendorProfile.deliveryFleet,
-        monthlySupplyBand: vendorProfile.monthlySupplyBand,
         fullName: ownerName,
         businessName: legal,
         tradeName: trade,
@@ -903,6 +994,7 @@ export default function VendorRegisterPage() {
         deliveryCapability,
         udyamNumber: udyamNumber.trim(),
         cinNumber: cinNumber.trim(),
+        verificationToken: verificationToken || undefined,
       };
       const res = await fetch('/api/v1/vendor/onboarding/submit', {
         method: 'POST',
@@ -1311,7 +1403,16 @@ export default function VendorRegisterPage() {
                 <p className="text-[12px] text-gray-400 mt-1.5">Shown to customers on the marketplace as your store name.</p>
               </div>
               <VendorProfileForm
-                value={{ ...vendorProfile, fullName, email, password }}
+                value={{
+                  ...vendorProfile,
+                  fullName,
+                  email,
+                  password,
+                  phone: vendorProfile.phone || vendorProfile.mobilePhone || vendorProfile.authorizedPersonPhone || phone,
+                  mobilePhone: vendorProfile.mobilePhone || vendorProfile.phone || phone,
+                  authorizedPersonPhone:
+                    vendorProfile.authorizedPersonPhone || authorizedPersonPhone || phone,
+                }}
                 onChange={patch => {
                   setVendorProfile(prev => ({ ...prev, ...patch }));
                   if (patch.fullName !== undefined) setFullName(patch.fullName);
@@ -1321,8 +1422,13 @@ export default function VendorRegisterPage() {
                   if (patch.tradeName !== undefined) setTradeName(patch.tradeName);
                   if (patch.displayName !== undefined) setTradeName(patch.displayName);
                   if (patch.authorizedPersonName !== undefined) setAuthorizedPersonName(patch.authorizedPersonName);
-                  if (patch.authorizedPersonPhone !== undefined) setAuthorizedPersonPhone(patch.authorizedPersonPhone);
                   if (patch.authorizedPersonEmail !== undefined) setAuthorizedPersonEmail(patch.authorizedPersonEmail);
+                  const nextPhone = patch.authorizedPersonPhone ?? patch.phone ?? patch.mobilePhone;
+                  if (nextPhone !== undefined) {
+                    const digits = String(nextPhone).replace(/\D/g, '').slice(-10);
+                    setAuthorizedPersonPhone(digits);
+                    setPhone(digits);
+                  }
                 }}
                 errors={fieldErrors}
                 onFieldBlur={(field, value) => setFE(field, validateVendorFieldBlur(field, value))}
@@ -1332,6 +1438,11 @@ export default function VendorRegisterPage() {
                 onPasswordChange={setPassword}
                 layout="wide"
               />
+              {isAuthMode && (
+                <p className="text-[12px] text-gray-400 mt-3">
+                  Mobile and email are filled from your Horeca1 account. You can change them for this store — it does not change your login.
+                </p>
+              )}
             </section>
           )}
 

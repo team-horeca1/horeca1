@@ -5,6 +5,7 @@ import { sendPhoneOtp } from '@/lib/providers/otpSms';
 import { withRateLimit } from '@/middleware/withRateLimit';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 import { lookupEmailForRegistration, type EmailCheckIntent } from '@/lib/auth/checkEmailLookup';
+import { normalizePhone } from '@/lib/phone';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -43,44 +44,51 @@ async function postHandler(req: NextRequest) {
     const mode: 'login' | 'register' = body.mode === 'register' ? 'register' : 'login';
     const intent = parseIntent(body.intent);
 
-    const rawPhone = String(body.phone ?? '').replace(/\D/g, '');
-    const phone = rawPhone.length === 12 ? rawPhone.replace(/^91/, '') : rawPhone;
+    const rawPhoneInput = String(body.phone ?? '').trim();
+    const hasPhoneInput = !!rawPhoneInput;
+    const phone = normalizePhone(rawPhoneInput);
     const email = String(body.email ?? '').trim().toLowerCase();
 
-    const usePhone = !!phone;
-    const useEmail = !usePhone && !!email;
+    const hasEmailInput = !!email;
+    const phoneValid = !!phone;
+    const emailValid = EMAIL_RE.test(email);
 
-    if (!usePhone && !useEmail) {
+    // Register may send the same OTP to phone + email. Login stays exclusive.
+    const usePhone = phoneValid;
+    const useEmail = emailValid && (mode === 'register' || !usePhone);
+    const dualRegister = mode === 'register' && usePhone && useEmail;
+
+    if (!hasPhoneInput && !hasEmailInput) {
       return NextResponse.json(
         { success: false, error: 'Provide a phone number or email' },
         { status: 400 }
       );
     }
 
-    if (usePhone && !/^\d{10}$/.test(phone)) {
+    if (hasPhoneInput && !phoneValid) {
       return NextResponse.json(
         { success: false, error: 'Enter a valid 10-digit phone number' },
         { status: 400 }
       );
     }
 
-    if (useEmail && !EMAIL_RE.test(email)) {
+    if (hasEmailInput && !emailValid) {
       return NextResponse.json(
         { success: false, error: 'Enter a valid email address' },
         { status: 400 }
       );
     }
 
-    if (useEmail && mode === 'register' && !isRegisterEmailOtpEnabled()) {
+    if (useEmail && !usePhone && mode === 'register' && !isRegisterEmailOtpEnabled()) {
       return NextResponse.json(
         { success: false, error: 'Registration requires a phone number' },
         { status: 400 }
       );
     }
 
-    if (useEmail && mode === 'register' && isRegisterEmailOtpEnabled()) {
+    if (useEmail && mode === 'register') {
       const check = await lookupEmailForRegistration(email, intent);
-      if (check.exists) {
+      if (check.exists && check.suggestedAction === 'login_only') {
         return NextResponse.json(
           {
             success: false,
@@ -146,8 +154,26 @@ async function postHandler(req: NextRequest) {
       throw err;
     }
 
-    if (usePhone) await sendPhoneOtp(phone, otp);
-    else await dispatchEmailOTP(email, otp);
+    if (dualRegister) {
+      const results = await Promise.allSettled([
+        sendPhoneOtp(phone, otp),
+        dispatchEmailOTP(email, otp),
+      ]);
+      if (results[0].status === 'rejected') {
+        console.error('[otp/send] SMS failed', results[0].reason);
+        return NextResponse.json(
+          { success: false, error: 'Failed to send OTP. Please try again.' },
+          { status: 500 }
+        );
+      }
+      if (results[1].status === 'rejected') {
+        console.error('[otp/send] email OTP failed (phone delivered)', results[1].reason);
+      }
+    } else if (usePhone) {
+      await sendPhoneOtp(phone, otp);
+    } else {
+      await dispatchEmailOTP(email, otp);
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

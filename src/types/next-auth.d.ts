@@ -35,6 +35,7 @@ declare module 'next-auth' {
         displayName: string;
         isPrimaryStore: boolean;
         isActive: boolean;
+        defaultOutletId?: string | null;
       }>;
       isStoreScopedOnly?: boolean;
     };
@@ -76,6 +77,7 @@ declare module 'next-auth/jwt' {
       displayName: string;
       isPrimaryStore: boolean;
       isActive: boolean;
+      defaultOutletId?: string | null;
     }>;
     isStoreScopedOnly?: boolean;
     /** ms timestamp of User.updatedAt when permissions were last synced into this JWT */

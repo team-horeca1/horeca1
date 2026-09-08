@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Home, Package, Store, Clock, CheckCircle2, XCircle, Truck, CreditCard, Star, Loader2, X, ShoppingCart, FileDown, ClipboardList, RotateCcw, KeyRound } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Home, Package, Store, Clock, CheckCircle2, XCircle, Truck, CreditCard, Star, Loader2, X, ShoppingCart, FileDown, ClipboardList, RotateCcw, KeyRound, Zap, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useCart } from '@/context/CartContext';
@@ -16,6 +16,8 @@ import {
     orderTimelineCurrentKey,
 } from '@/components/features/finance/StatusTimeline';
 import CustomerReturnSection from '@/components/features/return/CustomerReturnSection';
+import { loadRazorpayScript, openRazorpayPopup } from '@/lib/razorpayClient';
+import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 
 interface ApiOrderItem {
     id: string;
@@ -99,6 +101,22 @@ function fmtTime(iso: string): string {
     } catch { return ''; }
 }
 
+interface CreditWalletLite {
+    vendorId: string | null;
+    status: string;
+    availableCredit: string | number;
+}
+
+const CREDIT_BLOCKED = new Set([
+    'BLACKLISTED', 'BLOCKED', 'FROZEN', 'SUSPENDED', 'EXPIRED', 'CANCELLED',
+]);
+
+function creditWalletUsable(wallet: CreditWalletLite | undefined, amount: number): boolean {
+    if (!wallet) return false;
+    if (CREDIT_BLOCKED.has(wallet.status)) return false;
+    return Number(wallet.availableCredit) >= amount;
+}
+
 function getImg(item: ApiOrderItem): string | null {
     return item.product?.imageUrl || item.product?.images?.[0] || null;
 }
@@ -132,16 +150,17 @@ export default function OrderDetailPage() {
         vendorNote?: string | null;
     } | null>(null);
 
-    React.useEffect(() => {
-        if (sessionStatus === 'unauthenticated') { router.push('/'); return; }
-        if (sessionStatus !== 'authenticated') return;
+    const [payingMethod, setPayingMethod] = React.useState<'online' | 'credit' | 'wallet' | null>(null);
+    const [vendorCredit, setVendorCredit] = React.useState<CreditWalletLite | null>(null);
+    const [platformCredit, setPlatformCredit] = React.useState<CreditWalletLite | null>(null);
+
+    const loadOrder = React.useCallback(() => {
         setLoading(true);
         setLoadFailed(false);
-        dal.orders.getById(orderId)
+        return dal.orders.getById(orderId)
             .then(async (result: unknown) => {
                 const r = result as { data?: ApiOrder } & ApiOrder;
                 const loaded = r.data ?? r;
-                // Fallback if order payload omitted review (older caches / race).
                 if (!loaded.review?.rating) {
                     try {
                         const existing = await dal.reviews.getOrderReview(orderId);
@@ -160,7 +179,13 @@ export default function OrderDetailPage() {
                 setLoadFailed(true);
             })
             .finally(() => setLoading(false));
-    }, [orderId, sessionStatus, router]);
+    }, [orderId]);
+
+    React.useEffect(() => {
+        if (sessionStatus === 'unauthenticated') { router.push('/'); return; }
+        if (sessionStatus !== 'authenticated') return;
+        void loadOrder();
+    }, [sessionStatus, router, loadOrder]);
 
     React.useEffect(() => {
         if (sessionStatus !== 'authenticated') return;
@@ -183,6 +208,105 @@ export default function OrderDetailPage() {
             image: getImg(item),
             packSize: '',
         }))))}&vendorId=${encodeURIComponent(order.vendor?.id || '')}&vendorName=${encodeURIComponent(order.vendor?.businessName || '')}`);
+    };
+
+    React.useEffect(() => {
+        if (sessionStatus !== 'authenticated' || !order) return;
+        if (order.paymentStatus !== 'unpaid' || !isOfflinePaymentMethod(order.paymentMethod)) return;
+        fetch('/api/v1/wallet')
+            .then((r) => r.json())
+            .then((d: { data?: CreditWalletLite[] }) => {
+                const wallets = d.data ?? [];
+                let vendor: CreditWalletLite | null = null;
+                let platform: CreditWalletLite | null = null;
+                for (const w of wallets) {
+                    if (w.vendorId === order.vendor.id) vendor = w;
+                    else if (!w.vendorId && platform === null) platform = w;
+                }
+                setVendorCredit(vendor);
+                setPlatformCredit(platform);
+            })
+            .catch(() => {
+                setVendorCredit(null);
+                setPlatformCredit(null);
+            });
+    }, [sessionStatus, order]);
+
+    const handlePayOnline = async () => {
+        if (!order) return;
+        setPayingMethod('online');
+        try {
+            await loadRazorpayScript();
+            const initiateRes = await fetch('/api/v1/payments/initiate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId: order.id }),
+            });
+            const initiateData = await initiateRes.json();
+            if (!initiateRes.ok) throw new Error(initiateData.error?.message || 'Payment initiation failed');
+            const { razorpay_order_id, amount, currency, key_id } = initiateData.data;
+            let payment;
+            try {
+                payment = await openRazorpayPopup({
+                    key: key_id,
+                    amount,
+                    currency,
+                    order_id: razorpay_order_id,
+                    description: `Order ${order.orderNumber}`,
+                });
+            } catch (popupErr) {
+                await fetch('/api/v1/payments/abandon', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ razorpay_order_id }),
+                }).catch(() => {});
+                throw popupErr;
+            }
+            const verifyRes = await fetch('/api/v1/payments/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    razorpay_order_id: payment.razorpay_order_id,
+                    razorpay_payment_id: payment.razorpay_payment_id,
+                    razorpay_signature: payment.razorpay_signature,
+                }),
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) {
+                await fetch('/api/v1/payments/abandon', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ razorpay_order_id }),
+                }).catch(() => {});
+                throw new Error(verifyData.error?.message || 'Payment verification failed');
+            }
+            toast.success('Payment received');
+            await loadOrder();
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Payment failed');
+        } finally {
+            setPayingMethod(null);
+        }
+    };
+
+    const handlePayWithCredit = async (method: 'credit' | 'wallet') => {
+        if (!order) return;
+        setPayingMethod(method);
+        try {
+            const res = await fetch(`/api/v1/orders/${order.id}/pay`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ method }),
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error?.message || 'Could not apply credit');
+            toast.success('Payment recorded');
+            await loadOrder();
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Could not apply credit');
+        } finally {
+            setPayingMethod(null);
+        }
     };
 
     React.useEffect(() => {
@@ -281,6 +405,12 @@ export default function OrderDetailPage() {
     const promoDiscount = Number(order.promoDiscount) || 0;
     const couponDiscount = Number(order.couponDiscount) || 0;
     const walletApplied = Number(order.walletApplied) || 0;
+    const canPayNow =
+        order.paymentStatus === 'unpaid' &&
+        isOfflinePaymentMethod(order.paymentMethod) &&
+        order.status !== 'cancelled';
+    const showDiscco = canPayNow && creditWalletUsable(vendorCredit ?? undefined, total);
+    const showPlatformCredit = canPayNow && creditWalletUsable(platformCredit ?? undefined, total);
 
     const showDeliveryOtp =
         (order.status === 'shipped' ||
@@ -568,7 +698,12 @@ export default function OrderDetailPage() {
                                         <div>
                                             <p className="text-[12px] text-gray-400 font-medium">Method</p>
                                             <p className="text-[13px] font-bold text-[#181725] capitalize">
-                                                {order.paymentMethod === 'razorpay' ? 'Razorpay' : order.paymentMethod === 'bank_transfer' ? 'Bank Transfer' : order.paymentMethod === 'po_number' ? 'PO Number' : order.paymentMethod === 'credit' ? 'Credit Line' : order.paymentMethod || '—'}
+                                                {order.paymentMethod === 'razorpay' || order.paymentMethod === 'online' ? 'Razorpay'
+                                                  : order.paymentMethod === 'bank_transfer' ? 'Bank Transfer'
+                                                  : order.paymentMethod === 'po_number' ? 'PO Number'
+                                                  : order.paymentMethod === 'credit' ? 'DiSCCO'
+                                                  : order.paymentMethod === 'wallet' || order.paymentMethod === 'h1_wallet' ? 'Horeca1 Credit'
+                                                  : order.paymentMethod || '—'}
                                             </p>
                                         </div>
                                     </div>
@@ -582,6 +717,56 @@ export default function OrderDetailPage() {
                                     <div className="bg-gray-50 rounded-xl px-3 py-2">
                                         <p className="text-[11px] text-gray-400 font-medium">Transaction ID</p>
                                         <p className="text-[12px] font-mono text-gray-600">{order.payments[0].razorpayPaymentId}</p>
+                                    </div>
+                                )}
+
+                                {canPayNow && (
+                                    <div className="pt-1 space-y-2">
+                                        <p className="text-[12px] font-bold text-[#181725]">Pay now</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => void handlePayOnline()}
+                                            disabled={payingMethod !== null}
+                                            className="w-full flex items-center justify-between gap-2 px-3.5 py-3 rounded-xl border border-primary/30 bg-primary-light/40 hover:bg-primary-light transition-colors disabled:opacity-60"
+                                        >
+                                            <span className="flex items-center gap-2 text-[13px] font-bold text-primary">
+                                                {payingMethod === 'online' ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                                                Pay Online
+                                            </span>
+                                            <span className="text-[11px] font-medium text-gray-500">UPI, cards, netbanking</span>
+                                        </button>
+                                        {showDiscco && (
+                                            <button
+                                                type="button"
+                                                onClick={() => void handlePayWithCredit('credit')}
+                                                disabled={payingMethod !== null}
+                                                className="w-full flex items-center justify-between gap-2 px-3.5 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-60"
+                                            >
+                                                <span className="flex items-center gap-2 text-[13px] font-bold text-[#181725]">
+                                                    {payingMethod === 'credit' ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
+                                                    DiSCCO credit
+                                                </span>
+                                                <span className="text-[11px] font-medium text-gray-500">
+                                                    ₹{Number(vendorCredit?.availableCredit ?? 0).toLocaleString('en-IN')} available
+                                                </span>
+                                            </button>
+                                        )}
+                                        {showPlatformCredit && (
+                                            <button
+                                                type="button"
+                                                onClick={() => void handlePayWithCredit('wallet')}
+                                                disabled={payingMethod !== null}
+                                                className="w-full flex items-center justify-between gap-2 px-3.5 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-60"
+                                            >
+                                                <span className="flex items-center gap-2 text-[13px] font-bold text-[#181725]">
+                                                    {payingMethod === 'wallet' ? <Loader2 size={14} className="animate-spin" /> : <Wallet size={14} />}
+                                                    Horeca1 Credit
+                                                </span>
+                                                <span className="text-[11px] font-medium text-gray-500">
+                                                    ₹{Number(platformCredit?.availableCredit ?? 0).toLocaleString('en-IN')} available
+                                                </span>
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>

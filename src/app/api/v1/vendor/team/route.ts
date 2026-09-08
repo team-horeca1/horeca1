@@ -316,7 +316,10 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     let user = looksEmail
       ? await prisma.user.findUnique({ where: { email: identifierTrim.toLowerCase() } })
       : normalizedPhone
-        ? await prisma.user.findFirst({ where: { phone: { in: phoneLookupVariants(normalizedPhone) } } })
+        ? await prisma.user.findFirst({
+            where: { phone: { in: phoneLookupVariants(normalizedPhone) } },
+            orderBy: { createdAt: 'asc' },
+          })
         : null;
 
     let tempPassword = '';
@@ -572,6 +575,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       success: true,
       data: {
         ...dto,
+        existingUser: !isNewUser,
         ...(tempPassword
           ? {
               inviteMeta: {

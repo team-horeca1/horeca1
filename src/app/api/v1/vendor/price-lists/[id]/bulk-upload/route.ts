@@ -77,7 +77,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     const skuMap = new Map<string, string>();
     if (skus.length > 0) {
       const products = await prisma.product.findMany({
-        where: { sku: { in: skus }, vendorId },
+        where: { sku: { in: skus }, vendorId, isActive: true, approvalStatus: 'approved' },
         select: { id: true, sku: true },
       });
       for (const p of products) if (p.sku) skuMap.set(p.sku, p.id);
@@ -88,7 +88,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     const validIds = new Set<string>();
     if (explicitIds.length > 0) {
       const products = await prisma.product.findMany({
-        where: { id: { in: explicitIds }, vendorId },
+        where: { id: { in: explicitIds }, vendorId, isActive: true, approvalStatus: 'approved' },
         select: { id: true },
       });
       for (const p of products) validIds.add(p.id);

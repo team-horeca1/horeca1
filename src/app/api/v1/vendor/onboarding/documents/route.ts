@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withRateLimit } from '@/middleware/withRateLimit';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { assertVerificationToken } from '@/lib/otpVerification';
+import { normalizePhone, phoneLookupVariants } from '@/lib/phone';
 import {
   MAX_DOC_BYTES,
   extForMime,
@@ -21,7 +23,6 @@ import {
 export const runtime = 'nodejs';
 
 const DOC_TYPES = ['fssai', 'gst', 'pan', 'bank_proof', 'other'];
-const PHONE_RE = /^\d{10}$/;
 
 async function postHandler(req: NextRequest) {
   try {
@@ -36,12 +37,14 @@ async function postHandler(req: NextRequest) {
     } catch {
       throw Errors.badRequest('Content-Type must be multipart/form-data');
     }
-    const phone = String(form.get('phone') ?? '');
+    const phoneRaw = String(form.get('phone') ?? '');
+    const phone = normalizePhone(phoneRaw);
     const vendorId = String(form.get('vendorId') ?? '');
     const type = String(form.get('type') ?? '');
     const file = form.get('file');
+    const verificationToken = form.get('verificationToken');
 
-    if (!PHONE_RE.test(phone)) throw Errors.badRequest('Invalid phone number');
+    if (!phone) throw Errors.badRequest('Invalid phone number');
     if (!vendorId) throw Errors.badRequest('Missing vendor reference');
     if (!DOC_TYPES.includes(type)) throw Errors.badRequest('Invalid document type');
     if (!(file instanceof File)) throw Errors.badRequest('No file provided');
@@ -50,21 +53,15 @@ async function postHandler(req: NextRequest) {
     if (!ext) throw Errors.badRequest('Unsupported file type. Allowed: PDF, JPG, PNG, WebP');
     if (file.size > MAX_DOC_BYTES) throw Errors.badRequest('File too large. Max size: 10MB');
 
-    // Same proof-of-ownership the submit route uses: a used OTP for this phone
-    // within the last 30 minutes.
-    const verifiedOtp = await prisma.otpCode.findFirst({
-      where: { phone, used: true, createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) } },
-      select: { id: true },
-    });
-    if (!verifiedOtp) throw Errors.forbidden('Phone not verified');
+    await assertVerificationToken(verificationToken, { phone });
 
-    // The vendor must belong to the user who owns this phone — otherwise a
-    // verified phone could attach docs to someone else's vendor id.
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },
       select: { id: true, user: { select: { phone: true } } },
     });
-    if (!vendor || vendor.user.phone !== phone) throw Errors.forbidden('Vendor does not match this phone');
+    if (!vendor || !phoneLookupVariants(vendor.user.phone).includes(phone)) {
+      throw Errors.forbidden('Vendor does not match this phone');
+    }
 
     const docId = newDocId();
     const buffer = Buffer.from(await file.arrayBuffer());

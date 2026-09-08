@@ -92,6 +92,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     const search = params.get('search') || undefined;
     const cursor = params.get('cursor') || undefined;
     const limit = Math.min(Number(params.get('limit')) || 20, 500);
+    const sellableOnly = params.get('sellable') === '1';
 
     const catalogService = new CatalogService();
     const result = await catalogService.getVendorProducts(vendorId, {
@@ -99,7 +100,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       search,
       cursor,
       limit,
-      includeInactive: true,
+      includeInactive: !sellableOnly,
       aggregateStock: true,
     });
 

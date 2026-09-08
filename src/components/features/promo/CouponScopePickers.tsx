@@ -158,7 +158,7 @@ export function CouponScopeFields({
         });
         const url = productSource === 'admin'
             ? `/api/v1/admin/products?search=${encodeURIComponent(debouncedProd.trim())}&gridListings=true&limit=15`
-            : `/api/v1/vendor/products?search=${encodeURIComponent(debouncedProd.trim())}&limit=15`;
+            : `/api/v1/vendor/products?search=${encodeURIComponent(debouncedProd.trim())}&limit=15&sellable=1`;
         fetch(url)
             .then((r) => r.json())
             .then((json: { data?: { products?: ProductHit[] } | ProductHit[] }) => {

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { normalizePhone, phoneLookupVariants } from '@/lib/phone';
+import type { Prisma } from '@prisma/client';
 
 export type PhoneCheckIntent = 'vendor' | 'brand' | 'customer';
 
@@ -56,8 +57,19 @@ export async function lookupPhoneForRegistration(
   }
 
   const variants = phoneLookupVariants(phone);
-  const user = await prisma.user.findFirst({
+  const user = await prisma.user.findUnique({
+    where: { phone },
+    select: {
+      id: true,
+      role: true,
+      fullName: true,
+      hcidDisplay: true,
+      vendors: { select: { isVerified: true } },
+      _count: { select: { accountMemberships: true } },
+    },
+  }) ?? await prisma.user.findFirst({
     where: { phone: { in: variants } },
+    orderBy: { createdAt: 'asc' },
     select: {
       id: true,
       role: true,
@@ -86,4 +98,20 @@ export async function lookupPhoneForRegistration(
     businessAccountCount: user._count.accountMemberships,
     suggestedAction: resolveSuggestedAction(intent, true, userRole),
   };
+}
+
+/** Prefer canonical 10-digit `User.phone`, then oldest legacy +91 / 91 row. */
+export async function findUserByPhoneLookup<S extends Prisma.UserSelect>(
+  raw: string | null | undefined,
+  select: S,
+): Promise<Prisma.UserGetPayload<{ select: S }> | null> {
+  const phone = normalizePhone(raw);
+  if (!phone) return null;
+  const exact = await prisma.user.findUnique({ where: { phone }, select });
+  if (exact) return exact;
+  return prisma.user.findFirst({
+    where: { phone: { in: phoneLookupVariants(phone) } },
+    orderBy: { createdAt: 'asc' },
+    select,
+  });
 }

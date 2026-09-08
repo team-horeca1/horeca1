@@ -24,15 +24,10 @@ import {
   derivedFullName,
   derivedLegalName,
 } from '@/lib/validators/customer-profile';
-import {
-  isRegisterEmailOtpEnabled,
-  resolveRegisterVerifyChannel,
-} from '@/lib/config/registerEmailOtp';
 
 const RESEND_COOLDOWN = 60;
-const EMAIL_REGISTER_ALLOWED = isRegisterEmailOtpEnabled();
 
-type Step = 'form' | 'otp' | 'success';
+type Step = 'form' | 'otp' | 'complete' | 'success';
 
 export default function RegisterPageInner() {
   const params = useSearchParams();
@@ -51,12 +46,14 @@ export default function RegisterPageInner() {
     }
   }, [role, redirectTo, router]);
 
+  const [step, setStep] = useState<Step>('form');
+
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
+    if (step === 'complete' || step === 'otp' || step === 'success') return;
     window.location.href = redirectTo || '/';
-  }, [sessionStatus, redirectTo]);
+  }, [sessionStatus, redirectTo, step]);
 
-  const [step, setStep] = useState<Step>('form');
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState('');
   const [profile, setProfile] = useState<CustomerProfileValues>({ ...EMPTY_CUSTOMER_PROFILE });
@@ -71,8 +68,6 @@ export default function RegisterPageInner() {
     suggestedAction: 'login_to_link' | 'login_only';
     contactType?: 'phone' | 'email';
   } | null>(null);
-
-  const [verifyChannel, setVerifyChannel] = useState<'phone' | 'email'>('phone');
 
   const setFE = useCallback((key: string, msg: string) => {
     setFieldErrors(prev => {
@@ -118,7 +113,7 @@ export default function RegisterPageInner() {
 
   const handleSendOtp = async () => {
     setApiError('');
-    const validation = validateCustomerProfile({ ...profile, password }, 'selfRegister');
+    const validation = validateCustomerProfile({ ...profile, password }, 'selfRegisterLite');
     if (!validation.success) {
       setFieldErrors(validation.errors);
       setApiError(validation.message ?? 'Please fix the highlighted fields');
@@ -128,69 +123,53 @@ export default function RegisterPageInner() {
 
     const phone = (profile.phone ?? profile.mobilePhone ?? '').replace(/\D/g, '').slice(-10);
     const email = (profile.email ?? '').trim().toLowerCase();
-    const channel = resolveRegisterVerifyChannel({
-      email,
-      phone,
-      preferred: verifyChannel,
-    });
-    if (!channel) {
-      setApiError('Enter a mobile number or email address');
-      return;
-    }
-    if (channel !== verifyChannel) setVerifyChannel(channel);
-    const useEmail = channel === 'email';
 
     setIsLoading(true);
     try {
-      if (useEmail) {
-        const checkRes = await fetch('/api/v1/auth/check-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, intent: 'customer' }),
+      const checkRes = await fetch('/api/v1/auth/check-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, intent: 'customer' }),
+      });
+      const checkData = await checkRes.json();
+      if (checkData.success && checkData.data?.exists) {
+        const data = checkData.data as PhoneCheckResult;
+        setExistingPhoneModal({
+          phone,
+          hcidDisplay: data.hcidDisplay,
+          accountLabel: accountLabelFromCheck(data),
+          suggestedAction: 'login_only',
+          contactType: 'phone',
         });
-        const checkData = await checkRes.json();
-        if (checkData.success && checkData.data?.exists) {
-          const data = checkData.data as PhoneCheckResult;
-          setExistingPhoneModal({
-            phone: email,
-            hcidDisplay: data.hcidDisplay,
-            accountLabel: accountLabelFromCheck(data),
-            suggestedAction: 'login_only',
-            contactType: 'email',
-          });
-          return;
-        }
-      } else {
-        const checkRes = await fetch('/api/v1/auth/check-phone', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone, intent: 'customer' }),
-        });
-        const checkData = await checkRes.json();
-        if (checkData.success && checkData.data?.exists) {
-          const data = checkData.data as PhoneCheckResult;
-          setExistingPhoneModal({
-            phone,
-            hcidDisplay: data.hcidDisplay,
-            accountLabel: accountLabelFromCheck(data),
-            suggestedAction: 'login_only',
-            contactType: 'phone',
-          });
-          return;
-        }
+        return;
       }
 
       const res = await fetch('/api/v1/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          useEmail
-            ? { email, mode: 'register', intent: 'customer' }
-            : { phone, mode: 'register', intent: 'customer' },
-        ),
+        body: JSON.stringify({
+          phone,
+          ...(email ? { email } : {}),
+          mode: 'register',
+          intent: 'customer',
+        }),
       });
       const data = await res.json();
-      if (!data.success) { setApiError(data.error || 'Failed to send OTP'); return; }
+      if (!data.success) {
+        if (data.code === 'EMAIL_EXISTS' && data.data) {
+          const existing = data.data as PhoneCheckResult;
+          setExistingPhoneModal({
+            phone: email,
+            hcidDisplay: existing.hcidDisplay,
+            accountLabel: accountLabelFromCheck(existing),
+            suggestedAction: 'login_only',
+            contactType: 'email',
+          });
+          return;
+        }
+        setApiError(data.error || 'Failed to send OTP');
+        return;
+      }
       setStep('otp');
       startResendTimer();
       setTimeout(() => otpRefs[0].current?.focus(), 100);
@@ -203,20 +182,13 @@ export default function RegisterPageInner() {
     setIsLoading(true);
     setApiError('');
     const phone = (profile.phone ?? profile.mobilePhone ?? '').replace(/\D/g, '').slice(-10);
-    const email = (profile.email ?? '').trim().toLowerCase();
-    const channel = resolveRegisterVerifyChannel({
-      email,
-      phone,
-      preferred: verifyChannel,
-    });
-    const useEmail = channel === 'email';
     const fullName = derivedFullName(profile);
     const businessName = derivedLegalName(profile);
 
     try {
       const result = await signIn('otp', {
-        phone: useEmail ? '' : phone,
-        loginEmail: useEmail ? email : '',
+        phone,
+        loginEmail: '',
         code,
         fullName,
         businessName,
@@ -225,39 +197,70 @@ export default function RegisterPageInner() {
         role: 'customer',
         isRegister: 'true',
         redirect: false,
-        salutation: profile.salutation ?? '',
         firstName: profile.firstName ?? '',
         lastName: profile.lastName ?? '',
-        designation: profile.designation ?? '',
         displayName: profile.displayName ?? '',
         tradeName: profile.displayName ?? '',
-        businessType: profile.businessType ?? '',
-        subType: profile.subType ?? '',
-        cuisine: profile.cuisine ?? '',
-        gstNumber: (profile.gstin ?? '').toUpperCase().trim(),
-        panNumber: (profile.pan ?? '').toUpperCase().trim(),
-        fssaiNumber: profile.fssaiNumber ?? '',
-        gstTreatment: profile.gstTreatment ?? '',
-        placeOfSupply: profile.placeOfSupply ?? '',
-        addressLine: profile.addressLine ?? profile.billingAddressLine ?? '',
-        flatInfo: profile.flatInfo ?? '',
-        city: profile.city ?? profile.billingCity ?? '',
-        state: profile.state ?? profile.billingState ?? '',
-        pincode: profile.pincode ?? profile.billingPincode ?? '',
-        outletName: profile.outletName ?? '',
-        latitude: profile.latitude != null ? String(profile.latitude) : '',
-        longitude: profile.longitude != null ? String(profile.longitude) : '',
-        placeId: profile.placeId ?? '',
       });
       if (result?.error) {
         setApiError('Invalid or expired OTP. Please try again.');
         setOtp(['', '', '', '']);
         setTimeout(() => otpRefs[0].current?.focus(), 50);
       } else {
-        setStep('success');
-        setTimeout(() => goPostLogin(), 1200);
+        setStep('complete');
       }
     } catch { setApiError('Something went wrong. Please try again.'); }
+    finally { setIsLoading(false); }
+  };
+
+  const handleCompleteProfile = async () => {
+    setApiError('');
+    const validation = validateCustomerProfile({ ...profile, password }, 'completeProfile');
+    if (!validation.success) {
+      setFieldErrors(validation.errors);
+      setApiError(validation.message ?? 'Please fix the highlighted fields');
+      return;
+    }
+    setFieldErrors({});
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/v1/me/complete-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          salutation: profile.salutation ?? '',
+          designation: profile.designation ?? '',
+          businessType: profile.businessType ?? '',
+          subType: profile.subType ?? '',
+          cuisine: profile.cuisine ?? '',
+          workPhone: profile.workPhone ?? '',
+          password,
+          gstTreatment: profile.gstTreatment ?? '',
+          placeOfSupply: profile.placeOfSupply ?? '',
+          gstin: (profile.gstin ?? '').toUpperCase().trim(),
+          pan: (profile.pan ?? '').toUpperCase().trim(),
+          fssaiNumber: profile.fssaiNumber ?? '',
+          outletName: profile.outletName ?? '',
+          addressLine: profile.addressLine ?? profile.billingAddressLine ?? '',
+          flatInfo: profile.flatInfo ?? '',
+          landmark: profile.landmark ?? '',
+          city: profile.city ?? profile.billingCity ?? '',
+          state: profile.state ?? profile.billingState ?? '',
+          pincode: profile.pincode ?? profile.billingPincode ?? '',
+          latitude: profile.latitude ?? null,
+          longitude: profile.longitude ?? null,
+          placeId: profile.placeId ?? null,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setApiError(data.error?.message || data.error || 'Could not save profile');
+        return;
+      }
+      setStep('success');
+      setTimeout(() => goPostLogin(), 800);
+    } catch { setApiError('Could not save profile. Please try again.'); }
     finally { setIsLoading(false); }
   };
 
@@ -314,11 +317,6 @@ export default function RegisterPageInner() {
   if (step === 'otp') {
     const phone = (profile.phone ?? profile.mobilePhone ?? '').replace(/\D/g, '').slice(-10);
     const email = (profile.email ?? '').trim().toLowerCase();
-    const useEmail = resolveRegisterVerifyChannel({
-      email,
-      phone,
-      preferred: verifyChannel,
-    }) === 'email';
     return (
       <CenteredCard>
         <div className="p-6 sm:p-8">
@@ -330,10 +328,14 @@ export default function RegisterPageInner() {
           <p className="text-[13px] text-gray-400 mb-6">
             We sent a 4-digit code to{' '}
             <span className="font-bold text-gray-700">
-              {useEmail
-                ? email
-                : `+91 ${phone.slice(0, 5)} ${phone.slice(5)}`}
+              +91 {phone.slice(0, 5)} {phone.slice(5)}
             </span>
+            {email ? (
+              <>
+                {' '}and{' '}
+                <span className="font-bold text-gray-700">{email}</span>
+              </>
+            ) : null}
           </p>
           {apiError && <ErrorBanner>{apiError}</ErrorBanner>}
           <div className="flex gap-3 justify-center my-6">
@@ -370,6 +372,64 @@ export default function RegisterPageInner() {
     );
   }
 
+  if (step === 'complete') {
+    return (
+      <div className="flex items-start justify-center px-4 py-5 min-h-[calc(100vh-150px)]">
+        <div className="w-full max-w-[1080px] rounded-[20px] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#EEEEEE]">
+          <div className="px-5 sm:px-7 pt-6 sm:pt-7 pb-5 border-b border-[#F5F5F5]">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-primary mb-1">Almost there</p>
+            <h1 className="text-[clamp(1.25rem,2vw+0.5rem,1.5rem)] font-[800] text-[#181725] leading-tight">
+              Complete your profile
+            </h1>
+            <p className="text-[13px] text-gray-500 mt-1">
+              Optional — helps vendors serve you better. You can do this later from Profile.
+            </p>
+          </div>
+          <div className="p-5 sm:p-7">
+            {apiError && <ErrorBanner>{apiError}</ErrorBanner>}
+            <CustomerProfileForm
+              value={profile}
+              onChange={patchProfile}
+              errors={fieldErrors}
+              onFieldBlur={handleFieldBlur}
+              layout="wide"
+              mode="full"
+              businessTypeInput="text"
+              omitCoreFields
+              visibleSections={{ contact: true, business: true, auth: true, tax: true, address: true }}
+              collapsedSections={['tax', 'address']}
+              showPassword
+              password={password}
+              onPasswordChange={setPassword}
+              showPasswordToggle
+              passwordVisible={showPassword}
+              onTogglePassword={() => setShowPassword(v => !v)}
+            />
+            <div className="mt-6 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => void handleCompleteProfile()}
+                disabled={isLoading}
+                className={cn(FORM.primaryBtn, 'w-full h-[46px]')}
+              >
+                {isLoading && <Loader2 size={18} className="animate-spin" />}
+                Save &amp; continue
+              </button>
+              <button
+                type="button"
+                onClick={goPostLogin}
+                disabled={isLoading}
+                className="w-full py-2.5 text-[13px] font-semibold text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Skip for now
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-start justify-center px-4 py-5 min-h-[calc(100vh-150px)]">
       <div className="w-full max-w-[1080px] rounded-[20px] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#EEEEEE]">
@@ -401,43 +461,13 @@ export default function RegisterPageInner() {
         <div className="p-5 sm:p-7">
           {apiError && <ErrorBanner>{apiError}</ErrorBanner>}
 
-          {EMAIL_REGISTER_ALLOWED && (
-            <div className="flex gap-2 mb-5 p-1 bg-gray-100 rounded-xl">
-              {(['phone', 'email'] as const).map(ch => (
-                <button
-                  key={ch}
-                  type="button"
-                  onClick={() => {
-                    setVerifyChannel(ch);
-                    setApiError('');
-                  }}
-                  className={cn(
-                    'flex-1 py-2.5 rounded-lg text-[12px] font-bold transition-colors',
-                    verifyChannel === ch
-                      ? 'bg-white text-primary shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700',
-                  )}
-                >
-                  {ch === 'phone' ? 'Verify via Mobile' : 'Verify via Email'}
-                </button>
-              ))}
-            </div>
-          )}
-
           <CustomerProfileForm
             value={profile}
             onChange={patchProfile}
             errors={fieldErrors}
             onFieldBlur={handleFieldBlur}
             layout="wide"
-            visibleSections={{ contact: true, business: true, auth: true, tax: true, address: true }}
-            collapsedSections={['tax', 'address']}
-            showPassword
-            password={password}
-            onPasswordChange={setPassword}
-            showPasswordToggle
-            passwordVisible={showPassword}
-            onTogglePassword={() => setShowPassword(v => !v)}
+            mode="register"
           />
 
           <div className="mt-6">

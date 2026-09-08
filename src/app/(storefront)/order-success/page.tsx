@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle2, Clock, Store, ShoppingCart, FileDown, ArrowRight, Home, Package } from 'lucide-react';
+import { CheckCircle2, Clock, Store, FileDown, ArrowRight, Home, Package, ShoppingCart } from 'lucide-react';
 
 interface OrderSummary {
     id: string;
@@ -19,9 +19,7 @@ interface OrderSummary {
 
 export default function OrderSuccessPage() {
     const searchParams = useSearchParams();
-    const router = useRouter();
     const orderIds = searchParams?.get('ids')?.split(',') || [];
-    const lastVendorId = searchParams?.get('vendor') || '';
 
     const [orders, setOrders] = useState<OrderSummary[]>([]);
     const [loading, setLoading] = useState(true);
@@ -39,7 +37,7 @@ export default function OrderSuccessPage() {
                     return {
                         id: d.id,
                         orderNumber: d.orderNumber,
-                        vendorId: d.vendor?.id || d.vendorId,
+                        vendorId: d.vendor?.id || d.vendorId || d.vendor?.slug || '',
                         vendorName: d.vendor?.businessName || d.vendorName || 'Vendor',
                         totalAmount: Number(d.totalAmount) || 0,
                         savings: (Number(d.promoDiscount) || 0) + (Number(d.couponDiscount) || 0) + (Number(d.walletApplied) || 0),
@@ -104,12 +102,21 @@ export default function OrderSuccessPage() {
                                     You saved ₹{Number(order.savings).toLocaleString('en-IN')} on this order
                                 </p>
                             )}
-                            <Link
-                                href={`/api/v1/orders/${order.id}/invoice`}
-                                className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-black text-primary hover:text-primary-dark transition-colors"
-                            >
-                                <FileDown size={12} /> Download Invoice
-                            </Link>
+                            <div className="mt-3 flex items-center justify-between gap-3">
+                                <Link
+                                    href={`/api/v1/orders/${order.id}/invoice`}
+                                    className="inline-flex items-center gap-1.5 text-[11px] font-black text-primary hover:text-primary-dark transition-colors"
+                                >
+                                    <FileDown size={12} /> Download Invoice
+                                </Link>
+                                <Link
+                                    href={order.vendorId ? `/vendor/${order.vendorId}` : '/vendors'}
+                                    className="inline-flex items-center gap-1.5 rounded-xl border border-primary/40 px-3 py-1.5 text-[11px] font-bold text-primary hover:bg-primary-light/60 transition-colors"
+                                >
+                                    <ShoppingCart size={12} />
+                                    Place another order
+                                </Link>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -122,15 +129,8 @@ export default function OrderSuccessPage() {
             {/* CTAs */}
             <div className="w-full max-w-[400px] flex flex-col gap-3">
                 <Link
-                    href={lastVendorId ? `/vendor/${lastVendorId}` : '/vendors'}
-                    className="w-full bg-primary text-white py-[18px] md:py-[22px] rounded-[18px] font-black text-[16px] shadow-xl shadow-green-100/80 hover:bg-primary-dark transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
-                >
-                    <ShoppingCart size={18} />
-                    Place Another Order
-                </Link>
-                <Link
                     href="/orders"
-                    className="w-full border-2 border-gray-200 text-[#181725] font-black text-[16px] py-4 rounded-[18px] hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+                    className="w-full bg-primary text-white py-[18px] md:py-[22px] rounded-[18px] font-black text-[16px] shadow-xl shadow-primary/20 hover:bg-primary-dark transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
                 >
                     <ArrowRight size={18} />
                     View My Orders

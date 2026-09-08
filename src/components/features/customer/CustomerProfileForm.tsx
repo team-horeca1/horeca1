@@ -70,6 +70,12 @@ export interface CustomerProfileFormProps {
   className?: string;
   /** wide = 3-column grid on large screens — used on /register to reduce form height */
   layout?: 'default' | 'wide';
+  /** Slim 6-field customer signup. Default keeps the full admin / add-business form. */
+  mode?: 'register' | 'full';
+  /** Customer complete-profile uses free-text type/sub-type. Admin keeps dropdowns. */
+  businessTypeInput?: 'select' | 'text';
+  /** Hide first/last/legal/display/mobile/email — they were collected at signup. */
+  omitCoreFields?: boolean;
 }
 
 function SectionHeader({ icon: Icon, children, spanClass }: { icon: React.ComponentType<{ size?: number; className?: string }>; children: React.ReactNode; spanClass: string }) {
@@ -131,11 +137,15 @@ export function CustomerProfileForm({
   onContactPersonsChange,
   className,
   layout = 'default',
+  mode = 'full',
+  businessTypeInput = 'select',
+  omitCoreFields = false,
 }: CustomerProfileFormProps) {
   const set = (patch: Partial<CustomerProfileValues>) => onChange(patch);
   const blur = (field: string, v: string) => onFieldBlur?.(field, v);
   const isWide = layout === 'wide';
-  const relaxedContact = isRegisterEmailOtpEnabled();
+  const isTextTypes = businessTypeInput === 'text';
+  const relaxedContact = isRegisterEmailOtpEnabled() && mode !== 'register' && !omitCoreFields;
   const GRID = isWide
     ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3'
     : 'grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4';
@@ -143,10 +153,18 @@ export function CustomerProfileForm({
   const SPAN_TWO = isWide ? 'sm:col-span-2' : 'sm:col-span-2';
 
   const handleBusinessTypeChange = (businessType: string) => {
+    if (isTextTypes) {
+      set({ businessType });
+      return;
+    }
     set({ businessType, subType: '', cuisine: '' });
   };
 
   const handleSubTypeChange = (subType: string) => {
+    if (isTextTypes) {
+      set({ subType });
+      return;
+    }
     set({ subType, cuisine: '' });
   };
 
@@ -176,6 +194,73 @@ export function CustomerProfileForm({
 
   const subTypes = subTypesForBusinessType(value.businessType ?? '');
   const cuisines = cuisinesForSubType(value.businessType ?? '', value.subType ?? '');
+
+  if (mode === 'register') {
+    return (
+      <div className={cn(GRID, 'space-y-0', className)}>
+        <div data-field="firstName">
+          <TextField
+            label="First Name"
+            required
+            value={value.firstName ?? ''}
+            error={errors.firstName}
+            onChange={v => set({ firstName: v })}
+            placeholder="First name"
+          />
+        </div>
+        <div data-field="lastName">
+          <TextField
+            label="Last Name"
+            required
+            value={value.lastName ?? ''}
+            error={errors.lastName}
+            onChange={v => set({ lastName: v })}
+            placeholder="Last name"
+          />
+        </div>
+        <div data-field="legalName">
+          <TextField
+            label="Legal Business Name"
+            required
+            value={value.legalName ?? value.companyName ?? ''}
+            error={errors.legalName}
+            onChange={v => set({ legalName: v, companyName: v })}
+            placeholder="Restaurant / hotel / company"
+          />
+        </div>
+        <div data-field="displayName">
+          <TextField
+            label="Display Name"
+            required
+            hint="Shown on invoices & lists"
+            value={value.displayName ?? ''}
+            error={errors.displayName}
+            onChange={v => set({ displayName: v })}
+            placeholder="e.g. Rockville Bar & Diner"
+          />
+        </div>
+        <div data-field="phone">
+          <FormField label="Mobile" required error={errors.phone}>
+            <PhoneInput
+              value={value.phone ?? value.mobilePhone ?? ''}
+              onChange={v => set({ phone: v, mobilePhone: v })}
+              hasError={!!errors.phone}
+            />
+          </FormField>
+        </div>
+        <div data-field="email">
+          <TextField
+            label="Email (optional)"
+            type="email"
+            value={value.email ?? ''}
+            error={errors.email}
+            onChange={v => set({ email: v })}
+            placeholder="you@example.com"
+          />
+        </div>
+      </div>
+    );
+  }
 
   const taxContent = (
     <div className={GRID}>
@@ -255,24 +340,38 @@ export function CustomerProfileForm({
           {visibleSections.contact && (
             <>
               <SectionHeader icon={User} spanClass={SPAN_FULL}>Primary Contact</SectionHeader>
-              <FormField label="Primary Contact" className={SPAN_FULL}>
-                <div data-field="firstName" className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
-                  <FormSelect value={value.salutation ?? ''} onChange={v => set({ salutation: v })}>
-                    {SALUTATIONS.map(s => <option key={s || 'empty'} value={s}>{s || 'Salutation'}</option>)}
-                  </FormSelect>
-                  <FormInput value={value.firstName ?? ''} onChange={v => set({ firstName: v })} placeholder="First Name"
-                    hasError={!!errors.firstName} />
-                  <FormInput value={value.lastName ?? ''} onChange={v => set({ lastName: v })} placeholder="Last Name" />
-                  {isWide && (
-                    <FormInput value={value.designation ?? ''} onChange={v => set({ designation: v })}
-                      placeholder="Designation (optional)" />
+              {omitCoreFields ? (
+                <>
+                  <FormField label="Salutation">
+                    <FormSelect value={value.salutation ?? ''} onChange={v => set({ salutation: v })}>
+                      {SALUTATIONS.map(s => <option key={s || 'empty'} value={s}>{s || 'Salutation'}</option>)}
+                    </FormSelect>
+                  </FormField>
+                  <TextField label="Designation (optional)" value={value.designation ?? ''}
+                    onChange={v => set({ designation: v })} placeholder="e.g. Procurement Manager" />
+                </>
+              ) : (
+                <>
+                  <FormField label="Primary Contact" className={SPAN_FULL}>
+                    <div data-field="firstName" className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
+                      <FormSelect value={value.salutation ?? ''} onChange={v => set({ salutation: v })}>
+                        {SALUTATIONS.map(s => <option key={s || 'empty'} value={s}>{s || 'Salutation'}</option>)}
+                      </FormSelect>
+                      <FormInput value={value.firstName ?? ''} onChange={v => set({ firstName: v })} placeholder="First Name"
+                        hasError={!!errors.firstName} />
+                      <FormInput value={value.lastName ?? ''} onChange={v => set({ lastName: v })} placeholder="Last Name" />
+                      {isWide && (
+                        <FormInput value={value.designation ?? ''} onChange={v => set({ designation: v })}
+                          placeholder="Designation (optional)" />
+                      )}
+                    </div>
+                    {errors.firstName && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.firstName}</p>}
+                  </FormField>
+                  {!isWide && (
+                    <TextField label="Designation (optional)" value={value.designation ?? ''}
+                      onChange={v => set({ designation: v })} placeholder="e.g. Procurement Manager" />
                   )}
-                </div>
-                {errors.firstName && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.firstName}</p>}
-              </FormField>
-              {!isWide && (
-                <TextField label="Designation (optional)" value={value.designation ?? ''}
-                  onChange={v => set({ designation: v })} placeholder="e.g. Procurement Manager" />
+                </>
               )}
             </>
           )}
@@ -280,62 +379,96 @@ export function CustomerProfileForm({
           {visibleSections.business && (
             <>
               <SectionHeader icon={Building2} spanClass={SPAN_FULL}>Business Identity</SectionHeader>
-              <div data-field="legalName">
-                <TextField label="Legal Business Name" required value={value.legalName ?? value.companyName ?? ''}
-                  error={errors.legalName}
-                  onChange={v => set({ legalName: v, companyName: v })}
-                  placeholder="Restaurant / hotel / company" />
-              </div>
-              <TextField label="Trade Name / Display Name" hint="Shown on invoices & lists"
-                value={value.displayName ?? ''} onChange={v => set({ displayName: v })}
-                placeholder="e.g. Rockville Bar & Diner" />
-              <div data-field="businessType">
-                <FormField label="Business Type" required>
-                  <FormSelect value={value.businessType ?? ''} onChange={handleBusinessTypeChange} hasError={!!errors.businessType}>
-                    <option value="">Select type</option>
-                    {CUSTOMER_BUSINESS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </FormSelect>
-                  {errors.businessType && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.businessType}</p>}
-                </FormField>
-              </div>
-              <FormField label="Sub-Type">
-                <FormSelect value={value.subType ?? ''} onChange={handleSubTypeChange} disabled={!value.businessType}>
-                  <option value="">Select sub-type</option>
-                  {subTypes.map(s => <option key={s} value={s}>{s}</option>)}
-                </FormSelect>
-              </FormField>
-              <FormField label="Cuisine / Category" className={SPAN_TWO}>
-                {cuisines.length > 0 ? (
-                  <FormSelect value={value.cuisine ?? ''} onChange={v => set({ cuisine: v })} disabled={!value.subType}>
-                    <option value="">Select cuisine</option>
-                    {cuisines.map(c => <option key={c} value={c}>{c}</option>)}
-                  </FormSelect>
-                ) : (
-                  <FormInput value={value.cuisine ?? ''} onChange={v => set({ cuisine: v })} placeholder="e.g. Japanese / Pan Asian" />
-                )}
-              </FormField>
+              {!omitCoreFields && (
+                <>
+                  <div data-field="legalName">
+                    <TextField label="Legal Business Name" required value={value.legalName ?? value.companyName ?? ''}
+                      error={errors.legalName}
+                      onChange={v => set({ legalName: v, companyName: v })}
+                      placeholder="Restaurant / hotel / company" />
+                  </div>
+                  <TextField label="Trade Name / Display Name" hint="Shown on invoices & lists"
+                    value={value.displayName ?? ''} onChange={v => set({ displayName: v })}
+                    placeholder="e.g. Rockville Bar & Diner" />
+                </>
+              )}
+              {isTextTypes ? (
+                <>
+                  <TextField
+                    label="Business Type"
+                    value={value.businessType ?? ''}
+                    error={errors.businessType}
+                    onChange={handleBusinessTypeChange}
+                    placeholder="e.g. Restaurant"
+                  />
+                  <TextField
+                    label="Business Sub-Type"
+                    value={value.subType ?? ''}
+                    onChange={handleSubTypeChange}
+                    placeholder="e.g. Fine dining"
+                  />
+                  <TextField
+                    label="Cuisine / Category"
+                    value={value.cuisine ?? ''}
+                    onChange={v => set({ cuisine: v })}
+                    placeholder="e.g. Japanese / Pan Asian"
+                  />
+                </>
+              ) : (
+                <>
+                  <div data-field="businessType">
+                    <FormField label="Business Type" required>
+                      <FormSelect value={value.businessType ?? ''} onChange={handleBusinessTypeChange} hasError={!!errors.businessType}>
+                        <option value="">Select type</option>
+                        {CUSTOMER_BUSINESS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </FormSelect>
+                      {errors.businessType && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.businessType}</p>}
+                    </FormField>
+                  </div>
+                  <FormField label="Sub-Type">
+                    <FormSelect value={value.subType ?? ''} onChange={handleSubTypeChange} disabled={!value.businessType}>
+                      <option value="">Select sub-type</option>
+                      {subTypes.map(s => <option key={s} value={s}>{s}</option>)}
+                    </FormSelect>
+                  </FormField>
+                  <FormField label="Cuisine / Category" className={SPAN_TWO}>
+                    {cuisines.length > 0 ? (
+                      <FormSelect value={value.cuisine ?? ''} onChange={v => set({ cuisine: v })} disabled={!value.subType}>
+                        <option value="">Select cuisine</option>
+                        {cuisines.map(c => <option key={c} value={c}>{c}</option>)}
+                      </FormSelect>
+                    ) : (
+                      <FormInput value={value.cuisine ?? ''} onChange={v => set({ cuisine: v })} placeholder="e.g. Japanese / Pan Asian" />
+                    )}
+                  </FormField>
+                </>
+              )}
             </>
           )}
 
           {visibleSections.auth && (
             <>
               <SectionHeader icon={User} spanClass={SPAN_FULL}>Contact &amp; Login</SectionHeader>
-              <div data-field="email">
-                <TextField label={relaxedContact ? 'Email (optional if mobile provided)' : 'Email (optional)'} type="email" value={value.email ?? ''}
-                  error={errors.email} onChange={v => set({ email: v })} placeholder="you@example.com" />
-              </div>
-              <div data-field="phone">
-                <FormField label={relaxedContact ? 'Mobile (optional if email provided)' : 'Mobile'} required={!relaxedContact} error={errors.phone}>
-                  <PhoneInput value={value.phone ?? value.mobilePhone ?? ''}
-                    onChange={v => set({ phone: v, mobilePhone: v })} hasError={!!errors.phone} />
-                </FormField>
-              </div>
+              {!omitCoreFields && (
+                <>
+                  <div data-field="email">
+                    <TextField label={relaxedContact ? 'Email (optional if mobile provided)' : 'Email (optional)'} type="email" value={value.email ?? ''}
+                      error={errors.email} onChange={v => set({ email: v })} placeholder="you@example.com" />
+                  </div>
+                  <div data-field="phone">
+                    <FormField label={relaxedContact ? 'Mobile (optional if email provided)' : 'Mobile'} required={!relaxedContact} error={errors.phone}>
+                      <PhoneInput value={value.phone ?? value.mobilePhone ?? ''}
+                        onChange={v => set({ phone: v, mobilePhone: v })} hasError={!!errors.phone} />
+                    </FormField>
+                  </div>
+                </>
+              )}
               <FormField label="Work Phone (optional)">
                 <PhoneInput value={value.workPhone ?? ''} onChange={v => set({ workPhone: v })} placeholder="Work phone" />
               </FormField>
               {showPassword && onPasswordChange && (
-                <div data-field="password">
-                  <FormField label="Password" hint="optional — skip OTP next time" className={SPAN_TWO}
+                <div data-field="password" className="sm:col-start-1 lg:col-start-1 sm:col-span-2">
+                  <FormField label="Password" hint="optional — skip OTP next time"
                     error={errors.password}>
                   {showPasswordToggle ? (
                     <PasswordInput value={password} onChange={onPasswordChange}

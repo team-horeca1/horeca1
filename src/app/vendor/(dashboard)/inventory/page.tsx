@@ -30,6 +30,8 @@ interface InventoryItem {
         unit?: string | null;
         imageUrl: string | null;
         isActive: boolean;
+        approvalStatus?: string;
+        listingStatus?: string;
         basePrice: number;
         brand?: string | null;
         tags?: string[];
@@ -39,6 +41,22 @@ interface InventoryItem {
 }
 
 type FilterTab = 'all' | 'low_stock' | 'out_of_stock';
+
+function isSellableInventoryProduct(product: InventoryItem['product']): boolean {
+    return (
+        product.isActive
+        && (product.approvalStatus ?? 'approved') === 'approved'
+        && (product.listingStatus ?? 'submitted') === 'submitted'
+    );
+}
+
+function inactiveReasonLabel(product: InventoryItem['product']): string {
+    if ((product.listingStatus ?? 'submitted') === 'draft') return 'Draft';
+    if (product.approvalStatus === 'rejected') return 'Rejected';
+    if (product.approvalStatus === 'pending' || product.approvalStatus === 'pending_edit') return 'Pending';
+    if (!product.isActive) return 'Inactive';
+    return 'Hidden';
+}
 
 // ─── Bulk upload helpers ────────────────────────────────────────────────────────
 
@@ -513,9 +531,10 @@ function InventoryRow({
 
     const net = qty - item.qtyReserved;
     const isLow = net <= threshold;
+    const sellable = isSellableInventoryProduct(item.product);
 
     return (
-        <tr className={cn('transition-colors', isLow ? 'bg-red-50/40' : 'hover:bg-[#FAFAFA]')}>
+        <tr className={cn('transition-colors', !sellable ? 'bg-[#FAFAFA] opacity-70' : isLow ? 'bg-red-50/40' : 'hover:bg-[#FAFAFA]')}>
             {/* Product */}
             <td className="px-5 py-3.5">
                 <div className="flex items-center gap-3">
@@ -527,7 +546,14 @@ function InventoryRow({
                         )}
                     </div>
                     <div>
-                        <p className="text-[13px] font-bold text-[#181725] leading-tight">{item.product.name}</p>
+                        <p className="text-[13px] font-bold text-[#181725] leading-tight">
+                            {item.product.name}
+                            {!sellable && (
+                                <span className="ml-2 inline-flex align-middle text-[10px] font-[900] uppercase tracking-wide px-1.5 py-0.5 rounded-[4px] bg-[#F3F4F6] text-[#6B7280]">
+                                    {inactiveReasonLabel(item.product)}
+                                </span>
+                            )}
+                        </p>
                         <p className="text-[11px] text-[#AEAEAE]">
                             {item.product.sku ? `SKU ${item.product.sku}` : `₹${Number(item.product.basePrice).toLocaleString('en-IN')}`}
                             {item.product.brand ? ` · ${item.product.brand}` : ''}
@@ -762,7 +788,14 @@ function InventoryMobileCard({
                     )}
                 </div>
                 <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-bold text-[#181725] leading-tight">{item.product.name}</p>
+                    <p className="text-[13px] font-bold text-[#181725] leading-tight">
+                        {item.product.name}
+                        {!isSellableInventoryProduct(item.product) && (
+                            <span className="ml-2 inline-flex align-middle text-[10px] font-[900] uppercase tracking-wide px-1.5 py-0.5 rounded-[4px] bg-[#F3F4F6] text-[#6B7280]">
+                                {inactiveReasonLabel(item.product)}
+                            </span>
+                        )}
+                    </p>
                     <p className="text-[11px] text-[#AEAEAE]">{item.product.sku ? `SKU ${item.product.sku}` : ''}</p>
                     {showWarehouse && item.outlet?.name && (
                         <p className="text-[11px] font-semibold text-[#1E40AF] mt-0.5">{item.outlet.name}</p>
@@ -809,6 +842,8 @@ export default function VendorInventoryPage() {
     const [showCsvModal, setShowCsvModal] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [alertCollapsed, setAlertCollapsed] = useState(false);
+    const [showInactive, setShowInactive] = useState(false);
+    const [inactiveCount, setInactiveCount] = useState(0);
     const fetchGen = useRef(0);
     const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -822,11 +857,15 @@ export default function VendorInventoryPage() {
         const gen = ++fetchGen.current;
         if (!silent) setLoading(true);
         try {
-            const res = await fetch(`/api/v1/vendor/inventory${outletQuery()}`);
+            const params = new URLSearchParams(outletQuery().replace(/^\?/, ''));
+            if (showInactive) params.set('includeInactive', '1');
+            const qs = params.toString();
+            const res = await fetch(`/api/v1/vendor/inventory${qs ? `?${qs}` : ''}`);
             const json = await res.json();
             if (gen !== fetchGen.current) return;
             if (json.success) {
                 const rows = json.data as InventoryItem[];
+                setInactiveCount(typeof json.inactiveCount === 'number' ? json.inactiveCount : 0);
                 // Guard: only this Online Store's default outlet.
                 if (activeOutletId) {
                     setItems(rows.filter((r) => !r.outletId || r.outletId === activeOutletId));
@@ -839,7 +878,7 @@ export default function VendorInventoryPage() {
         } finally {
             if (gen === fetchGen.current) setLoading(false);
         }
-    }, [outletQuery, scopeVersion, activeOutletId]);
+    }, [outletQuery, scopeVersion, activeOutletId, showInactive]);
 
     useEffect(() => {
         if (switching) return;
@@ -857,9 +896,10 @@ export default function VendorInventoryPage() {
         }));
     }, []);
 
-    // Derived counts
-    const lowStockItems = items.filter(i => i.isLowStock && i.qtyAvailable - i.qtyReserved > 0);
-    const outOfStockItems = items.filter(i => i.qtyAvailable - i.qtyReserved <= 0);
+    // Derived counts — OOS / low-stock banners only count sellable products.
+    const sellableItems = items.filter((i) => isSellableInventoryProduct(i.product));
+    const lowStockItems = sellableItems.filter(i => i.isLowStock && i.qtyAvailable - i.qtyReserved > 0);
+    const outOfStockItems = sellableItems.filter(i => i.qtyAvailable - i.qtyReserved <= 0);
 
     const brandOptions = Array.from(
         new Set(items.map((i) => i.product.brand?.trim()).filter((b): b is string => Boolean(b))),
@@ -1022,6 +1062,26 @@ export default function VendorInventoryPage() {
                             )}
                         </button>
                     ))}
+                    <button
+                        type="button"
+                        onClick={() => setShowInactive((p) => !p)}
+                        className={cn(
+                            'h-[34px] px-4 rounded-[8px] text-[12px] font-bold transition-all flex items-center gap-1.5',
+                            showInactive
+                                ? 'bg-primary text-white shadow-sm'
+                                : 'bg-white border border-[#EEEEEE] text-[#7C7C7C] hover:border-primary/30'
+                        )}
+                    >
+                        Show inactive products
+                        {inactiveCount > 0 && (
+                            <span className={cn(
+                                'text-[10px] font-[900] px-1.5 py-0.5 rounded-full',
+                                showInactive ? 'bg-white/20' : 'bg-[#F5F5F5] text-[#7C7C7C]'
+                            )}>
+                                {inactiveCount}
+                            </span>
+                        )}
+                    </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
                     <div className="relative">

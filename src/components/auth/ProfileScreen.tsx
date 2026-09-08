@@ -50,6 +50,7 @@ import { OutletsOverlay } from './OutletsOverlay';
 import { TeamMembersOverlay } from './TeamMembersOverlay';
 import { RolesPermissionsOverlay } from './RolesPermissionsOverlay';
 import { AccountOverviewOverlay } from './AccountOverviewOverlay';
+import { CompleteProfileOverlay } from './CompleteProfileOverlay';
 import { Sparkles } from 'lucide-react';
 
 interface ProfileScreenProps {
@@ -89,6 +90,8 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const [isRolesOpen, setIsRolesOpen] = useState(false);
     const [isOverviewOpen, setIsOverviewOpen] = useState(false);
     const [isSwitchBusinessOpen, setIsSwitchBusinessOpen] = useState(false);
+    const [isCompleteProfileOpen, setIsCompleteProfileOpen] = useState(false);
+    const [needsCompleteProfile, setNeedsCompleteProfile] = useState(false);
     const [signingOut, setSigningOut] = useState(false);
     const [hasVendorApplication, setHasVendorApplication] = useState<boolean | null>(null);
     const [vendorAppApproved, setVendorAppApproved] = useState(false);
@@ -120,21 +123,35 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         buyerImpersonating,
     } = useBusinessAccountSwitcher();
 
+    const canViewOutlets = has('outlets.view');
+    const canViewTeam = hasAny('users.view', 'users.create', 'users.edit', 'users.delete');
+    const canViewSettings = has('settings.view');
+    const openParam = searchParams?.get('open');
+
+    const clearOpenParam = () => {
+        const params = new URLSearchParams(searchParams?.toString() ?? '');
+        if (!params.has('open')) return;
+        params.delete('open');
+        const qs = params.toString();
+        router.replace(qs ? `/profile?${qs}` : '/profile', { scroll: false });
+    };
+
     useEffect(() => {
-        const openParam = searchParams?.get('open');
         if (!openParam) return;
         Promise.resolve().then(() => {
             if (openParam === 'outlets' || openParam === 'addresses' || openParam === 'saved-addresses') {
-                if (has('outlets.view')) setIsOutletsOpen(true);
+                if (canViewOutlets) setIsOutletsOpen(true);
             } else if (openParam === 'team' || openParam === 'team-members' || openParam === 'users') {
-                if (hasAny('users.view', 'users.create', 'users.edit', 'users.delete')) setIsTeamOpen(true);
+                if (canViewTeam) setIsTeamOpen(true);
             } else if (openParam === 'roles') {
-                if (hasAny('users.view', 'users.create', 'users.edit', 'users.delete')) setIsRolesOpen(true);
+                if (canViewTeam) setIsRolesOpen(true);
             } else if (openParam === 'overview' || openParam === 'account-overview') {
-                if (has('settings.view')) setIsOverviewOpen(true);
+                if (canViewSettings) setIsOverviewOpen(true);
+            } else if (openParam === 'complete' || openParam === 'complete-profile') {
+                setIsCompleteProfileOpen(true);
             }
         });
-    }, [searchParams, has, hasAny]);
+    }, [openParam, canViewOutlets, canViewTeam, canViewSettings]);
 
     // updateSession from useSession() is a new reference each render — keep it in a ref
     // so our role-sync effect doesn't refire and ping the session endpoint in a loop.
@@ -197,9 +214,13 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
             fetch('/api/v1/addresses', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
             fetch('/api/v1/vendor/application-status', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
             fetch('/api/v1/wallet', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
+            fetch('/api/v1/me/profile', { credentials: 'include' }).then(r => r.ok ? r.json() : null),
         ])
-            .then(([profileJson, addrJson, vendorJson, walletJson]) => {
+            .then(([profileJson, addrJson, vendorJson, walletJson, meProfileJson]) => {
                 if (cancelled) return;
+                if (meProfileJson?.success) {
+                    setNeedsCompleteProfile(!!meProfileJson.data?.needsCompleteProfile);
+                }
                 if (vendorJson?.success) {
                     Promise.resolve().then(() => {
                         setHasVendorApplication(!!vendorJson.data.hasApplication);
@@ -588,7 +609,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <p className="text-[10px] uppercase tracking-wider text-rose-200 font-bold">DiSCCO</p>
-                                            <h3 className="text-[20px] font-black mt-1">Buy Now, Pay Later</h3>
+                                            <h3 className="text-[20px] font-black mt-1 text-white">Buy Now, Pay Later</h3>
                                             <p className="text-[10px] text-rose-100/80 mt-0.5">
                                                 {creditSummary.lineCount} supplier credit line{creditSummary.lineCount === 1 ? '' : 's'}
                                             </p>
@@ -957,13 +978,14 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                             </>
                                         )}
                                     </div>
-                                    {!isProfileComplete && (
+                                    {!needsCompleteProfile ? null : (
                                         <button
-                                            onClick={() => setIsEditProfileOpen(true)}
-                                            className="hidden lg:flex items-center gap-2 shrink-0 bg-primary text-white text-[12px] font-bold px-4 py-2.5 rounded-xl hover:bg-primary-dark transition-colors cursor-pointer"
+                                            type="button"
+                                            onClick={() => setIsCompleteProfileOpen(true)}
+                                            className="flex items-center gap-2 shrink-0 bg-primary text-white text-[12px] font-bold px-4 py-2.5 rounded-xl hover:bg-primary-dark transition-colors cursor-pointer"
                                         >
-                                            <Pencil size={13} />
-                                            Complete profile
+                                            <Sparkles size={13} />
+                                            Complete your profile
                                         </button>
                                     )}
                                 </div>
@@ -982,7 +1004,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                                     </span>
                                                     <div>
                                                         <p className="text-[10px] uppercase tracking-wider text-rose-200 font-bold">DiSCCO</p>
-                                                        <h3 className="text-[22px] font-black leading-tight mt-0.5">Buy Now, Pay Later</h3>
+                                                        <h3 className="text-[22px] font-black leading-tight mt-0.5 text-white">Buy Now, Pay Later</h3>
                                                         <p className="text-[11px] text-rose-100/80 mt-0.5">
                                                             {creditSummary.lineCount} supplier credit line{creditSummary.lineCount === 1 ? '' : 's'}
                                                         </p>
@@ -1180,6 +1202,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                     if (/^\d{6}$/.test(data.pincode)) patch.pincode = data.pincode;
                     // Phone is editable now (10-digit local part; the API normalizes to +91…).
                     if (/^[6-9]\d{9}$/.test(data.phone)) patch.phone = data.phone;
+                    if (data.verificationToken) patch.verificationToken = data.verificationToken;
 
                     const res = await fetch('/api/v1/auth/me', {
                         method: 'PATCH',
@@ -1353,27 +1376,48 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                 onSubmitted={() => setHasVendorApplication(true)}
             />
 
+            <CompleteProfileOverlay
+                isOpen={isCompleteProfileOpen}
+                onClose={() => {
+                    setIsCompleteProfileOpen(false);
+                    clearOpenParam();
+                }}
+                onSaved={() => setNeedsCompleteProfile(false)}
+            />
+
             {/* Business Account Overlays */}
             {activeAccountIdForLinks && (
                 <>
                     <OutletsOverlay
                         isOpen={isOutletsOpen}
-                        onClose={() => setIsOutletsOpen(false)}
+                        onClose={() => {
+                            setIsOutletsOpen(false);
+                            clearOpenParam();
+                        }}
                         accountId={activeAccountIdForLinks}
                     />
                     <TeamMembersOverlay
                         isOpen={isTeamOpen}
-                        onClose={() => setIsTeamOpen(false)}
+                        onClose={() => {
+                            setIsTeamOpen(false);
+                            clearOpenParam();
+                        }}
                         accountId={activeAccountIdForLinks}
                     />
                     <RolesPermissionsOverlay
                         isOpen={isRolesOpen}
-                        onClose={() => setIsRolesOpen(false)}
+                        onClose={() => {
+                            setIsRolesOpen(false);
+                            clearOpenParam();
+                        }}
                         accountId={activeAccountIdForLinks}
                     />
                     <AccountOverviewOverlay
                         isOpen={isOverviewOpen}
-                        onClose={() => setIsOverviewOpen(false)}
+                        onClose={() => {
+                            setIsOverviewOpen(false);
+                            clearOpenParam();
+                        }}
                         accountId={activeAccountIdForLinks}
                         onOpenOutlets={() => setIsOutletsOpen(true)}
                         onOpenMembers={() => setIsTeamOpen(true)}

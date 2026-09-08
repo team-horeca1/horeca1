@@ -1,5 +1,5 @@
 // GET  /api/v1/admin/master-products — list the Horeca1 master catalog (admin CRUD).
-// POST /api/v1/admin/master-products — create a master SKU (admin-entered, required).
+// POST /api/v1/admin/master-products — create a master SKU (auto H1-SKU-* unless override).
 // PROTECTED: admin.
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -7,14 +7,14 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
-import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
-import { assertLeafCategory, syncMasterProductCategories } from '@/modules/catalog/catalog.service';
-import { validateMasterSku } from '@/lib/sku';
+import { assertLeafCategory, createMasterProductWithSku, syncMasterProductCategories } from '@/modules/catalog/catalog.service';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
+import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
 const createSchema = z.object({
-  sku: z.string().min(2).max(40),
+  sku: z.string().max(40).optional(),
   name: z.string().min(1),
   categoryId: z.string().uuid(),
   categoryIds: z.array(z.string().uuid()).min(1).optional(),
@@ -153,21 +153,11 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     requirePermission(ctx, 'products.create');
     const data = createSchema.parse(await req.json());
 
-    const skuCheck = validateMasterSku(data.sku);
-    if (!skuCheck.ok) throw Errors.badRequest(skuCheck.message);
-
-    const existingSku = await prisma.masterProduct.findFirst({
-      where: { sku: { equals: skuCheck.normalized, mode: 'insensitive' } },
-      select: { id: true },
-    });
-    if (existingSku) throw Errors.conflict(`SKU "${skuCheck.normalized}" is already in use`);
-
     const resolvedCategoryIds = data.categoryIds?.length ? data.categoryIds : [data.categoryId];
     await assertLeafCategory(resolvedCategoryIds);
 
-    const master = await prisma.masterProduct.create({
-      data: {
-        sku: skuCheck.normalized,
+    const master = await createMasterProductWithSku(
+      {
         name: data.name.trim(),
         categoryId: resolvedCategoryIds[0],
         brand: data.brand.trim(),
@@ -181,7 +171,8 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
         approvedBy: ctx.userId,
         approvedAt: new Date(),
       },
-    });
+      data.sku,
+    );
 
     await syncMasterProductCategories(master.id, resolvedCategoryIds);
 
@@ -195,6 +186,18 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       master.sku,
       master.id,
     ).catch(console.error);
+
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.masterProductCreate,
+      entity: 'MasterProduct',
+      entityId: master.id,
+      after: {
+        sku: master.sku,
+        name: master.name,
+        brand: master.brand,
+        categoryId: master.categoryId,
+      },
+    });
 
     return NextResponse.json({ success: true, data: master }, { status: 201 });
   } catch (error) {

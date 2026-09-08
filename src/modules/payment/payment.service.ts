@@ -3,6 +3,7 @@ import { getRazorpay } from '@/lib/razorpay';
 import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
 import { orderService } from '@/modules/order/order.service';
+import { canInitiateRazorpay } from '@/lib/offlinePayment';
 import crypto from 'crypto';
 
 function timingSafeEqHex(expectedHex: string, providedHex: string): boolean {
@@ -72,8 +73,8 @@ export class PaymentService {
       if (o.paymentStatus === 'paid') {
         throw Errors.badRequest(`Order ${o.orderNumber} is already paid`);
       }
-      if (o.paymentMethod !== 'online') {
-        throw Errors.badRequest(`Order ${o.orderNumber} is not an online payment order`);
+      if (!canInitiateRazorpay(o.paymentMethod)) {
+        throw Errors.badRequest(`Order ${o.orderNumber} cannot be paid online`);
       }
     }
 
@@ -178,7 +179,7 @@ export class PaymentService {
       }),
       prisma.order.updateMany({
         where: { id: { in: payments.map((p) => p.orderId) }, status: { not: 'cancelled' } },
-        data: { paymentStatus: 'paid' },
+        data: { paymentStatus: 'paid', paymentMethod: 'online' },
       }),
       prisma.order.updateMany({
         where: { id: { in: payments.map((p) => p.orderId) }, status: 'pending' },
@@ -307,7 +308,7 @@ export class PaymentService {
         // not resurrect a cancelled order or rewind one already in fulfilment.
         prisma.order.updateMany({
           where: { id: { in: payments.map(p => p.orderId) }, status: { not: 'cancelled' } },
-          data: { paymentStatus: 'paid' },
+          data: { paymentStatus: 'paid', paymentMethod: 'online' },
         }),
         prisma.order.updateMany({
           where: { id: { in: payments.map(p => p.orderId) }, status: 'pending' },

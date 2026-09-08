@@ -88,7 +88,12 @@ export const CustomerProfileSchema = z.object({
 
 export type CustomerProfileInput = z.infer<typeof CustomerProfileSchema>;
 
-export type ValidationContext = 'selfRegister' | 'adminCreate' | 'addBusiness';
+export type ValidationContext =
+  | 'selfRegister'
+  | 'adminCreate'
+  | 'addBusiness'
+  | 'selfRegisterLite'
+  | 'completeProfile';
 
 export interface ValidationResult {
   success: boolean;
@@ -141,6 +146,20 @@ export function validateCustomerProfile(
   const outletName = trim(data.outletName);
   const email = trim(data.email);
   const password = trim(data.password);
+
+  if (context === 'selfRegisterLite') {
+    if (!trim(data.firstName)) errors.firstName = 'First name is required';
+    if (!trim(data.lastName)) errors.lastName = 'Last name is required';
+    if (!legalName || legalName.length < 2) errors.legalName = 'Legal business name is required';
+    if (!trim(data.displayName)) errors.displayName = 'Display name is required';
+    const mobile = trim(data.mobilePhone || data.phone).replace(/\D/g, '').slice(-10);
+    if (mobile.length !== 10) errors.phone = 'Enter a valid 10-digit mobile number';
+    if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
+  }
+
+  if (context === 'completeProfile') {
+    if (password && password.length < 6) errors.password = 'Password must be at least 6 characters';
+  }
 
   if (context === 'selfRegister' || context === 'adminCreate') {
     if (!fullName || fullName.length < 2) errors.firstName = 'Contact name is required';

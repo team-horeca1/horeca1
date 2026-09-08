@@ -26,6 +26,7 @@ export const API_PERMISSION_RULES: readonly ApiPermissionRule[] = [
   { methods: ['PATCH'], pattern: /^admin\/vendors\/[^/]+$/, permission: 'vendors.edit' },
   { methods: ['DELETE'], pattern: /^admin\/vendors\/[^/]+$/, permission: 'vendors.delete' },
   { methods: ['GET'], pattern: /^admin\/orders(?:\/|$)/, permission: 'orders.view' },
+  { methods: ['POST'], pattern: /^admin\/orders\/[^/]+\/mark-paid$/, permission: 'orders.edit' },
   { methods: ['GET'], pattern: /^admin\/dashboard$/, permission: 'dashboard.view' },
   { methods: ['GET'], pattern: /^admin\/finance(?:\/|$)/, permission: 'payments.view' },
   { methods: ['GET'], pattern: /^admin\/ledger(?:\/|$)/, permission: 'payments.view' },

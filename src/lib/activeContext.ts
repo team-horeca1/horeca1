@@ -28,6 +28,7 @@ export interface AvailableStoreSummary {
   displayName: string;
   isPrimaryStore: boolean;
   isActive: boolean;
+  defaultOutletId: string | null;
 }
 
 export interface ActiveContext {
@@ -232,6 +233,7 @@ export async function loadActiveContext(
       displayName: (s.displayName?.trim() || s.businessName).trim(),
       isPrimaryStore: s.isPrimaryStore,
       isActive: s.isActive,
+      defaultOutletId: s.defaultOutletId,
     }));
 
     // Resolve active Online Store

@@ -11,6 +11,7 @@ import { adminOnly } from '@/middleware/rbac';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { syncCategoryParentLinks, getCategoryParentIds } from '@/modules/catalog/catalog.service';
+import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 
 // Helper: extract the [id] segment from the URL
 function extractId(req: NextRequest): string {
@@ -81,7 +82,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
 
     const existing = await prisma.category.findUnique({
       where: { id },
-      select: { id: true, parentId: true, _count: { select: { children: true } } },
+      select: { id: true, name: true, slug: true, parentId: true, isActive: true, _count: { select: { children: true } } },
     });
     if (!existing) throw Errors.notFound('Category');
 
@@ -135,6 +136,14 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
 
     const refreshedParentIds = await getCategoryParentIds(id);
 
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.categoryUpdate,
+      entity: 'Category',
+      entityId: id,
+      before: { name: existing.name, slug: existing.slug, parentId: existing.parentId, isActive: existing.isActive },
+      after: { name: category.name, slug: category.slug, parentId: category.parentId, isActive: category.isActive, parentCategoryIds: refreshedParentIds },
+    });
+
     return NextResponse.json({
       success: true,
       data: { ...category, parentCategoryIds: refreshedParentIds },
@@ -180,6 +189,13 @@ export const DELETE = adminOnly(async (req: NextRequest, ctx) => {
 
     await prisma.category.delete({
       where: { id },
+    });
+
+    logAction(ctx, req, {
+      action: AUDIT_ACTIONS.categoryDelete,
+      entity: 'Category',
+      entityId: id,
+      before: { name: existing.name, slug: existing.slug, parentId: existing.parentId },
     });
 
     return NextResponse.json({ success: true, data: { id, deleted: true } });

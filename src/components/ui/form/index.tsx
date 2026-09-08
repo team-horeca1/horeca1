@@ -30,7 +30,7 @@ export const FORM = {
 } as const;
 
 const CONTROL_BASE =
-  'w-full bg-white focus:bg-white border rounded-xl text-[15px] text-text placeholder:text-text-muted outline-none transition-all duration-150';
+  'w-full bg-white focus:bg-white border rounded-xl text-[15px] text-[#1C1C1C] caret-[#1C1C1C] placeholder:text-text-muted outline-none transition-all duration-150 [color-scheme:light] [&:-webkit-autofill]:[-webkit-text-fill-color:#1C1C1C] [&:-webkit-autofill]:shadow-[inset_0_0_0_1000px_#fff]';
 const CONTROL_OK =
   'border-divider focus:border-primary focus:ring-2 focus:ring-primary/10';
 const CONTROL_ERR =

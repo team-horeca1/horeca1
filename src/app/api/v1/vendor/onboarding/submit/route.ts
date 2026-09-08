@@ -16,6 +16,8 @@ import { emitEvent } from '@/events/emitter';
 import { GST_RE, PAN_RE, VENDOR_TYPES } from '@/lib/validators/vendor-kyc';
 import { resolveVendorTypeSlug, getEffectiveVendorTypeSelections } from '@/lib/validators/vendor-profile';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
+import { assertVerificationToken } from '@/lib/otpVerification';
+import { normalizePhone, phoneLookupVariants } from '@/lib/phone';
 import {
   normalizeVendorTypeSelections,
   legacyScalarsFromSelections,
@@ -44,6 +46,7 @@ const BodyBase = z.object({
   // Step 1 — phone or email verified via /auth/otp/verify
   phone: z.string().optional().or(z.literal('')),
   verifiedEmail: z.string().optional().or(z.literal('')),
+  verificationToken: z.string().min(1).optional(),
 
   // Step 2 — vendor type (CSV-aligned + legacy slugs)
   vendorType: z.enum(VENDOR_TYPES).optional(),
@@ -100,8 +103,7 @@ function parseBody(raw: unknown) {
   const relaxed = isRegisterEmailOtpEnabled();
   const parsed = BodyBase.parse(raw);
 
-  const phoneRaw = (parsed.phone ?? '').replace(/\D/g, '');
-  const phone = phoneRaw.length === 12 ? phoneRaw.replace(/^91/, '') : phoneRaw;
+  const phone = normalizePhone(parsed.phone) ?? '';
   const verifiedEmail = (parsed.verifiedEmail || parsed.email || '').trim().toLowerCase();
   const ownerEmail = (parsed.email || parsed.authorizedPersonEmail || verifiedEmail).trim().toLowerCase();
   const authPhone = (parsed.authorizedPersonPhone ?? phone).replace(/\D/g, '').slice(-10);
@@ -115,15 +117,12 @@ function parseBody(raw: unknown) {
     if (!hasPhone && !hasEmail) {
       throw Errors.badRequest('Provide a verified mobile number or email address');
     }
-    if (authPhone && authPhone.length > 0 && !PHONE_RE.test(authPhone)) {
-      throw Errors.badRequest('Invalid authorized person phone');
-    }
     if (ownerEmail && !EMAIL_RE.test(ownerEmail)) {
       throw Errors.badRequest('Invalid email address');
     }
-    if (!hasPhone && !ownerEmail) {
-      throw Errors.badRequest('Email is required when no phone is provided');
-    }
+  }
+  if (!PHONE_RE.test(authPhone)) {
+    throw Errors.badRequest('Enter a valid 10-digit store contact mobile number');
   }
 
   const selections = normalizeVendorTypeSelections(parsed.vendorTypeSelections)
@@ -153,6 +152,7 @@ function parseBody(raw: unknown) {
     vendorBusinessType: legacy?.vendorBusinessType ?? parsed.vendorBusinessType,
     vendorType: legacy?.vendorType ?? parsed.vendorType,
     subType: legacy?.subType ?? parsed.subType,
+    verificationToken: parsed.verificationToken,
     relaxed,
   };
 }
@@ -172,45 +172,24 @@ async function postHandler(req: NextRequest) {
     const email = input.email;
     const verifyEmail = input.verifiedEmail;
 
-    const otpWhere = input.relaxed
-      ? {
-          OR: [
-            ...(phone ? [{ phone, used: true as const }] : []),
-            ...(verifyEmail ? [{ email: verifyEmail, used: true as const }] : []),
-          ],
-          createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
-        }
-      : {
-          phone: phone!,
-          used: true as const,
-          createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
-        };
-
-    const verifiedOtp = await prisma.otpCode.findFirst({
-      where: otpWhere,
-      orderBy: { createdAt: 'desc' },
-      select: { id: true },
+    await assertVerificationToken(input.verificationToken, {
+      phone,
+      email: verifyEmail,
     });
-    if (!verifiedOtp) {
-      throw Errors.badRequest(
-        input.relaxed
-          ? 'Contact is not verified. Please verify your mobile or email first.'
-          : 'Phone number is not verified. Please verify your number first.',
-      );
-    }
 
     const existing = await prisma.user.findFirst({
       where: {
         OR: [
-          ...(phone ? [{ phone }] : []),
+          ...(phone ? [{ phone: { in: phoneLookupVariants(phone) } }] : []),
           ...(email ? [{ email }] : []),
         ],
       },
+      orderBy: { createdAt: 'asc' },
       select: { id: true, phone: true, email: true },
     });
     if (existing) {
-      const dupField = phone && existing.phone === phone ? 'Phone' : 'Email';
-      throw Errors.duplicate(dupField);
+      const phoneHit = phone && phoneLookupVariants(existing.phone).includes(phone);
+      throw Errors.duplicate(phoneHit ? 'Phone' : 'Email');
     }
 
     const vendorAdminTemplate = await prisma.accountRole.findFirst({

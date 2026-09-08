@@ -43,6 +43,7 @@ import VendorBulkGrid from '@/components/features/vendor/VendorBulkGrid';
 import AdminBulkEngine from '@/components/features/admin/AdminBulkEngine';
 import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
+import { DEFAULT_GST_SLABS, gstSlabSelectOptions } from '@/lib/constants/gstSlabs';
 import { ProductEssentialsFields } from '@/components/features/shared/productForm/ProductEssentialsFields';
 import FormSection, {
     FieldLabel,
@@ -217,8 +218,8 @@ type MasterCommerceSeed = {
     aliasNames: string[];
 };
 
-// GST slabs are government-fixed — not mock data.
-const TAX_OPTIONS = ['0', '5', '12', '18', '28'];
+// GST slabs are loaded from platform settings; fallback is government-fixed.
+const TAX_OPTIONS_FALLBACK = DEFAULT_GST_SLABS.map(String);
 
 function getPageRange(current: number, total: number): (number | 'gap')[] {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -425,6 +426,7 @@ export default function ProductsPage() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [brands, setBrands] = useState<BrandOption[]>([]);
     const [brandSuggesting, setBrandSuggesting] = useState(false);
+    const [gstSlabs, setGstSlabs] = useState<string[]>(TAX_OPTIONS_FALLBACK);
 
     // Loading state
     const [loading, setLoading] = useState(true);
@@ -573,6 +575,17 @@ export default function ProductsPage() {
         const timer = setTimeout(() => setDebouncedSearch(searchInput), 400);
         return () => clearTimeout(timer);
     }, [searchInput]);
+
+    useEffect(() => {
+        fetch('/api/v1/config/gst-slabs')
+            .then((r) => r.json())
+            .then((json: { success?: boolean; data?: { slabs?: number[] } }) => {
+                if (json.success && Array.isArray(json.data?.slabs) && json.data.slabs.length > 0) {
+                    setGstSlabs(json.data.slabs.map(String));
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     // -----------------------------------------------------------------------
     // Close export dropdown on outside click — removed (export in BulkProductToolbar)
@@ -799,6 +812,11 @@ export default function ProductsPage() {
             handleCellChange(productId, 'name', originalValue);
             return;
         }
+        if (field === 'sku' && (!value || !String(value).trim())) {
+            toast.error('SKU cannot be empty');
+            handleCellChange(productId, 'sku', originalValue);
+            return;
+        }
         if (field === 'basePrice' && (isNaN(Number(value)) || Number(value) <= 0)) {
             toast.error('Please enter a valid base price');
             handleCellChange(productId, 'basePrice', originalValue);
@@ -851,7 +869,7 @@ export default function ProductsPage() {
                     p.id === productId ? { ...p, ...updatedProduct } : p
                 );
             } else {
-                toast.error(json.message || 'Failed to update product');
+                toast.error(json.error?.message ?? json.message ?? 'Failed to update product');
                 if (field === 'primaryCategoryId') {
                     const origCat = originalProductsRef.current.find(p => p.id === productId)?.category;
                     handleCellChange(productId, 'category', origCat);
@@ -1312,6 +1330,7 @@ export default function ProductsPage() {
         const isMasterCreate = !editingProduct && !formData.vendorId;
         const errors = validateProductEssentials(formData, {
             portal: 'admin',
+            skuOptional: isMasterCreate,
             validateMasterSkuFormat: isMasterCreate,
             requireBasePriceForVendorListing: !!formData.vendorId,
         });
@@ -1627,7 +1646,7 @@ export default function ProductsPage() {
                     ? `/api/v1/admin/master-products/${editingProduct!.id}`
                     : '/api/v1/admin/master-products';
                 const method = isEdit ? 'PATCH' : 'POST';
-                if (!isEdit) masterPayload.sku = formData.sku.trim();
+                if (formData.sku.trim()) masterPayload.sku = formData.sku.trim();
 
                 const res = await fetch(url, {
                     method,
@@ -2273,7 +2292,7 @@ export default function ProductsPage() {
                                                     }}
                                                     className={cn(cellInput, "text-right font-medium text-[#7C7C7C] w-[65px] ml-auto appearance-none")}
                                                 >
-                                                    {TAX_OPTIONS.map(t => (
+                                                    {gstSlabSelectOptions(gstSlabs.map(Number), String(product.taxPercent ?? 0)).map(t => (
                                                         <option key={t} value={t}>{t}%</option>
                                                     ))}
                                                 </select>
@@ -2592,7 +2611,7 @@ export default function ProductsPage() {
                                     sku={formData.sku}
                                     hsn={formData.hsn}
                                     brand={formData.brand}
-                                    skuReadOnly={!!editingProduct?.isMasterRow}
+                                    skuOptional={!editingProduct && !formData.vendorId}
                                     onSkuChange={(v) => updateField('sku', v)}
                                     onHsnChange={(v) => updateField('hsn', v)}
                                     onBrandChange={(v) => updateField('brand', v)}
@@ -2623,7 +2642,7 @@ export default function ProductsPage() {
                                     brandSuggesting={brandSuggesting}
                                     errors={formErrors}
                                     basePriceRequired={!!formData.vendorId}
-                                    taxPercentOptions={TAX_OPTIONS}
+                                    taxPercentOptions={gstSlabSelectOptions(gstSlabs.map(Number), formData.taxPercent)}
                                 >
                                     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                                         <div id="ff-countryOfOrigin">

@@ -18,6 +18,7 @@ import { getDeliveryGeo } from '@/lib/deliveryLocation';
 import { CartService, type CartContext } from '@/modules/cart/cart.service';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { creditVendorOnDelivery } from '@/modules/vendor/vendorSettlement.service';
+import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import {
   promotionService,
   evaluateVendorPromo,
@@ -2509,6 +2510,142 @@ export class OrderService {
     });
 
     return { id: result.id, orderNumber: result.orderNumber };
+  }
+
+  /**
+   * Customer pays an unpaid offline PO (bank transfer / PO / cheque) with
+   * DiSCCO credit or Horeca1 platform credit. Debits the wallet and marks paid.
+   */
+  async payExistingOrder(orderId: string, userId: string, method: 'credit' | 'wallet') {
+    const updated = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw Errors.notFound('Order');
+      if (order.userId !== userId) throw Errors.forbidden('Order does not belong to this account');
+      if (order.status === 'cancelled') throw Errors.badRequest('This order is cancelled');
+      if (order.paymentStatus === 'paid') throw Errors.badRequest('Order is already paid');
+      if (order.paymentStatus !== 'unpaid') throw Errors.badRequest('Order cannot be paid in this state');
+      if (!isOfflinePaymentMethod(order.paymentMethod)) {
+        throw Errors.badRequest('This order is not payable with a different method');
+      }
+
+      const totalAmount = Number(order.totalAmount);
+      if (totalAmount > 0) {
+        const creditVendorId = method === 'wallet' ? null : order.vendorId;
+        await creditWalletService.debitWallet(userId, creditVendorId, totalAmount, order.id, tx);
+      }
+
+      const next = await tx.order.update({
+        where: { id: orderId },
+        data: { paymentMethod: method, paymentStatus: 'paid' },
+      });
+
+      await recordOrderEvents(tx, [
+        {
+          orderId: order.id,
+          actorId: userId,
+          action: ORDER_EVENT_ACTIONS.PAYMENT_RECORDED,
+          payload: {
+            via: method,
+            fromMethod: order.paymentMethod,
+            amount: totalAmount,
+          },
+        },
+      ]);
+
+      return next;
+    });
+
+    emitEvent('PaymentReceived', {
+      orderId: updated.id,
+      paymentId: updated.id,
+      userId: updated.userId,
+      vendorId: updated.vendorId,
+      amount: Number(updated.totalAmount),
+    });
+
+    try {
+      const { promotionService } = await import('@/modules/promotion/promotion.service');
+      await promotionService.onOrdersBecameSuccessful([updated.id]);
+    } catch (err) {
+      console.error('[Order] Program issuance after credit pay failed:', err);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Admin records that an offline (bank transfer / PO / cheque) payment was received.
+   */
+  async adminMarkPaid(
+    orderId: string,
+    actorId: string,
+    input: { reference?: string; note?: string },
+  ) {
+    const updated = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw Errors.notFound('Order');
+      if (order.status === 'cancelled') throw Errors.badRequest('This order is cancelled');
+      if (order.paymentStatus === 'paid') throw Errors.badRequest('Order is already paid');
+      if (!isOfflinePaymentMethod(order.paymentMethod)) {
+        throw Errors.badRequest('Only bank transfer, PO, or cheque orders can be marked paid');
+      }
+
+      const reference = input.reference?.trim() || null;
+      const note = input.note?.trim() || null;
+
+      const payment = await tx.payment.create({
+        data: {
+          orderId: order.id,
+          vendorId: order.vendorId,
+          userId: order.userId,
+          amount: order.totalAmount,
+          currency: 'INR',
+          status: 'captured',
+          method: order.paymentMethod,
+          razorpayPaymentId: reference,
+        },
+      });
+
+      const next = await tx.order.update({
+        where: { id: orderId },
+        data: { paymentStatus: 'paid' },
+      });
+
+      await recordOrderEvents(tx, [
+        {
+          orderId: order.id,
+          actorId,
+          action: ORDER_EVENT_ACTIONS.PAYMENT_RECORDED,
+          payload: {
+            via: 'admin',
+            method: order.paymentMethod,
+            reference,
+            note,
+            amount: Number(order.totalAmount),
+            paymentId: payment.id,
+          },
+        },
+      ]);
+
+      return { order: next, paymentId: payment.id };
+    });
+
+    emitEvent('PaymentReceived', {
+      orderId: updated.order.id,
+      paymentId: updated.paymentId,
+      userId: updated.order.userId,
+      vendorId: updated.order.vendorId,
+      amount: Number(updated.order.totalAmount),
+    });
+
+    try {
+      const { promotionService } = await import('@/modules/promotion/promotion.service');
+      await promotionService.onOrdersBecameSuccessful([updated.order.id]);
+    } catch (err) {
+      console.error('[Order] Program issuance after admin mark-paid failed:', err);
+    }
+
+    return updated.order;
   }
 }
 

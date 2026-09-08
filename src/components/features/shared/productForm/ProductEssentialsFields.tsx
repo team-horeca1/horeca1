@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import FormSection from '@/components/features/shared/FormSection';
@@ -12,6 +12,7 @@ import {
   productFormInputCls,
   productFormSelectCls,
 } from './productFormFieldStyles';
+import { gstSlabSelectOptions } from '@/lib/constants/gstSlabs';
 
 const inputCls = productFormInputCls;
 const selectCls = productFormSelectCls;
@@ -41,6 +42,7 @@ export interface ProductEssentialsFieldsProps {
   catalogSku?: string;
   vendorSku?: string;
   skuReadOnly?: boolean;
+  skuOptional?: boolean;
   onSkuChange: (value: string) => void;
   onHsnChange: (value: string) => void;
   onBrandChange: (value: string) => void;
@@ -90,6 +92,7 @@ export function ProductEssentialsFields({
   catalogSku = '',
   vendorSku = '',
   skuReadOnly,
+  skuOptional,
   onSkuChange,
   onHsnChange,
   onBrandChange,
@@ -123,7 +126,14 @@ export function ProductEssentialsFields({
   children,
 }: ProductEssentialsFieldsProps) {
   const suggestLabel = portal === 'admin' ? 'admin' : 'vendor';
-  const useTaxSelect = portal === 'admin' && !!taxPercentOptions?.length;
+  const taxOptions = useMemo(
+    () => gstSlabSelectOptions(
+      (taxPercentOptions ?? []).map((t) => Number(t)).filter((n) => Number.isFinite(n)),
+      pricing.taxPercent,
+    ),
+    [taxPercentOptions, pricing.taxPercent],
+  );
+  const useTaxSelect = taxOptions.length > 0;
 
   const handleBasePriceChange = (base: string) => {
     onBasePriceChange(base);
@@ -218,12 +228,12 @@ export function ProductEssentialsFields({
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-3">
           {nameField}
           <div id="ff-sku" className="xl:col-span-2">
-            <FieldLabel required>SKU</FieldLabel>
+            <FieldLabel required={!skuOptional}>SKU</FieldLabel>
             <input
               type="text"
               value={sku}
               onChange={(e) => onSkuChange(portal === 'admin' ? e.target.value.toUpperCase() : e.target.value)}
-              placeholder={portal === 'admin' ? 'RIC-BAS-001' : undefined}
+              placeholder={skuOptional ? 'Auto (H1-SKU-xxxxx)' : portal === 'admin' ? 'RIC-BAS-001' : undefined}
               readOnly={skuReadOnly}
               className={cn(
                 inputCls,
@@ -231,6 +241,11 @@ export function ProductEssentialsFields({
                 errors.sku && 'border-[#E74C3C]',
               )}
             />
+            {skuOptional && !skuReadOnly && (
+              <p className="text-[11px] text-[#AEAEAE] font-medium mt-1.5">
+                Leave blank to auto-generate. Enter a custom SKU to override.
+              </p>
+            )}
             <FieldError message={errors.sku} />
           </div>
           <div id="ff-hsn" className="xl:col-span-2">
@@ -297,7 +312,7 @@ export function ProductEssentialsFields({
                   value={pricing.basePrice}
                   onChange={(e) => handleBasePriceChange(e.target.value)}
                   placeholder="0.00"
-                  className={cn(inputCls, 'pl-7', errors.basePrice && 'border-[#E74C3C]')}
+                  className={cn(inputCls, 'pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none', errors.basePrice && 'border-[#E74C3C]')}
                 />
               </div>
               <FieldError message={errors.basePrice} />
@@ -310,7 +325,7 @@ export function ProductEssentialsFields({
                   onChange={(e) => handleTaxPercentChange(e.target.value)}
                   className={selectCls}
                 >
-                  {taxPercentOptions!.map(t => (
+                  {taxOptions.map(t => (
                     <option key={t} value={t}>{t}%</option>
                   ))}
                 </select>
@@ -339,7 +354,7 @@ export function ProductEssentialsFields({
                   value={pricing.originalPrice}
                   onChange={(e) => handleGrossChange(e.target.value)}
                   placeholder="0.00"
-                  className={cn(inputCls, 'pl-7 font-bold text-primary bg-primary-light/10')}
+                  className={cn(inputCls, 'pl-7 font-bold text-primary bg-primary-light/10 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none')}
                 />
               </div>
             </div>

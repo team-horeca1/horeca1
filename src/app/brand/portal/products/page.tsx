@@ -138,6 +138,7 @@ export default function BrandProductsPage() {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [editingPendingMaster, setEditingPendingMaster] = useState(false);
     const [form, setForm] = useState<BrandProductFormData>(EMPTY_BRAND_PRODUCT_FORM);
     const [formError, setFormError] = useState<string | null>(null);
     const [showImport, setShowImport] = useState(false);
@@ -166,6 +167,7 @@ export default function BrandProductsPage() {
 
     const openAdd = useCallback(() => {
         setEditingId(null);
+        setEditingPendingMaster(false);
         setForm(EMPTY_BRAND_PRODUCT_FORM);
         setFormError(null);
         setShowForm(true);
@@ -173,6 +175,7 @@ export default function BrandProductsPage() {
 
     const openEdit = useCallback((p: MasterProduct) => {
         setEditingId(p.id);
+        setEditingPendingMaster(p.source === 'pending_master');
         setForm(productToForm(p));
         setFormError(null);
         setShowForm(true);
@@ -181,6 +184,7 @@ export default function BrandProductsPage() {
     const closeForm = useCallback(() => {
         setShowForm(false);
         setEditingId(null);
+        setEditingPendingMaster(false);
         setFormError(null);
     }, []);
 
@@ -216,19 +220,45 @@ export default function BrandProductsPage() {
         const packErr = validatePackUnitFields(form.packSize, form.unit);
         if (packErr) { setFormError(packErr); return; }
         if (!form.masterProductId && !editingId) {
-            if (!form.sku.trim()) { setFormError('SKU is required for new products'); return; }
             if (form.categoryIds.length === 0) { setFormError('At least one category is required'); return; }
         }
         setActionLoading('form');
         setFormError(null);
         try {
+            if (editingId && editingPendingMaster) {
+                if (form.categoryIds.length === 0) { setFormError('At least one category is required'); return; }
+                const res = await fetch(`/api/v1/brand/master-products/${editingId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: form.name.trim(),
+                        ...(form.sku.trim() && { sku: form.sku.trim() }),
+                        categoryId: form.categoryIds[0],
+                        categoryIds: form.categoryIds,
+                        ...(form.imageUrl && { imageUrl: form.imageUrl }),
+                        ...(form.packSize.trim() && { packSize: form.packSize.trim() }),
+                        ...(form.unit.trim() && { uom: form.unit.trim() }),
+                        ...detailFieldsPayload(form),
+                    }),
+                });
+                const json = await res.json();
+                if (json.success) {
+                    toast.success('Pending product updated');
+                    closeForm();
+                    fetchProducts();
+                } else {
+                    setFormError(json.error?.message ?? 'Failed to update product');
+                }
+                return;
+            }
+
             if (!editingId && !form.masterProductId) {
                 const res = await fetch('/api/v1/brand/master-products', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         name: form.name.trim(),
-                        sku: form.sku.trim(),
+                        ...(form.sku.trim() && { sku: form.sku.trim() }),
                         categoryId: form.categoryIds[0],
                         ...(form.imageUrl && { imageUrl: form.imageUrl }),
                         ...(form.packSize.trim() && { packSize: form.packSize.trim() }),
@@ -402,27 +432,23 @@ export default function BrandProductsPage() {
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
-                                            {isPendingMaster ? (
-                                                <span className="text-[12px] text-[#AEAEAE] font-medium">
-                                                    {status === 'pending' ? 'Awaiting admin' : '—'}
-                                                </span>
-                                            ) : (
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => openEdit(product)}
-                                                        className="h-[32px] w-[32px] flex items-center justify-center bg-[#F0F4FF] text-[#3B82F6] rounded-[8px] hover:bg-[#3B82F6] hover:text-white transition-colors"
-                                                    >
-                                                        <Pencil size={14} />
-                                                    </button>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => openEdit(product)}
+                                                    className="h-[32px] w-[32px] flex items-center justify-center bg-[#F0F4FF] text-[#3B82F6] rounded-[8px] hover:bg-[#3B82F6] hover:text-white transition-colors"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
+                                                {!isPendingMaster && (
                                                     <button
                                                         onClick={() => handleDelete(product.id)}
                                                         disabled={!!actionLoading}
                                                         className="h-[32px] w-[32px] flex items-center justify-center bg-[#FEF2F2] text-[#E74C3C] rounded-[8px] hover:bg-[#E74C3C] hover:text-white transition-colors disabled:opacity-50"
                                                     >
-                                                        {actionLoading === product.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                                                        <Trash2 size={14} />
                                                     </button>
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                     );

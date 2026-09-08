@@ -36,6 +36,7 @@ export const updateProfileSchema = z.object({
   businessName: z.string().optional(),
   gstNumber: z.string().optional(),
   image: z.string().url().optional(),
+  verificationToken: z.string().min(1).optional(),
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;
