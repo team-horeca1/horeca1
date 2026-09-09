@@ -4,7 +4,12 @@
 
 import { z } from 'zod';
 import { GST_RE, PINCODE_RE } from '@/lib/validators/vendor-kyc';
-import { BRAND_TYPES, subTypesForBrandType } from '@/lib/constants/brandProfile';
+import {
+  isOtherSentinel,
+  isPresetBrandType,
+  PROFILE_LABEL_MAX,
+  subTypesForBrandType,
+} from '@/lib/constants/brandProfile';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -142,19 +147,19 @@ export function validateBrandProfile(
     if (!rawLegal || rawLegal.length < 2) errors.legalName = 'Legal brand name is required';
     if (!rawDisplay || rawDisplay.length < 2) errors.displayName = 'Display name is required';
     if (!rawFirst || rawFirst.length < 2) errors.firstName = 'First name is required';
-    if (!trim(data.brandType)) errors.brandType = 'Brand type is required';
-    else if (!(BRAND_TYPES as readonly string[]).includes(trim(data.brandType))) {
-      errors.brandType = 'Select a valid brand type';
-    }
     const brandType = trim(data.brandType);
     const subType = trim(data.subType);
-    if (brandType && subType) {
+    if (!brandType) errors.brandType = 'Brand type is required';
+    else if (isOtherSentinel(brandType)) errors.brandType = 'Type your own brand type';
+    else if (brandType.length > PROFILE_LABEL_MAX) errors.brandType = `Brand type must be ${PROFILE_LABEL_MAX} characters or fewer`;
+    if (!subType) errors.subType = 'Sub-type is required';
+    else if (isOtherSentinel(subType)) errors.subType = 'Type your own sub-type';
+    else if (subType.length > PROFILE_LABEL_MAX) errors.subType = `Sub-type must be ${PROFILE_LABEL_MAX} characters or fewer`;
+    else if (isPresetBrandType(brandType)) {
       const allowed = subTypesForBrandType(brandType);
-      if (allowed.length > 0 && !allowed.includes(subType)) {
-        errors.subType = 'Select a valid sub-type for this brand type';
+      if (allowed.length > 0 && !allowed.includes(subType) && subType.length < 2) {
+        errors.subType = 'Select a sub-type or type your own';
       }
-    } else if (brandType && subTypesForBrandType(brandType).length > 0) {
-      errors.subType = 'Sub-type is required';
     }
     // adminCreate always uses email-OR-phone; publicRegister only when email OTP is enabled.
     const relaxedContact =

@@ -34,6 +34,29 @@ export const VENDOR_BUSINESS_TYPES = [
 
 export type VendorBusinessType = (typeof VENDOR_BUSINESS_TYPES)[number];
 
+/** Dropdown sentinel — never persisted. */
+export const OTHER_OPTION = 'Other';
+
+export const PROFILE_LABEL_MAX = 80;
+
+export function isPresetVendorType(vendorType: string): boolean {
+  return (VENDOR_BUSINESS_TYPES as readonly string[]).includes(vendorType);
+}
+
+export function isOtherSentinel(value: string): boolean {
+  return value.trim().toLowerCase() === OTHER_OPTION.toLowerCase();
+}
+
+function slugifyCustomType(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 40);
+  return slug ? `other_${slug}`.slice(0, 50) : 'other';
+}
+
 /** Sub-types keyed by vendor type (Level 3). */
 export const SUB_TYPES_BY_TYPE: Record<string, readonly string[]> = {
   Distributor: ['HoReCa Distributor', 'Multi-Category Distributor', 'FMCG Distributor'],
@@ -93,12 +116,14 @@ export function slugForVendorType(vendorType: string): string | undefined {
   if (vendorType in VENDOR_TYPE_SLUGS) {
     return VENDOR_TYPE_SLUGS[vendorType as VendorBusinessType];
   }
-  return undefined;
+  const trimmed = vendorType.trim();
+  if (!trimmed || isOtherSentinel(trimmed)) return undefined;
+  return slugifyCustomType(trimmed);
 }
 
 /** One vendor type row with multi-select sub-types (onboarding matrix). */
 export type VendorTypeSelection = {
-  type: VendorBusinessType;
+  type: string;
   slug: string;
   subTypes: string[];
 };
@@ -111,17 +136,18 @@ export function normalizeVendorTypeSelections(
   for (const item of raw) {
     if (!item || typeof item !== 'object') continue;
     const rec = item as Record<string, unknown>;
-    const type = String(rec.type ?? '').trim();
-    const slug = String(rec.slug ?? slugForVendorType(type) ?? '').trim();
+    const type = String(rec.type ?? '').trim().slice(0, PROFILE_LABEL_MAX);
+    if (!type || isOtherSentinel(type)) continue;
+    const slug = String(rec.slug ?? slugForVendorType(type) ?? '').trim().slice(0, 50);
     const subTypes = Array.isArray(rec.subTypes)
-      ? rec.subTypes.map((s) => String(s).trim()).filter(Boolean)
+      ? rec.subTypes
+          .map((s) => String(s).trim().slice(0, PROFILE_LABEL_MAX))
+          .filter((s) => s && !isOtherSentinel(s))
       : [];
-    if (!type || !(VENDOR_BUSINESS_TYPES as readonly string[]).includes(type)) continue;
     if (subTypes.length === 0) continue;
-    const allowed = subTypesForVendorType(type);
-    const validSubs = subTypes.filter((s) => allowed.includes(s));
-    if (validSubs.length === 0) continue;
-    out.push({ type: type as VendorBusinessType, slug: slug || slugForVendorType(type)!, subTypes: validSubs });
+    const resolvedSlug = slug || slugForVendorType(type);
+    if (!resolvedSlug) continue;
+    out.push({ type, slug: resolvedSlug, subTypes });
   }
   return out;
 }
@@ -142,8 +168,8 @@ export function legacyToVendorTypeSelections(
   const st = (subType ?? '').trim();
   if (!st) return [];
   return [{
-    type: display as VendorBusinessType,
-    slug: slugForVendorType(display as VendorBusinessType) ?? vendorType ?? display,
+    type: display,
+    slug: slugForVendorType(display) ?? vendorType ?? display,
     subTypes: [st],
   }];
 }

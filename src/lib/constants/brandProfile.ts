@@ -43,6 +43,32 @@ export const BRAND_TYPES = [
 
 export type BrandType = (typeof BRAND_TYPES)[number];
 
+/** Dropdown sentinel — never persisted. Typed value is stored on Brand.brandType / subType. */
+export const OTHER_OPTION = 'Other';
+
+export const PROFILE_LABEL_MAX = 80;
+
+export function isPresetBrandType(brandType: string): boolean {
+  return (BRAND_TYPES as readonly string[]).includes(brandType);
+}
+
+export function isOtherSentinel(value: string): boolean {
+  return value.trim().toLowerCase() === OTHER_OPTION.toLowerCase();
+}
+
+export function brandTypeSelectValue(brandType: string): string {
+  if (!brandType) return '';
+  if (isPresetBrandType(brandType)) return brandType;
+  return OTHER_OPTION;
+}
+
+export function brandSubTypeSelectValue(brandType: string, subType: string): string {
+  if (!subType) return '';
+  const presets = subTypesForBrandType(brandType);
+  if (presets.includes(subType)) return subType;
+  return OTHER_OPTION;
+}
+
 /** Sub-types keyed by brand type (Level 3). */
 export const SUB_TYPES_BY_TYPE: Record<string, readonly string[]> = {
   D2C: ['Food Brand', 'Beverage Brand'],

@@ -13,9 +13,9 @@ import {
 import {
   VENDOR_BUSINESS_TYPES,
   slugForVendorType,
-  subTypesForVendorType,
   normalizeVendorTypeSelections,
   legacyToVendorTypeSelections,
+  isOtherSentinel,
   type VendorBusinessType,
   type VendorTypeSelection,
 } from '@/lib/constants/vendorProfile';
@@ -166,7 +166,9 @@ export function normalizedVendorTypeSlug(vendorType: string | undefined | null):
   );
   if (csvSlugMatch) return v;
 
-  return null;
+  if (v.startsWith('other_')) return v;
+  const custom = slugForVendorType(v);
+  return custom ?? null;
 }
 
 /** Slug or CSV label → CSV display label for dropdowns. */
@@ -219,16 +221,21 @@ function validateVendorTypeSelections(data: VendorProfileInput): Record<string, 
     return errors;
   }
   for (const row of selections) {
-    if (!(VENDOR_BUSINESS_TYPES as readonly string[]).includes(row.type)) {
-      errors.vendorTypeSelections = 'Select a valid supplier type';
+    if (isOtherSentinel(row.type)) {
+      errors.vendorTypeSelections = 'Type your own supplier type';
       break;
     }
-    const allowed = subTypesForVendorType(row.type);
-    for (const st of row.subTypes) {
-      if (allowed.length > 0 && !allowed.includes(st)) {
-        errors.vendorTypeSelections = `Invalid sub-type "${st}" for ${row.type}`;
-        break;
-      }
+    if (row.type.length > 80) {
+      errors.vendorTypeSelections = 'Supplier type must be 80 characters or fewer';
+      break;
+    }
+    if (row.subTypes.some((st) => isOtherSentinel(st) || st.trim().length < 1)) {
+      errors.vendorTypeSelections = 'Type your own sub-type';
+      break;
+    }
+    if (row.subTypes.some((st) => st.trim().length > 80)) {
+      errors.vendorTypeSelections = 'Sub-type must be 80 characters or fewer';
+      break;
     }
   }
   return errors;

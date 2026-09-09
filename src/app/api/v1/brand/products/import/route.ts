@@ -10,9 +10,12 @@ import { requirePermission } from '@/lib/permissions/engine';
 import {
   parseBrandCatalogImport,
   generateBrandCatalogTemplate,
+  brandImportProductFields,
+  toPendingMasterSubmit,
 } from '@/modules/import-export/brand-excel.service';
 import { resolveImportCategoryIds } from '@/modules/catalog/catalog.service';
 import { validatePackUnitFields } from '@/lib/packSizeValidation';
+import { validateMasterSku } from '@/lib/sku';
 import type { AuthContext } from '@/middleware/auth';
 
 const brandService = new BrandService();
@@ -87,34 +90,69 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
       }
 
       try {
+        const fields = brandImportProductFields(row);
         const existing = row.sku
           ? await brandService.findBrandProductBySku(userId, row.sku)
           : null;
 
         if (existing) {
           await brandService.updateMasterProduct(userId, existing.id, {
-            name: row.name,
-            packSize: row.packSize,
-            unit: row.unit,
+            name: fields.name,
+            packSize: fields.packSize,
+            unit: fields.unit,
             categoryIds,
-            imageUrl: row.imageUrl,
-            description: row.aliasName,
+            imageUrl: fields.imageUrl,
+            hsn: fields.hsn,
+            barcode: fields.barcode,
+            ean: fields.ean,
+            vegNonVeg: fields.vegNonVeg,
+            storageType: fields.storageType,
+            shelfLifeDays: fields.shelfLifeDays,
+            countryOfOrigin: fields.countryOfOrigin,
+            fssaiRef: fields.fssaiRef,
+            aliasNames: fields.aliasNames,
+          });
+          updated += 1;
+          continue;
+        }
+
+        if (!row.sku) {
+          errors.push({ row: row.row, message: 'SKU required for new products' });
+          continue;
+        }
+
+        const skuCheck = validateMasterSku(row.sku);
+        if (!skuCheck.ok) {
+          errors.push({ row: row.row, message: skuCheck.message });
+          continue;
+        }
+
+        const pending = await brandService.findPendingMasterBySku(userId, skuCheck.normalized);
+        const categoryId = categoryIds[0];
+        if (pending) {
+          await brandService.updatePendingMasterProduct(userId, pending.id, {
+            name: fields.name,
+            categoryId,
+            categoryIds,
+            packSize: fields.packSize,
+            uom: fields.uom,
+            imageUrl: fields.imageUrl,
+            hsn: fields.hsn,
+            barcode: fields.barcode,
+            ean: fields.ean,
+            vegNonVeg: fields.vegNonVeg,
+            storageType: fields.storageType,
+            shelfLifeDays: fields.shelfLifeDays,
+            countryOfOrigin: fields.countryOfOrigin,
+            fssaiRef: fields.fssaiRef,
+            aliasNames: fields.aliasNames,
           });
           updated += 1;
         } else {
-          if (!row.sku) {
-            errors.push({ row: row.row, message: 'SKU required for new products' });
-            continue;
-          }
-          await brandService.createMasterProduct(userId, {
-            name: row.name,
-            sku: row.sku,
-            packSize: row.packSize,
-            unit: row.unit,
-            categoryIds,
-            imageUrl: row.imageUrl,
-            description: row.aliasName,
-          });
+          await brandService.submitPendingMasterProduct(
+            userId,
+            toPendingMasterSubmit(row, categoryId),
+          );
           created += 1;
         }
       } catch (e: unknown) {

@@ -42,7 +42,7 @@ export type DeliveryCapability = (typeof DELIVERY_CAPABILITIES)[number];
  * settlement, dispatch, and tax-compliant invoicing all depend on these.
  */
 const VendorDetailsSchemaBase = z.object({
-  vendorType: z.enum(VENDOR_TYPES),
+  vendorType: z.string().min(1).max(50),
   // PAN is optional with no format check — vendors can be onboarded before KYC
   // docs are in hand; admin verifies later at /admin/vendors/[id].
   panNumber: z.string().regex(PAN_RE, 'Invalid PAN format').optional().or(z.literal('')),

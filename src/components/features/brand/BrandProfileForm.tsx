@@ -21,6 +21,11 @@ import {
   DISTRIBUTION_PRESENCE_OPTIONS,
   MARKETPLACE_VISIBILITY_OPTIONS,
   TARGET_SEGMENT_PRESETS,
+  OTHER_OPTION,
+  PROFILE_LABEL_MAX,
+  brandTypeSelectValue,
+  brandSubTypeSelectValue,
+  isPresetBrandType,
   subTypesForBrandType,
   productCategoriesForSubType,
 } from '@/lib/constants/brandProfile';
@@ -166,12 +171,52 @@ export function BrandProfileForm({
   const phoneLocked = verifiedContact?.channel === 'phone';
   const emailLocked = verifiedContact?.channel === 'email';
 
-  const handleBrandTypeChange = (brandType: string) => {
-    set({ brandType, subType: '', productCategories: [] });
+  const [brandTypeOtherOpen, setBrandTypeOtherOpen] = useState(
+    () => brandTypeSelectValue(value.brandType ?? '') === OTHER_OPTION,
+  );
+  const [subTypeOtherOpen, setSubTypeOtherOpen] = useState(
+    () => brandSubTypeSelectValue(value.brandType ?? '', value.subType ?? '') === OTHER_OPTION,
+  );
+
+  const typeSelect = brandTypeOtherOpen || brandTypeSelectValue(value.brandType ?? '') === OTHER_OPTION
+    ? OTHER_OPTION
+    : (value.brandType ?? '');
+  const subSelect = subTypeOtherOpen
+    || brandSubTypeSelectValue(value.brandType ?? '', value.subType ?? '') === OTHER_OPTION
+    ? OTHER_OPTION
+    : (value.subType ?? '');
+  const showCustomType = typeSelect === OTHER_OPTION;
+  const showCustomSubType = !!value.brandType && subSelect === OTHER_OPTION;
+
+  const handleBrandTypeChange = (selected: string) => {
+    if (selected === OTHER_OPTION) {
+      setBrandTypeOtherOpen(true);
+      setSubTypeOtherOpen(false);
+      set({
+        brandType: isPresetBrandType(value.brandType ?? '') ? '' : (value.brandType ?? ''),
+        subType: '',
+        productCategories: [],
+      });
+      return;
+    }
+    setBrandTypeOtherOpen(false);
+    setSubTypeOtherOpen(false);
+    set({ brandType: selected, subType: '', productCategories: [] });
   };
 
-  const handleSubTypeChange = (subType: string) => {
-    set({ subType, productCategories: [] });
+  const handleSubTypeChange = (selected: string) => {
+    if (selected === OTHER_OPTION) {
+      const current = value.subType ?? '';
+      const presets = subTypesForBrandType(value.brandType ?? '');
+      setSubTypeOtherOpen(true);
+      set({
+        subType: presets.includes(current) ? '' : current,
+        productCategories: [],
+      });
+      return;
+    }
+    setSubTypeOtherOpen(false);
+    set({ subType: selected, productCategories: [] });
   };
 
   const handleAddressPick = (place: AddressPickPayload) => {
@@ -279,18 +324,45 @@ export function BrandProfileForm({
               onChange={v => set({ displayName: v, name: v })}
               onBlur={() => blur('displayName', value.displayName ?? value.name ?? '')}
               placeholder="Kissan" />
-            <FormField label="Brand Type" required dataField="brandType">
-              <FormSelect value={value.brandType ?? ''} onChange={handleBrandTypeChange} hasError={!!errors.brandType}>
+            <FormField label="Brand Type" required dataField="brandType" error={errors.brandType}>
+              <FormSelect value={typeSelect} onChange={handleBrandTypeChange} hasError={!!errors.brandType}>
                 <option value="">Select brand type</option>
                 {BRAND_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                <option value={OTHER_OPTION}>{OTHER_OPTION}</option>
               </FormSelect>
-              {errors.brandType && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.brandType}</p>}
+              {showCustomType && (
+                <FormInput
+                  className="mt-2"
+                  value={isPresetBrandType(value.brandType ?? '') ? '' : (value.brandType ?? '')}
+                  onChange={v => set({ brandType: v.slice(0, PROFILE_LABEL_MAX) })}
+                  onBlur={() => blur('brandType', value.brandType ?? '')}
+                  placeholder="Type your brand type"
+                  maxLength={PROFILE_LABEL_MAX}
+                  hasError={!!errors.brandType}
+                />
+              )}
             </FormField>
-            <FormField label="Sub-Type" error={errors.subType} dataField="subType">
-              <FormSelect value={value.subType ?? ''} onChange={handleSubTypeChange} disabled={!value.brandType} hasError={!!errors.subType}>
+            <FormField label="Sub-Type" required error={errors.subType} dataField="subType">
+              <FormSelect
+                value={subSelect}
+                onChange={handleSubTypeChange}
+                disabled={!value.brandType}
+                hasError={!!errors.subType}
+              >
                 <option value="">Select sub-type</option>
                 {subTypes.map(s => <option key={s} value={s}>{s}</option>)}
+                <option value={OTHER_OPTION}>{OTHER_OPTION}</option>
               </FormSelect>
+              {showCustomSubType && (
+                <FormInput
+                  className="mt-2"
+                  value={subTypes.includes(value.subType ?? '') ? '' : (value.subType ?? '')}
+                  onChange={v => set({ subType: v.slice(0, PROFILE_LABEL_MAX), productCategories: [] })}
+                  placeholder="Type your sub-type"
+                  maxLength={PROFILE_LABEL_MAX}
+                  hasError={!!errors.subType}
+                />
+              )}
             </FormField>
             {productCats.length > 0 && (
               <FormField label="Product Categories" className={SPAN_FULL}>

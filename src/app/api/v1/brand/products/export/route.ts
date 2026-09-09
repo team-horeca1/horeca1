@@ -33,12 +33,20 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
     const rows = products.map((p) => ({
       name: p.name,
       sku: p.sku,
+      hsn: p.hsn,
+      barcode: p.barcode,
+      ean: p.ean,
       packSize: p.packSize,
       unit: p.unit,
+      vegNonVeg: p.vegNonVeg,
+      storageType: p.storageType,
+      shelfLifeDays: p.shelfLifeDays,
+      countryOfOrigin: p.countryOfOrigin,
+      fssaiRef: p.fssaiRef,
       parentCategory: p.categoryRel?.parent?.name ?? p.categoryRel?.name ?? '',
       subCategory: p.categoryRel?.parent ? p.categoryRel.name : '',
       imageUrl: p.imageUrl,
-      description: p.description,
+      description: p.aliasNames[0] ?? p.description,
     }));
 
     const buf = exportBrandCatalogToXlsx(rows);

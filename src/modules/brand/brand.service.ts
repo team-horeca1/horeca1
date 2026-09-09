@@ -762,6 +762,38 @@ export class BrandService {
     });
   }
 
+  /** Pending / rejected / needs-changes MasterProduct for this brand with the same SKU. */
+  async findPendingMasterBySku(userId: string, sku: string) {
+    const brandId = await this.getBrandIdForUser(userId);
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
+      select: {
+        userId: true,
+        teamMembers: { select: { userId: true } },
+      },
+    });
+    if (!brand) return null;
+
+    const brandUserIds = Array.from(
+      new Set([
+        ...(brand.userId ? [brand.userId] : []),
+        ...brand.teamMembers.map((m) => m.userId),
+      ]),
+    );
+
+    return prisma.masterProduct.findFirst({
+      where: {
+        sku: { equals: sku.trim(), mode: 'insensitive' },
+        approvalStatus: { in: ['pending', 'rejected', 'needs_changes'] },
+        OR: [
+          ...(brandUserIds.length > 0 ? [{ suggestedBy: { in: brandUserIds } }] : []),
+          { metadata: { path: ['brandId'], equals: brandId } },
+        ],
+      },
+      select: { id: true },
+    });
+  }
+
   // ── Brand: create master product ──────────────────────────
   async createMasterProduct(userId: string, input: CreateBrandProductInput) {
     const brandId = await this.getBrandIdForUser(userId);

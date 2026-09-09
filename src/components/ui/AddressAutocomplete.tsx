@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MapPin, Search, Loader2 } from 'lucide-react';
 import { useGooglePlacesAutocomplete, type PlaceDetails } from '@/hooks/useGooglePlacesAutocomplete';
+import { useGoogleMaps } from '@/components/providers/GoogleMapsProvider';
 import { LABEL_CLASS, inputClass } from '@/components/ui/form';
 import { cn } from '@/lib/utils';
 
@@ -64,17 +65,22 @@ export function AddressAutocomplete({
   const [query, setQuery] = useState(initialValue);
   const [open, setOpen] = useState(false);
   const [pickingId, setPickingId] = useState<string | null>(null);
+  const [hasPicked, setHasPicked] = useState(() => initialValue.trim().length > 0);
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
+  const { loadError } = useGoogleMaps();
   const { predictions, isSearching, getPlaceDetails, clearPredictions } =
     useGooglePlacesAutocomplete(query, { businessMode });
 
   // Sync with initialValue if it changes from the parent
   useEffect(() => {
     setQuery(initialValue);
+    if (initialValue.trim().length > 0) {
+      queueMicrotask(() => setHasPicked(true));
+    }
   }, [initialValue]);
 
   const showDropdown = open && predictions.length > 0;
@@ -120,6 +126,7 @@ export function AddressAutocomplete({
       const details: PlaceDetails | null = await getPlaceDetails(placeId);
       if (!details) return;
       setQuery(details.shortAddress || mainText);
+      setHasPicked(true);
       clearPredictions();
       setOpen(false);
       onPick({
@@ -148,9 +155,14 @@ export function AddressAutocomplete({
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setHasPicked(false);
+              setOpen(true);
+            }}
             onFocus={() => setOpen(true)}
             placeholder={placeholder}
+            disabled={!!loadError}
             className={inputClass(false, 'pl-10 pr-10')}
           />
           {isSearching && (
@@ -158,7 +170,17 @@ export function AddressAutocomplete({
           )}
         </div>
       </label>
-      {hint && <p className="mt-1 text-[11px] text-[#AEAEAE]">{hint}</p>}
+      {loadError ? (
+        <p className="mt-1 text-[11px] text-[#DC2626]">
+          {loadError}. Address search is unavailable until Google Maps loads.
+        </p>
+      ) : query.trim().length >= 2 && !hasPicked ? (
+        <p className="mt-1 text-[11px] text-[#667085]">
+          Select a result from the list. Typing an address does not save it until you click a suggestion.
+        </p>
+      ) : hint ? (
+        <p className="mt-1 text-[11px] text-[#AEAEAE]">{hint}</p>
+      ) : null}
 
       {showDropdown && rect && typeof document !== 'undefined' && createPortal(
         <ul

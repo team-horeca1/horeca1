@@ -76,8 +76,11 @@ export default function BrandProductImportModal({ open, onClose, onComplete }: P
 
         <div className="p-5 space-y-4">
           <p className="text-[13px] text-[#7C7C7C]">
-            Upload the Brand Store Excel template. Columns: Item Name, SKU, Parent Category, Sub-Category,
-            Usage unit (pack size), Unit Name (container), Image URL, Alias Name.
+            Upload the Brand Store Excel template. Columns match the product form: Item Name, SKU, HSN,
+            Barcode, EAN, Parent Category, Sub-Category, Usage unit, Unit Name, Veg/Non-Veg, Storage,
+            Shelf Life Days, Country of Origin, FSSAI, Image URL, Alias Name. New SKUs are submitted as{' '}
+            <span className="font-semibold text-[#181725]">Pending</span> until admin approval. Existing
+            catalog SKUs are updated in place.
           </p>
 
           <div className="flex flex-wrap gap-2">

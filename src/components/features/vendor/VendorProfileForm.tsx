@@ -5,7 +5,7 @@
  * Bank / pincodes / docs stay in wizard steps 5–7.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Building2, MapPin, Receipt, User, ShieldCheck, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AddressAutocomplete, type AddressPickPayload } from '@/components/ui/AddressAutocomplete';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/form';
 import {
   BUSINESS_SIZES, COVERAGE_OPTIONS, VENDOR_LEAD_STATUSES,
+  PROFILE_LABEL_MAX,
   categoryPresetsForSelections,
 } from '@/lib/constants/vendorProfile';
 import {
@@ -101,11 +102,21 @@ export function VendorProfileForm({
   const typeSelections = getEffectiveVendorTypeSelections(value);
   const categoryPresets = categoryPresetsForSelections(typeSelections);
   const selectedCategories = value.categoriesHandled ?? [];
+  const [categoryDraft, setCategoryDraft] = useState('');
+  const extraCategories = selectedCategories.filter((c) => !categoryPresets.includes(c));
   const toggleCategory = (cat: string) => {
     const next = selectedCategories.includes(cat)
       ? selectedCategories.filter(c => c !== cat)
       : [...selectedCategories, cat];
     set({ categoriesHandled: next });
+  };
+  const addCustomCategory = () => {
+    const label = categoryDraft.trim().slice(0, PROFILE_LABEL_MAX);
+    if (!label) return;
+    if (!selectedCategories.some((c) => c.toLowerCase() === label.toLowerCase())) {
+      set({ categoriesHandled: [...selectedCategories, label] });
+    }
+    setCategoryDraft('');
   };
 
   const handleBillingPick = (place: AddressPickPayload) => {
@@ -156,23 +167,43 @@ export function VendorProfileForm({
               error={errors.vendorTypeSelections || errors.vendorBusinessType || errors.subType}
               className={SPAN_FULL}
             />
-            {categoryPresets.length > 0 && (
-              <FormField label="Categories Handled" className={SPAN_FULL}>
-                <div className="flex flex-wrap gap-2">
-                  {categoryPresets.map(cat => (
-                    <button key={cat} type="button" onClick={() => toggleCategory(cat)}
-                      className={cn(
-                        'px-3 py-1.5 rounded-lg text-[12px] font-bold border transition-colors',
-                        selectedCategories.includes(cat)
-                          ? 'border-primary bg-primary-light text-primary'
-                          : 'border-[#EEEEEE] bg-white text-gray-500 hover:border-gray-300',
-                      )}>
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </FormField>
-            )}
+            <FormField
+              label="Categories Handled"
+              className={SPAN_FULL}
+              hint="Select presets or type your own"
+            >
+              <div className="flex flex-wrap gap-2">
+                {categoryPresets.map(cat => (
+                  <button key={cat} type="button" onClick={() => toggleCategory(cat)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-[12px] font-bold border transition-colors',
+                      selectedCategories.includes(cat)
+                        ? 'border-primary bg-primary-light text-primary'
+                        : 'border-[#EEEEEE] bg-white text-gray-500 hover:border-gray-300',
+                    )}>
+                    {cat}
+                  </button>
+                ))}
+                {extraCategories.map(cat => (
+                  <button key={cat} type="button" onClick={() => toggleCategory(cat)}
+                    className="px-3 py-1.5 rounded-lg text-[12px] font-bold border border-primary bg-primary-light text-primary">
+                    {cat}
+                  </button>
+                ))}
+                <FormInput
+                  className="h-9 min-w-[160px] max-w-[240px] text-[12px]"
+                  value={categoryDraft}
+                  onChange={(v) => setCategoryDraft(v.slice(0, PROFILE_LABEL_MAX))}
+                  placeholder="Add category, Enter"
+                  maxLength={PROFILE_LABEL_MAX}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    addCustomCategory();
+                  }}
+                />
+              </div>
+            </FormField>
           </>
         )}
 

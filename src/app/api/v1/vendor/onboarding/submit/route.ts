@@ -13,7 +13,7 @@ import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { withRateLimit } from '@/middleware/withRateLimit';
 import { uniqueHcid } from '@/lib/hcid';
 import { emitEvent } from '@/events/emitter';
-import { GST_RE, PAN_RE, VENDOR_TYPES } from '@/lib/validators/vendor-kyc';
+import { GST_RE, PAN_RE } from '@/lib/validators/vendor-kyc';
 import { resolveVendorTypeSlug, getEffectiveVendorTypeSelections } from '@/lib/validators/vendor-profile';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 import { assertVerificationToken } from '@/lib/otpVerification';
@@ -49,7 +49,7 @@ const BodyBase = z.object({
   verificationToken: z.string().min(1).optional(),
 
   // Step 2 — vendor type (CSV-aligned + legacy slugs)
-  vendorType: z.enum(VENDOR_TYPES).optional(),
+  vendorType: z.string().min(1).max(50).optional(),
   vendorBusinessType: z.string().max(80).optional(),
   vendorTypeSelections: z.array(VendorTypeSelectionSchema).optional(),
 
