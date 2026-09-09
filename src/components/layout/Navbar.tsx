@@ -311,6 +311,8 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
             )}
 
             {/* ── Mobile Header ── */}
+            {/* Category pages use location + back/title/search — do not mount the logo/cart bar. */}
+            {!pathname?.startsWith('/category') ? (
             <header className="lg:hidden w-full bg-white relative z-[10000] sticky top-0 border-b border-divider">
                 <div className="w-full py-3 px-4 flex items-center justify-between">
                     {/* Logo: Horeca1 joined simply */}
@@ -347,9 +349,15 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
                     </div>
                 </div>
             </header>
+            ) : null}
 
             <OutletContextStrip
-                className="lg:hidden sticky top-[calc(var(--mobile-header-offset,0px)+0px)] z-[9999]"
+                className={cn(
+                    "lg:hidden sticky z-[9999]",
+                    pathname?.startsWith('/category')
+                        ? "top-0"
+                        : "top-[calc(var(--mobile-header-offset,0px)+0px)]",
+                )}
                 fallbackLabel={selectedAddress?.shortAddress || 'Select Location'}
                 onGuestLocationClick={() => setIsLocationOverlayOpen(true)}
                 onLoggedInSwitchClick={() => setIsLocationOverlayOpen(true)}

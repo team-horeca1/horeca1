@@ -30,7 +30,7 @@ export function StickyCartBar() {
                 type="button"
                 onClick={() => setHidden(false)}
                 aria-label="Show cart bar"
-                className="fixed z-50 bottom-4 right-4 w-12 h-12 rounded-full bg-primary text-white shadow-cdl-3 flex items-center justify-center hover:bg-primary-dark transition-colors"
+                className="fixed z-50 bottom-[4.5rem] right-4 md:bottom-4 w-12 h-12 rounded-full bg-primary text-white shadow-cdl-3 flex items-center justify-center hover:bg-primary-dark transition-colors"
             >
                 <ShoppingCart size={18} />
                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-white text-primary text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-primary">
@@ -41,7 +41,7 @@ export function StickyCartBar() {
     }
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-50 md:bottom-4 md:left-auto md:right-4 md:max-w-[420px]">
+        <div className="fixed bottom-[4.5rem] left-0 right-0 z-50 md:bottom-4 md:left-auto md:right-4 md:max-w-[420px]">
             <div className="relative bg-primary md:rounded-2xl shadow-cdl-3">
                 <button
                     type="button"

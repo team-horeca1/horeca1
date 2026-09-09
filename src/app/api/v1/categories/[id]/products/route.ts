@@ -81,7 +81,7 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const pincode = searchParams.get('pincode')?.trim();
     const limitParam = Number(searchParams.get('limit'));
-    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 24) : 8;
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 60) : 48;
 
     const category = await prisma.category.findFirst({
       where: { id: categoryId, isActive: true, approvalStatus: 'approved' },
@@ -113,6 +113,7 @@ export async function GET(
         vendor: {
           select: {
             id: true,
+            slug: true,
             businessName: true,
             logoUrl: true,
             minOrderValue: true,

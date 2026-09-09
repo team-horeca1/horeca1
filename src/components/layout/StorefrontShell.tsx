@@ -35,7 +35,7 @@ export function StorefrontShell({
       <AddressProvider>
         <CartProvider>
           <Navbar initialNav={initialNav} />
-          <div className="px-[clamp(1rem,3vw,2rem)] pt-2">
+          <div className="px-[clamp(1rem,3vw,2rem)]">
             <AdminImpersonationBanner />
           </div>
           <OutletCompletionBanner />
