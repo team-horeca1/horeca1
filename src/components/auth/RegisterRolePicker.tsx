@@ -6,14 +6,20 @@ import { cn } from '@/lib/utils';
 
 interface RegisterRolePickerProps {
   redirectTo?: string | null;
+  phone?: string | null;
+  email?: string | null;
 }
+
+type RoleHrefOpts = { redirect: string | null; phone?: string | null; email?: string | null };
 
 const ROLES = [
   {
     id: 'customer' as const,
-    href: (redirect: string | null) => {
+    href: (opts: RoleHrefOpts) => {
       const qs = new URLSearchParams({ role: 'customer' });
-      if (redirect) qs.set('redirect', redirect);
+      if (opts.redirect) qs.set('redirect', opts.redirect);
+      if (opts.phone) qs.set('phone', opts.phone);
+      if (opts.email) qs.set('email', opts.email);
       return `/register?${qs.toString()}`;
     },
     icon: ShoppingBag,
@@ -22,23 +28,27 @@ const ROLES = [
   },
   {
     id: 'vendor' as const,
-    href: (redirect: string | null) =>
-      redirect ? `/vendor/register?redirect=${encodeURIComponent(redirect)}` : '/vendor/register',
+    href: (opts: RoleHrefOpts) =>
+      opts.redirect ? `/vendor/register?redirect=${encodeURIComponent(opts.redirect)}` : '/vendor/register',
     icon: Store,
     title: 'Onboard as Supplier',
     subtitle: 'Sell on Horeca1 — full KYC, about 5 minutes',
   },
   {
     id: 'brand' as const,
-    href: (redirect: string | null) =>
-      redirect ? `/brand/register?redirect=${encodeURIComponent(redirect)}` : '/brand/register',
+    href: (opts: RoleHrefOpts) =>
+      opts.redirect ? `/brand/register?redirect=${encodeURIComponent(opts.redirect)}` : '/brand/register',
     icon: Sparkles,
     title: 'Onboard as Brand',
     subtitle: 'Register your brand on the marketplace',
   },
 ];
 
-export function RegisterRolePicker({ redirectTo = null }: RegisterRolePickerProps) {
+export function RegisterRolePicker({
+  redirectTo = null,
+  phone = null,
+  email = null,
+}: RegisterRolePickerProps) {
   const loginHref = `/login${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`;
 
   return (
@@ -71,7 +81,7 @@ export function RegisterRolePicker({ redirectTo = null }: RegisterRolePickerProp
               return (
                 <Link
                   key={role.id}
-                  href={role.href(redirectTo)}
+                  href={role.href({ redirect: redirectTo, phone, email })}
                   className={cn(
                     'group flex flex-col gap-3 rounded-[14px] border border-[#EEEEEE] bg-[#FAFAFA] px-4 py-4',
                     'hover:border-primary/30 hover:bg-[#F7FBF8] transition-all duration-200',

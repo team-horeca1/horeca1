@@ -114,9 +114,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               select: { id: true, email: true, fullName: true, role: true, image: true, isActive: true },
             });
 
-        if (useEmail && !user && !isRegister) return null;
+        if (!user && !isRegister) return null;
 
-        if (!user && (usePhone || (useEmail && isRegister))) {
+        if (!user && isRegister) {
           const fullName = String(credentials?.fullName ?? '').trim()
             || (usePhone ? phone : loginEmail);
           const businessName = String(credentials?.businessName ?? '').trim() || null;

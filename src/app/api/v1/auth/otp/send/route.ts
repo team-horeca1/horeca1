@@ -5,6 +5,7 @@ import { sendPhoneOtp } from '@/lib/providers/otpSms';
 import { withRateLimit } from '@/middleware/withRateLimit';
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 import { lookupEmailForRegistration, type EmailCheckIntent } from '@/lib/auth/checkEmailLookup';
+import { findUserByPhoneLookup } from '@/lib/auth/checkPhoneLookup';
 import { normalizePhone } from '@/lib/phone';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -101,12 +102,14 @@ async function postHandler(req: NextRequest) {
       }
     }
 
-    // Account-existence check applies to EMAIL login only. A phone login
-    // doubles as passwordless signup: when no account exists we still send the
-    // OTP and auth.ts auto-creates a customer on verify. Email cannot
-    // self-register (registration requires a phone), so it stays gated.
-    if (mode === 'login' && useEmail) {
-      const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    // Login requires an existing account. Unknown phone/email must register
+    // first so customer signup can collect profile data before OTP.
+    if (mode === 'login') {
+      const existing = usePhone
+        ? await findUserByPhoneLookup(phone, { id: true })
+        : useEmail
+          ? await prisma.user.findUnique({ where: { email }, select: { id: true } })
+          : null;
       if (!existing) {
         return NextResponse.json(
           { success: false, code: 'NO_ACCOUNT', error: 'No account found. Please register first.' },

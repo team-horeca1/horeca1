@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signIn, useSession } from 'next-auth/react';
 import {
@@ -22,9 +22,22 @@ function looksLikeEmail(s: string) {
   return s.includes('@') || /[a-zA-Z]/.test(s);
 }
 
+function noAccountRegisterHref(opts: {
+  phone?: string;
+  email?: string;
+  redirect?: string | null;
+}): string {
+  const qs = new URLSearchParams({ role: 'customer' });
+  if (opts.phone) qs.set('phone', opts.phone);
+  if (opts.email) qs.set('email', opts.email);
+  if (opts.redirect) qs.set('redirect', opts.redirect);
+  return `/register?${qs.toString()}`;
+}
+
 type Step = 'form' | 'otp';
 
 export default function LoginPageInner() {
+  const router = useRouter();
   const params = useSearchParams();
   const redirectTo = sanitizeRedirect(
     params?.get('redirect') || params?.get('callbackUrl') || null,
@@ -106,10 +119,14 @@ export default function LoginPageInner() {
       const data = await res.json();
       if (!data.success) {
         if (data.code === 'NO_ACCOUNT') {
-          setApiError('No account found. ');
-        } else {
-          setApiError(data.error || 'Failed to send OTP');
+          router.push(noAccountRegisterHref({
+            phone: isEmail ? undefined : phoneDigits,
+            email: isEmail ? trimmedId.toLowerCase() : undefined,
+            redirect: redirectTo,
+          }));
+          return;
         }
+        setApiError(data.error || 'Failed to send OTP');
         return;
       }
       setStep('otp');

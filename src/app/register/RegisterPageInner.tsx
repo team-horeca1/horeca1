@@ -34,6 +34,8 @@ export default function RegisterPageInner() {
   const router = useRouter();
   const redirectTo = params?.get('redirect') || null;
   const role = params?.get('role');
+  const prefilledPhone = params?.get('phone')?.replace(/\D/g, '').slice(0, 10) ?? '';
+  const prefilledEmail = (params?.get('email') ?? '').trim().toLowerCase();
   const { status: sessionStatus } = useSession();
 
   useEffect(() => {
@@ -56,7 +58,13 @@ export default function RegisterPageInner() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState('');
-  const [profile, setProfile] = useState<CustomerProfileValues>({ ...EMPTY_CUSTOMER_PROFILE });
+  const [profile, setProfile] = useState<CustomerProfileValues>(() => ({
+    ...EMPTY_CUSTOMER_PROFILE,
+    ...(prefilledPhone.length === 10
+      ? { phone: prefilledPhone, mobilePhone: prefilledPhone }
+      : {}),
+    ...(prefilledEmail.includes('@') ? { email: prefilledEmail } : {}),
+  }));
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -284,10 +292,22 @@ export default function RegisterPageInner() {
     if (digit && next.every(d => d)) handleVerifyOtp(next.join(''));
   };
 
-  const registerOptionsHref = `/register${redirectTo ? `?redirect=${encodeURIComponent(redirectTo)}` : ''}`;
+  const registerOptionsQs = new URLSearchParams();
+  if (redirectTo) registerOptionsQs.set('redirect', redirectTo);
+  if (prefilledPhone.length === 10) registerOptionsQs.set('phone', prefilledPhone);
+  if (prefilledEmail.includes('@')) registerOptionsQs.set('email', prefilledEmail);
+  const registerOptionsHref = registerOptionsQs.size
+    ? `/register?${registerOptionsQs.toString()}`
+    : '/register';
 
   if (!role || (role !== 'customer' && role !== 'vendor' && role !== 'brand')) {
-    return <RegisterRolePicker redirectTo={redirectTo} />;
+    return (
+      <RegisterRolePicker
+        redirectTo={redirectTo}
+        phone={prefilledPhone.length === 10 ? prefilledPhone : null}
+        email={prefilledEmail.includes('@') ? prefilledEmail : null}
+      />
+    );
   }
 
   if (role === 'vendor' || role === 'brand') {

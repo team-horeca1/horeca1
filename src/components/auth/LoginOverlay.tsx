@@ -22,6 +22,13 @@ function looksLikeEmail(s: string) {
   return s.includes('@') || /[a-zA-Z]/.test(s);
 }
 
+function noAccountRegisterHref(opts: { phone?: string; email?: string }): string {
+  const qs = new URLSearchParams({ role: 'customer' });
+  if (opts.phone) qs.set('phone', opts.phone);
+  if (opts.email) qs.set('email', opts.email);
+  return `/register?${qs.toString()}`;
+}
+
 export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayProps) {
   const router = useRouter();
   const [step, setStep] = useState<'identifier' | 'otp'>('identifier');
@@ -93,7 +100,18 @@ export function LoginOverlay({ isOpen, onClose, onLoginSuccess }: LoginOverlayPr
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!data.success) { showError(data.error || 'Failed to send OTP'); return; }
+      if (!data.success) {
+        if (data.code === 'NO_ACCOUNT') {
+          handleClose();
+          router.push(noAccountRegisterHref({
+            phone: isEmail ? undefined : phoneDigits,
+            email: isEmail ? trimmedId.toLowerCase() : undefined,
+          }));
+          return;
+        }
+        showError(data.error || 'Failed to send OTP');
+        return;
+      }
       setStep('otp');
       startResendTimer();
       setTimeout(() => otpRefs[0].current?.focus(), 100);
