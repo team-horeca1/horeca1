@@ -23,6 +23,7 @@ export const createOrderSchema = z.object({
     })
   ).min(1),
   paymentMethod: paymentMethodSchema,
+  customerPoNumber: z.string().trim().min(1).max(80).optional(),
   // Draft PO (Req 7): persist without reserving stock / charging credit /
   // clearing the cart. Submitted later via PATCH /orders/:id/submit.
   saveDraft: z.boolean().optional(),
@@ -34,13 +35,20 @@ export const createOrderSchema = z.object({
 }).refine(
   (d) => !d.saveDraft || (!d.couponCode && !d.useWallet),
   { message: 'Coupons and wallet redemption cannot be applied to draft orders', path: ['couponCode'] },
+).refine(
+  (d) => d.saveDraft || d.paymentMethod !== 'po_number' || !!d.customerPoNumber,
+  { message: 'Purchase order number is required', path: ['customerPoNumber'] },
 );
 
 // PATCH /orders/:id/submit — drafts are saved with a placeholder method; the
 // user picks the real one on submit.
 export const submitDraftSchema = z.object({
   paymentMethod: paymentMethodSchema.optional(),
-});
+  customerPoNumber: z.string().trim().min(1).max(80).optional(),
+}).refine(
+  (d) => d.paymentMethod !== 'po_number' || !!d.customerPoNumber,
+  { message: 'Purchase order number is required', path: ['customerPoNumber'] },
+);
 
 // Ops controls (Req 7) — admin order management.
 export const modifyQuantitiesSchema = z.object({

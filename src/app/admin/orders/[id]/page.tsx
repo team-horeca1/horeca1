@@ -87,6 +87,7 @@ interface OrderData {
     totalAmount: number;
     paymentStatus: string;
     paymentMethod: string | null;
+    customerPoNumber?: string | null;
     deliveryAddressSnapshot: any;
     notes: string | null;
     createdAt: string;
@@ -495,7 +496,12 @@ export default function OrderDetailsPage() {
                                     </div>
                                     {paymentMethod && (
                                         <p className="text-[12px] text-[#4B5563] font-semibold">
-                                            <span className="text-[#9CA3AF] font-medium">Method:</span> {paymentMethod}
+                                            <span className="text-[#9CA3AF] font-medium">Method:</span> {paymentMethod === 'po_number' ? 'PO Number' : paymentMethod === 'bank_transfer' ? 'Bank Transfer' : paymentMethod}
+                                        </p>
+                                    )}
+                                    {order.customerPoNumber && (
+                                        <p className="text-[12px] text-[#4B5563] font-semibold">
+                                            <span className="text-[#9CA3AF] font-medium">Customer PO:</span> {order.customerPoNumber}
                                         </p>
                                     )}
                                     {canMarkPaid && (

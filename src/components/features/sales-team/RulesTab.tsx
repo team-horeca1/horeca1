@@ -195,15 +195,29 @@ function RuleDialog({
       const res = await fetch(url);
       const json = await res.json();
       if (!json.success) { setRefOptions([]); return; }
-      // Each endpoint returns a slightly different shape; we normalize.
-      type CustomerRow = { id: string; user?: { fullName?: string; businessName?: string }; fullName?: string; businessName?: string };
+      type CustomerRow = {
+        id: string;
+        mappingId?: string | null;
+        userId?: string;
+        user?: { fullName?: string; businessName?: string };
+        fullName?: string;
+        businessName?: string;
+      };
       type BrandRow = { id: string; name: string };
       type CategoryRow = { id: string; name: string };
-      const data = (json.data ?? []) as Array<CustomerRow | BrandRow | CategoryRow>;
-      const opts = data.map((row): { id: string; label: string } => {
+      const raw = json.data as { customers?: CustomerRow[] } | CustomerRow[] | undefined;
+      const rows: Array<CustomerRow | BrandRow | CategoryRow> = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.customers)
+          ? raw.customers
+          : [];
+      const opts = rows.map((row): { id: string; label: string } => {
         if (s === 'customer') {
           const r = row as CustomerRow;
-          return { id: r.id, label: r.user?.fullName ?? r.user?.businessName ?? r.businessName ?? r.fullName ?? r.id };
+          return {
+            id: r.mappingId ?? r.userId ?? r.id,
+            label: r.user?.fullName ?? r.user?.businessName ?? r.businessName ?? r.fullName ?? r.id,
+          };
         }
         const r = row as BrandRow | CategoryRow;
         return { id: r.id, label: r.name };

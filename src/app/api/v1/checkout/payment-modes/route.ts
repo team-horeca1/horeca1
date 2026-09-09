@@ -7,8 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/middleware/auth';
 import { errorResponse } from '@/middleware/errorHandler';
 import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
-
-const DEFAULT_MODES = ['cod', 'prepaid', 'credit', 'cheque', 'online'];
+import { DEFAULT_CHECKOUT_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
@@ -25,7 +24,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
     const byVendor: Record<string, string[]> = {};
     for (const vid of vendorIds) {
       const m = mappings.find((x) => x.vendorId === vid);
-      byVendor[vid] = m?.allowedPaymentModes?.length ? m.allowedPaymentModes : DEFAULT_MODES;
+      byVendor[vid] = m?.allowedPaymentModes?.length ? m.allowedPaymentModes : DEFAULT_CHECKOUT_PAYMENT_MODES;
     }
 
     return NextResponse.json({ success: true, data: byVendor });

@@ -624,7 +624,7 @@ export const dal = {
       vendorOrders: Array<{ vendorId: string; items: Array<{ productId: string; quantity: number }>; deliverySlotId?: string; notes?: string }>,
       paymentMethod: string,
       saveDraft = false,
-      promo?: { couponCode?: string; useWallet?: boolean },
+      promo?: { couponCode?: string; useWallet?: boolean; customerPoNumber?: string },
     ) {
       return apiFetch('/api/v1/orders', {
         method: 'POST',
@@ -634,15 +634,21 @@ export const dal = {
           ...(saveDraft ? { saveDraft: true } : {}),
           ...(promo?.couponCode ? { couponCode: promo.couponCode } : {}),
           ...(promo?.useWallet ? { useWallet: true } : {}),
+          ...(promo?.customerPoNumber ? { customerPoNumber: promo.customerPoNumber } : {}),
         }),
       });
     },
 
     /** Submit a saved draft PO (draft -> pending). Optionally override the payment method. */
-    async submitDraft(orderId: string, paymentMethod?: string) {
+    async submitDraft(orderId: string, paymentMethod?: string, customerPoNumber?: string) {
       return apiFetch(`/api/v1/orders/${orderId}/submit`, {
         method: 'PATCH',
-        ...(paymentMethod ? { body: JSON.stringify({ paymentMethod }) } : {}),
+        ...(paymentMethod || customerPoNumber
+          ? { body: JSON.stringify({
+              ...(paymentMethod ? { paymentMethod } : {}),
+              ...(customerPoNumber ? { customerPoNumber } : {}),
+            }) }
+          : {}),
       });
     },
 

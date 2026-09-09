@@ -1,14 +1,20 @@
-// GET   /api/v1/vendor/customers — List vendor's CRM customers (mapped + order history)
+// GET   /api/v1/vendor/customers — All Horeca marketplace customers + this vendor's mapping overlay
 // POST  /api/v1/vendor/customers — Create/update customer mapping
 // PROTECTED: Vendor only
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
+import { marketplaceCustomerFilter } from '@/lib/marketplaceCustomers';
+import {
+  DEFAULT_VENDOR_CUSTOMER_PAYMENT_MODES,
+  VENDOR_CUSTOMER_PAYMENT_MODES,
+} from '@/lib/vendorPaymentModes';
 
 const upsertSchema = z.object({
   userId: z.string().uuid(),
@@ -21,7 +27,7 @@ const upsertSchema = z.object({
   tags: z.array(z.string()).optional(),
   notes: z.string().max(2000).nullable().optional(),
   paymentTerms: z.string().max(50).nullable().optional(),
-  allowedPaymentModes: z.array(z.enum(['cod', 'prepaid', 'credit', 'cheque', 'discco', 'online'])).optional(),
+  allowedPaymentModes: z.array(z.enum(VENDOR_CUSTOMER_PAYMENT_MODES)).optional(),
 });
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
@@ -36,67 +42,115 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
     const page = Math.max(1, parseInt(url.searchParams.get('page') ?? '1'));
     const take = 50;
 
-    const customers = await prisma.vendorCustomer.findMany({
-      where: {
-        vendorId,
-        ...(status ? { status: status as 'active' | 'blocked' | 'suspended' } : {}),
-        ...(search
-          ? {
-              user: {
-                OR: [
-                  { fullName: { contains: search, mode: 'insensitive' } },
-                  { businessName: { contains: search, mode: 'insensitive' } },
-                  { email: { contains: search, mode: 'insensitive' } },
-                  { phone: { contains: search, mode: 'insensitive' } },
-                ],
-              },
-            }
-          : {}),
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            fullName: true,
-            businessName: true,
-            email: true,
-            phone: true,
-            createdAt: true,
-          },
+    const andConditions: Prisma.UserWhereInput[] = [marketplaceCustomerFilter()];
+    if (search) {
+      andConditions.push({
+        OR: [
+          { fullName: { contains: search, mode: 'insensitive' } },
+          { businessName: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { phone: { contains: search } },
+        ],
+      });
+    }
+    if (status === 'active' || status === 'blocked' || status === 'suspended') {
+      andConditions.push({
+        vendorCustomers: { some: { vendorId, status } },
+      });
+    }
+
+    const [users, totalCount, mappedCount, bankTransferCount, poNumberCount] = await Promise.all([
+      prisma.user.findMany({
+        where: { AND: andConditions },
+        select: {
+          id: true,
+          fullName: true,
+          businessName: true,
+          email: true,
+          phone: true,
+          createdAt: true,
         },
-        priceList: { select: { id: true, name: true, discountPercent: true } },
-        salesperson: { select: { id: true, name: true, code: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * take,
-      take: take + 1,
-    });
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * take,
+        take: take + 1,
+      }),
+      prisma.user.count({ where: { AND: andConditions } }),
+      prisma.vendorCustomer.count({ where: { vendorId } }),
+      prisma.vendorCustomer.count({
+        where: { vendorId, allowedPaymentModes: { has: 'bank_transfer' } },
+      }),
+      prisma.vendorCustomer.count({
+        where: { vendorId, allowedPaymentModes: { has: 'po_number' } },
+      }),
+    ]);
 
-    const hasMore = customers.length > take;
-    const items = customers.slice(0, take);
+    const hasMore = users.length > take;
+    const items = users.slice(0, take);
+    const userIds = items.map((u) => u.id);
 
-    // Attach order summary per customer
-    const userIds = items.map((c) => c.userId);
-    const orderStats = await prisma.order.groupBy({
-      by: ['userId'],
-      where: { vendorId, userId: { in: userIds }, status: { not: 'cancelled' } },
-      _count: { id: true },
-      _sum: { totalAmount: true },
-      _max: { createdAt: true },
-    });
+    const [mappings, orderStats] = await Promise.all([
+      userIds.length
+        ? prisma.vendorCustomer.findMany({
+            where: { vendorId, userId: { in: userIds } },
+            include: {
+              priceList: { select: { id: true, name: true, discountPercent: true } },
+              salesperson: { select: { id: true, name: true, code: true } },
+            },
+          })
+        : Promise.resolve([]),
+      userIds.length
+        ? prisma.order.groupBy({
+            by: ['userId'],
+            where: { vendorId, userId: { in: userIds }, status: { not: 'cancelled' } },
+            _count: { id: true },
+            _sum: { totalAmount: true },
+            _max: { createdAt: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const mappingByUser = new Map(mappings.map((m) => [m.userId, m]));
     const statsMap = new Map(orderStats.map((s) => [s.userId, s]));
 
-    const enriched = items.map((c) => {
-      const stats = statsMap.get(c.userId);
+    const enriched = items.map((user) => {
+      const mapping = mappingByUser.get(user.id);
+      const stats = statsMap.get(user.id);
       return {
-        ...c,
+        id: mapping?.id ?? user.id,
+        mappingId: mapping?.id ?? null,
+        userId: user.id,
+        status: mapping?.status ?? null,
+        priceListId: mapping?.priceListId ?? null,
+        territory: mapping?.territory ?? null,
+        salesExecutive: mapping?.salesExecutive ?? null,
+        salespersonId: mapping?.salespersonId ?? null,
+        salesperson: mapping?.salesperson ?? null,
+        deliveryRoute: mapping?.deliveryRoute ?? null,
+        tags: mapping?.tags ?? [],
+        notes: mapping?.notes ?? null,
+        paymentTerms: mapping?.paymentTerms ?? null,
+        allowedPaymentModes: mapping?.allowedPaymentModes ?? [...DEFAULT_VENDOR_CUSTOMER_PAYMENT_MODES],
+        createdAt: mapping?.createdAt ?? user.createdAt,
+        user,
+        priceList: mapping?.priceList ?? null,
         orderCount: stats?._count.id ?? 0,
         totalSpend: Number(stats?._sum.totalAmount ?? 0),
         lastOrderAt: stats?._max.createdAt ?? null,
       };
     });
 
-    return NextResponse.json({ success: true, data: { customers: enriched, hasMore } });
+    return NextResponse.json({
+      success: true,
+      data: {
+        customers: enriched,
+        hasMore,
+        totals: {
+          total: totalCount,
+          mapped: mappedCount,
+          bankTransfer: bankTransferCount,
+          poNumber: poNumberCount,
+        },
+      },
+    });
   } catch (error) {
     return errorResponse(error);
   }
@@ -129,7 +183,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
         tags: body.tags ?? [],
         notes: body.notes ?? null,
         paymentTerms: body.paymentTerms ?? null,
-        allowedPaymentModes: body.allowedPaymentModes ?? ['cod', 'prepaid', 'credit', 'cheque'],
+        allowedPaymentModes: body.allowedPaymentModes ?? [...DEFAULT_VENDOR_CUSTOMER_PAYMENT_MODES],
       },
       update: {
         ...(body.status !== undefined && { status: body.status }),

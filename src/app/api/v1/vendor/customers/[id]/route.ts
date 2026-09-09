@@ -9,6 +9,7 @@ import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { resolveVendorId } from '@/lib/resolveVendorId';
+import { VENDOR_CUSTOMER_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
 
 function extractId(req: NextRequest) {
   return new URL(req.url).pathname.split('/').at(-1) ?? '';
@@ -24,7 +25,7 @@ const patchSchema = z.object({
   tags: z.array(z.string()).optional(),
   notes: z.string().max(2000).nullable().optional(),
   paymentTerms: z.string().max(50).nullable().optional(),
-  allowedPaymentModes: z.array(z.enum(['cod', 'prepaid', 'credit', 'cheque', 'discco', 'online'])).optional(),
+  allowedPaymentModes: z.array(z.enum(VENDOR_CUSTOMER_PAYMENT_MODES)).optional(),
 });
 
 export const PATCH = vendorOnly(async (req: NextRequest, ctx) => {

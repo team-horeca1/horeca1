@@ -44,6 +44,7 @@ interface ApiOrder {
     status: string;
     paymentStatus: string;
     paymentMethod: string | null;
+    customerPoNumber?: string | null;
     subtotal: string | number;
     taxAmount?: string | number;
     promoDiscount?: string | number;
@@ -705,6 +706,9 @@ export default function OrderDetailPage() {
                                                   : order.paymentMethod === 'wallet' || order.paymentMethod === 'h1_wallet' ? 'Horeca1 Credit'
                                                   : order.paymentMethod || '—'}
                                             </p>
+                                            {order.customerPoNumber && (
+                                                <p className="text-[11px] font-mono text-gray-500 mt-0.5">{order.customerPoNumber}</p>
+                                            )}
                                         </div>
                                     </div>
                                     <span className={cn('px-2.5 py-1 rounded-full text-[11px] font-black', paymentCfg.bg, paymentCfg.color)}>

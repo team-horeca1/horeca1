@@ -1,11 +1,32 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
-  Users, Search, Loader2, MoreVertical, CheckCircle, XCircle,
-  PauseCircle, Tag, Bell, Trash2, Plus, CalendarDays, X, DollarSign, History,
+  Users, Loader2, CheckCircle, Tag, Bell, Trash2, Plus, CalendarDays, X, History,
+  Mail, Phone, Building2, Banknote, FileText, Pencil,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { DEFAULT_VENDOR_CUSTOMER_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
+import {
+  AdminStatusBadge,
+  AdminRegistryPageHeader,
+  AdminRegistryStatsGrid,
+  AdminRegistryFilterBar,
+  registryFilterPillClass,
+  AdminRegistryLoadingState,
+  AdminRegistryEmptyState,
+  AdminRegistryTableShell,
+  AdminRegistryTableHead,
+  AdminRegistryTableBody,
+  AdminRegistryRowActions,
+  AdminRegistryOverflowMenu,
+  AdminRegistryOverflowMenuItem,
+  AdminRegistryViewToggle,
+  useAdminDesktop,
+} from '@/components/features/admin/entity';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,8 +46,9 @@ interface VendorCustomerUser {
 
 interface VendorCustomer {
   id: string;
+  mappingId: string | null;
   userId: string;
-  status: 'active' | 'blocked' | 'suspended';
+  status: 'active' | 'blocked' | 'suspended' | null;
   priceListId: string | null;
   territory: string | null;
   salesExecutive: string | null;
@@ -57,24 +79,30 @@ interface CustomerTask {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STATUS_ICONS = {
-  active: <CheckCircle size={13} className="text-primary" />,
-  blocked: <XCircle size={13} className="text-[#E74C3C]" />,
-  suspended: <PauseCircle size={13} className="text-amber-500" />,
-};
+function mappingStatusBadge(status: VendorCustomer['status']) {
+  if (!status) return <AdminStatusBadge variant="pending" label="Not mapped" />;
+  if (status === 'active') return <AdminStatusBadge variant="active" />;
+  if (status === 'suspended') return <AdminStatusBadge variant="pending" label="Suspended" />;
+  return <AdminStatusBadge variant="inactive" label="Blocked" />;
+}
 
-const STATUS_LABELS = { active: 'Active', blocked: 'Blocked', suspended: 'Suspended' };
+function OfflinePayChips({ modes }: { modes?: string[] }) {
+  const bank = modes?.includes('bank_transfer');
+  const po = modes?.includes('po_number');
+  if (!bank && !po) return <span className="text-[#9CA3AF]">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {bank && (
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#F8E8EC] text-[#6B1D2E]">Bank</span>
+      )}
+      {po && (
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#F8E8EC] text-[#6B1D2E]">PO</span>
+      )}
+    </div>
+  );
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function relativeTime(isoStr: string) {
-  const diff = Date.now() - new Date(isoStr).getTime();
-  const d = Math.floor(diff / 86400000);
-  if (d === 0) return 'Today';
-  if (d === 1) return 'Yesterday';
-  if (d < 30) return `${d}d ago`;
-  return new Date(isoStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-}
 
 /** Return 'overdue' | 'today' | 'upcoming' | null */
 function dueDateState(dueDate: string | null): 'overdue' | 'today' | 'upcoming' | null {
@@ -311,14 +339,16 @@ interface EditModalProps {
 }
 
 function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
-  const [status, setStatus] = useState(customer.status);
+  const [status, setStatus] = useState(customer.status ?? 'active');
   const [priceListId, setPriceListId] = useState(customer.priceListId ?? '');
   const [territory, setTerritory] = useState(customer.territory ?? '');
   const [salespersonId, setSalespersonId] = useState(customer.salespersonId ?? '');
   const [salespersons, setSalespersons] = useState<Array<{ id: string; name: string; code: string | null }>>([]);
   const [deliveryRoute, setDeliveryRoute] = useState(customer.deliveryRoute ?? '');
   const [paymentTerms, setPaymentTerms] = useState(customer.paymentTerms ?? '');
-  const [allowedModes, setAllowedModes] = useState<string[]>(customer.allowedPaymentModes ?? ['cod', 'prepaid', 'credit', 'cheque']);
+  const [allowedModes, setAllowedModes] = useState<string[]>(
+    customer.allowedPaymentModes ?? [...DEFAULT_VENDOR_CUSTOMER_PAYMENT_MODES],
+  );
   const [notes, setNotes] = useState(customer.notes ?? '');
   const [tags, setTags] = useState<string[]>(customer.tags ?? []);
   const [tagInput, setTagInput] = useState('');
@@ -347,9 +377,10 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
   };
 
   const handleSave = async () => {
+    if (!customer.mappingId) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/v1/vendor/customers/${customer.id}`, {
+      const res = await fetch(`/api/v1/vendor/customers/${customer.mappingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -467,7 +498,15 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
           <div>
             <label className="block text-[12px] font-semibold text-[#7C7C7C] mb-2">Allowed payment modes at checkout</label>
             <div className="flex flex-wrap gap-2">
-              {(['cod', 'prepaid', 'credit', 'cheque', 'online'] as const).map((mode) => (
+              {([
+                ['cod', 'COD'],
+                ['prepaid', 'Prepaid'],
+                ['credit', 'DiSCCO'],
+                ['online', 'Online'],
+                ['cheque', 'Cheque'],
+                ['bank_transfer', 'Bank Transfer'],
+                ['po_number', 'PO Number'],
+              ] as const).map(([mode, label]) => (
                 <label key={mode} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#181725] cursor-pointer">
                   <input
                     type="checkbox"
@@ -477,10 +516,11 @@ function EditModal({ customer, priceLists, onClose, onSave }: EditModalProps) {
                     }}
                     className="w-4 h-4 rounded text-primary"
                   />
-                  {mode.toUpperCase()}
+                  {label}
                 </label>
               ))}
             </div>
+            <p className="text-[11px] text-[#AEAEAE] mt-1.5">Bank Transfer and PO Number stay off until you tick them for this customer.</p>
           </div>
 
           <div>
@@ -577,7 +617,7 @@ function PriceHistoryModal({ customer, onClose }: PriceHistoryModalProps) {
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/v1/vendor/price-history?customerId=${customer.id}`);
+        const res = await fetch(`/api/v1/vendor/price-history?customerId=${customer.mappingId ?? customer.id}`);
         const json = await res.json();
         if (cancelled) return;
         if (json.success) {
@@ -659,20 +699,27 @@ function PriceHistoryModal({ customer, onClose }: PriceHistoryModalProps) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function VendorCustomersPage() {
+  const router = useRouter();
   const [customers, setCustomers] = useState<VendorCustomer[]>([]);
   const [priceLists, setPriceLists] = useState<PriceList[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [editCustomer, setEditCustomer] = useState<VendorCustomer | null>(null);
   const [historyCustomer, setHistoryCustomer] = useState<VendorCustomer | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
-  // Set of VendorCustomer.id (not userId) that have overdue/today tasks
   const [dueCustomerIds, setDueCustomerIds] = useState<Set<string>>(new Set());
+  const [totals, setTotals] = useState({ total: 0, mapped: 0, bankTransfer: 0, poNumber: 0 });
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+  const isDesktop = useAdminDesktop();
+  const effectiveView = isDesktop ? viewMode : 'grid';
+  const [activeMenu, setActiveMenu] = useState<{ id: string; top: number; right: number } | null>(null);
 
   const fetchCustomers = useCallback(async (p = 1, q = '', s = '') => {
-    setLoading(true);
+    if (p === 1) setLoading(true);
+    else setLoadingMore(true);
     try {
       const params = new URLSearchParams({ page: String(p) });
       if (q) params.set('search', q);
@@ -682,32 +729,67 @@ export default function VendorCustomersPage() {
         fetch('/api/v1/vendor/price-lists'),
       ]);
       const [custJson, plJson] = await Promise.all([custRes.json(), plRes.json()]);
-      if (custJson.success) {
-        const list: VendorCustomer[] = custJson.data.customers;
-        setCustomers(list);
-        setHasMore(custJson.data.hasMore);
-        // Fetch due task indicators in background
-        fetchDueCustomerIds(list.map((c) => c.id))
-          .then((ids) => setDueCustomerIds(ids))
-          .catch(() => { /* ignore */ });
+      if (!custRes.ok || !custJson.success) {
+        if (p === 1) setCustomers([]);
+        toast.error(typeof custJson?.error?.message === 'string' ? custJson.error.message : 'Failed to load customers');
+        return;
       }
+      const list: VendorCustomer[] = custJson.data.customers;
+      setCustomers((prev) => (p === 1 ? list : [...prev, ...list]));
+      setHasMore(Boolean(custJson.data.hasMore));
+      if (custJson.data.totals) {
+        setTotals({
+          total: custJson.data.totals.total ?? 0,
+          mapped: custJson.data.totals.mapped ?? 0,
+          bankTransfer: custJson.data.totals.bankTransfer ?? 0,
+          poNumber: custJson.data.totals.poNumber ?? 0,
+        });
+      }
+      fetchDueCustomerIds(list.map((c) => c.mappingId).filter((id): id is string => !!id))
+        .then((ids) => setDueCustomerIds((prev) => (p === 1 ? ids : new Set([...prev, ...ids]))))
+        .catch(() => { /* ignore */ });
       if (plJson.success) setPriceLists(plJson.data);
+    } catch {
+      if (p === 1) setCustomers([]);
+      toast.error('Network error loading customers');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
-  useEffect(() => { void fetchCustomers(1, search, statusFilter); }, [fetchCustomers, statusFilter]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(1);
+      void fetchCustomers(1, search, statusFilter);
+    }, search ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [fetchCustomers, search, statusFilter]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    void fetchCustomers(1, search, statusFilter);
-  };
+  useEffect(() => {
+    const handleClickOutside = () => setActiveMenu(null);
+    if (activeMenu !== null) {
+      window.addEventListener('click', handleClickOutside);
+    }
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, [activeMenu]);
+
+  useEffect(() => {
+    if (!activeMenu) return;
+    const close = () => setActiveMenu(null);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [activeMenu]);
 
   const handleCustomerSaved = (updated: VendorCustomer) => {
-    setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    setCustomers((prev) => prev.map((c) => (c.userId === updated.userId ? { ...c, ...updated } : c)));
   };
+
+  const openDetails = (userId: string) => router.push(`/vendor/customers/${userId}`);
 
   const FILTERS = [
     { label: 'All', value: '' },
@@ -716,156 +798,237 @@ export default function VendorCustomersPage() {
     { label: 'Blocked', value: 'blocked' },
   ];
 
+  const stats = [
+    { label: 'Customers', value: totals.total, icon: Users, iconBg: 'bg-[#F8E8EC]', iconColor: 'text-[#6B1D2E]' },
+    { label: 'Mapped', value: totals.mapped, icon: Tag, iconBg: 'bg-[#EEF2FF]', iconColor: 'text-[#2563EB]' },
+    { label: 'Bank Transfer', value: totals.bankTransfer, icon: Banknote, iconBg: 'bg-[#F8E8EC]', iconColor: 'text-[#6B1D2E]' },
+    { label: 'PO Number', value: totals.poNumber, icon: FileText, iconBg: 'bg-[#FEF3C7]', iconColor: 'text-[#B45309]' },
+  ];
+
   return (
     <div className="space-y-5 pb-10">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-[24px] font-bold text-[#181725]">Customers</h1>
-          <p className="text-[12px] text-[#AEAEAE]">Manage your B2B customer accounts, pricing, and credit terms</p>
-        </div>
-      </div>
+      <AdminRegistryPageHeader
+        title="Customers"
+        subtitle="All Horeca buyers — enable Bank Transfer or PO Number per customer on their detail page."
+      />
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <form onSubmit={handleSearch} className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#AEAEAE]" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, email, phone…"
-            className="w-[260px] h-[36px] pl-8 pr-3 rounded-[10px] border border-[#EEEEEE] bg-white text-[12px] outline-none focus:border-primary/40"
-          />
-        </form>
+      <AdminRegistryStatsGrid stats={stats} />
 
-        <div className="flex bg-[#F5F5F5] rounded-[10px] p-0.5 gap-0.5">
-          {FILTERS.map((f) => (
+      <AdminRegistryFilterBar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search by name, email, phone..."
+        searching={loading && customers.length > 0}
+        leftSlot={
+          FILTERS.map((f) => (
             <button
-              key={f.value}
+              key={f.value || 'all'}
+              type="button"
               onClick={() => { setStatusFilter(f.value); setPage(1); }}
-              className={cn(
-                'h-[30px] px-3 rounded-[8px] text-[12px] font-semibold transition-all',
-                statusFilter === f.value
-                  ? 'bg-white text-[#181725] shadow-sm'
-                  : 'text-[#7C7C7C] hover:text-[#181725]'
-              )}
+              className={registryFilterPillClass(statusFilter === f.value)}
             >
               {f.label}
             </button>
-          ))}
-        </div>
-      </div>
+          ))
+        }
+        trailingSlot={<AdminRegistryViewToggle viewMode={viewMode} onChange={setViewMode} />}
+      />
 
-      {/* Table */}
-      <div className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="animate-spin text-primary" size={28} />
-          </div>
-        ) : customers.length === 0 ? (
-          <div className="py-14 text-center">
-            <Users size={36} className="text-[#E5E7EB] mx-auto mb-3" />
-            <p className="text-[13px] font-bold text-[#AEAEAE]">No customers found</p>
-            <p className="text-[12px] text-[#AEAEAE] mt-1">Customers appear here once they place an order with you</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[12px]">
-              <thead>
-                <tr className="bg-[#FAFAFA] border-b border-[#F5F5F5]">
-                  <th className="text-left px-5 py-3 font-semibold text-[#7C7C7C]">Customer</th>
-                  <th className="text-left px-4 py-3 font-semibold text-[#7C7C7C]">Status</th>
-                  <th className="text-left px-4 py-3 font-semibold text-[#7C7C7C]">Price List</th>
-                  <th className="text-left px-4 py-3 font-semibold text-[#7C7C7C]">Territory</th>
-                  <th className="text-right px-4 py-3 font-semibold text-[#7C7C7C]">Orders</th>
-                  <th className="text-right px-4 py-3 font-semibold text-[#7C7C7C]">Total Spend</th>
-                  <th className="text-right px-4 py-3 font-semibold text-[#7C7C7C]">Last Order</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#F5F5F5]">
-                {customers.map((c) => (
-                  <tr key={c.id} className="hover:bg-[#FAFAFA] transition-colors">
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <div>
-                          <p className="font-semibold text-[#181725] truncate max-w-[160px]">
-                            {c.user.businessName ?? c.user.fullName}
-                          </p>
-                          <p className="text-[#AEAEAE] truncate">{c.user.email ?? c.user.phone ?? '—'}</p>
-                          {c.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {c.tags.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
+      {loading && customers.length === 0 ? (
+        <AdminRegistryLoadingState message="Loading customers..." />
+      ) : customers.length === 0 ? (
+        <AdminRegistryEmptyState
+          icon={Users}
+          title={search || statusFilter ? 'No matched results' : 'No customers found'}
+          subtitle="Marketplace customers will appear here. Try a different search."
+        />
+      ) : effectiveView === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {customers.map((c) => {
+            const name = c.user.businessName ?? c.user.fullName;
+            return (
+              <div
+                key={c.userId}
+                className="bg-white rounded-[16px] border border-[#D1D5DB] shadow-sm overflow-hidden flex flex-col h-full hover:shadow-md hover:border-[#6B1D2E]/30 hover:-translate-y-0.5 transition-all w-full relative"
+              >
+                <button
+                  type="button"
+                  onClick={() => openDetails(c.userId)}
+                  className="p-5 flex-1 flex flex-col text-left"
+                >
+                  <div className="bg-[#F9FAFB] rounded-[12px] h-[100px] relative flex items-center justify-center p-4 border border-[#F3F4F6] mb-4">
+                    <div className="absolute top-2.5 right-2.5">{mappingStatusBadge(c.status)}</div>
+                    {c.mappingId && dueCustomerIds.has(c.mappingId) && (
+                      <Bell size={14} className="absolute top-2.5 left-2.5 text-amber-500" aria-label="Has tasks due" />
+                    )}
+                    <div className="w-[60px] h-[60px] rounded-full bg-[#6B1D2E]/10 flex items-center justify-center border border-[#6B1D2E]/20">
+                      <span className="text-[22px] font-black text-[#6B1D2E]">{name.charAt(0).toUpperCase()}</span>
+                    </div>
+                  </div>
+                  <h3 className="text-[16px] font-extrabold text-[#111827] line-clamp-1">{name}</h3>
+                  <p className="text-[12px] text-[#6B7280] mt-0.5 line-clamp-1">{c.user.fullName}</p>
+                  <div className="mt-2"><OfflinePayChips modes={c.allowedPaymentModes} /></div>
+                  <div className="space-y-2 mt-auto pt-3 border-t border-[#F3F4F6]">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Mail size={13} className="text-[#9CA3AF] shrink-0" />
+                      <span className="text-[12px] font-semibold text-[#4B5563] truncate">{c.user.email || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone size={13} className="text-[#9CA3AF] shrink-0" />
+                      <span className="text-[12px] font-semibold text-[#4B5563]">{c.user.phone || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Building2 size={13} className="text-[#9CA3AF] shrink-0" />
+                      <span className="text-[12px] font-semibold text-[#4B5563] truncate">{c.user.businessName || '—'}</span>
+                    </div>
+                    <p className="text-[12px] font-bold text-[#111827] tabular-nums">
+                      {c.orderCount} orders · ₹{c.totalSpend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                </button>
+                <div className="p-4 border-t border-[#D1D5DB] bg-white flex items-center gap-2">
+                  <Link
+                    href={`/vendor/customers/${c.userId}`}
+                    className="flex-1 min-h-12 bg-[#6B1D2E] text-white rounded-[12px] text-[13px] font-semibold hover:bg-[#5A1926] transition-all flex items-center justify-center"
+                  >
+                    Details
+                  </Link>
+                  {c.mappingId && (
+                    <button
+                      type="button"
+                      onClick={() => setEditCustomer(c)}
+                      className="min-h-12 px-3 rounded-[12px] border border-[#E5E7EB] text-[#374151] font-semibold hover:bg-[#F9FAFB]"
+                      aria-label="Edit CRM"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <AdminRegistryTableShell minWidth="1100px">
+          <AdminRegistryTableHead>
+            <th className="px-6 py-3.5 font-bold min-w-[220px] border-r border-[#D1D5DB]">Customer</th>
+            <th className="px-6 py-3.5 font-bold min-w-[180px] border-r border-[#D1D5DB]">Email</th>
+            <th className="px-6 py-3.5 font-bold min-w-[120px] border-r border-[#D1D5DB]">Phone</th>
+            <th className="px-6 py-3.5 font-bold text-center w-[110px] border-r border-[#D1D5DB]">Status</th>
+            <th className="px-6 py-3.5 font-bold min-w-[110px] border-r border-[#D1D5DB]">Offline pay</th>
+            <th className="px-6 py-3.5 font-bold text-right w-[80px] border-r border-[#D1D5DB]">Orders</th>
+            <th className="px-6 py-3.5 font-bold text-right min-w-[110px] border-r border-[#D1D5DB]">Spend</th>
+            <th className="px-6 py-3.5 font-bold text-left min-w-[200px]">Actions</th>
+          </AdminRegistryTableHead>
+          <AdminRegistryTableBody>
+            {customers.map((c) => {
+              const name = c.user.businessName ?? c.user.fullName;
+              return (
+                <tr
+                  key={c.userId}
+                  onClick={() => openDetails(c.userId)}
+                  className="group hover:bg-[#F9FAFB]/60 transition-colors cursor-pointer"
+                >
+                  <td className="px-6 py-3 align-middle border-r border-[#D1D5DB]">
+                    <div className="flex items-center gap-3">
+                      <div className="w-[42px] h-[42px] rounded-[10px] bg-[#F3F4F6] overflow-hidden shrink-0 border border-[#E5E7EB] flex items-center justify-center">
+                        <span className="text-[15px] font-black text-[#6B1D2E]">{name.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[14px] font-bold text-[#111827] truncate group-hover:text-[#6B1D2E] transition-colors flex items-center gap-1.5">
+                          {name}
+                          {c.mappingId && dueCustomerIds.has(c.mappingId) && (
+                            <Bell size={12} className="text-amber-500 shrink-0" aria-label="Has tasks due" />
                           )}
-                        </div>
-                        {dueCustomerIds.has(c.id) && (
-                          <Bell
-                            size={12}
-                            className="text-amber-500 flex-shrink-0"
-                            aria-label="Has tasks due today or overdue"
-                          />
-                        )}
+                        </p>
+                        <p className="text-[12px] text-[#9CA3AF] truncate">{c.user.fullName}</p>
                       </div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        {STATUS_ICONS[c.status]}
-                        <span className="text-[#181725]">{STATUS_LABELS[c.status]}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {c.priceList ? (
-                        <span className="flex items-center gap-1 text-primary">
-                          <Tag size={11} />
-                          {c.priceList.name}
-                        </span>
-                      ) : (
-                        <span className="text-[#AEAEAE]">Default</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5 text-[#7C7C7C]">{c.territory ?? '—'}</td>
-                    <td className="px-4 py-3.5 text-right font-semibold text-[#181725]">{c.orderCount}</td>
-                    <td className="px-4 py-3.5 text-right font-bold text-[#181725]">
-                      ₹{c.totalSpend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                    </td>
-                    <td className="px-4 py-3.5 text-right text-[#AEAEAE]">
-                      {c.lastOrderAt ? relativeTime(c.lastOrderAt) : '—'}
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setHistoryCustomer(c)}
-                          className="p-1.5 rounded-[6px] hover:bg-[#F5F5F5] transition-colors text-[#7C7C7C]"
-                          title="Price history"
-                          aria-label="View price history"
-                        >
-                          <History size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditCustomer(c)}
-                          className="p-1.5 rounded-[6px] hover:bg-[#F5F5F5] transition-colors text-[#7C7C7C]"
-                          aria-label="Edit customer"
-                        >
-                          <MoreVertical size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-3 text-[13px] font-medium text-[#4B5563] truncate max-w-[200px] align-middle border-r border-[#D1D5DB]">
+                    {c.user.email || '—'}
+                  </td>
+                  <td className="px-6 py-3 text-[11px] text-[#9CA3AF] font-semibold font-mono align-middle border-r border-[#D1D5DB]">
+                    {c.user.phone || '—'}
+                  </td>
+                  <td className="px-6 py-3 text-center align-middle border-r border-[#D1D5DB]">
+                    {mappingStatusBadge(c.status)}
+                  </td>
+                  <td className="px-6 py-3 align-middle border-r border-[#D1D5DB]">
+                    <OfflinePayChips modes={c.allowedPaymentModes} />
+                  </td>
+                  <td className="px-6 py-3 text-right font-bold tabular-nums text-[#111827] align-middle border-r border-[#D1D5DB]">
+                    {c.orderCount}
+                  </td>
+                  <td className="px-6 py-3 text-right font-bold tabular-nums text-[#111827] align-middle border-r border-[#D1D5DB]">
+                    ₹{c.totalSpend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </td>
+                  <td className="px-6 py-3 text-left align-middle" onClick={(e) => e.stopPropagation()}>
+                    <AdminRegistryRowActions
+                      detailsHref={`/vendor/customers/${c.userId}`}
+                      onDetailsClick={(e) => e.stopPropagation()}
+                      showMenu={Boolean(c.mappingId)}
+                      menuOpen={activeMenu?.id === c.userId}
+                      onMenuToggle={c.mappingId ? (e) => {
+                        e.stopPropagation();
+                        if (activeMenu?.id === c.userId) {
+                          setActiveMenu(null);
+                          return;
+                        }
+                        const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                        setActiveMenu({
+                          id: c.userId,
+                          top: rect.bottom + 6,
+                          right: window.innerWidth - rect.right,
+                        });
+                      } : undefined}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </AdminRegistryTableBody>
+        </AdminRegistryTableShell>
+      )}
+
+      {hasMore && (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            disabled={loadingMore}
+            onClick={() => {
+              const next = page + 1;
+              setPage(next);
+              void fetchCustomers(next, search, statusFilter);
+            }}
+            className="min-h-12 px-5 rounded-[12px] border border-[#E5E7EB] bg-white text-[13px] font-bold text-[#374151] hover:bg-[#F9FAFB] disabled:opacity-60 flex items-center gap-2"
+          >
+            {loadingMore && <Loader2 size={14} className="animate-spin" />}
+            Load more
+          </button>
+        </div>
+      )}
+
+      <AdminRegistryOverflowMenu active={activeMenu}>
+        {activeMenu && (() => {
+          const c = customers.find((row) => row.userId === activeMenu.id);
+          if (!c?.mappingId) return null;
+          return (
+            <>
+              <AdminRegistryOverflowMenuItem
+                icon={<Pencil size={14} />}
+                label="Edit CRM"
+                onClick={() => { setEditCustomer(c); setActiveMenu(null); }}
+              />
+              <AdminRegistryOverflowMenuItem
+                icon={<History size={14} />}
+                label="Price history"
+                onClick={() => { setHistoryCustomer(c); setActiveMenu(null); }}
+              />
+            </>
+          );
+        })()}
+      </AdminRegistryOverflowMenu>
 
       {editCustomer && (
         <EditModal

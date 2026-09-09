@@ -172,8 +172,8 @@ const PAYMENT_TO_VENDOR_MODE: Record<string, string> = {
   online: 'prepaid',
   credit: 'credit',
   wallet: 'prepaid',
-  bank_transfer: 'prepaid',
-  po_number: 'cheque',
+  bank_transfer: 'bank_transfer',
+  po_number: 'po_number',
 };
 
 const DEFAULT_VENDOR_PAYMENT_MODES = ['cod', 'prepaid', 'credit', 'cheque', 'online'];
@@ -894,6 +894,10 @@ function CheckoutPageContent() {
             setOrderError('Select a delivery address before placing orders. Use Deliver to in the navbar.');
             return;
         }
+        if (selectedPayment === 'po_number' && !poNumberInput.trim()) {
+            setOrderError('Enter your purchase order number.');
+            return;
+        }
         // V2.2: an outlet without an address cannot receive deliveries. Block the
         // order here as well, even though the button is disabled below — defence
         // in depth in case state changes between render and click.
@@ -917,7 +921,11 @@ function CheckoutPageContent() {
             // 1. Create or submit order (draft vs new order)
             let createdOrders: Array<{ id: string; orderNumber: string }> = [];
             if (draftId) {
-                const submitRes = await dal.orders.submitDraft(draftId, selectedPayment) as {
+                const submitRes = await dal.orders.submitDraft(
+                    draftId,
+                    selectedPayment,
+                    selectedPayment === 'po_number' ? poNumberInput.trim() : undefined,
+                ) as {
                     id: string;
                     orderNumber: string;
                 };
@@ -929,6 +937,7 @@ function CheckoutPageContent() {
                 const result = await dal.orders.create(vendorOrders, selectedPayment, false, {
                     ...(appliedCoupon ? { couponCode: appliedCoupon.code } : {}),
                     ...(useRewardsWallet && walletUseEst > 0 ? { useWallet: true } : {}),
+                    ...(selectedPayment === 'po_number' ? { customerPoNumber: poNumberInput.trim() } : {}),
                 }) as {
                     orders: Array<{ id: string; orderNumber: string }>;
                 };
@@ -1702,14 +1711,16 @@ function CheckoutPageContent() {
                                     !selectedPayment || 
                                     isPlacingOrder || 
                                     (selectedPayment === 'credit' && (!creditWalletsLoaded || !creditAllSelectionsValid)) ||
-                                    (selectedPayment === 'wallet' && (!creditWalletsLoaded || !walletEligibility.ok))
+                                    (selectedPayment === 'wallet' && (!creditWalletsLoaded || !walletEligibility.ok)) ||
+                                    (selectedPayment === 'po_number' && !poNumberInput.trim())
                                 }
                                 className={`w-full py-4 text-[15px] font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${
                                     !checkoutBlocked &&
                                     selectedPayment && 
                                     !isPlacingOrder && 
                                     !(selectedPayment === 'credit' && (!creditWalletsLoaded || !creditAllSelectionsValid)) &&
-                                    !(selectedPayment === 'wallet' && (!creditWalletsLoaded || !walletEligibility.ok))
+                                    !(selectedPayment === 'wallet' && (!creditWalletsLoaded || !walletEligibility.ok)) &&
+                                    !(selectedPayment === 'po_number' && !poNumberInput.trim())
                                         ? 'bg-primary hover:bg-primary-dark text-white shadow-green-100/50 active:scale-[0.99]'
                                         : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
                                 }`}

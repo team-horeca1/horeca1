@@ -87,6 +87,8 @@ export default function CartPage() {
     // retype without the value snapping back to current pcs on each keystroke.
     const [qtyDraft, setQtyDraft] = useState<Record<string, string>>({});
     const [paymentMethod, setPaymentMethod] = useState('razorpay');
+    const [allowedModesByVendor, setAllowedModesByVendor] = useState<Record<string, string[]>>({});
+    const [poNumberInput, setPoNumberInput] = useState('');
     const [isPlacingOrder, setIsPlacingOrder] = useState(false);
     const [orderError, setOrderError] = useState<string | null>(null);
 
@@ -210,6 +212,27 @@ export default function CartPage() {
     const selectedTaxable = selectedGroups.reduce((s, g) => s + g.subtotalTaxable, 0);
     const selectedGST = selectedGroups.reduce((s, g) => s + g.totalGST, 0);
     const selectedTotal = selectedGroups.reduce((s, g) => s + g.subtotal, 0);
+
+    React.useEffect(() => {
+        const vendorIds = selectedGroups.map((g) => g.vendorId);
+        if (!vendorIds.length) {
+            setAllowedModesByVendor({});
+            return;
+        }
+        fetch(`/api/v1/checkout/payment-modes?vendorIds=${vendorIds.join(',')}`)
+            .then((r) => r.json())
+            .then((j) => { if (j.success) setAllowedModesByVendor(j.data as Record<string, string[]>); })
+            .catch(() => {});
+    }, [selectedGroups.map((g) => g.vendorId).join(',')]);
+
+    React.useEffect(() => {
+        if (paymentMethod !== 'bank_transfer' && paymentMethod !== 'po_number') return;
+        const vendorIds = selectedGroups.map((g) => g.vendorId);
+        const allowed = vendorIds.length > 0 && vendorIds.every((id) =>
+            (allowedModesByVendor[id] ?? ['cod', 'prepaid', 'credit', 'cheque', 'online']).includes(paymentMethod),
+        );
+        if (!allowed) setPaymentMethod('razorpay');
+    }, [paymentMethod, allowedModesByVendor, selectedGroups]);
 
     const itemTaxable = selectedGroups.length > 0 ? selectedTaxable : totalTaxable;
     const itemGST = selectedGroups.length > 0 ? selectedGST : totalGST;
@@ -361,9 +384,34 @@ export default function CartPage() {
         },
     ] as const;
 
+    const CART_PAYMENT_TO_VENDOR_MODE: Record<string, string> = {
+        razorpay: 'prepaid',
+        disco: 'credit',
+        wallet: 'prepaid',
+        bank_transfer: 'bank_transfer',
+        po_number: 'po_number',
+    };
+    let cartModes: Set<string> | null = null;
+    const cartVendorIds = selectedGroups.map((g) => g.vendorId);
+    if (cartVendorIds.length) {
+        cartModes = new Set(allowedModesByVendor[cartVendorIds[0]] ?? ['cod', 'prepaid', 'credit', 'cheque', 'online']);
+        for (const vid of cartVendorIds.slice(1)) {
+            const next = new Set(allowedModesByVendor[vid] ?? ['cod', 'prepaid', 'credit', 'cheque', 'online']);
+            cartModes = new Set([...cartModes].filter((m) => next.has(m)));
+        }
+    }
+    const visiblePaymentMethods = PAYMENT_METHODS.filter((method) => {
+        if (!cartModes) return method.id !== 'bank_transfer' && method.id !== 'po_number';
+        return cartModes.has(CART_PAYMENT_TO_VENDOR_MODE[method.id] ?? method.id);
+    });
+
     const confirmOrder = async () => {
         if (selectedGroups.length === 0) {
             setOrderError('Select at least one PO to checkout.');
+            return;
+        }
+        if (paymentMethod === 'po_number' && !poNumberInput.trim()) {
+            setOrderError('Enter your purchase order number.');
             return;
         }
         setIsPlacingOrder(true);
@@ -384,7 +432,9 @@ export default function CartPage() {
                 : paymentMethod;
 
             // 1. Create orders in DB
-            const result = await dal.orders.create(vendorOrders, apiPaymentMethod) as {
+            const result = await dal.orders.create(vendorOrders, apiPaymentMethod, false, {
+                ...(apiPaymentMethod === 'po_number' ? { customerPoNumber: poNumberInput.trim() } : {}),
+            }) as {
                 orders: Array<{ id: string; orderNumber: string }>;
             };
             const createdOrders = result.orders || [];
@@ -448,7 +498,7 @@ export default function CartPage() {
     };
 
     if (screen === 'payment') {
-        const selected = PAYMENT_METHODS.find(m => m.id === paymentMethod) ?? PAYMENT_METHODS[0];
+        const selected = visiblePaymentMethods.find(m => m.id === paymentMethod) ?? visiblePaymentMethods[0] ?? PAYMENT_METHODS[0];
         return (
             <div className="min-h-screen bg-[#F2F3F2] flex flex-col pb-28 lg:pb-16">
                 {/* Mobile Header */}
@@ -486,7 +536,7 @@ export default function CartPage() {
                                 <p className="text-[13px] text-gray-400 font-medium mt-0.5">Choose how you&apos;d like to pay</p>
                             </div>
                             <div className="divide-y divide-[#F5F5F5]">
-                                {PAYMENT_METHODS.map((method) => {
+                                {visiblePaymentMethods.map((method) => {
                                     const isSelected = paymentMethod === method.id;
                                     return (
                                         <button
@@ -522,6 +572,18 @@ export default function CartPage() {
                                     );
                                 })}
                             </div>
+                            {paymentMethod === 'po_number' && (
+                                <div className="px-5 md:px-7 py-4 bg-orange-50 border-t border-orange-100">
+                                    <p className="text-[13px] font-bold text-orange-700 mb-2">Enter Purchase Order Number</p>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. PO-2024-001"
+                                        value={poNumberInput}
+                                        onChange={(e) => setPoNumberInput(e.target.value)}
+                                        className="w-full border border-orange-200 bg-white rounded-xl px-4 py-3 text-[13px] font-bold outline-none focus:ring-1 focus:ring-primary placeholder:text-gray-400"
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {/* Right — Bill Summary (desktop) */}

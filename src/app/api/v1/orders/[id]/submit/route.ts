@@ -17,8 +17,8 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
     requireStorefrontAccess(ctx, 'storefront.order');
     const storefrontCtx = await resolveStorefrontContext(ctx);
     const body = await req.json().catch(() => ({}));
-    const { paymentMethod } = submitDraftSchema.parse(body);
-    const updated = await new OrderService().submitDraft(orderId(req), storefrontCtx, paymentMethod);
+    const { paymentMethod, customerPoNumber } = submitDraftSchema.parse(body);
+    const updated = await new OrderService().submitDraft(orderId(req), storefrontCtx, paymentMethod, customerPoNumber);
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     return errorResponse(error);

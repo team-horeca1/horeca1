@@ -868,6 +868,7 @@ model Order {
   totalAmount               Decimal      @map("total_amount") @db.Decimal(12, 2)
   paymentMethod             String?      @map("payment_method") @db.VarChar(30)
   paymentStatus             PaymentState @default(unpaid) @map("payment_status")
+  customerPoNumber          String?      @map("customer_po_number") @db.VarChar(80)
   deliverySlotId            String?      @map("delivery_slot_id") @db.Uuid
   deliveryDate              DateTime?    @map("delivery_date") @db.Date
   notes                     String?      @db.Text

@@ -19,6 +19,7 @@ import { CartService, type CartContext } from '@/modules/cart/cart.service';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { creditVendorOnDelivery } from '@/modules/vendor/vendorSettlement.service';
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
+import { DEFAULT_CHECKOUT_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
 import {
   promotionService,
   evaluateVendorPromo,
@@ -67,9 +68,21 @@ const BLOCKED_CUSTOMER_STATUSES = ['blocked', 'suspended'];
 /** Map checkout payment methods to VendorCustomer.allowedPaymentModes values. */
 function normalizeVendorPaymentMode(method: string): string {
   if (method === 'vendor_credit' || method === 'discco') return 'credit';
-  if (method === 'wallet' || method === 'h1_wallet' || method === 'online' || method === 'bank_transfer') return 'prepaid';
-  if (method === 'po_number') return 'cheque';
+  if (method === 'wallet' || method === 'h1_wallet' || method === 'online') return 'prepaid';
   return method;
+}
+
+function allowedModesForVendorCustomer(modes: string[] | null | undefined): string[] {
+  return modes?.length ? modes : DEFAULT_CHECKOUT_PAYMENT_MODES;
+}
+
+function assertPaymentMethodAllowed(method: string, modes: string[] | null | undefined) {
+  const normalized = normalizeVendorPaymentMode(method);
+  if (!allowedModesForVendorCustomer(modes).includes(normalized)) {
+    throw Errors.badRequest(
+      `Payment method "${method}" is not allowed for your account with this vendor`,
+    );
+  }
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -139,6 +152,8 @@ interface CreateOrderInput {
   // optional prepaid-wallet redemption (Rule 6). Both rejected on drafts.
   couponCode?: string;
   useWallet?: boolean;
+  /** Buyer's enterprise PO reference — required when paymentMethod is po_number. */
+  customerPoNumber?: string;
 }
 
 /**
@@ -312,13 +327,8 @@ export class OrderService {
           );
         }
 
-        if (!isDraft && vendorCustomer?.allowedPaymentModes?.length) {
-          const normalized = normalizeVendorPaymentMode(input.paymentMethod);
-          if (!vendorCustomer.allowedPaymentModes.includes(normalized)) {
-            throw Errors.badRequest(
-              `Payment method "${input.paymentMethod}" is not allowed for your account with this vendor`,
-            );
-          }
+        if (!isDraft) {
+          assertPaymentMethodAllowed(input.paymentMethod, vendorCustomer?.allowedPaymentModes);
         }
         const customerCtx: CustomerContext = {
           userId,
@@ -602,6 +612,9 @@ export class OrderService {
             checkoutGroupId,
             totalAmount,
             paymentMethod: input.paymentMethod,
+            customerPoNumber: input.paymentMethod === 'po_number'
+              ? (input.customerPoNumber?.trim() || null)
+              : null,
             deliverySlotId: vo.deliverySlotId,
             notes: vo.notes,
             salespersonId: p.salespersonId,
@@ -908,7 +921,7 @@ export class OrderService {
   }
 
   /** Submit a draft PO: draft → pending. Re-validates stock/MOV/credit, reserves, notifies. */
-  async submitDraft(orderId: string, ctx: OrderContext, paymentMethod?: string) {
+  async submitDraft(orderId: string, ctx: OrderContext, paymentMethod?: string, customerPoNumber?: string) {
     return prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
         where: { id: orderId, userId: ctx.userId, status: 'draft' },
@@ -936,12 +949,19 @@ export class OrderService {
       // blocked the customer must not slip through at submit time.
       const vendorCustomer = await tx.vendorCustomer.findUnique({
         where: { vendorId_userId: { vendorId: order.vendorId, userId: ctx.userId } },
-        select: { status: true },
+        select: { status: true, allowedPaymentModes: true },
       });
       if (vendorCustomer && BLOCKED_CUSTOMER_STATUSES.includes(vendorCustomer.status)) {
         throw Errors.forbidden(
           `Ordering from ${vendor.businessName} is currently unavailable for your account. Please contact the vendor.`,
         );
+      }
+      if (effectivePaymentMethod) {
+        assertPaymentMethodAllowed(effectivePaymentMethod, vendorCustomer?.allowedPaymentModes);
+      }
+      const resolvedPo = (customerPoNumber?.trim() || order.customerPoNumber?.trim() || '') || null;
+      if (effectivePaymentMethod === 'po_number' && !resolvedPo) {
+        throw Errors.badRequest('Purchase order number is required');
       }
 
       await this.inventoryService.reserveStock(items, fulfillOutlet, tx);
@@ -961,6 +981,7 @@ export class OrderService {
           status: 'pending',
           acceptedAt: new Date(),
           paymentMethod: effectivePaymentMethod,
+          customerPoNumber: effectivePaymentMethod === 'po_number' ? resolvedPo : null,
           ...(creditPaid ? { paymentStatus: 'paid' } : {}),
         },
       });

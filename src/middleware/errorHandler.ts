@@ -81,10 +81,10 @@ export function friendlyErrorMessage(error: unknown, fallback = 'Something went 
   if (error instanceof Error && error.name === 'PrismaClientValidationError') {
     const unknownArg = error.message.match(/Unknown argument `([^`]+)`/);
     if (unknownArg) {
-      return `Database schema out of date (${unknownArg[1]}). Run: npx prisma generate && restart dev server`;
+      return `Database schema out of date (${unknownArg[1]}). Restart the dev server after prisma generate.`;
     }
-    const line = error.message.split('\n').find((l) => l.includes('Invalid')) ?? error.message.split('\n')[0];
-    return line?.trim() || fallback;
+    console.error('[API Error] PrismaClientValidationError', error.message.slice(0, 500));
+    return fallback;
   }
   if (error instanceof Error && error.message && !error.message.includes('invocation')) {
     return error.message;

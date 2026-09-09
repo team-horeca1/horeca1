@@ -691,15 +691,15 @@ test.describe('Section 4 — Pricing & bulk pricing', () => {
 
     const customers = await pageJson<{
       success?: boolean;
-      data?: { customers?: Array<{ id: string }> };
+      data?: { customers?: Array<{ id: string; mappingId?: string | null }> };
     }>(page, '/api/v1/vendor/customers?page=1');
     expect(customers.status).not.toBe(404);
-    const first = customers.json.data?.customers?.[0];
-    if (first) {
+    const firstMapped = customers.json.data?.customers?.find((c) => c.mappingId);
+    if (firstMapped?.mappingId) {
       const hist = await pageJson<{
         success?: boolean;
         data?: { entries?: unknown[]; message?: string };
-      }>(page, `/api/v1/vendor/price-history?customerId=${first.id}`);
+      }>(page, `/api/v1/vendor/price-history?customerId=${firstMapped.mappingId}`);
       expect(hist.status).not.toBe(404);
       expect([200, 403]).toContain(hist.status);
       if (hist.status === 200) {

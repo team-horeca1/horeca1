@@ -86,6 +86,7 @@ interface OrderData {
     totalAmount: number;
     promoDiscount: number;
     paymentMethod: string | null;
+    customerPoNumber?: string | null;
     paymentStatus: string;
     deliveryDate: string | null;
     notes: string | null;
@@ -1281,7 +1282,12 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                                     </div>
                                     {order.paymentMethod && (
                                         <p className="text-[12px] text-[#4B5563] font-semibold">
-                                            <span className="text-[#9CA3AF] font-medium">Method:</span> {order.paymentMethod}
+                                            <span className="text-[#9CA3AF] font-medium">Method:</span> {order.paymentMethod === 'po_number' ? 'PO Number' : order.paymentMethod === 'bank_transfer' ? 'Bank Transfer' : order.paymentMethod}
+                                        </p>
+                                    )}
+                                    {order.customerPoNumber && (
+                                        <p className="text-[12px] text-[#4B5563] font-semibold">
+                                            <span className="text-[#9CA3AF] font-medium">Customer PO:</span> {order.customerPoNumber}
                                         </p>
                                     )}
                                 </div>
