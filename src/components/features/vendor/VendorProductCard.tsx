@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { CreditCard, Share2, ShoppingCart, Plus, Minus, Navigation, X, Loader2, Package, Trash2, ChevronDown, CheckCircle, Clock } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { CreditCard, Share2, ShoppingCart, Plus, Minus, Navigation, X, Loader2, Package, Trash2, ChevronDown, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { toast } from 'sonner';
@@ -37,6 +37,21 @@ export const VendorProductCard = React.memo(function VendorProductCard({
 
     // ── Bulk pricing bottom-sheet state (opened from the mobile grid card's "Bulk ▾" chip) ──
     const [showBulkSheet, setShowBulkSheet] = useState(false);
+    const [bulkCelebrate, setBulkCelebrate] = useState(false);
+    const bulkCelebrateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const flashBulkAdded = () => {
+        setBulkCelebrate(true);
+        if (bulkCelebrateTimer.current) clearTimeout(bulkCelebrateTimer.current);
+        bulkCelebrateTimer.current = setTimeout(() => {
+            setBulkCelebrate(false);
+            bulkCelebrateTimer.current = null;
+        }, 1800);
+    };
+
+    useEffect(() => () => {
+        if (bulkCelebrateTimer.current) clearTimeout(bulkCelebrateTimer.current);
+    }, []);
 
     // ── Desktop grid card inline bulk-tier stepper state ──
     const [openStepperIdx, setOpenStepperIdx] = useState<number | null>(null);
@@ -149,6 +164,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
             }
             addToCart(product, target);
             toast.success(`${product.name} — quantity set to ${target} ${product.packSize || ''}`, { duration: 2000 });
+            flashBulkAdded();
             return;
         }
 
@@ -170,6 +186,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         }
         updateQuantity(product.id, target);
         toast.success(`${product.name} — quantity set to ${target} ${product.packSize || ''}`, { duration: 2000 });
+        if (target > currentQty) flashBulkAdded();
     };
 
     const handleDecrement = (e: React.MouseEvent) => {
@@ -218,6 +235,35 @@ export const VendorProductCard = React.memo(function VendorProductCard({
     const isOutOfStock = forceInStockDisplay || availabilityLabel === 'area'
         ? false
         : (product.stock === 0 || product.isActive === false || availabilityLabel === 'none');
+
+    // Spec list card: at most 2 slabs, starting from the first discounted tier.
+    const savingsSlabs = bulkTiers.filter((t) => t.price < product.price).slice(0, 2);
+    const nextSavingsSlab = savingsSlabs.find((t) => currentQty < t.minQty);
+    const bestSavingsSlab = savingsSlabs[savingsSlabs.length - 1];
+    const onBestPrice = !!bestSavingsSlab && currentQty >= bestSavingsSlab.minQty;
+    const remainingToNext = nextSavingsSlab ? nextSavingsSlab.minQty - currentQty : 0;
+    const currentSavingsSlab = [...savingsSlabs].reverse().find((t) => currentQty >= t.minQty);
+    const savingPerPc = currentSavingsSlab ? product.price - currentSavingsSlab.price : 0;
+    const hasRealMrp = product.customerPriceApplied === true
+        && product.originalPrice != null
+        && product.originalPrice > product.price;
+    const mrpSaveAmount = hasRealMrp ? product.originalPrice! - product.price : 0;
+    const mrpSavePct = hasRealMrp ? Math.round((mrpSaveAmount / product.originalPrice!) * 100) : 0;
+    const listBadge = availabilityLabel === 'area'
+        ? { label: 'Not in your area', className: 'bg-amber-500' }
+        : availabilityLabel === 'none'
+            ? { label: 'No distributor', className: 'bg-gray-600' }
+            : isOutOfStock
+                ? { label: 'Out of stock', className: 'bg-gray-800' }
+                : product.storePromotion
+                    ? { label: product.storePromotion.badgeLabel, className: 'bg-primary' }
+                    : product.isDeal
+                        ? { label: 'Deal', className: 'bg-primary' }
+                        : product.creditBadge
+                            ? { label: 'Credit', className: 'bg-primary' }
+                            : product.customerPriceApplied
+                                ? { label: 'Your price', className: 'bg-primary' }
+                                : null;
 
     // ── Renders a single bulk-tier pill (used by the desktop grid card).
     //    Directly adds the tier's minimum quantity to the cart on click. ──
@@ -487,213 +533,169 @@ export const VendorProductCard = React.memo(function VendorProductCard({
 
     return (<>
         {variant === 'list' ? (
-            // ── LIST VARIANT — Swiggy-style card optimized for large screens:
-            //    Divided into 3 columns on desktop/tablets (md+):
-            //      1. Product Info & Price (Left column - flex-1)
-            //      2. Bulk pricing tiers or trust features (Center column - flex-1)
-            //      3. Thumbnail Image & Primary ADD CTA (Right column - shrink-0)
-            //    On mobile, retains a stacked layout with bulk tiers at the bottom.
             <div
                 className={cn(
-                    "bg-white rounded-2xl border border-gray-100 overflow-hidden transition-all duration-300 group p-3 sm:p-4 relative flex flex-col gap-3",
-                    isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_12px_30px_-12px_rgba(107,29,46,0.18)] hover:border-primary/30"
+                    "w-full bg-white rounded-xl border-[0.5px] border-primary overflow-hidden relative",
+                    isOutOfStock ? "opacity-75" : ""
                 )}
             >
-                {/* TOP — content (left) + bulk tiers / details (middle) + image+CTA (right) */}
-                <div className="flex gap-3 sm:gap-4 md:gap-6 items-stretch">
-                    {/* Left: Product Info */}
-                    <div className="flex-[1.2] min-w-0 flex flex-col gap-1.5 justify-between">
-                        <div>
-                            <h3 className={cn(
-                                "text-[14px] sm:text-[15px] font-bold leading-[1.35] line-clamp-2",
-                                isOutOfStock ? "text-gray-400" : "text-[#181725]"
-                            )}>
-                                {product.displayName ?? product.name}
-                            </h3>
+                <div className="relative h-[168px] bg-ivory">
+                    <Image
+                        src={product.images[0] || '/images/recom-product/product-img10.png'}
+                        alt={product.name}
+                        fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                        className={cn("object-contain p-4", isOutOfStock ? "grayscale" : "")}
+                    />
+                    {listBadge && (
+                        <span className={cn(
+                            "absolute top-2.5 left-2.5 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide",
+                            listBadge.className
+                        )}>
+                            {listBadge.label}
+                        </span>
+                    )}
+                    <div className="absolute top-2 right-2 z-20">
+                        <button
+                            type="button"
+                            aria-label="Share product"
+                            className="size-8 rounded-full bg-white border border-divider flex items-center justify-center"
+                            onClick={handleShare}
+                        >
+                            <Share2 size={14} className="text-text-muted" strokeWidth={2} />
+                        </button>
+                    </div>
+                </div>
 
-                            <div className="flex items-center gap-2 flex-wrap mt-1">
-                                {product.brandSlug && product.brandName && (
-                                    <Link
-                                        href={`/brand/${product.brandSlug}`}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="relative z-20 text-[11px] font-semibold text-primary hover:underline shrink-0"
-                                    >
-                                        by {product.brandName}
-                                    </Link>
-                                )}
-                                <p className="text-[11px] sm:text-[12px] text-gray-500 font-medium truncate">{product.packSize}</p>
-                                {(product.minOrderQuantity || 1) > 1 && (
-                                    <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full shrink-0">
-                                        Min {product.minOrderQuantity}
-                                    </span>
-                                )}
-                            </div>
+                <div className="p-3">
+                    {product.brandSlug && product.brandName ? (
+                        <Link
+                            href={`/brand/${product.brandSlug}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[11px] font-medium text-text-muted hover:text-primary hover:underline"
+                        >
+                            {product.brandName}
+                        </Link>
+                    ) : distributorName ? (
+                        <button
+                            type="button"
+                            onClick={onDistributorClick}
+                            className="text-[11px] font-medium text-text-muted text-left truncate max-w-full"
+                        >
+                            {distributorName}
+                        </button>
+                    ) : null}
 
-                            {/* Trust/Popularity Tags in Left Column */}
-                            <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                                {product.storePromotion ? (
-                                    <span className="bg-purple-50 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                        {product.storePromotion.badgeLabel}
-                                    </span>
-                                ) : product.isDeal && (
-                                    <span className="bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                        Deal
-                                    </span>
-                                )}
-                                {product.frequentlyOrdered && (
-                                    <span className="bg-yellow-50 text-yellow-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                        Popular
-                                    </span>
-                                )}
-                            </div>
+                    <h3 className={cn(
+                        "mt-0.5 text-[15px] font-bold leading-[1.3] line-clamp-2 text-balance min-h-[2.6em]",
+                        isOutOfStock ? "text-gray-400" : "text-text"
+                    )}>
+                        {product.displayName ?? product.name}
+                    </h3>
+                    <p className="mt-1 text-[12px] text-text-muted">
+                        {product.packSize || product.unit || '1 unit'}
+                    </p>
 
-                            {/* Description to fill empty space between left and middle */}
-                            <p className="text-[12px] text-gray-400 mt-2 line-clamp-2 leading-relaxed max-w-[85%]">
-                                {product.description || `Premium quality ${product.name.toLowerCase()} sourced directly from verified vendors. Sized and packed for commercial kitchens.`}
-                            </p>
-                        </div>
-
-                        <div className="flex items-baseline gap-1.5 mt-3">
+                    <div className="mt-3">
+                        <div className="flex items-baseline gap-1.5">
                             <span className={cn(
-                                "text-[18px] sm:text-[20px] font-extrabold tracking-tight leading-none",
-                                isOutOfStock ? "text-gray-300" : "text-[#181725]"
+                                "text-[22px] font-extrabold leading-none tabular-nums",
+                                isOutOfStock ? "text-gray-300" : "text-primary"
                             )}>
                                 ₹{product.price}
                             </span>
-                            {product.customerPriceApplied && product.originalPrice != null && product.originalPrice > product.price && (
-                                <span className="text-[12px] font-semibold text-gray-400 line-through">₹{product.originalPrice}</span>
-                            )}
-                            <span className="text-[11px] font-medium text-gray-500">/ unit</span>
+                            <span className="text-[12px] text-text-muted">/Pc</span>
                         </div>
+                        {hasRealMrp && (
+                            <p className="mt-1 text-[11px] text-text-muted">
+                                <span className="line-through tabular-nums">MRP ₹{product.originalPrice}</span>
+                                <span className="ml-1.5 font-semibold text-success">Save ₹{mrpSaveAmount} ({mrpSavePct}%)</span>
+                            </p>
+                        )}
                     </div>
 
-                    {/* Middle Column (Only on md+ screens to utilize empty space) */}
-                    <div className="hidden md:flex flex-col gap-2 flex-1 justify-center px-6 border-l border-gray-100/80 relative z-20">
-                        {distributorName ? (
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Distributor</span>
-                                <p className="text-[13px] font-bold text-gray-700 leading-normal truncate">
-                                    {distributorName}
-                                </p>
-                                {distributorCount && distributorCount > 1 && onDistributorClick && (
-                                    <button
-                                        type="button"
-                                        onClick={onDistributorClick}
-                                        className="text-[11px] font-extrabold text-primary hover:underline text-left mt-1"
-                                    >
-                                        Available from {distributorCount} distributors ➔
-                                    </button>
-                                )}
-                            </div>
-                        ) : isOutOfStock ? (
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[10px] font-black text-red-500 bg-red-50 w-fit px-2 py-0.5 rounded-md uppercase tracking-wider">
-                                    Unavailable
-                                </span>
-                                <p className="text-[12px] font-bold text-gray-400 leading-normal">
-                                    This item is currently out of stock. You can request alternatives from other stores.
-                                </p>
-                            </div>
-                        ) : bulkTiers.length > 0 ? (
+                    <div className="mt-3 min-h-[108px] rounded-lg border border-divider bg-ivory/60 p-2">
+                        {savingsSlabs.length > 0 && !isOutOfStock ? (
                             <>
-                                <span className="text-[11px] font-black text-gray-400 uppercase tracking-wider">Bulk Savings</span>
-                                <div className="grid grid-cols-1 gap-1.5">
-                                    {bulkTiers.map((tier, i) => {
-                                        const pricePerUnit = tier.price.toFixed(2);
+                                <p className="mb-1.5 text-center text-[10px] font-bold uppercase tracking-wide text-primary">
+                                    {onBestPrice ? 'Best price unlocked' : 'Buy more · save more'}
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {savingsSlabs.map((tier, i) => {
+                                        const isBest = i === savingsSlabs.length - 1;
+                                        const isActive = currentQty >= tier.minQty
+                                            && (i === savingsSlabs.length - 1 || currentQty < savingsSlabs[i + 1].minQty);
+                                        const saveAmt = product.price - tier.price;
                                         return (
-                                            <div key={i} className="flex items-center justify-between py-1 px-3 rounded-xl bg-primary-light border border-primary/15 hover:border-primary/40 transition-all">
-                                                <span className="text-[12px] font-semibold text-primary">
-                                                    <span className="font-extrabold">₹{pricePerUnit}</span>
-                                                    <span className="opacity-80 text-[11px]"> ({tier.minQty}+ pcs)</span>
+                                            <button
+                                                key={`${tier.minQty}-${tier.price}`}
+                                                type="button"
+                                                onClick={(e) => handleTierSelect(e, tier.minQty)}
+                                                className={cn(
+                                                    "rounded-lg border bg-white px-2 py-1.5 text-center transition-colors",
+                                                    isActive ? "border-primary" : "border-divider hover:border-primary/40"
+                                                )}
+                                            >
+                                                <span className="block text-[10px] font-semibold text-text-muted whitespace-nowrap">
+                                                    {tier.minQty}+ Qty{isBest ? ' · Best' : ''}
                                                 </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        handleTierSelect(e, tier.minQty);
-                                                    }}
-                                                    className="text-[11px] font-black text-primary hover:text-primary-dark active:scale-95 transition-all shrink-0 ml-3 bg-white px-2.5 py-1 rounded-lg border border-primary/15 shadow-sm"
-                                                >
-                                                    Add {tier.minQty}
-                                                </button>
-                                            </div>
+                                                <span className="mt-0.5 block text-[13px] font-extrabold text-primary tabular-nums whitespace-nowrap">
+                                                    ₹{tier.price}/Pc
+                                                </span>
+                                                {saveAmt > 0 && (
+                                                    <span className="mt-0.5 block text-[10px] font-semibold text-success whitespace-nowrap">
+                                                        Save ₹{saveAmt}
+                                                    </span>
+                                                )}
+                                            </button>
                                         );
                                     })}
                                 </div>
+                                <p className={cn(
+                                    "mt-1.5 min-h-[2.4em] text-center text-[11px] text-pretty",
+                                    bulkCelebrate || onBestPrice || savingPerPc > 0
+                                        ? "font-semibold text-success"
+                                        : "font-medium text-text-secondary"
+                                )}>
+                                    {bulkCelebrate
+                                        ? 'Bulk added to cart'
+                                        : onBestPrice
+                                            ? 'Smart buy · You unlocked maximum savings'
+                                            : savingPerPc > 0
+                                                ? `Great choice · You're saving ₹${savingPerPc}/Pc`
+                                                : nextSavingsSlab
+                                                    ? `Add ${remainingToNext} more to get ₹${nextSavingsSlab.price}/Pc`
+                                                    : '\u00a0'}
+                                </p>
                             </>
                         ) : (
-                            <div className="flex flex-col gap-2">
-                                <div className="flex items-center gap-2 text-gray-600">
-                                    <div className="w-5 h-5 rounded-full bg-success-light flex items-center justify-center text-primary shrink-0">
-                                        <CheckCircle size={12} strokeWidth={3} />
-                                    </div>
-                                    <span className="text-[12px] font-bold">100% Quality Assured</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-gray-600">
-                                    <div className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 shrink-0">
-                                        <Clock size={12} strokeWidth={3} />
-                                    </div>
-                                    <span className="text-[12px] font-bold">Next Day Delivery Available</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-gray-600">
-                                    <div className="w-5 h-5 rounded-full bg-purple-50 flex items-center justify-center text-[#7B1FA2] shrink-0">
-                                        <Package size={12} strokeWidth={3} />
-                                    </div>
-                                    <span className="text-[12px] font-bold">Bulk Stock Live Tracked</span>
-                                </div>
-                            </div>
+                            <p className="flex h-full min-h-[92px] items-center justify-center text-[11px] font-medium text-text-muted">
+                                {isOutOfStock ? 'Volume pricing unavailable' : 'No extra volume discount on this pack'}
+                            </p>
                         )}
                     </div>
- 
-                    {/* Right: Image & CTA */}
-                    <div className="shrink-0 flex flex-col items-center gap-2 self-center w-[104px] sm:w-[120px] md:w-[140px]">
-                        <div className="relative w-[104px] h-[104px] sm:w-[120px] sm:h-[120px] rounded-xl overflow-hidden bg-gradient-to-br from-ivory via-white to-cream flex items-center justify-center">
-                            <div className="relative w-[85%] h-[85%]">
-                                <Image
-                                    src={product.images[0] || '/images/recom-product/product-img10.png'}
-                                    alt={product.name}
-                                    fill
-                                    sizes="120px"
-                                    className={cn(
-                                        "object-contain transition-transform duration-500 ease-out p-0.5 group-hover:scale-[1.04]",
-                                        isOutOfStock ? "grayscale" : ""
-                                    )}
-                                />
-                            </div>
-                            {imageBadges}
-                        </div>
-                        <div className="w-full relative z-20">{renderPrimaryCTA(true)}</div>
+
+                    {product.frequentlyOrdered && (
+                        <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-text-secondary">
+                            <CheckCircle size={12} className="text-success shrink-0" strokeWidth={2.5} />
+                            Frequently ordered
+                        </p>
+                    )}
+
+                    {distributorCount && distributorCount > 1 && onDistributorClick ? (
+                        <button
+                            type="button"
+                            onClick={onDistributorClick}
+                            className="mt-1 text-[11px] font-semibold text-primary hover:underline"
+                        >
+                            Available from {distributorCount} distributors
+                        </button>
+                    ) : null}
+
+                    <div className="mt-3">
+                        {renderPrimaryCTA(false, true)}
                     </div>
                 </div>
- 
-                {/* BOTTOM — bulk-tier suggestions on mobile only */}
-                {bulkTiers.length > 0 && !isOutOfStock && (
-                    <div className="md:hidden border-t border-gray-100 -mx-3 sm:-mx-4 px-3 sm:px-4 pt-2.5 flex flex-col divide-y divide-gray-50 relative z-20">
-                        {bulkTiers.map((tier, i) => {
-                            const pricePerUnit = tier.price.toFixed(2);
-                            return (
-                                <div key={i} className="flex items-center justify-between py-1.5">
-                                    <span className="text-[11.5px] sm:text-[12px] font-semibold text-gray-600">
-                                        <span className="text-[#181725] font-bold">₹{pricePerUnit}/pc</span>
-                                        <span className="text-gray-400 font-medium"> for {tier.minQty}+ pcs</span>
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            handleTierSelect(e, tier.minQty);
-                                        }}
-                                        className="text-[12px] font-bold text-primary hover:text-primary-dark active:scale-95 transition-all shrink-0 ml-3"
-                                    >
-                                        Add {tier.minQty}
-                                    </button>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
             </div>
         ) : (
             // ── GRID VARIANT — two breakpoint-specific layouts under one Link.
@@ -711,7 +713,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                     {/* Full-width Image Container */}
                     <div className="relative w-full aspect-square bg-gradient-to-br from-ivory via-white to-cream overflow-hidden">
                         {/* Image wrapper centered in the top area (excluding the bottom 30px bar) */}
-                        <div className="absolute top-0 left-0 right-0 bottom-[30px] flex items-center justify-center p-3">
+                        <div className="absolute top-0 left-0 right-0 bottom-7 flex items-center justify-center p-2">
                             <div className="relative w-full h-full">
                                 <Image
                                     src={product.images[0] || '/images/recom-product/product-img10.png'}
@@ -737,7 +739,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     e.stopPropagation();
                                     onDistributorClick(e);
                                 }}
-                                className="absolute bottom-0 left-0 right-0 h-[30px] bg-primary-light border-t border-primary/15 text-primary flex items-center justify-center gap-1 hover:bg-[#F0D4DC] transition-colors z-20"
+                                className="absolute bottom-0 left-0 right-0 h-7 bg-primary-light border-t border-primary/15 text-primary flex items-center justify-center gap-1 hover:bg-[#F0D4DC] transition-colors z-20"
                                 aria-label="Show distributors list"
                             >
                                 <span className="text-[10px] font-black truncate">
@@ -753,7 +755,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     e.stopPropagation();
                                     setShowBulkSheet(true);
                                 }}
-                                className="absolute bottom-0 left-0 right-0 h-[30px] bg-primary-light border-t border-primary/15 text-primary flex items-center justify-center gap-1 hover:bg-[#F0D4DC] transition-colors z-20"
+                                className="absolute bottom-0 left-0 right-0 h-7 bg-primary-light border-t border-primary/15 text-primary flex items-center justify-center gap-1 hover:bg-[#F0D4DC] transition-colors z-20"
                                 aria-label="Show bulk price tiers"
                             >
                                 <span className="text-[10px] font-black truncate">
@@ -763,7 +765,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             </button>
                         ) : (
                             <div className={cn(
-                                "absolute bottom-0 left-0 right-0 h-[30px] border-t flex items-center justify-center z-20",
+                                "absolute bottom-0 left-0 right-0 h-7 border-t flex items-center justify-center z-20",
                                 isOutOfStock ? "bg-gray-100 border-gray-200 text-gray-400" : "bg-[#F4F4F4] border-gray-200 text-gray-600"
                             )}>
                                 <span className="text-[10px] font-extrabold truncate">
@@ -774,10 +776,10 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                     </div>
 
                     {/* Text Details with padding */}
-                    <div className="flex flex-col gap-1 p-2.5 flex-1 justify-between">
+                    <div className="flex flex-col gap-1 p-2 flex-1 justify-between">
                         <div>
                             <h3 className={cn(
-                                "text-[13px] font-bold leading-[1.3] line-clamp-2 min-h-[2.6em]",
+                                "text-[12px] font-bold leading-[1.25] line-clamp-2 min-h-[2.5em] text-pretty",
                                 isOutOfStock ? "text-gray-400" : "text-[#181725]"
                             )}>
                                 {product.displayName ?? product.name}
@@ -800,10 +802,10 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             </div>
                         </div>
 
-                        <div className="mt-2">
-                            <div className="flex items-baseline gap-1.5 flex-wrap mb-2">
+                        <div className="mt-1.5">
+                            <div className="flex items-baseline gap-1 flex-wrap mb-1.5">
                                 <span className={cn(
-                                    "text-[16px] font-extrabold tracking-tight leading-none tabular-nums",
+                                    "text-[15px] font-extrabold leading-none tabular-nums",
                                     isOutOfStock ? "text-gray-300" : "text-primary"
                                 )}>
                                     ₹{product.price}

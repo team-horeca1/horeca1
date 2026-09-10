@@ -338,7 +338,7 @@ export default function VendorStorePage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50/50 pb-24">
+        <div className="min-h-screen bg-page pb-20 md:pb-24">
             {/* Vendor Header */}
             <VendorStoreHeader 
                 vendor={vendor} 
@@ -394,7 +394,7 @@ export default function VendorStorePage() {
             )}
 
             {/* Main Content Area */}
-            <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] pb-8 pt-2">
+            <div className="max-w-[var(--container-max)] mx-auto px-3 md:px-[var(--container-padding)] pb-8 pt-2">
                 {activeTab === 'orders' ? (
                     <div className="max-w-2xl mx-auto space-y-4 py-4">
                         <h3 className="text-[18px] font-black text-[#181725] mb-4">My Previous Orders</h3>
@@ -440,26 +440,26 @@ export default function VendorStorePage() {
                               Selecting a parent drills into its sub-categories on the right.
                               Mobile (<md): Hyperpure-style vertical tile rail (~76px), image-on-top + label-below.
                               Desktop (md+): row list with image + label + count. ── */}
-                        <aside className="w-[76px] md:w-[200px] lg:w-[260px] shrink-0 sticky top-24">
-                            <div className="bg-white rounded-2xl border border-gray-100 p-1 md:p-3 shadow-sm">
+                        <aside className="w-[64px] md:w-[200px] lg:w-[260px] shrink-0 sticky top-24">
+                            <div className="bg-white rounded-xl md:rounded-2xl border border-gray-100 p-1 md:p-3 shadow-sm">
                                 {/* All Products entry */}
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab('all')}
                                     className={cn(
-                                        "w-full rounded-xl transition-all text-left flex flex-col items-center md:flex-row md:items-center md:justify-between px-1 md:px-3 py-3 md:py-2.5",
+                                        "w-full rounded-lg md:rounded-xl transition-colors text-left flex flex-col items-center md:flex-row md:justify-between px-1 md:px-3 py-2 md:py-2.5",
                                         activeTab === 'all' ? "bg-primary-light" : "hover:bg-gray-50"
                                     )}
                                 >
-                                    <div className="flex flex-col items-center md:flex-row md:items-center md:gap-3 min-w-0 w-full">
+                                    <div className="flex flex-col items-center md:flex-row md:gap-3 min-w-0 w-full">
                                         <div className={cn(
-                                            "w-12 h-12 md:w-9 md:h-9 rounded-lg flex items-center justify-center transition-all shrink-0",
+                                            "flex size-9 md:size-9 rounded-lg items-center justify-center transition-all shrink-0",
                                             activeTab === 'all' ? "bg-white border border-primary/30 shadow-sm" : "bg-gray-50"
                                         )}>
                                             <LayoutGrid className={cn('w-5 h-5 md:w-4 md:h-4', activeTab === 'all' ? 'text-primary' : 'text-gray-400')} strokeWidth={1.5} />
                                         </div>
                                         <span className={cn(
-                                            "text-[10px] md:text-[13px] font-semibold md:font-bold leading-tight text-center md:text-left mt-1 md:mt-0 line-clamp-2 md:line-clamp-none md:truncate w-full md:flex-1",
+                                            "text-[9px] md:text-[13px] font-semibold md:font-bold leading-tight text-center md:text-left mt-1 md:mt-0 line-clamp-2 md:truncate w-full md:flex-1",
                                             activeTab === 'all' ? "text-primary" : "text-[#181725]"
                                         )}>
                                             All Products
@@ -480,12 +480,12 @@ export default function VendorStorePage() {
                                                 setActiveTab(`cat:${parent.name}`);
                                             }}
                                             className={cn(
-                                                "w-full mt-1 rounded-xl transition-all text-left flex flex-col items-center md:flex-row md:items-center md:gap-3 px-1 md:px-3 py-2 md:py-2.5 min-w-0",
+                                                "w-full mt-1 rounded-lg md:rounded-xl transition-colors text-left flex flex-col items-center md:flex-row md:gap-3 px-1 md:px-3 py-2 md:py-2.5 min-w-0",
                                                 isParentActive ? "bg-primary-light" : "hover:bg-gray-50"
                                             )}
                                         >
                                             <div className={cn(
-                                                "w-12 h-12 md:w-9 md:h-9 rounded-lg flex items-center justify-center overflow-hidden relative transition-all shrink-0",
+                                                "flex size-9 rounded-lg items-center justify-center overflow-hidden relative transition-all shrink-0",
                                                 isParentActive ? "bg-white border border-primary/30 shadow-sm" : "bg-gray-50"
                                             )}>
                                                 {parent.image ? (
@@ -495,7 +495,7 @@ export default function VendorStorePage() {
                                                 )}
                                             </div>
                                             <span className={cn(
-                                                "text-[10px] md:text-[13px] font-semibold md:font-bold leading-tight text-center md:text-left mt-1 md:mt-0 line-clamp-2 md:line-clamp-none md:truncate w-full md:flex-1",
+                                                "text-[9px] md:text-[13px] font-semibold md:font-bold leading-tight text-center md:text-left mt-1 md:mt-0 line-clamp-2 md:truncate w-full md:flex-1",
                                                 isParentActive ? "text-primary" : "text-[#181725]"
                                             )}>
                                                 {parent.name}
@@ -511,24 +511,24 @@ export default function VendorStorePage() {
                         <div className="flex-1 min-w-0">
                             {showSubcategoryTiles && activeParentNode ? (
                                 <div>
-                                    <h2 className="text-[clamp(1.1rem,2vw+0.5rem,1.6rem)] font-black text-[#181725] mb-4">{activeParentNode.name}</h2>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                                    <h2 className="text-sm md:text-[clamp(1.1rem,2vw+0.5rem,1.6rem)] font-bold text-[#181725] mb-2 md:mb-4">{activeParentNode.name}</h2>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4">
                                         {activeParentNode.children.map((child) => (
                                             <button
                                                 key={child.id}
                                                 type="button"
                                                 onClick={() => setActiveTab(`cat:${child.name}`)}
-                                                className="group bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md hover:border-primary/40 transition-all flex flex-col items-center text-center"
+                                                className="group min-w-0 bg-white rounded-xl md:rounded-2xl border border-divider p-2 md:p-4 shadow-sm hover:border-primary/40 transition-colors flex flex-col items-center text-center"
                                             >
-                                                <div className="w-20 h-20 rounded-xl bg-gray-50 flex items-center justify-center overflow-hidden mb-3">
+                                                <div className="flex size-14 md:size-20 rounded-lg md:rounded-xl bg-gray-50 items-center justify-center overflow-hidden mb-2 md:mb-3">
                                                     {child.image ? (
                                                         <Image src={child.image} alt={child.name} width={64} height={64} className="object-contain w-full h-full p-1.5" />
                                                     ) : (
                                                         <Package size={28} className="text-gray-300" strokeWidth={1.5} />
                                                     )}
                                                 </div>
-                                                <span className="text-[13px] font-bold text-[#181725] leading-tight line-clamp-2 group-hover:text-primary transition-colors">{child.name}</span>
-                                                <span className="text-[11px] font-bold text-gray-400 mt-1">{child.count} {child.count === 1 ? 'item' : 'items'}</span>
+                                                <span className="text-[11px] md:text-[13px] font-bold text-[#181725] leading-tight line-clamp-2 group-hover:text-primary transition-colors">{child.name}</span>
+                                                <span className="text-[10px] md:text-[11px] font-semibold text-gray-400 mt-1">{child.count} {child.count === 1 ? 'item' : 'items'}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -552,8 +552,8 @@ export default function VendorStorePage() {
                                     {filteredProducts.length > 0 ? (
                                         <div className={cn(
                                             layoutMode === 'grid'
-                                                ? 'grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5'
-                                                : 'flex flex-col gap-3 md:gap-4'
+                                                ? 'grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5'
+                                                : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4'
                                         )}>
                                             {filteredProducts.map((product) => (
                                                 <VendorProductCard key={product.id} product={product} variant={layoutMode} />

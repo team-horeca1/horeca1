@@ -63,9 +63,9 @@ export function VendorCatalogNav({
     );
 
     return (
-        <div className="w-full bg-white/95 backdrop-blur-md sticky top-0 z-[40] border-b border-divider shadow-cdl-1">
-            <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)]">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 py-3 md:py-4">
+        <div className="w-full bg-white/95 backdrop-blur-md sticky top-0 z-40 border-b border-divider shadow-cdl-1">
+            <div className="max-w-[var(--container-max)] mx-auto px-3 md:px-[var(--container-padding)]">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 py-2 md:py-4">
                     <div className="relative group flex-1 md:max-w-[450px] lg:max-w-[600px] flex items-center gap-2 md:gap-3">
                         <div className="relative flex-1">
                             <Search
@@ -78,7 +78,7 @@ export function VendorCatalogNav({
                                 placeholder="Search in this store..."
                                 value={searchQuery}
                                 onChange={(e) => onSearchChange(e.target.value)}
-                                className="w-full pl-10 pr-9 py-2.5 bg-ivory/50 border border-divider rounded-xl text-xs md:text-sm font-semibold text-text placeholder:text-text-muted focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 transition-all shadow-sm"
+                                className="w-full pl-10 pr-9 py-2 bg-ivory/50 border border-divider rounded-xl text-xs md:text-sm font-semibold text-text placeholder:text-text-muted focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 transition-all shadow-sm"
                             />
                             {searchQuery && (
                                 <button
@@ -90,22 +90,22 @@ export function VendorCatalogNav({
                                 </button>
                             )}
                         </div>
-                        <button type="button" className="p-2.5 rounded-xl bg-white border border-divider text-text-muted hover:text-primary hover:border-primary/30 transition-all shrink-0">
+                        <button type="button" aria-label="Filter products" className="p-2 rounded-xl bg-white border border-divider text-text-muted hover:text-primary hover:border-primary/30 transition-all shrink-0">
                             <SlidersHorizontal size={17} strokeWidth={2} />
                         </button>
                         {ToggleGroup}
                     </div>
-                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
+                    <div className="hidden md:flex items-center gap-4 overflow-x-auto no-scrollbar md:mx-0 md:px-0">
                         {TABS.map((tab) => (
                             <button
                                 key={tab.key}
                                 type="button"
                                 onClick={() => onTabChange(tab.key)}
                                 className={cn(
-                                    'px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 border',
+                                    'pb-1.5 md:px-4 md:py-2 md:rounded-full text-[10px] md:text-xs font-semibold whitespace-nowrap transition-colors border-b-2 md:border',
                                     activeTab === tab.key
-                                        ? 'bg-primary text-white border-primary shadow-cdl-1'
-                                        : 'bg-white text-text-secondary border-divider hover:border-primary/40 hover:text-primary'
+                                        ? 'text-primary border-primary md:bg-primary md:text-white md:shadow-cdl-1'
+                                        : 'text-text-secondary border-transparent md:bg-white md:border-divider hover:text-primary'
                                 )}
                             >
                                 {tab.label}

@@ -64,8 +64,8 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
     return (
         <div className="w-full bg-white md:bg-white md:pb-6 md:pt-4">
             {/* ── MOBILE HEADER — ivory / burgundy hero ── */}
-            <div className="block md:hidden relative px-4 pt-4">
-                <div className="relative w-full rounded-[20px] overflow-hidden bg-ivory border border-divider">
+            <div className="block md:hidden relative px-3 pt-2">
+                <div className="relative w-full rounded-2xl overflow-hidden bg-ivory border border-divider">
                     <button
                         onClick={() => router.back()}
                         className="absolute top-3 left-3 z-20 p-2 bg-white rounded-full shadow-sm border border-divider"
@@ -73,9 +73,9 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                     >
                         <ChevronLeft size={18} strokeWidth={3} className="text-[#181725]" />
                     </button>
-                    <div className="flex items-center px-5 py-6 pt-10">
+                    <div className="flex items-center px-4 py-3 pl-12 min-h-[112px]">
                         <div className="flex-1 pr-2 min-w-0">
-                            <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                                 <span className="bg-primary text-white px-2 py-0.5 rounded-md flex items-center gap-1 text-[11px] font-bold shadow-sm">
                                     {vendor.rating} <Star size={10} fill="white" className="text-white" />
                                 </span>
@@ -92,18 +92,18 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                                     </span>
                                 )}
                             </div>
-                            <h1 className="text-[20px] font-[900] text-[#0f172a] leading-[1.15] mb-1 line-clamp-2">
+                            <h1 className="text-[18px] font-extrabold text-[#0f172a] leading-[1.2] mb-1.5 line-clamp-1 text-balance">
                                 {vendor.name}
                             </h1>
-                            <p className="text-[11px] text-gray-500 font-medium leading-[1.4] line-clamp-2 mb-1.5">
+                            <p className="text-[11px] text-gray-500 font-medium leading-[1.45] line-clamp-1 mb-1.5">
                                 {vendor.categories.slice(0, 3).join(' · ')}
                             </p>
-                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-wide">
+                            <p className="text-[10px] text-gray-500 font-bold tabular-nums">
                                 Min ₹{vendor.minOrderValue}
                             </p>
                         </div>
-                        <div className="flex-shrink-0 w-[38%] max-w-[120px] relative">
-                            <div className="w-full aspect-square rounded-[14px] overflow-hidden bg-white border border-white/60 shadow-sm relative">
+                        <div className="flex-shrink-0 size-[76px] relative">
+                            <div className="size-full rounded-xl overflow-hidden bg-white border border-divider shadow-sm relative">
                                 <Image
                                     src={heroImage}
                                     alt={vendor.name}
@@ -118,34 +118,34 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                 </div>
 
                 {/* Operational Action Pills (below hero) */}
-                <div className="flex items-center gap-2.5 mt-4 overflow-x-auto no-scrollbar pb-1">
-                    <button type="button" className="shrink-0 bg-ivory border border-divider px-3.5 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-text hover:bg-white transition-colors">
+                <div className="grid grid-cols-4 w-48 mx-auto mt-2 mb-1 relative z-20">
+                    <button type="button" className="hidden">
                         <Navigation size={15} className="text-primary" strokeWidth={2} />
                         Directions
                     </button>
-                    <button type="button" className="shrink-0 p-2.5 bg-ivory border border-divider rounded-xl text-text hover:bg-white transition-colors" aria-label="Call">
+                    <button type="button" className="size-10 mx-auto rounded-lg text-primary hover:bg-ivory transition-colors flex items-center justify-center" aria-label="Call vendor">
                         <Phone size={16} className="text-primary" strokeWidth={2} />
                     </button>
-                    <button type="button" onClick={handleShare} className="shrink-0 p-2.5 bg-ivory border border-divider rounded-xl text-text hover:bg-white transition-colors" aria-label="Share">
+                    <button type="button" onClick={handleShare} className="size-10 mx-auto rounded-lg text-primary hover:bg-ivory transition-colors flex items-center justify-center" aria-label="Share vendor">
                         <Share2 size={16} className="text-primary" strokeWidth={2} />
                     </button>
                     <button
                         type="button"
                         onClick={handleMyListsClick}
-                        className="shrink-0 bg-ivory border border-divider px-3.5 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-text hover:bg-white transition-colors"
+                        className="size-10 mx-auto rounded-lg text-primary hover:bg-ivory transition-colors flex items-center justify-center"
+                        aria-label="My lists"
                     >
                         <ClipboardList size={15} className="text-primary" strokeWidth={2} />
-                        My Lists
                     </button>
                     <button
                         type="button"
                         onClick={() => setDealsOpen(true)}
-                        className="shrink-0 bg-white border border-divider px-3.5 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-text shadow-sm hover:border-primary/40 transition-colors"
+                        className="size-10 mx-auto rounded-lg text-primary hover:bg-ivory transition-colors flex items-center justify-center"
+                        aria-label="Store deals"
                     >
                         <Tag size={15} strokeWidth={2} className="text-primary" />
-                        Deals
                         {storePromos.length > 0 && (
-                            <span className="min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                            <span className="absolute sr-only">
                                 {storePromos.length}
                             </span>
                         )}
@@ -153,7 +153,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                 </div>
 
                 {storePromos.length > 0 && (
-                    <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar">
+                    <div className="mt-2 flex gap-2 overflow-x-auto no-scrollbar">
                         {storePromos.map((p) => (
                             <div
                                 key={p.id}
@@ -167,10 +167,9 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                 )}
 
                 {/* Mobile Tabs */}
-                <div className="flex items-center gap-6 border-b border-divider mt-3 overflow-x-auto no-scrollbar">
+                <div className="grid grid-cols-4 border-b border-divider overflow-hidden">
                     {[
                         { key: 'all', label: 'Catalog' },
-                        { key: 'deals', label: 'Deals' },
                         { key: 'orders', label: 'My Orders' },
                         { key: 'ratings', label: 'Ratings' },
                         { key: 'about', label: 'Info' }
@@ -180,7 +179,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                             type="button"
                             onClick={() => onTabChange(tab.key)}
                             className={cn(
-                                "pb-3 pt-2 text-xs font-bold transition-all relative shrink-0",
+                                "min-w-0 px-1 pb-2 pt-1 text-[10px] font-semibold text-center transition-colors relative",
                                 activeTab === tab.key ? "text-primary" : "text-text-muted hover:text-text"
                             )}
                         >
