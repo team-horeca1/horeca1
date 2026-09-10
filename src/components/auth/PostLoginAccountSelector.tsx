@@ -13,11 +13,13 @@ import { usePathname } from 'next/navigation';
 import { useBusinessAccountSwitcher, type AccountSummary } from '@/hooks/useBusinessAccountSwitcher';
 import {
   DISMISS_KEY,
+  PENDING_REDIRECT_KEY,
   readForcePickerCookie,
   clearForcePickerCookie,
   completePostLoginPicker,
   isPickerSettled,
   markPickerSettled,
+  setPendingRedirect,
 } from '@/lib/postLoginPicker';
 import { broadcastAuthEvent } from '@/lib/authTabSync';
 import { CDL } from '@/lib/cdl';
@@ -82,9 +84,9 @@ export function PostLoginAccountSelector() {
     const totalCount = (u.totalAccountCount as number | undefined) ?? accounts.length;
     const mustPick = forcePick && totalCount > 1;
 
-    // This login was already answered — stay quiet through any number of
-    // reloads. The next login stamps a new armedAt and arms the picker again.
-    if (forcePick && isPickerSettled(armedAt)) {
+    // This login was already answered — stay quiet through dashboard navigation
+    // and reloads. The next login stamps a new armedAt and arms the picker again.
+    if (isPickerSettled(armedAt)) {
       settledRef.current = true;
       clearForcePickerCookie();
       return;
@@ -248,17 +250,19 @@ export function PostLoginAccountSelector() {
                           ?? null;
                         if (vendorAccount && matchedStore) {
                           await switchOnlineStore(matchedStore.id, outletStep.id);
-                          settle();
                           setEnteredStore(true);
-                          setOpen(false);
-                          setOutletStep(null);
-                          setPickingId(null);
                           try {
-                            await update({ accountPickerCompleted: true });
+                            const pending = sessionStorage.getItem(PENDING_REDIRECT_KEY);
+                            if (!pending || pending === '/') {
+                              setPendingRedirect('/vendor/dashboard');
+                            }
                           } catch {
-                            /* JWT flag expires on its own */
+                            setPendingRedirect('/vendor/dashboard');
                           }
-                          window.location.assign('/vendor/dashboard');
+                          await finishPicker(
+                            outletChanged || accountChangedRef.current,
+                            outletStep,
+                          );
                           return;
                         }
                       } catch {

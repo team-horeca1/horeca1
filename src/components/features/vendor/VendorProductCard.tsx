@@ -5,6 +5,7 @@ import { CreditCard, Share2, ShoppingCart, Plus, Minus, Navigation, X, Loader2, 
 import Link from 'next/link';
 import Image from 'next/image';
 import { toast } from 'sonner';
+import { shareCard } from '@/lib/share-cards/shareClient';
 import { useSession } from 'next-auth/react';
 import { cn, formatPackSize } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
@@ -501,24 +502,24 @@ export const VendorProductCard = React.memo(function VendorProductCard({
     const handleShare = async (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        const shareUrl = `${window.location.origin}/vendor/${product.vendorId}`;
-        const shareData = { title: product.name, text: `Check out ${product.name} from ${product.vendorName} on Horeca1`, url: shareUrl };
-        try {
-            if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
-                await navigator.share(shareData);
-            } else {
-                await navigator.clipboard.writeText(shareUrl);
-                toast.success('Link copied to clipboard!', { description: 'You can now share it with others.' });
-            }
-        } catch (err) {
-            if (err instanceof Error && err.name !== 'AbortError') toast.error('Failed to share link');
+        const shareUrl = `${window.location.origin}/product/${product.id}`;
+        const result = await shareCard({
+            title: product.displayName ?? product.name,
+            text: `Check out ${product.displayName ?? product.name} from ${product.vendorName} on Horeca1`,
+            url: shareUrl,
+            imageUrl: `/api/og/product/${product.id}?format=square`,
+        });
+        if (result === 'copied') {
+            toast.success('Link copied to clipboard!', { description: 'You can now share it with others.' });
         }
     };
 
     const shareButton = (
         <button
+            type="button"
             className="p-2 rounded-full backdrop-blur-md bg-white/80 border border-white/60 shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:bg-primary/10 hover:text-primary transition-all"
             onClick={handleShare}
+            aria-label="Share product"
         >
             <Share2 size={14} className="text-gray-500" strokeWidth={2} />
         </button>

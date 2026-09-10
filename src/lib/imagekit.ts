@@ -15,6 +15,7 @@ export const IMAGEKIT_FOLDERS = {
   banners: '/horeca/banners',
   collections: '/horeca/collections',
   misc: '/horeca/misc',
+  voices: '/horeca/voices',
 } as const;
 
 export type ImageFolder = keyof typeof IMAGEKIT_FOLDERS;

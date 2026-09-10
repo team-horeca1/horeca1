@@ -57,6 +57,11 @@ export const AUDIT_ACTIONS = {
   collectionCreate: 'collection.create',
   collectionUpdate: 'collection.update',
   collectionDelete: 'collection.delete',
+  voiceCreate: 'voice.create',
+  voiceUpdate: 'voice.update',
+  voiceDelete: 'voice.delete',
+  nominationUpdate: 'voice_nomination.update',
+  nominationDelete: 'voice_nomination.delete',
   orderMarkPaid: 'order.mark_paid',
 } as const;
 

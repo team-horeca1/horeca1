@@ -5,6 +5,7 @@ import { Star, MapPin, Phone, Share2, ChevronLeft, Image as ImageIcon, Navigatio
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
+import { shareCard } from '@/lib/share-cards/shareClient';
 import { useStableSession } from '@/hooks/useStableSession';
 import { cn } from '@/lib/utils';
 import type { Vendor, StorePromotion } from '@/types';
@@ -44,21 +45,14 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
     };
 
     const handleShare = async () => {
-        const shareData = {
+        const url = `${window.location.origin}/vendor/${vendor.id}`;
+        const result = await shareCard({
             title: vendor.name,
             text: `Check out ${vendor.name} on Horeca1`,
-            url: window.location.href,
-        };
-        try {
-            if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
-                await navigator.share(shareData);
-            } else {
-                await navigator.clipboard.writeText(window.location.href);
-                toast.success('Link copied to clipboard!');
-            }
-        } catch (err) {
-            console.error(err);
-        }
+            url,
+            imageUrl: `/api/og/vendor/${vendor.id}?format=square`,
+        });
+        if (result === 'copied') toast.success('Link copied to clipboard!');
     };
 
     return (
@@ -295,7 +289,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                             <Phone size={14} strokeWidth={2} />
                             Call Vendor
                         </button>
-                        <button type="button" onClick={handleShare} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-ivory border border-divider text-xs font-semibold text-text hover:bg-primary-light hover:border-primary/40 hover:text-primary transition-all">
+                        <button type="button" onClick={handleShare} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-ivory border border-divider text-xs font-semibold text-text hover:bg-primary-light hover:border-primary/40 hover:text-primary transition-all" aria-label="Share vendor">
                             <Share2 size={14} strokeWidth={2} />
                             Share
                         </button>

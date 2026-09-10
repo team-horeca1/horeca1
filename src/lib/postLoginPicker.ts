@@ -34,11 +34,15 @@ export function readForcePickerCookie(): boolean {
   }
 }
 
+function forcePickerCookieAttrs(): string {
+  const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; secure' : '';
+  return `path=/; samesite=lax${secure}`;
+}
+
 export function setForcePickerCookie(): void {
   if (typeof document === 'undefined') return;
   try {
-    const secure = typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; secure' : '';
-    document.cookie = `${FORCE_PICKER_COOKIE}=1; path=/; max-age=${COOKIE_MAX_AGE_SEC}; samesite=lax${secure}`;
+    document.cookie = `${FORCE_PICKER_COOKIE}=1; ${forcePickerCookieAttrs()}; max-age=${COOKIE_MAX_AGE_SEC}`;
   } catch {
     /* ignore */
   }
@@ -47,6 +51,9 @@ export function setForcePickerCookie(): void {
 export function clearForcePickerCookie(): void {
   if (typeof document === 'undefined') return;
   try {
+    // Attributes must match the setter or the browser will not expire the cookie
+    // (Secure cookies on HTTPS were surviving the old max-age=0 write).
+    document.cookie = `${FORCE_PICKER_COOKIE}=; ${forcePickerCookieAttrs()}; max-age=0`;
     document.cookie = `${FORCE_PICKER_COOKIE}=; path=/; max-age=0`;
   } catch {
     /* ignore */
@@ -79,11 +86,23 @@ export function markPickerSettled(armedAt: number | null | undefined): void {
   } catch {
     /* ignore */
   }
+  try {
+    sessionStorage.setItem(DISMISS_KEY, '1');
+  } catch {
+    /* ignore */
+  }
 }
 
 export function isPickerSettled(armedAt: number | null | undefined): boolean {
   try {
-    return localStorage.getItem(SETTLED_KEY) === String(armedAt ?? 0);
+    const stored = localStorage.getItem(SETTLED_KEY);
+    const dismissed = sessionStorage.getItem(DISMISS_KEY) === '1';
+    if (typeof armedAt === 'number') {
+      return stored === String(armedAt);
+    }
+    // JWT stamp is deleted after a successful pick. Same-tab dismiss + stored
+    // stamp means this login already answered — don't reopen on the next page.
+    return dismissed && stored != null;
   } catch {
     return false;
   }

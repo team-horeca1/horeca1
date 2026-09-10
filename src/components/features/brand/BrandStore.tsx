@@ -4,8 +4,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, MapPin, Store, ArrowLeft, Search, X, AlertCircle, Plus, Minus, ShoppingCart, Loader2, Check, LayoutGrid, LayoutList, ChevronRight, ChevronDown, Package, Sparkles } from 'lucide-react';
+import { ChevronLeft, MapPin, Store, ArrowLeft, Search, X, AlertCircle, Plus, Minus, ShoppingCart, Loader2, Check, LayoutGrid, LayoutList, ChevronRight, ChevronDown, Package, Sparkles, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { shareCard } from '@/lib/share-cards/shareClient';
 import { cn, formatPackSize } from '@/lib/utils';
 import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
 import { buildCategoryTree, filterProductsByCatalogTab, slugifyCategory } from '@/lib/categoryTree';
@@ -235,6 +236,17 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
     const updateLayoutMode = (mode: 'grid' | 'list') => {
         setLayoutMode(mode);
         try { localStorage.setItem('horeca_brand_layout', mode); } catch {}
+    };
+
+    const handleShare = async () => {
+        if (!brand) return;
+        const result = await shareCard({
+            title: brand.name,
+            text: `Find ${brand.name} on Horeca1`,
+            url: `${window.location.origin}/brand/${brand.slug}`,
+            imageUrl: `/api/og/brand/${brand.slug}?format=square`,
+        });
+        if (result === 'copied') toast.success('Link copied to clipboard!');
     };
 
     // Always fetch from the API — no client-side mock data anymore.
@@ -524,7 +536,15 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                 </button>
 
                                 {/* Brand-store ribbon — green for site theme */}
-                                <div className="absolute top-3 right-3 md:top-4 md:right-4 z-20">
+                                <div className="absolute top-3 right-3 md:top-4 md:right-4 z-20 flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleShare()}
+                                        className="p-2 md:p-2.5 bg-white/90 backdrop-blur-md rounded-full shadow-md hover:bg-white transition"
+                                        aria-label="Share brand"
+                                    >
+                                        <Share2 size={16} className="text-primary" strokeWidth={2} />
+                                    </button>
                                     <span className="inline-flex items-center gap-1.5 bg-primary text-white text-[10px] md:text-[11px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-md">
                                         <Store size={11} /> Brand Store
                                     </span>
@@ -552,10 +572,7 @@ export function BrandStore({ brandId, initialCatSlug = '' }: BrandStoreProps) {
                                     </div>
                                 </div>
 
-                                <div className="bg-white rounded-2xl md:rounded-b-[28px] md:rounded-t-none border border-primary/20 md:border-t-0 shadow-[0_10px_30px_rgba(107, 29, 46, )] overflow-hidden">
-                                    {/* Thin green accent line at top — ties to site theme */}
-                                    <div className="h-0.5 bg-primary" />
-
+                                <div className="bg-white rounded-2xl md:rounded-b-[28px] md:rounded-t-none border-x border-b border-primary/20 shadow-[0_10px_30px_rgba(107,29,46,0.12)] overflow-hidden">
                                     {/* Content padded on left to clear the absolute logo */}
                                     <div className="pl-[76px] md:pl-[150px] pr-3 md:pr-8 py-3 md:py-6">
                                         <div className="flex items-start gap-4 md:gap-5">

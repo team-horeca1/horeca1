@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Local tunnel helpers (not app source)
     "tmp-tun*.js",
+    "studio-horeca1/**",
   ]),
   {
     rules: {

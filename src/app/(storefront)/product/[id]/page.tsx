@@ -23,6 +23,7 @@ import { PromotionBanners } from '@/components/features/PromotionBanners';
 import { DeliveryPoster } from '@/components/features/DeliveryPoster';
 import { useCart } from '@/context/CartContext';
 import { toast } from 'sonner';
+import { shareCard } from '@/lib/share-cards/shareClient';
 import { dal } from '@/lib/dal';
 import type { Vendor as DalVendor, VendorProduct } from '@/types';
 import AlternateVendorsStrip from '@/components/features/product/AlternateVendorsStrip';
@@ -256,26 +257,16 @@ export default function ProductDetailPage() {
     const similarItemsList: { id: string; originalId?: string; name: string; image: string; vendorCount?: number }[] = []; // Similar items loaded from API in a future iteration
 
     const handleShare = async () => {
-        const shareData = {
+        const result = await shareCard({
             title: product.name,
             text: `Check out ${product.name} from ${vendorName} on Horeca1`,
-            url: window.location.href,
-        };
-
-        try {
-            if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
-                await navigator.share(shareData);
-            } else {
-                await navigator.clipboard.writeText(window.location.href);
-                toast.success('Link copied to clipboard!', {
-                    description: 'You can now share it with others.',
-                });
-            }
-        } catch (err) {
-            // Only show error if it's not a user cancellation
-            if (err instanceof Error && err.name !== 'AbortError') {
-                toast.error('Failed to share link');
-            }
+            url: `${window.location.origin}/product/${id}`,
+            imageUrl: `/api/og/product/${id}?format=square`,
+        });
+        if (result === 'copied') {
+            toast.success('Link copied to clipboard!', {
+                description: 'You can now share it with others.',
+            });
         }
     };
 
@@ -311,7 +302,14 @@ export default function ProductDetailPage() {
                 <div className="absolute left-1/2 -translate-x-1/2 text-[18px] font-extrabold text-[#181725] tracking-tight whitespace-nowrap">
                     {vendorName}
                 </div>
-                <div className="w-8" />
+                <button
+                    type="button"
+                    onClick={handleShare}
+                    aria-label="Share product"
+                    className="p-1.5 text-text hover:text-primary transition-colors"
+                >
+                    <Share2 size={20} />
+                </button>
             </header>
 
             {/* --- MOBILE VIEW (Simplified Layout) --- */}
@@ -349,7 +347,7 @@ export default function ProductDetailPage() {
                                 )}
                             </div>
                             <div className="flex items-center gap-2 pt-1.5">
-                                <button onClick={handleShare} className="text-[#181725] active:scale-90 transition-transform">
+                                <button type="button" onClick={handleShare} aria-label="Share product" className="text-[#181725] active:scale-90 transition-transform">
                                     <Share2 size={21} />
                                 </button>
                             </div>
@@ -457,7 +455,7 @@ export default function ProductDetailPage() {
                                     {product.name}
                                 </h1>
                                 <div className="flex items-center gap-4 pt-4 shrink-0">
-                                    <button onClick={handleShare} className="w-14 h-14 rounded-full bg-white border border-gray-100 flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm active:scale-90 transition-transform">
+                                    <button type="button" onClick={handleShare} aria-label="Share product" className="w-14 h-14 rounded-full bg-white border border-gray-100 flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm active:scale-90 transition-transform">
                                         <Share2 size={26} className="text-[#181725]" />
                                     </button>
                                 </div>

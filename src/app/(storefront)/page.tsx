@@ -2,6 +2,7 @@ import dynamic from 'next/dynamic';
 import { Hero } from '@/components/features/Hero';
 import { QuickActions } from '@/components/features/homepage/QuickActions';
 import { CompleteProfileBanner } from '@/components/features/homepage/CompleteProfileBanner';
+import { listHomepageVoiceStories } from '@/modules/voices/voice.service';
 
 const HomeTicker = dynamic(
   () => import('@/components/features/homepage/HomeTicker').then((m) => m.HomeTicker),
@@ -45,7 +46,20 @@ const DistributorCTA = dynamic(
   () => import('@/components/features/homepage/DistributorCTA').then((m) => m.DistributorCTA),
 );
 
-export default function Home() {
+export default async function Home() {
+  const voiceStories = (await listHomepageVoiceStories()).map((s) => ({
+    id: s.id,
+    slug: s.slug,
+    badge: s.badge,
+    name: s.name,
+    role: s.role,
+    venue: s.venue,
+    quote: s.quote,
+    photoUrl: s.photoUrl,
+    storySquareUrl: s.storySquareUrl,
+    storyPortraitUrl: s.storyPortraitUrl,
+  }));
+
   return (
     <div className="flex flex-col w-full min-w-0 overflow-x-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
       <Hero />
@@ -60,9 +74,9 @@ export default function Home() {
       <ShopByStorePromo />
       <FeatureBar />
       <Collections />
+      <VoicesSection stories={voiceStories} />
       <CategoryProductRails />
       <FeaturedDeals />
-      <VoicesSection />
       <DistributorCTA />
     </div>
   );

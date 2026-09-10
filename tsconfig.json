@@ -47,6 +47,7 @@
     "prisma/export-local-to-prod.ts",
     "prisma/migrations/**/*.ts",
     "prisma/_archive_migrations_pre_baseline/**/*.ts",
-    "scripts"
+    "scripts",
+    "studio-horeca1"
   ]
 }
