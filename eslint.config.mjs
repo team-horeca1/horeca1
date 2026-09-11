@@ -38,7 +38,12 @@ const eslintConfig = defineConfig([
       "src/lib/authTabSync.ts",
       "src/lib/userScopedStorage.ts",
     ],
-    ignores: ["src/app/api/**"],
+    ignores: [
+      "src/app/api/**",
+      // Next.js file conventions — always server-rendered, never in the browser graph.
+      "src/app/**/opengraph-image.tsx",
+      "src/app/**/twitter-image.tsx",
+    ],
     rules: {
       "no-restricted-imports": [
         "error",
