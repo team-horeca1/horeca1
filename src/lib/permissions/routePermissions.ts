@@ -154,8 +154,6 @@ export function getVendorAccountTabPermission(tab: string): RoutePermission | nu
   switch (tab) {
     case 'team':
       return ['users.view', 'users.create', 'users.edit', 'users.delete'];
-    case 'outlets':
-      return 'outlets.view';
     case 'overview':
     default:
       return 'settings.view';

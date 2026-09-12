@@ -97,12 +97,14 @@ export function AccountOverviewPanel({ accountId, fromPortal, onSelectTab }: Acc
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className={`grid grid-cols-1 gap-3 ${fromPortal === 'vendor' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
         {onSelectTab ? (
           <>
+            {fromPortal !== 'vendor' && (
             <button type="button" onClick={() => onSelectTab('outlets')} className={statClass}>
               <StatCardInner icon={<MapPin size={16} className="text-primary" />} iconBg="bg-primary-light" title="Outlets" value={String(account.outlets.length)} sub={incomplete > 0 ? `${incomplete} need address` : 'All complete'} subClass={incomplete > 0 ? 'text-amber-600' : 'text-primary'} />
             </button>
+            )}
             <button type="button" onClick={() => onSelectTab('users')} className={statClass}>
               <StatCardInner icon={<Users size={16} className="text-blue-500" />} iconBg="bg-blue-50" title="Members" value={String(account._count.members)} sub="Manage access" />
             </button>

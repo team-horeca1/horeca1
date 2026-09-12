@@ -52,8 +52,7 @@ function AccountLayoutInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (fromPortal !== 'vendor') return;
     let tab = 'overview';
-    if (pathname.endsWith('/outlets')) tab = 'outlets';
-    else if (pathname.endsWith('/users') || pathname.endsWith('/roles')) tab = 'team';
+    if (pathname.endsWith('/users') || pathname.endsWith('/roles')) tab = 'team';
     const dest = tab === 'overview' ? '/vendor/account' : `/vendor/account?tab=${tab}`;
     router.replace(dest);
   }, [fromPortal, pathname, router]);

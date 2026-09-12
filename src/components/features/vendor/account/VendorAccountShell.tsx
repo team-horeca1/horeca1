@@ -1,16 +1,15 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Building2, MapPin, Users } from 'lucide-react';
+import { Building2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePermissions } from '@/hooks/usePermissions';
 import { getVendorAccountTabPermission } from '@/lib/permissions/routePermissions';
 
-export type VendorAccountTabId = 'overview' | 'outlets' | 'team';
+export type VendorAccountTabId = 'overview' | 'team';
 
 const TABS: { id: VendorAccountTabId; label: string; icon: typeof Building2 }[] = [
   { id: 'overview', label: 'Overview', icon: Building2 },
-  { id: 'outlets', label: 'Outlets', icon: MapPin },
   { id: 'team', label: 'Team & roles', icon: Users },
 ];
 
@@ -43,7 +42,7 @@ export function VendorAccountShell({ activeTab, businessName, children }: Props)
           Business account
         </h1>
         <p className="text-[13px] text-[#7C7C7C]">
-          {businessName ? `${businessName} · ` : ''}GST, outlets, team &amp; permissions
+          {businessName ? `${businessName} · ` : ''}GST, team &amp; permissions
         </p>
       </div>
 
@@ -75,6 +74,6 @@ export function VendorAccountShell({ activeTab, businessName, children }: Props)
 }
 
 export function parseVendorAccountTab(raw: string | null): VendorAccountTabId {
-  if (raw === 'outlets' || raw === 'team') return raw;
+  if (raw === 'team') return raw;
   return 'overview';
 }

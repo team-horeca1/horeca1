@@ -12,7 +12,7 @@ export default function AccountOutletsPage() {
 
   useEffect(() => {
     if (from === 'vendor') {
-      router.replace('/vendor/account?tab=outlets');
+      router.replace('/vendor/account');
       return;
     }
     router.replace(`/profile?open=outlets&accountId=${params.id}`);

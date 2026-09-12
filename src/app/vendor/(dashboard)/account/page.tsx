@@ -5,7 +5,6 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { AccountOverviewPanel } from '@/components/account/AccountOverviewPanel';
-import { VendorOutletsManager } from '@/components/features/vendor/VendorOutletsManager';
 import { VendorTeamPanel } from '@/components/features/vendor/VendorTeamPanel';
 import { VendorAccountShell, parseVendorAccountTab, type VendorAccountTabId } from '@/components/features/vendor/account/VendorAccountShell';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
@@ -41,10 +40,9 @@ function VendorAccountContent() {
         <AccountOverviewPanel
           accountId={accountId}
           fromPortal="vendor"
-          onSelectTab={(t) => goTab(t === 'outlets' ? 'outlets' : 'team')}
+          onSelectTab={() => goTab('team')}
         />
       )}
-      {activeTab === 'outlets' && <VendorOutletsManager embedded />}
       {activeTab === 'team' && <VendorTeamPanel embedded />}
     </VendorAccountShell>
   );
