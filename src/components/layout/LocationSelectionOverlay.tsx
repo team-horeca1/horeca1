@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
     ArrowLeft, Search, MapPin, Loader2,
     Navigation, X, Trash2, Store, Pencil,
@@ -14,7 +15,7 @@ import { EditAddressOverlay } from './EditAddressOverlay';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useStableSession } from '@/hooks/useStableSession';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
-import { syncAddressToOutlet, prepareAccountForOutletSync } from '@/lib/syncAddressToOutlet';
+import { accountCanManageOutlets, syncAddressToOutlet, prepareAccountForOutletSync } from '@/lib/syncAddressToOutlet';
 import { toast } from 'sonner';
 
 interface LocationSelectionOverlayProps {
@@ -35,6 +36,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
         removeAddress,
         detectCurrentLocation,
         isDetectingLocation,
+        refreshAddresses,
     } = useAddress();
 
     const { isAuthenticated } = useStableSession();
@@ -50,6 +52,12 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
     const [isAddNewOpen, setIsAddNewOpen] = useState(false);
     const [initialCoords, setInitialCoords] = useState<{ lat?: number; lng?: number }>({});
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+    const canManageOutlets = !isAuthenticated || accountCanManageOutlets(currentAccount);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        void refreshAddresses();
+    }, [isOpen, refreshAddresses]);
 
     // ─── Google Places autocomplete (address search in main overlay) ─────
     const { predictions, isSearching, getPlaceDetails, clearPredictions } =
@@ -57,6 +65,10 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
 
     // ─── Sync selected address with active session outlet ────────────────
     const handleSelectAddressAndSyncOutlet = async (addr: Address) => {
+        if (isAuthenticated && !canManageOutlets) {
+            toast.error('Switch to a restaurant or retail business to set delivery.');
+            return;
+        }
         setSelectedAddress(addr);
 
         // Selecting an address also makes it primary (isDefault + primaryOutletId via PATCH).
@@ -78,8 +90,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                     switchAccount,
                 );
                 if (!accountId) {
-                    toast.error('No business account found. Complete your profile or log in again.');
-                    onClose();
+                    toast.error('Switch to a restaurant or retail business to set delivery.');
                     return;
                 }
                 await syncAddressToOutlet({
@@ -146,6 +157,11 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
 
     // ─── Save from AddNewAddressOverlay ──────────────────────────────────
     const handleSaveNewAddress = async (address: Omit<Address, 'id'>) => {
+        if (isAuthenticated && !canManageOutlets) {
+            toast.error('Switch to a restaurant or retail business to set delivery.');
+            setIsAddNewOpen(false);
+            return;
+        }
         const saved = await addAddress(address);
         setIsAddNewOpen(false);
         if (saved) {
@@ -173,13 +189,31 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                     <button onClick={onClose} className="p-1 -ml-1 md:hidden" aria-label="Close delivery location">
                         <ArrowLeft size={24} className="text-gray-700" />
                     </button>
-                    <h2 className="text-xl font-bold text-gray-800">Delivery Location</h2>
+                    <h2 className="text-xl font-bold text-text text-balance">Delivery outlets</h2>
                     <button onClick={onClose} className="p-1 -mr-1 hover:bg-gray-100 rounded-full transition-colors" aria-label="Close delivery location">
                         <X size={22} className="text-gray-600" />
                     </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-4 pt-2 pb-24 md:pb-4">
+
+                    {isAuthenticated && !canManageOutlets && (
+                        <div className="mb-4 rounded-xl border border-divider bg-ivory px-4 py-3">
+                            <p className="text-[13px] font-semibold text-text text-pretty">
+                                Delivery outlets belong to restaurant or retail.
+                            </p>
+                            <p className="text-[12px] text-text-secondary mt-1 text-pretty">
+                                Switch business to add or edit where orders are delivered.
+                            </p>
+                            <Link
+                                href="/businesses"
+                                onClick={onClose}
+                                className="inline-flex mt-2 text-[13px] font-semibold text-primary"
+                            >
+                                Manage businesses
+                            </Link>
+                        </div>
+                    )}
 
                     {/* Search Bar */}
                     <div className="mb-4 relative">
@@ -191,7 +225,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                disabled={!isLoaded}
+                                disabled={!isLoaded || !canManageOutlets}
                             />
                             {searchQuery && (
                                 <button onClick={() => { setSearchQuery(''); clearPredictions(); }}>
@@ -229,7 +263,7 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                     {/* Use Current Location */}
                     <button
                         onClick={handleUseCurrentLocation}
-                        disabled={isDetectingLocation}
+                        disabled={isDetectingLocation || !canManageOutlets}
                         className="w-full flex items-center gap-4 p-4 bg-primary-light border border-primary/20 rounded-lg mb-6 active:scale-[0.98] transition-transform text-left disabled:opacity-60"
                     >
                         <div className="w-10 h-10 shrink-0 bg-white rounded-full flex items-center justify-center shadow-sm">
@@ -257,8 +291,8 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
 
                     {!isLoadingAddresses && savedAddresses.length > 0 && (
                         <>
-                            <h3 className="text-[11px] font-extrabold text-gray-400 uppercase tracking-wider mb-3">
-                                Delivery Addresses
+                            <h3 className="text-[11px] font-semibold text-text-muted uppercase mb-3">
+                                Saved outlets
                             </h3>
                             <div className="space-y-3 mb-6">
                                 {savedAddresses.map((addr) => {
@@ -342,8 +376,8 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                             <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                 <Store size={28} className="text-gray-300" />
                             </div>
-                            <h3 className="text-sm font-bold text-gray-500 mb-1">No delivery addresses yet</h3>
-                            <p className="text-xs text-gray-400">Search for your restaurant, hotel or cafe below</p>
+                            <h3 className="text-sm font-semibold text-text-secondary mb-1">No delivery outlets yet</h3>
+                            <p className="text-xs text-text-muted text-pretty">Search for your restaurant, hotel, or cafe</p>
                         </div>
                     )}
                 </div>
@@ -352,13 +386,18 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
                 <div className="p-4 bg-white border-t border-gray-100 shrink-0">
                     <button
                         onClick={() => {
+                            if (!canManageOutlets) {
+                                toast.error('Switch to a restaurant or retail business to set delivery.');
+                                return;
+                            }
                             setInitialCoords({});
                             setIsAddNewOpen(true);
                         }}
-                        className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-xl shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        disabled={!canManageOutlets}
+                        className="w-full min-h-12 bg-primary hover:bg-primary-dark text-white font-semibold py-4 rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                         <Store size={18} />
-                        Add Delivery Address
+                        Add delivery outlet
                     </button>
                 </div>
             </div>
@@ -375,7 +414,10 @@ export function LocationSelectionOverlay({ isOpen, onClose }: LocationSelectionO
             {/* Edit Address Overlay */}
             <EditAddressOverlay
                 address={editingAddress}
-                onClose={() => setEditingAddress(null)}
+                onClose={() => {
+                    setEditingAddress(null);
+                    void refreshAddresses();
+                }}
             />
         </>
     );

@@ -327,7 +327,12 @@ export function useBusinessAccountSwitcher() {
         ?? currentAccount?.outlets[0]
         ?? null
       )
-      : (currentAccount?.outlets.find((o) => o.id === activeOutletId) ?? null);
+      : (
+        currentAccount?.outlets.find((o) => o.id === activeOutletId)
+        ?? currentAccount?.outlets.find((o) => o.id === currentAccount.primaryOutletId)
+        ?? currentAccount?.outlets[0]
+        ?? null
+      );
 
   const effectiveActiveOutletId = vendorImpersonating
     ? (currentOutlet?.id ?? null)

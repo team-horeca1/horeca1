@@ -542,17 +542,17 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         {variant === 'list' ? (
             <div
                 className={cn(
-                    "w-full bg-white rounded-xl border-[0.5px] border-primary overflow-hidden relative",
+                    "w-full h-full bg-white rounded-xl border-[0.5px] border-primary overflow-hidden relative flex flex-col",
                     isOutOfStock ? "opacity-75" : ""
                 )}
             >
-                <div className="relative h-[168px] bg-ivory">
+                <div className="relative h-[112px] shrink-0 bg-ivory">
                     <Image
                         src={product.images[0] || '/images/recom-product/product-img10.png'}
                         alt={product.name}
                         fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                        className={cn("object-contain p-4", isOutOfStock ? "grayscale" : "")}
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                        className={cn("object-contain p-2", isOutOfStock ? "grayscale" : "")}
                     />
                     {listBadge && (
                         <span className={cn(
@@ -574,44 +574,48 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                     </div>
                 </div>
 
-                <div className="p-3">
-                    {product.brandSlug && product.brandName ? (
-                        <Link
-                            href={`/brand/${product.brandSlug}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-[11px] font-medium text-text-muted hover:text-primary hover:underline"
-                        >
-                            {product.brandName}
-                        </Link>
-                    ) : distributorName ? (
-                        <button
-                            type="button"
-                            onClick={onDistributorClick}
-                            className="text-[11px] font-medium text-text-muted text-left truncate max-w-full"
-                        >
-                            {distributorName}
-                        </button>
-                    ) : null}
+                <div className="px-3 py-2 flex flex-col flex-1 min-h-0">
+                    <div className="h-4 truncate">
+                        {product.brandSlug && product.brandName ? (
+                            <Link
+                                href={`/brand/${product.brandSlug}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="block truncate text-[11px] leading-4 font-medium text-text-muted hover:text-primary hover:underline"
+                            >
+                                {product.brandName}
+                            </Link>
+                        ) : distributorName ? (
+                            <button
+                                type="button"
+                                onClick={onDistributorClick}
+                                className="block w-full truncate text-left text-[11px] leading-4 font-medium text-text-muted"
+                            >
+                                {distributorName}
+                            </button>
+                        ) : (
+                            <span className="block h-4" aria-hidden="true">&nbsp;</span>
+                        )}
+                    </div>
 
                     <h3 className={cn(
-                        "mt-0.5 text-[15px] font-bold leading-[1.3] line-clamp-2 text-balance min-h-[2.6em]",
+                        "mt-0.5 text-[14px] font-semibold leading-snug line-clamp-2 min-h-[2.8em] text-balance",
                         isOutOfStock ? "text-gray-400" : "text-text"
                     )}>
                         {product.displayName ?? product.name}
                     </h3>
-                    <p className="mt-1 text-[12px] text-text-muted">
+                    <p className="mt-0.5 text-[11px] text-text-muted truncate">
                         {product.packSize || product.unit || '1 unit'}
                     </p>
 
-                    <div className="mt-3">
-                        <div className="flex items-baseline gap-1.5">
+                    <div className="mt-1.5">
+                        <div className="flex items-baseline gap-1">
                             <span className={cn(
-                                "text-[22px] font-extrabold leading-none tabular-nums",
+                                "text-[18px] font-bold leading-none tabular-nums",
                                 isOutOfStock ? "text-gray-300" : "text-primary"
                             )}>
                                 ₹{product.price}
                             </span>
-                            <span className="text-[12px] text-text-muted">/Pc</span>
+                            <span className="text-[11px] text-text-muted">/Pc</span>
                         </div>
                         {hasRealMrp && (
                             <p className="mt-1 text-[11px] text-text-muted">
@@ -621,65 +625,65 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         )}
                     </div>
 
-                    <div className="mt-3 min-h-[108px] rounded-lg border border-divider bg-ivory/60 p-2">
-                        {savingsSlabs.length > 0 && !isOutOfStock ? (
-                            <>
-                                <p className="mb-1.5 text-center text-[10px] font-bold uppercase tracking-wide text-primary">
-                                    {onBestPrice ? 'Best price unlocked' : 'Buy more · save more'}
-                                </p>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {savingsSlabs.map((tier, i) => {
-                                        const isBest = i === savingsSlabs.length - 1;
-                                        const isActive = currentQty >= tier.minQty
-                                            && (i === savingsSlabs.length - 1 || currentQty < savingsSlabs[i + 1].minQty);
-                                        const saveAmt = product.price - tier.price;
-                                        return (
-                                            <button
-                                                key={`${tier.minQty}-${tier.price}`}
-                                                type="button"
-                                                onClick={(e) => handleTierSelect(e, tier.minQty)}
-                                                className={cn(
-                                                    "rounded-lg border bg-white px-2 py-1.5 text-center transition-colors",
-                                                    isActive ? "border-primary" : "border-divider hover:border-primary/40"
-                                                )}
-                                            >
-                                                <span className="block text-[10px] font-semibold text-text-muted whitespace-nowrap">
-                                                    {tier.minQty}+ Qty{isBest ? ' · Best' : ''}
-                                                </span>
-                                                <span className="mt-0.5 block text-[13px] font-extrabold text-primary tabular-nums whitespace-nowrap">
-                                                    ₹{tier.price}/Pc
-                                                </span>
-                                                {saveAmt > 0 && (
-                                                    <span className="mt-0.5 block text-[10px] font-semibold text-success whitespace-nowrap">
-                                                        Save ₹{saveAmt}
+                    <div className="mt-2 min-h-[115px] rounded-lg border border-divider bg-ivory/60 p-1.5 flex flex-col">
+                            {savingsSlabs.length > 0 && !isOutOfStock ? (
+                                <>
+                                    <p className="mb-1 text-center text-[10px] font-semibold uppercase text-primary">
+                                        {onBestPrice ? 'Best price unlocked' : 'Buy more · save more'}
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-1.5">
+                                        {savingsSlabs.map((tier, i) => {
+                                            const isBest = i === savingsSlabs.length - 1;
+                                            const isActive = currentQty >= tier.minQty
+                                                && (i === savingsSlabs.length - 1 || currentQty < savingsSlabs[i + 1].minQty);
+                                            const saveAmt = product.price - tier.price;
+                                            return (
+                                                <button
+                                                    key={`${tier.minQty}-${tier.price}`}
+                                                    type="button"
+                                                    onClick={(e) => handleTierSelect(e, tier.minQty)}
+                                                    className={cn(
+                                                        "rounded-lg border bg-white px-1.5 py-1 text-center transition-colors",
+                                                        isActive ? "border-primary" : "border-divider hover:border-primary/40"
+                                                    )}
+                                                >
+                                                    <span className="block text-[10px] font-semibold text-text-muted whitespace-nowrap">
+                                                        {tier.minQty}+ Qty{isBest ? ' · Best' : ''}
                                                     </span>
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                <p className={cn(
-                                    "mt-1.5 min-h-[2.4em] text-center text-[11px] text-pretty",
-                                    bulkCelebrate || onBestPrice || savingPerPc > 0
-                                        ? "font-semibold text-success"
-                                        : "font-medium text-text-secondary"
-                                )}>
-                                    {bulkCelebrate
-                                        ? 'Bulk added to cart'
-                                        : onBestPrice
-                                            ? 'Smart buy · You unlocked maximum savings'
-                                            : savingPerPc > 0
-                                                ? `Great choice · You're saving ₹${savingPerPc}/Pc`
-                                                : nextSavingsSlab
-                                                    ? `Add ${remainingToNext} more to get ₹${nextSavingsSlab.price}/Pc`
-                                                    : '\u00a0'}
+                                                    <span className="mt-0.5 block text-[12px] font-bold text-primary tabular-nums whitespace-nowrap">
+                                                        ₹{tier.price}/Pc
+                                                    </span>
+                                                    {saveAmt > 0 && (
+                                                        <span className="mt-0.5 block text-[10px] font-semibold text-success whitespace-nowrap">
+                                                            Save ₹{saveAmt}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    <p className={cn(
+                                        "mt-1 text-center text-[11px] text-pretty",
+                                        bulkCelebrate || onBestPrice || savingPerPc > 0
+                                            ? "font-semibold text-success"
+                                            : "font-medium text-text-secondary"
+                                    )}>
+                                        {bulkCelebrate
+                                            ? 'Bulk added to cart'
+                                            : onBestPrice
+                                                ? 'Smart buy · You unlocked maximum savings'
+                                                : savingPerPc > 0
+                                                    ? `Great choice · You're saving ₹${savingPerPc}/Pc`
+                                                    : nextSavingsSlab
+                                                        ? `Add ${remainingToNext} more to get ₹${nextSavingsSlab.price}/Pc`
+                                                        : '\u00a0'}
+                                    </p>
+                                </>
+                            ) : (
+                                <p className="flex flex-1 items-center justify-center py-2 text-[11px] font-medium text-text-muted">
+                                    {isOutOfStock ? 'Volume pricing unavailable' : 'No extra volume discount on this pack'}
                                 </p>
-                            </>
-                        ) : (
-                            <p className="flex h-full min-h-[92px] items-center justify-center text-[11px] font-medium text-text-muted">
-                                {isOutOfStock ? 'Volume pricing unavailable' : 'No extra volume discount on this pack'}
-                            </p>
-                        )}
+                            )}
                     </div>
 
                     {product.frequentlyOrdered && (
@@ -699,18 +703,13 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         </button>
                     ) : null}
 
-                    <div className="mt-3">
-                        {renderPrimaryCTA(false, true)}
+                    <div className="mt-auto pt-2">
+                        {renderPrimaryCTA(true, true)}
                     </div>
                 </div>
             </div>
         ) : (
-            // ── GRID VARIANT — two breakpoint-specific layouts under one Link.
-            //    Mobile (<sm): Hyperpure compact tile — floating ADD on image, bulk chip below price.
-            //    Desktop (sm+): original full-size card — share icon top-right, inline bulk-tier pills,
-            //    big "ADD TO CART" pill at the bottom. ──
             <>
-                {/* ── MOBILE COMPACT TILE ── */}
                 <div
                     className={cn(
                         "sm:hidden bg-white rounded-2xl border border-gray-100 overflow-hidden transition-all duration-300 group p-0 relative flex flex-col h-full",
@@ -831,7 +830,6 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                     </div>
                 </div>
 
-                {/* ── DESKTOP ORIGINAL CARD (restored — share top-right, inline tier pills, bottom ADD) ── */}
                 <div
                     className={cn(
                         "hidden sm:flex bg-white rounded-[22px] border border-gray-100 overflow-hidden transition-all duration-500 group p-4 md:p-5 relative flex-col gap-3 h-full",

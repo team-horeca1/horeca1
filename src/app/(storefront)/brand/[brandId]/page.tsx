@@ -8,5 +8,6 @@ export default function BrandStorePage({ params }: { params: Promise<{ brandId: 
     const { brandId } = use(params);
     const searchParams = useSearchParams();
     const initialCatSlug = searchParams?.get('cat') || '';
-    return <BrandStore brandId={brandId} initialCatSlug={initialCatSlug} />;
+    const initialSkuId = searchParams?.get('sku') || searchParams?.get('product') || '';
+    return <BrandStore brandId={brandId} initialCatSlug={initialCatSlug} initialSkuId={initialSkuId} />;
 }

@@ -2,13 +2,15 @@
 import { CDL } from '@/lib/cdl';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, LogOut, Loader2, ShieldCheck, Store, MapPin, Plus, Building2 } from 'lucide-react';
+import { Check, ChevronDown, LogOut, Loader2, ShieldCheck, Store, MapPin, Building2, ChevronRight } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { ACCOUNT_SWITCHER_OPEN_EVENT } from '@/lib/accountSwitcherEvents';
 import { setEnteredStore } from '@/lib/supplierPortalLevel';
+import { businessKindLabel, kindFromFlags } from '@/lib/businessCapability';
+import { cn } from '@/lib/utils';
 
 type Portal = 'vendor' | 'brand' | 'customer' | 'admin';
 
@@ -32,9 +34,9 @@ function initialsOf(name: string): string {
 type AccountKind = 'customer' | 'vendor' | 'brand';
 
 const KIND_STYLE: Record<AccountKind, { label: string; color: string; bg: string }> = {
-  customer: { label: 'Restaurant / Retail', color: '#2563EB', bg: '#DBEAFE' },
+  customer: { label: 'Restaurant / Retail', color: CDL.primary, bg: CDL.primaryLight },
   vendor:   { label: 'Supplier', color: CDL.primary, bg: CDL.primaryLight },
-  brand:    { label: 'Brand',    color: '#7C3AED', bg: '#EDE9FE' },
+  brand:    { label: 'Brand',    color: CDL.primary, bg: CDL.primaryLight },
 };
 
 const ROLE_STYLE_FALLBACK: Record<string, { label: string; color: string; bg: string }> = {
@@ -196,21 +198,19 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
                 )}
               </div>
               <span
-                className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
                 style={{ color: conf.color, backgroundColor: conf.bg }}
               >
                 {conf.label}
               </span>
             </div>
           </div>
-          {accounts.length > 1 && (
-            <div className="py-1 border-b border-[#F0F0F0] max-h-[240px] overflow-y-auto">
-              <p className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#AEAEAE]">
-                Switch business
+          {accounts.length > 0 && (
+            <div className="py-1 border-b border-divider max-h-[240px] overflow-y-auto">
+              <p className="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase text-text-muted">
+                Ordering as
               </p>
               {accounts.map((a) => {
-                const kind = classifyAccount(a);
-                const badge = KIND_STYLE[kind];
                 const isCurrent = a.id === currentAccount?.id;
                 return (
                   <button
@@ -220,36 +220,36 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
                     onClick={async () => {
                       if (isCurrent) return;
                       try {
-                        await switchAccount(a.id);
+                        await switchAccount(
+                          a.id,
+                          a.primaryOutletId ?? a.outlets[0]?.id ?? undefined,
+                        );
                         setIsOpen(false);
                       } catch {
                         /* hook toasts / throws */
                       }
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-ivory transition-colors text-left disabled:opacity-70"
+                    className={cn(
+                      'w-full flex items-center gap-3 px-4 py-2.5 text-left disabled:opacity-70',
+                      isCurrent ? 'bg-primary-light' : 'hover:bg-ivory',
+                    )}
                   >
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: badge.bg }}
-                    >
+                    <div className="size-8 rounded-full bg-white border border-divider flex items-center justify-center shrink-0">
                       {switching && !isCurrent ? (
-                        <Loader2 size={13} className="animate-spin" style={{ color: badge.color }} />
+                        <Loader2 size={13} className="animate-spin text-primary" />
                       ) : (
-                        <span className="text-[10px] font-bold" style={{ color: badge.color }}>
+                        <span className="text-[10px] font-semibold text-primary">
                           {initialsOf(a.displayName ?? a.legalName)}
                         </span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-[#181725] truncate">
+                      <p className="text-[13px] font-semibold text-text truncate">
                         {a.displayName ?? a.legalName}
                       </p>
-                      <span
-                        className="inline-block mt-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider"
-                        style={{ color: badge.color, backgroundColor: badge.bg }}
-                      >
-                        {badge.label}
-                      </span>
+                      <p className="text-[11px] text-text-secondary">
+                        {businessKindLabel(kindFromFlags(a))}
+                      </p>
                     </div>
                     {isCurrent && <Check size={14} className="text-primary shrink-0" />}
                   </button>
@@ -259,7 +259,7 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
           )}
           {isVendorPortal && activeStores.length > 0 && (
             <div className="py-1 border-b border-[#F0F0F0] max-h-[240px] overflow-y-auto">
-              <p className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#AEAEAE]">
+              <p className="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase text-text-muted">
                 Switch store
               </p>
               {activeStores.map((store) => {
@@ -293,41 +293,15 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
               })}
             </div>
           )}
-          <div className="py-1 border-b border-[#F0F0F0]">
-            <p className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#AEAEAE]">
-              Add business
-            </p>
-            <Link
-              href="/businesses?add=buyer"
-              onClick={() => setIsOpen(false)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-ivory transition-colors text-left"
-            >
-              <Plus size={16} className="text-primary shrink-0" />
-              <span className="text-[13px] font-semibold text-[#181725]">Add restaurant or retail</span>
-            </Link>
-            <Link
-              href="/businesses?add=brand"
-              onClick={() => setIsOpen(false)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-ivory transition-colors text-left"
-            >
-              <Plus size={16} className="text-primary shrink-0" />
-              <span className="text-[13px] font-semibold text-[#181725]">Add brand</span>
-            </Link>
-            <Link
-              href="/businesses?add=supplier"
-              onClick={() => setIsOpen(false)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-ivory transition-colors text-left"
-            >
-              <Plus size={16} className="text-primary shrink-0" />
-              <span className="text-[13px] font-semibold text-[#181725]">Add supplier</span>
-            </Link>
+          <div className="py-1 border-b border-divider">
             <Link
               href="/businesses"
               onClick={() => setIsOpen(false)}
               className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-ivory transition-colors text-left"
             >
               <Building2 size={16} className="text-primary shrink-0" />
-              <span className="text-[13px] font-semibold text-[#181725]">My Businesses</span>
+              <span className="flex-1 text-[13px] font-semibold text-text">Manage businesses</span>
+              <ChevronRight size={14} className="text-text-muted" />
             </Link>
           </div>
           <div className="py-1">

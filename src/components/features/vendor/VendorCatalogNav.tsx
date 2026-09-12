@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, X, SlidersHorizontal, LayoutGrid, LayoutList } from 'lucide-react';
+import { Search, X, LayoutGrid, LayoutList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface VendorCatalogNavProps {
@@ -92,9 +92,6 @@ export function VendorCatalogNav({
                                 </button>
                             )}
                         </div>
-                        <button type="button" aria-label="Filter products" className="p-2 rounded-xl bg-white border border-divider text-text-muted hover:text-primary hover:border-primary/30 transition-all shrink-0">
-                            <SlidersHorizontal size={17} strokeWidth={2} />
-                        </button>
                         {ToggleGroup}
                     </div>
                     <div className="hidden md:flex items-center gap-4 overflow-x-auto no-scrollbar md:mx-0 md:px-0">

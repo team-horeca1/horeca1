@@ -13,18 +13,16 @@ import {
     X,
     Store,
     Loader2,
-    Building2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import Link from 'next/link';
 import { useAddress, type Address } from '@/context/AddressContext';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useSession } from 'next-auth/react';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
-import { syncAddressToOutlet, prepareAccountForOutletSync } from '@/lib/syncAddressToOutlet';
+import { accountCanManageOutlets, syncAddressToOutlet, prepareAccountForOutletSync } from '@/lib/syncAddressToOutlet';
 import { toast } from 'sonner';
 import { AddNewAddressOverlay } from '@/components/layout/AddNewAddressOverlay';
 import { EditAddressOverlay } from '@/components/layout/EditAddressOverlay';
-import { CreateBusinessAccountModal } from './CreateBusinessAccountModal';
 
 interface SavedAddressesOverlayProps {
     isOpen: boolean;
@@ -54,7 +52,7 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
     const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
     const [isAddNewOpen, setIsAddNewOpen] = useState(false);
     const [editingAddress, setEditingAddress] = useState<Address | null>(null);
-    const [isCreateBusinessOpen, setIsCreateBusinessOpen] = useState(false);
+    const canManageOutlets = status !== 'authenticated' || accountCanManageOutlets(currentAccount);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -66,6 +64,10 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
 
     const syncToOutlet = async (addr: Address) => {
         if (status !== 'authenticated') return;
+        if (!canManageOutlets) {
+            toast.error('Switch to a restaurant or retail business to set delivery.');
+            return;
+        }
         try {
             const accountId = await prepareAccountForOutletSync(accounts, currentAccount, switchAccount);
             if (!accountId) return;
@@ -81,6 +83,11 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
     };
 
     const handleSaveNewAddress = async (address: Omit<Address, 'id'>) => {
+        if (status === 'authenticated' && !canManageOutlets) {
+            toast.error('Switch to a restaurant or retail business to set delivery.');
+            setIsAddNewOpen(false);
+            return;
+        }
         const saved = await addAddress(address);
         setIsAddNewOpen(false);
         if (saved) {
@@ -139,16 +146,30 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
                         <button onClick={onClose} className="p-1 hover:bg-gray-50 rounded-full transition-colors absolute left-4 md:hidden z-10">
                             <ChevronLeft size={20} className="text-[#181725]" />
                         </button>
-                        <h2 className="w-full text-center md:text-left text-[17px] md:text-[20px] font-[700] text-[#181725]">Delivery Addresses</h2>
+                        <h2 className="w-full text-center md:text-left text-[17px] md:text-[20px] font-semibold text-text text-balance">Delivery outlets</h2>
                         <button onClick={onClose} className="hidden md:flex p-2 hover:bg-gray-100 rounded-full transition-colors absolute right-4 z-10">
                             <X size={20} className="text-gray-500" />
                         </button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto px-4 md:px-6 pt-4 md:pt-5 pb-36 md:pb-6">
-                        <p className="text-[12px] text-[#7C7C7C] mb-4 leading-relaxed">
-                            Manage where your orders are delivered. Add your restaurant, hotel, or outlet — or register a new business account.
+                        <p className="text-[12px] text-text-secondary mb-4 leading-relaxed text-pretty">
+                            These are delivery outlets for your restaurant or retail business.
                         </p>
+                        {status === 'authenticated' && !canManageOutlets && (
+                            <div className="mb-4 rounded-xl border border-divider bg-ivory px-4 py-3">
+                                <p className="text-[13px] font-semibold text-text text-pretty">
+                                    Switch to restaurant or retail to manage outlets.
+                                </p>
+                                <Link
+                                    href="/businesses"
+                                    onClick={onClose}
+                                    className="inline-flex mt-2 text-[13px] font-semibold text-primary"
+                                >
+                                    Manage businesses
+                                </Link>
+                            </div>
+                        )}
 
                         {isLoadingAddresses ? (
                             <div className="flex items-center justify-center py-10 gap-2 text-[#AEAEAE]">
@@ -159,7 +180,7 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
                             <div className="text-center py-10 px-4 bg-white md:bg-gray-50/80 border border-dashed border-gray-200 rounded-[12px]">
                                 <Store size={28} className="text-[#AEAEAE] mx-auto mb-2" />
                                 <p className="text-[14px] font-bold text-[#374151]">No delivery addresses yet</p>
-                                <p className="text-[12px] text-[#AEAEAE] mt-1">Add your business location or register a new business below</p>
+                                <p className="text-[12px] text-text-muted mt-1 text-pretty">Add your restaurant, hotel, or outlet below</p>
                             </div>
                         ) : (
                             <div className="space-y-3 md:space-y-4">
@@ -235,31 +256,23 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
                             </div>
                         )}
 
-                        <button
-                            type="button"
-                            onClick={() => setIsCreateBusinessOpen(true)}
-                            className={cn(
-                                'w-full mt-4 flex items-center gap-3 p-4 rounded-[12px] border border-[#EEEEEE] bg-white hover:border-primary/30 hover:bg-primary-light/40 transition-colors text-left',
-                            )}
-                        >
-                            <div className="w-10 h-10 rounded-full bg-[#EEF2FF] flex items-center justify-center shrink-0">
-                                <Building2 size={18} className="text-[#6366F1]" />
-                            </div>
-                            <div className="min-w-0">
-                                <p className="text-[13px] font-bold text-[#181725]">Register new business</p>
-                                <p className="text-[11px] text-[#7C7C7C] mt-0.5">Create another business account with delivery location</p>
-                            </div>
-                        </button>
                     </div>
 
                     <div className="fixed md:static bottom-0 left-0 right-0 px-5 md:px-6 pt-3 pb-5 md:py-5 bg-white border-t border-gray-100 space-y-2">
                         <button
                             type="button"
-                            onClick={() => setIsAddNewOpen(true)}
-                            className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3.5 md:py-4 rounded-xl md:rounded-2xl active:scale-[0.98] transition-all text-[14px] md:text-[15px] flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                            onClick={() => {
+                                if (!canManageOutlets) {
+                                    toast.error('Switch to a restaurant or retail business to set delivery.');
+                                    return;
+                                }
+                                setIsAddNewOpen(true);
+                            }}
+                            disabled={!canManageOutlets}
+                            className="w-full min-h-12 bg-primary hover:bg-primary-dark text-white font-semibold py-3.5 md:py-4 rounded-xl text-[14px] md:text-[15px] flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                             <Plus size={18} />
-                            Add delivery address
+                            Add delivery outlet
                         </button>
                     </div>
                 </div>
@@ -279,14 +292,6 @@ export function SavedAddressesOverlay({ isOpen, onClose }: SavedAddressesOverlay
                 }}
             />
 
-            <CreateBusinessAccountModal
-                isOpen={isCreateBusinessOpen}
-                onClose={() => setIsCreateBusinessOpen(false)}
-                onCreated={() => {
-                    setIsCreateBusinessOpen(false);
-                    void refreshAddresses();
-                }}
-            />
         </>
     );
 }

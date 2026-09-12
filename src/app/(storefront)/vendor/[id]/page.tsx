@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { VendorStoreHeader } from '@/components/features/vendor/VendorStoreHeader';
 import { VendorCatalogNav } from '@/components/features/vendor/VendorCatalogNav';
+import { VendorCategoryRail } from '@/components/features/vendor/VendorCategoryRail';
 import { VendorProductCard } from '@/components/features/vendor/VendorProductCard';
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
 import { dal } from '@/lib/dal';
@@ -13,8 +15,7 @@ import { buildCategoryTree, filterProductsByCatalogTab } from '@/lib/categoryTre
 import { useCart } from '@/context/CartContext';
 import { useDeliveryPincode } from '@/hooks/useDeliveryPincode';
 import type { Vendor, VendorProduct } from '@/types';
-import { Package, Star, CheckCircle, Clock, ChevronRight, LayoutGrid, CreditCard } from 'lucide-react';
-import Image from 'next/image';
+import { Package, Star, CheckCircle, Clock, ChevronRight, CreditCard } from 'lucide-react';
 
 interface VendorOrder {
     id?: string;
@@ -42,6 +43,8 @@ export default function VendorStorePage() {
     // Pre-fill active tab from ?cat= param (deep-link from search overlay / category page).
     // ?cat=mayo-sauces → activeTab='cat:Mayo & Sauces' once products load (slug → name match below).
     const initialCatSlug = searchParams?.get('cat') || '';
+    const brandFilter = (searchParams?.get('brand') || '').trim();
+    const highlightProductId = (searchParams?.get('product') || '').trim();
     const [activeTab, setActiveTab] = useState(initialCatSlug ? `cat:${initialCatSlug}` : 'all');
     // Pre-fill search from ?q= param (e.g. navigating from search overlay with a specific product)
     const [searchQuery, setSearchQuery] = useState(() => searchParams?.get('q') || '');
@@ -262,21 +265,19 @@ export default function VendorStorePage() {
         [products],
     );
 
-    // Drill-down state derived from activeTab.
-    // Left rail = top-level categories (parents). Selecting a parent shows its
-    // sub-category TILES on the right; selecting a sub-category shows its products.
-    // Items are only ever mapped to sub-categories, so a parent never shows products directly.
     const activeCatName = activeTab.startsWith('cat:') ? activeTab.slice(4) : '';
-    const activeParentNode = useMemo(
-        () => vendorCategoryTree.find(p => p.name === activeCatName && p.children.length > 0),
-        [vendorCategoryTree, activeCatName],
-    );
     const parentOfActiveSub = useMemo(
         () => vendorCategoryTree.find(p => p.children.some(c => c.name === activeCatName)),
         [vendorCategoryTree, activeCatName],
     );
-    // Show the sub-category grid when a parent (with children) is selected and the user isn't searching.
-    const showSubcategoryTiles = !searchQuery.trim() && !!activeParentNode;
+    const brandFilterName = useMemo(() => {
+        if (!brandFilter) return '';
+        const slug = brandFilter.toLowerCase();
+        return products.find((p) =>
+            (p.brandSlug ?? '').toLowerCase() === slug ||
+            (p.brandName ?? '').toLowerCase() === slug,
+        )?.brandName || brandFilter;
+    }, [products, brandFilter]);
 
     const filteredProducts = useMemo(() => {
         let result = products;
@@ -290,6 +291,14 @@ export default function VendorStorePage() {
             result = prevOrderedProducts;
         } else if (activeTab.startsWith('cat:')) {
             result = filterProductsByCatalogTab(result, activeTab);
+        }
+
+        if (brandFilter) {
+            const slug = brandFilter.toLowerCase();
+            result = result.filter((p) =>
+                (p.brandSlug ?? '').toLowerCase() === slug ||
+                (p.brandName ?? '').toLowerCase() === slug,
+            );
         }
 
         // Filter by search (include brand displayName; guard nullish fields)
@@ -313,7 +322,13 @@ export default function VendorStorePage() {
             const bOut = (b.stock ?? 0) <= 0 ? 1 : 0;
             return aOut - bOut;
         });
-    }, [products, activeTab, searchQuery, prevOrderedProducts]);
+    }, [products, activeTab, searchQuery, prevOrderedProducts, brandFilter]);
+
+    useEffect(() => {
+        if (!highlightProductId || loading) return;
+        const el = document.querySelector(`[data-product-id="${highlightProductId}"]`);
+        if (el instanceof HTMLElement) el.scrollIntoView({ block: 'center' });
+    }, [highlightProductId, loading, filteredProducts.length]);
 
     if (loading) {
         return (
@@ -437,138 +452,66 @@ export default function VendorStorePage() {
                     </div>
                 ) : activeTab === 'all' || activeTab === 'deals' || activeTab === 'frequent' || activeTab === 'prev-ordered' || activeTab.startsWith('cat:') ? (
                     <div className="flex gap-2 md:gap-4 lg:gap-6 items-start">
-                        {/* ── LEFT RAIL: TOP-LEVEL CATEGORIES ONLY (parents).
-                              Selecting a parent drills into its sub-categories on the right.
-                              Mobile (<md): Hyperpure-style vertical tile rail (~76px), image-on-top + label-below.
-                              Desktop (md+): row list with image + label + count. ── */}
-                        <aside className="w-[64px] md:w-[200px] lg:w-[260px] shrink-0 sticky top-24">
-                            <div className="bg-white rounded-xl md:rounded-2xl border border-gray-100 p-1 md:p-3 shadow-sm">
-                                {/* All Products entry */}
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab('all')}
-                                    className={cn(
-                                        "w-full rounded-lg md:rounded-xl transition-colors text-left flex flex-col items-center md:flex-row md:justify-between px-1 md:px-3 py-2 md:py-2.5",
-                                        activeTab === 'all' ? "bg-primary-light" : "hover:bg-gray-50"
-                                    )}
-                                >
-                                    <div className="flex flex-col items-center md:flex-row md:gap-3 min-w-0 w-full">
-                                        <div className={cn(
-                                            "flex size-9 md:size-9 rounded-lg items-center justify-center transition-all shrink-0",
-                                            activeTab === 'all' ? "bg-white border border-primary/30 shadow-sm" : "bg-gray-50"
-                                        )}>
-                                            <LayoutGrid className={cn('w-5 h-5 md:w-4 md:h-4', activeTab === 'all' ? 'text-primary' : 'text-gray-400')} strokeWidth={1.5} />
-                                        </div>
-                                        <span className={cn(
-                                            "text-[9px] md:text-[13px] font-semibold md:font-bold leading-tight text-center md:text-left mt-1 md:mt-0 line-clamp-2 md:truncate w-full md:flex-1",
-                                            activeTab === 'all' ? "text-primary" : "text-[#181725]"
-                                        )}>
-                                            All Products
-                                        </span>
-                                    </div>
-                                    <span className="hidden md:inline text-[11px] font-bold text-gray-400 shrink-0 ml-2">{products.length}</span>
-                                </button>
+                        <VendorCategoryRail
+                            tree={vendorCategoryTree}
+                            activeTab={activeTab}
+                            productCount={products.length}
+                            onSelect={setActiveTab}
+                        />
 
-                                {vendorCategoryTree.map((parent) => {
-                                    // Highlight the parent both when it is selected AND when one of its
-                                    // sub-categories is active, so the rail tracks the drill-down.
-                                    const isParentActive = activeTab === `cat:${parent.name}` || parent.children.some(c => activeTab === `cat:${c.name}`);
-                                    return (
-                                        <button
-                                            key={parent.id}
-                                            type="button"
-                                            onClick={() => {
-                                                setActiveTab(`cat:${parent.name}`);
-                                            }}
+                        <div className="flex-1 min-w-0">
+                            {brandFilter && (
+                                <div className="flex flex-wrap items-center gap-2 mb-3 rounded-xl border border-primary/20 bg-primary-tint px-3 py-2">
+                                    <p className="flex-1 min-w-0 text-[12px] font-medium text-text">
+                                        Showing {brandFilterName} at this supplier
+                                    </p>
+                                    <Link
+                                        href={`/brand/${brandFilter}`}
+                                        className="text-[12px] font-semibold text-primary shrink-0"
+                                    >
+                                        View full {brandFilterName} catalog
+                                    </Link>
+                                </div>
+                            )}
+                            {parentOfActiveSub && (
+                                <div className="flex items-center gap-1.5 mb-3 text-[12px] font-semibold">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveTab(`cat:${parentOfActiveSub.name}`)}
+                                        className="text-text-muted hover:text-primary"
+                                    >
+                                        {parentOfActiveSub.name}
+                                    </button>
+                                    <ChevronRight size={13} className="text-text-muted" strokeWidth={2.5} />
+                                    <span className="text-text">{activeCatName}</span>
+                                </div>
+                            )}
+                            {filteredProducts.length > 0 ? (
+                                <div className={cn(
+                                    layoutMode === 'grid'
+                                        ? 'grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5'
+                                        : 'grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4'
+                                )}>
+                                    {filteredProducts.map((product) => (
+                                        <div
+                                            key={product.id}
+                                            data-product-id={product.id}
                                             className={cn(
-                                                "w-full mt-1 rounded-lg md:rounded-xl transition-colors text-left flex flex-col items-center md:flex-row md:gap-3 px-1 md:px-3 py-2 md:py-2.5 min-w-0",
-                                                isParentActive ? "bg-primary-light" : "hover:bg-gray-50"
+                                                'h-full',
+                                                highlightProductId === product.id ? 'ring-2 ring-primary rounded-xl' : undefined
                                             )}
                                         >
-                                            <div className={cn(
-                                                "flex size-9 rounded-lg items-center justify-center overflow-hidden relative transition-all shrink-0",
-                                                isParentActive ? "bg-white border border-primary/30 shadow-sm" : "bg-gray-50"
-                                            )}>
-                                                {parent.image ? (
-                                                    <Image src={parent.image} alt={parent.name} width={36} height={36} className="object-contain w-full h-full p-1" />
-                                                ) : (
-                                                    <Package size={16} className="text-gray-300" strokeWidth={1.5} />
-                                                )}
-                                            </div>
-                                            <span className={cn(
-                                                "text-[9px] md:text-[13px] font-semibold md:font-bold leading-tight text-center md:text-left mt-1 md:mt-0 line-clamp-2 md:truncate w-full md:flex-1",
-                                                isParentActive ? "text-primary" : "text-[#181725]"
-                                            )}>
-                                                {parent.name}
-                                            </span>
-                                            <span className="hidden md:inline text-[11px] font-bold text-gray-400 shrink-0 ml-auto">{parent.count}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </aside>
-
-                        {/* ── RIGHT: SUB-CATEGORY TILES (parent selected) → PRODUCTS (sub-category selected / All / search) ── */}
-                        <div className="flex-1 min-w-0">
-                            {showSubcategoryTiles && activeParentNode ? (
-                                <div>
-                                    <h2 className="text-sm md:text-[clamp(1.1rem,2vw+0.5rem,1.6rem)] font-bold text-[#181725] mb-2 md:mb-4">{activeParentNode.name}</h2>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4">
-                                        {activeParentNode.children.map((child) => (
-                                            <button
-                                                key={child.id}
-                                                type="button"
-                                                onClick={() => setActiveTab(`cat:${child.name}`)}
-                                                className="group min-w-0 bg-white rounded-xl md:rounded-2xl border border-divider p-2 md:p-4 shadow-sm hover:border-primary/40 transition-colors flex flex-col items-center text-center"
-                                            >
-                                                <div className="flex size-14 md:size-20 rounded-lg md:rounded-xl bg-gray-50 items-center justify-center overflow-hidden mb-2 md:mb-3">
-                                                    {child.image ? (
-                                                        <Image src={child.image} alt={child.name} width={64} height={64} className="object-contain w-full h-full p-1.5" />
-                                                    ) : (
-                                                        <Package size={28} className="text-gray-300" strokeWidth={1.5} />
-                                                    )}
-                                                </div>
-                                                <span className="text-[11px] md:text-[13px] font-bold text-[#181725] leading-tight line-clamp-2 group-hover:text-primary transition-colors">{child.name}</span>
-                                                <span className="text-[10px] md:text-[11px] font-semibold text-gray-400 mt-1">{child.count} {child.count === 1 ? 'item' : 'items'}</span>
-                                            </button>
-                                        ))}
-                                    </div>
+                                            <VendorProductCard product={product} variant={layoutMode} />
+                                        </div>
+                                    ))}
                                 </div>
                             ) : (
-                                <div>
-                                    {/* Breadcrumb back to the sub-category tiles when viewing a sub-category's products */}
-                                    {parentOfActiveSub && (
-                                        <div className="flex items-center gap-1.5 mb-3 text-[12px] font-bold">
-                                            <button
-                                                type="button"
-                                                onClick={() => setActiveTab(`cat:${parentOfActiveSub.name}`)}
-                                                className="text-gray-400 hover:text-primary transition-colors"
-                                            >
-                                                {parentOfActiveSub.name}
-                                            </button>
-                                            <ChevronRight size={13} className="text-gray-300" strokeWidth={2.5} />
-                                            <span className="text-[#181725]">{activeCatName}</span>
-                                        </div>
-                                    )}
-                                    {filteredProducts.length > 0 ? (
-                                        <div className={cn(
-                                            layoutMode === 'grid'
-                                                ? 'grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5'
-                                                : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4'
-                                        )}>
-                                            {filteredProducts.map((product) => (
-                                                <VendorProductCard key={product.id} product={product} variant={layoutMode} />
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center py-24 text-center">
-                                            <div className="p-6 bg-gray-50 rounded-full mb-4">
-                                                <Package className="text-gray-300" size={48} strokeWidth={1.5} />
-                                            </div>
-                                            <h3 className="text-[20px] font-black text-[#181725]">No items found</h3>
-                                            <p className="text-gray-400 font-bold mt-1">Try adjusting your search or filters</p>
-                                        </div>
-                                    )}
+                                <div className="flex flex-col items-center justify-center py-24 text-center">
+                                    <div className="p-6 bg-gray-50 rounded-full mb-4">
+                                        <Package className="text-gray-300" size={48} strokeWidth={1.5} />
+                                    </div>
+                                    <h3 className="text-[20px] font-black text-[#181725]">No items found</h3>
+                                    <p className="text-gray-400 font-bold mt-1">Try adjusting your search or filters</p>
                                 </div>
                             )}
                         </div>

@@ -253,6 +253,8 @@ export class BrandService {
                         businessName: true,
                         slug: true,
                         logoUrl: true,
+                        rating: true,
+                        creditEnabled: true,
                         serviceAreas: {
                           where: { isActive: true },
                           select: { pincode: true },
@@ -309,6 +311,8 @@ export class BrandService {
       pincodes: string[]; productIds: string[];
       prices: Record<string, number>;
       servicesPincode: boolean;
+      rating: number;
+      creditEnabled: boolean;
     }>();
 
     const products = brand.masterProducts.map(mp => {
@@ -332,6 +336,8 @@ export class BrandService {
             productIds: [],
             prices: {},
             servicesPincode,
+            rating: Number(v.rating) || 0,
+            creditEnabled: !!v.creditEnabled,
           });
         }
         const vendor = vendorMap.get(v.id)!;
@@ -340,6 +346,7 @@ export class BrandService {
 
         return {
           vendorId: v.id,
+          vendorSlug: v.slug,
           vendorName: v.businessName,
           price: Math.round(priceWithTax * 100) / 100,
           basePrice: Number(m.distributorProduct.basePrice),
@@ -386,6 +393,11 @@ export class BrandService {
         image: mp.imageUrl,
         packSize: mp.packSize,
         unit: mp.unit,
+        vegNonVeg: mp.vegNonVeg,
+        storageType: mp.storageType,
+        shelfLifeDays: mp.shelfLifeDays,
+        tags: mp.tags,
+        fssaiRef: mp.fssaiRef,
         category: primaryCategory,
         categories,
         distributors,

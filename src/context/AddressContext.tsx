@@ -58,12 +58,34 @@ function pickDefaultAddress(addresses: Address[]): Address | null {
     return addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
 }
 
+function persistSelectedAddress(userId: string | null, address: Address | null) {
+    try {
+        if (address) {
+            localStorage.setItem(addressSelectedKey(userId), JSON.stringify(address));
+        } else {
+            localStorage.removeItem(addressSelectedKey(userId));
+        }
+    } catch { /* ignore */ }
+}
+
+function pickAddressForOutlet(
+    addresses: Address[],
+    outletId: string | null | undefined,
+): Address | null {
+    if (outletId) {
+        const match = addresses.find((a) => a.outletId === outletId);
+        if (match) return match;
+    }
+    return pickDefaultAddress(addresses);
+}
+
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function AddressProvider({ children }: { children: React.ReactNode }) {
     const { isLoaded, google } = useGoogleMaps();
     const { session, isAuthenticated, isResolved } = useStableSession();
     const userId = session?.user?.id ?? null;
+    const activeOutletId = session?.user?.activeOutletId ?? null;
     const [selectedAddress, setSelectedAddressState] = useState<Address | null>(null);
     const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
     const [isDetectingLocation, setIsDetectingLocation] = useState(false);
@@ -164,13 +186,13 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                 }
                 if (defaultAddr) {
                     setSelectedAddressState(prev => {
-                        // Drop orphan selections that aren't in the fetched list.
-                        // When id still matches, use the fresh DB row (not a stale localStorage blob).
                         const freshMatch = prev
                             ? addresses.find((a) => a.id === prev.id) ?? null
                             : null;
-                        const next = freshMatch ?? defaultAddr;
-                        try { localStorage.setItem(addressSelectedKey(userId), JSON.stringify(next)); } catch { /* ignore */ }
+                        const next = pickAddressForOutlet(addresses, activeOutletId)
+                            ?? freshMatch
+                            ?? defaultAddr;
+                        persistSelectedAddress(userId, next);
                         return next;
                     });
                 }
@@ -182,7 +204,32 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
                 else Promise.resolve().then(() => setSavedAddresses([]));
             } catch { /* ignore */ }
         }
-    }, [isResolved, isAuthenticated, userId, fetchAddressesFromDB, buyerImpersonating]);
+    }, [isResolved, isAuthenticated, userId, fetchAddressesFromDB, buyerImpersonating, activeOutletId]);
+
+    // Keep "Deliver to" on the active outlet after business / outlet switches.
+    useEffect(() => {
+        if (!isAuthenticated || buyerImpersonating || savedAddresses.length === 0) return;
+        Promise.resolve().then(() => setSelectedAddressState((prev) => {
+            if (activeOutletId) {
+                const match = savedAddresses.find((a) => a.outletId === activeOutletId);
+                if (match) {
+                    if (prev?.id === match.id) return prev;
+                    persistSelectedAddress(userId, match);
+                    return match;
+                }
+                if (prev?.outletId && prev.outletId !== activeOutletId) {
+                    persistSelectedAddress(userId, null);
+                    return null;
+                }
+                return prev;
+            }
+            if (prev?.outletId) {
+                persistSelectedAddress(userId, null);
+                return null;
+            }
+            return prev;
+        }));
+    }, [activeOutletId, savedAddresses, isAuthenticated, buyerImpersonating, userId]);
 
     // ─── Sync the selected delivery address into a cookie ────────────────
     // The server reads `h1_addr` (a SavedAddress id) to drive location-based
@@ -212,13 +259,11 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
             if (impersonatingRef.current) {
                 return freshMatch ?? defaultAddr;
             }
-            const next = freshMatch ?? defaultAddr;
-            if (next) {
-                try { localStorage.setItem(addressSelectedKey(userId), JSON.stringify(next)); } catch { /* ignore */ }
-            }
+            const next = pickAddressForOutlet(addresses, activeOutletId) ?? freshMatch ?? defaultAddr;
+            persistSelectedAddress(userId, next);
             return next;
         });
-    }, [isAuthenticated, fetchAddressesFromDB, userId]);
+    }, [isAuthenticated, fetchAddressesFromDB, userId, activeOutletId]);
 
     // ─── setSelectedAddress ──────────────────────────────────────────────
 

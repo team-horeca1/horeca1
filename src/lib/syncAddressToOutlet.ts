@@ -15,20 +15,50 @@ export interface OutletSyncAccount {
   isPrimary: boolean;
   primaryOutletId: string | null;
   outlets: Array<{ id: string }>;
+  isCustomer?: boolean;
+  isVendor?: boolean;
+  isBrand?: boolean;
 }
 
-/** Ensure the session has an active business account before outlet sync. */
+/**
+ * Outlets are restaurant / retail only. Flags omitted (legacy callers) stay
+ * allowed so guest/bootstrap paths keep working.
+ */
+export function accountCanManageOutlets(account: OutletSyncAccount | null | undefined): boolean {
+  if (!account) return false;
+  if (account.isVendor === true || account.isBrand === true) return false;
+  if (account.isCustomer === true) return true;
+  return account.isCustomer === undefined
+    && account.isVendor === undefined
+    && account.isBrand === undefined;
+}
+
+export function pickBuyerAccountForOutletSync(
+  accounts: OutletSyncAccount[],
+  currentAccount: OutletSyncAccount | null,
+): OutletSyncAccount | null {
+  if (accountCanManageOutlets(currentAccount)) return currentAccount;
+  return accounts.find((a) => accountCanManageOutlets(a)) ?? null;
+}
+
+/** Ensure the session has an active buyer business before outlet sync. */
 export async function prepareAccountForOutletSync(
   accounts: OutletSyncAccount[],
   currentAccount: OutletSyncAccount | null,
   switchAccount: (businessAccountId: string, outletId?: string) => Promise<void>,
 ): Promise<string | null> {
-  if (currentAccount) return currentAccount.id;
-  const primary = accounts.find((a) => a.isPrimary) ?? accounts[0];
-  if (!primary) return null;
-  const defaultOutletId = primary.primaryOutletId ?? primary.outlets[0]?.id;
-  await switchAccount(primary.id, defaultOutletId ?? undefined);
-  return primary.id;
+  if (accountCanManageOutlets(currentAccount) && currentAccount) {
+    return currentAccount.id;
+  }
+  // First-login / no active BA yet: activate the buyer, never a supplier or brand.
+  if (!currentAccount) {
+    const buyer = pickBuyerAccountForOutletSync(accounts, null);
+    if (!buyer) return null;
+    const defaultOutletId = buyer.primaryOutletId ?? buyer.outlets[0]?.id;
+    await switchAccount(buyer.id, defaultOutletId ?? undefined);
+    return buyer.id;
+  }
+  return null;
 }
 
 export interface SyncAddressToOutletParams {
