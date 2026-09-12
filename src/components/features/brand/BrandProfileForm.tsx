@@ -64,7 +64,7 @@ export interface BrandProfileFormProps {
   passwordVisible?: boolean;
   onTogglePassword?: () => void;
   className?: string;
-  layout?: 'default' | 'wide';
+  layout?: 'default' | 'wide' | 'modal';
   /** When true, outlet/address/pincode show required markers (add-business flow). */
   requireLocationFields?: boolean;
   /**
@@ -163,10 +163,13 @@ export function BrandProfileForm({
   const set = (patch: Partial<BrandProfileValues>) => onChange(patch);
   const blur = (field: string, v: string) => onFieldBlur?.(field, v);
   const isWide = layout === 'wide';
-  const GRID = isWide
-    ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3'
-    : 'grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4';
-  const SPAN_FULL = isWide ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2';
+  const isModal = layout === 'modal';
+  const GRID = isModal
+    ? 'flex flex-col gap-4 min-w-0'
+    : isWide
+      ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3'
+      : 'grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4';
+  const SPAN_FULL = isModal ? 'w-full min-w-0' : isWide ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2';
   const relaxedContact = contactMode === 'relaxed';
   const phoneLocked = verifiedContact?.channel === 'phone';
   const emailLocked = verifiedContact?.channel === 'email';
@@ -307,7 +310,7 @@ export function BrandProfileForm({
   );
 
   return (
-    <div className={cn(isWide ? 'space-y-4' : 'space-y-5', className)}>
+    <div className={cn(isModal ? 'space-y-4 min-w-0' : isWide ? 'space-y-4' : 'space-y-5', className)}>
       <div className={cn(GRID, 'space-y-0')}>
         {visibleSections.identity && (
           <>
@@ -446,8 +449,29 @@ export function BrandProfileForm({
         {visibleSections.contact && (
           <>
             <SectionHeader icon={User} spanClass={SPAN_FULL}>Primary Contact</SectionHeader>
+            {isModal ? (
+              <>
+                <TextField
+                  label="First Name"
+                  required
+                  dataField="firstName"
+                  value={value.firstName ?? ''}
+                  error={errors.firstName}
+                  onChange={v => set({ firstName: v })}
+                  onBlur={() => blur('firstName', value.firstName ?? '')}
+                  placeholder="First name"
+                />
+                <TextField
+                  label="Last Name"
+                  value={value.lastName ?? ''}
+                  error={errors.lastName}
+                  onChange={v => set({ lastName: v })}
+                  placeholder="Last name"
+                />
+              </>
+            ) : (
             <FormField label="Contact Name" className={SPAN_FULL} dataField="firstName">
-              <div className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
+              <div className={cn('grid gap-2 min-w-0', isWide ? 'grid-cols-[100px_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
                 <FormSelect value={value.salutation ?? ''} onChange={v => set({ salutation: v })}>
                   <option value="">Salutation</option>
                   <option value="Mr.">Mr.</option>
@@ -463,6 +487,7 @@ export function BrandProfileForm({
               </div>
               {errors.firstName && <p className="text-[11px] text-red-600 font-medium mt-1">{errors.firstName}</p>}
             </FormField>
+            )}
             <FormField
               label={relaxedContact ? 'Mobile (optional if email provided)' : 'Mobile'}
               required={!relaxedContact}

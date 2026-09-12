@@ -209,7 +209,7 @@ export function AccountOverviewOverlay({
                   <DetailRow
                     label="Account type"
                     value={[
-                      account.isCustomer && 'Customer',
+                      account.isCustomer && 'Restaurant / Retail',
                       account.isVendor && 'Supplier',
                       account.isBrand && 'Brand',
                     ]

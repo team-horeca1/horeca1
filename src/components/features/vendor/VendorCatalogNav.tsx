@@ -13,6 +13,7 @@ interface VendorCatalogNavProps {
     subcategories?: Record<string, string[]>;
     layoutMode?: 'grid' | 'list';
     onLayoutModeChange?: (mode: 'grid' | 'list') => void;
+    searchPlaceholder?: string;
 }
 
 const TABS = [
@@ -29,6 +30,7 @@ export function VendorCatalogNav({
     onSearchChange,
     layoutMode,
     onLayoutModeChange,
+    searchPlaceholder = 'Search in this store...',
 }: VendorCatalogNavProps) {
     const showToggle = !!onLayoutModeChange;
     const ToggleGroup = (
@@ -75,7 +77,7 @@ export function VendorCatalogNav({
                             />
                             <input
                                 type="text"
-                                placeholder="Search in this store..."
+                                placeholder={searchPlaceholder}
                                 value={searchQuery}
                                 onChange={(e) => onSearchChange(e.target.value)}
                                 className="w-full pl-10 pr-9 py-2 bg-ivory/50 border border-divider rounded-xl text-xs md:text-sm font-semibold text-text placeholder:text-text-muted focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 transition-all shadow-sm"

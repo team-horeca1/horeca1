@@ -111,10 +111,10 @@ export default function SupplierAllOrdersPage() {
     <div className="max-w-[1100px] mx-auto space-y-6" data-testid="supplier-all-orders">
       <div>
         <Link
-          href="/vendor/overview"
+          href="/businesses?type=supplier"
           className="text-[13px] font-bold text-primary hover:text-primary-dark"
         >
-          ← Supplier Dashboard
+          ← Supplier businesses
         </Link>
         <h1 className="text-[24px] font-bold text-[#181725] mt-1">All Orders</h1>
         <p className="text-[14px] text-[#7C7C7C] mt-1">

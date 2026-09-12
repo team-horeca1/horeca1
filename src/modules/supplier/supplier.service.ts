@@ -143,6 +143,9 @@ export async function createBusiness(
     gstin?: string;
     vendorTypeSelections?: VendorTypeSelectionInput;
     businessSize?: string;
+    categoriesHandled?: string[];
+    coverage?: string;
+    warehouseCount?: number;
   },
 ) {
   const legalName = input.legalName.trim();
@@ -159,19 +162,26 @@ export async function createBusiness(
     ? (input.vendorTypeSelections as Prisma.InputJsonValue)
     : undefined;
 
+  const extraFields: Prisma.InputJsonValue = {
+    categoriesHandled: input.categoriesHandled ?? [],
+    coverage: input.coverage?.trim() || null,
+    warehouseCount: input.warehouseCount ?? null,
+  };
+
   return prisma.$transaction(async (tx) => {
     const ba = await tx.businessAccount.create({
       data: {
         legalName,
         displayName: input.displayName?.trim() || legalName,
         gstin: input.gstin?.trim() || null,
-        isCustomer: true,
+        isCustomer: false,
         isVendor: true,
         isBrand: false,
         status: 'active',
         businessType: 'vendor',
         vendorTypeSelections: typeSelections,
         businessSize: input.businessSize?.trim() || null,
+        customFields: extraFields,
       },
     });
 

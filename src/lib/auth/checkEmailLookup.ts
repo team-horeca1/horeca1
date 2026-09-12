@@ -2,7 +2,8 @@ import { prisma } from '@/lib/prisma';
 import {
   type PhoneCheckIntent,
   type PhoneCheckResult,
-  type PhoneCheckSuggestedAction,
+  USER_REG_SELECT,
+  existingKindsFromUser,
   resolveSuggestedAction,
   resolveAccountType,
   resolveVendorStatus,
@@ -24,14 +25,7 @@ export async function lookupEmailForRegistration(
 
   const user = await prisma.user.findUnique({
     where: { email },
-    select: {
-      id: true,
-      role: true,
-      fullName: true,
-      hcidDisplay: true,
-      vendors: { select: { isVerified: true } },
-      _count: { select: { accountMemberships: true } },
-    },
+    select: USER_REG_SELECT,
   });
 
   if (!user) {
@@ -41,6 +35,7 @@ export async function lookupEmailForRegistration(
   const vendorStatus = resolveVendorStatus(user.vendors);
   const userRole = user.role;
   const accountType = resolveAccountType(userRole, vendorStatus);
+  const kinds = existingKindsFromUser(user);
 
   return {
     exists: true,
@@ -50,6 +45,7 @@ export async function lookupEmailForRegistration(
     accountType,
     vendorStatus,
     businessAccountCount: user._count.accountMemberships,
-    suggestedAction: resolveSuggestedAction(intent, true, userRole),
+    ...kinds,
+    suggestedAction: resolveSuggestedAction(intent, true, userRole, kinds),
   };
 }

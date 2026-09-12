@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Star, MapPin, Phone, Share2, ChevronLeft, Image as ImageIcon, Navigation, ClipboardList, CreditCard, Clock, Megaphone, Tag } from 'lucide-react';
+import { Star, MapPin, Phone, Share2, ChevronLeft, Navigation, ClipboardList, CreditCard, Clock, Megaphone, Tag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
@@ -55,58 +55,111 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
         if (result === 'copied') toast.success('Link copied to clipboard!');
     };
 
+    const handleWhatsAppShare = () => {
+        const url = `${window.location.origin}/vendor/${vendor.id}`;
+        const text = `Check out ${vendor.name} on Horeca1\n${url}`;
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+    };
+
+    const locationLine = [vendor.address?.city, vendor.address?.state].filter(Boolean).join(', ')
+        || vendor.categories.slice(0, 2).join(' · ');
+
     return (
         <div className="w-full bg-white md:bg-white md:pb-6 md:pt-4">
-            {/* ── MOBILE HEADER — ivory / burgundy hero ── */}
-            <div className="block md:hidden relative px-3 pt-2">
-                <div className="relative w-full rounded-2xl overflow-hidden bg-ivory border border-divider">
-                    <button
-                        onClick={() => router.back()}
-                        className="absolute top-3 left-3 z-20 p-2 bg-white rounded-full shadow-sm border border-divider"
-                        aria-label="Back"
-                    >
-                        <ChevronLeft size={18} strokeWidth={3} className="text-[#181725]" />
-                    </button>
-                    <div className="flex items-center px-4 py-3 pl-12 min-h-[112px]">
-                        <div className="flex-1 pr-2 min-w-0">
-                            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                <span className="bg-primary text-white px-2 py-0.5 rounded-md flex items-center gap-1 text-[11px] font-bold shadow-sm">
-                                    {vendor.rating} <Star size={10} fill="white" className="text-white" />
-                                </span>
-                                {vendor.deliverySchedule ? (
-                                    <span className="text-[10px] text-primary font-bold uppercase tracking-tighter">
-                                        <Clock size={10} className="inline mr-0.5" />{vendor.deliverySchedule}
-                                    </span>
-                                ) : (
-                                    <span className="text-[10px] text-primary font-bold uppercase tracking-tighter">Open till 8PM</span>
-                                )}
-                                {vendor.creditEnabled && (
-                                    <span className="bg-primary-light text-primary text-[9px] font-bold px-1.5 py-0.5 rounded-lg flex items-center gap-0.5">
-                                        <CreditCard size={9} strokeWidth={2.5} />Credit
-                                    </span>
-                                )}
-                            </div>
-                            <h1 className="text-[18px] font-extrabold text-[#0f172a] leading-[1.2] mb-1.5 line-clamp-1 text-balance">
-                                {vendor.name}
-                            </h1>
-                            <p className="text-[11px] text-gray-500 font-medium leading-[1.45] line-clamp-1 mb-1.5">
-                                {vendor.categories.slice(0, 3).join(' · ')}
-                            </p>
-                            <p className="text-[10px] text-gray-500 font-bold tabular-nums">
-                                Min ₹{vendor.minOrderValue}
-                            </p>
-                        </div>
-                        <div className="flex-shrink-0 size-[76px] relative">
-                            <div className="size-full rounded-xl overflow-hidden bg-white border border-divider shadow-sm relative">
-                                <Image
-                                    src={heroImage}
-                                    alt={vendor.name}
-                                    fill
-                                    className="object-contain p-2"
-                                    style={heroImageStyle}
-                                    priority
+            {/* ── MOBILE HEADER — banner + overlapping logo + WhatsApp ── */}
+            <div className="block md:hidden">
+                <div className="relative">
+                    <div className="relative h-[88px] overflow-hidden bg-primary">
+                        <Image
+                            src={coverImage}
+                            alt=""
+                            fill
+                            className="object-cover opacity-35"
+                            sizes="100vw"
+                            priority
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-primary/80 to-primary/40" />
+                        <button
+                            type="button"
+                            onClick={() => router.back()}
+                            className="absolute top-3 left-3 z-20 size-9 bg-white rounded-full shadow-sm border border-divider flex items-center justify-center"
+                            aria-label="Back"
+                        >
+                            <ChevronLeft size={18} strokeWidth={3} className="text-[#181725]" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleWhatsAppShare}
+                            className="absolute top-3 right-3 z-20 size-9 bg-white rounded-full shadow-sm flex items-center justify-center"
+                            aria-label="Share on WhatsApp"
+                        >
+                            <svg viewBox="0 0 24 24" className="size-[18px]" aria-hidden>
+                                <path
+                                    fill="#25D366"
+                                    d="M17.47 14.38c-.28-.14-1.64-.81-1.9-.9-.25-.1-.44-.14-.62.14-.19.28-.71.9-.87 1.08-.16.19-.32.21-.6.07-.28-.14-1.18-.43-2.25-1.39-.83-.74-1.39-1.65-1.55-1.93-.16-.28-.02-.43.12-.57.13-.13.28-.32.42-.48.14-.16.19-.28.28-.46.1-.19.05-.35-.02-.49-.07-.14-.62-1.49-.85-2.04-.22-.53-.45-.46-.62-.47h-.53c-.19 0-.49.07-.74.35-.25.28-.97.95-.97 2.31s1 2.68 1.13 2.86c.14.19 1.96 2.99 4.75 4.19.66.29 1.18.46 1.59.58.67.21 1.27.18 1.75.11.53-.08 1.64-.67 1.87-1.32.23-.65.23-1.2.16-1.32-.07-.11-.25-.18-.53-.32Z"
                                 />
-                            </div>
+                                <path
+                                    fill="#25D366"
+                                    d="M12.04 2C6.58 2 2.15 6.43 2.15 11.89c0 1.75.46 3.45 1.34 4.95L2 22l5.3-1.39a9.86 9.86 0 0 0 4.74 1.21h.01c5.46 0 9.89-4.43 9.89-9.89C22 6.43 17.5 2 12.04 2Zm0 18.07h-.01a8.2 8.2 0 0 1-4.18-1.15l-.3-.18-3.14.82.84-3.06-.2-.31a8.18 8.18 0 0 1-1.26-4.37c0-4.53 3.69-8.21 8.23-8.21 4.54 0 8.24 3.68 8.24 8.21 0 4.54-3.7 8.25-8.22 8.25Z"
+                                />
+                            </svg>
+                        </button>
+                        <p className="absolute top-1/2 -translate-y-1/2 left-14 right-14 text-[11px] text-white/90 font-medium line-clamp-1 z-10">
+                            {locationLine}
+                        </p>
+                    </div>
+
+                    <div className="px-3 flex items-start gap-3">
+                        <div className="relative size-16 -mt-7 rounded-xl overflow-hidden bg-white border border-divider shadow-sm shrink-0 z-10">
+                            <Image
+                                src={heroImage}
+                                alt={vendor.name}
+                                fill
+                                className="object-contain p-1.5"
+                                style={heroImageStyle}
+                                priority
+                            />
+                        </div>
+                        <div className="min-w-0 flex-1 pt-1.5">
+                            <h1 className="text-[18px] font-extrabold text-[#0f172a] leading-tight line-clamp-1 text-balance">
+                                {vendor.name}
+                                {vendor.isVerified ? (
+                                    <span className="ml-1 text-primary align-middle" aria-label="Verified">✓</span>
+                                ) : null}
+                            </h1>
+                        </div>
+                    </div>
+
+                    <div className="px-3 mt-2 space-y-2">
+                        <p className="text-[12px] text-text-secondary font-medium flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center gap-0.5 tabular-nums">
+                                <Star size={11} className="text-primary fill-primary" />
+                                {vendor.rating}
+                                {vendor.totalRatings ? (
+                                    <span className="text-text-muted">({vendor.totalRatings.toLocaleString('en-IN')})</span>
+                                ) : null}
+                            </span>
+                            {vendor.productCount ? (
+                                <>
+                                    <span className="text-divider">·</span>
+                                    <span className="tabular-nums">{vendor.productCount.toLocaleString('en-IN')}+ products</span>
+                                </>
+                            ) : null}
+                        </p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            {vendor.creditEnabled && (
+                                <span className="inline-flex items-center gap-1 bg-ivory border border-divider text-text text-[10px] font-semibold px-2 py-1 rounded-full">
+                                    <CreditCard size={10} className="text-primary" strokeWidth={2.5} />
+                                    Credit
+                                </span>
+                            )}
+                            <span className="inline-flex items-center bg-ivory border border-divider text-text text-[10px] font-semibold px-2 py-1 rounded-full tabular-nums">
+                                MOV ₹{vendor.minOrderValue.toLocaleString('en-IN')}
+                            </span>
+                            <span className="inline-flex items-center gap-1 bg-ivory border border-divider text-text text-[10px] font-semibold px-2 py-1 rounded-full">
+                                <Clock size={10} className="text-primary" />
+                                {vendor.deliverySchedule || 'Next day'}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -147,7 +200,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                 </div>
 
                 {storePromos.length > 0 && (
-                    <div className="mt-2 flex gap-2 overflow-x-auto no-scrollbar">
+                    <div className="mt-2 px-3 flex gap-2 overflow-x-auto no-scrollbar">
                         {storePromos.map((p) => (
                             <div
                                 key={p.id}

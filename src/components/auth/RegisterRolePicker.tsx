@@ -23,24 +23,36 @@ const ROLES = [
       return `/register?${qs.toString()}`;
     },
     icon: ShoppingBag,
-    title: 'Onboard as Customer',
-    subtitle: 'Order supplies for your business',
+    title: 'Restaurant or Retail',
+    subtitle: 'Order supplies for your outlets',
   },
   {
     id: 'vendor' as const,
-    href: (opts: RoleHrefOpts) =>
-      opts.redirect ? `/vendor/register?redirect=${encodeURIComponent(opts.redirect)}` : '/vendor/register',
+    href: (opts: RoleHrefOpts) => {
+      const qs = new URLSearchParams();
+      if (opts.redirect) qs.set('redirect', opts.redirect);
+      if (opts.phone) qs.set('phone', opts.phone);
+      if (opts.email) qs.set('email', opts.email);
+      const q = qs.toString();
+      return q ? `/vendor/register?${q}` : '/vendor/register';
+    },
     icon: Store,
     title: 'Onboard as Supplier',
     subtitle: 'Sell on Horeca1 — full KYC, about 5 minutes',
   },
   {
     id: 'brand' as const,
-    href: (opts: RoleHrefOpts) =>
-      opts.redirect ? `/brand/register?redirect=${encodeURIComponent(opts.redirect)}` : '/brand/register',
+    href: (opts: RoleHrefOpts) => {
+      const qs = new URLSearchParams();
+      if (opts.redirect) qs.set('redirect', opts.redirect);
+      if (opts.phone) qs.set('phone', opts.phone);
+      if (opts.email) qs.set('email', opts.email);
+      const q = qs.toString();
+      return q ? `/brand/register?${q}` : '/brand/register';
+    },
     icon: Sparkles,
     title: 'Onboard as Brand',
-    subtitle: 'Register your brand on the marketplace',
+    subtitle: 'Publish catalogues and map distributors',
   },
 ];
 

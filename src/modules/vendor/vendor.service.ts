@@ -91,15 +91,18 @@ export class VendorService {
           select: { category: { select: { name: true } } },
           distinct: ['categoryId'],
         },
+        _count: { select: { products: { where: { isActive: true } }, reviews: true } },
       },
     });
 
     if (!vendor) throw Errors.notFound('Vendor');
 
     // Flatten products→category into a simple categories string array
-    const { products, ...rest } = vendor;
+    const { products, _count, ...rest } = vendor;
     return {
       ...rest,
+      productCount: _count.products,
+      totalRatings: _count.reviews,
       categories: [...new Set(products.map(p => p.category?.name).filter(Boolean))],
     };
   }

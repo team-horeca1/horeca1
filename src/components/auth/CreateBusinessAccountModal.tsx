@@ -35,12 +35,16 @@ interface CreateBusinessAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreated?: () => void;
+  initialType?: 'customer' | 'vendor' | 'brand';
+  lockType?: boolean;
 }
 
 export function CreateBusinessAccountModal({
   isOpen,
   onClose,
   onCreated,
+  initialType = 'customer',
+  lockType = false,
 }: CreateBusinessAccountModalProps) {
   const router = useRouter();
   const { switchAccount, refresh: refreshAccounts } = useBusinessAccountSwitcher();
@@ -48,7 +52,7 @@ export function CreateBusinessAccountModal({
 
   const [profile, setProfile] = useState<CustomerProfileValues>({ ...EMPTY_CUSTOMER_PROFILE });
   const [brandProfile, setBrandProfile] = useState<BrandProfileValues>({ ...EMPTY_BRAND_PROFILE });
-  const [businessType, setBusinessType] = useState<'customer' | 'vendor' | 'brand'>('customer');
+  const [businessType, setBusinessType] = useState<'customer' | 'vendor' | 'brand'>(initialType);
   const [submitting, setSubmitting] = useState(false);
   const {
     bannerError,
@@ -74,8 +78,10 @@ export function CreateBusinessAccountModal({
       setBrandSubmitted(false);
       clearErrors();
       setSubmitting(false);
+      return;
     }
-  }, [isOpen]);
+    setBusinessType(initialType);
+  }, [isOpen, initialType]);
 
   useEffect(() => {
     if (!/^\d{6}$/.test(profile.pincode ?? profile.billingPincode ?? '')) return;
@@ -179,6 +185,8 @@ export function CreateBusinessAccountModal({
       lastName: profile.lastName?.trim() || undefined,
       designation: profile.designation?.trim() || undefined,
       workPhone: profile.workPhone?.trim() || undefined,
+      mobilePhone: (profile.phone ?? profile.mobilePhone ?? '').replace(/\D/g, '').slice(-10) || undefined,
+      email: profile.email?.trim() || undefined,
       billingAddressLine: profile.addressLine ?? profile.billingAddressLine,
       billingCity: profile.city ?? profile.billingCity,
       billingState: profile.state ?? profile.billingState,
@@ -209,7 +217,10 @@ export function CreateBusinessAccountModal({
         body: JSON.stringify(payload),
       });
 
-      const json = await parseJsonResponse<{ success: boolean; data?: { account: { id: string }; outlet: { id: string } } }>(res);
+      const json = await parseJsonResponse<{
+        success: boolean;
+        data?: { account: { id: string }; outlet: { id: string }; nextPath?: string };
+      }>(res);
       if (!json.success) {
         applyApiError(json, { dataField: true, onFieldError: (_f, fields) => setFieldErrors(fields) });
         setSubmitting(false);
@@ -251,7 +262,7 @@ export function CreateBusinessAccountModal({
 
       onCreated?.();
       onClose();
-      window.location.assign('/');
+      window.location.assign(json.data.nextPath || `/businesses/${newAccount.id}`);
     } catch {
       applyValidationErrors({ _server: 'Network error — please try again.' }, 'Network error — please try again.');
       setSubmitting(false);
@@ -276,11 +287,11 @@ export function CreateBusinessAccountModal({
             onClick={() => {
               setBrandSubmitted(false);
               onClose();
-              router.push('/');
+              router.push('/brand/portal');
             }}
             className={cn(FORM.primaryBtn, 'inline-flex px-6 py-3 text-[13px]')}
           >
-            Back to Home
+            Open brand dashboard
           </button>
         </div>
       </div>
@@ -289,18 +300,27 @@ export function CreateBusinessAccountModal({
 
   return (
     <div className="fixed inset-0 z-[16000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-[20px] w-full max-w-[640px] max-h-[90vh] flex flex-col overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.08)] border border-gray-100 animate-in zoom-in-95 duration-150">
+      <div
+        role="dialog"
+        aria-modal="true"
+        data-testid="create-business-modal"
+        className="bg-white rounded-[20px] w-full max-w-[640px] max-h-[90vh] flex flex-col overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.08)] border border-divider animate-in zoom-in-95 duration-150"
+      >
         <div className="p-6 border-b border-gray-100 flex items-start gap-4">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center shrink-0 shadow-lg shadow-primary/10">
             <Building2 size={22} className="text-white" />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-[17px] font-[800] text-[#181725] flex items-center gap-1.5 leading-snug">
-              Register New Business
+              {businessType === 'customer'
+                ? 'Add a restaurant or retail business'
+                : businessType === 'brand'
+                  ? 'Add a brand'
+                  : 'Add a supplier'}
               <Sparkles size={14} className="text-amber-500" />
             </h3>
             <p className="text-[12px] text-gray-400 mt-0.5 leading-normal">
-              Create a new entity with its own outlets, team members, and permissions.
+              One login, one capability — this business stays separate from your others.
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
@@ -310,9 +330,10 @@ export function CreateBusinessAccountModal({
 
         <FormErrorBanner message={bannerError} className="mx-6" />
 
-        <div className="p-6 overflow-y-auto flex-1 space-y-5">
+        <div className="p-5 sm:p-6 overflow-y-auto overflow-x-hidden flex-1 min-w-0 space-y-5">
+          {!lockType && (
           <div>
-            <span className="text-[11px] font-bold text-[#AEAEAE] mb-1.5 block uppercase tracking-wider ml-0.5">Account Role</span>
+            <span className="text-[11px] font-bold text-[#AEAEAE] mb-1.5 block uppercase tracking-wider ml-0.5">Business type</span>
             <div className="grid grid-cols-3 gap-2">
               {(['customer', 'vendor', 'brand'] as const).map((t) => (
                 <button
@@ -325,11 +346,12 @@ export function CreateBusinessAccountModal({
                       : 'border-[#EEEEEE] bg-white hover:border-gray-300 text-gray-500'
                   }`}
                 >
-                  {t === 'vendor' ? 'Supplier' : t.charAt(0).toUpperCase() + t.slice(1)}
+                  {t === 'customer' ? 'Restaurant / Retail' : t === 'vendor' ? 'Supplier' : 'Brand'}
                 </button>
               ))}
             </div>
           </div>
+          )}
 
           {businessType === 'vendor' && (
             <div className="rounded-2xl border-2 border-primary/30 bg-primary-light/40 p-5">
@@ -362,6 +384,7 @@ export function CreateBusinessAccountModal({
               onChange={patch => setProfile(prev => ({ ...prev, ...patch }))}
               errors={fieldErrors}
               onFieldBlur={(field, value) => setFE(field, validateCustomerFieldBlur(field, value))}
+              layout="modal"
               visibleSections={{
                 contact: true,
                 business: true,
@@ -378,6 +401,7 @@ export function CreateBusinessAccountModal({
               onChange={patch => setBrandProfile(prev => ({ ...prev, ...patch }))}
               errors={fieldErrors}
               onFieldBlur={(field, value) => setFE(field, validateBrandFieldBlur(field, value))}
+              layout="modal"
               requireLocationFields
               visibleSections={{
                 contact: true,
@@ -393,19 +417,21 @@ export function CreateBusinessAccountModal({
 
         </div>
 
-        <div className="p-5 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0 bg-gray-50/50">
+        <div className="p-5 border-t border-divider flex items-center justify-end gap-3 shrink-0 bg-ivory/60 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
           <button
+            type="button"
             onClick={onClose}
             disabled={submitting}
-            className="px-5 py-2.5 text-[13px] font-bold text-gray-500 hover:bg-gray-100/80 rounded-xl transition-colors duration-200"
+            className="min-h-12 px-5 text-[13px] font-semibold text-text-secondary hover:bg-white rounded-[12px] transition-colors duration-200"
           >
             Cancel
           </button>
           {businessType !== 'vendor' && (
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={submitting}
-              className={cn(FORM.primaryBtn, 'px-6 py-2.5 text-[13px] shadow-primary/10')}
+              className={cn(FORM.primaryBtn, 'min-w-[9.5rem] shadow-primary/10')}
             >
               {submitting ? <Loader2 size={14} className="animate-spin" /> : null}
               {submitting ? 'Registering…' : 'Create Business'}

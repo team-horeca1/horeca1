@@ -9,8 +9,14 @@ import {
   SETTLED_KEY,
   clearDismissFlag,
   clearForcePickerCookie,
+  destinationAfterAccountPick,
+  isPickerPending,
   isPickerSettled,
+  markLoginHandoff,
+  markPickerInFlight,
   markPickerSettled,
+  prepareFreshLoginNavigation,
+  resolvePostLoginDestination,
   setForcePickerCookie,
 } from '@/lib/postLoginPicker';
 
@@ -95,5 +101,90 @@ describe('post-login picker settle', () => {
     markPickerSettled(111);
     expect(sessionStorage.getItem(DISMISS_KEY)).toBe('1');
     expect(localStorage.getItem(SETTLED_KEY)).toBe('111');
+  });
+});
+
+describe('resolvePostLoginDestination', () => {
+  it('sends supplier to businesses so they can enter a store', () => {
+    expect(
+      resolvePostLoginDestination('/', { isCustomer: false, isVendor: true, isBrand: false }),
+    ).toBe('/businesses?type=supplier');
+  });
+
+  it('sends brand to the portal when redirect is marketplace home', () => {
+    expect(
+      resolvePostLoginDestination('/', { isCustomer: false, isVendor: false, isBrand: true }),
+    ).toBe('/brand/portal');
+  });
+
+  it('keeps restaurant on the marketplace home', () => {
+    expect(
+      resolvePostLoginDestination('/', { isCustomer: true, isVendor: false, isBrand: false }),
+    ).toBe('/');
+  });
+
+  it('keeps an explicit deep-link for suppliers', () => {
+    expect(
+      resolvePostLoginDestination('/cart', { isCustomer: false, isVendor: true, isBrand: false }),
+    ).toBe('/cart');
+  });
+});
+
+describe('destinationAfterAccountPick', () => {
+  it('sends brand to the brand portal', () => {
+    expect(destinationAfterAccountPick({ id: 'b1', isBrand: true, isVendor: false, isCustomer: false }))
+      .toBe('/brand/portal');
+  });
+
+  it('sends supplier to that business store list', () => {
+    expect(destinationAfterAccountPick({ id: 'v1', isVendor: true, isBrand: false, isCustomer: false }))
+      .toBe('/vendor/businesses/v1');
+  });
+
+  it('sends restaurant to the marketplace', () => {
+    expect(destinationAfterAccountPick({ id: 'c1', isCustomer: true, isVendor: false, isBrand: false }))
+      .toBe('/');
+  });
+});
+
+describe('isPickerPending', () => {
+  beforeEach(() => {
+    installBrowserStubs('https:');
+  });
+
+  it('is owed while pickerArmedAt is fresh even without forceAccountPicker', () => {
+    expect(isPickerPending({ pickerArmedAt: Date.now(), totalAccountCount: 3 })).toBe(true);
+  });
+
+  it('is not owed after this login was answered', () => {
+    const armedAt = Date.now();
+    markPickerSettled(armedAt);
+    expect(isPickerPending({ pickerArmedAt: armedAt, totalAccountCount: 3 })).toBe(false);
+  });
+
+  it('is not owed for a single-account login', () => {
+    expect(isPickerPending({ pickerArmedAt: Date.now(), totalAccountCount: 1 })).toBe(false);
+  });
+
+  it('is not owed after the user already picked (in-flight)', () => {
+    markPickerInFlight();
+    expect(isPickerPending({ pickerArmedAt: Date.now(), totalAccountCount: 3 })).toBe(false);
+  });
+});
+
+describe('prepareFreshLoginNavigation', () => {
+  beforeEach(() => {
+    installBrowserStubs('https:');
+    vi.stubGlobal('window', {
+      location: { protocol: 'https:', href: '/login', assign: vi.fn() },
+    });
+  });
+
+  it('does not overwrite a Brand pick with a late login-page redirect', async () => {
+    markLoginHandoff();
+    markPickerInFlight();
+    markPickerSettled(Date.now());
+    await prepareFreshLoginNavigation(null, { picker: false });
+    expect(window.location.href).toBe('/login');
   });
 });

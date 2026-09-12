@@ -27,7 +27,7 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
       if (!parsed.success) throw Errors.badRequest('vendorId must be a valid UUID');
       vendorId = parsed.data;
     }
-    const coverage = await brandService.getDistributorCoverage(userId, vendorId);
+    const coverage = await brandService.getDistributorCoverage(userId, vendorId, ctx.activeBrandId);
     return NextResponse.json({ success: true, data: coverage });
   } catch (err) {
     return errorResponse(err);
@@ -37,6 +37,6 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
 export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   requirePermission(ctx, 'products.edit');
   const userId = await resolveUserId(ctx, req);
-  const result = await brandService.triggerMapping(userId);
+  const result = await brandService.triggerMapping(userId, ctx.activeBrandId);
   return NextResponse.json({ success: true, data: result });
 });

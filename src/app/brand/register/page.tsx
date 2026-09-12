@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useSession, signIn } from 'next-auth/react';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import {
@@ -24,6 +25,7 @@ import { extractApiError, parseJsonResponse } from '@/lib/apiError';
 import { ExistingPhoneModal } from '@/components/auth/ExistingPhoneModal';
 import { accountLabelFromCheck } from '@/lib/auth/phoneCheckLabels';
 import type { PhoneCheckResult } from '@/lib/auth/checkPhoneLookup';
+import { existingPhoneRedirect } from '@/lib/auth/phoneCheckLabels';
 import { toast } from 'sonner';
 import {
   isRegisterEmailOtpEnabled,
@@ -46,6 +48,7 @@ const BRAND_FIELD_ORDER = [
 
 export default function BrandRegisterPage() {
   const { data: session, status: sessionStatus } = useSession();
+  const searchParams = useSearchParams();
   const isAuthMode = sessionStatus === 'authenticated';
   const { switchAccount, refresh: refreshAccounts } = useBusinessAccountSwitcher();
 
@@ -54,10 +57,14 @@ export default function BrandRegisterPage() {
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState<{ hcid: string } | null>(null);
 
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(
+    () => searchParams.get('phone')?.replace(/\D/g, '').slice(0, 10) ?? '',
+  );
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [verifyChannel, setVerifyChannel] = useState<'phone' | 'email'>('phone');
-  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerEmail, setRegisterEmail] = useState(
+    () => (searchParams.get('email') ?? '').trim().toLowerCase(),
+  );
   const [emailVerified, setEmailVerified] = useState(false);
   const [verificationToken, setVerificationToken] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
@@ -179,15 +186,10 @@ export default function BrandRegisterPage() {
           });
           const checkData = await checkRes.json();
           if (checkData.success && checkData.data?.exists) {
-            const check = checkData.data as PhoneCheckResult;
-            if (check.suggestedAction === 'login_only') {
-              openExistingPhoneModal(email, check, 'email');
-              return;
-            }
-            setLinkExistingUser(check.suggestedAction === 'login_to_link');
-          } else {
-            setLinkExistingUser(false);
+            openExistingPhoneModal(email, checkData.data as PhoneCheckResult, 'email');
+            return;
           }
+          setLinkExistingUser(false);
         } else {
           const checkRes = await fetch('/api/v1/auth/check-phone', {
             method: 'POST',
@@ -196,15 +198,10 @@ export default function BrandRegisterPage() {
           });
           const checkData = await checkRes.json();
           if (checkData.success && checkData.data?.exists) {
-            const check = checkData.data as PhoneCheckResult;
-            if (check.suggestedAction === 'login_only') {
-              openExistingPhoneModal(digits, check, 'phone');
-              return;
-            }
-            setLinkExistingUser(check.suggestedAction === 'login_to_link');
-          } else {
-            setLinkExistingUser(false);
+            openExistingPhoneModal(digits, checkData.data as PhoneCheckResult, 'phone');
+            return;
           }
+          setLinkExistingUser(false);
         }
       }
 
@@ -385,6 +382,7 @@ export default function BrandRegisterPage() {
         } catch { /* optional */ }
         setSubmitted({ hcid: hcidDisplay });
         setSubmitting(false);
+        setTimeout(() => { window.location.assign('/brand/portal'); }, 800);
         return;
       }
 
@@ -442,8 +440,8 @@ export default function BrandRegisterPage() {
             Your brand onboarding request has been received. Our team will review your profile and contact you shortly.
           </p>
           <p className="text-[12px] text-gray-400 mb-6">HCID: <span className="font-bold text-gray-600">{submitted.hcid}</span></p>
-          <Link href="/" className={cn(FORM.primaryBtn, 'inline-flex px-6 py-3 text-[13px]')}>
-            Back to Home
+          <Link href="/brand/portal" className={cn(FORM.primaryBtn, 'inline-flex px-6 py-3 text-[13px]')}>
+            Open brand dashboard
           </Link>
         </div>
       </div>
@@ -655,7 +653,10 @@ export default function BrandRegisterPage() {
         hcidDisplay={existingPhoneModal?.hcidDisplay}
         accountLabel={existingPhoneModal?.accountLabel ?? 'Customer'}
         intent="brand"
-        redirectTo="/brand/register"
+        redirectTo={existingPhoneRedirect(
+          'brand',
+          existingPhoneModal?.suggestedAction ?? 'login_to_link',
+        )}
         suggestedAction={existingPhoneModal?.suggestedAction ?? 'login_to_link'}
         contactType={existingPhoneModal?.contactType ?? 'phone'}
         onClose={() => setExistingPhoneModal(null)}

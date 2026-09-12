@@ -99,10 +99,10 @@ export const SUPPLIER_NAV_GROUPS: PortalNavGroup[] = [
     label: 'Supplier',
     links: [
       // Always available for team members — not gated by Store Dashboard (dashboard.view).
-      { name: 'Dashboard', icon: LayoutDashboard, href: '/vendor/overview' },
+      { name: 'Dashboard', icon: LayoutDashboard, href: '/businesses?type=supplier' },
       { name: 'Orders', icon: ShoppingBag, href: '/vendor/all-orders', feature: 'orders', requiredPerm: 'orders.view' },
       // Always available — needed to enter stores even when Store Dashboard is off.
-      { name: 'Businesses', icon: Building2, href: '/vendor/businesses' },
+      { name: 'Businesses', icon: Building2, href: '/businesses' },
       { name: 'Team Members', icon: Users, href: '/vendor/team', feature: 'users', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
       // Hidden for now — re-enable when supplier-level reports/ledger ship
       // { name: 'Reports', icon: BarChart3, href: '/vendor/reports', feature: 'analytics', requiredPerm: 'analytics.view' },
@@ -158,7 +158,7 @@ export const VENDOR_NAV_GROUPS: PortalNavGroup[] = [
     links: [
       { name: 'Notifications', icon: Bell, href: '/vendor/notifications', feature: 'notifications', requiredPerm: 'notifications.view' },
       // Always available — supplier home is not gated by Store Dashboard permission.
-      { name: 'Back to Supplier', icon: Building2, href: '/vendor/overview', matrixExclude: true },
+      { name: 'Back to Supplier', icon: Building2, href: '/businesses?type=supplier', matrixExclude: true },
       { name: 'Store Settings', icon: Settings, href: '/vendor/settings', feature: 'settings', requiredPerm: 'settings.view' },
     ],
   },
@@ -171,6 +171,7 @@ export const BRAND_NAV_LINKS: PortalNavLink[] = [
   { name: 'Analytics', icon: BarChart3, href: '/brand/portal/analytics', feature: 'analytics', requiredPerm: 'analytics.view' },
   { name: 'Team', icon: Users, href: '/brand/portal/team', feature: 'users', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
   { name: 'Settings', icon: Settings, href: '/brand/portal/settings', feature: 'settings', requiredPerm: 'settings.view' },
+  { name: 'My Businesses', icon: Building2, href: '/businesses', matrixExclude: true },
 ];
 
 export function filterNavLinks(

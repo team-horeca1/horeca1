@@ -9,10 +9,15 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
+  clearLoginHandoff,
+  hasLoginHandoff,
+  isOnboardOrAddRedirect,
+  isPickerInFlight,
+  isPickerPending,
+  markLoginHandoff,
   prepareFreshLoginNavigation,
   readForcePickerCookie,
   sanitizeRedirect,
-  setPendingRedirect,
 } from '@/lib/postLoginPicker';
 
 const RESEND_COOLDOWN = 60;
@@ -27,11 +32,12 @@ function noAccountRegisterHref(opts: {
   email?: string;
   redirect?: string | null;
 }): string {
-  const qs = new URLSearchParams({ role: 'customer' });
+  const qs = new URLSearchParams();
   if (opts.phone) qs.set('phone', opts.phone);
   if (opts.email) qs.set('email', opts.email);
   if (opts.redirect) qs.set('redirect', opts.redirect);
-  return `/register?${qs.toString()}`;
+  const q = qs.toString();
+  return q ? `/register?${q}` : '/register';
 }
 
 type Step = 'form' | 'otp';
@@ -47,22 +53,29 @@ export default function LoginPageInner() {
   // number they just verified.
   const prefilledPhone = params?.get('phone')?.replace(/\D/g, '').slice(0, 10) ?? '';
   const prefilledEmail = params?.get('email') ?? '';
-  const { status: sessionStatus } = useSession();
+  const { status: sessionStatus, data: session } = useSession();
+  const leavingRef = useRef(false);
 
   const [step, setStep] = useState<Step>('form');
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  // Already signed in — defer to the picker when a fresh-login cookie is armed.
+  // Already signed in — honor add/onboard redirects. Fresh multi-account
+  // login stays here so the picker can be answered once (no storefront flash).
+  // A session.update() remounts this page; handoff / in-flight must survive
+  // that remount or we race the Brand/Supplier destination back to `/`.
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
-    if (readForcePickerCookie()) {
-      setPendingRedirect(redirectTo);
-      window.location.href = '/';
+    if (leavingRef.current || hasLoginHandoff() || isPickerInFlight()) return;
+    if (isOnboardOrAddRedirect(redirectTo)) {
+      leavingRef.current = true;
+      void prepareFreshLoginNavigation(redirectTo, { picker: false });
       return;
     }
+    if (isPickerPending(session?.user) || readForcePickerCookie()) return;
+    leavingRef.current = true;
     void prepareFreshLoginNavigation(redirectTo, { picker: false });
-  }, [sessionStatus, redirectTo]);
+  }, [sessionStatus, redirectTo, session?.user]);
 
   const [identifier, setIdentifier] = useState(prefilledPhone || prefilledEmail);
   const [usePassword, setUsePassword] = useState(false);
@@ -95,6 +108,8 @@ export default function LoginPageInner() {
 
   // Hard-navigate so the new session cookie is picked up by SSR.
   const goPostLogin = useCallback(async () => {
+    leavingRef.current = true;
+    markLoginHandoff();
     await prepareFreshLoginNavigation(redirectTo);
   }, [redirectTo]);
 
@@ -140,6 +155,8 @@ export default function LoginPageInner() {
     if (code.length !== 4 || isLoading) return;
     setIsLoading(true);
     setApiError('');
+    leavingRef.current = true;
+    markLoginHandoff();
     try {
       const result = await signIn('otp', {
         phone: isEmail ? '' : phoneDigits,
@@ -149,6 +166,8 @@ export default function LoginPageInner() {
         redirect: false,
       });
       if (result?.error) {
+        leavingRef.current = false;
+        clearLoginHandoff();
         setApiError('Invalid or expired OTP. Please try again.');
         setOtp(['', '', '', '']);
         setTimeout(() => otpRefs[0].current?.focus(), 50);
@@ -189,14 +208,19 @@ export default function LoginPageInner() {
     }
     if (!password) { setApiError('Enter your password'); return; }
     setIsLoading(true);
+    leavingRef.current = true;
+    markLoginHandoff();
     try {
       const result = await signIn('credentials', {
         email: isEmail ? trimmedId.toLowerCase() : phoneDigits,
         password,
         redirect: false,
       });
-      if (result?.error) setApiError('Invalid credentials');
-      else await goPostLogin();
+      if (result?.error) {
+        leavingRef.current = false;
+        clearLoginHandoff();
+        setApiError('Invalid credentials');
+      } else await goPostLogin();
     } catch { setApiError('Something went wrong.'); }
     finally { setIsLoading(false); }
   };

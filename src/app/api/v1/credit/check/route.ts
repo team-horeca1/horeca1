@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/middleware/auth';
+import { requireStorefrontAccess } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
 
@@ -17,6 +18,7 @@ const num = (d: { toString(): string } | number | null) => (d == null ? 0 : Numb
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
+    requireStorefrontAccess(ctx, 'storefront.order');
     const vendorId = req.nextUrl.searchParams.get('vendorId');
 
     const wallets = await prisma.creditWallet.findMany({

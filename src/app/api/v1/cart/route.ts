@@ -42,6 +42,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
 
 export const DELETE = withAuth(async (_req, ctx) => {
   try {
+    requireStorefrontAccess(ctx, 'storefront.order');
     const cartCtx = await resolveCartContext(ctx);
     await cartService.clearCart(cartCtx);
     return NextResponse.json({ success: true, message: 'Cart cleared' });

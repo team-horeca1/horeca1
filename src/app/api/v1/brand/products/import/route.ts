@@ -92,7 +92,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
       try {
         const fields = brandImportProductFields(row);
         const existing = row.sku
-          ? await brandService.findBrandProductBySku(userId, row.sku)
+          ? await brandService.findBrandProductBySku(userId, row.sku, ctx.activeBrandId)
           : null;
 
         if (existing) {
@@ -111,7 +111,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
             countryOfOrigin: fields.countryOfOrigin,
             fssaiRef: fields.fssaiRef,
             aliasNames: fields.aliasNames,
-          });
+          }, ctx.activeBrandId);
           updated += 1;
           continue;
         }
@@ -127,7 +127,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
           continue;
         }
 
-        const pending = await brandService.findPendingMasterBySku(userId, skuCheck.normalized);
+        const pending = await brandService.findPendingMasterBySku(userId, skuCheck.normalized, ctx.activeBrandId);
         const categoryId = categoryIds[0];
         if (pending) {
           await brandService.updatePendingMasterProduct(userId, pending.id, {
@@ -146,12 +146,13 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
             countryOfOrigin: fields.countryOfOrigin,
             fssaiRef: fields.fssaiRef,
             aliasNames: fields.aliasNames,
-          });
+          }, ctx.activeBrandId);
           updated += 1;
         } else {
           await brandService.submitPendingMasterProduct(
             userId,
             toPendingMasterSubmit(row, categoryId),
+            ctx.activeBrandId,
           );
           created += 1;
         }

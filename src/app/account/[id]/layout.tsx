@@ -127,8 +127,8 @@ function AccountLayoutInner({ children }: { children: React.ReactNode }) {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2 sm:ml-auto">
-                  {account.isCustomer && <Badge color="#2563EB" bg="#DBEAFE">Customer</Badge>}
-                  {account.isVendor   && <Badge color={CDL.primary} bg={CDL.successLight}>Vendor</Badge>}
+                  {account.isCustomer && <Badge color="#2563EB" bg="#DBEAFE">Restaurant / Retail</Badge>}
+                  {account.isVendor   && <Badge color={CDL.primary} bg={CDL.successLight}>Supplier</Badge>}
                   {account.isBrand    && <Badge color="#7C3AED" bg="#EDE9FE">Brand</Badge>}
                   {account.status !== 'active' && <Badge color="#DC2626" bg="#FEE2E2">{account.status}</Badge>}
                 </div>

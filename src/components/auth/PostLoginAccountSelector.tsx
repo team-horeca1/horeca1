@@ -13,22 +13,27 @@ import { usePathname } from 'next/navigation';
 import { useBusinessAccountSwitcher, type AccountSummary } from '@/hooks/useBusinessAccountSwitcher';
 import {
   DISMISS_KEY,
-  PENDING_REDIRECT_KEY,
-  readForcePickerCookie,
   clearForcePickerCookie,
+  clearLoginHandoff,
+  clearPickerInFlight,
   completePostLoginPicker,
+  isOnboardOrAddRedirect,
+  isPickerInFlight,
+  isPickerPending,
   isPickerSettled,
+  markLoginHandoff,
+  markPickerInFlight,
   markPickerSettled,
-  setPendingRedirect,
+  rememberPickedAccount,
 } from '@/lib/postLoginPicker';
 import { broadcastAuthEvent } from '@/lib/authTabSync';
+import { supplierLandingPath } from '@/lib/businessCapability';
 import { CDL } from '@/lib/cdl';
-import { setEnteredStore } from '@/lib/supplierPortalLevel';
 import { ShieldCheck, Store, Sparkles, User, MapPin, Loader2, X, ChevronLeft, Check } from 'lucide-react';
 
 type Kind = 'customer' | 'vendor' | 'brand';
 const STYLE: Record<Kind, { label: string; color: string; bg: string; icon: typeof Store }> = {
-  customer: { label: 'Customer', color: CDL.info, bg: CDL.infoLight, icon: User },
+  customer: { label: 'Restaurant / Retail', color: CDL.info, bg: CDL.infoLight, icon: User },
   vendor:   { label: 'Supplier', color: CDL.primary, bg: CDL.primaryLight, icon: Store },
   brand:    { label: 'Brand',    color: '#7C3AED', bg: '#EDE9FE', icon: Sparkles },
 };
@@ -39,11 +44,38 @@ function classify(a: AccountSummary): Kind {
   return 'customer';
 }
 
+function pickerLeavePath(a: AccountSummary): string {
+  if (a.isBrand) return '/brand/portal';
+  if (a.isVendor) return supplierLandingPath(a.id);
+  return '/';
+}
+
+/** Outlets are restaurant/retail only. Supplier → stores; brand → dashboard. */
+function childMeta(a: AccountSummary, kind: Kind): { Icon: typeof MapPin; text: string } {
+  if (kind === 'vendor') {
+    const n = a.stores?.length ?? 0;
+    return {
+      Icon: Store,
+      text: n === 0 ? 'Open supplier dashboard' : `${n} online store${n === 1 ? '' : 's'}`,
+    };
+  }
+  if (kind === 'brand') {
+    const n = a.catalogueCount ?? 0;
+    return {
+      Icon: Sparkles,
+      text: n > 0 ? `${n} SKU${n === 1 ? '' : 's'} · Open dashboard` : 'Open brand dashboard',
+    };
+  }
+  const n = a.outlets.length;
+  return { Icon: MapPin, text: `${n} outlet${n === 1 ? '' : 's'}` };
+}
+
 export function PostLoginAccountSelector() {
   const { data: session, status, update } = useSession();
   const pathname = usePathname();
   const onAddBusinessRegister = pathname === '/brand/register' || pathname === '/vendor/register';
-  const { accounts, currentAccount, switchAccount, switchOutlet, switchOnlineStore, activeOutletId, switching, availableStores, activeVendorId } = useBusinessAccountSwitcher();
+  const onRegisterRoute = pathname === '/register' || onAddBusinessRegister;
+  const { accounts, currentAccount, switchAccount, switchOutlet, activeOutletId, switching } = useBusinessAccountSwitcher();
   const [open, setOpen] = useState(false);
   const [pickingId, setPickingId] = useState<string | null>(null);
   const [outletStep, setOutletStep] = useState<AccountSummary | null>(null);
@@ -52,6 +84,7 @@ export function PostLoginAccountSelector() {
   // Answered in this page life — blocks the effect from reopening when the
   // session refresh that follows a pick hands us a new `accounts` array.
   const settledRef = useRef(false);
+  const leavingRef = useRef(false);
 
   const u = (session?.user ?? {}) as Record<string, unknown>;
   const accessibleOutletIds = Array.isArray(u.accessibleOutletIds) ? (u.accessibleOutletIds as string[]) : [];
@@ -69,20 +102,32 @@ export function PostLoginAccountSelector() {
   }, [armedAt]);
 
   useEffect(() => {
+    if (pathname === '/login' || pathname === '/register') return;
+    clearLoginHandoff();
+  }, [pathname]);
+
+  useEffect(() => {
     if (status !== 'authenticated') return;
     if (accounts.length === 0) return;
     if (u.role === 'admin') return;
-    if (settledRef.current) return;
-    // Stay on add-business register so OTP-login can continue the form.
-    if (onAddBusinessRegister) {
+    if (settledRef.current || leavingRef.current || isPickerInFlight()) return;
+    // Stay on add-business / onboard so login intent is not stolen by the picker.
+    // `/login` must keep the picker — leaving it to hard-nav home is the flash.
+    if (
+      onRegisterRoute
+      || isOnboardOrAddRedirect(`${window.location.pathname}${window.location.search}`)
+    ) {
       settle();
       return;
     }
 
-    const hasForceCookie = readForcePickerCookie();
-    const forcePick = hasForceCookie || u.forceAccountPicker === true;
     const totalCount = (u.totalAccountCount as number | undefined) ?? accounts.length;
-    const mustPick = forcePick && totalCount > 1;
+    const mustPick = isPickerPending({
+      forceAccountPicker: u.forceAccountPicker === true,
+      pickerArmedAt: armedAt ?? undefined,
+      totalAccountCount: totalCount,
+      role: typeof u.role === 'string' ? u.role : undefined,
+    }) && totalCount > 1;
 
     // This login was already answered — stay quiet through dashboard navigation
     // and reloads. The next login stamps a new armedAt and arms the picker again.
@@ -102,13 +147,16 @@ export function PostLoginAccountSelector() {
 
     const visibleOutlets = filterOutlets(accounts[0]);
     if (accounts.length === 1) {
-      const needsOutletPick = visibleOutlets.length > 1 && !activeOutletId;
+      const needsOutletPick =
+        classify(accounts[0]) === 'customer'
+        && visibleOutlets.length > 1
+        && !activeOutletId;
       if (needsOutletPick) {
         Promise.resolve().then(() => {
           setOutletStep(accounts[0]);
           setOpen(true);
         });
-      } else if (forcePick) {
+      } else if (mustPick) {
         settle();
         void update({ accountPickerCompleted: true })
           .catch(() => {})
@@ -118,12 +166,16 @@ export function PostLoginAccountSelector() {
     }
     Promise.resolve().then(() => setOpen(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, accounts, session?.user?.id, activeOutletId, accessibleOutletIds.join(','), armedAt, onAddBusinessRegister, settle]);
+  }, [status, accounts, session?.user?.id, activeOutletId, accessibleOutletIds.join(','), armedAt, onRegisterRoute, settle]);
 
   const finishPicker = useCallback(
-    async (contextChanged: boolean, chosen?: AccountSummary | null) => {
-      // Settle first, synchronously: the navigation below aborts in-flight
-      // requests, so the local record of the decision must already be written.
+    (contextChanged: boolean, chosen?: AccountSummary | null) => {
+      // Assign the destination synchronously before session.update() remounts
+      // this tree — otherwise Brand/Supplier clicks appear to do nothing.
+      leavingRef.current = true;
+      markLoginHandoff();
+      markPickerInFlight();
+      rememberPickedAccount(chosen?.id);
       settle();
       setOpen(false);
       setOutletStep(null);
@@ -131,13 +183,11 @@ export function PostLoginAccountSelector() {
       if (!contextChanged) {
         broadcastAuthEvent('session-changed', { userId: session?.user?.id });
       }
-      // switchAccount / switchOutlet already broadcast 'account-switched'.
-      try {
-        await update({ accountPickerCompleted: true });
-      } catch {
+      const dest = chosen ? pickerLeavePath(chosen) : '/';
+      void update({ accountPickerCompleted: true }).catch(() => {
         /* the JWT flag expires on its own — see PICKER_TTL_MS */
-      }
-      await completePostLoginPicker(contextChanged, chosen ?? undefined);
+      });
+      window.location.replace(dest);
     },
     [settle, session?.user?.id, update],
   );
@@ -159,10 +209,33 @@ export function PostLoginAccountSelector() {
   if (!open) return null;
 
   const handlePick = async (a: AccountSummary) => {
+    if (leavingRef.current) return;
+    const kind = classify(a);
+    const needsOutlet = kind === 'customer' && filterOutlets(a).length > 1;
+    // Brand and supplier never wait on switchAccount — that update() can hang
+    // and leave this row disabled (click does nothing).
+    if (a.isBrand || a.isVendor || !needsOutlet) {
+      if (a.id !== currentAccount?.id) {
+        try {
+          await Promise.race([
+            switchAccount(a.id, undefined, { redirect: false }),
+            new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('switch-timeout')), 2500);
+            }),
+          ]);
+        } catch {
+          /* portal layout finishes the switch after navigation */
+        }
+      }
+      finishPicker(true, a);
+      return;
+    }
+
     setPickingId(a.id);
     if (!mandatoryPick) {
       try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch { /* ignore */ }
     }
+
     let contextChanged = false;
     if (a.id !== currentAccount?.id) {
       try {
@@ -170,17 +243,14 @@ export function PostLoginAccountSelector() {
         await switchAccount(a.id, undefined, { redirect: false });
         contextChanged = true;
       } catch {
+        clearPickerInFlight();
         setPickingId(null);
         return;
       }
     }
-    if (filterOutlets(a).length > 1) {
-      accountChangedRef.current = contextChanged;
-      setOutletStep(a);
-      setPickingId(null);
-    } else {
-      await finishPicker(contextChanged, a);
-    }
+    accountChangedRef.current = contextChanged;
+    setOutletStep(a);
+    setPickingId(null);
   };
 
   // Dismissing is allowed when the picker is not mandatory: the session already
@@ -240,31 +310,6 @@ export function PostLoginAccountSelector() {
                         if (outletChanged) {
                           await switchOutlet(o.id);
                         }
-                        const vendorAccount = outletStep.isVendor;
-                        const stores = availableStores.filter((s) => s.isActive);
-                        const matchedStore =
-                          stores.find((s) => s.defaultOutletId === o.id)
-                          ?? stores.find((s) => s.displayName.trim().toLowerCase() === o.name.trim().toLowerCase())
-                          ?? stores.find((s) => s.id === activeVendorId)
-                          ?? stores[0]
-                          ?? null;
-                        if (vendorAccount && matchedStore) {
-                          await switchOnlineStore(matchedStore.id, outletStep.id);
-                          setEnteredStore(true);
-                          try {
-                            const pending = sessionStorage.getItem(PENDING_REDIRECT_KEY);
-                            if (!pending || pending === '/') {
-                              setPendingRedirect('/vendor/dashboard');
-                            }
-                          } catch {
-                            setPendingRedirect('/vendor/dashboard');
-                          }
-                          await finishPicker(
-                            outletChanged || accountChangedRef.current,
-                            outletStep,
-                          );
-                          return;
-                        }
                       } catch {
                         setPickingId(null);
                         return;
@@ -274,7 +319,7 @@ export function PostLoginAccountSelector() {
                         outletStep,
                       );
                     }}
-                    disabled={switching || isPicking}
+                    disabled={isPicking}
                     className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-ivory transition-colors text-left disabled:opacity-60"
                   >
                     <div className="w-[44px] h-[44px] rounded-full flex items-center justify-center shrink-0 bg-primary-light">
@@ -351,11 +396,13 @@ export function PostLoginAccountSelector() {
             const Icon = conf.icon;
             const isCurrent = a.id === currentAccount?.id;
             const isPicking = pickingId === a.id;
+            const meta = childMeta(a, kind);
+            const MetaIcon = meta.Icon;
             return (
               <li key={a.id}>
                 <button
                   onClick={() => handlePick(a)}
-                  disabled={switching || isPicking}
+                  disabled={isPicking}
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-ivory transition-colors text-left disabled:opacity-60"
                 >
                   <div
@@ -380,9 +427,9 @@ export function PostLoginAccountSelector() {
                       )}
                     </div>
                     <p className="text-[11px] text-text-muted flex items-center gap-1">
-                      <MapPin size={10} />
-                      {filterOutlets(a).length} outlet{filterOutlets(a).length === 1 ? '' : 's'}
-                      {filterOutlets(a).some((o) => o.requiresAddressUpdate) && (
+                      <MetaIcon size={10} />
+                      {meta.text}
+                      {kind === 'customer' && filterOutlets(a).some((o) => o.requiresAddressUpdate) && (
                         <span className="ml-1 text-warning font-semibold">· address needed</span>
                       )}
                     </p>

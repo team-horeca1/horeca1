@@ -13,21 +13,21 @@ import type { AuthContext } from '@/middleware/auth';
 const brandService = new BrandService();
 
 export const PATCH = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
-  await resolveBrandContext(ctx, req); // tenant guard
+  const { brandId } = await resolveBrandContext(ctx, req); // tenant guard
   requirePermission(ctx, 'products.edit');
   const userId = await resolveUserId(ctx, req);
   const productId = req.nextUrl.pathname.split('/').at(-1)!;
   const body = await req.json();
   const input = updateBrandProductSchema.parse(body);
-  const product = await brandService.updateMasterProduct(userId, productId, input);
+  const product = await brandService.updateMasterProduct(userId, productId, input, brandId);
   return NextResponse.json({ success: true, data: product });
 });
 
 export const DELETE = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
-  await resolveBrandContext(ctx, req); // tenant guard
+  const { brandId } = await resolveBrandContext(ctx, req); // tenant guard
   requirePermission(ctx, 'products.delete');
   const userId = await resolveUserId(ctx, req);
   const productId = req.nextUrl.pathname.split('/').at(-1)!;
-  await brandService.deleteMasterProduct(userId, productId);
+  await brandService.deleteMasterProduct(userId, productId, brandId);
   return NextResponse.json({ success: true });
 });

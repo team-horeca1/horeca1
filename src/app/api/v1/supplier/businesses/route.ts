@@ -24,6 +24,9 @@ const CreateBody = z.object({
     subTypes: z.array(z.string()).default([]),
   })).optional(),
   businessSize: z.string().max(50).optional(),
+  categoriesHandled: z.array(z.string()).optional(),
+  coverage: z.string().max(120).optional(),
+  warehouseCount: z.number().int().nonnegative().optional(),
 });
 
 export const GET = withAuth(async (req: NextRequest, ctx) => {
@@ -47,6 +50,9 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
       gstin: body.gstin,
       businessSize: body.businessSize,
       vendorTypeSelections: typeSelections.length > 0 ? typeSelections : undefined,
+      categoriesHandled: body.categoriesHandled,
+      coverage: body.coverage,
+      warehouseCount: body.warehouseCount,
     });
     // Ensure User.role can access vendor portal (skip when Admin View)
     if (ctx.role === 'customer') {

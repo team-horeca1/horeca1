@@ -2,8 +2,9 @@
 import { CDL } from '@/lib/cdl';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, LogOut, Loader2, ShieldCheck, Store, MapPin } from 'lucide-react';
+import { Check, ChevronDown, LogOut, Loader2, ShieldCheck, Store, MapPin, Plus, Building2 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { ACCOUNT_SWITCHER_OPEN_EVENT } from '@/lib/accountSwitcherEvents';
@@ -31,7 +32,7 @@ function initialsOf(name: string): string {
 type AccountKind = 'customer' | 'vendor' | 'brand';
 
 const KIND_STYLE: Record<AccountKind, { label: string; color: string; bg: string }> = {
-  customer: { label: 'Customer', color: '#2563EB', bg: '#DBEAFE' },
+  customer: { label: 'Restaurant / Retail', color: '#2563EB', bg: '#DBEAFE' },
   vendor:   { label: 'Supplier', color: CDL.primary, bg: CDL.primaryLight },
   brand:    { label: 'Brand',    color: '#7C3AED', bg: '#EDE9FE' },
 };
@@ -40,7 +41,7 @@ const ROLE_STYLE_FALLBACK: Record<string, { label: string; color: string; bg: st
   admin:    { label: 'Admin',    color: '#DC2626', bg: '#FEE2E2' },
   vendor:   { label: 'Supplier', color: CDL.primary, bg: CDL.primaryLight },
   brand:    { label: 'Brand',    color: '#7C3AED', bg: '#EDE9FE' },
-  customer: { label: 'Customer', color: '#2563EB', bg: '#DBEAFE' },
+  customer: { label: 'Restaurant / Retail', color: '#2563EB', bg: '#DBEAFE' },
   delivery: { label: 'Delivery', color: '#EA580C', bg: '#FED7AA' },
 };
 
@@ -292,6 +293,43 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
               })}
             </div>
           )}
+          <div className="py-1 border-b border-[#F0F0F0]">
+            <p className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#AEAEAE]">
+              Add business
+            </p>
+            <Link
+              href="/businesses?add=buyer"
+              onClick={() => setIsOpen(false)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-ivory transition-colors text-left"
+            >
+              <Plus size={16} className="text-primary shrink-0" />
+              <span className="text-[13px] font-semibold text-[#181725]">Add restaurant or retail</span>
+            </Link>
+            <Link
+              href="/businesses?add=brand"
+              onClick={() => setIsOpen(false)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-ivory transition-colors text-left"
+            >
+              <Plus size={16} className="text-primary shrink-0" />
+              <span className="text-[13px] font-semibold text-[#181725]">Add brand</span>
+            </Link>
+            <Link
+              href="/businesses?add=supplier"
+              onClick={() => setIsOpen(false)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-ivory transition-colors text-left"
+            >
+              <Plus size={16} className="text-primary shrink-0" />
+              <span className="text-[13px] font-semibold text-[#181725]">Add supplier</span>
+            </Link>
+            <Link
+              href="/businesses"
+              onClick={() => setIsOpen(false)}
+              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-ivory transition-colors text-left"
+            >
+              <Building2 size={16} className="text-primary shrink-0" />
+              <span className="text-[13px] font-semibold text-[#181725]">My Businesses</span>
+            </Link>
+          </div>
           <div className="py-1">
             <button
               type="button"

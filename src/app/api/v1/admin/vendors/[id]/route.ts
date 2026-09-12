@@ -469,13 +469,8 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       return vendorUpdateResult;
     });
 
-    // Promote user role to 'vendor' on approval, revert to 'customer' on revoke
-    if (typeof allowedFields.isVerified === 'boolean') {
-      await prisma.user.update({
-        where: { id: existing.userId },
-        data: { role: allowedFields.isVerified ? 'vendor' : 'customer' },
-      });
-    }
+    // Do not rewrite User.role from a single store verify/revoke — one login
+    // can own supplier, buyer, and brand businesses at the same time.
 
     // Emit VendorOnboarded when vendor is verified for the first time
     if (

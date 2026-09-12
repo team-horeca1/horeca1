@@ -7,6 +7,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
+import { provisionBusinessProfile } from '@/modules/account/provisionBusinessProfile';
 import { withRateLimit } from '@/middleware/withRateLimit';
 import { uniqueHcid } from '@/lib/hcid';
 import { emitEvent } from '@/events/emitter';
@@ -29,14 +30,6 @@ const BodyBase = BrandProfileSchema.extend({
   password: z.string().min(6).optional().or(z.literal('')),
   verificationToken: z.string().min(1).optional(),
 });
-
-function slugify(name: string, suffix: string): string {
-  const base = name.toLowerCase().trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 50);
-  return `${base || 'brand'}-${suffix.slice(0, 8)}`;
-}
 
 function parseBody(raw: unknown) {
   const relaxed = isRegisterEmailOtpEnabled();
@@ -118,14 +111,6 @@ async function postHandler(req: NextRequest) {
       throw Errors.duplicate(phoneHit ? 'Phone' : 'Email');
     }
 
-    const brandAdminTemplate = await prisma.accountRole.findFirst({
-      where: { businessAccountId: null, isTemplate: true, name: 'Brand Admin', scope: 'brand' },
-      select: { id: true },
-    });
-    if (!brandAdminTemplate) {
-      throw Errors.badRequest('Brand Admin role template missing. Run seed migration.');
-    }
-
     const hashedPassword = input.password ? await bcrypt.hash(input.password, 12) : null;
     const hcidDisplay = await uniqueHcid();
     const brandFields = mapToBrandFields({ ...input, email: input.email ?? undefined });
@@ -148,84 +133,45 @@ async function postHandler(req: NextRequest) {
         select: { id: true, hcidDisplay: true },
       });
 
-      const account = await tx.businessAccount.create({
-        data: {
-          legalName: derivedLegalName({ ...input, email: input.email ?? undefined }) || brandName,
-          ...(baData as object),
-          isCustomer: false,
-          isVendor: false,
-          isBrand: true,
-          status: 'active',
-        },
-      });
+      const addressLine = (baData as { billingAddressLine?: string | null }).billingAddressLine
+        || input.addressLine
+        || 'Address pending — complete in brand settings';
 
-      const addressLine = (baData as { billingAddressLine?: string | null }).billingAddressLine;
-      const outlet = await tx.outlet.create({
-        data: {
-          businessAccountId: account.id,
+      const provisioned = await provisionBusinessProfile({
+        userId: user.id,
+        kind: 'brand',
+        isPrimaryMembership: true,
+        legalName: derivedLegalName({ ...input, email: input.email ?? undefined }) || brandName,
+        displayName: brandName,
+        gstin: input.gstin || null,
+        pan: null,
+        businessType: input.brandType || null,
+        subType: input.subType || null,
+        billingAddressLine: (baData as { billingAddressLine?: string | null }).billingAddressLine ?? null,
+        billingCity: (baData as { billingCity?: string | null }).billingCity ?? null,
+        billingState: (baData as { billingState?: string | null }).billingState ?? null,
+        billingPincode: (baData as { billingPincode?: string | null }).billingPincode ?? null,
+        primaryOutlet: {
           name: `${brandName} HQ`,
-          addressLine: addressLine || 'Address pending — complete in brand settings',
-          city: (baData as { billingCity?: string | null }).billingCity ?? null,
-          state: (baData as { billingState?: string | null }).billingState ?? null,
-          pincode: (baData as { billingPincode?: string | null }).billingPincode ?? null,
-          requiresAddressUpdate: !addressLine,
+          addressLine,
+          city: (baData as { billingCity?: string | null }).billingCity ?? undefined,
+          state: (baData as { billingState?: string | null }).billingState ?? undefined,
+          pincode: (baData as { billingPincode?: string | null }).billingPincode ?? undefined,
         },
-      });
+        brand: {
+          productCategories: input.productCategories,
+          businessSize: input.businessSize,
+          distributionPresence: input.distributionPresence,
+          targetSegments: input.targetSegments,
+          horecaFocused: input.horecaFocused === true || input.horecaFocused === 'true',
+          retailFocused: input.retailFocused === true || input.retailFocused === 'true',
+          website: input.website,
+          tagline: input.tagline,
+          description: input.description,
+        },
+      }, tx);
 
-      await tx.businessAccount.update({
-        where: { id: account.id },
-        data: { primaryOutletId: outlet.id },
-      });
-
-      await tx.businessAccountMember.create({
-        data: { userId: user.id, businessAccountId: account.id, isPrimary: true, acceptedAt: new Date() },
-      });
-
-      await tx.userRole.create({
-        data: { userId: user.id, businessAccountId: account.id, outletId: null, roleId: brandAdminTemplate.id },
-      });
-
-      const existingBrand = await tx.brand.findFirst({
-        where: { name: { equals: brandName, mode: 'insensitive' } },
-        select: { id: true, userId: true, slug: true },
-      });
-      if (existingBrand?.userId) {
-        throw Errors.conflict('A brand with this name already exists.');
-      }
-
-      let brand: { id: string; slug: string };
-      if (existingBrand) {
-        brand = await tx.brand.update({
-          where: { id: existingBrand.id },
-          data: {
-            userId: user.id,
-            businessAccountId: account.id,
-            approvalStatus: 'pending',
-            isActive: false,
-            ...brandFields,
-          },
-          select: { id: true, slug: true },
-        });
-      } else {
-        const slug = slugify(brandName, user.id);
-        const slugTaken = await tx.brand.findUnique({ where: { slug }, select: { id: true } });
-        if (slugTaken) {
-          throw Errors.conflict('A brand with this name already exists.');
-        }
-        brand = await tx.brand.create({
-          data: {
-            userId: user.id,
-            businessAccountId: account.id,
-            slug,
-            approvalStatus: 'pending',
-            isActive: false,
-            ...brandFields,
-          },
-          select: { id: true, slug: true },
-        });
-      }
-
-      return { user, brand };
+      return { user, brandId: provisioned.brandId, nextPath: provisioned.nextPath };
     });
 
     emitEvent('UserRegistered', {
@@ -238,8 +184,9 @@ async function postHandler(req: NextRequest) {
       {
         success: true,
         data: {
-          brandId: result.brand.id,
+          brandId: result.brandId,
           hcidDisplay: result.user.hcidDisplay,
+          nextPath: result.nextPath,
           message: 'Brand application submitted. Our team will review and contact you shortly.',
         },
       },

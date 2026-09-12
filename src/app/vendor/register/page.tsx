@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
@@ -32,6 +32,7 @@ import {
 import { ExistingPhoneModal } from '@/components/auth/ExistingPhoneModal';
 import { accountLabelFromCheck } from '@/lib/auth/phoneCheckLabels';
 import type { PhoneCheckResult } from '@/lib/auth/checkPhoneLookup';
+import { existingPhoneRedirect } from '@/lib/auth/phoneCheckLabels';
 import {
   isRegisterEmailOtpEnabled,
   resolveRegisterVerifyChannel,
@@ -143,6 +144,7 @@ function inferStepFromMessage(message: string): number | null {
 
 export default function VendorRegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   // Auth-aware mode: when a user is already signed in, the wizard runs in
   // "add a vendor under my existing HCID" mode instead of "new public
   // signup" mode. This skips step 1 (OTP — the user is already
@@ -161,10 +163,14 @@ export default function VendorRegisterPage() {
   const [submitted, setSubmitted] = useState<{ hcid: string } | null>(null);
 
   // Step 1 — phone verify
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(
+    () => searchParams.get('phone')?.replace(/\D/g, '').slice(0, 10) ?? '',
+  );
   const [phoneVerified, setPhoneVerified] = useState(false);
   const [verifyChannel, setVerifyChannel] = useState<'phone' | 'email'>('phone');
-  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerEmail, setRegisterEmail] = useState(
+    () => (searchParams.get('email') ?? '').trim().toLowerCase(),
+  );
   const [emailVerified, setEmailVerified] = useState(false);
   const [verificationToken, setVerificationToken] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
@@ -469,15 +475,10 @@ export default function VendorRegisterPage() {
           });
           const checkData = await checkRes.json();
           if (checkData.success && checkData.data?.exists) {
-            const check = checkData.data as PhoneCheckResult;
-            if (check.suggestedAction === 'login_only') {
-              openExistingPhoneModal(email, check, 'email');
-              return;
-            }
-            setLinkExistingUser(check.suggestedAction === 'login_to_link');
-          } else {
-            setLinkExistingUser(false);
+            openExistingPhoneModal(email, checkData.data as PhoneCheckResult, 'email');
+            return;
           }
+          setLinkExistingUser(false);
         } else {
           const checkRes = await fetch('/api/v1/auth/check-phone', {
             method: 'POST',
@@ -486,15 +487,10 @@ export default function VendorRegisterPage() {
           });
           const checkData = await checkRes.json();
           if (checkData.success && checkData.data?.exists) {
-            const check = checkData.data as PhoneCheckResult;
-            if (check.suggestedAction === 'login_only') {
-              openExistingPhoneModal(phone, check, 'phone');
-              return;
-            }
-            setLinkExistingUser(check.suggestedAction === 'login_to_link');
-          } else {
-            setLinkExistingUser(false);
+            openExistingPhoneModal(phone, checkData.data as PhoneCheckResult, 'phone');
+            return;
           }
+          setLinkExistingUser(false);
         }
       }
 
@@ -510,11 +506,8 @@ export default function VendorRegisterPage() {
       const data = await res.json();
       if (!data.success) {
         if (data.code === 'EMAIL_EXISTS' && data.data) {
-          const check = data.data as PhoneCheckResult;
-          if (check.suggestedAction === 'login_only') {
-            openExistingPhoneModal(email, check, 'email');
-            return;
-          }
+          openExistingPhoneModal(email, data.data as PhoneCheckResult, 'email');
+          return;
         }
         setError(data.error || 'Failed to send OTP');
         return;
@@ -889,7 +882,7 @@ export default function VendorRegisterPage() {
           pan: (panNumber || vendorProfile.pan || '').toUpperCase().trim(),
           businessType: vendorProfile.vendorBusinessType || 'vendor',
           subType: vendorProfile.subType,
-          isCustomer: true,
+          isCustomer: false,
           isVendor: true,
           isBrand: false,
           primaryOutlet: {
@@ -934,16 +927,13 @@ export default function VendorRegisterPage() {
           applySubmitError(data.error);
           return;
         }
-        // Switch session context to the new business account so the vendor
-        // dashboard resolves to THIS vendor and not the user's old one.
         try {
           await switchAccount(data.data.account.id, data.data.outlet.id);
         } catch { /* non-fatal — user can switch manually */ }
-        // New account is now active — attach any KYC files the user picked.
         await uploadAuthedDocs();
         setSubmitted({ hcid: '' });
-        // Pending application — homepage banner; no supplier panel until approved.
-        setTimeout(() => { window.location.assign('/'); }, 1200);
+        const next = (data.data?.nextPath as string | undefined) || '/businesses?type=supplier';
+        setTimeout(() => { window.location.assign(next); }, 800);
         return;
       }
 
@@ -1057,7 +1047,7 @@ export default function VendorRegisterPage() {
           <h1 className="text-[24px] font-[800] text-gray-800 mb-3">Application Submitted</h1>
           <p className="text-[14px] text-gray-500 mb-6 leading-relaxed">
             {isAuthMode
-              ? 'Your new supplier business is created and under review. Switching you to the new account now…'
+              ? 'Your new supplier business is created. Opening the supplier dashboard…'
               : 'Thank you for applying! Your supplier account is under review. Log in below to track your application status — our team will verify your KYC documents and contact you shortly.'}
           </p>
           {submitted.hcid && !isAuthMode && (
@@ -1069,15 +1059,15 @@ export default function VendorRegisterPage() {
           {isAuthMode ? (
             <div className="flex items-center justify-center gap-2 text-[13px] text-gray-500">
               <Loader2 size={16} className="animate-spin" />
-              Taking you home — we&apos;ll notify you when approved…
+              Taking you to your supplier dashboard…
             </div>
           ) : (
             <>
               <button
                 onClick={() => router.push(
                   emailVerified
-                    ? `/login?email=${encodeURIComponent(registerEmail.trim().toLowerCase())}`
-                    : `/login?phone=${encodeURIComponent(phone)}`,
+                    ? `/login?email=${encodeURIComponent(registerEmail.trim().toLowerCase())}&redirect=${encodeURIComponent('/businesses?type=supplier')}`
+                    : `/login?phone=${encodeURIComponent(phone)}&redirect=${encodeURIComponent('/businesses?type=supplier')}`,
                 )}
                 className={cn(FORM.primaryBtn, 'w-full py-3')}
               >
@@ -1775,7 +1765,10 @@ export default function VendorRegisterPage() {
         hcidDisplay={existingPhoneModal?.hcidDisplay}
         accountLabel={existingPhoneModal?.accountLabel ?? 'Customer'}
         intent="vendor"
-        redirectTo="/vendor/register"
+        redirectTo={existingPhoneRedirect(
+          'vendor',
+          existingPhoneModal?.suggestedAction ?? 'login_to_link',
+        )}
         suggestedAction={existingPhoneModal?.suggestedAction ?? 'login_to_link'}
         contactType={existingPhoneModal?.contactType ?? 'phone'}
         onClose={() => setExistingPhoneModal(null)}

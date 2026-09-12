@@ -38,6 +38,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { supplierDashboardPath } from '@/lib/businessCapability';
 import { useAddress } from '@/context/AddressContext';
 import { EditProfileOverlay } from './EditProfileOverlay';
 import { SavedAddressesOverlay } from './SavedAddressesOverlay';
@@ -422,8 +423,9 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const canSeeOverview = has('settings.view');
     const hideBusinessAccountForAdmin = sessionRole === 'admin' && !viewingAsBuyer;
     const canSwitchBusiness = !hideBusinessAccountForAdmin && !viewingAsBuyer && switcherAccounts.length > 1;
-    const businessAccountItems = (!hideBusinessAccountForAdmin && (activeAccountIdForLinks || canSwitchBusiness)) ? [
-        ...(canSwitchBusiness ? [{ id: 'switch-business', label: 'Switch business', desc: 'Move between your brand and supplier accounts', icon: ArrowLeftRight, onClick: () => setIsSwitchBusinessOpen(true) }] : []),
+    const businessAccountItems = !hideBusinessAccountForAdmin ? [
+        { id: 'my-businesses', label: 'My Businesses', desc: 'Restaurant, supplier, and brand under this login', icon: Building2, onClick: () => { onClose(); router.push('/businesses'); } },
+        ...(canSwitchBusiness ? [{ id: 'switch-business', label: 'Switch business', desc: 'Move between restaurant, supplier, and brand', icon: ArrowLeftRight, onClick: () => setIsSwitchBusinessOpen(true) }] : []),
         ...(activeAccountIdForLinks && canSeeOutlets ? [{ id: 'outlets', label: 'Outlets & Delivery', desc: 'Branches and where orders are delivered', icon: MapPin, onClick: () => setIsOutletsOpen(true) }] : []),
         ...(activeAccountIdForLinks && !viewingAsBuyer && canSeeTeam ? [{ id: 'team-members', label: 'Team Members', desc: 'Invite users, manage roles & access', icon: Users, onClick: () => router.push('/profile/team') }] : []),
         ...(activeAccountIdForLinks && canSeeOverview ? [{ id: 'account-overview', label: 'Account Overview', desc: 'GST, business type, members', icon: Building2, onClick: () => setIsOverviewOpen(true) }] : []),
@@ -441,7 +443,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
 
     const sessionAcctType = (session?.user as {
         activeBusinessAccountType?: { isVendor?: boolean; isBrand?: boolean };
-        availableAccounts?: Array<{ isVendor?: boolean; isBrand?: boolean }>;
+        availableAccounts?: Array<{ id?: string; isVendor?: boolean; isBrand?: boolean }>;
     } | undefined);
     const showVendorDashboardCta =
         !viewingAsBuyer
@@ -456,9 +458,15 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
         ? [{
             id: 'vendor-dashboard',
             label: 'Supplier Dashboard',
-            desc: 'Inventory, orders & store operations',
+            desc: 'Pick a business, then enter an Online Store',
             icon: LayoutDashboard,
-            onClick: () => { onClose(); router.push('/vendor/dashboard'); },
+            onClick: () => {
+              onClose();
+              const vendorIds = (sessionAcctType?.availableAccounts ?? [])
+                .filter((a) => a.isVendor === true)
+                .map((a) => a.id);
+              router.push(supplierDashboardPath(vendorIds));
+            },
           }]
         : [];
     const showBrandPortalCta =
@@ -1045,7 +1053,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                 {/* Become a vendor CTA — only for customer-only users who haven't applied yet */}
                                 {showBecomeVendorCta && (
                                     <button
-                                        onClick={() => setIsBecomeVendorOpen(true)}
+                                        onClick={() => { onClose(); router.push('/businesses?add=supplier'); }}
                                         className="w-full text-left bg-gradient-to-br from-primary-light/60 via-white to-primary-light/40 border border-primary/20 rounded-2xl p-5 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group cursor-pointer"
                                     >
                                         <div className="flex items-center gap-4">
@@ -1057,14 +1065,14 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-[14px] font-bold text-text leading-tight">
-                                                    Want to sell on Horeca1? Become a supplier.
+                                                    Want to sell on Horeca1? Add a supplier business.
                                                 </p>
                                                 <p className="text-[12px] text-text-secondary mt-0.5">
-                                                    Keep your account — just unlock the supplier portal. Admin reviews in ~24h.
+                                                    Keep this login — create a separate supplier business. Restaurant stays the one that orders.
                                                 </p>
                                             </div>
                                             <span className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-white text-[12px] font-bold group-hover:bg-primary-dark transition-colors shrink-0 shadow-sm shadow-primary/20">
-                                                Apply
+                                                Add supplier
                                                 <ChevronRight size={13} />
                                             </span>
                                         </div>

@@ -25,37 +25,37 @@ function intentCopy(
   accountLabel: string,
   phone: string,
   contactType: 'phone' | 'email',
+  suggestedAction: 'login_to_link' | 'login_only',
 ): { title: string; body: string; cta: string; contactLabel: string; useDifferent: string } {
   const digits = phone.replace(/\D/g, '').slice(-10);
   const masked = digits.length === 10 ? `+91 ${digits.slice(0, 5)} ${digits.slice(5)}` : phone;
   const contactWord = contactType === 'email' ? 'email address' : 'mobile number';
   const contactLabel = contactType === 'email' ? 'Email' : 'Mobile';
   const useDifferent = contactType === 'email' ? 'Use a different email' : 'Use a different number';
+  const existing = accountLabel || 'Horeca1';
+  const contactBit = contactType === 'email'
+    ? `This email is already a ${existing}`
+    : `This number (${masked}) is already a ${existing}`;
 
-  if (intent === 'vendor') {
+  const wanted =
+    intent === 'vendor' ? 'Supplier'
+      : intent === 'brand' ? 'Brand'
+        : 'Restaurant or Retail';
+
+  if (suggestedAction === 'login_only') {
     return {
-      title: `This ${contactWord} is already registered`,
-      body: `This ${contactWord} is already linked to an existing account as a ${accountLabel}. Log in to register a new supplier business under your HCID.`,
-      cta: 'Log in & continue supplier setup',
+      title: `You already have a ${wanted}`,
+      body: `${contactBit}. Log in with the same account.`,
+      cta: 'Log in',
       contactLabel,
       useDifferent,
     };
   }
-  if (intent === 'brand') {
-    return {
-      title: `This ${contactWord} is already registered`,
-      body: `This ${contactWord} is already linked to an existing account as a ${accountLabel}. Log in to add a brand business under your HCID.`,
-      cta: 'Log in & continue brand setup',
-      contactLabel,
-      useDifferent,
-    };
-  }
+
   return {
-    title: 'You already have an account',
-    body: contactType === 'email'
-      ? `This email (${phone}) is already registered as a ${accountLabel}. Log in instead of creating a duplicate account.`
-      : `This mobile number (${masked}) is already registered as a ${accountLabel}. Log in instead of creating a duplicate account.`,
-    cta: 'Log in to your account',
+    title: 'You already have a Horeca1 account',
+    body: `${contactBit}. You can add a ${wanted} on the same login.`,
+    cta: `Log in & add ${wanted === 'Restaurant or Retail' ? 'restaurant' : wanted.toLowerCase()}`,
     contactLabel,
     useDifferent,
   };
@@ -82,7 +82,7 @@ export function ExistingPhoneModal({
   if (redirectTo) loginQs.set('redirect', redirectTo);
   const loginHref = `/login?${loginQs.toString()}`;
 
-  const copy = intentCopy(intent, accountLabel, phone, contactType);
+  const copy = intentCopy(intent, accountLabel, phone, contactType, suggestedAction);
   const showHcid = !!hcidDisplay;
 
   return (
@@ -123,7 +123,7 @@ export function ExistingPhoneModal({
             </div>
           </div>
 
-          {suggestedAction === 'login_only' && intent === 'customer' && (
+          {suggestedAction === 'login_only' && (
             <p className="text-[12px] text-gray-500 leading-relaxed">
               If you forgot your password, use OTP login on the next screen.
             </p>

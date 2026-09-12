@@ -29,7 +29,7 @@ interface ProvisionResult {
 
 const KIND_TO_FLAGS: Record<AccountKind, { isCustomer: boolean; isVendor: boolean; isBrand: boolean; templateName: string; templateScope: 'account' | 'vendor' | 'brand'; businessType: string }> = {
   customer: { isCustomer: true,  isVendor: false, isBrand: false, templateName: 'Owner',        templateScope: 'account', businessType: 'customer' },
-  vendor:   { isCustomer: true,  isVendor: true,  isBrand: false, templateName: 'Vendor Admin', templateScope: 'vendor',  businessType: 'vendor' },
+  vendor:   { isCustomer: false, isVendor: true,  isBrand: false, templateName: 'Vendor Admin', templateScope: 'vendor',  businessType: 'vendor' },
   brand:    { isCustomer: false, isVendor: false, isBrand: true,  templateName: 'Brand Admin',  templateScope: 'brand',   businessType: 'brand' },
 };
 
@@ -66,36 +66,39 @@ export async function provisionDefaultAccount(
     },
   });
   if (existing && existing.businessAccount.primaryOutletId) {
-    const template = await db.accountRole.findFirst({
-      where: { businessAccountId: null, isTemplate: true, name: flags.templateName, scope: flags.templateScope },
-      select: { id: true },
+    const existingBa = await db.businessAccount.findUnique({
+      where: { id: existing.businessAccountId },
+      select: { isCustomer: true, isVendor: true, isBrand: true },
     });
-    if (template) {
-      const has = await db.userRole.findFirst({
-        where: { userId: input.userId, businessAccountId: existing.businessAccountId, outletId: null, roleId: template.id },
+    const sameKind =
+      (input.kind === 'customer' && existingBa?.isCustomer && !existingBa.isVendor && !existingBa.isBrand)
+      || (input.kind === 'vendor' && existingBa?.isVendor && !existingBa.isCustomer && !existingBa.isBrand)
+      || (input.kind === 'brand' && existingBa?.isBrand && !existingBa.isCustomer && !existingBa.isVendor);
+
+    if (sameKind) {
+      const template = await db.accountRole.findFirst({
+        where: { businessAccountId: null, isTemplate: true, name: flags.templateName, scope: flags.templateScope },
         select: { id: true },
       });
-      if (!has) {
-        await db.userRole.create({
-          data: { userId: input.userId, businessAccountId: existing.businessAccountId, outletId: null, roleId: template.id },
+      if (template) {
+        const has = await db.userRole.findFirst({
+          where: { userId: input.userId, businessAccountId: existing.businessAccountId, outletId: null, roleId: template.id },
+          select: { id: true },
         });
+        if (!has) {
+          await db.userRole.create({
+            data: { userId: input.userId, businessAccountId: existing.businessAccountId, outletId: null, roleId: template.id },
+          });
+        }
       }
+      return {
+        businessAccountId: existing.businessAccountId,
+        outletId: existing.businessAccount.primaryOutletId,
+        created: false,
+        ownerRoleId: template?.id ?? '',
+      };
     }
-    if (input.kind === 'vendor' || input.kind === 'brand') {
-      await db.businessAccount.update({
-        where: { id: existing.businessAccountId },
-        data: {
-          ...(input.kind === 'vendor' ? { isVendor: true } : {}),
-          ...(input.kind === 'brand' ? { isBrand: true } : {}),
-        },
-      });
-    }
-    return {
-      businessAccountId: existing.businessAccountId,
-      outletId: existing.businessAccount.primaryOutletId,
-      created: false,
-      ownerRoleId: template?.id ?? '',
-    };
+    // Different capability already exists — fall through and create a new BusinessAccount.
   }
 
   const user = await db.user.findUnique({

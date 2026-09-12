@@ -8,6 +8,12 @@ export type PhoneCheckSuggestedAction = 'proceed' | 'login_to_link' | 'login_onl
 
 export type VendorPhoneStatus = 'none' | 'pending' | 'active';
 
+export type ExistingBusinessKinds = {
+  hasVendor: boolean;
+  hasBrand: boolean;
+  hasCustomer: boolean;
+};
+
 export interface PhoneCheckResult {
   exists: boolean;
   hcidDisplay?: string;
@@ -16,7 +22,43 @@ export interface PhoneCheckResult {
   accountType?: string;
   vendorStatus?: VendorPhoneStatus;
   businessAccountCount?: number;
+  hasVendor?: boolean;
+  hasBrand?: boolean;
+  hasCustomer?: boolean;
   suggestedAction: PhoneCheckSuggestedAction;
+}
+
+export const USER_REG_SELECT = {
+  id: true,
+  role: true,
+  fullName: true,
+  hcidDisplay: true,
+  vendors: { select: { isVerified: true } },
+  accountMemberships: {
+    select: {
+      businessAccount: {
+        select: { isCustomer: true, isVendor: true, isBrand: true },
+      },
+    },
+  },
+  _count: { select: { accountMemberships: true } },
+} as const;
+
+export function existingKindsFromUser(user: {
+  role: string;
+  vendors: Array<{ isVerified: boolean }>;
+  accountMemberships?: Array<{
+    businessAccount: { isCustomer: boolean; isVendor: boolean; isBrand: boolean };
+  }>;
+}): ExistingBusinessKinds {
+  const memberships = user.accountMemberships ?? [];
+  return {
+    hasVendor: memberships.some((m) => m.businessAccount.isVendor) || user.vendors.length > 0,
+    hasBrand: memberships.some((m) => m.businessAccount.isBrand) || user.role === 'brand',
+    hasCustomer: memberships.some(
+      (m) => m.businessAccount.isCustomer && !m.businessAccount.isVendor && !m.businessAccount.isBrand,
+    ),
+  };
 }
 
 export function resolveVendorStatus(
@@ -40,10 +82,13 @@ export function resolveSuggestedAction(
   intent: PhoneCheckIntent,
   exists: boolean,
   userRole: string,
+  kinds?: ExistingBusinessKinds,
 ): PhoneCheckSuggestedAction {
   if (!exists) return 'proceed';
   if (userRole === 'admin') return 'login_only';
-  if (intent === 'customer') return 'login_only';
+  if (intent === 'vendor' && kinds?.hasVendor) return 'login_only';
+  if (intent === 'brand' && kinds?.hasBrand) return 'login_only';
+  if (intent === 'customer' && kinds?.hasCustomer) return 'login_only';
   return 'login_to_link';
 }
 
@@ -59,25 +104,11 @@ export async function lookupPhoneForRegistration(
   const variants = phoneLookupVariants(phone);
   const user = await prisma.user.findUnique({
     where: { phone },
-    select: {
-      id: true,
-      role: true,
-      fullName: true,
-      hcidDisplay: true,
-      vendors: { select: { isVerified: true } },
-      _count: { select: { accountMemberships: true } },
-    },
+    select: USER_REG_SELECT,
   }) ?? await prisma.user.findFirst({
     where: { phone: { in: variants } },
     orderBy: { createdAt: 'asc' },
-    select: {
-      id: true,
-      role: true,
-      fullName: true,
-      hcidDisplay: true,
-      vendors: { select: { isVerified: true } },
-      _count: { select: { accountMemberships: true } },
-    },
+    select: USER_REG_SELECT,
   });
 
   if (!user) {
@@ -87,6 +118,7 @@ export async function lookupPhoneForRegistration(
   const vendorStatus = resolveVendorStatus(user.vendors);
   const userRole = user.role;
   const accountType = resolveAccountType(userRole, vendorStatus);
+  const kinds = existingKindsFromUser(user);
 
   return {
     exists: true,
@@ -96,7 +128,8 @@ export async function lookupPhoneForRegistration(
     accountType,
     vendorStatus,
     businessAccountCount: user._count.accountMemberships,
-    suggestedAction: resolveSuggestedAction(intent, true, userRole),
+    ...kinds,
+    suggestedAction: resolveSuggestedAction(intent, true, userRole, kinds),
   };
 }
 

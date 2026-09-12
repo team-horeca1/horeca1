@@ -16,7 +16,7 @@ const brandService = new BrandService();
 export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   requirePermission(ctx, 'settings.view');
   const userId = await resolveUserId(ctx, req);
-  const profile = await brandService.getMyProfile(userId);
+  const profile = await brandService.getMyProfile(userId, ctx.activeBrandId);
   return NextResponse.json({ success: true, data: profile });
 });
 
@@ -35,7 +35,7 @@ export const PATCH = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   const userId = await resolveUserId(ctx, req);
   const body = await req.json();
   const input = updateBrandSchema.parse(body);
-  const brand = await brandService.updateProfile(userId, input);
+  const brand = await brandService.updateProfile(userId, input, ctx.activeBrandId);
   return NextResponse.json({ success: true, data: brand });
 });
 

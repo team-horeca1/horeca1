@@ -390,6 +390,7 @@ export default function VendorStorePage() {
                     onSearchChange={setSearchQuery}
                     layoutMode={layoutMode}
                     onLayoutModeChange={updateLayoutMode}
+                    searchPlaceholder={`Search in ${vendor.name}`}
                 />
             )}
 

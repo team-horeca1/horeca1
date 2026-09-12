@@ -286,14 +286,11 @@ export function MobileBottomNav({
             subtitle="Manage profile details"
           />
           <PopupRow
-            href={isAuthenticated ? '/profile' : '/login'}
-            onClick={() => {
-              setPopup(null);
-              onBusinessSwitchClick?.();
-            }}
+            href={isAuthenticated ? '/businesses' : '/login'}
+            onClick={() => setPopup(null)}
             icon={Building2}
             title="My Businesses"
-            subtitle="Switch or manage outlets"
+            subtitle="Restaurant, supplier, and brand"
           />
           <PopupRow href="/profile/team" onClick={() => setPopup(null)} icon={Users} title="Team" subtitle="Users & permissions" />
           <PopupRow href="/profile" onClick={() => setPopup(null)} icon={Settings} title="Settings" subtitle="App preferences" />
@@ -322,7 +319,7 @@ export function MobileBottomNav({
                   } else if (item.id === 'credit') {
                     startLongPress('credit', () => router.push('/wallet'));
                   } else if (item.id === 'profile') {
-                    startLongPress('profile', () => onBusinessSwitchClick?.());
+                    startLongPress('profile', () => router.push(isAuthenticated ? '/businesses' : '/login'));
                   }
                 }}
                 onPointerUp={clearLongPress}

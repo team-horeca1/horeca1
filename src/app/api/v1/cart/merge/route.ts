@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { CartService, resolveCartContext } from '@/modules/cart/cart.service';
 import { withAuth } from '@/middleware/auth';
+import { requireStorefrontAccess } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 
 const cartService = new CartService();
@@ -25,6 +26,7 @@ const mergeSchema = z.object({
 
 export const POST = withAuth(async (req: NextRequest, ctx) => {
   try {
+    requireStorefrontAccess(ctx, 'storefront.order');
     const cartCtx = await resolveCartContext(ctx);
     const body = await req.json();
     const { items } = mergeSchema.parse(body);

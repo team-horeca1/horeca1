@@ -7,12 +7,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { CartService, resolveCartContext } from '@/modules/cart/cart.service';
 import { updateCartItemSchema } from '@/modules/cart/cart.validator';
 import { withAuth } from '@/middleware/auth';
+import { requireStorefrontAccess } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 
 const cartService = new CartService();
 
 export const PATCH = withAuth(async (req: NextRequest, ctx) => {
   try {
+    requireStorefrontAccess(ctx, 'storefront.order');
     const cartCtx = await resolveCartContext(ctx);
     const url = new URL(req.url);
     const segments = url.pathname.split('/');
@@ -30,6 +32,7 @@ export const PATCH = withAuth(async (req: NextRequest, ctx) => {
 
 export const DELETE = withAuth(async (req: NextRequest, ctx) => {
   try {
+    requireStorefrontAccess(ctx, 'storefront.order');
     const cartCtx = await resolveCartContext(ctx);
     const url = new URL(req.url);
     const segments = url.pathname.split('/');

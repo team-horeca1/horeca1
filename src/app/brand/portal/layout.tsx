@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { defaultPortalPath } from '@/lib/portalRouting';
-import { isPickerPending } from '@/lib/postLoginPicker';
+import { consumePickedAccount, isPickerInFlight, isPickerPending, peekPickedAccount } from '@/lib/postLoginPicker';
 import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
 import { signOut } from 'next-auth/react';
 import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/BusinessAccountSwitcherDropdown';
@@ -144,16 +144,20 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
         // Wait for the fresh-login picker: auto-switching here would fight the
         // account the user is choosing and re-arm the picker.
         if (isPickerPending(session?.user)) return;
-        const brandAccount = switcherAccounts.find((a) => a.isBrand);
+        const preferredId = peekPickedAccount();
+        const brandAccount =
+          (preferredId ? switcherAccounts.find((a) => a.id === preferredId && a.isBrand) : undefined)
+          ?? switcherAccounts.find((a) => a.isBrand);
         if (brandAccount) {
             if (brandAutoSwitchAttempted.current) return;
             brandAutoSwitchAttempted.current = true;
+            consumePickedAccount();
             void switchAccount(brandAccount.id).catch(() => {
                 brandAutoSwitchAttempted.current = false;
-                router.replace(defaultPortalPath(activeAccountType));
             });
             return;
         }
+        if (preferredId || isPickerInFlight()) return;
         router.replace(defaultPortalPath(activeAccountType));
     }, [
         status,

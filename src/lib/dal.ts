@@ -82,7 +82,7 @@ function toVendor(v: Record<string, unknown>): Vendor {
     logo: (v.logoUrl as string) || '/images/top vendors/emarket.png',
     coverImage: (v.bannerUrl as string) || '',
     rating: Number(v.rating) || 0,
-    totalRatings: 0,
+    totalRatings: typeof v.totalRatings === 'number' ? v.totalRatings : 0,
     deliverySchedule: nextDeliveryLabel(slots),
     deliveryTime: '24 hrs',
     minOrderValue: Number(v.minOrderValue) || 0,
@@ -93,6 +93,15 @@ function toVendor(v: Record<string, unknown>): Vendor {
     description: (v.description as string) || '',
     createdAt: v.createdAt ? String(v.createdAt) : undefined,
     productCount: typeof v.productCount === 'number' ? v.productCount : undefined,
+    address: (v.city || v.state)
+      ? {
+          line1: String(v.addressLine || ''),
+          city: String(v.city || ''),
+          state: String(v.state || ''),
+          postalCode: String(v.addressPincode || ''),
+          country: 'India',
+        }
+      : undefined,
   };
 }
 

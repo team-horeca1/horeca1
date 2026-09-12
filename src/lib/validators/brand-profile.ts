@@ -192,8 +192,19 @@ export function validateBrandProfile(
 
   if (context === 'addBusiness') {
     const rawLegal = trim(data.legalName);
+    const rawDisplay = rawDisplayName(data);
+    const rawFirst = trim(data.firstName);
+    const brandType = trim(data.brandType);
+    const subType = trim(data.subType);
     if (!rawLegal || rawLegal.length < 2) errors.legalName = 'Legal brand name is required';
-    if (!trim(data.brandType)) errors.brandType = 'Brand type is required';
+    if (!rawDisplay || rawDisplay.length < 2) errors.displayName = 'Display name is required';
+    if (!rawFirst || rawFirst.length < 2) errors.firstName = 'First name is required';
+    if (!brandType) errors.brandType = 'Brand type is required';
+    else if (isOtherSentinel(brandType)) errors.brandType = 'Type your own brand type';
+    if (!subType) errors.subType = 'Sub-type is required';
+    else if (isOtherSentinel(subType)) errors.subType = 'Type your own sub-type';
+    if (!phone || phone.length !== 10) errors.phone = 'Enter a valid 10-digit mobile number';
+    if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
     if (!outletName || outletName.length < 2) errors.outletName = 'Outlet name is required';
     if (!addressLine || addressLine.length < 5) errors.addressLine = 'Enter the full address';
     if (!pincode || !PINCODE_RE.test(pincode)) errors.pincode = 'Pincode must be 6 digits';

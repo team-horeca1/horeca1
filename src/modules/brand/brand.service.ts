@@ -132,9 +132,29 @@ export class BrandService {
   // Brand.userId is no longer unique — pick the most recently created brand
   // for this user. Callers that need a specific brand (multi-brand owners)
   // should resolve via the active business account context instead.
-  async getBrandIdForUser(userId: string): Promise<string> {
+  async getBrandIdForUser(userId: string, preferredBrandId?: string | null): Promise<string> {
+    if (preferredBrandId) {
+      const scoped = await prisma.brand.findFirst({
+        where: {
+          id: preferredBrandId,
+          OR: [
+            { userId },
+            { teamMembers: { some: { userId } } },
+            { businessAccount: { members: { some: { userId } } } },
+          ],
+        },
+        select: { id: true },
+      });
+      if (scoped) return scoped.id;
+    }
     const brand = await prisma.brand.findFirst({
-      where: { userId },
+      where: {
+        OR: [
+          { userId },
+          { teamMembers: { some: { userId } } },
+          { businessAccount: { members: { some: { userId } } } },
+        ],
+      },
       orderBy: { createdAt: 'desc' },
       select: { id: true },
     });
@@ -605,10 +625,10 @@ export class BrandService {
   // V2.2: a user may own multiple brand profiles. Return the most recently
   // created — callers that need a specific brand should resolve via active
   // business account context first and pass brandId in directly.
-  async getMyProfile(userId: string) {
-    const brand = await prisma.brand.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
+  async getMyProfile(userId: string, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
       include: {
         _count: {
           select: {
@@ -618,15 +638,16 @@ export class BrandService {
         },
       },
     });
-    if (!brand) throw Errors.notFound('Brand profile not found');
+    if (!brand) throw Errors.notFound('Brand profile not found for this user');
     return brand;
   }
 
   // ── Brand: update profile ──────────────────────────────────
-  async updateProfile(userId: string, input: UpdateBrandInput) {
-    const brand = await prisma.brand.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
+  async updateProfile(userId: string, input: UpdateBrandInput, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
+    const brand = await prisma.brand.findUnique({
+      where: { id: brandId },
+      select: { id: true },
     });
     if (!brand) throw Errors.notFound('Brand profile not found');
 
@@ -750,8 +771,8 @@ export class BrandService {
   }
 
   // ── Brand: find master product by SKU (brand-scoped) ───────
-  async findBrandProductBySku(userId: string, sku: string) {
-    const brandId = await this.getBrandIdForUser(userId);
+  async findBrandProductBySku(userId: string, sku: string, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
     return prisma.brandMasterProduct.findFirst({
       where: {
         brandId,
@@ -763,8 +784,8 @@ export class BrandService {
   }
 
   /** Pending / rejected / needs-changes MasterProduct for this brand with the same SKU. */
-  async findPendingMasterBySku(userId: string, sku: string) {
-    const brandId = await this.getBrandIdForUser(userId);
+  async findPendingMasterBySku(userId: string, sku: string, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
       select: {
@@ -795,8 +816,8 @@ export class BrandService {
   }
 
   // ── Brand: create master product ──────────────────────────
-  async createMasterProduct(userId: string, input: CreateBrandProductInput) {
-    const brandId = await this.getBrandIdForUser(userId);
+  async createMasterProduct(userId: string, input: CreateBrandProductInput, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
 
     // Resolve primary categoryId: prefer explicit input.categoryId, otherwise
     // fall back to the first entry in categoryIds[]. Keeps single-category
@@ -893,8 +914,8 @@ export class BrandService {
   }
 
   // ── Brand: submit new master catalog entry for admin approval ──
-  async submitPendingMasterProduct(userId: string, input: BrandMasterSubmitInput) {
-    const brandId = await this.getBrandIdForUser(userId);
+  async submitPendingMasterProduct(userId: string, input: BrandMasterSubmitInput, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
     const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { name: true } });
     if (!brand) throw Errors.notFound('Brand profile not found');
 
@@ -936,8 +957,8 @@ export class BrandService {
     return master;
   }
 
-  async updatePendingMasterProduct(userId: string, productId: string, input: BrandMasterUpdateInput) {
-    const brandId = await this.getBrandIdForUser(userId);
+  async updatePendingMasterProduct(userId: string, productId: string, input: BrandMasterUpdateInput, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
     const brand = await prisma.brand.findUnique({
       where: { id: brandId },
       select: {
@@ -1003,8 +1024,8 @@ export class BrandService {
   }
 
   // ── Brand: update master product ──────────────────────────
-  async updateMasterProduct(userId: string, productId: string, input: Partial<CreateBrandProductInput>) {
-    const brandId = await this.getBrandIdForUser(userId);
+  async updateMasterProduct(userId: string, productId: string, input: Partial<CreateBrandProductInput>, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
     const product = await prisma.brandMasterProduct.findFirst({
       where: { id: productId, brandId },
     });
@@ -1065,8 +1086,8 @@ export class BrandService {
   // ── Brand: delete master product (hard, with mapping cleanup) ─────────
   // BrandProductMapping cascades on brandMasterProductId, so this fully removes
   // the row and any mappings. Vendor-side Product rows are not touched.
-  async deleteMasterProduct(userId: string, productId: string) {
-    const brandId = await this.getBrandIdForUser(userId);
+  async deleteMasterProduct(userId: string, productId: string, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
     const product = await prisma.brandMasterProduct.findFirst({
       where: { id: productId, brandId },
       select: { id: true },
@@ -1077,8 +1098,8 @@ export class BrandService {
   }
 
   // ── Brand: get product-level coverage (for portal mappings page) ──────
-  async getDistributorCoverage(userId: string, vendorId?: string) {
-    const brandId = await this.getBrandIdForUser(userId);
+  async getDistributorCoverage(userId: string, vendorId?: string, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
 
     const approvedKeys = await getApprovedDistributorKeys({ brandId });
     const authRows = await prisma.brandAuthorizedDistributor.findMany({
@@ -1186,8 +1207,8 @@ export class BrandService {
   }
 
   // ── Brand: reject / flag an incorrect mapping ─────────────────────────
-  async brandRejectMapping(userId: string, mappingId: string, reviewNote?: string) {
-    const brandId = await this.getBrandIdForUser(userId);
+  async brandRejectMapping(userId: string, mappingId: string, reviewNote?: string, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
     const mapping = await prisma.brandProductMapping.findFirst({
       where: { id: mappingId, brandId },
     });
@@ -1209,8 +1230,8 @@ export class BrandService {
   // re-fetches coverage immediately after, and "Run Auto-Mapping" needs to
   // feel synchronous to the brand. Returns before/after counts so we can also
   // surface what changed in the UI later if needed.
-  async triggerMapping(userId: string) {
-    const brandId = await this.getBrandIdForUser(userId);
+  async triggerMapping(userId: string, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
     const before = await prisma.brandProductMapping.count({ where: { brandId } });
     try {
       await runMappingForBrand(brandId);

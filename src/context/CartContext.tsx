@@ -10,6 +10,11 @@ import {
 } from '@/lib/clearImpersonation';
 import { subscribeAuthTabEvents } from '@/lib/authTabSync';
 import { useStableSession } from '@/hooks/useStableSession';
+import { toast } from 'sonner';
+import {
+    describePurchaseAccess,
+    type PurchaseAccess,
+} from '@/lib/businessCapability';
 import {
     resolveSellableDisplayName,
     resolveSellableImages,
@@ -25,7 +30,7 @@ interface CartItemWithId extends CartItem {
 interface CartContextType {
     cart: CartItemWithId[];
     groups: VendorCartGroup[];
-    addToCart: (product: VendorProduct, quantity?: number) => void;
+    addToCart: (product: VendorProduct, quantity?: number) => boolean;
     removeFromCart: (productId: string) => void;
     /** Set absolute quantity (typed input, tier jumps). */
     updateQuantity: (productId: string, quantity: number) => void;
@@ -40,6 +45,7 @@ interface CartContextType {
     vendorCount: number;
     /** True during a full context-switch load (cart may be empty). False during silent revalidate. */
     isCartLoading: boolean;
+    purchaseAccess: PurchaseAccess;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -273,6 +279,12 @@ function saveLocalCart(
     } catch { /* ignore */ }
 }
 
+const EMPTY_ACCOUNT_CAPS: Array<{
+    isCustomer?: boolean;
+    isVendor?: boolean;
+    isBrand?: boolean;
+}> = [];
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
     const { session, isAuthenticated, isResolved } = useStableSession();
     const isLoggedIn = isAuthenticated;
@@ -284,6 +296,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const activeBAType = sessionUser.activeBusinessAccountType as
         | { isCustomer?: boolean; isVendor?: boolean; isBrand?: boolean }
         | undefined;
+    const availableAccounts = Array.isArray(sessionUser.availableAccounts)
+        ? (sessionUser.availableAccounts as Array<{
+            isCustomer?: boolean;
+            isVendor?: boolean;
+            isBrand?: boolean;
+        }>)
+        : EMPTY_ACCOUNT_CAPS;
     const [cart, setCart] = useState<CartItemWithId[]>([]);
     const [apiGroupMeta, setApiGroupMeta] = useState<Record<string, ApiGroupMeta>>({});
     const [isInitialized, setIsInitialized] = useState(false);
@@ -291,13 +310,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Last identity we finished loading for — session blips reuse this for silent revalidate.
     const lastContextKeyRef = useRef<string | null>(null);
 
-    // Align with requireStorefrontAccess: customer role OR active BA isCustomer
-    // (vendor JWT shopping on a customer BA must use server cart, not fragile local-only).
-    const shouldUseServerCart =
-        !isLoggedIn ||
-        buyerImpersonating ||
-        userRole === 'customer' ||
-        activeBAType?.isCustomer === true;
+    const purchaseAccess = useMemo(
+        () => describePurchaseAccess({
+            isLoggedIn,
+            role: userRole,
+            active: activeBAType,
+            accounts: availableAccounts.map((a) => ({
+                isCustomer: a.isCustomer ?? (a.isVendor !== true && a.isBrand !== true),
+                isVendor: a.isVendor === true,
+                isBrand: a.isBrand === true,
+            })),
+        }),
+        [isLoggedIn, userRole, activeBAType, availableAccounts],
+    );
+
+    // Buying requires an active restaurant/retail business (or admin / buyer impersonation).
+    const shouldUseServerCart = Boolean(
+        buyerImpersonating || (isLoggedIn && purchaseAccess.allowed),
+    );
 
     const applyApiCart = useCallback((apiData: { vendorGroups: unknown[]; total: number }) => {
         const { items, groupMeta } = parseApiCart(apiData);
@@ -348,13 +378,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (isLoggedIn && !shouldUseServerCart) {
-            // Vendor/brand/admin without a customer BA — local cart only (no /api/v1/cart).
-            // Must reload from localStorage after remount (Dashboard → storefront), otherwise
-            // the earlier setCart([]) + mirror effect permanently wipes the cart.
+            // Supplier/Brand (or guest-like browse) — no buying cart.
             setApiGroupMeta({});
-            if (!silent) {
-                setCart(loadLocalCart(userId, activeBAId, activeOutletId));
-            }
+            if (!silent) setCart([]);
             lastContextKeyRef.current = contextKey;
             setIsInitialized(true);
             return;
@@ -412,9 +438,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                     setIsInitialized(true);
                 });
         } else {
-            if (!silent) {
-                setCart(loadLocalCart(null));
-            }
+            if (!silent) setCart([]);
             lastContextKeyRef.current = contextKey;
             setIsInitialized(true);
         }
@@ -427,14 +451,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Skip while Admin View is on — otherwise the customer's cart overwrites the admin mirror key.
     useEffect(() => {
         if (!isInitialized || buyerImpersonating) return;
+        if (!shouldUseServerCart) return;
         saveLocalCart(cart, isLoggedIn ? userId : null, activeBAId, activeOutletId);
-    }, [cart, isInitialized, isLoggedIn, userId, activeBAId, activeOutletId, buyerImpersonating]);
+    }, [cart, isInitialized, isLoggedIn, userId, activeBAId, activeOutletId, buyerImpersonating, shouldUseServerCart]);
 
-    const addToCart = useCallback((product: VendorProduct, quantity: number = 1) => {
+    const addToCart = useCallback((product: VendorProduct, quantity: number = 1): boolean => {
+        if (!buyerImpersonating && !purchaseAccess.allowed) {
+            toast.error(purchaseAccess.message);
+            return false;
+        }
         // Cap to fulfillment-aware stock when known (stock > 0). stock === 0 means OOS.
         const maxStock = typeof product.stock === 'number' && product.stock > 0 ? product.stock : undefined;
         if (typeof product.stock === 'number' && product.stock <= 0) {
-            return;
+            return false;
         }
         if (maxStock != null && quantity > maxStock) {
             quantity = maxStock;
@@ -494,7 +523,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 return [...prev, { productId: product.id, product: productWithEffectivePrice, quantity, basePriceGross }];
             });
         }
-    }, [isLoggedIn, shouldUseServerCart, applyApiCart]);
+        return true;
+    }, [isLoggedIn, shouldUseServerCart, applyApiCart, buyerImpersonating, purchaseAccess]);
 
     // Side effects (API calls) must run OUTSIDE setCart's updater function —
     // React 19 strict mode invokes the updater twice, which would fire the
@@ -676,7 +706,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         totalAmount,
         vendorCount,
         isCartLoading,
-    }), [cart, groups, addToCart, removeFromCart, updateQuantity, adjustQuantity, clearCart, totalItems, subtotal, totalTaxable, totalGST, totalAmount, vendorCount, isCartLoading]);
+        purchaseAccess,
+    }), [cart, groups, addToCart, removeFromCart, updateQuantity, adjustQuantity, clearCart, totalItems, subtotal, totalTaxable, totalGST, totalAmount, vendorCount, isCartLoading, purchaseAccess]);
 
     return (
         <CartContext.Provider value={value}>

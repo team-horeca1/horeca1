@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Building2, MapPin, ChevronDown, Check, Loader2, AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+import { Building2, MapPin, ChevronDown, Check, Loader2, AlertCircle, Plus } from 'lucide-react';
 import { CDL } from '@/lib/cdl';
 import { useStableSession } from '@/hooks/useStableSession';
 import { useBusinessAccountSwitcher, type AccountSummary } from '@/hooks/useBusinessAccountSwitcher';
@@ -24,7 +25,7 @@ type StickyDeliverTo = {
 type AccountKind = 'customer' | 'vendor' | 'brand';
 
 const KIND_STYLE: Record<AccountKind, { label: string; color: string; bg: string }> = {
-  customer: { label: 'Customer', color: CDL.info, bg: CDL.infoLight },
+  customer: { label: 'Restaurant / Retail', color: CDL.info, bg: CDL.infoLight },
   vendor:   { label: 'Supplier', color: CDL.primary, bg: CDL.primaryLight },
   brand:    { label: 'Brand',    color: '#7C3AED', bg: '#EDE9FE' },
 };
@@ -412,7 +413,31 @@ export function NavContextSelector({ fallbackLabel, onFallbackClick, variant }: 
           {o.id === currentOutlet.id && <Check size={variant === 'mobile' ? 12 : 14} className="text-primary shrink-0" />}
         </button>
       ))}
-      <div className="border-t border-gray-100 mt-1.5 pt-1.5 px-0.5 sticky bottom-0 bg-white">
+      <div className="border-t border-gray-100 mt-1.5 pt-1.5 px-0.5 sticky bottom-0 bg-white space-y-0.5">
+        <Link
+          href="/businesses?add=buyer"
+          onClick={() => setOpen(false)}
+          className={`w-full flex items-center rounded-lg hover:bg-primary-light text-left text-primary font-bold transition-colors ${variant === 'mobile' ? 'gap-1.5 px-2 py-1.5 text-[11px]' : 'gap-2 px-2.5 py-2 text-[12px]'}`}
+        >
+          <Plus size={variant === 'mobile' ? 11 : 13} className="shrink-0 text-primary" />
+          Add restaurant or retail
+        </Link>
+        <Link
+          href="/businesses?add=brand"
+          onClick={() => setOpen(false)}
+          className={`w-full flex items-center rounded-lg hover:bg-primary-light text-left text-primary font-bold transition-colors ${variant === 'mobile' ? 'gap-1.5 px-2 py-1.5 text-[11px]' : 'gap-2 px-2.5 py-2 text-[12px]'}`}
+        >
+          <Plus size={variant === 'mobile' ? 11 : 13} className="shrink-0 text-primary" />
+          Add brand
+        </Link>
+        <Link
+          href="/businesses?add=supplier"
+          onClick={() => setOpen(false)}
+          className={`w-full flex items-center rounded-lg hover:bg-primary-light text-left text-primary font-bold transition-colors ${variant === 'mobile' ? 'gap-1.5 px-2 py-1.5 text-[11px]' : 'gap-2 px-2.5 py-2 text-[12px]'}`}
+        >
+          <Plus size={variant === 'mobile' ? 11 : 13} className="shrink-0 text-primary" />
+          Add supplier
+        </Link>
         <button
           type="button"
           onClick={() => {

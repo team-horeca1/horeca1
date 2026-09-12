@@ -33,7 +33,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
     availabilityLabel,
     forceInStockDisplay = false,
 }: VendorProductCardProps) {
-    const { addToCart, groups, updateQuantity, adjustQuantity, removeFromCart } = useCart();
+    const { addToCart, groups, updateQuantity, adjustQuantity, removeFromCart, purchaseAccess } = useCart();
     const { status: sessionStatus } = useSession();
 
     // ── Bulk pricing bottom-sheet state (opened from the mobile grid card's "Bulk ▾" chip) ──
@@ -108,6 +108,11 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         e.preventDefault();
         e.stopPropagation();
 
+        if (!purchaseAccess.allowed) {
+            toast.error(purchaseAccess.message);
+            return;
+        }
+
         const minQty = product.minOrderQuantity || 1;
         const maxStock = typeof product.stock === 'number' && product.stock > 0 ? product.stock : undefined;
 
@@ -131,7 +136,8 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 toast.error('Out of stock');
                 return;
             }
-            addToCart(product, firstAddQty);
+            const added = addToCart(product, firstAddQty);
+            if (!added) return;
             qty = firstAddQty;
         }
 

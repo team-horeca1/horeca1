@@ -2618,32 +2618,33 @@ export default function VendorDashboardPage() {
             <SetupBanner />
 
             {/* Header / Systems Operations Center */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 p-6 rounded-3xl border border-slate-800 shadow-[0_15px_30px_-5px_rgba(0,0,0,0.15)] relative overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-800 shadow-[0_15px_30px_-5px_rgba(0,0,0,0.15)] relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-success/10 rounded-full blur-[120px] pointer-events-none" />
                 <div className="absolute -bottom-20 left-10 w-[250px] h-[250px] bg-success-light0/5 rounded-full blur-[80px] pointer-events-none" />
                 
-                <div className="relative z-10">
+                <div className="relative z-10 min-w-0">
                     <div className="flex items-center gap-2.5 flex-wrap">
-                        <h1 className="text-[24px] font-semibold text-white tracking-tight leading-none">Today's Operations Control Center</h1>
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-success/10 text-success border border-primary/20 uppercase tracking-wider">
+                        <h1 className="text-[clamp(1.15rem,3.6vw,1.5rem)] font-semibold text-white tracking-tight leading-snug text-balance">Today&apos;s Operations</h1>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-success/10 text-success border border-primary/20 uppercase">
                             <span className="w-1.5 h-1.5 rounded-full bg-success-light0 animate-ping"></span>
-                            Live Pulse Active
+                            Live
                         </span>
                     </div>
-                    <p className="text-[12px] text-slate-400 font-medium mt-2">
-                        Store: <span className="font-bold text-slate-200">{scopedOutlet?.name || currentOutlet?.name || 'Online Store'}</span> · Connected Rep: <span className="font-bold text-slate-200">{session?.user?.name || 'Manager'}</span>
+                    <p className="text-[12px] text-slate-400 font-medium mt-2 text-pretty">
+                        Store: <span className="font-bold text-slate-200">{scopedOutlet?.name || currentOutlet?.name || 'Online Store'}</span>
+                        <span className="hidden sm:inline"> · Connected Rep: <span className="font-bold text-slate-200">{session?.user?.name || 'Manager'}</span></span>
                     </p>
                 </div>
-                <div className="flex items-center gap-3.5 self-end sm:self-center relative z-10">
-                    <span className="text-[11px] text-slate-450 font-extrabold hidden md:inline tracking-wider uppercase">
+                <div className="flex items-center gap-3.5 self-stretch sm:self-center relative z-10">
+                    <span className="text-[11px] text-slate-400 font-extrabold hidden md:inline uppercase">
                         REFRESHED: {lastRefresh.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                     </span>
                     <button
                         onClick={() => fetchDashboard()}
-                        className="h-10 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-[13px] font-medium text-slate-200 hover:text-white flex items-center gap-2 border border-slate-700/50 hover:border-slate-600 transition-all shadow-md active:scale-95 cursor-pointer"
+                        className="min-h-12 w-full sm:w-auto px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-[13px] font-medium text-slate-200 hover:text-white flex items-center justify-center gap-2 border border-slate-700/50 hover:border-slate-600 active:scale-[0.97] transition-transform"
                     >
                         <RefreshCw size={14} className={cn(loading && "animate-spin text-success")} />
-                        Refresh Control
+                        Refresh
                     </button>
                 </div>
             </div>

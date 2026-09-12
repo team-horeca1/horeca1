@@ -166,7 +166,7 @@ export function MyBusinessAccountsOverlay({ isOpen, onClose, onAccountDeleted }:
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           {acc.isCustomer && (
                             <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-[#7C7C7C] bg-[#F5F5F5] px-2 py-0.5 rounded-full">
-                              <ShoppingBag size={10} /> Customer
+                              <ShoppingBag size={10} /> Restaurant / Retail
                             </span>
                           )}
                           {acc.isVendor && (

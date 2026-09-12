@@ -8,13 +8,28 @@
 
 import { getSession } from 'next-auth/react';
 import { broadcastAuthEvent } from '@/lib/authTabSync';
-import { accountCanAccessPath, defaultPortalPath, type AccountPortalCaps } from '@/lib/portalRouting';
+import {
+  accountCanAccessPath,
+  defaultPortalPath,
+  supplierLandingPath,
+  type AccountPortalCaps,
+} from '@/lib/portalRouting';
 import { setEnteredStore } from '@/lib/supplierPortalLevel';
 
 export const FORCE_PICKER_COOKIE = 'horeca_force_account_picker';
 export const PENDING_REDIRECT_KEY = 'horeca_pending_post_login_redirect';
 export const DISMISS_KEY = 'horeca_post_login_selector_dismissed';
 export const SETTLED_KEY = 'horeca_picker_settled_at';
+export const PICK_IN_FLIGHT_KEY = 'horeca_picker_in_flight';
+export const PICKED_ACCOUNT_KEY = 'horeca_picked_account_id';
+export const LOGIN_HANDOFF_KEY = 'horeca_login_handoff';
+
+export type PickerUserFlags = {
+  forceAccountPicker?: boolean;
+  pickerArmedAt?: number;
+  totalAccountCount?: number;
+  role?: string;
+};
 
 /**
  * How long a fresh login stays "must pick". The JWT stores only an armed-at
@@ -68,9 +83,102 @@ export function clearDismissFlag(): void {
     /* ignore */
   }
   try {
+    sessionStorage.removeItem(PICK_IN_FLIGHT_KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
+    sessionStorage.removeItem(PICKED_ACCOUNT_KEY);
+  } catch {
+    /* ignore */
+  }
+  try {
     localStorage.removeItem(SETTLED_KEY);
   } catch {
     /* ignore */
+  }
+}
+
+export function markLoginHandoff(): void {
+  try {
+    sessionStorage.setItem(LOGIN_HANDOFF_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearLoginHandoff(): void {
+  try {
+    sessionStorage.removeItem(LOGIN_HANDOFF_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function hasLoginHandoff(): boolean {
+  try {
+    return sessionStorage.getItem(LOGIN_HANDOFF_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markPickerInFlight(): void {
+  try {
+    sessionStorage.setItem(PICK_IN_FLIGHT_KEY, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearPickerInFlight(): void {
+  try {
+    sessionStorage.removeItem(PICK_IN_FLIGHT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function isPickerInFlight(): boolean {
+  try {
+    const raw = sessionStorage.getItem(PICK_IN_FLIGHT_KEY);
+    if (!raw) return false;
+    const t = Number(raw);
+    if (Number.isFinite(t) && t > 0) return Date.now() - t < 15_000;
+    return raw === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function rememberPickedAccount(id: string | null | undefined): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    if (id) sessionStorage.setItem(PICKED_ACCOUNT_KEY, id);
+    else sessionStorage.removeItem(PICKED_ACCOUNT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function peekPickedAccount(): string | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const id = sessionStorage.getItem(PICKED_ACCOUNT_KEY);
+    return id && id.length > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+export function consumePickedAccount(): string | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const id = sessionStorage.getItem(PICKED_ACCOUNT_KEY);
+    sessionStorage.removeItem(PICKED_ACCOUNT_KEY);
+    return id && id.length > 0 ? id : null;
+  } catch {
+    return null;
   }
 }
 
@@ -109,15 +217,27 @@ export function isPickerSettled(armedAt: number | null | undefined): boolean {
 }
 
 /**
- * True while a fresh-login pick is still owed. Portal layouts check this before
- * auto-switching the active business, so their auto-switch never overrides the
- * account the user is about to choose (which would re-arm the picker).
+ * True while a fresh-login pick is still owed. Portal layouts and the
+ * account-switcher bootstrap check this before auto-switching, so they never
+ * override the account the user is about to choose.
+ *
+ * The JWT stores `pickerArmedAt` (not a boolean). `forceAccountPicker` is a
+ * leftover flag — either signal plus the short-lived cookie counts, unless
+ * this login was already answered.
  */
-export function isPickerPending(
-  user: { forceAccountPicker?: boolean; pickerArmedAt?: number } | null | undefined,
-): boolean {
-  if (user?.forceAccountPicker !== true) return false;
-  return !isPickerSettled(user.pickerArmedAt);
+export function isPickerPending(user: PickerUserFlags | null | undefined): boolean {
+  if (user?.role === 'admin') return false;
+  if (isPickerSettled(user?.pickerArmedAt)) return false;
+  // Pick already chosen — destination layouts must be allowed to switch.
+  if (isPickerInFlight() || peekPickedAccount()) return false;
+  const count = user?.totalAccountCount;
+  if (typeof count === 'number' && count <= 1) return false;
+  if (readForcePickerCookie()) return true;
+  if (user?.forceAccountPicker === true) return true;
+  if (typeof user?.pickerArmedAt === 'number') {
+    return Date.now() - user.pickerArmedAt < PICKER_TTL_MS;
+  }
+  return false;
 }
 
 export function sanitizeRedirect(url: string | null | undefined): string | null {
@@ -125,6 +245,19 @@ export function sanitizeRedirect(url: string | null | undefined): string | null 
   const trimmed = url.trim();
   if (!trimmed.startsWith('/') || trimmed.startsWith('//')) return null;
   return trimmed;
+}
+
+/** Login came from “add this business type” — skip the account picker. */
+export function isOnboardOrAddRedirect(url: string | null | undefined): boolean {
+  const safe = sanitizeRedirect(url);
+  if (!safe) return false;
+  const [path, query = ''] = safe.split('?');
+  if (path === '/vendor/register' || path === '/brand/register') return true;
+  if (path === '/businesses') {
+    const add = new URLSearchParams(query).get('add');
+    return add === 'buyer' || add === 'customer' || add === 'brand' || add === 'supplier' || add === 'vendor';
+  }
+  return false;
 }
 
 export function setPendingRedirect(url: string | null): void {
@@ -160,10 +293,13 @@ export function resolvePostLoginDestination(
   role?: string | null,
 ): string {
   const safe = sanitizeRedirect(redirectTo);
-  if (safe) return safe;
+  // Marketplace home is the login default, not an explicit deep-link.
+  // Supplier / brand / admin should land on their dashboard instead.
+  const genericHome = safe === '/';
+  if (safe && !genericHome) return safe;
   if (role === 'admin') return '/admin/dashboard';
   if (caps) return defaultPortalPath(caps);
-  return '/';
+  return safe || '/';
 }
 
 export function capsFromSessionUser(user: {
@@ -189,12 +325,17 @@ export function capsFromSessionUser(user: {
   return null;
 }
 
+function shouldAbortPreparedNavigation(): boolean {
+  return isPickerInFlight() || hasLoginHandoff();
+}
+
 /** Called after OTP/password sign-in on the login page. */
 export async function prepareFreshLoginNavigation(
   redirectTo: string | null,
   opts?: { picker?: boolean },
 ): Promise<void> {
   const allowPicker = opts?.picker !== false;
+  if (!allowPicker && shouldAbortPreparedNavigation()) return;
   clearDismissFlag();
   // Never resume a previous "Entered Store" session after a fresh login —
   // multi-store team members must land on the business/store picker.
@@ -213,16 +354,36 @@ export async function prepareFreshLoginNavigation(
     isStoreScopedOnly?: boolean;
     totalAccountCount?: number;
     availableAccounts?: unknown[];
+    pickerArmedAt?: number;
   } | null | undefined;
   const totalAccountCount = user?.totalAccountCount
     ?? (Array.isArray(user?.availableAccounts) ? user.availableAccounts.length : 0);
 
+  if (!allowPicker && shouldAbortPreparedNavigation()) return;
+
+  const onboardRedirect = sanitizeRedirect(redirectTo);
+  if (isOnboardOrAddRedirect(onboardRedirect)) {
+    markPickerSettled(user?.pickerArmedAt);
+    clearForcePickerCookie();
+    try {
+      sessionStorage.removeItem(PENDING_REDIRECT_KEY);
+    } catch {
+      /* ignore */
+    }
+    window.location.href = onboardRedirect!;
+    return;
+  }
+
   if (allowPicker && role !== 'admin' && totalAccountCount > 1) {
     setPendingRedirect(redirectTo);
     setForcePickerCookie();
-    window.location.href = '/';
+    // Stay on this page. Hard-nav to `/` remounts the picker (flash: modal →
+    // storefront → modal) and the session.update() after a pick can swallow
+    // navigation. The in-page selector is the next step.
     return;
   }
+
+  if (!allowPicker && shouldAbortPreparedNavigation()) return;
 
   clearForcePickerCookie();
   try {
@@ -245,9 +406,11 @@ export async function prepareFreshLoginNavigation(
     }
   }
 
+  if (!allowPicker && shouldAbortPreparedNavigation()) return;
+
   // Store-scoped team members → Businesses picker (Enter the store they need).
   if (!sanitizeRedirect(redirectTo) && role !== 'admin' && user?.isStoreScopedOnly) {
-    window.location.href = '/vendor/businesses';
+    window.location.href = '/businesses?type=supplier';
     return;
   }
   window.location.href = resolvePostLoginDestination(redirectTo, caps, role);
@@ -263,6 +426,19 @@ function normalizeChosenCaps(
   return { isCustomer: chosen.isCustomer ?? (!isVendor && !isBrand), isVendor, isBrand };
 }
 
+/** Sync destination for a picker choice — no session fetch. */
+export function destinationAfterAccountPick(
+  chosen?: (Partial<AccountPortalCaps> & { id?: string }) | null,
+): string {
+  const caps = normalizeChosenCaps(chosen);
+  if (!caps) return '/';
+  if (caps.isVendor) {
+    const id = typeof chosen?.id === 'string' && chosen.id.length > 0 ? chosen.id : null;
+    return supplierLandingPath(id);
+  }
+  return defaultPortalPath(caps);
+}
+
 /**
  * Called when the picker finishes (or when no pick is needed).
  * Honors a pending deep-link; otherwise lands on the portal for the chosen account.
@@ -275,7 +451,7 @@ function normalizeChosenCaps(
  */
 export async function completePostLoginPicker(
   contextChanged = true,
-  chosen?: Partial<AccountPortalCaps> | null,
+  chosen?: (Partial<AccountPortalCaps> & { id?: string }) | null,
 ): Promise<void> {
   clearForcePickerCookie();
   try {
@@ -286,6 +462,9 @@ export async function completePostLoginPicker(
   const chosenCaps = normalizeChosenCaps(chosen);
   let pending = sanitizeRedirect(consumePendingRedirect());
   if (pending && chosenCaps && !accountCanAccessPath(pending, chosenCaps)) {
+    pending = null;
+  }
+  if (pending === '/' && chosenCaps && (chosenCaps.isVendor || chosenCaps.isBrand)) {
     pending = null;
   }
   const here =
@@ -300,6 +479,15 @@ export async function completePostLoginPicker(
     return;
   }
 
+  if (chosenCaps) {
+    rememberPickedAccount(typeof chosen?.id === 'string' ? chosen.id : null);
+    const dest = destinationAfterAccountPick(chosen);
+    if (dest !== here) {
+      window.location.href = dest;
+    }
+    return;
+  }
+
   let session = await getSession();
   if (!session?.user) {
     await new Promise((r) => setTimeout(r, 150));
@@ -307,12 +495,12 @@ export async function completePostLoginPicker(
   }
   const user = session?.user as { isStoreScopedOnly?: boolean; role?: string } | null | undefined;
   if (user?.role !== 'admin' && user?.isStoreScopedOnly) {
-    window.location.href = '/vendor/businesses';
+    window.location.href = '/businesses?type=supplier';
     return;
   }
   const dest = resolvePostLoginDestination(
     null,
-    chosenCaps ?? capsFromSessionUser(session?.user ?? null),
+    capsFromSessionUser(session?.user ?? null),
     session?.user?.role ?? null,
   );
   if (dest !== here) {

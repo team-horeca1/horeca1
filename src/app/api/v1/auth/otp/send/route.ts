@@ -18,12 +18,12 @@ function parseIntent(raw: unknown): EmailCheckIntent {
 
 function emailExistsMessage(intent: EmailCheckIntent): string {
   if (intent === 'vendor') {
-    return 'This email is already registered. Log in to add a vendor under your account.';
+    return 'This email is already registered. Log in to add a Supplier under the same login.';
   }
   if (intent === 'brand') {
-    return 'This email is already registered. Log in to add a brand under your account.';
+    return 'This email is already registered. Log in to add a Brand under the same login.';
   }
-  return 'This email is already registered. Log in instead of creating a duplicate account.';
+  return 'This email is already registered. Log in to add a restaurant or retail business under the same login.';
 }
 
 function generateOTP(): string {
@@ -89,7 +89,7 @@ async function postHandler(req: NextRequest) {
 
     if (useEmail && mode === 'register') {
       const check = await lookupEmailForRegistration(email, intent);
-      if (check.exists && check.suggestedAction === 'login_only') {
+      if (check.exists) {
         return NextResponse.json(
           {
             success: false,

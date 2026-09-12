@@ -1,28 +1,28 @@
-export type AccountPortalCaps = {
-  isCustomer: boolean;
-  isVendor: boolean;
-  isBrand: boolean;
-};
+import {
+  defaultPortalPath,
+  type AccountPortalCaps,
+} from '@/lib/businessCapability';
 
-/** Default landing page for an account's primary portal. */
-export function defaultPortalPath(account: AccountPortalCaps): string {
-  if (account.isVendor) return '/vendor/overview';
-  if (account.isBrand) return '/brand/portal';
-  return '/';
-}
+export type { AccountPortalCaps };
+export { supplierLandingPath, supplierDashboardPath, SUPPLIER_HUB_PATH } from '@/lib/businessCapability';
+export { defaultPortalPath };
 
 /** Whether this account may use routes under the given pathname prefix. */
 export function accountCanAccessPath(pathname: string, account: AccountPortalCaps): boolean {
-  if (pathname === '/brand/register' || pathname === '/vendor/register') return true;
-  if (pathname.startsWith('/vendor')) return account.isVendor;
-  if (pathname.startsWith('/brand')) return account.isBrand;
+  const path = pathname.split('?')[0] ?? pathname;
+  if (
+    path === '/brand/register'
+    || path === '/vendor/register'
+    || path === '/businesses'
+    || path.startsWith('/businesses/')
+  ) {
+    return true;
+  }
+  if (path.startsWith('/vendor')) return account.isVendor;
+  if (path.startsWith('/brand')) return account.isBrand;
   return true;
 }
 
-/**
- * When the user switches business account on a portal-specific route,
- * return where they should go instead of staying on a blocked page.
- */
 export function redirectIfPortalMismatch(
   pathname: string,
   account: AccountPortalCaps,

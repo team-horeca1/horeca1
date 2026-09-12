@@ -20,11 +20,11 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
 });
 
 export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
-  await resolveBrandContext(ctx, req); // tenant guard
+  const { brandId } = await resolveBrandContext(ctx, req); // tenant guard
   requirePermission(ctx, 'products.create');
   const userId = await resolveUserId(ctx, req);
   const body = await req.json();
   const input = createBrandProductSchema.parse(body);
-  const product = await brandService.createMasterProduct(userId, input);
+  const product = await brandService.createMasterProduct(userId, input, brandId);
   return NextResponse.json({ success: true, data: product }, { status: 201 });
 });

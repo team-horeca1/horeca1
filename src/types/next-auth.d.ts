@@ -25,6 +25,7 @@ declare module 'next-auth' {
       availableAccounts?: Array<{
         id: string;
         displayName: string | null;
+        isCustomer: boolean;
         isVendor: boolean;
         isBrand: boolean;
       }>;
@@ -67,6 +68,7 @@ declare module 'next-auth/jwt' {
     availableAccounts?: Array<{
       id: string;
       displayName: string | null;
+      isCustomer: boolean;
       isVendor: boolean;
       isBrand: boolean;
     }>;

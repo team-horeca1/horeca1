@@ -352,7 +352,7 @@ function DeliveringToRow() {
 function CheckoutPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { groups, clearCart, removeFromCart, isCartLoading } = useCart();
+    const { groups, clearCart, removeFromCart, isCartLoading, purchaseAccess } = useCart();
     const { status: sessionStatus } = useSession();
 
     useEffect(() => {
@@ -360,8 +360,12 @@ function CheckoutPageContent() {
             const qs = searchParams?.toString();
             const returnTo = qs ? `/checkout?${qs}` : '/checkout';
             router.replace(`/login?redirect=${encodeURIComponent(returnTo)}`);
+            return;
         }
-    }, [sessionStatus, router, searchParams]);
+        if (sessionStatus === 'authenticated' && !purchaseAccess.allowed) {
+            router.replace(purchaseAccess.href || '/businesses?add=buyer');
+        }
+    }, [sessionStatus, router, searchParams, purchaseAccess.allowed, purchaseAccess.href]);
     const { currentOutlet, activeBusinessAccountId, activeOutletId } = useBusinessAccountSwitcher();
     const { selectedAddress } = useAddress();
     // Outlet on JWT is optional — saved "Deliver to" address is enough (server resolves at order time).

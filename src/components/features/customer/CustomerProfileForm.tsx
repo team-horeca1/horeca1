@@ -69,7 +69,7 @@ export interface CustomerProfileFormProps {
   onContactPersonsChange?: (contacts: ContactPerson[]) => void;
   className?: string;
   /** wide = 3-column grid on large screens — used on /register to reduce form height */
-  layout?: 'default' | 'wide';
+  layout?: 'default' | 'wide' | 'modal';
   /** Slim 6-field customer signup. Default keeps the full admin / add-business form. */
   mode?: 'register' | 'full';
   /** Customer complete-profile uses free-text type/sub-type. Admin keeps dropdowns. */
@@ -144,13 +144,16 @@ export function CustomerProfileForm({
   const set = (patch: Partial<CustomerProfileValues>) => onChange(patch);
   const blur = (field: string, v: string) => onFieldBlur?.(field, v);
   const isWide = layout === 'wide';
+  const isModal = layout === 'modal';
   const isTextTypes = businessTypeInput === 'text';
   const relaxedContact = isRegisterEmailOtpEnabled() && mode !== 'register' && !omitCoreFields;
-  const GRID = isWide
-    ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3'
-    : 'grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4';
-  const SPAN_FULL = isWide ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2';
-  const SPAN_TWO = isWide ? 'sm:col-span-2' : 'sm:col-span-2';
+  const GRID = isModal
+    ? 'flex flex-col gap-4 min-w-0'
+    : isWide
+      ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3'
+      : 'grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4';
+  const SPAN_FULL = isModal ? 'w-full min-w-0' : isWide ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2';
+  const SPAN_TWO = isModal ? 'w-full min-w-0' : isWide ? 'sm:col-span-2' : 'sm:col-span-2';
 
   const handleBusinessTypeChange = (businessType: string) => {
     if (isTextTypes) {
@@ -334,9 +337,68 @@ export function CustomerProfileForm({
   );
 
   return (
-    <div className={cn(isWide ? 'space-y-4' : 'space-y-5', className)}>
+    <div className={cn(isModal ? 'space-y-4 min-w-0' : isWide ? 'space-y-4' : 'space-y-5', className)}>
       {(visibleSections.contact || visibleSections.business || visibleSections.auth) && (
         <div className={cn(GRID, 'space-y-0')}>
+          {isModal && !omitCoreFields && visibleSections.contact && visibleSections.business ? (
+            <>
+              <TextField
+                label="First Name"
+                required
+                dataField="firstName"
+                value={value.firstName ?? ''}
+                error={errors.firstName}
+                onChange={v => set({ firstName: v })}
+                onBlur={() => blur('firstName', value.firstName ?? '')}
+                placeholder="First name"
+              />
+              <TextField
+                label="Last Name"
+                required
+                dataField="lastName"
+                value={value.lastName ?? ''}
+                error={errors.lastName}
+                onChange={v => set({ lastName: v })}
+                onBlur={() => blur('lastName', value.lastName ?? '')}
+                placeholder="Last name"
+              />
+              <div data-field="legalName">
+                <TextField label="Legal Business Name" required value={value.legalName ?? value.companyName ?? ''}
+                  error={errors.legalName}
+                  onChange={v => set({ legalName: v, companyName: v })}
+                  placeholder="Restaurant / hotel / company" />
+              </div>
+              <TextField label="Display Name" required hint="Shown on invoices & lists"
+                value={value.displayName ?? ''} error={errors.displayName}
+                onChange={v => set({ displayName: v })}
+                onBlur={() => blur('displayName', value.displayName ?? '')}
+                placeholder="e.g. Rockville Bar & Diner" />
+              <FormField label="Mobile" required className={SPAN_FULL} dataField="phone" error={errors.phone}>
+                <PhoneInput
+                  value={value.phone ?? value.mobilePhone ?? ''}
+                  onChange={v => set({ phone: v, mobilePhone: v })}
+                  hasError={!!errors.phone}
+                />
+              </FormField>
+              <TextField
+                label="Email (optional)"
+                type="email"
+                dataField="email"
+                value={value.email ?? ''}
+                error={errors.email}
+                onChange={v => set({ email: v })}
+                placeholder="you@example.com"
+              />
+              <TextField
+                label="Designation (optional)"
+                value={value.designation ?? ''}
+                onChange={v => set({ designation: v })}
+                placeholder="e.g. Procurement Manager"
+              />
+              <SectionHeader icon={Building2} spanClass={SPAN_FULL}>Business Identity</SectionHeader>
+            </>
+          ) : (
+          <>
           {visibleSections.contact && (
             <>
               <SectionHeader icon={User} spanClass={SPAN_FULL}>Primary Contact</SectionHeader>
@@ -353,7 +415,7 @@ export function CustomerProfileForm({
               ) : (
                 <>
                   <FormField label="Primary Contact" className={SPAN_FULL}>
-                    <div data-field="firstName" className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
+                    <div data-field="firstName" className={cn('grid gap-2 min-w-0', isWide ? 'grid-cols-[100px_1fr_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
                       <FormSelect value={value.salutation ?? ''} onChange={v => set({ salutation: v })}>
                         {SALUTATIONS.map(s => <option key={s || 'empty'} value={s}>{s || 'Salutation'}</option>)}
                       </FormSelect>
@@ -387,11 +449,20 @@ export function CustomerProfileForm({
                       onChange={v => set({ legalName: v, companyName: v })}
                       placeholder="Restaurant / hotel / company" />
                   </div>
-                  <TextField label="Trade Name / Display Name" hint="Shown on invoices & lists"
-                    value={value.displayName ?? ''} onChange={v => set({ displayName: v })}
+                  <TextField label="Display Name" required={isModal} hint="Shown on invoices & lists"
+                    value={value.displayName ?? ''} error={errors.displayName}
+                    onChange={v => set({ displayName: v })}
+                    onBlur={() => blur('displayName', value.displayName ?? '')}
                     placeholder="e.g. Rockville Bar & Diner" />
                 </>
               )}
+              </>
+          )}
+          </>
+          )}
+
+          {visibleSections.business && (
+            <>
               {isTextTypes ? (
                 <>
                   <TextField
@@ -635,7 +706,7 @@ export function CustomerProfileForm({
             <div key={i} className="border border-[#EEEEEE] rounded-[12px] p-4 space-y-3 relative">
               <button type="button" onClick={() => onContactPersonsChange(contactPersons.filter((_, idx) => idx !== i))}
                 className="absolute top-3 right-3 text-gray-300 hover:text-red-500"><Trash2 size={15} /></button>
-              <div className="grid grid-cols-[100px_1fr_1fr] gap-2">
+              <div className={cn('grid gap-2 min-w-0', isModal ? 'grid-cols-1' : 'grid-cols-[100px_1fr_1fr]')}>
                 <FormSelect value={c.salutation ?? ''} onChange={v => {
                   const next = [...contactPersons]; next[i] = { ...c, salutation: v }; onContactPersonsChange(next);
                 }}>

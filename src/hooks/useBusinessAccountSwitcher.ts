@@ -20,9 +20,10 @@ import {
   tryAcquireBootstrapLock,
   releaseBootstrapLock,
 } from '@/lib/authTabSync';
-import { clearUserClientStores, localCartHasItems } from '@/lib/userScopedStorage';
+import { clearUserClientStores } from '@/lib/userScopedStorage';
 import { clientLogout, markSigningOut } from '@/lib/clientLogout';
 import { readEnteredStore } from '@/lib/supplierPortalLevel';
+import { hasLoginHandoff, isPickerInFlight, isPickerPending, readForcePickerCookie } from '@/lib/postLoginPicker';
 import { toast } from 'sonner';
 
 /** Same-tab sync: each useBusinessAccountSwitcher() has its own state — broadcast outlet switches. */
@@ -58,6 +59,8 @@ export interface AccountSummary {
   isPrimary: boolean;
   primaryOutletId: string | null;
   outlets: Array<{ id: string; name: string; pincode: string | null; requiresAddressUpdate: boolean }>;
+  stores?: Array<{ id: string; name: string }>;
+  catalogueCount?: number;
 }
 
 export interface OutletSummary {
@@ -338,7 +341,9 @@ export function useBusinessAccountSwitcher() {
       outletId?: string,
       opts?: { redirect?: boolean },
     ) => {
-      if (switching) return;
+      if (switching) {
+        throw new AccountSwitchError('Account switch already in progress');
+      }
 
       // Admin View: switch to primary Online Store under the target Business
       if (isAdminVendorImpersonationActive()) {
@@ -614,42 +619,35 @@ export function useBusinessAccountSwitcher() {
     ],
   );
 
-  // Bootstrap session when JWT is missing account/outlet, or when the active BA
-  // is a personal shopping BA while primary is vendor/brand (Dashboard lives there).
-  // Do NOT snap away from another intentional vendor/brand business (multi-BA Enter).
+  // Bootstrap only when JWT has no active BA. Never steal a restaurant/retail
+  // context — vendor/brand portals switch themselves on entry.
   useEffect(() => {
     if (customerImpersonating || vendorImpersonating) return;
     if (!userId || loading || switching || accounts.length === 0) return;
     if (bootstrapAttempted.current) return;
     // Store Ops Enter already set JWT BA/store — do not undo on remount/reload.
     if (readEnteredStore()) return;
+    if (pathname === '/login' || pathname === '/register') return;
+    // Fresh-login picker is still owed — do not steal the account the user is
+    // about to choose (or bounce Brand/Supplier after they pick).
+    if (
+      readForcePickerCookie()
+      || hasLoginHandoff()
+      || isPickerInFlight()
+      || isPickerPending({
+        forceAccountPicker: u.forceAccountPicker === true,
+        pickerArmedAt: typeof u.pickerArmedAt === 'number' ? u.pickerArmedAt : undefined,
+        totalAccountCount: typeof u.totalAccountCount === 'number' ? u.totalAccountCount : undefined,
+        role: typeof u.role === 'string' ? u.role : undefined,
+      })
+    ) return;
 
     const primary = accounts.find((a) => a.isPrimary) ?? accounts[0];
     const defaultOutletId =
       primary.primaryOutletId ?? primary.outlets[0]?.id ?? null;
-    const activeAccount =
-      accounts.find((a) => a.id === activeBusinessAccountId) ?? null;
-    const stuckOnShoppingBa =
-      !!activeAccount && !activeAccount.isVendor && !activeAccount.isBrand;
-    const needsPrimarySwitch =
-      !activeBusinessAccountId
-      || (
-        activeBusinessAccountId !== primary.id
-        && (primary.isVendor || primary.isBrand)
-        && stuckOnShoppingBa
-      );
+    const needsPrimarySwitch = !activeBusinessAccountId;
 
     if (needsPrimarySwitch) {
-      // Keep shopping BA while the storefront cart still has items — switching to
-      // the vendor/brand BA would hydrate an empty cart and wipe the shopping mirror.
-      if (
-        stuckOnShoppingBa
-        && userId
-        && activeBusinessAccountId
-        && localCartHasItems(userId, activeBusinessAccountId, activeOutletId)
-      ) {
-        return;
-      }
       if (!tryAcquireBootstrapLock()) return;
       bootstrapAttempted.current = true;
       void switchAccount(primary.id, defaultOutletId ?? undefined).catch(() => {
@@ -682,6 +680,11 @@ export function useBusinessAccountSwitcher() {
     currentAccount,
     switchAccount,
     switchOutlet,
+    u.pickerArmedAt,
+    u.forceAccountPicker,
+    u.totalAccountCount,
+    u.role,
+    pathname,
   ]);
 
   // Legacy sessions: refresh JWT so server can provision BusinessAccount if missing.

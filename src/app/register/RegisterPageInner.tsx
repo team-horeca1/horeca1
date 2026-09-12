@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { FORM } from '@/components/ui/form';
 import { RegisterRolePicker } from '@/components/auth/RegisterRolePicker';
 import { ExistingPhoneModal } from '@/components/auth/ExistingPhoneModal';
-import { accountLabelFromCheck } from '@/lib/auth/phoneCheckLabels';
+import { accountLabelFromCheck, existingPhoneRedirect } from '@/lib/auth/phoneCheckLabels';
 import type { PhoneCheckResult } from '@/lib/auth/checkPhoneLookup';
 import {
   CustomerProfileForm,
@@ -53,8 +53,12 @@ export default function RegisterPageInner() {
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
     if (step === 'complete' || step === 'otp' || step === 'success') return;
-    window.location.href = redirectTo || '/';
-  }, [sessionStatus, redirectTo, step]);
+    if (role === 'customer') {
+      window.location.href = '/businesses?add=buyer';
+      return;
+    }
+    window.location.href = '/businesses';
+  }, [sessionStatus, redirectTo, step, role]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState('');
@@ -146,7 +150,7 @@ export default function RegisterPageInner() {
           phone,
           hcidDisplay: data.hcidDisplay,
           accountLabel: accountLabelFromCheck(data),
-          suggestedAction: 'login_only',
+          suggestedAction: data.suggestedAction === 'login_only' ? 'login_only' : 'login_to_link',
           contactType: 'phone',
         });
         return;
@@ -170,7 +174,7 @@ export default function RegisterPageInner() {
             phone: email,
             hcidDisplay: existing.hcidDisplay,
             accountLabel: accountLabelFromCheck(existing),
-            suggestedAction: 'login_only',
+            suggestedAction: existing.suggestedAction === 'login_only' ? 'login_only' : 'login_to_link',
             contactType: 'email',
           });
           return;
@@ -505,8 +509,11 @@ export default function RegisterPageInner() {
         hcidDisplay={existingPhoneModal?.hcidDisplay}
         accountLabel={existingPhoneModal?.accountLabel ?? 'Customer'}
         intent="customer"
-        redirectTo={redirectTo || '/'}
-        suggestedAction={existingPhoneModal?.suggestedAction ?? 'login_only'}
+        redirectTo={existingPhoneRedirect(
+          'customer',
+          existingPhoneModal?.suggestedAction ?? 'login_to_link',
+        )}
+        suggestedAction={existingPhoneModal?.suggestedAction ?? 'login_to_link'}
         contactType={existingPhoneModal?.contactType ?? 'phone'}
         onClose={() => setExistingPhoneModal(null)}
         onUseDifferentNumber={() => {

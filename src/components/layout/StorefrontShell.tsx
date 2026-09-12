@@ -8,6 +8,7 @@ import { AddressProvider } from '@/context/AddressContext';
 import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 import { VendorApplicationBanner } from '@/components/features/homepage/VendorApplicationBanner';
 import { AdminImpersonationBanner } from '@/components/features/admin/AdminCustomerImpersonationBanner';
+import { BrowseOnlyBanner } from '@/components/layout/BrowseOnlyBanner';
 import type { InitialNav } from '@/lib/navChrome';
 
 const MandatoryAddressGate = dynamic(
@@ -40,6 +41,7 @@ export function StorefrontShell({
           </div>
           <OutletCompletionBanner />
           <VendorApplicationBanner />
+          <BrowseOnlyBanner />
           <main className="w-full min-h-screen pb-20 lg:pb-0">{children}</main>
           <Footer />
           <MandatoryAddressGate />

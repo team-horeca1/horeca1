@@ -19,7 +19,7 @@ export default function VendorOutletsPage() {
           Warehouses retired — create another Online Store instead.
         </p>
         <Link
-          href="/vendor/businesses"
+          href="/businesses"
           className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white text-[14px] font-bold rounded-[10px] transition-colors"
         >
           Go to Businesses

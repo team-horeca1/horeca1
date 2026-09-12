@@ -196,11 +196,17 @@ export function validateCustomerProfile(
   }
 
   if (context === 'addBusiness') {
+    if (!trim(data.firstName)) errors.firstName = 'First name is required';
+    if (!trim(data.lastName)) errors.lastName = 'Last name is required';
     if (!legalName || legalName.length < 2) errors.legalName = 'Legal business name is required';
+    if (!trim(data.displayName)) errors.displayName = 'Display name is required';
     if (!trim(data.businessType)) errors.businessType = 'Business type is required';
     if (!outletName || outletName.length < 2) errors.outletName = 'Outlet name is required';
     if (!addressLine || addressLine.length < 5) errors.addressLine = 'Enter the full address';
     if (!pincode || !PINCODE_RE.test(pincode)) errors.pincode = 'Pincode must be 6 digits';
+    const addMobile = trim(data.mobilePhone || data.phone).replace(/\D/g, '').slice(-10);
+    if (addMobile.length !== 10) errors.phone = 'Enter a valid 10-digit mobile number';
+    if (email && !EMAIL_RE.test(email)) errors.email = 'Enter a valid email address';
   }
 
   if (gstin && !GST_RE.test(gstin)) errors.gstin = 'Format: 22ABCDE1234F1Z5';

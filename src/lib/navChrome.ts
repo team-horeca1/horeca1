@@ -1,4 +1,5 @@
 import type { ImpersonationMode } from '@/lib/clearImpersonation';
+import { SUPPLIER_HUB_PATH } from '@/lib/businessCapability';
 
 export type NavPortalItem = {
   name: string;
@@ -39,7 +40,7 @@ export function resolvePortalNav(input: {
 }): NavPortalItem[] {
   if (!input.isLoggedIn) return [];
   if (input.userRole === 'admin' && input.impersonationMode === 'vendor') {
-    return [{ name: 'Supplier Portal', href: '/vendor/overview' }];
+    return [{ name: 'Supplier Portal', href: '/businesses?type=supplier' }];
   }
   if (input.userRole === 'admin' && input.impersonationMode === 'brand') {
     return [{ name: 'Brand Portal', href: '/brand/portal' }];
@@ -55,10 +56,10 @@ export function resolvePortalNav(input: {
     if (input.activeIsBrand && !input.activeIsVendor) {
       return [{ name: 'Brand', href: '/brand/portal' }];
     }
-    return [{ name: 'Supplier', href: '/vendor/dashboard' }];
+    return [{ name: 'Supplier', href: SUPPLIER_HUB_PATH }];
   }
   if (canVendor) {
-    return [{ name: 'Dashboard', href: '/vendor/dashboard' }];
+    return [{ name: 'Dashboard', href: SUPPLIER_HUB_PATH }];
   }
   if (canBrand) {
     return [{ name: 'Dashboard', href: '/brand/portal' }];

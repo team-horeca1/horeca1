@@ -252,7 +252,7 @@ test.describe('@enter-buy supplier business → store → Enter → buy', () => 
         .nth(1);
       if (await supplierCrumb.isVisible({ timeout: 5_000 }).catch(() => false)) {
         const href = await supplierCrumb.getAttribute('href');
-        expect(href).toBe('/vendor/businesses');
+        expect(href).toBe('/businesses');
       }
 
       const createdBa = await createBusinessOnly(page, secondBizName);

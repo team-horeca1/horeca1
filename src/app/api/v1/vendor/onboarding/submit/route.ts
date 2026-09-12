@@ -10,6 +10,7 @@ import type { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
+import { provisionBusinessProfile } from '@/modules/account/provisionBusinessProfile';
 import { withRateLimit } from '@/middleware/withRateLimit';
 import { uniqueHcid } from '@/lib/hcid';
 import { emitEvent } from '@/events/emitter';
@@ -157,14 +158,6 @@ function parseBody(raw: unknown) {
   };
 }
 
-function slugify(name: string, suffix: string): string {
-  const base = name.toLowerCase().trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 50);
-  return `${base || 'vendor'}-${suffix.slice(0, 8)}`;
-}
-
 async function postHandler(req: NextRequest) {
   try {
     const input = parseBody(await req.json());
@@ -192,14 +185,6 @@ async function postHandler(req: NextRequest) {
       throw Errors.duplicate(phoneHit ? 'Phone' : 'Email');
     }
 
-    const vendorAdminTemplate = await prisma.accountRole.findFirst({
-      where: { businessAccountId: null, isTemplate: true, name: 'Vendor Admin', scope: 'vendor' },
-      select: { id: true },
-    });
-    if (!vendorAdminTemplate) {
-      throw Errors.badRequest('Vendor Admin role template missing. Run seed migration.');
-    }
-
     const hashedPassword = input.password ? await bcrypt.hash(input.password, 12) : null;
     const hcidDisplay = await uniqueHcid();
 
@@ -207,19 +192,6 @@ async function postHandler(req: NextRequest) {
       vendorBusinessType: input.vendorBusinessType,
       vendorType: input.vendorType,
     }) ?? input.vendorType ?? input.vendorTypeSelections[0]?.slug ?? 'distributor';
-
-    const typeSelectionsJson = input.vendorTypeSelections as unknown as Prisma.InputJsonValue;
-
-    const warehouseCount = input.warehouseCount != null && input.warehouseCount !== ''
-      ? Number(input.warehouseCount)
-      : null;
-    const deliveryFleet = typeof input.deliveryFleet === 'boolean'
-      ? input.deliveryFleet
-      : input.deliveryFleet === 'yes' || input.deliveryFleet === 'true'
-        ? true
-        : input.deliveryFleet === 'no' || input.deliveryFleet === 'false'
-          ? false
-          : null;
 
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -237,136 +209,62 @@ async function postHandler(req: NextRequest) {
         select: { id: true, hcidDisplay: true },
       });
 
-      const account = await tx.businessAccount.create({
-        data: {
-          legalName: input.businessName,
-          displayName: input.businessName,
-          gstin: input.gstNumber || null,
-          pan: input.panNumber || null,
-          businessType: input.vendorBusinessType || input.vendorType || 'vendor',
-          subType: input.subType || null,
-          vendorTypeSelections: typeSelectionsJson,
-          businessSize: input.businessSize || null,
-          salutation: input.salutation || null,
-          firstName: input.firstName || null,
-          lastName: input.lastName || null,
-          designation: input.designation || null,
-          isCustomer: true,
-          isVendor: true,
-          isBrand: false,
-          status: 'active',
-        },
-      });
-
-      const outlet = await tx.outlet.create({
-        data: {
-          businessAccountId: account.id,
+      const provisioned = await provisionBusinessProfile({
+        userId: user.id,
+        kind: 'vendor',
+        isPrimaryMembership: true,
+        legalName: input.businessName,
+        displayName: input.tradeName || input.businessName,
+        gstin: input.gstNumber || null,
+        pan: input.panNumber || null,
+        businessType: input.vendorBusinessType || input.vendorType || 'vendor',
+        subType: input.subType || null,
+        businessSize: input.businessSize || null,
+        salutation: input.salutation || null,
+        firstName: input.firstName || null,
+        lastName: input.lastName || null,
+        designation: input.designation || null,
+        vendorTypeSelections: input.vendorTypeSelections as unknown as Prisma.InputJsonValue,
+        billingAddressLine: input.billingAddress.addressLine,
+        billingCity: input.billingAddress.city,
+        billingState: input.billingAddress.state,
+        billingPincode: input.billingAddress.pincode,
+        primaryOutlet: {
           name: input.tradeName,
           addressLine: input.pickupAddress.addressLine,
           city: input.pickupAddress.city,
           state: input.pickupAddress.state,
           pincode: input.pickupAddress.pincode,
-          requiresAddressUpdate: false,
         },
-      });
-
-      await tx.businessAccount.update({
-        where: { id: account.id },
-        data: { primaryOutletId: outlet.id },
-      });
-
-      await tx.businessAccountMember.create({
-        data: { userId: user.id, businessAccountId: account.id, isPrimary: true, acceptedAt: new Date() },
-      });
-
-      await tx.userRole.create({
-        data: {
-          userId: user.id,
-          businessAccountId: account.id,
-          outletId: null,
-          vendorId: null,
-          roleId: vendorAdminTemplate.id,
-        },
-      });
-
-      const slug = slugify(input.tradeName, user.id);
-      const slugTaken = await tx.vendor.findUnique({ where: { slug }, select: { id: true } });
-      if (slugTaken) {
-        throw Errors.conflict('A supplier Online Store with this trade name already exists.');
-      }
-
-      const vendor = await tx.vendor.create({
-        data: {
-          userId: user.id,
-          businessAccountId: account.id,
-          businessName: input.businessName,
-          displayName: input.tradeName || input.businessName,
-          slug,
-          isActive: false,
-          isVerified: false,
-          isPrimaryStore: true,
-          multiWarehouseEnabled: false,
-          defaultOutletId: outlet.id,
-          setupProgress: {
-            business: true,
-            online_store: true,
-            delivery: (input.serviceablePincodes?.length ?? 0) > 0,
-          },
-
-          gstNumber: input.gstNumber || null,
-          addressLine: input.billingAddress.addressLine,
-          city: input.billingAddress.city,
-          state: input.billingAddress.state,
-          addressPincode: input.billingAddress.pincode,
-
+        vendorDetails: {
+          vendorType: typeSlug,
+          panNumber: input.panNumber || '',
+          authorizedPersonName: input.authorizedPersonName,
+          authorizedPersonPhone: input.authorizedPersonPhone || '',
+          authorizedPersonEmail: input.authorizedPersonEmail || email || '',
+          billingAddress: input.billingAddress,
           bankAccountName: input.bankAccountName,
           bankAccountNumber: input.bankAccountNumber,
           bankIfsc: input.bankIfsc,
           bankName: input.bankName,
           bankAccountType: input.bankAccountType,
-
-          tradeName: input.tradeName,
-          vendorType: typeSlug,
-          subType: input.subType || null,
-          vendorTypeSelections: typeSelectionsJson,
-          categoriesHandled: input.categoriesHandled ?? [],
-          businessSize: input.businessSize || null,
-          coverage: input.coverage || null,
-          warehouseCount: Number.isFinite(warehouseCount) ? Math.round(warehouseCount!) : null,
-          deliveryFleet,
-          monthlySupplyBand: input.monthlySupplyBand || null,
-          panNumber: input.panNumber || null,
-          authorizedPersonName: input.authorizedPersonName,
-          authorizedPersonPhone: input.authorizedPersonPhone || null,
-          authorizedPersonEmail: input.authorizedPersonEmail || email,
-          pickupAddressLine: input.pickupAddress.addressLine,
-          pickupCity: input.pickupAddress.city,
-          pickupState: input.pickupAddress.state,
-          pickupPincode: input.pickupAddress.pincode,
+          serviceablePincodes: input.serviceablePincodes,
           deliveryCapability: input.deliveryCapability,
-          fssaiNumber: input.fssaiNumber || null,
-          udyamNumber: input.udyamNumber || null,
-          cinNumber: input.cinNumber || null,
+          fssaiNumber: input.fssaiNumber || '',
+          udyamNumber: input.udyamNumber || '',
+          cinNumber: input.cinNumber || '',
+          subType: input.subType,
+          vendorTypeSelections: input.vendorTypeSelections,
+          categoriesHandled: input.categoriesHandled,
+          businessSize: input.businessSize,
+          coverage: input.coverage,
+          warehouseCount: input.warehouseCount,
+          deliveryFleet: input.deliveryFleet,
+          monthlySupplyBand: input.monthlySupplyBand,
         },
-        select: { id: true, slug: true },
-      });
+      }, tx);
 
-      const uniquePincodes = Array.from(
-        new Set(input.serviceablePincodes.map((p) => p.trim()).filter(Boolean)),
-      );
-      if (uniquePincodes.length > 0) {
-        await tx.serviceArea.createMany({
-          data: uniquePincodes.map((pincode) => ({
-            vendorId: vendor.id,
-            outletId: outlet.id,
-            pincode,
-            isActive: true,
-          })),
-          skipDuplicates: true,
-        });
-      }
-
-      return { user, vendor };
+      return { user, vendorId: provisioned.vendorId, nextPath: provisioned.nextPath };
     });
 
     emitEvent('UserRegistered', {
@@ -379,8 +277,9 @@ async function postHandler(req: NextRequest) {
       {
         success: true,
         data: {
-          vendorId: result.vendor.id,
+          vendorId: result.vendorId,
           hcidDisplay: result.user.hcidDisplay,
+          nextPath: result.nextPath,
           message: 'Supplier application submitted. Our team will review and contact you shortly.',
         },
       },

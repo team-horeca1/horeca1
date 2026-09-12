@@ -19,6 +19,7 @@ const MAX_AVAILABLE_ACCOUNTS = 20;
 export interface AvailableAccountSummary {
   id: string;
   displayName: string;
+  isCustomer: boolean;
   isVendor: boolean;
   isBrand: boolean;
 }
@@ -357,6 +358,7 @@ export async function loadActiveContext(
         return {
           id: ba.id,
           displayName: businessFacingName(ba, storeNames),
+          isCustomer: ba.isCustomer,
           isVendor: ba.isVendor,
           isBrand: ba.isBrand,
         };

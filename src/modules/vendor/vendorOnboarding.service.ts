@@ -131,7 +131,7 @@ export async function createDirectVendor(
         firstName: input.firstName || null,
         lastName: input.lastName || null,
         designation: input.designation || null,
-        isCustomer: true,
+        isCustomer: false,
         isVendor: true,
         isBrand: false,
         status: 'active',

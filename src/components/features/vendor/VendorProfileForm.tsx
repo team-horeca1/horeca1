@@ -54,9 +54,15 @@ export interface VendorProfileFormProps {
   pickupSameAsBilling?: boolean;
   onPickupSameAsBillingChange?: (v: boolean) => void;
   className?: string;
-  layout?: 'default' | 'wide';
+  layout?: 'default' | 'wide' | 'modal';
   /** Show the optional Display Name field in the identity section (Businesses pages). */
   showDisplayName?: boolean;
+  /** Categories chips — hide in compact add-business modals. */
+  showCategories?: boolean;
+  /** Optional GSTIN under identity (add-supplier modal). */
+  showGstin?: boolean;
+  /** Optional business size under identity (add-supplier modal). */
+  showBusinessSize?: boolean;
 }
 
 function SectionHeader({ icon: Icon, children, spanClass }: {
@@ -91,14 +97,20 @@ export function VendorProfileForm({
   className,
   layout = 'default',
   showDisplayName = false,
+  showCategories = true,
+  showGstin = false,
+  showBusinessSize = false,
 }: VendorProfileFormProps) {
   const set = (patch: Partial<VendorProfileValues>) => onChange(patch);
   const blur = (field: string, v: string) => onFieldBlur?.(field, v);
   const isWide = layout === 'wide';
-  const GRID = isWide
-    ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3'
-    : 'grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4';
-  const SPAN_FULL = isWide ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2';
+  const isModal = layout === 'modal';
+  const GRID = isModal
+    ? 'flex flex-col gap-4 min-w-0'
+    : isWide
+      ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-3'
+      : 'grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4';
+  const SPAN_FULL = isModal ? 'w-full min-w-0' : isWide ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2';
   const typeSelections = getEffectiveVendorTypeSelections(value);
   const categoryPresets = categoryPresetsForSelections(typeSelections);
   const selectedCategories = value.categoriesHandled ?? [];
@@ -140,14 +152,14 @@ export function VendorProfileForm({
   const billingPincode = value.billingPincode ?? value.billingAddress?.pincode ?? '';
 
   return (
-    <div className={cn(isWide ? 'space-y-4' : 'space-y-5', className)}>
+    <div className={cn(isModal ? 'space-y-4 min-w-0' : isWide ? 'space-y-4' : 'space-y-5', className)}>
       <div className={cn(GRID, 'space-y-0')}>
         {visibleSections.identity && (
           <>
             <SectionHeader icon={Building2} spanClass={SPAN_FULL}>Business Identity</SectionHeader>
             <TextField label="Legal Business Name" required value={value.legalName ?? value.businessName ?? ''}
               dataField="legalName"
-              className={!showDisplayName ? SPAN_FULL : undefined}
+              className={!showDisplayName || isModal ? SPAN_FULL : undefined}
               error={errors.legalName}
               onChange={v => set({ legalName: v, businessName: v })}
               onBlur={() => blur('legalName', value.legalName ?? value.businessName ?? '')}
@@ -156,6 +168,7 @@ export function VendorProfileForm({
             {showDisplayName && (
               <TextField label="Display Name (optional)" value={value.displayName ?? value.tradeName ?? ''}
                 dataField="displayName"
+                className={isModal ? SPAN_FULL : undefined}
                 error={errors.displayName}
                 onChange={v => set({ displayName: v, tradeName: v })}
                 onBlur={() => blur('displayName', value.displayName ?? value.tradeName ?? '')}
@@ -166,9 +179,19 @@ export function VendorProfileForm({
               onChange={onChange}
               error={errors.vendorTypeSelections || errors.vendorBusinessType || errors.subType}
               className={SPAN_FULL}
+              variant={isModal ? 'stacked' : 'table'}
             />
+            {showBusinessSize && (
+              <FormField label="Business size (optional)" className={SPAN_FULL}>
+                <FormSelect value={value.businessSize ?? ''} onChange={v => set({ businessSize: v })}>
+                  <option value="">Select size</option>
+                  {BUSINESS_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                </FormSelect>
+              </FormField>
+            )}
+            {showCategories && (
             <FormField
-              label="Categories Handled"
+              label="Categories handled"
               className={SPAN_FULL}
               hint="Select presets or type your own"
             >
@@ -204,6 +227,7 @@ export function VendorProfileForm({
                 />
               </div>
             </FormField>
+            )}
           </>
         )}
 
@@ -211,7 +235,10 @@ export function VendorProfileForm({
           <>
             <SectionHeader icon={User} spanClass={SPAN_FULL}>Store Contact</SectionHeader>
             <FormField label="Contact Person" className={SPAN_FULL} dataField="firstName" error={errors.firstName}>
-              <div className={cn('grid gap-2', isWide ? 'grid-cols-[100px_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]')}>
+              <div className={cn(
+                'grid gap-2 min-w-0',
+                isModal ? 'grid-cols-1' : isWide ? 'grid-cols-[100px_1fr_1fr]' : 'grid-cols-[110px_1fr_1fr]',
+              )}>
                 <FormSelect value={value.salutation ?? ''} onChange={v => set({ salutation: v })}>
                   {SALUTATIONS.map(s => <option key={s || 'empty'} value={s}>{s || 'Salutation'}</option>)}
                 </FormSelect>
@@ -386,6 +413,19 @@ export function VendorProfileForm({
               inputMode="numeric"
               onChange={v => set({ warehouseCount: v.replace(/\D/g, '') || undefined })} />
           </>
+        )}
+
+        {showGstin && (
+          <TextField
+            label="GSTIN (optional)"
+            className={SPAN_FULL}
+            value={value.gstin ?? value.gstNumber ?? ''}
+            maxLength={15}
+            error={errors.gstin}
+            onChange={v => set({ gstin: v.toUpperCase().slice(0, 15), gstNumber: v.toUpperCase().slice(0, 15) })}
+            onBlur={() => blur('gstin', value.gstin ?? value.gstNumber ?? '')}
+            placeholder="22ABCDE1234F1Z5"
+          />
         )}
 
         {visibleSections.admin && (

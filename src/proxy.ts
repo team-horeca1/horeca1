@@ -8,6 +8,7 @@ const CUSTOMER_PROTECTED_PREFIXES = [
   '/order-lists',
   '/profile',
   '/account',
+  '/businesses',
 ];
 
 const VENDOR_PORTAL_SEGMENTS = new Set([
@@ -73,10 +74,10 @@ export async function proxy(req: NextRequest) {
 
   if (isVendorPortal) {
     const isVendorActor =
-      role === 'vendor'
-      || role === 'admin'
+      role === 'admin'
       || token.activeBusinessAccountType?.isVendor === true
-      || (token.availableAccounts?.some((a) => a.isVendor === true) ?? false);
+      || token.availableAccounts?.some((a) => a.isVendor === true) === true
+      || (role === 'vendor' && token.activeBusinessAccountType == null);
     if (!isVendorActor) {
       const url = req.nextUrl.clone();
       url.pathname = '/';
@@ -86,10 +87,10 @@ export async function proxy(req: NextRequest) {
 
   if (isBrandPortal) {
     const isBrandActor =
-      role === 'brand'
-      || role === 'admin'
+      role === 'admin'
       || token.activeBusinessAccountType?.isBrand === true
-      || (token.availableAccounts?.some((a) => a.isBrand === true) ?? false);
+      || token.availableAccounts?.some((a) => a.isBrand === true) === true
+      || (role === 'brand' && token.activeBusinessAccountType == null);
     if (!isBrandActor) {
       const url = req.nextUrl.clone();
       url.pathname = '/';

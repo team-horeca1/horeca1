@@ -22,7 +22,7 @@ export const PATCH = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
     const id = req.nextUrl.pathname.split('/').pop()!;
     const body = bodySchema.parse(await req.json());
     if (body.action === 'reject') {
-      const data = await brandService.brandRejectMapping(userId, id, body.reviewNote);
+      const data = await brandService.brandRejectMapping(userId, id, body.reviewNote, ctx.activeBrandId);
       return NextResponse.json({ success: true, data });
     }
     return NextResponse.json({ success: false, error: { message: 'Unknown action' } }, { status: 400 });

@@ -3,6 +3,7 @@ import type { Role } from '@prisma/client';
 import { auth } from '@/auth';
 import { type AuthContext, getAuthContext } from './auth';
 import { Errors, errorResponse } from './errorHandler';
+import { isBuyerOnly } from '@/lib/businessCapability';
 import { requirePermission } from '@/lib/permissions/engine';
 import type { PermissionKey } from '@/lib/permissions/registry';
 import { ALL_PERMISSION_KEYS } from '@/lib/permissions/registry';
@@ -27,14 +28,23 @@ import { ALL_PERMISSION_KEYS } from '@/lib/permissions/registry';
  * account-type branches reference 'admin', so they stay admin-gated.
  */
 function isRoleAllowed(ctx: AuthContext, allowedRoles: Role[]): boolean {
-  if (allowedRoles.includes(ctx.role)) return true;
+  if (ctx.role === 'admin' && allowedRoles.includes('admin')) return true;
+
   const t = ctx.activeBusinessAccountType;
   if (t) {
     if (allowedRoles.includes('brand') && t.isBrand) return true;
     if (allowedRoles.includes('vendor') && t.isVendor) return true;
-    if (allowedRoles.includes('customer') && t.isCustomer) return true;
+    if (allowedRoles.includes('customer') && isBuyerOnly(t)) return true;
+    if (
+      allowedRoles.includes('customer')
+      || allowedRoles.includes('vendor')
+      || allowedRoles.includes('brand')
+    ) {
+      return false;
+    }
   }
-  return false;
+
+  return allowedRoles.includes(ctx.role);
 }
 
 // Wrapper for role-restricted API routes
@@ -106,6 +116,11 @@ export function brandOnly(handler: (req: NextRequest, ctx: AuthContext) => Promi
  */
 export function requireStorefrontAccess(ctx: AuthContext, key: PermissionKey): void {
   if (ctx.role === 'admin') return;
-  if (ctx.role === 'customer' || ctx.activeBusinessAccountType?.isCustomer === true) return;
+  if (isBuyerOnly(ctx.activeBusinessAccountType)) return;
+  if (ctx.activeBusinessAccountType?.isVendor || ctx.activeBusinessAccountType?.isBrand) {
+    throw Errors.forbidden(
+      'Switch to a restaurant or retail business to order. Supplier and Brand accounts can only browse.',
+    );
+  }
   requirePermission(ctx, key);
 }

@@ -74,7 +74,7 @@ export default function BusinessDetailPage() {
 
   const [business, setBusiness] = useState<BusinessRow | null>(null);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [addStoreOpen, setAddStoreOpen] = useState(false);
   const [editStoreId, setEditStoreId] = useState<string | null>(null);
   const [editStoreInitial, setEditStoreInitial] = useState<Partial<StoreSetupPayload> | null>(null);
@@ -114,6 +114,11 @@ export default function BusinessDetailPage() {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(VIEW_STORAGE_KEY);
+      const narrow = window.innerWidth < 768;
+      if (narrow) {
+        Promise.resolve().then(() => setViewMode('grid'));
+        return;
+      }
       if (stored === 'grid' || stored === 'table') {
         Promise.resolve().then(() => setViewMode(stored));
       }
@@ -376,7 +381,7 @@ export default function BusinessDetailPage() {
     return (
       <div className="max-w-[720px] mx-auto text-center py-12">
         <p className="text-[13px] text-[#7C7C7C] mb-3">Business not found.</p>
-        <Link href="/vendor/businesses" className="text-[13px] font-bold text-primary">
+        <Link href="/businesses" className="text-[13px] font-bold text-primary">
           ← Businesses
         </Link>
       </div>
@@ -384,11 +389,11 @@ export default function BusinessDetailPage() {
   }
 
   return (
-    <div className="max-w-[1100px] mx-auto space-y-4" data-testid="business-detail">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+    <div className="w-full space-y-4" data-testid="business-detail">
+      <div className="flex items-start justify-between gap-3 flex-col sm:flex-row sm:flex-wrap">
         <div className="min-w-0">
           <Link
-            href="/vendor/businesses"
+            href="/businesses"
             className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary hover:text-primary-dark"
             data-testid="back-to-supplier"
           >
@@ -412,11 +417,11 @@ export default function BusinessDetailPage() {
               .join(' · ')}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
+        <div className="flex items-center gap-2 flex-wrap sm:justify-end shrink-0 w-full sm:w-auto">
           <button
             type="button"
             onClick={openEditBusiness}
-            className="inline-flex items-center gap-1.5 h-[36px] px-3 border border-[#EEEEEE] text-[#7C7C7C] hover:text-[#181725] hover:bg-[#F8F9FB] text-[13px] font-bold rounded-[8px] transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 min-h-12 px-3 border border-divider text-text-secondary hover:text-text hover:bg-ivory text-[13px] font-bold rounded-[12px] flex-1 sm:flex-none"
           >
             <Pencil size={14} />
             Edit Business
@@ -458,7 +463,7 @@ export default function BusinessDetailPage() {
           <button
             type="button"
             onClick={() => setAddStoreOpen(true)}
-            className="inline-flex items-center gap-1.5 h-[36px] px-3.5 bg-primary hover:bg-primary-dark text-white text-[13px] font-bold rounded-[8px] transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 min-h-12 px-3.5 bg-primary hover:bg-primary-dark text-white text-[13px] font-bold rounded-[12px] w-full sm:w-auto active:scale-[0.97] transition-transform"
           >
             <Plus size={15} />
             Add Online Store
