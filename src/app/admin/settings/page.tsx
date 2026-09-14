@@ -11,7 +11,7 @@ export default function SettingsPage() {
     const { data: session } = useSession();
 
     // General Settings
-    const [platformName, setPlatformName] = useState('HoReCa1');
+    const [platformName, setPlatformName] = useState('Horeca1');
     const [contactEmail, setContactEmail] = useState('support@horeca1.com');
     const [supportPhone, setSupportPhone] = useState('+91 98765 43210');
 

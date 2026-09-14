@@ -55,7 +55,7 @@ export function AdminVendorPlatformFee({ vendorId, platformFeePct, globalDefault
         </div>
         <div>
           <h3 className="text-[15px] font-bold text-[#181725]">Platform Fee</h3>
-          <p className="text-[11px] text-[#7C7C7C]">How much HoReCa1 keeps from this vendor&apos;s sales</p>
+          <p className="text-[11px] text-[#7C7C7C]">How much Horeca1 keeps from this vendor&apos;s sales</p>
         </div>
       </div>
       <div className="p-6 space-y-4">

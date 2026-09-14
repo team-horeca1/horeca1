@@ -1,5 +1,5 @@
 // App constants
-export const APP_NAME = 'HoReCa' as const;
+export const APP_NAME = 'Horeca1' as const;
 export const APP_DESCRIPTION = 'B2B E-commerce for Restaurant & Eating Products' as const;
 
 // Breakpoints matching Tailwind defaults

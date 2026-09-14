@@ -463,7 +463,7 @@ export default function BrandRegisterPage() {
             <p className="text-[13px] text-gray-500">
               {isAuthMode
                 ? 'You are already signed in — no OTP needed. Add another brand business under your existing account.'
-                : 'Register your brand on the HoReCa1 marketplace'}
+                : 'Register your brand on the Horeca1 marketplace'}
             </p>
             {isAuthMode && (
               <p className="mt-1.5 inline-flex items-center text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">

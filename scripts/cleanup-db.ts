@@ -150,7 +150,7 @@ async function main() {
   await prisma.platformSetting.create({
     data: {
       id: '3bf5f1a6-1fdc-47c0-b3b0-2734a325d915',
-      platformName: 'HoReCa1',
+      platformName: 'Horeca1',
       defaultCommissionPct: 10.00,
       minOrderValue: 500.00,
       freeDeliveryThreshold: 2000.00,

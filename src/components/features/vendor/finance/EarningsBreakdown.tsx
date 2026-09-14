@@ -67,7 +67,7 @@ export function EarningsBreakdown({
         <span className="text-[18px] font-bold text-primary">{inr(net)}</span>
       </div>
       <p className="text-[11px] text-[#AEAEAE] mt-2">
-        Platform fee is set by HoReCa1. {isCustomRate ? 'Your store has a custom rate.' : 'Using the global default rate.'}
+        Platform fee is set by Horeca1. {isCustomRate ? 'Your store has a custom rate.' : 'Using the global default rate.'}
       </p>
     </div>
   );

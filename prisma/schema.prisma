@@ -3652,7 +3652,7 @@ model VoiceStory {
 // Global, single-row platform configuration edited from the admin Settings page.
 model PlatformSetting {
   id                    String   @id @default(uuid()) @db.Uuid
-  platformName          String   @default("HoReCa1") @map("platform_name") @db.VarChar(120)
+  platformName          String   @default("Horeca1") @map("platform_name") @db.VarChar(120)
   contactEmail          String?  @map("contact_email") @db.VarChar(255)
   supportPhone          String?  @map("support_phone") @db.VarChar(30)
   defaultCommissionPct  Decimal  @default(5) @map("default_commission_pct") @db.Decimal(5, 2)

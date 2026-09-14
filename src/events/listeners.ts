@@ -33,7 +33,7 @@ async function resolveVendorUserId(vendorId: string): Promise<string> {
 const globalForListeners = globalThis as unknown as { eventListenersRegistered?: boolean };
 
 /**
- * Register all event listeners for the HoReCa1 event bus.
+ * Register all event listeners for the Horeca1 event bus.
  * Call once on application startup (e.g. from instrumentation.ts).
  * Guarded against duplicate registration (e.g. during hot reload).
  */

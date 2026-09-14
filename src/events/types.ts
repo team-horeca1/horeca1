@@ -1,4 +1,4 @@
-// All event type definitions for the HoReCa1 event bus
+// All event type definitions for the Horeca1 event bus
 // Each module emits events that other modules can listen to
 
 export interface OrderCreatedPayload {

@@ -74,7 +74,7 @@ const PERIOD_LABELS: Record<Period, string> = {
 function downloadCsv(data: ReportsData) {
     const periodLabel = PERIOD_LABELS[data.period as Period] ?? data.period;
     const rows = [
-        [`HoReCa1 Vendor Report — ${periodLabel}`],
+        [`Horeca1 Vendor Report — ${periodLabel}`],
         [],
         ['Summary'],
         ['Metric', 'Value'],
