@@ -1,4 +1,4 @@
-# HoReCa Hub — Full Project Status
+# Horeca1 — Full Project Status
 
 > **Last Updated:** 2026-03-19
 > **Stack:** Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4 + Prisma 7 + PostgreSQL + Redis
@@ -9,7 +9,7 @@
 
 ## What Is This Project?
 
-**HoReCa Hub** is a B2B e-commerce marketplace where restaurants, hotels, and catering businesses buy food and supplies from multiple vendors. Think "Swiggy for bulk wholesale procurement."
+**Horeca1** is a B2B e-commerce marketplace where restaurants, hotels, and catering businesses buy food and supplies from multiple vendors. Think "Swiggy for bulk wholesale procurement."
 
 **Key Business Features:**
 - Multi-vendor marketplace with vendor-grouped cart

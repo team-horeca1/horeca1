@@ -1,6 +1,6 @@
 # Website Glitch Audit — Full Report
 
-**Project:** HoReCa Hub (horeca1-prod)  
+**Project:** Horeca1 (horeca1-prod)  
 **Date:** 24 August 2026  
 **Environment:** `http://localhost:3000` (Next.js 16 Turbopack, Docker Postgres + Redis)  
 **Method:** Playwright MCP (accessibility snapshots) + codebase root-cause analysis  

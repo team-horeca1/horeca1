@@ -1,4 +1,4 @@
-# Playwright P0 Crawl Report — HoReCa Hub
+# Playwright P0 Crawl Report — Horeca1
 
 **Date:** 2026-07-15T17:58:08.927Z
 **Base URL:** http://localhost:3000

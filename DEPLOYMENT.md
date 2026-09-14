@@ -1,4 +1,4 @@
-# HoReCa Hub — Production Deployment
+# Horeca1 — Production Deployment
 
 ## Live URL
 
@@ -217,7 +217,7 @@ Production email uses **Gmail SMTP only** (no Resend). Required keys in `.env.pr
 | `EMAIL_PASS` | 16-char Gmail app password (no spaces) |
 | `EMAIL_HOST` | `smtp.gmail.com` |
 | `EMAIL_PORT` | `465` |
-| `EMAIL_FROM` | `HoReCa Hub <team.horeca1@gmail.com>` |
+| `EMAIL_FROM` | `Horeca1 <team.horeca1@gmail.com>` |
 
 After changing email vars: `docker compose -f docker/docker-compose.prod.yml up -d --force-recreate app worker` (restart alone does not reload `env_file`).
 

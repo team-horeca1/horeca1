@@ -464,7 +464,7 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
 
     // ── Footer: registered company info ─────────────────────────────────────
     doc.font('Helvetica-Bold').fontSize(9).fillColor('#000');
-    doc.text(`${order.vendor.businessName.toUpperCase()} (Registered on HoReCa Hub)`, LEFT, y, { width: PAGE_W, align: 'center' });
+    doc.text(`${order.vendor.businessName.toUpperCase()} (Registered on Horeca1)`, LEFT, y, { width: PAGE_W, align: 'center' });
     y += 12;
     doc.font('Helvetica').fontSize(8).fillColor('#222');
     const footerLine1 = `Phone: ${order.vendor.user?.phone ?? '—'}    Email: ${order.vendor.user?.email ?? '—'}`;

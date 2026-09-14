@@ -281,9 +281,9 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
         const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c));
 
         if (recipientEmail) {
-          const subject = `Access granted to ${businessName} on HoReCa Hub`;
-          const text = `Hello ${recipientName},\n\n${inviterName} has added you to the business account "${businessName}" on HoReCa Hub.\n\nYou can now log in and access this account.\n\nLogin URL: ${loginUrl}\n\n— The HoReCa Hub team`;
-          const html = `<p>Hello <strong>${esc(recipientName)}</strong>,</p><p>${esc(inviterName)} has added you to the business account <strong>${esc(businessName)}</strong> on HoReCa Hub.</p><p>You can now log in and access this account.</p><p><a href="${esc(loginUrl)}">Sign in to HoReCa Hub</a></p><p>— The HoReCa Hub team</p>`;
+          const subject = `Access granted to ${businessName} on Horeca1`;
+          const text = `Hello ${recipientName},\n\n${inviterName} has added you to the business account "${businessName}" on Horeca1.\n\nYou can now log in and access this account.\n\nLogin URL: ${loginUrl}\n\n— The Horeca1 team`;
+          const html = `<p>Hello <strong>${esc(recipientName)}</strong>,</p><p>${esc(inviterName)} has added you to the business account <strong>${esc(businessName)}</strong> on Horeca1.</p><p>You can now log in and access this account.</p><p><a href="${esc(loginUrl)}">Sign in to Horeca1</a></p><p>— The Horeca1 team</p>`;
           sendEmailInBackground({
             to: recipientEmail,
             subject,
@@ -294,7 +294,7 @@ export const POST = withAuth(async (req: NextRequest, ctx) => {
         }
 
         if (recipientPhone) {
-          const smsBody = `Hello ${recipientName}, you have been added to the business account "${businessName}" on HoReCa Hub by ${inviterName}. Log in to access: ${loginUrl}`;
+          const smsBody = `Hello ${recipientName}, you have been added to the business account "${businessName}" on Horeca1 by ${inviterName}. Log in to access: ${loginUrl}`;
           void sendSms({ to: recipientPhone, body: smsBody, channel: 'sms' }).catch((err) => {
             console.error('[invite-notification]', err);
           });

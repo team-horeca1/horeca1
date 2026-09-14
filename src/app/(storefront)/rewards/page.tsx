@@ -202,8 +202,8 @@ export default function RewardsPage() {
                                     const url = publicInviteUrl(referral);
                                     if (typeof navigator.share === 'function') {
                                         void navigator.share({
-                                            title: 'Join me on HoReCa Hub',
-                                            text: 'Order supplies on HoReCa Hub with my invite',
+                                            title: 'Join me on Horeca1',
+                                            text: 'Order supplies on Horeca1 with my invite',
                                             url,
                                         }).catch(() => {});
                                         return;

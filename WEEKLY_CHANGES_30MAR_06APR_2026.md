@@ -1,6 +1,6 @@
 # Weekly Changes — March 30 to April 6, 2026
 
-**Project:** HoReCa Hub (B2B e-commerce marketplace)
+**Project:** Horeca1 (B2B e-commerce marketplace)
 **Period:** Monday 30 March 2026 – Sunday 6 April 2026
 **Contributors:** mayur5689, sanket gade
 **Total commits:** 17 (including 1 merge commit)
@@ -369,7 +369,7 @@ Refactored from a static grid to a dynamic component:
 
 - Added `GoogleMapsProvider` and `AddressContext` to global providers tree
 - `WishlistContext` moved up to root layout so it's available to all pages
-- HoReCa Hub logo (`public/horeca1_logo.jpg`) added to the project
+- Horeca1 logo (`public/horeca1_logo.jpg`) added to the project
 
 #### `src/components/layout/Navbar.tsx` (refactor, 42 lines net change)
 

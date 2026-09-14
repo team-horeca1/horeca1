@@ -1,4 +1,4 @@
-# HoReCa Hub — Architecture Audit Map
+# Horeca1 — Architecture Audit Map
 
 **Purpose:** Security / QA audit reference. Describes how the system is structured, where trust boundaries sit, and which surfaces are live vs stale.  
 **Scope:** Application architecture as of the working tree at `c:\Users\Roger\Desktop\horeca1-prod`.  

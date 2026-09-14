@@ -4,7 +4,7 @@ import { ChevronLeft, Tag } from 'lucide-react';
 import { OffersList } from '@/components/features/promo/OffersList';
 
 export const metadata: Metadata = {
-  title: 'Deals & Discounts · HoReCa Hub',
+  title: 'Deals & Discounts · Horeca1',
 };
 
 export default function DealsPage() {

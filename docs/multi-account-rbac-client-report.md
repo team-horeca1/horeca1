@@ -1,4 +1,4 @@
-# HoReCa Hub — Multi-Account Access & RBAC: V2.2 Plan Report
+# Horeca1 — Multi-Account Access & RBAC: V2.2 Plan Report
 
 > **Audience**: Client / business stakeholder. Plain language summary of what's being built, why, and what changes.
 > **Companion**: [`multi-account-rbac-implementation-plan.md`](./multi-account-rbac-implementation-plan.md) (engineering team).
@@ -9,7 +9,7 @@
 
 ## 1. What You Asked For
 
-Your specification (the **"Multi-Account Customer Access Architecture & RBAC"** document) laid out a clear vision for HoReCa Hub V2.2:
+Your specification (the **"Multi-Account Customer Access Architecture & RBAC"** document) laid out a clear vision for Horeca1 V2.2:
 
 - Move from **"1 login = 1 business"** to **"1 identity (HCID) = many businesses"** — similar to how netbanking, Slack, or Zoho lets one human access multiple organizations.
 - Recognise that a **business is not the same as an address**. A restaurant chain like "Chrome Hospitality" can have multiple outlets ("Eve Powai", "Eve Worli", "Lyla") — and these are children of the business, not separate businesses.

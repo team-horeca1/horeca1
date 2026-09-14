@@ -15,7 +15,7 @@ fetch('https://api.resend.com/emails', {
   body: JSON.stringify({
     from,
     to: ['team.horeca1@gmail.com'],
-    subject: 'HoReCa Hub prod Resend test',
+    subject: 'Horeca1 prod Resend test',
     html: '<p>Production Resend test from freshville.store at ' + new Date().toISOString() + '</p>'
   })
 }).then(async r => {

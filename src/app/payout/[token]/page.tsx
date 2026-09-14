@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import PayoutClaimClient from '@/components/features/promo/PayoutClaimClient';
 
 export const metadata: Metadata = {
-  title: 'Claim payout · HoReCa Hub',
+  title: 'Claim payout · Horeca1',
   robots: { index: false, follow: false },
 };
 

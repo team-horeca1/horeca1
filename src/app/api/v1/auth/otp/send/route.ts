@@ -33,7 +33,7 @@ function generateOTP(): string {
 async function dispatchEmailOTP(email: string, otp: string): Promise<void> {
   await sendEmail({
     to: email,
-    subject: 'Your HoReCa Hub login code',
+    subject: 'Your Horeca1 login code',
     text: `Your verification code is ${otp}. It expires in 10 minutes.\n\nIf you didn't request this, you can ignore this email.`,
     html: `<p>Your verification code is <strong style="font-size:18px;letter-spacing:2px">${otp}</strong>.</p><p>It expires in 10 minutes. If you didn't request this, you can ignore this email.</p>`,
   });

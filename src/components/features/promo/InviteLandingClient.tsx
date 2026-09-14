@@ -59,7 +59,7 @@ export default function InviteLandingClient({ token }: { token: string }) {
               href="/"
               className="mt-2 inline-flex rounded-2xl bg-primary px-6 py-3 font-medium text-white"
             >
-              Go to HoReCa Hub
+              Go to Horeca1
             </Link>
           </div>
         )}
@@ -73,7 +73,7 @@ export default function InviteLandingClient({ token }: { token: string }) {
               {state.referrerName} invited you
             </h1>
             <p className="text-[#7C7C7C]">
-              Create your HoReCa Hub account to claim referral rewards and start ordering from verified vendors.
+              Create your Horeca1 account to claim referral rewards and start ordering from verified vendors.
             </p>
             <Link
               href="/register"

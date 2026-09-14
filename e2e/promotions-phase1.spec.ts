@@ -351,7 +351,7 @@ test.describe('Phase 1 UI', () => {
     expect(click.json.data?.token).toBe(token);
 
     await page.goto(`/invite/${token}`, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText(/invited you|Create your HoReCa Hub account|Opening your invite/i).first()).toBeVisible({
+    await expect(page.getByText(/invited you|Create your Horeca1 account|Opening your invite/i).first()).toBeVisible({
       timeout: 45_000,
     });
     await expect(page.getByText(/Return pickup/i)).toHaveCount(0);

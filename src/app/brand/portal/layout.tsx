@@ -225,7 +225,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                         </div>
                         <div>
                             <h1 className="text-[17px] font-extrabold leading-tight text-[#181725]">Brand Portal</h1>
-                            <p className="text-[10px] text-[#AEAEAE] font-semibold uppercase tracking-wide -mt-0.5">HoReCa Hub</p>
+                            <p className="text-[10px] text-[#AEAEAE] font-semibold uppercase tracking-wide -mt-0.5">Horeca1</p>
                         </div>
                     </div>
                     <button
@@ -337,7 +337,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                         {!isCollapsed && (
                             <div className="whitespace-nowrap">
                                 <h1 className="text-[17px] font-extrabold leading-tight text-[#181725]">Brand Portal</h1>
-                                <p className="text-[10px] text-[#AEAEAE] font-semibold uppercase tracking-wide -mt-0.5">HoReCa Hub</p>
+                                <p className="text-[10px] text-[#AEAEAE] font-semibold uppercase tracking-wide -mt-0.5">Horeca1</p>
                             </div>
                         )}
                     </Link>

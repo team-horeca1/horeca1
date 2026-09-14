@@ -1,4 +1,4 @@
-# AUDIT_INVENTORY.md — HoReCa Hub QA Test Map
+# AUDIT_INVENTORY.md — Horeca1 QA Test Map
 
 **Generated:** 2026-07-15  
 **Scope:** read-only inventory of pages, APIs, overlays, workflows, permissions  

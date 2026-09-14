@@ -1,4 +1,4 @@
-# HoReCa Hub — Project Status Report
+# Horeca1 — Project Status Report
 **Date:** May 4, 2026  
 **Version:** v1.0  
 **Status:** Ready for Public Testing  
@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-HoReCa Hub is a B2B marketplace connecting restaurants, hotels, and caterers with verified food suppliers. The platform enables bulk purchasing with vendor-grouped carts, bulk pricing tiers, and integrated payment processing.
+Horeca1 is a B2B marketplace connecting restaurants, hotels, and caterers with verified food suppliers. The platform enables bulk purchasing with vendor-grouped carts, bulk pricing tiers, and integrated payment processing.
 
 **Current Status:** 16 core features live, zero technical errors, deployed on DigitalOcean Droplet (http://64.227.187.210/). Ready for HTTPS implementation and public launch.
 
@@ -199,7 +199,7 @@ HoReCa Hub is a B2B marketplace connecting restaurants, hotels, and caterers wit
 
 ## Conclusion
 
-HoReCa Hub has achieved a solid MVP with all core marketplace functionality operational. The platform successfully connects food suppliers with bulk buyers through an intuitive, secure interface. With HTTPS implementation and the completion of 3-4 high-priority features, the platform will be ready for public launch and revenue generation.
+Horeca1 has achieved a solid MVP with all core marketplace functionality operational. The platform successfully connects food suppliers with bulk buyers through an intuitive, secure interface. With HTTPS implementation and the completion of 3-4 high-priority features, the platform will be ready for public launch and revenue generation.
 
 **Next Critical Action:** Implement SSL certificate to enable payment processing.
 

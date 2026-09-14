@@ -1,4 +1,4 @@
-# HoReCa Hub - Database Schema Overview
+# Horeca1 - Database Schema Overview
 
 Generated: 2026-07-24
 

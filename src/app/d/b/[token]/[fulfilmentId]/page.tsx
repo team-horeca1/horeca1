@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import DeliveryLinkClient from '@/components/features/delivery/DeliveryLinkClient';
 
 export const metadata: Metadata = {
-  title: 'Delivery order · HoReCa Hub',
+  title: 'Delivery order · Horeca1',
   robots: { index: false, follow: false },
 };
 

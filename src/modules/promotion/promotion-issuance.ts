@@ -305,7 +305,7 @@ export async function issueWelcomeForUser(userId: string): Promise<void> {
         couponPrefix: 'WEL',
         couponName: 'Welcome offer',
         notes: 'Welcome offer',
-        notifyTitle: 'Welcome to HoReCa Hub 🎁',
+        notifyTitle: 'Welcome to Horeca1 🎁',
         notifyBody:
           offer.rewardType === 'wallet_credit' || offer.rewardType === 'cashback'
             ? `₹${Number(offer.rewardValue).toLocaleString('en-IN')} has been credited to your H1 Wallet.`
@@ -604,7 +604,7 @@ export async function recordReferralClick(token: string): Promise<{
     data: { token, referrerId: referrer.id },
     select: { id: true },
   });
-  const referrerName = (referrer.businessName || referrer.fullName || 'A HoReCa Hub customer').trim();
+  const referrerName = (referrer.businessName || referrer.fullName || 'A Horeca1 customer').trim();
   return { token, referrerName, clickId: click.id };
 }
 

@@ -45,7 +45,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       const to = order.user.email?.trim();
       if (!to) throw Errors.badRequest('Customer has no email on file');
       const authUrl = process.env.AUTH_URL ?? 'http://localhost:3000';
-      const subject = `Invoice for order ${order.orderNumber} — HoReCa Hub`;
+      const subject = `Invoice for order ${order.orderNumber} — Horeca1`;
       const text = [
         `Hello ${order.user.fullName},`,
         '',
@@ -53,9 +53,9 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         '',
         `You can also view your order at: ${authUrl}/orders/${order.id}`,
         '',
-        '— The HoReCa Hub team',
+        '— The Horeca1 team',
       ].join('\n');
-      const html = `<p>Hello <strong>${order.user.fullName}</strong>,</p><p>Please find attached the GST tax invoice for your order <strong>${order.orderNumber}</strong>.</p><p><a href="${authUrl}/orders/${order.id}">View order</a></p><p>— The HoReCa Hub team</p>`;
+      const html = `<p>Hello <strong>${order.user.fullName}</strong>,</p><p>Please find attached the GST tax invoice for your order <strong>${order.orderNumber}</strong>.</p><p><a href="${authUrl}/orders/${order.id}">View order</a></p><p>— The Horeca1 team</p>`;
       const { sent } = await sendEmail({
         to,
         subject,

@@ -28,7 +28,7 @@ if (count === '0') {
 }
 
 // Resend requires a verified-domain From address for external recipients.
-const fromLine = 'EMAIL_FROM=HoReCa Hub <noreply@freshville.store>';
+const fromLine = 'EMAIL_FROM=Horeca1 <noreply@freshville.store>';
 const fromCount = execSync(
   `ssh root@64.227.187.210 "grep -c '^EMAIL_FROM=' /opt/horeca1/.env.production 2>/dev/null || echo 0"`,
   { encoding: 'utf8' },

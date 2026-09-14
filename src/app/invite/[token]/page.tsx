@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import InviteLandingClient from '@/components/features/promo/InviteLandingClient';
 
 export const metadata: Metadata = {
-  title: 'You are invited · HoReCa Hub',
+  title: 'You are invited · Horeca1',
   robots: { index: false, follow: false },
 };
 

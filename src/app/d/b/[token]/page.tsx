@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import DeliveryBoyPortalList from '@/components/features/delivery/DeliveryBoyPortalList';
 
 export const metadata: Metadata = {
-  title: 'Delivery runs · HoReCa Hub',
+  title: 'Delivery runs · Horeca1',
   robots: { index: false, follow: false },
 };
 

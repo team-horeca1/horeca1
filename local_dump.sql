@@ -909,7 +909,7 @@ a7eaa4ed-64a7-4e59-bc56-c7f3f099615e	48b6c774-f869-4e2e-841c-7eed042e6ff6	93b01c
 --
 
 COPY public.notifications (id, user_id, type, channel, title, body, reference_id, reference_type, status, read_at, created_at) FROM stdin;
-c0d8f287-71d0-4d7b-a1ae-2853811878c5	bf9d6c40-26d1-46cd-9259-878820fc711c	account	in_app	Welcome to HoReCa Hub!	Your account has been created. Start exploring vendors and place your first order.	bf9d6c40-26d1-46cd-9259-878820fc711c	user	pending	\N	2026-03-21 21:04:28.612+00
+c0d8f287-71d0-4d7b-a1ae-2853811878c5	bf9d6c40-26d1-46cd-9259-878820fc711c	account	in_app	Welcome to Horeca1!	Your account has been created. Start exploring vendors and place your first order.	bf9d6c40-26d1-46cd-9259-878820fc711c	user	pending	\N	2026-03-21 21:04:28.612+00
 f675f728-20f3-4d90-ab66-e3daccee7790	b4d67165-07f4-4473-b8ea-102e3887f520	approval	in_app	New Product Pending Approval	New product pending approval: test2	fbad9e01-d19f-4750-9482-117c2d3de6b3	product	pending	\N	2026-03-26 07:40:42.547+00
 9845bb1b-06d3-4faa-b3ef-455c9f5be8fb	8e04279e-987d-4dd4-90fc-abd9fd2f6397	approval	in_app	Product Approved	Your product 'test2' has been approved	fbad9e01-d19f-4750-9482-117c2d3de6b3	product	pending	\N	2026-03-26 07:42:54.373+00
 \.

@@ -229,7 +229,7 @@ async function collectPageIssues(page: Page, route: string): Promise<Finding[]> 
   return findings;
 }
 
-test.describe('HoReCa Hub P0 smoke crawl', () => {
+test.describe('Horeca1 P0 smoke crawl', () => {
   test('crawl routes and write PLAYWRIGHT_QA_REPORT.md', async ({ page }) => {
     test.setTimeout(600_000);
     const all: Finding[] = [];
@@ -283,7 +283,7 @@ test.describe('HoReCa Hub P0 smoke crawl', () => {
     const reportPath = path.join(process.cwd(), 'PLAYWRIGHT_QA_REPORT.md');
     const bySeverity = (s: Finding['severity']) => all.filter((f) => f.severity === s);
     const lines: string[] = [
-      '# Playwright P0 Crawl Report — HoReCa Hub',
+      '# Playwright P0 Crawl Report — Horeca1',
       '',
       `**Date:** ${new Date().toISOString()}`,
       `**Base URL:** ${process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000'}`,

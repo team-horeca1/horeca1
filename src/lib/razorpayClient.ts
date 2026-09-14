@@ -33,7 +33,7 @@ export function openRazorpayPopup(opts: {
       amount: opts.amount,
       currency: opts.currency,
       order_id: opts.order_id,
-      name: 'HoReCa Hub',
+      name: 'Horeca1',
       description: opts.description,
       theme: { color: CDL.primary },
       handler: (response: RazorpaySuccessPayload) => resolve(response),

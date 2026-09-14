@@ -1,8 +1,8 @@
-# CLAUDE.md — Horeca1 (HoReCa Hub)
+# CLAUDE.md — Horeca1
 Read this file at the start of every session.
 
 ## PROJECT OVERVIEW
-**HoReCa Hub** is a B2B marketplace where restaurants, hotels, caterers, and bakeries buy food and supplies in bulk from verified vendors. Think Swiggy-style vendor marketplace, but for procurement: vendor-grouped cart, bulk price tiers, DiSCCO credit, delivery-slot booking, multi-vendor checkout.
+**Horeca1** is a B2B marketplace where restaurants, hotels, caterers, and bakeries buy food and supplies in bulk from verified vendors. Think Swiggy-style vendor marketplace, but for procurement: vendor-grouped cart, bulk price tiers, DiSCCO credit, delivery-slot booking, multi-vendor checkout.
 
 **Tech stack:** Next.js 16 App Router · React 19 · TypeScript (strict) · Tailwind CSS 4 · Framer Motion · Prisma 7 · PostgreSQL 16 · Auth.js v5 (JWT) · BullMQ + Redis 7 · Razorpay (payments) · ImageKit (media) · Resend (email) · MSG91 (SMS) · Sentry (monitoring) · Google Maps · Docker Compose · Nginx · PM2.
 

@@ -1,4 +1,4 @@
-# AUDIT PACK RESULTS — HoReCa Hub
+# AUDIT PACK RESULTS — Horeca1
 
 **Audit date:** 2026-07-15  
 **Fix + retest date:** 2026-07-15  

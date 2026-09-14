@@ -217,7 +217,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
         recipientEmail: user.email,
         tempPassword,
         scope: 'admin',
-        businessName: 'HoReCa Hub Admin',
+        businessName: 'Horeca1 Admin',
         loginUrl,
         inviterName: inviter?.fullName ?? undefined,
       });

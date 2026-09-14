@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import ReturnPickupLinkClient from '@/components/features/return/ReturnPickupLinkClient';
 
 export const metadata: Metadata = {
-  title: 'Return pickup · HoReCa Hub',
+  title: 'Return pickup · Horeca1',
   robots: { index: false, follow: false },
 };
 

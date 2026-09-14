@@ -22,7 +22,7 @@ export interface SendEmailResult {
   sent: boolean;
 }
 
-const DEFAULT_FROM = 'HoReCa Hub <onboarding@resend.dev>';
+const DEFAULT_FROM = 'Horeca1 <onboarding@resend.dev>';
 
 function resolveFrom(): string {
   return process.env.EMAIL_FROM ?? DEFAULT_FROM;

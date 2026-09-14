@@ -81,7 +81,7 @@ const groups = {
 };
 
 const overview = {
-  project: 'HoReCa Hub (horeca1)',
+  project: 'Horeca1 (horeca1)',
   generatedAt: new Date().toISOString().slice(0, 10),
   databaseEngine: 'PostgreSQL',
   importantNote:
@@ -105,7 +105,7 @@ mkdirSync('docs', { recursive: true });
 writeFileSync('docs/horeca1-schema-overview.json', JSON.stringify(overview, null, 2));
 
 const md = [
-  '# HoReCa Hub - Database Schema Overview',
+  '# Horeca1 - Database Schema Overview',
   '',
   `Generated: ${overview.generatedAt}`,
   '',

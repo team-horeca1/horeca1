@@ -1,4 +1,4 @@
-# HoReCa Hub — Go-Live Readiness Audit
+# Horeca1 — Go-Live Readiness Audit
 
 **Date:** 2026-06-05
 **Scope:** The 7 "Go-Live Absolute Must-Haves" supplied by the client + the `User_Profile_Master_Datasheet`.

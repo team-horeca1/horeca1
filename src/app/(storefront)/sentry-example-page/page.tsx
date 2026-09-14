@@ -7,13 +7,13 @@ export default function SentryExamplePage() {
   const [sent, setSent] = useState(false);
 
   const triggerError = () => {
-    const error = new Error("Sentry test error — HoReCa Hub verification");
+    const error = new Error("Sentry test error — Horeca1 verification");
     Sentry.captureException(error);
     setSent(true);
   };
 
   const triggerUnhandled = () => {
-    throw new Error("Unhandled Sentry test error — HoReCa Hub");
+    throw new Error("Unhandled Sentry test error — Horeca1");
   };
 
   return (

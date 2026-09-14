@@ -1,4 +1,4 @@
-# Monitoring Strategy — HoReCa Hub
+# Monitoring Strategy — Horeca1
 
 ## Current Stack
 

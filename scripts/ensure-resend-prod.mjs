@@ -11,7 +11,7 @@ const key = match[1].trim().replace(/'/g, "'\\''");
 
 const remote = `root@64.227.187.210`;
 const envPath = '/opt/horeca1/.env.production';
-const fromLine = "EMAIL_FROM=HoReCa Hub <noreply@freshville.store>";
+const fromLine = "EMAIL_FROM=Horeca1 <noreply@freshville.store>";
 
 const shell = `
 if grep -q '^RESEND_API_KEY=' ${envPath} 2>/dev/null; then

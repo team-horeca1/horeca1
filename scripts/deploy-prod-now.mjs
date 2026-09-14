@@ -40,7 +40,7 @@ function syncResendKey() {
   const match = env.match(/^RESEND_API_KEY=(.+)$/m);
   if (!match) throw new Error('RESEND_API_KEY not found in .env.local');
   const key = match[1].trim().replace(/'/g, "'\\''");
-  const fromLine = 'HoReCa Hub <noreply@freshville.store>';
+  const fromLine = 'Horeca1 <noreply@freshville.store>';
 
   console.log('Syncing RESEND_API_KEY + EMAIL_FROM to production...');
   runRemoteScript('sync-resend', [

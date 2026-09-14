@@ -4,7 +4,7 @@ import DeliveryLinkClient from '@/components/features/delivery/DeliveryLinkClien
 import { deliveryLinkService } from '@/modules/fulfillment/delivery-link.service';
 
 export const metadata: Metadata = {
-  title: 'Delivery · HoReCa Hub',
+  title: 'Delivery · Horeca1',
   robots: { index: false, follow: false },
 };
 

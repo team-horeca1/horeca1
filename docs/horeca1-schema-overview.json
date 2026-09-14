@@ -1,5 +1,5 @@
 {
-  "project": "HoReCa Hub (horeca1)",
+  "project": "Horeca1 (horeca1)",
   "generatedAt": "2026-07-24",
   "databaseEngine": "PostgreSQL",
   "importantNote": "There is one application database with many tables — not multiple separate databases.",

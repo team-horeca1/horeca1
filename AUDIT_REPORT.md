@@ -1,4 +1,4 @@
-# AUDIT REPORT — HoReCa Hub (Post-Fix Update)
+# AUDIT REPORT — Horeca1 (Post-Fix Update)
 
 **Original audit:** 2026-07-15  
 **Fixes applied:** 2026-07-15 (Wave 1–3)  

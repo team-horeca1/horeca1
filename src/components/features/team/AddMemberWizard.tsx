@@ -1094,7 +1094,7 @@ function Step3Role({
             <span className="text-[10px] text-[#2563EB] bg-[#DBEAFE] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide">As Buyer</span>
           </div>
           <p className="text-[11px] text-[#6B7280] mb-3 leading-relaxed">
-            Allow this member to access the HoReCa Hub storefront on behalf of your business.
+            Allow this member to access the Horeca1 storefront on behalf of your business.
           </p>
           <div className="space-y-2.5">
             {([

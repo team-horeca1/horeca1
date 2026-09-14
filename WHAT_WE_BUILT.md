@@ -1,9 +1,9 @@
-# HoReCa Hub — What We've Built So Far
+# Horeca1 — What We've Built So Far
 **Simple Version for Everyone**
 
 ---
 
-## What Is HoReCa Hub?
+## What Is Horeca1?
 
 A **marketplace app** where restaurants, hotels, bakeries, and catering companies buy food and supplies in bulk — like an online wholesale store. Think of it like Amazon, but for restaurant supplies.
 

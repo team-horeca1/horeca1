@@ -40,13 +40,13 @@ export function buildInviteEmail(p: InviteEmailParams): {
   const role = scopeLabel[p.scope];
   const inviterFragment = p.inviterName ? ` by ${p.inviterName}` : '';
 
-  const subject = `You're invited to ${p.businessName} on HoReCa Hub`;
+  const subject = `You're invited to ${p.businessName} on Horeca1`;
 
   // ───── plain-text fallback ─────
   const text = [
     `Hello ${greetingName},`,
     '',
-    `You've been invited${inviterFragment} to join ${p.businessName} on HoReCa Hub as a ${role} team member.`,
+    `You've been invited${inviterFragment} to join ${p.businessName} on Horeca1 as a ${role} team member.`,
     '',
     'Use the credentials below to sign in:',
     '',
@@ -56,7 +56,7 @@ export function buildInviteEmail(p: InviteEmailParams): {
     '',
     'Please change your password after first login from your account settings.',
     '',
-    '— The HoReCa Hub team',
+    '— The Horeca1 team',
   ].join('\n');
 
   // ───── HTML version (inline styles only, no remote assets) ─────
@@ -87,14 +87,14 @@ export function buildInviteEmail(p: InviteEmailParams): {
           <tr>
             <td style="padding:24px 32px;border-top:4px solid ${CDL.primary};">
               <h1 style="margin:0;font-size:22px;line-height:1.3;color:#1f2a24;">You're invited to ${safeBusiness}</h1>
-              <p style="margin:8px 0 0;font-size:14px;color:#6b7770;">on HoReCa Hub</p>
+              <p style="margin:8px 0 0;font-size:14px;color:#6b7770;">on Horeca1</p>
             </td>
           </tr>
           <tr>
             <td style="padding:8px 32px 0;">
               <p style="margin:16px 0 0;font-size:15px;line-height:1.55;">Hello ${safeName},</p>
               <p style="margin:12px 0 0;font-size:15px;line-height:1.55;">
-                You've been invited${inviterHtmlFragment} to join <strong>${safeBusiness}</strong> on HoReCa Hub as a <strong>${safeRole}</strong> team member.
+                You've been invited${inviterHtmlFragment} to join <strong>${safeBusiness}</strong> on Horeca1 as a <strong>${safeRole}</strong> team member.
               </p>
               <p style="margin:12px 0 0;font-size:15px;line-height:1.55;">Use the credentials below to sign in:</p>
             </td>
@@ -125,13 +125,13 @@ export function buildInviteEmail(p: InviteEmailParams): {
           </tr>
           <tr>
             <td align="center" style="padding:24px 32px 8px;">
-              <a href="${safeLoginUrl}" style="display:inline-block;background:${CDL.primary};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px;">Sign in to HoReCa Hub</a>
+              <a href="${safeLoginUrl}" style="display:inline-block;background:${CDL.primary};color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px;">Sign in to Horeca1</a>
             </td>
           </tr>
           <tr>
             <td style="padding:8px 32px 24px;">
               <p style="margin:12px 0 0;font-size:13px;line-height:1.5;color:#6b7770;">Please change your password after first login from your account settings.</p>
-              <p style="margin:20px 0 0;font-size:13px;line-height:1.5;color:#6b7770;">— The HoReCa Hub team</p>
+              <p style="margin:20px 0 0;font-size:13px;line-height:1.5;color:#6b7770;">— The Horeca1 team</p>
             </td>
           </tr>
         </table>
@@ -157,7 +157,7 @@ export function buildInviteSms(p: InviteSmsParams): string {
   const name = p.recipientName.trim() || 'there';
   const inviter = p.inviterName?.trim() ? ` by ${p.inviterName.trim()}` : '';
   return [
-    `Hello ${name}, you've been invited${inviter} to ${p.businessName} on HoReCa Hub.`,
+    `Hello ${name}, you've been invited${inviter} to ${p.businessName} on Horeca1.`,
     `Login: ${p.loginUrl}`,
     `User: ${p.loginIdentifier}`,
     `Password: ${p.tempPassword}`,
