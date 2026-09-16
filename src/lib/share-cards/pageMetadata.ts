@@ -1,5 +1,6 @@
 import 'server-only';
 import type { Metadata } from 'next';
+import { prisma } from '@/lib/prisma';
 import { shareSiteOrigin } from '@/lib/share-cards/ogHelpers';
 
 export function catalogShareMetadata(opts: {
@@ -40,4 +41,66 @@ export function catalogShareMetadata(opts: {
       images: [image],
     },
   };
+}
+
+function clip(text: string | null | undefined, fallback: string): string {
+  const trimmed = text?.trim();
+  if (!trimmed) return fallback;
+  return trimmed.length > 160 ? `${trimmed.slice(0, 159).trimEnd()}…` : trimmed;
+}
+
+export async function productShareMetadata(id: string): Promise<Metadata> {
+  const product = await prisma.product.findFirst({
+    where: { id, isActive: true, approvalStatus: 'approved', archivedAt: null },
+    select: { name: true, description: true },
+  });
+  const title = product?.name || 'Horeca1';
+  return catalogShareMetadata({
+    title,
+    description: clip(product?.description, `Shop ${title} on Horeca1`),
+    path: `/product/${id}`,
+    ogPath: `/api/og/product/${id}?format=square`,
+  });
+}
+
+export async function vendorShareMetadata(id: string): Promise<Metadata> {
+  const vendor = await prisma.vendor.findFirst({
+    where: { id, isActive: true },
+    select: { displayName: true, businessName: true, description: true },
+  });
+  const title = vendor?.displayName || vendor?.businessName || 'Horeca1';
+  return catalogShareMetadata({
+    title,
+    description: clip(vendor?.description, `Order from ${title} on Horeca1`),
+    path: `/vendor/${id}`,
+    ogPath: `/api/og/vendor/${id}?format=square`,
+  });
+}
+
+export async function brandShareMetadata(slug: string): Promise<Metadata> {
+  const brand = await prisma.brand.findFirst({
+    where: { slug, isActive: true, approvalStatus: 'approved' },
+    select: { name: true, description: true },
+  });
+  const title = brand?.name || 'Horeca1';
+  return catalogShareMetadata({
+    title,
+    description: clip(brand?.description, `Find ${title} on Horeca1`),
+    path: `/brand/${slug}`,
+    ogPath: `/api/og/brand/${encodeURIComponent(slug)}?format=square`,
+  });
+}
+
+export async function collectionShareMetadata(slug: string): Promise<Metadata> {
+  const collection = await prisma.collection.findFirst({
+    where: { slug, isActive: true },
+    select: { name: true, description: true },
+  });
+  const title = collection?.name || 'Horeca1';
+  return catalogShareMetadata({
+    title,
+    description: clip(collection?.description, `Browse ${title} on Horeca1`),
+    path: `/collections/${slug}`,
+    ogPath: `/api/og/collection/${encodeURIComponent(slug)}?format=square`,
+  });
 }
