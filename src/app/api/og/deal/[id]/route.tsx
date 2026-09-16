@@ -1,4 +1,4 @@
-import { renderVendorShareImage } from '@/lib/share-cards/renderVendorCard';
+import { renderDealShareImage } from '@/lib/share-cards/renderDealCard';
 import { notFoundOgResponse, parseOgFormat } from '@/lib/share-cards/ogHelpers';
 
 export const runtime = 'nodejs';
@@ -9,7 +9,7 @@ export async function GET(
 ) {
   const { id } = await ctx.params;
   const format = parseOgFormat(req);
-  const image = await renderVendorShareImage(id, format, req);
-  if (!image) return notFoundOgResponse('Vendor not found');
+  const image = await renderDealShareImage(id, format, req);
+  if (!image) return notFoundOgResponse('Deal not found');
   return image;
 }

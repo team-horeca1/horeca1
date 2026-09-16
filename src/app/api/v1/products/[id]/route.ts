@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
         basePrice: true,
         originalPrice: true,
         promoPrice: true,
+        taxPercent: true,
         imageUrl: true,
         images: true,
         packSize: true,

@@ -2,9 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, Search, Share2, Store, X } from 'lucide-react';
-import { toast } from 'sonner';
-import { shareCard } from '@/lib/share-cards/shareClient';
+import { ChevronRight, Search, Store, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
 import { buildCategoryTree, filterProductsByCatalogTab, slugifyCategory } from '@/lib/categoryTree';
@@ -13,6 +11,8 @@ import { VendorCategoryRail } from '@/components/features/vendor/VendorCategoryR
 import { BrandProductCard } from '@/components/features/brand/BrandProductCard';
 import { BrandAttributeFilters, matchesBrandAttrFilters, type BrandAttrFilter } from '@/components/features/brand/BrandAttributeFilters';
 import { BrandSuppliersPanel, type BrandSupplier } from '@/components/features/brand/BrandSuppliersPanel';
+import { ShareButton } from '@/components/features/share/ShareButton';
+import { brandShareContent } from '@/lib/share-cards/types';
 
 const PRODUCT_IMAGE_FALLBACK = '/images/recom-product/product-img10.png';
 
@@ -269,15 +269,11 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
         setActiveTab('suppliers');
     };
 
-    const handleShareBrand = async () => {
-        const result = await shareCard({
-            title: brand.name,
-            text: `Find ${brand.name} on Horeca1`,
-            url: `${window.location.origin}/brand/${brand.slug}`,
-            imageUrl: `/api/og/brand/${brand.slug}?format=square`,
-        });
-        if (result === 'copied') toast.success('Link copied');
-    };
+    const shareContent = brandShareContent({
+        slug: brand.slug,
+        name: brand.name,
+        image: logoParsed.src || bannerParsed.src || null,
+    });
 
     return (
         <div className="min-h-dvh bg-page pb-20 md:pb-24">
@@ -310,14 +306,7 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
                         <h1 className="text-[22px] md:text-[28px] font-semibold text-text text-balance truncate">
                             {brand.name}
                         </h1>
-                        <button
-                            type="button"
-                            onClick={() => void handleShareBrand()}
-                            aria-label="Share brand"
-                            className="size-9 rounded-full bg-white border border-divider flex items-center justify-center text-primary shrink-0"
-                        >
-                            <Share2 size={15} />
-                        </button>
+                        <ShareButton content={shareContent} variant="icon" className="size-9" />
                     </div>
                 </div>
             </div>

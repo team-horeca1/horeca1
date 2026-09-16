@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 import { dal } from '@/lib/dal';
+import { ShareButton } from '@/components/features/share/ShareButton';
+import { collectionShareContent } from '@/lib/share-cards/types';
 
 interface CollectionCard {
   id: string;
@@ -98,8 +100,9 @@ export default function CollectionsIndexPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
             {collections.map((col) => (
-              <Link key={col.id} href={`/collections/${col.slug}`} className="group block">
+              <Link key={col.id} href={`/collections/${col.slug}`} className="group block relative">
                 <div className="relative rounded-[18px] overflow-hidden aspect-[16/10] shadow-md shadow-black/8 group-hover:shadow-xl transition-shadow">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={col.image}
                     alt={col.name}
@@ -111,8 +114,19 @@ export default function CollectionsIndexPage() {
                       {col.category}
                     </span>
                   </div>
-                  <div className="absolute top-3 right-3 w-9 h-9 rounded-full bg-primary flex items-center justify-center z-10 group-hover:bg-primary-dark transition-colors">
-                    <ChevronRight size={18} className="text-white" strokeWidth={2.5} />
+                  <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+                    <ShareButton
+                      content={collectionShareContent({
+                        slug: col.slug,
+                        name: col.name,
+                        image: col.image,
+                      })}
+                      variant="overlay"
+                      className="size-9"
+                    />
+                    <span className="w-9 h-9 rounded-full bg-primary flex items-center justify-center group-hover:bg-primary-dark transition-colors">
+                      <ChevronRight size={18} className="text-white" strokeWidth={2.5} />
+                    </span>
                   </div>
                   <div className="absolute inset-x-0 bottom-0 p-5 z-10">
                     <h2 className="text-[clamp(1rem,1.5vw+0.5rem,1.25rem)] font-extrabold text-white tracking-tight">

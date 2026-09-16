@@ -1,4 +1,4 @@
-import { renderBrandShareImage } from '@/lib/share-cards/renderBrandCard';
+import { renderCollectionShareImage } from '@/lib/share-cards/renderCollectionCard';
 import { notFoundOgResponse, parseOgFormat } from '@/lib/share-cards/ogHelpers';
 
 export const runtime = 'nodejs';
@@ -9,7 +9,7 @@ export async function GET(
 ) {
   const { slug } = await ctx.params;
   const format = parseOgFormat(req);
-  const image = await renderBrandShareImage(slug, format, req);
-  if (!image) return notFoundOgResponse('Brand not found');
+  const image = await renderCollectionShareImage(slug, format, req);
+  if (!image) return notFoundOgResponse('Collection not found');
   return image;
 }

@@ -6,6 +6,8 @@ import { Package, Store } from 'lucide-react';
 import { formatPackSize, formatPrice } from '@/lib/utils';
 import { categorySkuHref } from '@/lib/categoryBrowse';
 import type { VendorProduct } from '@/types';
+import { ShareButton } from '@/components/features/share/ShareButton';
+import { productShareContent } from '@/lib/share-cards/types';
 
 export interface CategorySkuItem {
   master: {
@@ -40,11 +42,19 @@ export function CategorySkuCard({
   );
   const price = Number(item.defaultOffer.price);
   const href = categorySkuHref(categorySlug, item);
+  const shareContent = productShareContent({
+    id: item.defaultOffer.id,
+    title,
+    vendorName: item.defaultOffer.vendorName,
+    image: img,
+    priceLabel: Number.isFinite(price) ? `From ${formatPrice(price)}` : null,
+    pack: pack || null,
+  });
 
   return (
     <Link
       href={href}
-      className="group bg-white rounded-xl border border-divider overflow-hidden shadow-cdl-1 hover:shadow-cdl-2 hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-200 flex flex-col"
+      className="group bg-white rounded-xl border border-divider overflow-hidden shadow-cdl-1 hover:shadow-cdl-2 hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative"
     >
       <div className="relative aspect-square bg-ivory">
         {img ? (
@@ -54,6 +64,9 @@ export function CategorySkuCard({
             <Package size={28} className="text-gray-300" strokeWidth={1.5} />
           </div>
         )}
+        <div className="absolute top-2 right-2 z-10">
+          <ShareButton content={shareContent} variant="overlay" />
+        </div>
       </div>
       <div className="p-2 md:p-3 flex flex-col flex-1">
         <h3 className="text-[12px] md:text-[13px] font-bold text-[#1C1C1C] line-clamp-2 leading-snug group-hover:text-primary transition-colors">

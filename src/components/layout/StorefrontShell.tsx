@@ -9,6 +9,7 @@ import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 import { VendorApplicationBanner } from '@/components/features/homepage/VendorApplicationBanner';
 import { AdminImpersonationBanner } from '@/components/features/admin/AdminCustomerImpersonationBanner';
 import { BrowseOnlyBanner } from '@/components/layout/BrowseOnlyBanner';
+import { ShareProvider } from '@/components/features/share/ShareProvider';
 import type { InitialNav } from '@/lib/navChrome';
 
 const MandatoryAddressGate = dynamic(
@@ -35,16 +36,18 @@ export function StorefrontShell({
     <GoogleMapsProvider>
       <AddressProvider>
         <CartProvider>
-          <Navbar initialNav={initialNav} />
-          <div className="px-[clamp(1rem,3vw,2rem)]">
-            <AdminImpersonationBanner />
-          </div>
-          <OutletCompletionBanner />
-          <VendorApplicationBanner />
-          <BrowseOnlyBanner />
-          <main className="w-full min-h-screen pb-20 lg:pb-0">{children}</main>
-          <Footer />
-          <MandatoryAddressGate />
+          <ShareProvider>
+            <Navbar initialNav={initialNav} />
+            <div className="px-[clamp(1rem,3vw,2rem)]">
+              <AdminImpersonationBanner />
+            </div>
+            <OutletCompletionBanner />
+            <VendorApplicationBanner />
+            <BrowseOnlyBanner />
+            <main className="w-full min-h-screen pb-20 lg:pb-0">{children}</main>
+            <Footer />
+            <MandatoryAddressGate />
+          </ShareProvider>
         </CartProvider>
       </AddressProvider>
     </GoogleMapsProvider>

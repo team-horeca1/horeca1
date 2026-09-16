@@ -4,15 +4,16 @@ import { VoiceShareCard } from '@/lib/share-cards/templates';
 import { resolveOgImage } from '@/lib/share-cards/absoluteUrl';
 import { qrPngDataUrl } from '@/lib/share-cards/qr';
 import { voiceTitleLine } from '@/sanity/lib/types';
+import { shareSiteOrigin } from '@/lib/share-cards/ogHelpers';
 
 export const alt = 'Horeca1 Voice story';
 export const size = { width: 1080, height: 1080 };
 export const contentType = 'image/png';
 
-export default async function Image({ params }: { params: Promise<{ id: string; slug: string }> }) {
+export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const story = await getPublishedVoiceStoryBySlug(slug);
-  const origin = process.env.AUTH_URL || 'http://localhost:3000';
+  const origin = shareSiteOrigin();
   const articleUrl = `${origin}/voices/${slug}`;
   const qrDataUrl = await qrPngDataUrl(articleUrl);
   const photoUrl = await resolveOgImage(origin, story?.photoOgUrl || story?.photoUrl);
@@ -30,7 +31,6 @@ export default async function Image({ params }: { params: Promise<{ id: string; 
         qrDataUrl={qrDataUrl}
       />
     ),
-
     { ...size },
   );
 }

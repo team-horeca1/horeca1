@@ -1,15 +1,14 @@
-import { renderProductShareImage } from '@/lib/share-cards/renderProductCard';
+import { renderBrandShareImage } from '@/lib/share-cards/renderBrandCard';
+import { ImageResponse } from 'next/og';
 
-export const alt = 'Horeca1 Product';
+export const alt = 'Horeca1 Brand Store';
 export const size = { width: 1080, height: 1080 };
 export const contentType = 'image/png';
 
-export default async function Image({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const image = await renderProductShareImage(id, 'square');
+export default async function Image({ params }: { params: Promise<{ brandId: string }> }) {
+  const { brandId } = await params;
+  const image = await renderBrandShareImage(brandId, 'square');
   if (!image) {
-    // File-convention OG cannot easily return 404 JSON — render a minimal fallback.
-    const { ImageResponse } = await import('next/og');
     return new ImageResponse(
       (
         <div

@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { Copy, Gift, Loader2, Percent, Store, Tag } from 'lucide-react';
 import { toast } from 'sonner';
+import { ShareButton } from '@/components/features/share/ShareButton';
+import { dealShareContent, vendorShareContent } from '@/lib/share-cards/types';
+import type { ShareableContent } from '@/lib/share-cards/types';
 
 export interface PublicCouponOffer {
   id: string;
@@ -173,6 +176,21 @@ export function OffersList({
                       <Copy size={13} strokeWidth={2.5} />
                       Copy
                     </button>
+                    {c.vendorId ? (
+                      <ShareButton
+                        content={{
+                          ...vendorShareContent({
+                            id: c.vendorId,
+                            name: c.vendorName || c.name,
+                          }),
+                          couponCode: c.code,
+                          text: `${couponHeadline(c)} with code ${c.code} at ${c.vendorName || 'Horeca1'}`,
+                          title: c.name,
+                        } satisfies ShareableContent}
+                        variant="overlay"
+                        className="size-9 shrink-0"
+                      />
+                    ) : null}
                   </div>
                   <p className="text-[10px] text-gray-400 font-medium mt-2">Apply this code at checkout.</p>
                 </div>
@@ -226,6 +244,33 @@ export function OffersList({
                       >
                         {o.vendorId ? 'Shop this vendor' : 'Browse vendors'}
                       </Link>
+                      {o.vendorId && o.kind === 'vendor_promo' ? (
+                        <div className="mt-2">
+                          <ShareButton
+                            content={dealShareContent({
+                              id: o.id,
+                              title: o.badgeLabel || o.name,
+                              vendorId: o.vendorId,
+                              vendorName: o.vendorName,
+                              priceLabel: o.badgeLabel,
+                              endDate: o.endDate,
+                            })}
+                            variant="chip"
+                            label="Share offer"
+                          />
+                        </div>
+                      ) : o.vendorId ? (
+                        <div className="mt-2">
+                          <ShareButton
+                            content={vendorShareContent({
+                              id: o.vendorId,
+                              name: o.vendorName || o.name,
+                            })}
+                            variant="chip"
+                            label="Share store"
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>

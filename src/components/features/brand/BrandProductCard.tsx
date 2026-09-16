@@ -1,9 +1,8 @@
 'use client';
 
-import { Share2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { ShareButton } from '@/components/features/share/ShareButton';
+import { brandShareContent } from '@/lib/share-cards/types';
 import { cn } from '@/lib/utils';
-import { shareCard } from '@/lib/share-cards/shareClient';
 import { Chip } from '@/components/ui/Chip';
 import {
   brandHighlightTag,
@@ -61,16 +60,16 @@ export function BrandProductCard({
   const highlight = brandHighlightTag(product);
   const nearby = nearbySupplierCount(product.distributors);
 
-  const handleShare = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const result = await shareCard({
-      title: product.name,
-      text: `${product.name} · ${brandName} on Horeca1`,
-      url: `${window.location.origin}/brand/${brandSlug}?sku=${product.id}`,
-      imageUrl: image && image !== PRODUCT_IMAGE_FALLBACK ? image : undefined,
-    });
-    if (result === 'copied') toast.success('Link copied');
+  // Brand SKU deep-links to brand store; share uses brand OG card (not raw CDN photo).
+  const shareContent = {
+    ...brandShareContent({
+      slug: brandSlug,
+      name: product.name,
+      image: image && image !== PRODUCT_IMAGE_FALLBACK ? image : null,
+    }),
+    path: `/brand/${brandSlug}?sku=${product.id}`,
+    text: `${product.name} · ${brandName} on Horeca1`,
+    subtitle: brandName,
   };
 
   return (
@@ -94,14 +93,9 @@ export function BrandProductCard({
           className="w-full h-full object-contain p-3"
         />
         {veg && <VegMark kind={veg} />}
-        <button
-          type="button"
-          aria-label={`Share ${product.name}`}
-          onClick={handleShare}
-          className="absolute top-2 right-2 size-8 rounded-full bg-white/95 border border-divider flex items-center justify-center text-text-muted hover:text-primary"
-        >
-          <Share2 size={14} strokeWidth={2} />
-        </button>
+        <div className="absolute top-2 right-2 z-10">
+          <ShareButton content={shareContent} variant="overlay" />
+        </div>
       </div>
 
       <div className="px-2.5 pt-2 pb-3">

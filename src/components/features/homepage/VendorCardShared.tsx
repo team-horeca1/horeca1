@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Star, ArrowRight, Package, Clock, ShieldCheck } from 'lucide-react';
 import type { Vendor } from '@/types';
+import { ShareButton } from '@/components/features/share/ShareButton';
+import { vendorShareContent } from '@/lib/share-cards/types';
 
 export const VENDOR_COVERS = [
   '/images/vendors/chad-peltola-BTvQ2ET_iKc-unsplash.webp',
@@ -45,6 +47,11 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
   const remainingCategories = Math.max(0, vendor.categories.length - 3);
   const years = vendorYears(vendor.createdAt);
   const vendorHref = `/vendor/${vendor.id}`;
+  const shareContent = vendorShareContent({
+    id: vendor.id,
+    name: vendor.name,
+    image: vendor.logo || cover,
+  });
 
   return (
     <article
@@ -68,7 +75,7 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent pointer-events-none" />
 
         {/* Floating Badges */}
-        <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none">
+        <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-auto">
           {vendor.isVerified ? (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white bg-black/40 backdrop-blur-md border border-white/20 shadow-sm">
               <ShieldCheck size={12} className="text-emerald-400" />
@@ -77,16 +84,18 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
           ) : (
             <span />
           )}
-
-          {vendor.minOrderValue > 0 ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white bg-primary/85 backdrop-blur-md border border-white/20 shadow-sm">
-              MOV ₹{vendor.minOrderValue}
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white bg-emerald-600/85 backdrop-blur-md border border-white/20 shadow-sm">
-              No Min. Order
-            </span>
-          )}
+          <div className="flex items-center gap-1.5">
+            {vendor.minOrderValue > 0 ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white bg-primary/85 backdrop-blur-md border border-white/20 shadow-sm pointer-events-none">
+                MOV ₹{vendor.minOrderValue}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white bg-emerald-600/85 backdrop-blur-md border border-white/20 shadow-sm pointer-events-none">
+                No Min. Order
+              </span>
+            )}
+            <ShareButton content={shareContent} variant="overlay" className="size-9" />
+          </div>
         </div>
       </Link>
 

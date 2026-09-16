@@ -11,7 +11,9 @@ import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { useCart } from '@/context/CartContext';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { VendorOfferPicker } from '@/components/features/homepage/VendorOfferPicker';
-import { cn } from '@/lib/utils';
+import { ShareButton } from '@/components/features/share/ShareButton';
+import { productShareContent } from '@/lib/share-cards/types';
+import { cn, formatPrice } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
 
 /** Preferred leaf slugs for homepage aisle rails (order = priority). */
@@ -451,13 +453,22 @@ export function CategoryProductRails() {
                       const img = itemImage(item);
                       const pack = itemPack(item);
                       const key = item.master?.id || item.defaultOffer.id;
+                      const price = Number(item.defaultOffer.price);
+                      const shareContent = productShareContent({
+                        id: item.defaultOffer.id,
+                        title,
+                        vendorName: item.defaultOffer.vendorName,
+                        image: img,
+                        priceLabel: Number.isFinite(price) ? formatPrice(price) : null,
+                        pack: pack || null,
+                      });
 
                       return (
                         <button
                           key={key}
                           type="button"
                           onClick={() => openSuppliers(item)}
-                          className="w-[160px] md:w-[180px] shrink-0 text-left bg-white rounded-xl border border-[#E9E3DD] overflow-hidden hover:shadow-md transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                          className="w-[160px] md:w-[180px] shrink-0 text-left bg-white rounded-xl border border-[#E9E3DD] overflow-hidden hover:shadow-md transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 relative"
                         >
                           <div className="relative aspect-square bg-[#FAF5EC]">
                             {img ? (
@@ -473,6 +484,9 @@ export function CategoryProductRails() {
                                 <Package size={28} />
                               </div>
                             )}
+                            <div className="absolute top-1.5 right-1.5 z-10">
+                              <ShareButton content={shareContent} variant="overlay" className="size-8" />
+                            </div>
                           </div>
                           <div className="p-3">
                             <h3 className="text-[13px] font-bold text-[#1C1C1C] line-clamp-2 leading-snug min-h-[2.4em]">

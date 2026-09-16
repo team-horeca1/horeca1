@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { useCart } from '@/context/CartContext';
 import { cn, formatPackSize } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
+import { ShareButton } from '@/components/features/share/ShareButton';
+import { productShareContent } from '@/lib/share-cards/types';
 
 export interface CollectionSkuItem {
   master: {
@@ -137,6 +139,21 @@ export const CollectionSkuCard = React.memo(function CollectionSkuCard({
                 <span className="text-[9px] font-bold uppercase tracking-wide leading-none">Bulk</span>
               </span>
             ) : null}
+          </div>
+        ) : null}
+        {defaultOffer ? (
+          <div className="absolute top-2 right-2 z-10">
+            <ShareButton
+              content={productShareContent({
+                id: defaultOffer.id,
+                title: item.master.name,
+                vendorName: defaultOffer.vendorName,
+                image: img,
+                priceLabel: hasPrice ? `₹${Math.round(price).toLocaleString('en-IN')}` : null,
+                pack: pack || null,
+              })}
+              variant="overlay"
+            />
           </div>
         ) : null}
       </div>

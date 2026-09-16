@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, ChefHat, Clock, Sparkles, Utensils, HelpCircle, Store, Share2 } from 'lucide-react';
+import { ArrowLeft, ChefHat, Clock, Sparkles, Utensils, HelpCircle, Store } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { PortableText, type PortableTextComponents } from '@portabletext/react';
 import {
@@ -140,6 +140,7 @@ export default async function VoiceStoryPage({ params }: { params: Promise<{ slu
               quote={story.quote}
               badge={story.badge}
               photoUrl={story.photoUrl}
+              preRenderedImageUrl={story.storySquareUrl}
               variant="icon"
             />
           </div>
@@ -200,6 +201,7 @@ export default async function VoiceStoryPage({ params }: { params: Promise<{ slu
                 quote={story.quote}
                 badge={story.badge}
                 photoUrl={story.photoUrl}
+                preRenderedImageUrl={story.storySquareUrl}
                 variant="outline"
               />
             </div>
@@ -349,6 +351,7 @@ export default async function VoiceStoryPage({ params }: { params: Promise<{ slu
                 quote={story.quote}
                 badge={story.badge}
                 photoUrl={story.photoUrl}
+                preRenderedImageUrl={story.storySquareUrl}
                 variant="labeled"
               />
             </div>

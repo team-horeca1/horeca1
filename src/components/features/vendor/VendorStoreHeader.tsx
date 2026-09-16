@@ -1,32 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Star, MapPin, Phone, Share2, ChevronLeft, ClipboardList, CreditCard, Clock, Megaphone, Tag } from 'lucide-react';
+import { Star, MapPin, Phone, ChevronLeft, ClipboardList, CreditCard, Clock, Megaphone, Tag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
-import { shareCard } from '@/lib/share-cards/shareClient';
+import { ShareButton } from '@/components/features/share/ShareButton';
+import { vendorShareContent } from '@/lib/share-cards/types';
 import { useStableSession } from '@/hooks/useStableSession';
 import { cn } from '@/lib/utils';
 import type { Vendor, StorePromotion } from '@/types';
 import { VENDOR_COVERS } from '@/components/features/homepage/VendorCardShared';
 import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
 import { OffersSheet } from '@/components/features/promo/OffersSheet';
-
-function WhatsAppGlyph() {
-    return (
-        <svg viewBox="0 0 24 24" className="size-[18px]" aria-hidden>
-            <path
-                fill="#25D366"
-                d="M17.47 14.38c-.28-.14-1.64-.81-1.9-.9-.25-.1-.44-.14-.62.14-.19.28-.71.9-.87 1.08-.16.19-.32.21-.6.07-.28-.14-1.18-.43-2.25-1.39-.83-.74-1.39-1.65-1.55-1.93-.16-.28-.02-.43.12-.57.13-.13.28-.32.42-.48.14-.16.19-.28.28-.46.1-.19.05-.35-.02-.49-.07-.14-.62-1.49-.85-2.04-.22-.53-.45-.46-.62-.47h-.53c-.19 0-.49.07-.74.35-.25.28-.97.95-.97 2.31s1 2.68 1.13 2.86c.14.19 1.96 2.99 4.75 4.19.66.29 1.18.46 1.59.58.67.21 1.27.18 1.75.11.53-.08 1.64-.67 1.87-1.32.23-.65.23-1.2.16-1.32-.07-.11-.25-.18-.53-.32Z"
-            />
-            <path
-                fill="#25D366"
-                d="M12.04 2C6.58 2 2.15 6.43 2.15 11.89c0 1.75.46 3.45 1.34 4.95L2 22l5.3-1.39a9.86 9.86 0 0 0 4.74 1.21h.01c5.46 0 9.89-4.43 9.89-9.89C22 6.43 17.5 2 12.04 2Zm0 18.07h-.01a8.2 8.2 0 0 1-4.18-1.15l-.3-.18-3.14.82.84-3.06-.2-.31a8.18 8.18 0 0 1-1.26-4.37c0-4.53 3.69-8.21 8.23-8.21 4.54 0 8.24 3.68 8.24 8.21 0 4.54-3.7 8.25-8.22 8.25Z"
-            />
-        </svg>
-    );
-}
 
 interface VendorStoreHeaderProps {
     vendor: Vendor;
@@ -59,22 +45,11 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
         router.push(`/order-lists?vendorId=${vendor.id}`);
     };
 
-    const handleShare = async () => {
-        const url = `${window.location.origin}/vendor/${vendor.id}`;
-        const result = await shareCard({
-            title: vendor.name,
-            text: `Check out ${vendor.name} on Horeca1`,
-            url,
-            imageUrl: `/api/og/vendor/${vendor.id}?format=square`,
-        });
-        if (result === 'copied') toast.success('Link copied to clipboard!');
-    };
-
-    const handleWhatsAppShare = () => {
-        const url = `${window.location.origin}/vendor/${vendor.id}`;
-        const text = `Check out ${vendor.name} on Horeca1\n${url}`;
-        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
-    };
+    const shareContent = vendorShareContent({
+        id: vendor.id,
+        name: vendor.name,
+        image: vendor.logo || vendor.coverImage || null,
+    });
 
     const locationLine = [vendor.address?.city, vendor.address?.state].filter(Boolean).join(', ')
         || vendor.categories.slice(0, 2).join(' · ');
@@ -121,14 +96,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                                 ) : null}
                             </h1>
                             <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={handleWhatsAppShare}
-                                    className="size-9 rounded-full bg-white border border-divider shadow-sm flex items-center justify-center"
-                                    aria-label="Share on WhatsApp"
-                                >
-                                    <WhatsAppGlyph />
-                                </button>
+                                <ShareButton content={shareContent} variant="icon" className="size-9" />
                                 <button
                                     type="button"
                                     onClick={() => onTabChange('about')}
@@ -319,10 +287,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                             <Phone size={14} strokeWidth={2} />
                             Call Vendor
                         </button>
-                        <button type="button" onClick={handleShare} className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-ivory border border-divider text-xs font-semibold text-text hover:bg-primary-light hover:border-primary/40 hover:text-primary transition-all" aria-label="Share vendor">
-                            <Share2 size={14} strokeWidth={2} />
-                            Share
-                        </button>
+                        <ShareButton content={shareContent} variant="chip" label="Share" />
                         <button
                             type="button"
                             onClick={handleMyListsClick}

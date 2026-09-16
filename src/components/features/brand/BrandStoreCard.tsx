@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
+import { ShareButton } from '@/components/features/share/ShareButton';
+import { brandShareContent } from '@/lib/share-cards/types';
 
 interface BrandStoreCardProps {
     name: string;
@@ -33,6 +35,11 @@ export function BrandStoreCard({
     const logoStyle = getDisplayStyle(logoMeta);
     const cover = img || logoSrc;
     const categoryLine = categories.slice(0, 3).join(' · ');
+    const shareContent = brandShareContent({
+        slug,
+        name,
+        image: logoSrc || cover || null,
+    });
 
     return (
         <Link
@@ -77,6 +84,10 @@ export function BrandStoreCard({
                         <span className="text-[15px] font-bold text-white select-none">{name[0]}</span>
                     </div>
                 )}
+            </div>
+
+            <div className="absolute top-2.5 right-2.5 z-20">
+                <ShareButton content={shareContent} variant="overlay" className="size-9" />
             </div>
 
             <div className="relative z-10 mt-auto p-3 text-white">

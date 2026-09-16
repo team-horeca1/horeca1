@@ -16,6 +16,8 @@ import {
   CollectionSkuCard,
   type CollectionSkuItem,
 } from '@/components/features/collections/CollectionSkuCard';
+import { ShareButton } from '@/components/features/share/ShareButton';
+import { collectionShareContent } from '@/lib/share-cards/types';
 import { cn } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
 
@@ -229,7 +231,8 @@ export default function CollectionDetailPage() {
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#2d0912]/90 via-[#2d0912]/40 to-black/20" />
 
-          <div className="absolute inset-x-0 top-0 p-4 md:p-5">
+          <div className="absolute inset-x-0 top-0 p-4 md:p-5 flex items-start justify-between gap-3">
+            <div>
             <Link
               href="/collections"
               className="md:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/15 backdrop-blur-md text-white text-[13px] font-bold hover:bg-white/25 active:scale-[0.97] transition-[background-color,transform] duration-150 ease-out"
@@ -251,6 +254,17 @@ export default function CollectionDetailPage() {
               <span className="text-white/40">/</span>
               <span className="text-white truncate max-w-[20rem]">{collection.name}</span>
             </nav>
+            </div>
+            <ShareButton
+              content={collectionShareContent({
+                slug: collection.slug,
+                name: collection.name,
+                image: typeof heroImage === 'string' ? heroImage : null,
+                itemCount: stats.skuCount,
+              })}
+              variant="icon"
+              className="size-10 bg-white/95"
+            />
           </div>
 
           <div className="absolute inset-x-0 bottom-0 p-[clamp(1rem,3vw,1.75rem)]">

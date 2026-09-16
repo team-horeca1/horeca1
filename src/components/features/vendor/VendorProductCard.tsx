@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { CreditCard, Share2, ShoppingCart, Plus, Minus, Navigation, X, Loader2, Package, Trash2, ChevronDown, CheckCircle } from 'lucide-react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { CreditCard, ShoppingCart, Plus, Minus, Navigation, X, Loader2, Package, Trash2, ChevronDown, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { toast } from 'sonner';
-import { shareCard } from '@/lib/share-cards/shareClient';
+import { ShareButton } from '@/components/features/share/ShareButton';
+import { productShareContent } from '@/lib/share-cards/types';
 import { useSession } from 'next-auth/react';
 import { cn, formatPackSize } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
@@ -505,30 +506,21 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         </>
     );
 
-    const handleShare = async (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const shareUrl = `${window.location.origin}/product/${product.id}`;
-        const result = await shareCard({
-            title: product.displayName ?? product.name,
-            text: `Check out ${product.displayName ?? product.name} from ${product.vendorName} on Horeca1`,
-            url: shareUrl,
-            imageUrl: `/api/og/product/${product.id}?format=square`,
-        });
-        if (result === 'copied') {
-            toast.success('Link copied to clipboard!', { description: 'You can now share it with others.' });
-        }
-    };
+    const shareContent = useMemo(
+        () =>
+            productShareContent({
+                id: product.id,
+                title: product.displayName ?? product.name,
+                vendorName: product.vendorName,
+                image: product.images?.[0] ?? null,
+                priceLabel: `₹${product.price}`,
+                pack: formatPackSize(product.packSize, product.unit) || product.packSize || null,
+            }),
+        [product],
+    );
 
     const shareButton = (
-        <button
-            type="button"
-            className="p-2 rounded-full backdrop-blur-md bg-white/80 border border-white/60 shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:bg-primary/10 hover:text-primary transition-all"
-            onClick={handleShare}
-            aria-label="Share product"
-        >
-            <Share2 size={14} className="text-gray-500" strokeWidth={2} />
-        </button>
+        <ShareButton content={shareContent} variant="overlay" className="size-9" />
     );
 
     const onCardClick = (e: React.MouseEvent) => {
@@ -563,14 +555,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         </span>
                     )}
                     <div className="absolute top-2 right-2 z-20">
-                        <button
-                            type="button"
-                            aria-label="Share product"
-                            className="size-8 rounded-full bg-white border border-divider flex items-center justify-center"
-                            onClick={handleShare}
-                        >
-                            <Share2 size={14} className="text-text-muted" strokeWidth={2} />
-                        </button>
+                        {shareButton}
                     </div>
                 </div>
 
@@ -735,6 +720,8 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         </div>
 
                         {imageBadges}
+
+                        <div className="absolute top-2 right-2 z-30">{shareButton}</div>
 
                         {/* Bottom Overlay Bar: Dropdown or Pack Size */}
                         {distributorCount && distributorCount > 1 && onDistributorClick ? (
