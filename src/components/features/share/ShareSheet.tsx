@@ -180,9 +180,9 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-end sm:justify-center p-0 sm:p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[10020] flex items-end justify-center px-0 pt-0 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:p-6 animate-in fade-in duration-150">
       <div
-        className="fixed inset-0 bg-black/40"
+        className="fixed inset-0 bg-black/45"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -191,7 +191,7 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
         role="dialog"
         aria-modal="true"
         aria-label="Share"
-        className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl border-t sm:border border-divider z-10 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-4 duration-150"
+        className="relative w-full max-w-md bg-white rounded-t-2xl lg:rounded-2xl shadow-2xl border-t lg:border border-divider z-10 px-4 pt-3 pb-4 animate-in slide-in-from-bottom-4 duration-150"
       >
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-divider sm:hidden" />
 
