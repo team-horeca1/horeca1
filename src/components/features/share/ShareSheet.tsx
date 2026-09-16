@@ -1,20 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import {
-  X,
-  Share2,
-  Download,
-  Copy,
-  Check,
-  MessageCircle,
-  Loader2,
-} from 'lucide-react';
+import { X, Share2, Copy, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ShareableContent } from '@/lib/share-cards/types';
 import { shareAbsoluteUrl } from '@/lib/share-cards/types';
 import {
-  downloadShareImage,
   getShareImageBlob,
   openWhatsAppShare,
   prefetchShareImage,
@@ -27,14 +18,36 @@ interface ShareSheetProps {
   content: ShareableContent | null;
 }
 
+type BusyKey = 'whatsapp' | 'instagram' | 'share' | null;
+
+function WhatsAppGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M12.04 2C6.58 2 2.15 6.4 2.15 11.84c0 1.74.46 3.44 1.33 4.94L2 22l5.37-1.4a10.1 10.1 0 0 0 4.67 1.14h.01c5.46 0 9.89-4.4 9.89-9.84C21.94 6.4 17.5 2 12.04 2zm5.76 14.16c-.24.68-1.4 1.25-1.94 1.33-.5.07-1.13.1-1.83-.11-.42-.14-.96-.31-1.65-.61-2.9-1.25-4.79-4.17-4.93-4.36-.14-.2-1.16-1.54-1.16-2.94 0-1.4.73-2.08.99-2.36.26-.28.57-.35.76-.35h.55c.18 0 .42-.07.65.5.24.58.82 2 .89 2.15.07.14.12.31.02.5-.1.2-.14.31-.28.48-.14.16-.3.37-.42.5-.14.14-.29.29-.12.56.16.28.73 1.2 1.56 1.95 1.08.96 1.98 1.26 2.26 1.4.28.14.44.12.6-.07.16-.2.7-.81.88-1.09.18-.28.37-.23.61-.14.24.1 1.54.73 1.8.86.26.14.44.2.5.31.07.12.07.68-.17 1.36z"
+      />
+    </svg>
+  );
+}
+
+function InstagramGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M7.5 3h9A4.5 4.5 0 0 1 21 7.5v9A4.5 4.5 0 0 1 16.5 21h-9A4.5 4.5 0 0 1 3 16.5v-9A4.5 4.5 0 0 1 7.5 3zm0 1.8A2.7 2.7 0 0 0 4.8 7.5v9a2.7 2.7 0 0 0 2.7 2.7h9a2.7 2.7 0 0 0 2.7-2.7v-9a2.7 2.7 0 0 0-2.7-2.7h-9zM17.1 6.2a1.05 1.05 0 1 1 0 2.1 1.05 1.05 0 0 1 0-2.1zM12 7.4A4.6 4.6 0 1 1 7.4 12 4.6 4.6 0 0 1 12 7.4zm0 1.8A2.8 2.8 0 1 0 14.8 12 2.8 2.8 0 0 0 12 9.2z"
+      />
+    </svg>
+  );
+}
+
 export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   const [origin, setOrigin] = useState('');
   const [ogReady, setOgReady] = useState(false);
-  const [ogFailed, setOgFailed] = useState(false);
-  const [ogObjectUrl, setOgObjectUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState<BusyKey>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') setOrigin(window.location.origin);
@@ -44,31 +57,21 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
     if (!isOpen || !content) return;
 
     let cancelled = false;
-    let objectUrl: string | null = null;
     setCopied(false);
     setCodeCopied(false);
     setOgReady(false);
-    setOgFailed(false);
-    setOgObjectUrl(null);
+    setBusy(null);
 
     const imageUrl = content.preRenderedImageUrl || content.ogPath;
     prefetchShareImage(imageUrl);
 
     void (async () => {
       const blob = await getShareImageBlob(imageUrl);
-      if (cancelled) return;
-      if (!blob) {
-        setOgFailed(true);
-        return;
-      }
-      objectUrl = window.URL.createObjectURL(blob);
-      setOgObjectUrl(objectUrl);
-      setOgReady(true);
+      if (!cancelled) setOgReady(!!blob);
     })();
 
     return () => {
       cancelled = true;
-      if (objectUrl) window.URL.revokeObjectURL(objectUrl);
     };
   }, [isOpen, content]);
 
@@ -79,19 +82,48 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
   const shareText = content.text.includes(pageUrl)
     ? content.text
     : `${content.text}\n${pageUrl}`;
-  const previewSrc = ogObjectUrl || content.image || null;
-  const kindLabel =
-    content.kind === 'article'
-      ? 'Share Story'
-      : content.kind === 'deal'
-        ? 'Share Offer'
-        : content.kind === 'collection'
-          ? 'Share Collection'
-          : content.kind === 'vendor'
-            ? 'Share Store'
-            : content.kind === 'brand'
-              ? 'Share Brand'
-              : 'Share Product';
+
+  const nativeShare = async (key: Exclude<BusyKey, null>) => {
+    setBusy(key);
+    try {
+      const result = await shareCard({
+        title: content.title,
+        text: content.text,
+        url: pageUrl,
+        imageUrl,
+        fileName: content.downloadName,
+      });
+      if (result === 'cancelled') return 'cancelled';
+      if (result === 'shared') {
+        onClose();
+        return 'shared';
+      }
+      return result;
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleWhatsApp = async () => {
+    const result = await nativeShare('whatsapp');
+    if (result === 'cancelled' || result === 'shared') return;
+    openWhatsAppShare(shareText);
+  };
+
+  const handleInstagram = async () => {
+    const result = await nativeShare('instagram');
+    if (result === 'cancelled' || result === 'shared') return;
+    toast.error('Instagram needs the card image — tap Share and pick Instagram');
+  };
+
+  const handleNativeShare = async () => {
+    const result = await nativeShare('share');
+    if (result === 'copied') {
+      toast.success('Link copied');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const handleCopy = async () => {
     try {
@@ -116,40 +148,41 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
     }
   };
 
-  const handleWhatsApp = () => {
-    openWhatsAppShare(shareText);
-    toast.success('Opening WhatsApp...');
-  };
-
-  const handleDownload = async () => {
-    setDownloading(true);
-    try {
-      const ok = await downloadShareImage(imageUrl, content.downloadName);
-      if (ok) toast.success('Card image downloaded');
-      else {
-        setOgFailed(true);
-        toast.error('Download unavailable — try Copy Link instead');
-      }
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const handleNativeShare = async () => {
-    const result = await shareCard({
-      title: content.title,
-      text: content.text,
-      url: pageUrl,
-      imageUrl: ogReady ? imageUrl : null,
-      skipFileWait: !ogReady,
-    });
-    if (result === 'copied') toast.success('Link copied');
-  };
+  const actions = [
+    {
+      key: 'whatsapp' as const,
+      label: 'WhatsApp',
+      onClick: () => void handleWhatsApp(),
+      className: 'bg-[#25D366] text-white',
+      icon: <WhatsAppGlyph className="size-6" />,
+    },
+    {
+      key: 'instagram' as const,
+      label: 'Instagram',
+      onClick: () => void handleInstagram(),
+      className: 'bg-[linear-gradient(45deg,#f58529,#dd2a7b,#8134af)] text-white',
+      icon: <InstagramGlyph className="size-6" />,
+    },
+    {
+      key: 'copy' as const,
+      label: copied ? 'Copied' : 'Copy link',
+      onClick: () => void handleCopy(),
+      className: 'bg-ivory text-primary border border-divider',
+      icon: copied ? <Check size={22} strokeWidth={2.4} /> : <Copy size={22} strokeWidth={2.2} />,
+    },
+    {
+      key: 'share' as const,
+      label: 'Share',
+      onClick: () => void handleNativeShare(),
+      className: 'bg-primary text-white',
+      icon: <Share2 size={22} strokeWidth={2.2} />,
+    },
+  ];
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-end sm:justify-center p-0 sm:p-4 animate-in fade-in duration-150">
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+        className="fixed inset-0 bg-black/40"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -157,149 +190,72 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={kindLabel}
-        className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-divider overflow-hidden z-10 flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-150 max-h-[90dvh]"
+        aria-label="Share"
+        className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl border-t sm:border border-divider z-10 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] animate-in slide-in-from-bottom-4 duration-150"
       >
-        <div className="px-5 py-4 border-b border-divider flex items-center justify-between bg-cream/30">
-          <div>
-            <h3 className="text-[16px] font-bold text-text leading-tight">{kindLabel}</h3>
-            <p className="text-[12px] text-text-secondary mt-0.5">
-              WhatsApp, copy link, or save the card
+        <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-divider sm:hidden" />
+
+        <div className="flex items-start gap-3 mb-4">
+          {content.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={content.image}
+              alt=""
+              className="size-11 rounded-lg object-contain bg-ivory border border-divider shrink-0"
+            />
+          ) : (
+            <div className="size-11 rounded-lg bg-primary-light shrink-0" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-semibold text-text leading-tight line-clamp-2">
+              {content.title}
+            </p>
+            <p className="text-[11px] text-text-secondary mt-0.5 line-clamp-1">
+              {ogReady ? 'Card ready' : 'Preparing card…'}
+              {content.priceLabel ? ` · ${content.priceLabel}` : ''}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="size-9 rounded-full hover:bg-black/5 text-text-secondary flex items-center justify-center transition-colors"
+            className="size-9 rounded-full hover:bg-black/5 text-text-secondary flex items-center justify-center shrink-0"
             aria-label="Close share"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="p-5 space-y-4 overflow-y-auto">
-          <div className="bg-[#EFEAE2] p-3 rounded-2xl border border-divider/60 space-y-2">
-            <div className="bg-white rounded-xl overflow-hidden shadow-xs">
-              <div className="aspect-square bg-ivory relative overflow-hidden">
-                {previewSrc ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={previewSrc}
-                    alt={content.title}
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center p-6">
-                    <p className="text-[15px] font-bold text-primary text-center line-clamp-4">
-                      {content.title}
-                    </p>
-                  </div>
-                )}
-                {!ogReady && !ogFailed ? (
-                  <div className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-full bg-black/55 text-white text-[10px] font-semibold px-2.5 py-1">
-                    <Loader2 size={11} className="animate-spin" />
-                    Preparing card…
-                  </div>
-                ) : null}
-              </div>
-              <div className="p-3">
-                <p className="text-[13px] font-bold text-text leading-tight line-clamp-2">
-                  {content.title}
-                </p>
-                {content.subtitle ? (
-                  <p className="text-[11px] text-text-secondary mt-0.5 line-clamp-1">
-                    {content.subtitle}
-                  </p>
-                ) : null}
-                {content.priceLabel ? (
-                  <p className="text-[13px] font-bold text-primary mt-1 tabular-nums">
-                    {content.priceLabel}
-                  </p>
-                ) : null}
-                <p className="text-[10px] text-text-muted mt-1.5 font-mono truncate">
-                  {pageUrl.replace(/^https?:\/\//, '')}
-                </p>
-              </div>
-            </div>
-            {ogFailed ? (
-              <p className="text-[11px] text-text-muted text-center">
-                Card image unavailable — you can still copy the link or share on WhatsApp
-              </p>
-            ) : (
-              <p className="text-[11px] text-text-muted text-center">
-                Recipients see a rich preview when the link unfurls
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-2.5 pt-1">
-            <button
-              type="button"
-              onClick={handleWhatsApp}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-[14px] shadow-sm transition-transform active:scale-[0.98] min-h-12"
-            >
-              <MessageCircle size={18} className="fill-white" />
-              Share to WhatsApp
-            </button>
-
-            <button
-              type="button"
-              onClick={() => void handleCopy()}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-divider hover:border-primary/40 text-text font-semibold text-[13px] shadow-2xs transition-colors min-h-11"
-            >
-              {copied ? <Check size={16} className="text-success" /> : <Copy size={16} />}
-              {copied ? 'Link Copied!' : 'Copy Link'}
-            </button>
-
-            {content.couponCode ? (
+        <div className="grid grid-cols-4 gap-2">
+          {actions.map((action) => {
+            const isBusy = busy === action.key;
+            return (
               <button
+                key={action.key}
                 type="button"
-                onClick={() => void handleCopyCode()}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-ivory border border-divider hover:border-primary/40 text-text font-semibold text-[13px] transition-colors min-h-11"
+                onClick={action.onClick}
+                disabled={busy !== null}
+                className="flex flex-col items-center gap-1.5 min-h-12 disabled:opacity-60"
               >
-                {codeCopied ? (
-                  <Check size={16} className="text-success" />
-                ) : (
-                  <Copy size={16} />
-                )}
-                {codeCopied ? 'Code Copied!' : `Copy code ${content.couponCode}`}
+                <span
+                  className={`size-12 rounded-full flex items-center justify-center ${action.className}`}
+                >
+                  {isBusy ? <Loader2 size={22} className="animate-spin" /> : action.icon}
+                </span>
+                <span className="text-[11px] font-medium text-text-secondary">{action.label}</span>
               </button>
-            ) : null}
-
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                type="button"
-                disabled={downloading || (!ogReady && !ogFailed)}
-                onClick={() => void handleDownload()}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-ivory hover:bg-cream border border-divider text-text-secondary text-[12px] font-semibold transition-colors disabled:opacity-60 min-h-11"
-              >
-                {downloading ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Download size={14} />
-                )}
-                {downloading
-                  ? 'Downloading…'
-                  : ogFailed
-                    ? 'Download unavailable'
-                    : ogReady
-                      ? 'Download Image'
-                      : 'Preparing…'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void handleNativeShare()}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-ivory hover:bg-cream border border-divider text-text-secondary text-[12px] font-semibold transition-colors min-h-11"
-              >
-                <Share2 size={14} />
-                {typeof navigator !== 'undefined' && typeof navigator.share === 'function'
-                  ? 'Share'
-                  : 'More'}
-              </button>
-            </div>
-          </div>
+            );
+          })}
         </div>
+
+        {content.couponCode ? (
+          <button
+            type="button"
+            onClick={() => void handleCopyCode()}
+            className="mt-3 w-full min-h-11 rounded-xl border border-divider bg-ivory text-[13px] font-semibold text-text"
+          >
+            {codeCopied ? 'Code copied' : `Copy code ${content.couponCode}`}
+          </button>
+        ) : null}
       </div>
     </div>
   );

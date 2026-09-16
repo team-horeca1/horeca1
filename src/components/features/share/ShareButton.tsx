@@ -53,6 +53,7 @@ export function ShareButton({
         VARIANT_CLASS[variant],
         className,
       )}
+      onPointerDown={() => prefetch(content)}
       onClick={(e) => {
         if (stopPropagation) {
           e.preventDefault();
