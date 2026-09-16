@@ -36,8 +36,9 @@ export function toGrossPrice(taxable: number, taxPercent: number): number {
   return Math.round(taxable * (1 + taxPercent / 100) * 100) / 100;
 }
 
+/** Satori's default font has no rupee glyph — "Rs." renders on every device. */
 export function formatInr(amount: number): string {
-  return `₹${amount.toLocaleString('en-IN', {
+  return `Rs. ${amount.toLocaleString('en-IN', {
     maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
   })}`;
 }
@@ -54,7 +55,7 @@ export function ogCacheHeaders(updatedAt?: Date | string | null): Record<string,
   return {
     'content-type': 'image/png',
     'cache-control': 'public, s-maxage=120, stale-while-revalidate=86400',
-    etag: `"og-${etagSource}"`,
+    etag: `"og-cdl3-${etagSource}"`,
   };
 }
 

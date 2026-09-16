@@ -19,11 +19,11 @@ function promoLabel(p: {
   minOrderValue: { toString(): string } | null;
 }): string | undefined {
   if (p.type === 'pct_discount' && p.discountPct) {
-    const mov = p.minOrderValue ? ` above ₹${Number(p.minOrderValue)}` : '';
+    const mov = p.minOrderValue ? ` above Rs. ${Number(p.minOrderValue)}` : '';
     return `Flat ${Number(p.discountPct)}% off${mov}`;
   }
   if (p.type === 'flat_discount' && p.discountFlat) {
-    return `₹${Number(p.discountFlat)} off`;
+    return `Rs. ${Number(p.discountFlat)} off`;
   }
   if (p.name) return p.name;
   return undefined;
@@ -63,7 +63,11 @@ export async function renderVendorShareImage(
       products: {
         where: { isActive: true, approvalStatus: 'approved' },
         take: 8,
-        select: { category: { select: { name: true } } },
+        select: {
+          imageUrl: true,
+          images: true,
+          category: { select: { name: true } },
+        },
       },
     },
   });
@@ -86,9 +90,18 @@ export async function renderVendorShareImage(
   const statLine = [rating, verified].filter(Boolean).join(' · ') || undefined;
   const offer = vendor.promotions?.[0] ? promoLabel(vendor.promotions[0]) : undefined;
 
+  const productPhoto =
+    vendor.products.find((p) => p.imageUrl || p.images?.[0]) ?? null;
   const [qrDataUrl, imageUrl] = await Promise.all([
     qrPngDataUrl(pageUrl),
-    resolveOgImage(origin, vendor.bannerUrl || vendor.logoUrl),
+    resolveOgImage(
+      origin,
+      vendor.logoUrl ||
+        vendor.bannerUrl ||
+        productPhoto?.imageUrl ||
+        productPhoto?.images?.[0] ||
+        null,
+    ),
   ]);
 
   return new ImageResponse(

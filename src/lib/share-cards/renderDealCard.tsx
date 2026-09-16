@@ -83,7 +83,7 @@ export async function renderDealShareImage(
 
   const [qrDataUrl, imageUrl] = await Promise.all([
     qrPngDataUrl(pageUrl),
-    resolveOgImage(origin, promo.vendor.bannerUrl || promo.vendor.logoUrl),
+    resolveOgImage(origin, promo.vendor.logoUrl || promo.vendor.bannerUrl),
   ]);
 
   return new ImageResponse(

@@ -33,6 +33,11 @@ export async function renderBrandShareImage(
       bannerUrl: true,
       categories: true,
       updatedAt: true,
+      masterProducts: {
+        where: { isActive: true },
+        take: 8,
+        select: { imageUrl: true, images: true },
+      },
       authorizedDistributors: {
         where: { status: 'approved' },
         select: { id: true },
@@ -48,9 +53,18 @@ export async function renderBrandShareImage(
       ? `Available via ${vendorCount} vendor${vendorCount === 1 ? '' : 's'} near you`
       : undefined;
 
+  const masterPhoto =
+    brand.masterProducts.find((p) => p.imageUrl || p.images?.[0]) ?? null;
   const [qrDataUrl, imageUrl] = await Promise.all([
     qrPngDataUrl(pageUrl),
-    resolveOgImage(origin, brand.bannerUrl || brand.logoUrl),
+    resolveOgImage(
+      origin,
+      brand.logoUrl ||
+        brand.bannerUrl ||
+        masterPhoto?.imageUrl ||
+        masterPhoto?.images?.[0] ||
+        null,
+    ),
   ]);
 
   return new ImageResponse(

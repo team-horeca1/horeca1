@@ -43,7 +43,7 @@ export async function resolveOgImage(origin: string, url: string | null | undefi
       if (!absUrl) return null;
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3500);
+      const timeout = setTimeout(() => controller.abort(), 6000);
       try {
         const res = await fetch(absUrl, { signal: controller.signal });
         if (res.ok) {
