@@ -53,24 +53,52 @@ export function useGooglePlacesAutocomplete(
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
 
+    // Ensure autocomplete and places services exist whenever google maps is available
+    const ensureServices = useCallback(() => {
+        const g = google || (typeof window !== 'undefined' ? window.google : null);
+        if (!g?.maps?.places) return false;
+        try {
+            if (!serviceRef.current) {
+                serviceRef.current = new g.maps.places.AutocompleteService();
+            }
+            if (!placesServiceRef.current) {
+                const dummyDiv = document.createElement('div');
+                placesServiceRef.current = new g.maps.places.PlacesService(dummyDiv);
+            }
+            if (!sessionTokenRef.current) {
+                sessionTokenRef.current = new g.maps.places.AutocompleteSessionToken();
+            }
+            return !!serviceRef.current && !!placesServiceRef.current;
+        } catch (err) {
+            console.warn('[useGooglePlacesAutocomplete] Service initialization error:', err);
+            return false;
+        }
+    }, [google]);
+
     // Initialize services when Google Maps is loaded
     useEffect(() => {
-        if (isLoaded && google) {
-            serviceRef.current = new google.maps.places.AutocompleteService();
-            const dummyDiv = document.createElement('div');
-            placesServiceRef.current = new google.maps.places.PlacesService(dummyDiv);
-            sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+        if (isLoaded || (typeof window !== 'undefined' && window.google?.maps?.places)) {
+            ensureServices();
         }
-    }, [isLoaded, google]);
+    }, [isLoaded, ensureServices]);
 
     // Debounced search
     useEffect(() => {
-        if (!isLoaded || !google || !serviceRef.current) {
-            queueMicrotask(() => setPredictions([]));
+        const hasMaps = isLoaded || (typeof window !== 'undefined' && !!window.google?.maps?.places);
+        if (!hasMaps) {
+            queueMicrotask(() => {
+                setPredictions([]);
+                setIsSearching(false);
+            });
             return;
         }
 
-        if (!query || query.trim().length < 2) {
+        if (!ensureServices()) {
+            return;
+        }
+
+        const trimmed = (query || '').trim();
+        if (trimmed.length < 2) {
             queueMicrotask(() => {
                 setPredictions([]);
                 setIsSearching(false);
@@ -83,42 +111,39 @@ export function useGooglePlacesAutocomplete(
 
         debounceTimerRef.current = setTimeout(async () => {
             try {
+                if (!ensureServices() || !serviceRef.current) {
+                    setIsSearching(false);
+                    return;
+                }
+
+                // AutocompletionRequest: do NOT restrict request.types to ['establishment'].
+                // In Google Places API, types: ['establishment'] completely ignores
+                // localities, street addresses, and areas (such as "Digha", "Sector 17", etc.).
+                // Omitting types allows matching both businesses (restaurants/hotels) and
+                // general addresses/localities/pincodes.
                 const request: google.maps.places.AutocompletionRequest = {
-                    input: query,
-                    sessionToken: sessionTokenRef.current!,
+                    input: trimmed,
+                    sessionToken: sessionTokenRef.current || undefined,
                     componentRestrictions: { country: countryCode },
                 };
 
-                // In business mode: restrict to food & lodging establishments
-                if (businessMode) {
-                    request.types = ['establishment'];
-                }
+                serviceRef.current.getPlacePredictions(request, (results, status) => {
+                    const g = google || (typeof window !== 'undefined' ? window.google : null);
+                    const OK = g?.maps?.places?.PlacesServiceStatus?.OK || 'OK';
+                    const ZERO_RESULTS = g?.maps?.places?.PlacesServiceStatus?.ZERO_RESULTS || 'ZERO_RESULTS';
 
-                serviceRef.current!.getPlacePredictions(request, (results, status) => {
-                    if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-                        // In business mode: filter predictions to hospitality types
-                        const filtered = businessMode
-                            ? results.filter(r => {
-                                const types = r.types || [];
-                                return types.some(t => [
-                                    'restaurant', 'cafe', 'bar', 'bakery', 'food',
-                                    'meal_delivery', 'meal_takeaway', 'hotel', 'lodging',
-                                    'night_club', 'establishment',
-                                ].includes(t));
-                            })
-                            : results;
-
+                    if (status === OK && results && results.length > 0) {
                         setPredictions(
-                            (filtered.length > 0 ? filtered : results).map(r => ({
+                            results.map((r) => ({
                                 placeId: r.place_id,
                                 description: r.description,
-                                mainText: r.structured_formatting.main_text,
-                                secondaryText: r.structured_formatting.secondary_text || '',
+                                mainText: r.structured_formatting?.main_text || r.description,
+                                secondaryText: r.structured_formatting?.secondary_text || '',
                             }))
                         );
                     } else {
-                        if (status !== google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-                            console.warn('[Places Autocomplete] status:', status, 'query:', query);
+                        if (status !== ZERO_RESULTS) {
+                            console.warn('[Places Autocomplete] status:', status, 'query:', trimmed);
                         }
                         setPredictions([]);
                     }
@@ -134,13 +159,18 @@ export function useGooglePlacesAutocomplete(
         return () => {
             if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
         };
-    }, [query, isLoaded, google, debounceMs, businessMode, countryCode]);
+    }, [query, isLoaded, google, debounceMs, countryCode, ensureServices]);
 
     // Get full place details — includes businessName when place has a proper name
     const getPlaceDetails = useCallback(
         (placeId: string): Promise<PlaceDetails | null> => {
             return new Promise((resolve) => {
-                if (!placesServiceRef.current || !google) {
+                if (!ensureServices() || !placesServiceRef.current) {
+                    resolve(null);
+                    return;
+                }
+                const g = google || (typeof window !== 'undefined' ? window.google : null);
+                if (!g?.maps?.places) {
                     resolve(null);
                     return;
                 }
@@ -153,7 +183,8 @@ export function useGooglePlacesAutocomplete(
                 };
 
                 placesServiceRef.current.getDetails(request, (place, status) => {
-                    if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+                    const OK = g.maps.places.PlacesServiceStatus.OK;
+                    if (status === OK && place) {
                         const lat = place.geometry?.location?.lat() || 0;
                         const lng = place.geometry?.location?.lng() || 0;
                         const components = place.address_components || [];
@@ -200,11 +231,11 @@ export function useGooglePlacesAutocomplete(
                                 && !place.formatted_address?.startsWith(placeName)
                                 && !/^\d/.test(placeName);
 
-                            sessionTokenRef.current = new google.maps.places.AutocompleteSessionToken();
+                            sessionTokenRef.current = new g.maps.places.AutocompleteSessionToken();
 
                             resolve({
                                 placeId: place.place_id || placeId,
-                                fullAddress: isAreaLevel ? '' : (place.formatted_address || ''),
+                                fullAddress: place.formatted_address || shortAddr || '',
                                 shortAddress: shortAddr,
                                 latitude: lat,
                                 longitude: lng,

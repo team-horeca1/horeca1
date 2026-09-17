@@ -225,9 +225,10 @@ export function BrandProfileForm({
   const handleAddressPick = (place: AddressPickPayload) => {
     const legal = derivedLegalName(value);
     const display = derivedDisplayName(value);
+    const resolvedAddress = place.fullAddress || place.shortAddress || '';
     const patch: Partial<BrandProfileValues> = {
-      addressLine: place.fullAddress,
-      billingAddressLine: place.fullAddress,
+      addressLine: resolvedAddress,
+      billingAddressLine: resolvedAddress,
       city: place.city,
       billingCity: place.city,
       state: place.state,
@@ -265,8 +266,7 @@ export function BrandProfileForm({
     <div className="space-y-4">
       <AddressAutocomplete
         label="Search address or place name"
-        placeholder="e.g. Bandra office..."
-        businessMode
+        placeholder="e.g. Bandra office, Andheri West..."
         hint="Selecting a place auto-fills city, state, and pincode."
         onPick={handleAddressPick}
       />

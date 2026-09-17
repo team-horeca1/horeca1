@@ -174,9 +174,10 @@ export function CustomerProfileForm({
   const handleAddressPick = (place: AddressPickPayload) => {
     const legal = derivedLegalName(value);
     const display = derivedDisplayName(value);
+    const resolvedAddress = place.fullAddress || place.shortAddress || '';
     const patch: Partial<CustomerProfileValues> = {
-      addressLine: place.fullAddress,
-      billingAddressLine: place.fullAddress,
+      addressLine: resolvedAddress,
+      billingAddressLine: resolvedAddress,
       city: place.city,
       billingCity: place.city,
       state: place.state,
@@ -295,8 +296,7 @@ export function CustomerProfileForm({
     <div className="space-y-4">
       <AddressAutocomplete
         label="Search address or place name"
-        placeholder="e.g. Vashi Rockville Diner..."
-        businessMode
+        placeholder="e.g. Vashi Rockville Diner, Digha, Linking Road..."
         hint="Selecting a place from maps auto-fills the coordinates, address, and city for you."
         onPick={handleAddressPick}
       />

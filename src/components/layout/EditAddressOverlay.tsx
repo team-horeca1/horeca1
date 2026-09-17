@@ -44,8 +44,9 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
     if (!address) return null;
 
     const handlePick = (place: AddressPickPayload) => {
-        setFullAddress(place.fullAddress);
-        setShortAddress(place.shortAddress);
+        const resolved = place.fullAddress || place.shortAddress;
+        setFullAddress(resolved);
+        setShortAddress(place.shortAddress || resolved);
         setPincode(place.pincode);
         setCity(place.city);
         setState(place.state);
@@ -104,9 +105,14 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
                     className="w-full md:max-w-[460px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom md:zoom-in-95 duration-300 pointer-events-auto"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                        <h2 className="text-[16px] font-bold text-gray-800">Edit delivery address</h2>
-                        <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full">
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-[#F0F0F0]">
+                        <h3 className="font-extrabold text-[16px] text-gray-900">
+                            Edit Delivery Address
+                        </h3>
+                        <button
+                            onClick={onClose}
+                            className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                        >
                             <X size={18} className="text-gray-600" />
                         </button>
                     </div>
@@ -115,7 +121,6 @@ export function EditAddressOverlay({ address, onClose }: EditAddressOverlayProps
                         <AddressAutocomplete
                             label="Search address"
                             placeholder="Search area, street, or business name…"
-                            businessMode
                             hint="Pick a place from search — this sets the map pin, pincode, city and state."
                             initialValue={isPlaceholder ? '' : fullAddress}
                             onPick={handlePick}

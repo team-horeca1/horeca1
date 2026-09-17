@@ -305,7 +305,7 @@ export function AddNewAddressOverlay({
     const [showFieldErrors, setShowFieldErrors] = useState(false);
 
     const { predictions, isSearching, getPlaceDetails, clearPredictions } =
-        useGooglePlacesAutocomplete(searchQuery, { businessMode: true, countryCode: 'in' });
+        useGooglePlacesAutocomplete(searchQuery, { countryCode: 'in' });
 
     const applyPlaceDetails = useCallback((details: PlaceDetails) => {
         setSelectedPlace(details);

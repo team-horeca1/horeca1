@@ -38,7 +38,7 @@ export function InitialPincodeOverlay({ onComplete }: InitialPincodeOverlayProps
     const { addAddress, setSelectedAddress, detectCurrentLocation, isDetectingLocation, geocodePincode } = useAddress();
     const { currentAccount, accounts, switchAccount, switchOutlet, refresh: refreshAccounts } = useBusinessAccountSwitcher();
     const { predictions, isSearching, getPlaceDetails, clearPredictions } =
-        useGooglePlacesAutocomplete(businessQuery, { businessMode: true, countryCode: 'in' });
+        useGooglePlacesAutocomplete(businessQuery, { countryCode: 'in' });
 
     // ─── Pincode State ────────────────────────────────────────────────────
     const [pincode, setPincode] = useState('');

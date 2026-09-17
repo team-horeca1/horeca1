@@ -286,7 +286,8 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
   const hasCoords = latitude !== null && longitude !== null;
 
   const handlePick = (place: import('@/components/ui/AddressAutocomplete').AddressPickPayload) => {
-    setAddressLine(place.fullAddress);
+    const resolved = place.fullAddress || place.shortAddress;
+    setAddressLine(resolved);
     setCity(place.city);
     setState(place.state);
     setPincode(place.pincode);
@@ -370,8 +371,7 @@ function OutletEditorModal({ accountId, draft, onClose, onSaved }: {
         <div className="p-5 overflow-y-auto flex-1 space-y-4">
           <AddressAutocomplete
             label="Pick from map"
-            placeholder="Search address or business name…"
-            businessMode
+            placeholder="Search address, locality, or business name…"
             hint="Picking a place fills the address, city, state and pincode for you."
             onPick={handlePick}
           />

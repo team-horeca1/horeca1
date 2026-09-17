@@ -48,7 +48,8 @@ export default function RegisterPageInner() {
     }
   }, [role, redirectTo, router]);
 
-  const [step, setStep] = useState<Step>('form');
+  const devStep = process.env.NODE_ENV !== 'production' ? (params?.get('step') as Step | null) : null;
+  const [step, setStep] = useState<Step>(devStep || 'form');
 
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;

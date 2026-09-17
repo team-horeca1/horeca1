@@ -132,13 +132,14 @@ export function VendorProfileForm({
   };
 
   const handleBillingPick = (place: AddressPickPayload) => {
+    const resolvedAddress = place.fullAddress || place.shortAddress || '';
     set({
-      billingAddressLine: place.fullAddress,
+      billingAddressLine: resolvedAddress,
       billingCity: place.city,
       billingState: place.state,
       billingPincode: place.pincode,
       billingAddress: {
-        addressLine: place.fullAddress,
+        addressLine: resolvedAddress,
         city: place.city,
         state: place.state,
         pincode: place.pincode,
@@ -334,8 +335,7 @@ export function VendorProfileForm({
             <div className={SPAN_FULL}>
               <AddressAutocomplete
                 label="Search billing address"
-                placeholder="Registered office..."
-                businessMode
+                placeholder="Registered office, warehouse, or street address..."
                 onPick={handleBillingPick}
               />
             </div>

@@ -258,8 +258,9 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
     };
 
     const handlePick = (place: AddressPickPayload) => {
-        setAddress(place.fullAddress);
-        setShortAddress(place.shortAddress);
+        const resolved = place.fullAddress || place.shortAddress;
+        setAddress(resolved);
+        setShortAddress(place.shortAddress || resolved);
         setPincode(place.pincode);
         setCity(place.city);
         setState(place.state);
@@ -496,7 +497,6 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
                             <AddressAutocomplete
                                 label="Search delivery address"
                                 placeholder="Search area, street, or business name…"
-                                businessMode
                                 hint="Pick a place from search — this sets pincode, city and map pin."
                                 initialValue={address}
                                 onPick={handlePick}

@@ -7,6 +7,7 @@ interface GoogleMapsContextType {
     isLoaded: boolean;
     loadError: string | null;
     google: typeof google | null;
+    __isProvider?: boolean;
 }
 
 const GoogleMapsContext = createContext<GoogleMapsContextType>({
@@ -19,17 +20,35 @@ export function useGoogleMaps() {
     return useContext(GoogleMapsContext);
 }
 
+let globalLoadPromise: Promise<void> | null = null;
+
 export function GoogleMapsProvider({ children }: { children: React.ReactNode }) {
-    const [isLoaded, setIsLoaded] = useState(false);
+    const parentContext = useContext(GoogleMapsContext);
+
+    // If an ancestor provider is already active, don't duplicate
+    if (parentContext.__isProvider) {
+        return <>{children}</>;
+    }
+
+    return <GoogleMapsProviderInner>{children}</GoogleMapsProviderInner>;
+}
+
+function GoogleMapsProviderInner({ children }: { children: React.ReactNode }) {
+    const [isLoaded, setIsLoaded] = useState(() => {
+        return typeof window !== 'undefined' && !!window.google?.maps?.places;
+    });
     const [loadError, setLoadError] = useState<string | null>(null);
-    const loadingRef = useRef(false);
 
     useEffect(() => {
-        if (loadingRef.current || isLoaded) return;
-        loadingRef.current = true;
+        if (typeof window !== 'undefined' && window.google?.maps?.places) {
+            setIsLoaded(true);
+            return;
+        }
 
-        const loadMaps = async () => {
-            try {
+        if (isLoaded) return;
+
+        if (!globalLoadPromise) {
+            globalLoadPromise = (async () => {
                 // Fetch key dynamically
                 const res = await fetch('/api/v1/config/maps-key');
                 if (!res.ok) {
@@ -54,23 +73,25 @@ export function GoogleMapsProvider({ children }: { children: React.ReactNode }) 
                     importLibrary('marker'),
                     importLibrary('geocoding'),
                 ]);
+            })();
+        }
 
+        globalLoadPromise
+            .then(() => {
                 setIsLoaded(true);
-            } catch (err: unknown) {
+            })
+            .catch((err: unknown) => {
                 console.error('Google Maps failed to load:', err);
                 setLoadError(err instanceof Error ? err.message : 'Failed to load Google Maps');
-                loadingRef.current = false;
-            }
-        };
-
-        loadMaps();
+                globalLoadPromise = null; // allow retry on next mount
+            });
     }, [isLoaded]);
 
     // Once loaded, the global `google` namespace is available
     const googleInstance = isLoaded ? (typeof window !== 'undefined' ? window.google : null) : null;
 
     const value = useMemo(
-        () => ({ isLoaded, loadError, google: googleInstance }),
+        () => ({ isLoaded, loadError, google: googleInstance, __isProvider: true }),
         [isLoaded, loadError, googleInstance],
     );
 
