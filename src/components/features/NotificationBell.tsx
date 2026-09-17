@@ -13,10 +13,12 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Bell, Loader2, CheckCheck } from 'lucide-react';
+import { Bell, BellOff, BellRing, Loader2, CheckCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CDL } from '@/lib/cdl';
 import { IMPERSONATION_CHANGED_EVENT } from '@/lib/clearImpersonation';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useStableSession } from '@/hooks/useStableSession';
 
 interface AppNotification {
   id: string;
@@ -55,9 +57,28 @@ export function NotificationBell({ accentColor = CDL.primary }: { accentColor?: 
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [topOffset, setTopOffset] = useState<number>(56);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const { isAuthenticated } = useStableSession();
+  const { permission, subscribed, loading: pushLoading, subscribe, unsubscribe } = usePushNotifications();
+  const pushSupported = isAuthenticated && permission !== 'unsupported';
+
   const unreadCount = notifications.filter((n) => !n.readAt).length;
+
+  const updatePosition = useCallback(() => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setTopOffset(Math.round(rect.bottom + 6));
+    }
+  }, []);
+
+  const toggleOpen = () => {
+    if (!open) {
+      updatePosition();
+    }
+    setOpen((v) => !v);
+  };
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -89,14 +110,23 @@ export function NotificationBell({ accentColor = CDL.primary }: { accentColor?: 
 
   useEffect(() => {
     if (!open) return;
-    const onPointerDown = (e: MouseEvent) => {
+    const onPointerDown = (e: PointerEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
-    document.addEventListener('mousedown', onPointerDown);
-    return () => document.removeEventListener('mousedown', onPointerDown);
-  }, [open]);
+    const handleReposition = () => updatePosition();
+
+    document.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('resize', handleReposition);
+    window.addEventListener('scroll', handleReposition, true);
+
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('resize', handleReposition);
+      window.removeEventListener('scroll', handleReposition, true);
+    };
+  }, [open, updatePosition]);
 
   const markRead = async (n: AppNotification) => {
     if (n.readAt) return;
@@ -131,80 +161,126 @@ export function NotificationBell({ accentColor = CDL.primary }: { accentColor?: 
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="relative size-12 flex items-center justify-center hover:bg-ivory rounded-full active:scale-[0.97] transition-transform"
+        onClick={toggleOpen}
+        className="relative w-9 h-9 flex items-center justify-center hover:bg-ivory rounded-lg active:scale-[0.97] transition-all"
         aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
       >
-        <Bell size={22} className="text-[#181725]" fill="#181725" />
+        <Bell size={21} className="text-[#181725]" />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#E74C3C] text-white text-[10px] font-bold flex items-center justify-center">
+          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-primary text-white text-[9px] font-bold flex items-center justify-center border border-white">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[min(380px,calc(100vw-2rem))] bg-white rounded-[14px] border border-[#EEEEEE] shadow-xl z-[60] overflow-hidden">
-          <div className="px-4 py-3 border-b border-[#EEEEEE] flex items-center justify-between">
-            <p className="text-[14px] font-bold text-[#181725]">Notifications</p>
-            {unreadCount > 0 && (
-              <button
-                type="button"
-                onClick={() => void markAllRead()}
-                className="flex items-center gap-1 text-[11px] font-bold hover:underline"
-                style={{ color: accentColor }}
-              >
-                <CheckCheck size={13} /> Mark all read
-              </button>
-            )}
-          </div>
+        <>
+          {/* Mobile backdrop so tapping anywhere outside closes the panel */}
+          <div
+            className="fixed inset-0 z-[10000] bg-black/20 sm:hidden"
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
 
-          {loading ? (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 size={22} className="animate-spin" style={{ color: accentColor }} />
-            </div>
-          ) : recent.length === 0 ? (
-            <p className="text-[13px] text-[#AEAEAE] text-center py-10 px-4">No notifications yet</p>
-          ) : (
-            <div className="max-h-[360px] overflow-y-auto divide-y divide-[#F5F5F5]">
-              {recent.map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => void markRead(n)}
-                  className={cn(
-                    'w-full text-left px-4 py-3 hover:bg-[#FAFAFA] transition-colors flex gap-3',
-                    !n.readAt && 'bg-blue-50/20'
-                  )}
-                >
-                  <div
+          <div
+            style={{ '--mobile-dropdown-top': `${topOffset}px` } as React.CSSProperties}
+            className={cn(
+              "fixed inset-x-3 max-w-sm mx-auto top-[var(--mobile-dropdown-top,56px)] z-[10001] bg-white rounded-2xl border border-[#EEEEEE] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150",
+              "sm:absolute sm:inset-x-auto sm:max-w-none sm:mx-0 sm:right-0 sm:top-full sm:mt-2 sm:w-[380px] sm:rounded-[14px] sm:shadow-xl sm:z-[60]"
+            )}
+          >
+            <div className="px-4 py-3 border-b border-[#EEEEEE] flex items-center justify-between">
+              <p className="text-[14px] font-bold text-[#181725]">Notifications</p>
+              <div className="flex items-center gap-2">
+                {pushSupported && (
+                  <button
+                    type="button"
+                    onClick={subscribed ? unsubscribe : subscribe}
+                    disabled={pushLoading}
+                    title={subscribed ? 'Push notifications enabled. Tap to turn off.' : 'Enable push notifications'}
                     className={cn(
-                      'mt-0.5 w-8 h-8 rounded-[8px] shrink-0 flex items-center justify-center text-[10px] font-bold uppercase',
-                      accent(n.title, n.type)
+                      'p-1.5 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-medium',
+                      subscribed
+                        ? 'text-emerald-700 hover:bg-emerald-50'
+                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                    )}
+                    aria-label={subscribed ? 'Disable push notifications' : 'Enable push notifications'}
+                  >
+                    {pushLoading ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : subscribed ? (
+                      <>
+                        <BellRing size={13} className="text-emerald-600" />
+                        <span className="text-[10px] font-semibold text-emerald-600">Push on</span>
+                      </>
+                    ) : (
+                      <>
+                        <BellOff size={13} />
+                        <span className="text-[10px]">Push off</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void markAllRead()}
+                    className="flex items-center gap-1 text-[11px] font-bold hover:underline"
+                    style={{ color: accentColor }}
+                  >
+                    <CheckCheck size={13} /> Mark all read
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 size={22} className="animate-spin" style={{ color: accentColor }} />
+              </div>
+            ) : recent.length === 0 ? (
+              <p className="text-[13px] text-[#AEAEAE] text-center py-10 px-4">No notifications yet</p>
+            ) : (
+              <div className="max-h-[360px] overflow-y-auto divide-y divide-[#F5F5F5]">
+                {recent.map((n) => (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={() => void markRead(n)}
+                    className={cn(
+                      'w-full text-left px-4 py-3 hover:bg-[#FAFAFA] transition-colors flex gap-3',
+                      !n.readAt && 'bg-blue-50/20'
                     )}
                   >
-                    {(n.title ?? n.type).slice(0, 2)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p
+                    <div
                       className={cn(
-                        'text-[13px] leading-snug',
-                        n.readAt ? 'text-[#7C7C7C]' : 'font-bold text-[#181725]'
+                        'mt-0.5 w-8 h-8 rounded-[8px] shrink-0 flex items-center justify-center text-[10px] font-bold uppercase',
+                        accent(n.title, n.type)
                       )}
                     >
-                      {n.title ?? n.type}
-                    </p>
-                    {n.body && <p className="text-[12px] text-[#AEAEAE] mt-0.5 line-clamp-2">{n.body}</p>}
-                    <p className="text-[11px] text-[#AEAEAE] mt-1">{relativeTime(n.createdAt)}</p>
-                  </div>
-                  {!n.readAt && (
-                    <span className="mt-1.5 w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: accentColor }} />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+                      {(n.title ?? n.type).slice(0, 2)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className={cn(
+                          'text-[13px] leading-snug',
+                          n.readAt ? 'text-[#7C7C7C]' : 'font-bold text-[#181725]'
+                        )}
+                      >
+                        {n.title ?? n.type}
+                      </p>
+                      {n.body && <p className="text-[12px] text-[#AEAEAE] mt-0.5 line-clamp-2">{n.body}</p>}
+                      <p className="text-[11px] text-[#AEAEAE] mt-1">{relativeTime(n.createdAt)}</p>
+                    </div>
+                    {!n.readAt && (
+                      <span className="mt-1.5 w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: accentColor }} />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

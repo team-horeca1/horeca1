@@ -26,7 +26,6 @@ import { useStableSession } from '@/hooks/useStableSession';
 import { useCart } from '@/context/CartContext';
 import { useAddress } from '@/context/AddressContext';
 import { InitialPincodeOverlay } from './InitialPincodeOverlay';
-import { PushBell } from '../features/PushBell';
 import { NotificationBell } from '../features/NotificationBell';
 import { dalClient as dal } from '@/lib/dalClient';
 import type { Category } from '@/types';
@@ -324,17 +323,11 @@ export function Navbar({ initialNav }: { initialNav?: InitialNav }) {
 
                     <div className="flex items-center gap-2">
                         {(isLoggedIn || reserveAuthSlots) && (
-                            <div className="flex items-center justify-end shrink-0 h-9 min-w-[76px] gap-1">
+                            <div className="flex items-center justify-center shrink-0 h-9 w-9">
                                 {isLoggedIn ? (
-                                    <>
-                                        <NotificationBell accentColor="#6B1D2E" />
-                                        <PushBell />
-                                    </>
+                                    <NotificationBell accentColor="#6B1D2E" />
                                 ) : (
-                                    <>
-                                        <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse" aria-hidden />
-                                        <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse" aria-hidden />
-                                    </>
+                                    <div className="w-6 h-6 rounded-full bg-gray-200 animate-pulse" aria-hidden />
                                 )}
                             </div>
                         )}

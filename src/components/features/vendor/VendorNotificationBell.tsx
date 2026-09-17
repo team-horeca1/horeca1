@@ -113,16 +113,41 @@ export function VendorNotificationBell() {
     };
   }, [fetchNotifications]);
 
+  const [topOffset, setTopOffset] = useState<number>(56);
+
+  const updatePosition = useCallback(() => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setTopOffset(Math.round(rect.bottom + 6));
+    }
+  }, []);
+
+  const toggleOpen = () => {
+    if (!open) {
+      updatePosition();
+    }
+    setOpen((v) => !v);
+  };
+
   useEffect(() => {
     if (!open) return;
-    const onPointerDown = (e: MouseEvent) => {
+    const onPointerDown = (e: PointerEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
-    document.addEventListener('mousedown', onPointerDown);
-    return () => document.removeEventListener('mousedown', onPointerDown);
-  }, [open]);
+    const handleReposition = () => updatePosition();
+
+    document.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('resize', handleReposition);
+    window.addEventListener('scroll', handleReposition, true);
+
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('resize', handleReposition);
+      window.removeEventListener('scroll', handleReposition, true);
+    };
+  }, [open, updatePosition]);
 
   const onItemClick = async (n: VendorNotification) => {
     setOpen(false);
@@ -143,11 +168,11 @@ export function VendorNotificationBell() {
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleOpen}
         className="relative hover:bg-gray-50 rounded-full p-2 transition-colors"
         aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
       >
-        <Bell size={22} className="text-[#181725]" fill="#181725" />
+        <Bell size={22} className="text-[#181725]" />
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#E74C3C] text-white text-[10px] font-bold flex items-center justify-center">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -156,13 +181,27 @@ export function VendorNotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[min(360px,calc(100vw-2rem))] bg-white rounded-[14px] border border-[#EEEEEE] shadow-xl z-50 overflow-hidden">
-          <div className="px-4 py-3 border-b border-[#EEEEEE] flex items-center justify-between">
-            <p className="text-[14px] font-bold text-[#181725]">Notifications</p>
-            {unreadCount > 0 && (
-              <span className="text-[11px] font-bold text-[#E74C3C]">{unreadCount} unread</span>
+        <>
+          {/* Mobile backdrop */}
+          <div
+            className="fixed inset-0 z-[10000] bg-black/20 sm:hidden"
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
+
+          <div
+            style={{ '--mobile-dropdown-top': `${topOffset}px` } as React.CSSProperties}
+            className={cn(
+              "fixed inset-x-3 max-w-sm mx-auto top-[var(--mobile-dropdown-top,56px)] z-[10001] bg-white rounded-2xl border border-[#EEEEEE] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150",
+              "sm:absolute sm:inset-x-auto sm:max-w-none sm:mx-0 sm:right-0 sm:top-full sm:mt-2 sm:w-[360px] sm:rounded-[14px] sm:shadow-xl sm:z-50"
             )}
-          </div>
+          >
+            <div className="px-4 py-3 border-b border-[#EEEEEE] flex items-center justify-between">
+              <p className="text-[14px] font-bold text-[#181725]">Notifications</p>
+              {unreadCount > 0 && (
+                <span className="text-[11px] font-bold text-[#E74C3C]">{unreadCount} unread</span>
+              )}
+            </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-10">
@@ -223,7 +262,8 @@ export function VendorNotificationBell() {
             </Link>
           </div>
         </div>
-      )}
-    </div>
+      </>
+    )}
+  </div>
   );
 }
