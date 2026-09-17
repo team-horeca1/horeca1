@@ -11,6 +11,10 @@ export function absoluteMediaUrl(origin: string, url: string | null | undefined)
   return ogSafeRaster(`${origin.replace(/\/$/, '')}${path}`);
 }
 
+// In-memory cache for resolved base64 data URLs to prevent repeat remote network fetches and Sharp re-encodings
+const resolvedImageCache = new Map<string, string>();
+const MAX_IMAGE_CACHE = 150;
+
 /**
  * Resolves an image URL for Satori / next/og.
  * Satori cannot reliably fetch localhost or edge URLs, and cannot decode WebP/AVIF.
@@ -24,6 +28,11 @@ export async function resolveOgImage(origin: string, url: string | null | undefi
 
   // Already a data URL
   if (trimmed.startsWith('data:')) return trimmed;
+
+  // Fast path: In-memory cached data URL
+  const cacheKey = `${origin}:${trimmed}`;
+  const cached = resolvedImageCache.get(cacheKey);
+  if (cached) return cached;
 
   try {
     let inputBuffer: Buffer | null = null;
@@ -43,7 +52,7 @@ export async function resolveOgImage(origin: string, url: string | null | undefi
       if (!absUrl) return null;
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 6000);
+      const timeout = setTimeout(() => controller.abort(), 4000);
       try {
         const res = await fetch(absUrl, { signal: controller.signal });
         if (res.ok) {
@@ -56,12 +65,20 @@ export async function resolveOgImage(origin: string, url: string | null | undefi
     }
 
     if (inputBuffer && inputBuffer.length > 0) {
+      // Fast Sharp encoding: 600x600 inside with compressionLevel: 1 and effort: 1
       const pngBuffer = await sharp(inputBuffer)
         .flatten({ background: '#ffffff' })
-        .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
-        .png()
+        .resize({ width: 600, height: 600, fit: 'inside', withoutEnlargement: true })
+        .png({ compressionLevel: 1, effort: 1 })
         .toBuffer();
-      return `data:image/png;base64,${pngBuffer.toString('base64')}`;
+      const dataUrl = `data:image/png;base64,${pngBuffer.toString('base64')}`;
+
+      if (resolvedImageCache.size >= MAX_IMAGE_CACHE) {
+        const first = resolvedImageCache.keys().next().value;
+        if (first) resolvedImageCache.delete(first);
+      }
+      resolvedImageCache.set(cacheKey, dataUrl);
+      return dataUrl;
     }
   } catch (err) {
     console.warn('[resolveOgImage] Sharp conversion fallback:', err);

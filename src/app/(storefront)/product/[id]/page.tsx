@@ -24,6 +24,7 @@ import { useCart } from '@/context/CartContext';
 import { toast } from 'sonner';
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { productShareContent } from '@/lib/share-cards/types';
+import { prefetchShareImage } from '@/lib/share-cards/shareClient';
 import { dal } from '@/lib/dal';
 import type { Vendor as DalVendor, VendorProduct } from '@/types';
 import AlternateVendorsStrip from '@/components/features/product/AlternateVendorsStrip';
@@ -281,6 +282,16 @@ export default function ProductDetailPage() {
             }),
         [id, product.name, product.image, sharePriceLabel, product.weight, vendorName],
     );
+
+    // Eagerly prefetch share card in background so clicking Share is instantaneous
+    useEffect(() => {
+        if (!apiProduct || !shareContent) return;
+        const timer = setTimeout(() => {
+            const url = shareContent.preRenderedImageUrl || shareContent.ogPath;
+            prefetchShareImage(url);
+        }, 800);
+        return () => clearTimeout(timer);
+    }, [apiProduct, shareContent]);
 
     if (pageLoading) {
         return (

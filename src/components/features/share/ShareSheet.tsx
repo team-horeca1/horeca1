@@ -227,6 +227,7 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
               alt={content.title}
               className="w-full h-full object-contain"
               loading="eager"
+              onLoad={() => setOgReady(true)}
             />
             {!ogReady && (
               <div className="absolute inset-0 bg-white/70 backdrop-blur-xs flex items-center justify-center">

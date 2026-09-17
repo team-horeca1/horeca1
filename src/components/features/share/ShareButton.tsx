@@ -54,6 +54,7 @@ export function ShareButton({
         className,
       )}
       onPointerDown={() => prefetch(content)}
+      onTouchStart={() => prefetch(content)}
       onClick={(e) => {
         if (stopPropagation) {
           e.preventDefault();

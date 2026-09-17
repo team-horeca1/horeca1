@@ -1,8 +1,9 @@
 import { renderDealShareImage } from '@/lib/share-cards/renderDealCard';
 import { notFoundOgResponse, parseOgFormat } from '@/lib/share-cards/ogHelpers';
+import { getOrRenderOgCard } from '@/lib/share-cards/ogCache';
 
 export const runtime = 'nodejs';
-export const revalidate = 120;
+export const revalidate = 300;
 
 export async function GET(
   req: Request,
@@ -10,7 +11,11 @@ export async function GET(
 ) {
   const { id } = await ctx.params;
   const format = parseOgFormat(req);
-  const image = await renderDealShareImage(id, format, req);
+  const cacheKey = `deal:${id}:${format}`;
+
+  const image = await getOrRenderOgCard(cacheKey, () =>
+    renderDealShareImage(id, format, req),
+  );
   if (!image) return notFoundOgResponse('Deal not found');
   return image;
 }

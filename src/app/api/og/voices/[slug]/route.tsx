@@ -4,6 +4,7 @@ import { resolveOgImage } from '@/lib/share-cards/absoluteUrl';
 import { qrPngDataUrl } from '@/lib/share-cards/qr';
 import { getPublishedVoiceStoryBySlug } from '@/modules/voices/voice.service';
 import { voiceTitleLine } from '@/sanity/lib/types';
+import { getOrRenderOgCard } from '@/lib/share-cards/ogCache';
 import {
   notFoundOgResponse,
   OG_SIZES,
@@ -13,7 +14,7 @@ import {
 } from '@/lib/share-cards/ogHelpers';
 
 export const runtime = 'nodejs';
-export const revalidate = 120;
+export const revalidate = 300;
 
 export async function GET(
   req: Request,
@@ -21,36 +22,43 @@ export async function GET(
 ) {
   const { slug } = await ctx.params;
   const format = parseOgFormat(req);
-  const story = await getPublishedVoiceStoryBySlug(slug);
-  if (!story) return notFoundOgResponse('Story not found');
+  const cacheKey = `voice:${slug}:${format}`;
 
-  const origin = shareSiteOrigin(req);
-  const name = story.name;
-  const quote = story.quote;
-  const badge = story.badge ?? 'HORECA1 VOICES';
-  const titleLine = voiceTitleLine(story.role, story.venue);
-  const articleUrl = `${origin}/voices/${slug}`;
-  const [qrDataUrl, photoUrl] = await Promise.all([
-    qrPngDataUrl(articleUrl),
-    resolveOgImage(origin, story.photoOgUrl || story.photoUrl),
-  ]);
+  const image = await getOrRenderOgCard(cacheKey, async () => {
+    const story = await getPublishedVoiceStoryBySlug(slug);
+    if (!story) return null;
 
-  return new ImageResponse(
-    (
-      <VoiceShareCard
-        format={format}
-        name={name}
-        badge={badge}
-        quote={quote}
-        titleLine={titleLine}
-        photoUrl={photoUrl}
-        articleUrl={articleUrl}
-        qrDataUrl={qrDataUrl}
-      />
-    ),
-    {
-      ...OG_SIZES[format],
-      headers: ogCacheHeaders(story.publishedAt),
-    },
-  );
+    const origin = shareSiteOrigin(req);
+    const name = story.name;
+    const quote = story.quote;
+    const badge = story.badge ?? 'HORECA1 VOICES';
+    const titleLine = voiceTitleLine(story.role, story.venue);
+    const articleUrl = `${origin}/voices/${slug}`;
+    const [qrDataUrl, photoUrl] = await Promise.all([
+      qrPngDataUrl(articleUrl),
+      resolveOgImage(origin, story.photoOgUrl || story.photoUrl),
+    ]);
+
+    return new ImageResponse(
+      (
+        <VoiceShareCard
+          format={format}
+          name={name}
+          badge={badge}
+          quote={quote}
+          titleLine={titleLine}
+          photoUrl={photoUrl}
+          articleUrl={articleUrl}
+          qrDataUrl={qrDataUrl}
+        />
+      ),
+      {
+        ...OG_SIZES[format],
+        headers: ogCacheHeaders(story.publishedAt),
+      },
+    );
+  });
+
+  if (!image) return notFoundOgResponse('Story not found');
+  return image;
 }

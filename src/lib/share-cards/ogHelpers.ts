@@ -59,7 +59,7 @@ export function ogCacheHeaders(updatedAt?: Date | string | null): Record<string,
     : 'static';
   return {
     'content-type': 'image/png',
-    'cache-control': 'public, s-maxage=120, stale-while-revalidate=86400',
+    'cache-control': 'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800',
     etag: `"og-v4-${etagSource}"`,
   };
 }
