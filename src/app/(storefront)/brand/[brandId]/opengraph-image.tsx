@@ -16,16 +16,16 @@ export default async function Image({ params }: { params: Promise<{ brandId: str
             width: '100%',
             height: '100%',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            background: '#6B1D2E',
-            color: 'white',
-            fontSize: 48,
-            fontWeight: 800,
+            background: '#FFFFFF',
+            color: '#6B1D2E',
             fontFamily: 'Inter, system-ui, sans-serif',
           }}
         >
-          HORECA1
+          <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: 2 }}>HORECA1</div>
+          <div style={{ fontSize: 24, fontWeight: 600, color: '#6B7280', marginTop: 12 }}>Brand Store</div>
         </div>
       ),
       { ...size },

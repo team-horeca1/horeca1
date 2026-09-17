@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, Share2, Copy, Check, Loader2 } from 'lucide-react';
+import { X, Share2, Copy, Check, Loader2, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ShareableContent } from '@/lib/share-cards/types';
 import { shareAbsoluteUrl } from '@/lib/share-cards/types';
 import {
+  downloadShareImage,
   getShareImageBlob,
   openWhatsAppShare,
   prefetchShareImage,
@@ -18,7 +19,7 @@ interface ShareSheetProps {
   content: ShareableContent | null;
 }
 
-type BusyKey = 'whatsapp' | 'instagram' | 'share' | null;
+type BusyKey = 'whatsapp' | 'share' | 'download' | null;
 
 function WhatsAppGlyph({ className }: { className?: string }) {
   return (
@@ -31,16 +32,6 @@ function WhatsAppGlyph({ className }: { className?: string }) {
   );
 }
 
-function InstagramGlyph({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M7.5 3h9A4.5 4.5 0 0 1 21 7.5v9A4.5 4.5 0 0 1 16.5 21h-9A4.5 4.5 0 0 1 3 16.5v-9A4.5 4.5 0 0 1 7.5 3zm0 1.8A2.7 2.7 0 0 0 4.8 7.5v9a2.7 2.7 0 0 0 2.7 2.7h9a2.7 2.7 0 0 0 2.7-2.7v-9a2.7 2.7 0 0 0-2.7-2.7h-9zM17.1 6.2a1.05 1.05 0 1 1 0 2.1 1.05 1.05 0 0 1 0-2.1zM12 7.4A4.6 4.6 0 1 1 7.4 12 4.6 4.6 0 0 1 12 7.4zm0 1.8A2.8 2.8 0 1 0 14.8 12 2.8 2.8 0 0 0 12 9.2z"
-      />
-    </svg>
-  );
-}
 
 export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
   const [copied, setCopied] = useState(false);
@@ -81,7 +72,7 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
   const imageUrl = content.preRenderedImageUrl || content.ogPath;
   const shareText = content.text.includes(pageUrl)
     ? content.text
-    : `${content.text}\n${pageUrl}`;
+    : `${content.text}\n\n${pageUrl}`;
 
   const nativeShare = async (key: Exclude<BusyKey, null>) => {
     setBusy(key);
@@ -110,11 +101,6 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
     openWhatsAppShare(shareText);
   };
 
-  const handleInstagram = async () => {
-    const result = await nativeShare('instagram');
-    if (result === 'cancelled' || result === 'shared') return;
-    toast.error('Instagram needs the card image — tap Share and pick Instagram');
-  };
 
   const handleNativeShare = async () => {
     const result = await nativeShare('share');
@@ -133,6 +119,22 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error('Failed to copy');
+    }
+  };
+
+  const handleDownload = async () => {
+    setBusy('download');
+    try {
+      const ok = await downloadShareImage(imageUrl, content.downloadName || 'horeca1-share.png');
+      if (ok) {
+        toast.success('Card image saved');
+      } else {
+        toast.error('Could not download image');
+      }
+    } catch {
+      toast.error('Download failed');
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -157,18 +159,18 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
       icon: <WhatsAppGlyph className="size-6" />,
     },
     {
-      key: 'instagram' as const,
-      label: 'Instagram',
-      onClick: () => void handleInstagram(),
-      className: 'bg-[linear-gradient(45deg,#f58529,#dd2a7b,#8134af)] text-white',
-      icon: <InstagramGlyph className="size-6" />,
-    },
-    {
       key: 'copy' as const,
       label: copied ? 'Copied' : 'Copy link',
       onClick: () => void handleCopy(),
       className: 'bg-ivory text-primary border border-divider',
       icon: copied ? <Check size={22} strokeWidth={2.4} /> : <Copy size={22} strokeWidth={2.2} />,
+    },
+    {
+      key: 'download' as const,
+      label: 'Download',
+      onClick: () => void handleDownload(),
+      className: 'bg-ivory text-text border border-divider hover:text-primary hover:border-primary/40',
+      icon: <Download size={22} strokeWidth={2.2} />,
     },
     {
       key: 'share' as const,
@@ -195,34 +197,43 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
       >
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-divider sm:hidden" />
 
-        <div className="flex items-start gap-3 mb-4">
-          {content.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={content.image}
-              alt=""
-              className="size-11 rounded-lg object-contain bg-ivory border border-divider shrink-0"
-            />
-          ) : (
-            <div className="size-11 rounded-lg bg-primary-light shrink-0" />
-          )}
+        {/* Header bar */}
+        <div className="flex items-start gap-3 mb-2">
           <div className="min-w-0 flex-1">
-            <p className="text-[14px] font-semibold text-text leading-tight line-clamp-2">
+            <p className="text-[15px] font-bold text-text leading-tight line-clamp-1">
               {content.title}
             </p>
-            <p className="text-[11px] text-text-secondary mt-0.5 line-clamp-1">
-              {ogReady ? 'Card ready' : 'Preparing card…'}
+            <p className="text-[12px] text-text-secondary mt-0.5 line-clamp-1">
+              {ogReady ? 'Card ready' : 'Generating card…'}
               {content.priceLabel ? ` · ${content.priceLabel}` : ''}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="size-9 rounded-full hover:bg-black/5 text-text-secondary flex items-center justify-center shrink-0"
+            className="size-8 rounded-full hover:bg-black/5 text-text-secondary flex items-center justify-center shrink-0"
             aria-label="Close share"
           >
             <X size={18} />
           </button>
+        </div>
+
+        {/* Card Preview Box */}
+        <div className="flex justify-center my-3">
+          <div className="relative w-[180px] h-[225px] rounded-xl overflow-hidden shadow-sm border border-divider/60 bg-[#F8FAFC] flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl}
+              alt={content.title}
+              className="w-full h-full object-contain"
+              loading="eager"
+            />
+            {!ogReady && (
+              <div className="absolute inset-0 bg-white/70 backdrop-blur-xs flex items-center justify-center">
+                <Loader2 size={24} className="animate-spin text-primary" />
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-4 gap-2">

@@ -41,7 +41,7 @@ export async function getShareImageBlob(
 }
 
 function shareCaption(text: string, url: string): string {
-  return text.includes(url) ? text : `${text}\n${url}`;
+  return text.includes(url) ? text : `${text}\n\n${url}`;
 }
 
 async function shareWithFiles(opts: {

@@ -7,7 +7,7 @@ import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { prisma } from '@/lib/prisma';
 import {
   discountPct,
-  formatInr,
+  formatAmount,
   OG_SIZES,
   type OgFormat,
   ogCacheHeaders,
@@ -83,11 +83,11 @@ export async function renderProductShareImage(
   const slab = product.priceSlabs?.[0];
   const slabOffer =
     slab != null
-      ? `${formatInr(toGrossPrice(Number(slab.price), tax))} at ${slab.minQty}+`
+      ? `${formatAmount(toGrossPrice(Number(slab.price), tax))} at ${slab.minQty}+`
       : undefined;
 
-  const priceHero = formatInr(grossPrice);
-  const mrpLine = grossMrp != null ? formatInr(grossMrp) : undefined;
+  const priceHero = formatAmount(grossPrice);
+  const mrpLine = grossMrp != null ? formatAmount(grossMrp) : undefined;
   const discountLine = pct != null && pct > 0 ? `${pct}% OFF` : undefined;
 
   const [qrDataUrl, imageUrl] = await Promise.all([

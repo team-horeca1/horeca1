@@ -57,6 +57,7 @@ export async function resolveOgImage(origin: string, url: string | null | undefi
 
     if (inputBuffer && inputBuffer.length > 0) {
       const pngBuffer = await sharp(inputBuffer)
+        .flatten({ background: '#ffffff' })
         .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
         .png()
         .toBuffer();
@@ -71,22 +72,23 @@ export async function resolveOgImage(origin: string, url: string | null | undefi
 
 /**
  * next/og (Satori) cannot decode webp/avif/svg directly.
- * Instead of dropping them, convert CDN URLs (ImageKit, Sanity, etc.) to JPG/PNG.
+ * Instead of dropping them, convert CDN URLs (ImageKit, Sanity, etc.) to JPG/PNG
+ * ensuring transparent backgrounds are cleanly flattened on white (never black).
  */
 function ogSafeRaster(url: string): string | null {
-  // ImageKit URL: convert to JPEG format via tr=f-jpg
+  // ImageKit URL: convert to PNG/JPG with clean white background
   if (url.includes('ik.imagekit.io') || url.includes('imagekit.io')) {
     if (url.includes('tr=')) {
-      return url.replace(/tr=([^&]*)/, 'tr=f-jpg,$1');
+      return url.replace(/tr=([^&]*)/, 'tr=f-png,bg-FFFFFF,$1');
     }
     const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}tr=f-jpg`;
+    return `${url}${sep}tr=f-png,bg-FFFFFF`;
   }
 
-  // Sanity CDN URL: force JPG via fm=jpg
+  // Sanity CDN URL: force JPG with white background
   if (url.includes('cdn.sanity.io')) {
     const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}fm=jpg`;
+    return `${url}${sep}fm=jpg&bg=ffffff`;
   }
 
   // Generic webp/avif/svg check

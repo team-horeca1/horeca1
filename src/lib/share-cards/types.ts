@@ -56,11 +56,11 @@ export function productShareContent(opts: {
     id: opts.id,
     title: opts.title,
     text: vendor
-      ? `Check out ${opts.title} from ${vendor} on Horeca1`
-      : `Check out ${opts.title} on Horeca1`,
+      ? `Check out ${opts.title} from ${vendor} on Horeca1.`
+      : `Check out ${opts.title} on Horeca1.`,
     path: `/product/${opts.id}`,
     image: opts.image,
-    ogPath: `/api/og/product/${opts.id}?format=square${v}`,
+    ogPath: `/api/og/product/${opts.id}?format=portrait${v}`,
     downloadName: `horeca1-product-${opts.id}.png`,
     subtitle: [vendor, opts.pack].filter(Boolean).join(' · ') || null,
     priceLabel: opts.priceLabel,
@@ -78,10 +78,10 @@ export function vendorShareContent(opts: {
     kind: 'vendor',
     id: opts.id,
     title: opts.name,
-    text: `Check out ${opts.name} on Horeca1`,
+    text: `Check out ${opts.name} on Horeca1.`,
     path: `/vendor/${opts.id}`,
     image: opts.image,
-    ogPath: `/api/og/vendor/${opts.id}?format=square${v}`,
+    ogPath: `/api/og/vendor/${opts.id}?format=portrait${v}`,
     downloadName: `horeca1-vendor-${opts.id}.png`,
     subtitle: 'Supplier store',
   };
@@ -98,10 +98,10 @@ export function brandShareContent(opts: {
     kind: 'brand',
     id: opts.slug,
     title: opts.name,
-    text: `Find ${opts.name} on Horeca1`,
+    text: `Find ${opts.name} on Horeca1.`,
     path: `/brand/${opts.slug}`,
     image: opts.image,
-    ogPath: `/api/og/brand/${encodeURIComponent(opts.slug)}?format=square${v}`,
+    ogPath: `/api/og/brand/${encodeURIComponent(opts.slug)}?format=portrait${v}`,
     downloadName: `horeca1-brand-${opts.slug}.png`,
     subtitle: 'Brand store',
   };
@@ -123,10 +123,10 @@ export function collectionShareContent(opts: {
     kind: 'collection',
     id: opts.slug,
     title: opts.name,
-    text: `Browse ${opts.name} on Horeca1`,
+    text: `Browse ${opts.name} on Horeca1.`,
     path: `/collections/${opts.slug}`,
     image: opts.image,
-    ogPath: `/api/og/collection/${encodeURIComponent(opts.slug)}?format=square${v}`,
+    ogPath: `/api/og/collection/${encodeURIComponent(opts.slug)}?format=portrait${v}`,
     downloadName: `horeca1-collection-${opts.slug}.png`,
     subtitle: count,
   };
@@ -147,11 +147,11 @@ export function dealShareContent(opts: {
     id: opts.id,
     title: opts.title,
     text: vendor
-      ? `${opts.title} at ${vendor} on Horeca1`
-      : `${opts.title} on Horeca1`,
+      ? `${opts.title} from ${vendor} on Horeca1.`
+      : `${opts.title} on Horeca1.`,
     path: `/vendor/${opts.vendorId}`,
     image: opts.image,
-    ogPath: `/api/og/deal/${opts.id}?format=square`,
+    ogPath: `/api/og/deal/${opts.id}?format=portrait`,
     downloadName: `horeca1-deal-${opts.id}.png`,
     subtitle: vendor || 'Store offer',
     priceLabel: opts.priceLabel,
@@ -175,7 +175,7 @@ export function articleShareContent(opts: {
     text: `🌟 *${opts.name}*${titleLine ? ` (${titleLine})` : ''}\n"${opts.quote}"\n\n📖 Read the full story on Horeca1 Voices:`,
     path: `/voices/${opts.slug}`,
     image: opts.photoUrl,
-    ogPath: `/api/og/voices/${encodeURIComponent(opts.slug)}?format=square`,
+    ogPath: `/api/og/voices/${encodeURIComponent(opts.slug)}?format=portrait`,
     downloadName: `horeca1-voices-${opts.slug}.png`,
     subtitle: titleLine || 'Horeca1 Voices',
     preRenderedImageUrl: opts.preRenderedImageUrl,

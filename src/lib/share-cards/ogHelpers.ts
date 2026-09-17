@@ -21,14 +21,14 @@ export function shareSiteOrigin(req?: Request): string {
 }
 
 export const OG_SIZES = {
-  portrait: { width: 1080, height: 1920 },
+  portrait: { width: 1080, height: 1350 },
   square: { width: 1080, height: 1080 },
 } as const;
 
 export type OgFormat = keyof typeof OG_SIZES;
 
 export function parseOgFormat(req: Request): OgFormat {
-  return new URL(req.url).searchParams.get('format') === 'portrait' ? 'portrait' : 'square';
+  return new URL(req.url).searchParams.get('format') === 'square' ? 'square' : 'portrait';
 }
 
 /** GST-inclusive public catalog price (never customer list prices). */
@@ -36,11 +36,16 @@ export function toGrossPrice(taxable: number, taxPercent: number): number {
   return Math.round(taxable * (1 + taxPercent / 100) * 100) / 100;
 }
 
-/** Satori's default font has no rupee glyph — "Rs." renders on every device. */
-export function formatInr(amount: number): string {
-  return `Rs. ${amount.toLocaleString('en-IN', {
+/** Format currency numbers cleanly in en-IN locale. */
+export function formatAmount(amount: number): string {
+  return amount.toLocaleString('en-IN', {
     maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  })}`;
+  });
+}
+
+/** Fallback string formatting with Rs. prefix where JSX components cannot be used. */
+export function formatInr(amount: number): string {
+  return `Rs. ${formatAmount(amount)}`;
 }
 
 export function discountPct(price: number, mrp: number): number | null {
@@ -55,7 +60,7 @@ export function ogCacheHeaders(updatedAt?: Date | string | null): Record<string,
   return {
     'content-type': 'image/png',
     'cache-control': 'public, s-maxage=120, stale-while-revalidate=86400',
-    etag: `"og-cdl3-${etagSource}"`,
+    etag: `"og-v4-${etagSource}"`,
   };
 }
 
