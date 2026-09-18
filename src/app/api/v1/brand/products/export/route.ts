@@ -46,7 +46,17 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
       parentCategory: p.categoryRel?.parent?.name ?? p.categoryRel?.name ?? '',
       subCategory: p.categoryRel?.parent ? p.categoryRel.name : '',
       imageUrl: p.imageUrl,
-      description: p.aliasNames[0] ?? p.description,
+      description: p.description,
+      tags: p.tags,
+      aliasNames: p.aliasNames,
+      netWeight: p.netWeight != null ? Number(p.netWeight) : null,
+      netWeightUnit: p.netWeightUnit,
+      packageWeight: p.packageWeight != null ? Number(p.packageWeight) : null,
+      weightUnit: p.weightUnit,
+      packageLength: p.packageLength != null ? Number(p.packageLength) : null,
+      packageWidth: p.packageWidth != null ? Number(p.packageWidth) : null,
+      packageHeight: p.packageHeight != null ? Number(p.packageHeight) : null,
+      dimensionUnit: p.dimensionUnit,
     }));
 
     const buf = exportBrandCatalogToXlsx(rows);

@@ -10,7 +10,9 @@ export interface BrandImportRow {
   parentCategory?: string;
   subCategory?: string;
   imageUrl?: string;
-  aliasName?: string;
+  description?: string;
+  aliasNames?: string[];
+  tags?: string[];
   hsn?: string;
   barcode?: string;
   ean?: string;
@@ -19,9 +21,18 @@ export interface BrandImportRow {
   shelfLifeDays?: number;
   countryOfOrigin?: string;
   fssaiRef?: string;
+  netWeight?: number;
+  netWeightUnit?: string;
+  packageWeight?: number;
+  weightUnit?: string;
+  packageLength?: number;
+  packageWidth?: number;
+  packageHeight?: number;
+  dimensionUnit?: string;
 }
 
-const BRAND_TEMPLATE_HEADERS = [
+/** Headers aligned with BrandProductForm — keep order stable for round-trip export. */
+export const BRAND_TEMPLATE_HEADERS = [
   'Item Name',
   'SKU',
   'HSN Code',
@@ -29,20 +40,30 @@ const BRAND_TEMPLATE_HEADERS = [
   'EAN',
   'Parent Category',
   'Sub-Category',
-  'Usage unit',
+  'Pack Size',
   'Unit Name',
   'Veg / Non-Veg',
   'Storage type',
   'Shelf Life Days',
   'Country of Origin',
   'FSSAI',
+  'Description',
+  'Tags',
+  'Alias Names',
+  'Net Weight',
+  'Net Weight Unit',
+  'Package Weight',
+  'Weight Unit',
+  'Package Length',
+  'Package Width',
+  'Package Height',
+  'Dimension Unit',
   'Image URL',
-  'Alias Name',
 ] as const;
 
 const INSTRUCTION_MARKERS = [
   'vendor provided', 'choose one', 'system fetched', 'system generated', 'for search',
-  'veg, nonveg', 'ambient', 'url',
+  'veg, nonveg', 'ambient', 'url', 'comma-separated', 'optional',
 ];
 
 function isInstructionRow(name: string): boolean {
@@ -53,6 +74,24 @@ function isInstructionRow(name: string): boolean {
 function cellStr(v: unknown): string | undefined {
   if (v === null || v === undefined || v === '') return undefined;
   return String(v).trim() || undefined;
+}
+
+function cellList(v: unknown): string[] | undefined {
+  const s = cellStr(v);
+  if (!s) return undefined;
+  const parts = s.split(/[,;]/).map((t) => t.trim()).filter(Boolean);
+  return parts.length > 0 ? parts : undefined;
+}
+
+function cellNumber(v: unknown): { value?: number; error?: string; label: string } {
+  const label = 'number';
+  const s = cellStr(v);
+  if (!s) return { label };
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < 0) {
+    return { error: 'must be a non-negative number', label };
+  }
+  return { value: n, label };
 }
 
 const STORAGE_ALIASES: Record<string, string> = {
@@ -101,6 +140,20 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+function pickCell(r: Record<string, unknown>, ...keys: string[]): unknown {
+  for (const key of keys) {
+    if (r[key] !== undefined && r[key] !== null && r[key] !== '') return r[key];
+  }
+  const lowerMap = new Map(
+    Object.entries(r).map(([k, v]) => [k.trim().toLowerCase(), v]),
+  );
+  for (const key of keys) {
+    const val = lowerMap.get(key.toLowerCase());
+    if (val !== undefined && val !== null && val !== '') return val;
+  }
+  return undefined;
+}
+
 export function parseBrandCatalogImport(buffer: Buffer): {
   rows: BrandImportRow[];
   errors: Array<{ row: number; message: string }>;
@@ -115,33 +168,71 @@ export function parseBrandCatalogImport(buffer: Buffer): {
 
   raw.forEach((r, idx) => {
     const rowNum = idx + 2;
-    const name = cellStr(r['Item Name']);
+    const name = cellStr(pickCell(r, 'Item Name', 'Product Name', 'Name'));
     if (!name || isInstructionRow(name)) return;
 
-    const shelfLife = parseShelfLifeDays(r['Shelf Life Days'] ?? r['Shelf Life']);
+    const shelfLife = parseShelfLifeDays(
+      pickCell(r, 'Shelf Life Days', 'Shelf Life (days)', 'Shelf Life'),
+    );
     if (shelfLife.error) {
       parsedErrors.push({ row: rowNum, message: shelfLife.error });
+      return;
+    }
+
+    const netWeight = cellNumber(pickCell(r, 'Net Weight'));
+    if (netWeight.error) {
+      parsedErrors.push({ row: rowNum, message: `Net Weight ${netWeight.error}` });
+      return;
+    }
+    const packageWeight = cellNumber(pickCell(r, 'Package Weight'));
+    if (packageWeight.error) {
+      parsedErrors.push({ row: rowNum, message: `Package Weight ${packageWeight.error}` });
+      return;
+    }
+    const packageLength = cellNumber(pickCell(r, 'Package Length'));
+    if (packageLength.error) {
+      parsedErrors.push({ row: rowNum, message: `Package Length ${packageLength.error}` });
+      return;
+    }
+    const packageWidth = cellNumber(pickCell(r, 'Package Width'));
+    if (packageWidth.error) {
+      parsedErrors.push({ row: rowNum, message: `Package Width ${packageWidth.error}` });
+      return;
+    }
+    const packageHeight = cellNumber(pickCell(r, 'Package Height'));
+    if (packageHeight.error) {
+      parsedErrors.push({ row: rowNum, message: `Package Height ${packageHeight.error}` });
       return;
     }
 
     rows.push({
       row: rowNum,
       name,
-      sku: cellStr(r['SKU']),
-      hsn: cellStr(r['HSN Code'] ?? r['HSN']),
-      barcode: cellStr(r['Barcode'] ?? r['UPC']),
-      ean: cellStr(r['EAN']),
-      parentCategory: cellStr(r['Parent Category']),
-      subCategory: cellStr(r['Sub-Category'] ?? r['Sub Category']),
-      packSize: cellStr(r['Usage unit'] ?? r['Pack Size']),
-      unit: cellStr(r['Unit Name'] ?? r['Unit']),
-      vegNonVeg: parseVegNonVeg(r['Veg / Non-Veg'] ?? r['Veg/Non-Veg']),
-      storageType: parseStorageType(r['Storage type'] ?? r['Storage Type']),
+      sku: cellStr(pickCell(r, 'SKU')),
+      hsn: cellStr(pickCell(r, 'HSN Code', 'HSN')),
+      barcode: cellStr(pickCell(r, 'Barcode', 'UPC')),
+      ean: cellStr(pickCell(r, 'EAN')),
+      parentCategory: cellStr(pickCell(r, 'Parent Category')),
+      subCategory: cellStr(pickCell(r, 'Sub-Category', 'Sub Category')),
+      packSize: cellStr(pickCell(r, 'Pack Size', 'Usage unit')),
+      unit: cellStr(pickCell(r, 'Unit Name', 'Unit')),
+      vegNonVeg: parseVegNonVeg(pickCell(r, 'Veg / Non-Veg', 'Veg/Non-Veg')),
+      storageType: parseStorageType(pickCell(r, 'Storage type', 'Storage Type')),
       shelfLifeDays: shelfLife.value,
-      countryOfOrigin: cellStr(r['Country of Origin']),
-      fssaiRef: cellStr(r['FSSAI'] ?? r['FSSAI Ref']),
-      imageUrl: cellStr(r['Image URL']),
-      aliasName: cellStr(r['Alias Name']),
+      countryOfOrigin: cellStr(pickCell(r, 'Country of Origin')),
+      fssaiRef: cellStr(pickCell(r, 'FSSAI', 'FSSAI Ref', 'FSSAI Reference')),
+      description: cellStr(pickCell(r, 'Description', 'Item Description')),
+      tags: cellList(pickCell(r, 'Tags')),
+      aliasNames: cellList(pickCell(r, 'Alias Names', 'Alias Name')),
+      netWeight: netWeight.value,
+      netWeightUnit: cellStr(pickCell(r, 'Net Weight Unit')),
+      packageWeight: packageWeight.value,
+      weightUnit: cellStr(pickCell(r, 'Weight Unit')),
+      packageLength: packageLength.value,
+      packageWidth: packageWidth.value,
+      packageHeight: packageHeight.value,
+      dimensionUnit: cellStr(pickCell(r, 'Dimension Unit')),
+      imageUrl: cellStr(pickCell(r, 'Image URL')),
     });
   });
 
@@ -156,6 +247,7 @@ export function brandImportProductFields(row: BrandImportRow): {
   unit?: string;
   uom?: string;
   imageUrl?: string;
+  description?: string;
   hsn?: string;
   barcode?: string;
   ean?: string;
@@ -164,6 +256,15 @@ export function brandImportProductFields(row: BrandImportRow): {
   shelfLifeDays?: number;
   countryOfOrigin?: string;
   fssaiRef?: string;
+  netWeight?: number;
+  netWeightUnit?: string;
+  packageWeight?: number;
+  weightUnit?: string;
+  packageLength?: number;
+  packageWidth?: number;
+  packageHeight?: number;
+  dimensionUnit?: string;
+  tags?: string[];
   aliasNames?: string[];
 } {
   const imageUrl = row.imageUrl && isHttpUrl(row.imageUrl) ? row.imageUrl : undefined;
@@ -174,6 +275,7 @@ export function brandImportProductFields(row: BrandImportRow): {
     unit: row.unit,
     uom: row.unit,
     imageUrl,
+    description: row.description,
     hsn: row.hsn,
     barcode: row.barcode,
     ean: row.ean,
@@ -182,7 +284,16 @@ export function brandImportProductFields(row: BrandImportRow): {
     shelfLifeDays: row.shelfLifeDays,
     countryOfOrigin: row.countryOfOrigin,
     fssaiRef: row.fssaiRef,
-    aliasNames: row.aliasName ? [row.aliasName] : undefined,
+    netWeight: row.netWeight,
+    netWeightUnit: row.netWeightUnit,
+    packageWeight: row.packageWeight,
+    weightUnit: row.weightUnit,
+    packageLength: row.packageLength,
+    packageWidth: row.packageWidth,
+    packageHeight: row.packageHeight,
+    dimensionUnit: row.dimensionUnit,
+    tags: row.tags,
+    aliasNames: row.aliasNames,
   };
 }
 
@@ -198,6 +309,7 @@ export function toPendingMasterSubmit(
     packSize: fields.packSize,
     uom: fields.uom,
     imageUrl: fields.imageUrl,
+    description: fields.description,
     hsn: fields.hsn,
     barcode: fields.barcode,
     ean: fields.ean,
@@ -206,25 +318,81 @@ export function toPendingMasterSubmit(
     shelfLifeDays: fields.shelfLifeDays,
     countryOfOrigin: fields.countryOfOrigin,
     fssaiRef: fields.fssaiRef,
+    netWeight: fields.netWeight,
+    netWeightUnit: fields.netWeightUnit,
+    packageWeight: fields.packageWeight,
+    weightUnit: fields.weightUnit,
+    packageLength: fields.packageLength,
+    packageWidth: fields.packageWidth,
+    packageHeight: fields.packageHeight,
+    dimensionUnit: fields.dimensionUnit,
+    tags: fields.tags,
     aliasNames: fields.aliasNames,
   };
 }
 
 export function generateBrandCatalogTemplate(): Buffer {
   const headers = [...BRAND_TEMPLATE_HEADERS];
-  const hint = [
-    'Vendor Provided', 'Vendor Provided', 'Vendor Provided', 'Optional', 'Optional',
-    'Choose One', 'Choose One', 'e.g. 1 ltr', 'e.g. Bottle',
-    'veg, nonveg, or egg', 'ambient, refrigerated, frozen, dry, or cool', 'e.g. 365', 'India', 'Optional',
-    'URL', 'for search',
-  ];
-  const example = [
-    'Manama Khus Syrup 1 Ltr', 'MAN-KHUS-1L', '210690', '', '',
-    'Beverages', 'Syrups', '1 ltr', 'Bottle',
-    'veg', 'Ambient', '365', 'India', '',
-    '', 'khus syrup',
-  ];
+  const hintByHeader: Record<(typeof BRAND_TEMPLATE_HEADERS)[number], string> = {
+    'Item Name': 'Vendor Provided',
+    SKU: 'Vendor Provided',
+    'HSN Code': 'Vendor Provided',
+    Barcode: 'Optional',
+    EAN: 'Optional',
+    'Parent Category': 'Choose One',
+    'Sub-Category': 'Choose One',
+    'Pack Size': 'e.g. 1 ltr',
+    'Unit Name': 'e.g. Bottle',
+    'Veg / Non-Veg': 'veg, nonveg, or egg',
+    'Storage type': 'ambient, refrigerated, frozen, dry, or cool',
+    'Shelf Life Days': 'e.g. 365',
+    'Country of Origin': 'India',
+    FSSAI: 'Optional',
+    Description: 'Optional product description',
+    Tags: 'Comma-separated',
+    'Alias Names': 'Comma-separated search aliases',
+    'Net Weight': 'e.g. 1',
+    'Net Weight Unit': 'kg / g / ml / l',
+    'Package Weight': 'Optional shipping weight',
+    'Weight Unit': 'kg / g',
+    'Package Length': 'Optional',
+    'Package Width': 'Optional',
+    'Package Height': 'Optional',
+    'Dimension Unit': 'cm / mm / in',
+    'Image URL': 'https://…',
+  };
+  const exampleByHeader: Record<(typeof BRAND_TEMPLATE_HEADERS)[number], string | number> = {
+    'Item Name': 'Manama Khus Syrup 1 Ltr',
+    SKU: 'MAN-KHUS-1L',
+    'HSN Code': '210690',
+    Barcode: '',
+    EAN: '',
+    'Parent Category': 'Beverages',
+    'Sub-Category': 'Syrups',
+    'Pack Size': '1 ltr',
+    'Unit Name': 'Bottle',
+    'Veg / Non-Veg': 'veg',
+    'Storage type': 'Ambient',
+    'Shelf Life Days': 365,
+    'Country of Origin': 'India',
+    FSSAI: '',
+    Description: 'Khus flavoured syrup for beverages',
+    Tags: 'syrup, khus, beverage',
+    'Alias Names': 'khus syrup, vetiver syrup',
+    'Net Weight': 1,
+    'Net Weight Unit': 'l',
+    'Package Weight': 1.2,
+    'Weight Unit': 'kg',
+    'Package Length': 8,
+    'Package Width': 8,
+    'Package Height': 28,
+    'Dimension Unit': 'cm',
+    'Image URL': '',
+  };
+  const hint = headers.map((h) => hintByHeader[h]);
+  const example = headers.map((h) => exampleByHeader[h]);
   const ws = XLSX.utils.aoa_to_sheet([headers, hint, example]);
+  ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Brand Store');
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
@@ -246,7 +414,23 @@ export interface BrandExportRow {
   parentCategory: string;
   subCategory: string;
   imageUrl: string | null;
-  description: string | null;
+  description?: string | null;
+  tags?: string[] | null;
+  aliasNames?: string[] | null;
+  netWeight?: number | string | null;
+  netWeightUnit?: string | null;
+  packageWeight?: number | string | null;
+  weightUnit?: string | null;
+  packageLength?: number | string | null;
+  packageWidth?: number | string | null;
+  packageHeight?: number | string | null;
+  dimensionUnit?: string | null;
+}
+
+function exportCell(v: unknown): string | number {
+  if (v === null || v === undefined || v === '') return '';
+  if (typeof v === 'number') return v;
+  return String(v);
 }
 
 export function exportBrandCatalogToXlsx(products: BrandExportRow[]): Buffer {
@@ -266,10 +450,21 @@ export function exportBrandCatalogToXlsx(products: BrandExportRow[]): Buffer {
     p.shelfLifeDays ?? '',
     p.countryOfOrigin ?? '',
     p.fssaiRef ?? '',
-    p.imageUrl ?? '',
     p.description ?? '',
+    p.tags?.length ? p.tags.join(', ') : '',
+    p.aliasNames?.length ? p.aliasNames.join(', ') : '',
+    exportCell(p.netWeight),
+    p.netWeightUnit ?? '',
+    exportCell(p.packageWeight),
+    p.weightUnit ?? '',
+    exportCell(p.packageLength),
+    exportCell(p.packageWidth),
+    exportCell(p.packageHeight),
+    p.dimensionUnit ?? '',
+    p.imageUrl ?? '',
   ]);
   const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+  ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Brand Store');
   return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
