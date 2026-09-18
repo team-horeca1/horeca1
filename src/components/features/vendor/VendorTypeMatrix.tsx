@@ -182,10 +182,9 @@ export function VendorTypeMatrix({
   const renderSubTypeChips = (type: string) => {
     const presetSubs = subTypesForVendorType(type);
     const draftLabel = (draftByType[type] ?? '').trim();
-    const provisional = provisionalByTypeRef.current[type];
     const extraSubs = (selections.find((s) => s.type === type)?.subTypes ?? [])
-      .filter((st) => !presetSubs.includes(st) && st !== draftLabel && st !== provisional);
-    const otherOpen = openOtherByType[type] || extraSubs.length > 0 || Boolean(draftLabel) || Boolean(provisional);
+      .filter((st) => !presetSubs.includes(st) && st !== draftLabel);
+    const otherOpen = openOtherByType[type] || extraSubs.length > 0 || Boolean(draftLabel);
     return (
       <div className="flex flex-wrap gap-2 items-center min-w-0">
         {presetSubs.map((st) => {
@@ -251,7 +250,7 @@ export function VendorTypeMatrix({
   );
 
   const customSubChips = (customSelection?.subTypes ?? []).filter(
-    (st) => st !== customSubDraft.trim() && st !== provisionalCustomSubRef.current,
+    (st) => st !== customSubDraft.trim(),
   );
 
   if (variant === 'stacked') {
