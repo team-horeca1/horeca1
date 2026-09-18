@@ -63,17 +63,22 @@ export async function productShareMetadata(id: string): Promise<Metadata> {
   });
 }
 
-export async function vendorShareMetadata(id: string): Promise<Metadata> {
+export async function vendorShareMetadata(idOrSlug: string): Promise<Metadata> {
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const vendor = await prisma.vendor.findFirst({
-    where: { id, isActive: true },
-    select: { displayName: true, businessName: true, description: true },
+    where: {
+      isActive: true,
+      ...(UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug }),
+    },
+    select: { displayName: true, businessName: true, description: true, slug: true, id: true },
   });
   const title = vendor?.displayName || vendor?.businessName || 'Horeca1';
+  const pathId = vendor?.slug || vendor?.id || idOrSlug;
   return catalogShareMetadata({
     title,
     description: clip(vendor?.description, `Order from ${title} on Horeca1`),
-    path: `/vendor/${id}`,
-    ogPath: `/api/og/vendor/${id}?format=square`,
+    path: `/vendor/${pathId}`,
+    ogPath: `/api/og/vendor/${encodeURIComponent(pathId)}?format=square`,
   });
 }
 

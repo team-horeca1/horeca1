@@ -30,17 +30,21 @@ function promoLabel(p: {
 }
 
 export async function renderVendorShareImage(
-  id: string,
+  idOrSlug: string,
   format: OgFormat,
   req?: Request,
 ): Promise<ImageResponse | null> {
   const origin = shareSiteOrigin(req);
-  const pageUrl = `${origin}/vendor/${id}`;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   const vendor = await prisma.vendor.findFirst({
-    where: { id, isActive: true },
+    where: {
+      isActive: true,
+      ...(UUID_RE.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug }),
+    },
     select: {
       id: true,
+      slug: true,
       businessName: true,
       displayName: true,
       logoUrl: true,
@@ -73,6 +77,8 @@ export async function renderVendorShareImage(
   });
 
   if (!vendor) return null;
+
+  const pageUrl = `${origin}/vendor/${vendor.slug || vendor.id}`;
 
   const name = vendor.displayName || vendor.businessName || 'Horeca1 supplier';
   const categories = [
