@@ -261,7 +261,7 @@ export function useGooglePlacesAutocomplete(
                 });
             });
         },
-        [google]
+        [google, ensureServices]
     );
 
     const clearPredictions = useCallback(() => {
