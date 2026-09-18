@@ -23,9 +23,12 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       });
     }
 
-    // Build a slug→id lookup for parent references
-    const existingSlugs = await prisma.category.findMany({ select: { id: true, slug: true } });
-    const slugMap = new Map(existingSlugs.map(c => [c.slug, c.id]));
+    // Parent may be referenced by slug (parentSlug) or display name (export "Parent" column)
+    const existingCats = await prisma.category.findMany({
+      select: { id: true, slug: true, name: true },
+    });
+    const slugMap = new Map(existingCats.map(c => [c.slug, c.id]));
+    const nameMap = new Map(existingCats.map(c => [c.name.toLowerCase(), c.id]));
 
     let created = 0;
     const createErrors: { row: number; message: string }[] = [...parseErrors];
@@ -42,12 +45,18 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           continue;
         }
 
-        // Resolve parent by slug
+        // Resolve parent by slug first, then case-insensitive name
         let parentId: string | null = null;
         if (row.parentSlug) {
-          parentId = slugMap.get(row.parentSlug) || null;
+          parentId =
+            slugMap.get(row.parentSlug) ||
+            nameMap.get(row.parentSlug.toLowerCase()) ||
+            null;
           if (!parentId) {
-            createErrors.push({ row: rowNum, message: `Parent slug "${row.parentSlug}" not found` });
+            createErrors.push({
+              row: rowNum,
+              message: `Parent "${row.parentSlug}" not found (match by slug or name)`,
+            });
             continue;
           }
           // Enforce the strict 2-level tree (B-3): the parent must itself be a root
@@ -86,6 +95,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
 
         // Add to lookup so subsequent rows can reference this as parent
         slugMap.set(cat.slug, cat.id);
+        nameMap.set(cat.name.toLowerCase(), cat.id);
         created++;
       } catch (err) {
         createErrors.push({

@@ -1191,12 +1191,15 @@ export function parsePriceUpdate(buffer: Buffer): {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Category Import/Export (unchanged column format)
+// Category Import/Export
+// Accepts both camelCase import headers and the Title Case XLSX export layout.
+// Parent may be a slug (parentSlug) or a display name (Parent / parentName).
 // ══════════════════════════════════════════════════════════════════════════════
 
 const categoryImportRowSchema = z.object({
   name: z.string().min(1),
   slug: z.string().optional(),
+  /** Parent slug and/or name — resolved by slug first, then case-insensitive name. */
   parentSlug: z.string().optional(),
   imageUrl: z.string().optional(),
   sortOrder: z.coerce.number().int().optional(),
@@ -1207,6 +1210,44 @@ export type CategoryImportRow = z.infer<typeof categoryImportRowSchema>;
 interface CategoryImportResult {
   rows: CategoryImportRow[];
   errors: ImportError[];
+}
+
+/** Pick first non-empty value for any of the given keys (exact, then case-insensitive). */
+function pickCategoryField(
+  raw: Record<string, unknown>,
+  ...keys: string[]
+): unknown {
+  for (const key of keys) {
+    const val = raw[key];
+    if (val !== undefined && val !== null && val !== '') return val;
+  }
+  const lowerMap = new Map(
+    Object.entries(raw).map(([k, v]) => [k.trim().toLowerCase(), v]),
+  );
+  for (const key of keys) {
+    const val = lowerMap.get(key.toLowerCase());
+    if (val !== undefined && val !== null && val !== '') return val;
+  }
+  return undefined;
+}
+
+function normalizeCategoryImportRow(
+  raw: Record<string, unknown>,
+): Record<string, unknown> {
+  const parent = pickCategoryField(
+    raw,
+    'parentSlug',
+    'parentName',
+    'Parent',
+    'parent',
+  );
+  return {
+    name: pickCategoryField(raw, 'name', 'Name'),
+    slug: pickCategoryField(raw, 'slug', 'Slug'),
+    parentSlug: typeof parent === 'string' ? parent.trim() || undefined : parent,
+    imageUrl: pickCategoryField(raw, 'imageUrl', 'Image URL', 'image url'),
+    sortOrder: pickCategoryField(raw, 'sortOrder', 'Sort Order', 'sort order'),
+  };
 }
 
 export function parseCategoryImport(buffer: Buffer): CategoryImportResult {
@@ -1220,7 +1261,11 @@ export function parseCategoryImport(buffer: Buffer): CategoryImportResult {
   const errors: ImportError[] = [];
 
   rawRows.forEach((raw, idx) => {
-    const cleaned = cleanRow(raw);
+    const cleaned = normalizeCategoryImportRow(cleanRow(raw));
+    // Skip blank / trailing empty rows (common when Excel marks a huge used range)
+    if (cleaned.name === undefined || cleaned.name === null || cleaned.name === '') {
+      return;
+    }
     const result = categoryImportRowSchema.safeParse(cleaned);
     if (result.success) {
       rows.push(result.data);

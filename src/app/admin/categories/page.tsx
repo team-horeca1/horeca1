@@ -1156,11 +1156,16 @@ export default function CategoriesPage() {
                             {/* Info */}
                             <div className="bg-[#EFF6FF] border border-[#3B82F6]/10 rounded-[10px] p-4">
                                 <p className="text-[13px] font-medium text-[#3B82F6] leading-relaxed">
-                                    Upload a <strong>.csv</strong> or <strong>.xlsx</strong> file
-                                    with the following columns:{' '}
+                                    Upload a <strong>.csv</strong> or <strong>.xlsx</strong> file.
+                                    Columns:{' '}
                                     <code className="bg-white/60 px-1.5 py-0.5 rounded text-[12px] font-mono">
                                         name, slug, parentSlug, imageUrl, sortOrder
                                     </code>
+                                    {' '}— or the export format{' '}
+                                    <code className="bg-white/60 px-1.5 py-0.5 rounded text-[12px] font-mono">
+                                        Name, Slug, Parent, Image URL, Sort Order
+                                    </code>
+                                    {' '}(Parent may be a name or slug).
                                 </p>
                             </div>
 
