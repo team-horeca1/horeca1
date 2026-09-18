@@ -831,11 +831,12 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
                 ...(r.packSize ? { packSize: r.packSize } : {}),
                 ...(r.description ? { description: r.description } : {}),
                 ...(r.originalPrice != null ? { originalPrice: r.originalPrice } : {}),
-                creditEligible: true,
+                creditEligible: r.creditEligible ?? true,
                 ...(r.isActive != null ? { isActive: r.isActive } : {}),
                 ...(r.shelfLifeDays != null ? { shelfLifeDays: Number(r.shelfLifeDays) } : {}),
                 ...(r.countryOfOrigin ? { countryOfOrigin: r.countryOfOrigin } : {}),
                 ...(r.tags?.length ? { tags: r.tags } : {}),
+                ...(r.fssaiRef ? { fssaiRef: r.fssaiRef } : {}),
               },
             });
 
@@ -911,11 +912,12 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
                 packSize: r.packSize || null,
                 description: r.description || null,
                 originalPrice: r.originalPrice ?? null,
-                creditEligible: true,
+                creditEligible: r.creditEligible ?? true,
                 isActive: r.isActive ?? true,
                 shelfLifeDays: r.shelfLifeDays != null ? Number(r.shelfLifeDays) : null,
                 countryOfOrigin: r.countryOfOrigin || null,
                 tags: r.tags ?? [],
+                fssaiRef: r.fssaiRef || null,
               },
             });
             const vendor = await tx.vendor.findUnique({

@@ -268,6 +268,9 @@ const productImportRowSchema = z
     'Shelf Life': z.coerce.number().int().min(0).optional(),
     'Country of Origin': z.coerce.string().optional(),
     'Tags': z.coerce.string().optional(),
+    'FSSAI': z.coerce.string().optional(),
+    'FSSAI Ref': z.coerce.string().optional(),
+    'FSSAI Reference': z.coerce.string().optional(),
     // Zoho and other metadata fields
     'Account': z.coerce.string().optional(),
     'Account Code': z.coerce.string().optional(),
@@ -360,6 +363,15 @@ const HEADER_MAP: Record<string, string> = (() => {
     'promo rate': '6pm to 9am Promo Rate - Single Unit',
     'veg / non-veg': 'Veg / Non-Veg',
     'storage type': 'Storage type',
+    'pack size': 'Pack Size',
+    'country of origin': 'Country of Origin',
+    'shelf life (days)': 'Shelf Life (days)',
+    'shelf life': 'Shelf Life (days)',
+    'credit eligible': 'Credit Eligible',
+    'fssai': 'FSSAI Reference',
+    'fssai ref': 'FSSAI Reference',
+    'fssai reference': 'FSSAI Reference',
+    'taxable rate (amt)': 'Taxable Rate (Amt)',
   };
   for (const [alias, canonical] of Object.entries(aliases)) {
     map[alias] = canonical;
@@ -403,6 +415,7 @@ export interface ParsedProductRow {
   shelfLifeDays?: number;
   countryOfOrigin?: string;
   tags?: string[];
+  fssaiRef?: string;
   bulkSlabs: {
     minQty: number;
     grossRate: number;
@@ -583,7 +596,7 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
       vegNonVeg: normalizeVegNonVeg(r['Veg / Non-Veg']),
       storageType: r['Storage type'],
       moq: r['MOQ'],
-      packSize: r['Pack Size'] || r['Usage unit'] || undefined,
+      packSize: r['Pack Size']?.trim() || undefined,
       description: r['Description'] || r['Item Description'] || undefined,
       originalPrice: (() => {
         const mrp = r['MRP'] ?? r['Gross Rate'] ?? r['Gross rate'];
@@ -591,7 +604,15 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
         const n = Number(mrp);
         return Number.isFinite(n) && n > 0 ? n : undefined;
       })(),
-      creditEligible: true,
+      creditEligible: (() => {
+        const v = r['Credit Eligible'];
+        if (v === undefined || v === null || v === '') return undefined;
+        if (typeof v === 'boolean') return v;
+        const s = String(v).toLowerCase().trim();
+        if (['yes', 'true', '1', 'y'].includes(s)) return true;
+        if (['no', 'false', '0', 'n'].includes(s)) return false;
+        return undefined;
+      })(),
       isActive: (() => {
         const v = String(r['Item Status'] ?? r['Active on Online Store'] ?? '').toLowerCase();
         if (!v) return undefined;
@@ -600,6 +621,7 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
       shelfLifeDays: r['Shelf Life (days)'] ?? r['Shelf Life'] ?? undefined,
       countryOfOrigin: r['Country of Origin'] || undefined,
       tags: r['Tags'] ? String(r['Tags']).split(/[,;]/).map((t) => t.trim()).filter(Boolean) : undefined,
+      fssaiRef: (r['FSSAI Reference'] || r['FSSAI Ref'] || r['FSSAI'] || '').trim() || undefined,
       bulkSlabs,
       metadata: {
         itemId: r['Item ID'],
@@ -682,7 +704,15 @@ export interface ProductExportRow {
   storageType?: string | null;
   vendorId?: string | null;
   itemId?: string | null;
-  // Price slabs (up to 2)
+  packSize?: string | null;
+  originalPrice?: number | null;
+  shelfLifeDays?: number | null;
+  countryOfOrigin?: string | null;
+  tags?: string[] | null;
+  fssaiRef?: string | null;
+  creditEligible?: boolean | null;
+  isActive?: boolean | null;
+  // Price slabs (up to 3)
   priceSlabs?: {
     minQty: number;
     price: number; // taxable rate
@@ -700,7 +730,7 @@ export function getImportTemplateHeaders(): string[] {
   ];
 }
 
-/** Clean catalog export headers — no duplicate Net/Taxable/Bulk Rates/Stock/Unit columns. */
+/** Clean catalog export headers — covers every product form field for round-trip import. */
 export function getProductExportHeaders(): string[] {
   return [
     'Vendor ID',
@@ -717,21 +747,29 @@ export function getProductExportHeaders(): string[] {
     'Taxable Rate',
     'Tax %',
     'Gross Rate 1Pc (visible to the Customer)',
+    'MRP',
     'Bulk Qty 1 - Quantity',
     'Bulk Qty 1 - Taxable Rate / Pc',
     'Bulk Qty 2 - Quantity',
     'Bulk Qty 2 - Taxable Rate / Pc',
     'Bulk Qty 3 - Quantity',
     'Bulk Qty 3 - Taxable Rate / Pc',
+    '6pm to 9am Promo Rate - Single Unit',
     'MOQ',
     'Stock On Hand',
     'Image URL',
     'Usage unit',
+    'Pack Size',
     'Alias Name',
     'UPC',
     'EAN',
     'Veg / Non-Veg',
     'Storage type',
+    'Shelf Life (days)',
+    'Country of Origin',
+    'FSSAI Reference',
+    'Tags',
+    'Credit Eligible',
     'Account',
     'Account Code',
     'Taxable',
@@ -783,6 +821,15 @@ const TEMPLATE_INSTRUCTIONS: Record<string, string> = {
   'Bulk Qty 1 - Taxable Rate / Pc': 'Refer Hyperpure',
   'Veg / Non-Veg': 'veg, nonveg, or egg',
   'Storage type': 'Ambient / Chilled / Frozen',
+  'Pack Size': 'e.g. 1 Kg, 500 ml',
+  'MRP': 'MRP / strikethrough price (optional)',
+  'Shelf Life (days)': 'Integer days',
+  'Country of Origin': 'e.g. India',
+  'FSSAI Reference': 'FSSAI license / product ref',
+  'Tags': 'Comma-separated',
+  'Credit Eligible': 'Yes / No',
+  '6pm to 9am Promo Rate - Single Unit': 'Promo gross rate (optional)',
+  'Description': 'Product description',
 };
 
 function exportCell(v: unknown): string | number {
@@ -819,6 +866,7 @@ function mapProductToImportColumns(p: ProductExportRow): Record<string, string |
     'Taxable Rate': Number(p.basePrice),
     'Tax %': tax,
     'Gross Rate 1Pc (visible to the Customer)': toGross(Number(p.basePrice), tax),
+    'MRP': p.originalPrice != null ? Number(p.originalPrice) : '',
     'Bulk Qty 1 - Quantity': slab1?.minQty ?? '',
     'Bulk Qty 1 - Net Rate / Pc': slab1 ? Number(slab1.price) : '',
     'Bulk Qty 1 - Taxable Rate / Pc': slab1 ? Number(slab1.price) : '',
@@ -837,6 +885,12 @@ function mapProductToImportColumns(p: ProductExportRow): Record<string, string |
     'UPC': p.barcode || '',
     'Veg / Non-Veg': p.vegNonVeg || '',
     'Storage type': p.storageType || '',
+    'Pack Size': p.packSize || '',
+    'Shelf Life (days)': p.shelfLifeDays ?? '',
+    'Country of Origin': p.countryOfOrigin || '',
+    'FSSAI Reference': p.fssaiRef || '',
+    'Tags': p.tags?.length ? p.tags.join(', ') : '',
+    'Credit Eligible': p.creditEligible == null ? '' : p.creditEligible ? 'Yes' : 'No',
     'Account': String(acc.account || ''),
     'Account Code': String(acc.accountCode || ''),
     'Taxable': exportCell(acc.taxable),
@@ -864,8 +918,12 @@ function mapProductToImportColumns(p: ProductExportRow): Record<string, string |
     'EAN': String(ids.ean || ''),
     'ISBN': String(ids.isbn || ''),
     'Platform Commission': exportCell(acc.platformCommission),
-    'Item Status': String(att.itemStatus || ''),
-    'Active on Online Store': exportCell(att.activeOnlineStore),
+    'Item Status':
+      String(att.itemStatus || '') ||
+      (p.isActive == null ? '' : p.isActive ? 'active' : 'inactive'),
+    'Active on Online Store':
+      exportCell(att.activeOnlineStore) ||
+      (p.isActive == null ? '' : p.isActive ? 'Yes' : 'No'),
     'Usage unit': p.unit || '',
     Description: p.description || '',
   };
@@ -959,12 +1017,18 @@ export function generateImportTemplate(): Buffer {
     'Net Rate': 100,
     'Tax %': 5,
     'Usage unit': 'Pc',
+    'Pack Size': '1 Kg',
+    'MRP': 120,
     'Stock On Hand': 500,
     'MOQ': 1,
     'Bulk Qty 1 - Quantity': 10,
     'Bulk Qty 1 - Net Rate / Pc': 95,
     'Veg / Non-Veg': 'veg',
     'Storage type': 'Ambient',
+    'Shelf Life (days)': 30,
+    'Country of Origin': 'India',
+    'Credit Eligible': 'Yes',
+    'Tags': 'dairy, milk',
   };
 
   const instructionRow: Record<string, string> = {};
