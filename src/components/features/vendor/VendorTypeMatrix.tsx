@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { FormField, FormInput } from '@/components/ui/form';
 import {
@@ -43,6 +43,10 @@ function chipClass(selected: boolean) {
   );
 }
 
+function isOtherLabel(label: string): boolean {
+  return label.toLowerCase() === OTHER_OPTION.toLowerCase();
+}
+
 export function VendorTypeMatrix({
   value,
   onChange,
@@ -55,6 +59,9 @@ export function VendorTypeMatrix({
   const [openOtherByType, setOpenOtherByType] = useState<Record<string, boolean>>({});
   const [customTypeDraft, setCustomTypeDraft] = useState('');
   const [customSubDraft, setCustomSubDraft] = useState('');
+  /** Last live-synced Other draft per type — replaced as the user types so Continue sees it without Enter. */
+  const provisionalByTypeRef = useRef<Record<string, string>>({});
+  const provisionalCustomSubRef = useRef<string>('');
 
   const customSelection = selections.find((s) => !isPresetVendorType(s.type));
   const customTypeName = customSelection?.type ?? customTypeDraft;
@@ -63,16 +70,16 @@ export function VendorTypeMatrix({
     onChange(buildPatchFromSelections(next));
   };
 
-  const upsertType = (type: string, subTypes: string[]) => {
+  const upsertType = (type: string, subTypes: string[], base: VendorTypeSelection[] = selections) => {
     const slug = slugForVendorType(type) ?? type;
-    const existing = selections.find((s) => s.type === type);
+    const existing = base.find((s) => s.type === type);
     let next: VendorTypeSelection[];
     if (subTypes.length === 0) {
-      next = selections.filter((s) => s.type !== type);
+      next = base.filter((s) => s.type !== type);
     } else if (existing) {
-      next = selections.map((s) => (s.type === type ? { ...s, slug, subTypes } : s));
+      next = base.map((s) => (s.type === type ? { ...s, slug, subTypes } : s));
     } else {
-      next = [...selections, { type, slug, subTypes }];
+      next = [...base, { type, slug, subTypes }];
     }
     commit(next);
   };
@@ -85,13 +92,69 @@ export function VendorTypeMatrix({
     upsertType(type, newSubs);
   };
 
-  const addCustomSub = (type: string, raw: string) => {
+  /**
+   * Keep typed "Other" text in vendorTypeSelections immediately (not only on Enter),
+   * replacing the previous provisional label so validation passes on Continue.
+   */
+  const syncProvisionalSub = (type: string, raw: string) => {
     const label = raw.trim().slice(0, PROFILE_LABEL_MAX);
-    if (!label || label.toLowerCase() === OTHER_OPTION.toLowerCase()) return;
+    const prev = provisionalByTypeRef.current[type];
     const existing = selections.find((s) => s.type === type);
-    const current = existing?.subTypes ?? [];
-    if (current.some((s) => s.toLowerCase() === label.toLowerCase())) return;
-    upsertType(type, [...current, label]);
+    let current = existing?.subTypes ?? [];
+    if (prev) current = current.filter((s) => s !== prev);
+
+    if (!label || isOtherLabel(label)) {
+      delete provisionalByTypeRef.current[type];
+      upsertType(type, current);
+      return;
+    }
+
+    if (!current.some((s) => s.toLowerCase() === label.toLowerCase())) {
+      current = [...current, label];
+    }
+    provisionalByTypeRef.current[type] = label;
+    upsertType(type, current);
+  };
+
+  const finalizeDraftSub = (type: string) => {
+    const draft = (draftByType[type] ?? '').trim();
+    if (draft && !isOtherLabel(draft)) {
+      syncProvisionalSub(type, draft);
+      delete provisionalByTypeRef.current[type];
+    }
+    setDraftByType((prev) => ({ ...prev, [type]: '' }));
+  };
+
+  const syncCustomProvisionalSub = (raw: string) => {
+    const typeName = (customSelection?.type || customTypeDraft).trim();
+    if (!typeName) return;
+    const label = raw.trim().slice(0, PROFILE_LABEL_MAX);
+    const prev = provisionalCustomSubRef.current;
+    const existing = selections.find((s) => s.type === typeName);
+    let current = existing?.subTypes ?? [];
+    if (prev) current = current.filter((s) => s !== prev);
+
+    if (!label || isOtherLabel(label)) {
+      provisionalCustomSubRef.current = '';
+      upsertType(typeName, current);
+      return;
+    }
+
+    if (!current.some((s) => s.toLowerCase() === label.toLowerCase())) {
+      current = [...current, label];
+    }
+    provisionalCustomSubRef.current = label;
+    upsertType(typeName, current);
+  };
+
+  const finalizeCustomDraftSub = () => {
+    const draft = customSubDraft.trim();
+    const typeName = (customSelection?.type || customTypeDraft).trim();
+    if (draft && typeName && !isOtherLabel(draft)) {
+      syncCustomProvisionalSub(draft);
+      provisionalCustomSubRef.current = '';
+    }
+    setCustomSubDraft('');
   };
 
   const renameCustomType = (nextName: string) => {
@@ -100,6 +163,7 @@ export function VendorTypeMatrix({
     if (!customSelection) return;
     const slug = slugForVendorType(trimmed.trim()) ?? customSelection.slug;
     if (!trimmed.trim()) {
+      provisionalCustomSubRef.current = '';
       commit(selections.filter((s) => s.type !== customSelection.type));
       return;
     }
@@ -117,9 +181,11 @@ export function VendorTypeMatrix({
 
   const renderSubTypeChips = (type: string) => {
     const presetSubs = subTypesForVendorType(type);
+    const draftLabel = (draftByType[type] ?? '').trim();
+    const provisional = provisionalByTypeRef.current[type];
     const extraSubs = (selections.find((s) => s.type === type)?.subTypes ?? [])
-      .filter((st) => !presetSubs.includes(st));
-    const otherOpen = openOtherByType[type] || extraSubs.length > 0;
+      .filter((st) => !presetSubs.includes(st) && st !== draftLabel && st !== provisional);
+    const otherOpen = openOtherByType[type] || extraSubs.length > 0 || Boolean(draftLabel) || Boolean(provisional);
     return (
       <div className="flex flex-wrap gap-2 items-center min-w-0">
         {presetSubs.map((st) => {
@@ -147,7 +213,10 @@ export function VendorTypeMatrix({
         ))}
         <button
           type="button"
-          onClick={() => setOpenOtherByType((prev) => ({ ...prev, [type]: !otherOpen }))}
+          onClick={() => {
+            if (otherOpen) finalizeDraftSub(type);
+            setOpenOtherByType((prev) => ({ ...prev, [type]: !otherOpen }));
+          }}
           className={chipClass(otherOpen)}
         >
           {OTHER_OPTION}
@@ -156,14 +225,18 @@ export function VendorTypeMatrix({
           <FormInput
             className="h-10 w-full min-w-0 sm:w-auto sm:min-w-[10rem] sm:max-w-[16rem] text-[13px]"
             value={draftByType[type] ?? ''}
-            onChange={(v) => setDraftByType((prev) => ({ ...prev, [type]: v.slice(0, PROFILE_LABEL_MAX) }))}
-            placeholder="Type sub-type, then Enter"
+            onChange={(v) => {
+              const next = v.slice(0, PROFILE_LABEL_MAX);
+              setDraftByType((prev) => ({ ...prev, [type]: next }));
+              syncProvisionalSub(type, next);
+            }}
+            placeholder="Type your sub-type"
             maxLength={PROFILE_LABEL_MAX}
+            onBlur={() => finalizeDraftSub(type)}
             onKeyDown={(e) => {
               if (e.key !== 'Enter') return;
               e.preventDefault();
-              addCustomSub(type, draftByType[type] ?? '');
-              setDraftByType((prev) => ({ ...prev, [type]: '' }));
+              finalizeDraftSub(type);
             }}
           />
         )}
@@ -173,8 +246,12 @@ export function VendorTypeMatrix({
 
   const hint = (
     <p className="text-[12px] text-text-muted mt-2 leading-relaxed">
-      Select every type that applies. You can pick more than one sub-type per type.
+      Select every type that applies. For Other, type your label — no need to press Enter.
     </p>
+  );
+
+  const customSubChips = (customSelection?.subTypes ?? []).filter(
+    (st) => st !== customSubDraft.trim() && st !== provisionalCustomSubRef.current,
   );
 
   if (variant === 'stacked') {
@@ -220,7 +297,7 @@ export function VendorTypeMatrix({
               maxLength={PROFILE_LABEL_MAX}
             />
             <div className="flex flex-wrap gap-2 items-center min-w-0">
-              {(customSelection?.subTypes ?? []).map((st) => (
+              {customSubChips.map((st) => (
                 <button
                   key={st}
                   type="button"
@@ -236,16 +313,18 @@ export function VendorTypeMatrix({
               <FormInput
                 className="h-10 w-full min-w-0 text-[13px]"
                 value={customSubDraft}
-                onChange={(v) => setCustomSubDraft(v.slice(0, PROFILE_LABEL_MAX))}
-                placeholder="Type a sub-type, then Enter"
+                onChange={(v) => {
+                  const next = v.slice(0, PROFILE_LABEL_MAX);
+                  setCustomSubDraft(next);
+                  syncCustomProvisionalSub(next);
+                }}
+                placeholder="Type a sub-type"
                 maxLength={PROFILE_LABEL_MAX}
+                onBlur={finalizeCustomDraftSub}
                 onKeyDown={(e) => {
                   if (e.key !== 'Enter') return;
                   e.preventDefault();
-                  const typeName = (customSelection?.type || customTypeDraft).trim();
-                  if (!typeName) return;
-                  addCustomSub(typeName, customSubDraft);
-                  setCustomSubDraft('');
+                  finalizeCustomDraftSub();
                 }}
               />
             </div>
@@ -305,7 +384,7 @@ export function VendorTypeMatrix({
               />
             </div>
             <div className="flex flex-wrap gap-2 items-center min-w-0">
-              {(customSelection?.subTypes ?? []).map((st) => (
+              {customSubChips.map((st) => (
                 <button
                   key={st}
                   type="button"
@@ -321,16 +400,18 @@ export function VendorTypeMatrix({
               <FormInput
                 className="h-10 w-full min-w-0 sm:w-auto sm:min-w-[10rem] sm:max-w-[16rem] text-[13px]"
                 value={customSubDraft}
-                onChange={(v) => setCustomSubDraft(v.slice(0, PROFILE_LABEL_MAX))}
-                placeholder="Type a sub-type, then Enter"
+                onChange={(v) => {
+                  const next = v.slice(0, PROFILE_LABEL_MAX);
+                  setCustomSubDraft(next);
+                  syncCustomProvisionalSub(next);
+                }}
+                placeholder="Type a sub-type"
                 maxLength={PROFILE_LABEL_MAX}
+                onBlur={finalizeCustomDraftSub}
                 onKeyDown={(e) => {
                   if (e.key !== 'Enter') return;
                   e.preventDefault();
-                  const typeName = (customSelection?.type || customTypeDraft).trim();
-                  if (!typeName) return;
-                  addCustomSub(typeName, customSubDraft);
-                  setCustomSubDraft('');
+                  finalizeCustomDraftSub();
                 }}
               />
             </div>
