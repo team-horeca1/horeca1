@@ -14,9 +14,14 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import {
   X, Upload, Download, Loader2, ChevronLeft, ChevronRight,
   CheckCircle, AlertTriangle, ArrowRight, RotateCcw, Eye, Check, Store, Info,
+  Lightbulb, Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import {
+  groupProductImportIssues,
+  type GroupedImportIssue,
+} from '@/modules/import-export/productImportIssueExplain';
 
 interface ColumnDef {
   key: string;
@@ -703,21 +708,28 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                   </button>
                 </div>
 
-                {/* Errors strip */}
+                {/* Errors strip — reason + how to fix */}
                 {preview.errors.length > 0 && (
-                  <div className="py-2 px-4 bg-[#FFF0F0] border border-[#E74C3C]/20 rounded-[10px] text-[13px] font-semibold text-[#E74C3C] space-y-1">
-                    <p className="flex items-center gap-2"><AlertTriangle size={15} /> Rows with errors are skipped automatically:</p>
-                    <ul className="list-disc pl-5 font-normal text-[#181725] text-[12.5px] max-h-[100px] overflow-y-auto space-y-0.5">
-                      {preview.errors.map((err, i) => (<li key={i}>Row {err.row}{err.field ? ` · ${err.field}` : ''}: {err.message}</li>))}
-                    </ul>
-                  </div>
+                  <ImportIssuesPanel
+                    title="Rows with problems (skipped until fixed)"
+                    subtitle="Fix them in the grid below, or skip the row. Download the template if column names look wrong."
+                    errors={preview.errors}
+                    compact
+                  />
                 )}
                 {missingSubCategoryRows.length > 0 && (
-                  <div className="py-2 px-4 bg-amber-50 border border-amber-200 rounded-[10px] text-[12.5px] text-amber-800">
-                    <p className="font-semibold">
-                      Parent category was provided without a sub-category in row{missingSubCategoryRows.length > 1 ? 's' : ''} {missingSubCategoryRows.join(', ')}.
+                  <div className="py-3 px-4 bg-[#FFFBEB] border border-[#F59E0B]/25 rounded-[12px] text-[12.5px] text-[#92400E]">
+                    <p className="font-bold flex items-center gap-2">
+                      <AlertTriangle size={14} className="text-[#D97706]" />
+                      Parent without sub-category
                     </p>
-                    <p className="mt-1">Pick a valid sub-category before commit; parent-only mappings are blocked.</p>
+                    <p className="mt-1.5 leading-relaxed">
+                      Row{missingSubCategoryRows.length > 1 ? 's' : ''} {missingSubCategoryRows.join(', ')} have a parent but no leaf sub-category.
+                    </p>
+                    <p className="mt-1.5 flex items-start gap-1.5 text-[#78350F]">
+                      <Lightbulb size={13} className="mt-0.5 shrink-0 text-[#D97706]" />
+                      <span>Pick a valid <strong>Sub-Category</strong> in the grid (or fill the column in your sheet) before you import.</span>
+                    </p>
                   </div>
                 )}
 
@@ -1073,68 +1085,97 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
 
             {/* Step 3: Result */}
             {step === 'result' && result && (
-              <div className="max-w-[560px] mx-auto py-8 text-center space-y-8 animate-in fade-in duration-300">
-                <div className="flex flex-col items-center gap-3">
+              <div className="max-w-[640px] mx-auto py-6 space-y-6 animate-in fade-in duration-300">
+                <div className="flex flex-col items-center gap-3 text-center">
                   {result.blocked ? (
                     <>
-                      <div className="w-[64px] h-[64px] rounded-full bg-[#FFF0F0] flex items-center justify-center text-[#E74C3C] border border-[#E74C3C]/10 shadow-sm">
+                      <div className="w-[64px] h-[64px] rounded-full bg-[#FEF2F2] flex items-center justify-center text-[#DC2626] border border-[#DC2626]/15 shadow-sm">
                         <AlertTriangle size={30} strokeWidth={2.5} />
                       </div>
-                      <h3 className="text-[22px] font-black text-[#181725]">Import blocked</h3>
-                      <p className="text-[13px] text-[#7C7C7C] font-semibold">Nothing was saved. Fix the rows below, or commit the valid rows anyway.</p>
+                      <h3 className="text-[22px] font-black text-[#1C1C1C]">Import blocked</h3>
+                      <p className="text-[13px] text-[#667085] font-medium max-w-md leading-relaxed">
+                        Nothing was saved. Fix the issues below (reason + how to fix), or commit only the valid rows.
+                      </p>
+                    </>
+                  ) : result.errors.length > 0 ? (
+                    <>
+                      <div className="w-[64px] h-[64px] rounded-full bg-[#FFFBEB] flex items-center justify-center text-[#D97706] border border-[#F59E0B]/25 shadow-sm">
+                        <AlertTriangle size={30} strokeWidth={2.5} />
+                      </div>
+                      <h3 className="text-[22px] font-black text-[#1C1C1C]">Import finished with issues</h3>
+                      <p className="text-[13px] text-[#667085] font-medium max-w-md leading-relaxed">
+                        {result.imported} product{result.imported === 1 ? '' : 's'} saved. Some rows still need attention — see why and how to fix them below.
+                      </p>
                     </>
                   ) : (
                     <>
-                      <div className="w-[64px] h-[64px] rounded-full bg-[#EBFDF2] flex items-center justify-center text-primary border border-primary/10 shadow-sm">
+                      <div className="w-[64px] h-[64px] rounded-full bg-[#F0FDF4] flex items-center justify-center text-[#16A34A] border border-[#16A34A]/20 shadow-sm">
                         <Check size={32} strokeWidth={3} />
                       </div>
-                      <h3 className="text-[22px] font-black text-[#181725]">Import complete</h3>
-                      <p className="text-[13px] text-[#7C7C7C] font-semibold">{result.imported} product{result.imported === 1 ? '' : 's'} synchronized.</p>
+                      <h3 className="text-[22px] font-black text-[#1C1C1C]">Import complete</h3>
+                      <p className="text-[13px] text-[#667085] font-medium">
+                        {result.imported} product{result.imported === 1 ? '' : 's'} synchronized.
+                      </p>
                     </>
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 bg-white border border-[#EEEEEE] rounded-[16px] p-6 shadow-sm">
-                  <div className="text-center border-r border-[#EEEEEE]">
-                    <p className="text-[32px] font-black text-primary">{result.created}</p>
-                    <p className="text-[12px] font-bold text-[#AEAEAE] uppercase tracking-wider mt-1">Created new</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-[12px] border border-[#E9E3DD] bg-[#FAF7F2] px-3 py-3 text-center">
+                    <p className="text-[26px] font-black tabular-nums text-[#16A34A]">{result.created}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[#667085] mt-0.5">Created</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-[32px] font-black text-[#3B82F6]">{result.updated}</p>
-                    <p className="text-[12px] font-bold text-[#AEAEAE] uppercase tracking-wider mt-1">Updated existing</p>
+                  <div className="rounded-[12px] border border-[#E9E3DD] bg-[#FAF7F2] px-3 py-3 text-center">
+                    <p className="text-[26px] font-black tabular-nums text-[#2563EB]">{result.updated}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[#667085] mt-0.5">Updated</p>
+                  </div>
+                  <div className="rounded-[12px] border border-[#E9E3DD] bg-[#FAF7F2] px-3 py-3 text-center">
+                    <p className={cn(
+                      'text-[26px] font-black tabular-nums',
+                      result.errors.length > 0 ? 'text-[#DC2626]' : 'text-[#667085]',
+                    )}>
+                      {result.errors.length}
+                    </p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[#667085] mt-0.5">Issues</p>
                   </div>
                 </div>
 
                 {result.errors.length > 0 && (
-                  <div className="bg-[#FFF0F0] border border-[#E74C3C]/20 rounded-[16px] p-5 text-left text-[13px] font-semibold text-[#E74C3C] space-y-3">
-                    <p className="flex items-center gap-2"><AlertTriangle size={16} /> {result.blocked ? 'Strict mode blocked the import — the following rows have errors:' : 'Some rows failed:'}</p>
-                    <ul className="list-disc pl-5 font-normal text-[#181725] text-[12.5px] max-h-[140px] overflow-y-auto space-y-1">
-                      {result.errors.map((err, i) => (<li key={i}>Row {err.row}{err.field ? ` · ${err.field}` : ''}: {err.message}</li>))}
-                    </ul>
-                  </div>
+                  <ImportIssuesPanel
+                    title={result.blocked ? 'Why import was blocked' : 'What failed and how to fix it'}
+                    subtitle="Same problems are grouped. Fix your sheet or the review grid, then try again."
+                    errors={result.errors}
+                  />
                 )}
 
                 {result.errorReport && (
-                  <button onClick={downloadErrorReport} className="h-[40px] mx-auto px-5 bg-white border border-[#E74C3C]/30 hover:bg-[#FFF0F0] text-[#E74C3C] rounded-[10px] text-[12px] font-bold flex items-center gap-1.5 transition-all">
-                    <Download size={14} /> Download error report
+                  <button
+                    onClick={downloadErrorReport}
+                    className="h-[44px] w-full px-5 bg-white border border-[#E9E3DD] hover:bg-[#FAF7F2] text-[#1C1C1C] rounded-[12px] text-[13px] font-bold flex items-center justify-center gap-2 transition-all"
+                  >
+                    <Download size={15} /> Download error report (CSV)
                   </button>
                 )}
 
                 {result.blocked && (
-                  <button onClick={() => handleCommit(true)} disabled={committing} className="h-[44px] w-full px-8 bg-primary hover:bg-primary-dark disabled:bg-[#DCDCDC] text-white rounded-[12px] text-[13px] font-bold flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed">
+                  <button
+                    onClick={() => handleCommit(true)}
+                    disabled={committing}
+                    className="h-[48px] w-full px-8 bg-[#6B1D2E] hover:bg-[#5A1926] disabled:bg-[#DCDCDC] text-white rounded-[12px] text-[14px] font-bold flex items-center justify-center gap-2 shadow-sm disabled:cursor-not-allowed"
+                  >
                     {committing ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} strokeWidth={3} />}
                     {committing ? 'Committing…' : 'Commit valid rows anyway'}
                   </button>
                 )}
 
                 {backupData && !undone && (
-                  <div className="bg-white border border-[#EEEEEE] rounded-[16px] p-5 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
+                  <div className="bg-white border border-[#E9E3DD] rounded-[16px] p-5 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between gap-3">
                       <div className="text-left">
-                        <p className="text-[13px] font-bold text-[#181725]">Undo this import?</p>
-                        <p className="text-[11.5px] text-[#AEAEAE] font-medium mt-0.5">Restore the pre-import state for all updated items.</p>
+                        <p className="text-[13px] font-bold text-[#1C1C1C]">Undo this import?</p>
+                        <p className="text-[11.5px] text-[#667085] font-medium mt-0.5">Restore the pre-import state for all updated items.</p>
                       </div>
-                      <button onClick={handleUndo} disabled={undoing} className="h-[36px] px-4 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 text-amber-800 rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-all">
+                      <button onClick={handleUndo} disabled={undoing} className="h-[36px] shrink-0 px-4 bg-[#FFFBEB] hover:bg-[#FEF3C7] disabled:opacity-50 text-[#92400E] rounded-[8px] text-[12px] font-bold flex items-center gap-1.5 transition-all">
                         {undoing ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Undo import
                       </button>
                     </div>
@@ -1142,24 +1183,105 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                 )}
 
                 {undone && (
-                  <div className="p-4 bg-amber-50 border border-amber-200/40 text-amber-800 text-[13px] font-semibold rounded-[12px] shadow-sm flex items-center gap-2 justify-center">
+                  <div className="p-4 bg-[#FFFBEB] border border-[#F59E0B]/25 text-[#92400E] text-[13px] font-semibold rounded-[12px] shadow-sm flex items-center gap-2 justify-center">
                     <RotateCcw size={15} /> Pre-import product data restored.
                   </div>
                 )}
 
-                <div className="flex items-center justify-center gap-3 border-t border-[#EEEEEE] pt-6">
+                <div className="flex items-center justify-center gap-3 border-t border-[#E9E3DD] pt-6">
                   {backupData && (
-                    <button onClick={downloadBackup} className="h-[44px] px-6 border border-[#EEEEEE] hover:bg-[#F8F9FB] rounded-[12px] text-[13px] font-bold text-[#181725] flex items-center gap-2 transition-all">
+                    <button onClick={downloadBackup} className="h-[48px] px-6 border border-[#E9E3DD] hover:bg-[#FAF7F2] rounded-[12px] text-[13px] font-bold text-[#1C1C1C] flex items-center gap-2 transition-all">
                       <Download size={14} /> Download backup.json
                     </button>
                   )}
-                  <button onClick={handleClose} className="h-[44px] px-8 bg-[#181725] hover:bg-black text-white rounded-[12px] text-[13px] font-bold transition-all shadow-sm">Done</button>
+                  <button onClick={handleClose} className="h-[48px] px-8 bg-[#6B1D2E] hover:bg-[#5A1926] text-white rounded-[12px] text-[14px] font-bold transition-all shadow-sm">
+                    Done
+                  </button>
                 </div>
               </div>
             )}
           </div>
       </div>
     </>
+  );
+}
+
+function formatRowList(rows: number[]): string {
+  if (rows.length <= 8) return rows.join(', ');
+  return `${rows.slice(0, 8).join(', ')} +${rows.length - 8} more`;
+}
+
+function ImportIssuesPanel({
+  title,
+  subtitle,
+  errors,
+  compact = false,
+}: {
+  title: string;
+  subtitle?: string;
+  errors: Array<{ row: number; field?: string; message: string }>;
+  compact?: boolean;
+}) {
+  const groups = useMemo(() => groupProductImportIssues(errors), [errors]);
+
+  return (
+    <div
+      className={cn(
+        'rounded-[16px] border border-[#DC2626]/15 bg-[#FEF2F2] overflow-hidden text-left',
+        compact && 'rounded-[12px]',
+      )}
+    >
+      <div className={cn('px-4 py-3 border-b border-[#DC2626]/10 bg-white/40', compact && 'py-2.5')}>
+        <p className="text-[13px] font-bold text-[#991B1B] flex items-center gap-2 flex-wrap">
+          <AlertTriangle size={15} className="shrink-0" />
+          <span>{title}</span>
+          <span className="font-semibold text-[#B91C1C]">
+            {groups.length} type{groups.length === 1 ? '' : 's'} · {errors.length} row{errors.length === 1 ? '' : 's'}
+          </span>
+        </p>
+        {subtitle && <p className="text-[12px] text-[#7F1D1D]/80 mt-1 leading-relaxed">{subtitle}</p>}
+      </div>
+      <ul className={cn('divide-y divide-[#DC2626]/10 max-h-[280px] overflow-y-auto', compact && 'max-h-[180px]')}>
+        {groups.map((g) => (
+          <ImportIssueCard key={g.key} group={g} compact={compact} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ImportIssueCard({ group, compact }: { group: GroupedImportIssue; compact?: boolean }) {
+  const { explained, rows, field, sampleMessage } = group;
+  return (
+    <li className={cn('px-4 py-3 bg-white/50', compact && 'py-2.5')}>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[13px] font-bold text-[#1C1C1C]">{explained.title}</p>
+        <span className="shrink-0 text-[11px] font-semibold tabular-nums text-[#991B1B] bg-[#FEE2E2] px-2 py-0.5 rounded-full">
+          Row{rows.length > 1 ? 's' : ''} {formatRowList(rows)}
+        </span>
+      </div>
+      {field && (
+        <p className="text-[11px] font-medium text-[#667085] mt-1">
+          Field: <code className="bg-[#F8E8EC] text-[#6B1D2E] px-1 rounded">{field}</code>
+        </p>
+      )}
+      <p className="text-[12.5px] text-[#4B5563] mt-1.5 leading-relaxed">
+        <span className="font-semibold text-[#1C1C1C]">Why: </span>
+        {explained.reason}
+      </p>
+      <p className="text-[12.5px] text-[#166534] mt-1.5 leading-relaxed flex items-start gap-1.5">
+        <Wrench size={13} className="mt-0.5 shrink-0 text-[#16A34A]" />
+        <span>
+          <span className="font-semibold">Fix: </span>
+          {explained.solution}
+        </span>
+      </p>
+      {!compact && sampleMessage !== explained.reason && (
+        <p className="text-[11px] text-[#9CA3AF] mt-1.5 font-mono truncate" title={sampleMessage}>
+          Detail: {sampleMessage}
+        </p>
+      )}
+    </li>
   );
 }
 
