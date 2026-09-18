@@ -1189,18 +1189,58 @@ export default function CategoriesPage() {
                         <div className="p-6 space-y-5 overflow-y-auto">
                             {!importSummary && (
                                 <>
+                                    <div className="rounded-[12px] border border-[#E9E3DD] bg-[#FAF7F2] p-4 space-y-3">
+                                        <div>
+                                            <p className="text-[14px] font-bold text-[#1C1C1C]">
+                                                1. Download template
+                                            </p>
+                                            <p className="text-[12px] text-[#667085] mt-1 leading-relaxed">
+                                                Use the sample sheet so column headers match import.
+                                                Parent may be a root category name or slug. Leave Parent blank for top-level categories.
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    window.open(
+                                                        '/api/v1/admin/categories/import?template=true&format=xlsx',
+                                                        '_blank',
+                                                    )
+                                                }
+                                                className="inline-flex items-center gap-2 h-10 px-3.5 rounded-[10px] bg-[#6B1D2E] text-white text-[13px] font-bold hover:bg-[#5A1926] transition-colors"
+                                            >
+                                                <FileSpreadsheet size={15} />
+                                                Excel (.xlsx)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    window.open(
+                                                        '/api/v1/admin/categories/import?template=true&format=csv',
+                                                        '_blank',
+                                                    )
+                                                }
+                                                className="inline-flex items-center gap-2 h-10 px-3.5 rounded-[10px] bg-white border border-[#E9E3DD] text-[#1C1C1C] text-[13px] font-bold hover:bg-[#FFF7F0] transition-colors"
+                                            >
+                                                <FileText size={15} />
+                                                CSV
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <div className="bg-[#EFF6FF] border border-[#2563EB]/15 rounded-[12px] p-4">
                                         <p className="text-[13px] font-medium text-[#2563EB] leading-relaxed">
-                                            Upload a <strong>.csv</strong> or <strong>.xlsx</strong> file.
+                                            2. Fill and upload a <strong>.csv</strong> or <strong>.xlsx</strong> file.
                                             Columns:{' '}
-                                            <code className="bg-white/60 px-1.5 py-0.5 rounded text-[12px] font-mono">
-                                                name, slug, parentSlug, imageUrl, sortOrder
-                                            </code>
-                                            {' '}— or the export format{' '}
                                             <code className="bg-white/60 px-1.5 py-0.5 rounded text-[12px] font-mono">
                                                 Name, Slug, Parent, Image URL, Sort Order
                                             </code>
-                                            {' '}(Parent may be a name or slug).
+                                            {' '}(also accepts{' '}
+                                            <code className="bg-white/60 px-1.5 py-0.5 rounded text-[12px] font-mono">
+                                                name, slug, parentSlug, imageUrl, sortOrder
+                                            </code>
+                                            ).
                                         </p>
                                     </div>
 

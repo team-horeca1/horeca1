@@ -2,9 +2,47 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
-import { parseCategoryImport } from '@/modules/import-export/excel.service';
+import {
+  generateCategoryImportTemplate,
+  generateCategoryImportTemplateCsv,
+  parseCategoryImport,
+} from '@/modules/import-export/excel.service';
 import { syncCategoryParentLinks } from '@/modules/catalog/catalog.service';
 import { requirePermission } from '@/lib/permissions/engine';
+
+/** GET ?template=true&format=xlsx|csv — blank import sheet with sample rows. */
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
+  try {
+    requirePermission(ctx, 'products.create');
+    if (req.nextUrl.searchParams.get('template') !== 'true') {
+      return NextResponse.json(
+        { success: false, error: { message: 'Use ?template=true&format=xlsx|csv' } },
+        { status: 400 },
+      );
+    }
+
+    const format = (req.nextUrl.searchParams.get('format') || 'xlsx').toLowerCase();
+    if (format === 'csv') {
+      const csv = generateCategoryImportTemplateCsv();
+      return new NextResponse(csv, {
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="category_import_template.csv"',
+        },
+      });
+    }
+
+    const buffer = generateCategoryImportTemplate();
+    return new NextResponse(new Uint8Array(buffer), {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="category_import_template.xlsx"',
+      },
+    });
+  } catch (error) {
+    return errorResponse(error);
+  }
+});
 
 export const POST = adminOnly(async (req: NextRequest, ctx) => {
   try {

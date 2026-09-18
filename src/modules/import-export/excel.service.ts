@@ -1347,6 +1347,54 @@ export function parseCategoryImport(buffer: Buffer): CategoryImportResult {
   return { rows, errors };
 }
 
+/** Headers for blank category import template (matches export + parseCategoryImport). */
+export const CATEGORY_IMPORT_TEMPLATE_HEADERS = [
+  'Name',
+  'Slug',
+  'Parent',
+  'Image URL',
+  'Sort Order',
+] as const;
+
+const CATEGORY_IMPORT_SAMPLE_ROWS: Record<(typeof CATEGORY_IMPORT_TEMPLATE_HEADERS)[number], string | number>[] = [
+  {
+    Name: 'Dairy',
+    Slug: 'dairy',
+    Parent: '',
+    'Image URL': '',
+    'Sort Order': 1,
+  },
+  {
+    Name: 'Milk',
+    Slug: 'milk',
+    Parent: 'Dairy',
+    'Image URL': '',
+    'Sort Order': 1,
+  },
+];
+
+/** Empty sample sheet admins can fill — Parent may be a root category name or slug. */
+export function generateCategoryImportTemplate(): Buffer {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(CATEGORY_IMPORT_SAMPLE_ROWS, {
+    header: [...CATEGORY_IMPORT_TEMPLATE_HEADERS],
+  });
+  ws['!cols'] = CATEGORY_IMPORT_TEMPLATE_HEADERS.map((key) => ({
+    wch: Math.max(key.length + 2, 14),
+  }));
+  XLSX.utils.book_append_sheet(wb, ws, 'Categories');
+  return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+}
+
+export function generateCategoryImportTemplateCsv(): string {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(CATEGORY_IMPORT_SAMPLE_ROWS, {
+    header: [...CATEGORY_IMPORT_TEMPLATE_HEADERS],
+  });
+  XLSX.utils.book_append_sheet(wb, ws, 'Categories');
+  return XLSX.utils.sheet_to_csv(ws);
+}
+
 export interface CategoryExportRow {
   name: string;
   slug: string;
