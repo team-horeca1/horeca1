@@ -22,6 +22,8 @@ import {
     AlertTriangle,
     FolderTree,
     Package,
+    Info,
+    SkipForward,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ImageUpload } from '@/components/ui/ImageUpload';
@@ -33,6 +35,16 @@ import {
 } from '@/components/features/admin/entity';
 
 const cellInput = 'bg-transparent border border-transparent hover:border-[#D1D5DB] focus:border-[#6B1D2E] focus:bg-white focus:ring-1 focus:ring-[#6B1D2E]/20 px-1.5 py-1 rounded-[4px] outline-none w-full text-[12.5px] tabular-nums transition-colors';
+
+function formatImportIssue(err: string | { row: number; message: string }): string {
+    return typeof err === 'string' ? err : `Row ${err.row}: ${err.message}`;
+}
+
+/** Duplicates / already-in-catalog are expected skips, not failures. */
+function isImportSkip(err: string | { row: number; message: string }): boolean {
+    const message = typeof err === 'string' ? err : err.message;
+    return /already exists/i.test(message);
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -141,6 +153,18 @@ export default function CategoriesPage() {
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const importSummary = useMemo(() => {
+        if (!importResult) return null;
+        const skipped = importResult.errors.filter(isImportSkip);
+        const failed = importResult.errors.filter((e) => !isImportSkip(e));
+        return {
+            created: importResult.created,
+            skipped,
+            failed,
+            ok: failed.length === 0,
+        };
+    }, [importResult]);
 
     // -----------------------------------------------------------------------
     // Fetch
@@ -1131,116 +1155,211 @@ export default function CategoriesPage() {
             {/* ============================================================= */}
             {showImportModal && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
                     onClick={closeImportModal}
                 >
                     <div
-                        className="bg-white rounded-[14px] border border-[#EEEEEE] shadow-2xl w-full max-w-[500px] mx-4 max-h-[calc(100vh-2rem)] overflow-y-auto animate-in fade-in zoom-in-95 duration-200"
+                        className={cn(
+                            'bg-white rounded-[16px] border border-[#E9E3DD] shadow-2xl w-full mx-auto max-h-[calc(100vh-2rem)] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200',
+                            importSummary ? 'max-w-[640px]' : 'max-w-[500px]',
+                        )}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Modal header */}
-                        <div className="flex items-center justify-between p-6 border-b border-[#EEEEEE]">
-                            <h2 className="text-[20px] font-[900] text-[#181725]">
-                                Import Categories
-                            </h2>
+                        <div className="flex items-center justify-between px-6 py-5 border-b border-[#E9E3DD] shrink-0">
+                            <div>
+                                <h2 className="text-[20px] font-[900] text-[#1C1C1C]">
+                                    {importSummary ? 'Import complete' : 'Import Categories'}
+                                </h2>
+                                {importSummary && importFile && (
+                                    <p className="text-[12px] text-[#667085] mt-0.5 truncate max-w-[420px]">
+                                        {importFile.name}
+                                    </p>
+                                )}
+                            </div>
                             <button
                                 onClick={closeImportModal}
-                                className="w-[36px] h-[36px] flex items-center justify-center rounded-[10px] bg-[#F1F4F9] text-[#7C7C7C] hover:bg-[#EEEEEE] transition-colors"
+                                className="w-[36px] h-[36px] flex items-center justify-center rounded-[10px] bg-[#F1F4F9] text-[#667085] hover:bg-[#EEEEEE] transition-colors"
                             >
                                 <X size={18} />
                             </button>
                         </div>
 
                         {/* Modal body */}
-                        <div className="p-6 space-y-5">
-                            {/* Info */}
-                            <div className="bg-[#EFF6FF] border border-[#3B82F6]/10 rounded-[10px] p-4">
-                                <p className="text-[13px] font-medium text-[#3B82F6] leading-relaxed">
-                                    Upload a <strong>.csv</strong> or <strong>.xlsx</strong> file.
-                                    Columns:{' '}
-                                    <code className="bg-white/60 px-1.5 py-0.5 rounded text-[12px] font-mono">
-                                        name, slug, parentSlug, imageUrl, sortOrder
-                                    </code>
-                                    {' '}— or the export format{' '}
-                                    <code className="bg-white/60 px-1.5 py-0.5 rounded text-[12px] font-mono">
-                                        Name, Slug, Parent, Image URL, Sort Order
-                                    </code>
-                                    {' '}(Parent may be a name or slug).
-                                </p>
-                            </div>
+                        <div className="p-6 space-y-5 overflow-y-auto">
+                            {!importSummary && (
+                                <>
+                                    <div className="bg-[#EFF6FF] border border-[#2563EB]/15 rounded-[12px] p-4">
+                                        <p className="text-[13px] font-medium text-[#2563EB] leading-relaxed">
+                                            Upload a <strong>.csv</strong> or <strong>.xlsx</strong> file.
+                                            Columns:{' '}
+                                            <code className="bg-white/60 px-1.5 py-0.5 rounded text-[12px] font-mono">
+                                                name, slug, parentSlug, imageUrl, sortOrder
+                                            </code>
+                                            {' '}— or the export format{' '}
+                                            <code className="bg-white/60 px-1.5 py-0.5 rounded text-[12px] font-mono">
+                                                Name, Slug, Parent, Image URL, Sort Order
+                                            </code>
+                                            {' '}(Parent may be a name or slug).
+                                        </p>
+                                    </div>
 
-                            {/* File upload area */}
-                            <div
-                                onClick={() => fileInputRef.current?.click()}
-                                className={cn(
-                                    'border-2 border-dashed rounded-[12px] p-8 text-center cursor-pointer transition-all',
-                                    importFile
-                                        ? 'border-[#6B1D2E] bg-[#F8E8EC]'
-                                        : 'border-[#EEEEEE] hover:border-[#6B1D2E]/40 hover:bg-[#F8F9FB]'
-                                )}
-                            >
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept=".csv,.xlsx,.xls"
-                                    className="hidden"
-                                    onChange={(e) => {
-                                        setImportFile(e.target.files?.[0] || null);
-                                        setImportResult(null);
-                                    }}
-                                />
-                                {importFile ? (
-                                    <div className="flex flex-col items-center gap-2">
-                                        <FileSpreadsheet
-                                            size={32}
-                                            className="text-[#6B1D2E]"
+                                    <div
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className={cn(
+                                            'border-2 border-dashed rounded-[12px] p-8 text-center cursor-pointer transition-all',
+                                            importFile
+                                                ? 'border-[#6B1D2E] bg-[#F8E8EC]'
+                                                : 'border-[#E9E3DD] hover:border-[#6B1D2E]/40 hover:bg-[#FAF7F2]',
+                                        )}
+                                    >
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept=".csv,.xlsx,.xls"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                                setImportFile(e.target.files?.[0] || null);
+                                                setImportResult(null);
+                                            }}
                                         />
-                                        <p className="text-[14px] font-bold text-[#181725]">
-                                            {importFile.name}
-                                        </p>
-                                        <p className="text-[12px] text-[#7C7C7C]">
-                                            {(importFile.size / 1024).toFixed(1)} KB
-                                        </p>
+                                        {importFile ? (
+                                            <div className="flex flex-col items-center gap-2">
+                                                <FileSpreadsheet
+                                                    size={32}
+                                                    className="text-[#6B1D2E]"
+                                                />
+                                                <p className="text-[14px] font-bold text-[#1C1C1C]">
+                                                    {importFile.name}
+                                                </p>
+                                                <p className="text-[12px] text-[#667085]">
+                                                    {(importFile.size / 1024).toFixed(1)} KB
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-2">
+                                                <Upload size={32} className="text-[#AEAEAE]" />
+                                                <p className="text-[14px] font-bold text-[#667085]">
+                                                    Click to select a file
+                                                </p>
+                                                <p className="text-[12px] text-[#AEAEAE]">
+                                                    Accepted: .csv, .xlsx
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
-                                ) : (
-                                    <div className="flex flex-col items-center gap-2">
-                                        <Upload size={32} className="text-[#AEAEAE]" />
-                                        <p className="text-[14px] font-bold text-[#7C7C7C]">
-                                            Click to select a file
-                                        </p>
-                                        <p className="text-[12px] text-[#AEAEAE]">
-                                            Accepted: .csv, .xlsx
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
+                                </>
+                            )}
 
-                            {/* Import results */}
-                            {importResult && (
-                                <div className="space-y-3">
-                                    {importResult.created > 0 && (
-                                        <div className="bg-[#F8E8EC] border border-[#6B1D2E]/10 rounded-[10px] p-4 flex items-center gap-3">
-                                            <CheckCircle
-                                                size={20}
-                                                className="text-[#6B1D2E] shrink-0"
-                                            />
-                                            <p className="text-[14px] font-bold text-[#6B1D2E]">
-                                                Successfully created {importResult.created}{' '}
-                                                categor{importResult.created !== 1 ? 'ies' : 'y'}
+                            {importSummary && (
+                                <div className="space-y-5">
+                                    <div
+                                        className={cn(
+                                            'rounded-[16px] p-6 text-center',
+                                            importSummary.ok
+                                                ? 'bg-[#F0FDF4] border border-[#16A34A]/20'
+                                                : 'bg-[#FEF2F2] border border-[#DC2626]/15',
+                                        )}
+                                    >
+                                        <div
+                                            className={cn(
+                                                'mx-auto mb-3 w-14 h-14 rounded-full flex items-center justify-center',
+                                                importSummary.ok ? 'bg-[#16A34A]/15' : 'bg-[#DC2626]/10',
+                                            )}
+                                        >
+                                            {importSummary.ok ? (
+                                                <CheckCircle size={28} className="text-[#16A34A]" />
+                                            ) : (
+                                                <AlertTriangle size={28} className="text-[#DC2626]" />
+                                            )}
+                                        </div>
+                                        <p
+                                            className={cn(
+                                                'text-[18px] font-bold',
+                                                importSummary.ok ? 'text-[#166534]' : 'text-[#991B1B]',
+                                            )}
+                                        >
+                                            {importSummary.ok
+                                                ? importSummary.created > 0
+                                                    ? `Created ${importSummary.created} categor${importSummary.created !== 1 ? 'ies' : 'y'}`
+                                                    : 'Nothing new to add'
+                                                : 'Import finished with issues'}
+                                        </p>
+                                        <p className="text-[13px] text-[#667085] mt-1.5 max-w-md mx-auto leading-relaxed">
+                                            {importSummary.ok
+                                                ? importSummary.skipped.length > 0
+                                                    ? `${importSummary.skipped.length} row${importSummary.skipped.length !== 1 ? 's' : ''} already in your catalog were skipped — that is expected.`
+                                                    : 'All rows imported successfully.'
+                                                : `${importSummary.failed.length} row${importSummary.failed.length !== 1 ? 's' : ''} need attention. Skipped duplicates are listed separately.`}
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div className="rounded-[12px] border border-[#E9E3DD] bg-[#FAF7F2] px-3 py-3 text-center">
+                                            <p className="text-[22px] font-bold tabular-nums text-[#16A34A]">
+                                                {importSummary.created}
+                                            </p>
+                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#667085] mt-0.5">
+                                                Created
                                             </p>
                                         </div>
-                                    )}
-                                    {importResult.errors.length > 0 && (
-                                        <div className="bg-[#FFF0F0] border border-[#E74C3C]/10 rounded-[10px] p-4 space-y-2">
-                                            <p className="text-[13px] font-bold text-[#E74C3C]">
-                                                {importResult.errors.length} error
-                                                {importResult.errors.length !== 1 ? 's' : ''}:
+                                        <div className="rounded-[12px] border border-[#E9E3DD] bg-[#FAF7F2] px-3 py-3 text-center">
+                                            <p className="text-[22px] font-bold tabular-nums text-[#D97706]">
+                                                {importSummary.skipped.length}
                                             </p>
-                                            <ul className="text-[12px] text-[#E74C3C] space-y-1 max-h-[120px] overflow-y-auto">
-                                                {importResult.errors.map((err, i) => (
-                                                    <li key={i} className="flex items-start gap-1.5">
-                                                        <span className="mt-0.5 shrink-0">-</span>
-                                                        {typeof err === 'string' ? err : `Row ${err.row}: ${err.message}`}
+                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#667085] mt-0.5">
+                                                Skipped
+                                            </p>
+                                        </div>
+                                        <div className="rounded-[12px] border border-[#E9E3DD] bg-[#FAF7F2] px-3 py-3 text-center">
+                                            <p
+                                                className={cn(
+                                                    'text-[22px] font-bold tabular-nums',
+                                                    importSummary.failed.length > 0
+                                                        ? 'text-[#DC2626]'
+                                                        : 'text-[#667085]',
+                                                )}
+                                            >
+                                                {importSummary.failed.length}
+                                            </p>
+                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#667085] mt-0.5">
+                                                Failed
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {importSummary.skipped.length > 0 && (
+                                        <div className="rounded-[12px] border border-[#F59E0B]/25 bg-[#FFFBEB] overflow-hidden">
+                                            <div className="flex items-center gap-2 px-4 py-3 border-b border-[#F59E0B]/20">
+                                                <SkipForward size={16} className="text-[#D97706] shrink-0" />
+                                                <p className="text-[13px] font-bold text-[#92400E]">
+                                                    Already in catalog ({importSummary.skipped.length})
+                                                </p>
+                                            </div>
+                                            <ul className="text-[12px] text-[#78350F] space-y-1.5 max-h-[160px] overflow-y-auto px-4 py-3">
+                                                {importSummary.skipped.map((err, i) => (
+                                                    <li key={`skip-${i}`} className="flex items-start gap-2">
+                                                        <Info size={12} className="mt-0.5 shrink-0 text-[#D97706]" />
+                                                        <span>{formatImportIssue(err)}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {importSummary.failed.length > 0 && (
+                                        <div className="rounded-[12px] border border-[#DC2626]/20 bg-[#FEF2F2] overflow-hidden">
+                                            <div className="flex items-center gap-2 px-4 py-3 border-b border-[#DC2626]/15">
+                                                <AlertTriangle size={16} className="text-[#DC2626] shrink-0" />
+                                                <p className="text-[13px] font-bold text-[#991B1B]">
+                                                    Need fixing ({importSummary.failed.length})
+                                                </p>
+                                            </div>
+                                            <ul className="text-[12px] text-[#7F1D1D] space-y-1.5 max-h-[160px] overflow-y-auto px-4 py-3">
+                                                {importSummary.failed.map((err, i) => (
+                                                    <li key={`fail-${i}`} className="flex items-start gap-2">
+                                                        <span className="mt-0.5 shrink-0">•</span>
+                                                        <span>{formatImportIssue(err)}</span>
                                                     </li>
                                                 ))}
                                             </ul>
@@ -1248,29 +1367,52 @@ export default function CategoriesPage() {
                                     )}
                                 </div>
                             )}
+                        </div>
 
-                            {/* Actions */}
-                            <div className="flex items-center gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={closeImportModal}
-                                    className="flex-1 h-[46px] bg-[#F8F9FB] border border-[#EEEEEE] text-[#7C7C7C] rounded-[10px] text-[14px] font-bold hover:bg-[#EEEEEE] transition-all"
-                                >
-                                    {importResult ? 'Close' : 'Cancel'}
-                                </button>
-                                {!importResult && (
+                        {/* Actions */}
+                        <div className="flex items-center gap-3 px-6 py-4 border-t border-[#E9E3DD] shrink-0 bg-[#FAF7F2]/60">
+                            {importSummary ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setImportFile(null);
+                                            setImportResult(null);
+                                            if (fileInputRef.current) fileInputRef.current.value = '';
+                                        }}
+                                        className="flex-1 h-[48px] bg-white border border-[#E9E3DD] text-[#667085] rounded-[10px] text-[14px] font-bold hover:bg-[#F8F9FB] transition-all"
+                                    >
+                                        Import another
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={closeImportModal}
+                                        className="flex-1 h-[48px] bg-[#6B1D2E] text-white rounded-[10px] text-[14px] font-bold hover:bg-[#5A1926] shadow-sm shadow-[#6B1D2E]/20 transition-all active:scale-[0.98]"
+                                    >
+                                        Done
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={closeImportModal}
+                                        className="flex-1 h-[48px] bg-white border border-[#E9E3DD] text-[#667085] rounded-[10px] text-[14px] font-bold hover:bg-[#F8F9FB] transition-all"
+                                    >
+                                        Cancel
+                                    </button>
                                     <button
                                         onClick={handleImport}
                                         disabled={!importFile || importLoading}
-                                        className="flex-1 h-[46px] bg-[#6B1D2E] text-white rounded-[10px] text-[14px] font-bold hover:bg-[#5A1926] shadow-sm shadow-[#6B1D2E]/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        className="flex-1 h-[48px] bg-[#6B1D2E] text-white rounded-[10px] text-[14px] font-bold hover:bg-[#5A1926] shadow-sm shadow-[#6B1D2E]/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
                                         {importLoading && (
                                             <Loader2 size={16} className="animate-spin" />
                                         )}
                                         Upload & Import
                                     </button>
-                                )}
-                            </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
