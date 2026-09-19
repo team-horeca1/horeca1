@@ -39,13 +39,10 @@ function dispatchSameTabImpersonationChanged(): void {
   window.dispatchEvent(new Event(IMPERSONATION_CHANGED_EVENT));
 }
 
-/** Clear all admin impersonation cookies (vendor, brand, customer). */
+/** Clear all admin impersonation cookies (vendor, brand, customer).
+ * One DELETE is enough — each route already clears every impersonation cookie. */
 export async function clearAllAdminImpersonation(): Promise<void> {
-  await Promise.allSettled([
-    fetch('/api/v1/admin/impersonate', { method: 'DELETE' }),
-    fetch('/api/v1/admin/impersonate/brand', { method: 'DELETE' }),
-    fetch('/api/v1/admin/impersonate/customer', { method: 'DELETE' }),
-  ]);
+  await fetch('/api/v1/admin/impersonate/customer', { method: 'DELETE' }).catch(() => {});
   broadcastAuthEvent('impersonation-changed');
   dispatchSameTabImpersonationChanged();
 }

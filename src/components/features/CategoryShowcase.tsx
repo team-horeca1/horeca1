@@ -272,7 +272,7 @@ function MobileCategoryCard({ cat, activeCategory, onCategoryClick }: MobileCate
     <div className="w-full flex flex-col items-center text-center">
       <div
         className={cn(
-          "w-full aspect-square rounded-[18px] flex items-center justify-center relative overflow-hidden transition-all duration-200",
+          "w-full aspect-square rounded-full flex items-center justify-center relative overflow-hidden transition-all duration-200",
           isActive
             ? "bg-white border-2 border-primary shadow-sm ring-2 ring-primary/10"
             : "bg-[#F8F7F4] border border-[#ECE8E1] shadow-[0_1px_4px_rgba(0,0,0,0.02)] active:scale-95"
@@ -334,7 +334,7 @@ const DesktopCategoryCard = ({ cat, activeCategory, onCategoryClick }: DesktopCa
     <>
       <div
         className={cn(
-          "w-full aspect-square rounded-2xl flex items-center justify-center mb-2.5 overflow-hidden relative border transition-all duration-300",
+          "w-full aspect-square rounded-full flex items-center justify-center mb-2.5 overflow-hidden relative border transition-all duration-300",
           isActive
             ? "border-primary shadow-cdl-2 ring-2 ring-primary/20 bg-white"
             : "bg-[#FBF9F5] border-border/80 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] group-hover:border-primary/40 group-hover:bg-white group-hover:shadow-[0_12px_24px_-4px_rgba(107,29,46,0.12)] group-hover:-translate-y-1.5"

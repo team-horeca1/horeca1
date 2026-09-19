@@ -18,7 +18,7 @@ function exitHref(mode: ImpersonationMode | null): string {
 }
 
 export function AdminImpersonationBanner() {
-  const { exit } = useAdminImpersonate('customer');
+  const { exit, loading } = useAdminImpersonate('customer');
   const [name, setName] = useState<string | null>(null);
   const [mode, setMode] = useState<ImpersonationMode | null>(null);
   const [vendorPortalOnly, setVendorPortalOnly] = useState(false);
@@ -65,11 +65,12 @@ export function AdminImpersonationBanner() {
         )}
         <button
           type="button"
+          disabled={loading}
           onClick={() => void exit(exitHref(mode))}
-          className="h-[34px] px-4 rounded-[8px] bg-amber-600 text-white text-[12px] font-bold hover:bg-amber-700 transition-colors flex items-center justify-center gap-1.5"
+          className="h-[34px] px-4 rounded-[8px] bg-amber-600 text-white text-[12px] font-bold hover:bg-amber-700 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:pointer-events-none"
         >
           <X size={14} />
-          Exit Admin View
+          {loading ? 'Exiting…' : 'Exit Admin View'}
         </button>
       </div>
     </div>

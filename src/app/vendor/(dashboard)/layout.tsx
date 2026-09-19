@@ -82,6 +82,7 @@ function VendorNavBody({
     isCollapsed,
     adminVendorName,
     onExitAdminView,
+    exitingAdminView = false,
     isAdmin,
     onNavigate,
 }: {
@@ -90,6 +91,7 @@ function VendorNavBody({
     isCollapsed: boolean;
     adminVendorName: string | null;
     onExitAdminView: () => void;
+    exitingAdminView?: boolean;
     isAdmin: boolean;
     onNavigate?: () => void;
 }) {
@@ -112,11 +114,12 @@ function VendorNavBody({
                                 <p className="text-[12px] font-semibold text-amber-800 truncate mb-2">{adminVendorName}</p>
                                 <button
                                     type="button"
+                                    disabled={exitingAdminView}
                                     onClick={onExitAdminView}
-                                    className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-1.5 rounded-[6px]"
+                                    className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-1.5 rounded-[6px] disabled:opacity-60 disabled:pointer-events-none"
                                 >
                                     <LogOut size={11} />
-                                    Exit Admin View
+                                    {exitingAdminView ? 'Exiting…' : 'Exit Admin View'}
                                 </button>
                             </>
                         )}
@@ -193,6 +196,7 @@ export default function VendorLayout({
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const [adminVendorName, setAdminVendorName] = useState<string | null>(null);
+    const [exitingAdminView, setExitingAdminView] = useState(false);
     const [isApplicationPending, setIsApplicationPending] = useState(false);
     const [checkingApplication, setCheckingApplication] = useState(true);
     const [enteredStore, setEnteredStoreState] = useState(() => {
@@ -420,10 +424,11 @@ export default function VendorLayout({
             .catch(() => {});
     }, [status, isAdmin, isActiveVendor, isApplicationPending, pathname, router]);
 
-    const handleExitAdminView = async () => {
-        await clearAllAdminImpersonation();
-        router.push('/admin/vendors');
-        router.refresh();
+    const handleExitAdminView = () => {
+        if (exitingAdminView) return;
+        setExitingAdminView(true);
+        void clearAllAdminImpersonation();
+        window.location.assign('/admin/vendors');
     };
 
     React.useEffect(() => {
@@ -661,7 +666,8 @@ export default function VendorLayout({
                             pathname={pathname}
                             isCollapsed={false}
                             adminVendorName={adminVendorName}
-                            onExitAdminView={() => void handleExitAdminView()}
+                            onExitAdminView={handleExitAdminView}
+                            exitingAdminView={exitingAdminView}
                             isAdmin={isAdmin}
                             onNavigate={() => setMobileOpen(false)}
                         />
@@ -765,7 +771,8 @@ export default function VendorLayout({
                             pathname={pathname}
                             isCollapsed={isCollapsed}
                             adminVendorName={adminVendorName}
-                            onExitAdminView={() => void handleExitAdminView()}
+                            onExitAdminView={handleExitAdminView}
+                            exitingAdminView={exitingAdminView}
                             isAdmin={isAdmin}
                         />
                         <div className="p-3 border-t border-[#EEEEEE]">

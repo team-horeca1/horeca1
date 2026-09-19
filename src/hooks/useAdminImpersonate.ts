@@ -82,15 +82,21 @@ export function useAdminImpersonate(target: ImpersonateTarget) {
 
   const exit = useCallback(
     async (returnTo?: string) => {
-      try {
-        await clearAllAdminImpersonation();
-      } catch {
-        // Best-effort cookie clear
-      }
-      router.push(returnTo ?? (target === 'customer' ? '/admin/customers' : target === 'brand' ? '/admin/brands' : '/admin/vendors'));
-      router.refresh();
+      if (loading) return;
+      setLoading(true);
+      const href =
+        returnTo
+        ?? (target === 'customer'
+          ? '/admin/customers'
+          : target === 'brand'
+            ? '/admin/brands'
+            : '/admin/vendors');
+      // Fire-and-forget — awaiting DELETE delayed Exit and felt like a dead click
+      // (same rationale as ProfileScreen logout).
+      void clearAllAdminImpersonation();
+      window.location.assign(href);
     },
-    [router, target],
+    [loading, target],
   );
 
   return { start, exit, loading };

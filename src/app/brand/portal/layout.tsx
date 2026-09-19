@@ -42,6 +42,7 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
     const { data: session, status } = useSession();
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [adminBrandName, setAdminBrandName] = useState<string | null>(null);
+    const [exitingAdminView, setExitingAdminView] = useState(false);
     const [applicationStatus, setApplicationStatus] = useState<'pending' | 'rejected' | null>(null);
     const [applicationBrandName, setApplicationBrandName] = useState<string | null>(null);
     const [checkingApplication, setCheckingApplication] = useState(true);
@@ -172,10 +173,11 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
         session?.user,
     ]);
 
-    const handleExitAdminView = async () => {
-        await clearAllAdminImpersonation();
-        router.push('/admin/brands');
-        router.refresh();
+    const handleExitAdminView = () => {
+        if (exitingAdminView) return;
+        setExitingAdminView(true);
+        void clearAllAdminImpersonation();
+        window.location.assign('/admin/brands');
     };
 
     // Only gate on the genuine initial load (no session yet). A background
@@ -381,11 +383,13 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
                                         </div>
                                         <p className="text-[12px] font-semibold text-amber-800 truncate mb-2">{adminBrandName}</p>
                                         <button
+                                            type="button"
+                                            disabled={exitingAdminView}
                                             onClick={handleExitAdminView}
-                                            className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-1.5 rounded-[6px] transition-colors"
+                                            className="w-full flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-2 py-1.5 rounded-[6px] transition-colors disabled:opacity-60 disabled:pointer-events-none"
                                         >
                                             <LogOut size={11} />
-                                            Exit Admin View
+                                            {exitingAdminView ? 'Exiting…' : 'Exit Admin View'}
                                         </button>
                                     </>
                                 )}
