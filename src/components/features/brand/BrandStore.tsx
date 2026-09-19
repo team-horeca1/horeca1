@@ -14,7 +14,7 @@ import { BrandSuppliersPanel, type BrandSupplier } from '@/components/features/b
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { brandShareContent } from '@/lib/share-cards/types';
 
-const PRODUCT_IMAGE_FALLBACK = '/images/recom-product/product-img10.png';
+const PRODUCT_IMAGE_FALLBACK = '/images/placeholders/no-product.svg';
 
 interface BrandDistributor {
     vendorId: string;

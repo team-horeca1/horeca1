@@ -130,7 +130,7 @@ export default function CartPage() {
                     size: item.product.packSize || '1 pc',
                     pcs: item.quantity,
                     price: item.product.price,
-                    image: item.product.images[0] || '/images/recom-product/product-img10.png',
+                    image: item.product.images[0] || '/images/placeholders/no-product.svg',
                     minQty: item.product.minOrderQuantity || 1,
                     tierLabel: activeTier ? `Bulk ${activeTier.minQty}+ @ ₹${activeTier.price}/pc` : null,
                     isPromoFree: item.isPromoFree,
@@ -856,7 +856,7 @@ export default function CartPage() {
                                                     className="w-[52px] h-[52px] rounded-full bg-white flex items-center justify-center shrink-0 border border-gray-100 shadow-sm relative overflow-hidden"
                                                     style={{ zIndex: shipment.items.length - idx }}
                                                 >
-                                                    <Image src={item.image || '/placeholder.png'} alt="" fill className="object-contain p-[15%]" sizes="52px" />
+                                                    <Image src={item.image || '/images/placeholders/no-product.svg'} alt="" fill className="object-contain p-[15%]" sizes="52px" />
                                                 </div>
                                             ))}
                                         </div>
@@ -978,7 +978,7 @@ export default function CartPage() {
                                                 <div key={item.id} className="px-7 py-5 flex items-center gap-5 hover:bg-gray-50/40 transition-colors group">
                                                     {/* Product Image */}
                                                     <div className="w-[72px] h-[72px] rounded-2xl bg-[#F7F8F7] shrink-0 border border-gray-100 group-hover:border-primary/10 transition-colors relative overflow-hidden">
-                                                        <Image src={item.image || '/placeholder.png'} alt={item.name} fill className="object-contain p-2" sizes="72px" />
+                                                        <Image src={item.image || '/images/placeholders/no-product.svg'} alt={item.name} fill className="object-contain p-2" sizes="72px" />
                                                     </div>
 
                                                     {/* Product Info */}

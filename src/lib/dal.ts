@@ -16,6 +16,8 @@ import {
   resolveSellableDisplayName,
   resolveSellableImages,
 } from '@/lib/productDisplayIdentity';
+import { storeDisplayName } from '@/lib/storeDisplayName';
+import { PLACEHOLDERS } from '@/lib/constants';
 
 // Base URL for API calls — works both server-side and client-side
 function getBaseUrl() {
@@ -77,9 +79,12 @@ function toVendor(v: Record<string, unknown>): Vendor {
   const slots = Array.isArray(v.deliverySlots) ? (v.deliverySlots as Array<{ dayOfWeek: number; slotStart: string }>) : [];
   return {
     id: v.id as string,
-    name: (v.businessName as string) || '',
+    name: storeDisplayName({
+      displayName: v.displayName as string | null | undefined,
+      businessName: v.businessName as string | null | undefined,
+    }),
     slug: (v.slug as string) || '',
-    logo: (v.logoUrl as string) || '/images/top vendors/emarket.png',
+    logo: (v.logoUrl as string) || PLACEHOLDERS.vendor,
     coverImage: (v.bannerUrl as string) || '',
     rating: Number(v.rating) || 0,
     totalRatings: typeof v.totalRatings === 'number' ? v.totalRatings : 0,
@@ -108,9 +113,12 @@ function toVendor(v: Record<string, unknown>): Vendor {
 function toVendorSummary(v: Record<string, unknown>): VendorSummary {
   return {
     id: v.id as string,
-    name: (v.businessName as string) || '',
+    name: storeDisplayName({
+      displayName: v.displayName as string | null | undefined,
+      businessName: v.businessName as string | null | undefined,
+    }),
     slug: (v.slug as string) || '',
-    logo: (v.logoUrl as string) || '/images/top vendors/emarket.png',
+    logo: (v.logoUrl as string) || PLACEHOLDERS.vendor,
     rating: Number(v.rating) || 0,
     deliveryTime: '24 hrs',
     minOrderValue: Number(v.minOrderValue) || 0,
@@ -276,7 +284,10 @@ function toVendorProduct(p: Record<string, unknown>, vendorInfo?: Record<string,
     createdAt: new Date(p.createdAt as string),
     updatedAt: new Date(p.updatedAt as string),
     vendorId: (p.vendorId as string) || (vendor.id as string) || '',
-    vendorName: (vendor.businessName as string) || '',
+    vendorName: storeDisplayName({
+      displayName: vendor.displayName as string | null | undefined,
+      businessName: vendor.businessName as string | null | undefined,
+    }),
     vendorLogo: (vendor.logoUrl as string) || '',
     vendorSlug: typeof vendor.slug === 'string' ? vendor.slug : undefined,
     vendorRating: Number(vendor.rating) || 0,
@@ -346,7 +357,10 @@ function toOrderList(l: Record<string, unknown>): OrderList {
     name: (l.name as string) || '',
     userId: (l.userId as string) || '',
     vendorId: (l.vendorId as string) || (vendor.id as string) || '',
-    vendorName: (vendor.businessName as string) || '',
+    vendorName: storeDisplayName({
+      displayName: vendor.displayName as string | null | undefined,
+      businessName: vendor.businessName as string | null | undefined,
+    }),
     vendorLogo: (vendor.logoUrl as string) || undefined,
     items,
     createdAt: new Date(l.createdAt as string),
@@ -359,7 +373,7 @@ function toCategory(c: Record<string, unknown>): Category {
     id: c.id as string,
     name: (c.name as string) || '',
     slug: (c.slug as string) || '',
-    image: (c.imageUrl as string) || '/images/category/vegitable.png',
+    image: (c.imageUrl as string) || PLACEHOLDERS.category,
     parentId: (c.parentId as string) || undefined,
     isActive: (c.isActive as boolean) ?? true,
   };
@@ -633,7 +647,14 @@ export const dal = {
     /** Create new order(s) from cart. Pass saveDraft to persist as draft PO(s).
      *  Promo Engine Phase 1: optional couponCode + useWallet (ignored on drafts). */
     async create(
-      vendorOrders: Array<{ vendorId: string; items: Array<{ productId: string; quantity: number }>; deliverySlotId?: string; notes?: string }>,
+      vendorOrders: Array<{
+        vendorId: string;
+        items: Array<{ productId: string; quantity: number }>;
+        deliverySlotId?: string;
+        deliveryMode?: 'supplier_delivery' | 'third_party' | 'self_pickup';
+        deliveryDate?: string | null;
+        notes?: string;
+      }>,
       paymentMethod: string,
       saveDraft = false,
       promo?: { couponCode?: string; useWallet?: boolean; customerPoNumber?: string },

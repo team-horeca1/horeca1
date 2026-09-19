@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Clock, Star } from 'lucide-react';
-import { VENDOR_COVERS } from '@/components/features/homepage/VendorCardShared';
+import { PLACEHOLDERS } from '@/lib/constants';
 
 export function CategoryVendorCard({
   href,
@@ -11,7 +11,7 @@ export function CategoryVendorCard({
   rating,
   minOrderValue,
   deliveryTime = '24 hrs',
-  index,
+  index: _index,
 }: {
   href: string;
   name: string;
@@ -20,7 +20,7 @@ export function CategoryVendorCard({
   deliveryTime?: string;
   index: number;
 }) {
-  const cover = VENDOR_COVERS[index % VENDOR_COVERS.length];
+  const cover = PLACEHOLDERS.vendor;
   const showRating = typeof rating === 'number' && rating > 0;
 
   return (

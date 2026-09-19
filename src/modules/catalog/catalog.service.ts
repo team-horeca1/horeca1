@@ -1004,7 +1004,7 @@ export class CatalogService {
           },
         },
       },
-      vendor: { select: { id: true, businessName: true, logoUrl: true, vendorCode: true } },
+      vendor: { select: { id: true, businessName: true, displayName: true, logoUrl: true, vendorCode: true } },
       brandMappings: productBrandMappingsInclude,
     };
 
@@ -1148,6 +1148,7 @@ export class CatalogService {
       select: {
         id: true,
         businessName: true,
+        displayName: true,
         slug: true,
         logoUrl: true,
         rating: true,
@@ -1316,6 +1317,7 @@ export class CatalogService {
                 select: {
                   id: true,
                   businessName: true,
+                  displayName: true,
                   logoUrl: true,
                   minOrderValue: true,
                   rating: true,

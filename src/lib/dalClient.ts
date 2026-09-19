@@ -3,6 +3,7 @@
  * Avoids pulling the full vendors/products/orders graph into every page.
  */
 import type { Category } from '@/types';
+import { PLACEHOLDERS } from '@/lib/constants';
 
 function getBaseUrl() {
   if (typeof window !== 'undefined') return '';
@@ -40,7 +41,7 @@ function toCategory(c: Record<string, unknown>): Category {
     id: c.id as string,
     name: (c.name as string) || '',
     slug: (c.slug as string) || '',
-    image: (c.imageUrl as string) || '/images/category/vegitable.png',
+    image: (c.imageUrl as string) || PLACEHOLDERS.category,
     parentId: (c.parentId as string) || undefined,
     isActive: (c.isActive as boolean) ?? true,
   };

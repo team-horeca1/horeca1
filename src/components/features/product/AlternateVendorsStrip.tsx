@@ -8,11 +8,17 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Store, ArrowRight } from 'lucide-react';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface AlternateVendor {
   id: string;
   name: string;
-  vendor: { id: string; businessName: string; minOrderValue: number | string } | null;
+  vendor: {
+    id: string;
+    businessName: string;
+    displayName?: string | null;
+    minOrderValue: number | string;
+  } | null;
   inventory?: { qtyAvailable: number } | null;
   category: { id: string; name: string } | null;
 }
@@ -76,8 +82,9 @@ export default function AlternateVendorsStrip({ productId }: Props) {
         {alternates.map(alt => {
           const vendor = alt.vendor;
           if (!vendor) return null;
-          const initial = vendor.businessName?.charAt(0).toUpperCase() || 'V';
-          const colour = colourFor(vendor.businessName || vendor.id);
+          const label = storeDisplayName(vendor) || 'Vendor';
+          const initial = label.charAt(0).toUpperCase() || 'V';
+          const colour = colourFor(label || vendor.id);
           const qty = alt.inventory?.qtyAvailable ?? 0;
           const mov = Number(vendor.minOrderValue) || 0;
 
@@ -93,7 +100,7 @@ export default function AlternateVendorsStrip({ productId }: Props) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[14px] font-extrabold text-[#181725] truncate">
-                    {vendor.businessName}
+                    {label}
                   </p>
                   {alt.category && (
                     <p className="text-[11px] font-semibold text-[#7C7C7C] truncate uppercase tracking-wider">

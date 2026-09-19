@@ -37,6 +37,7 @@ export class VendorService {
       select: {
         id: true,
         businessName: true,
+        displayName: true,
         slug: true,
         logoUrl: true,
         bannerUrl: true,
@@ -138,6 +139,7 @@ export class VendorService {
           select: {
             id: true,
             businessName: true,
+            displayName: true,
             slug: true,
             logoUrl: true,
             rating: true,

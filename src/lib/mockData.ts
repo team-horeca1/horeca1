@@ -11,7 +11,7 @@ export const MOCK_VENDORS: Vendor[] = [
         id: 'v1',
         name: 'Emarket',
         slug: 'emarket',
-        logo: '/images/top vendors/emarket.png',
+        logo: '/images/placeholders/no-vendor.svg',
         rating: 4.6,
         totalRatings: 234,
         deliverySchedule: 'Tomorrow 7:00 AM',
@@ -335,7 +335,7 @@ export const MOCK_VENDOR_SUMMARIES: VendorSummary[] = MOCK_VENDORS.map(v => ({
 // ---- PRODUCTS (PER VENDOR) ----
 
 const productBase = {
-    images: ['/images/recom-product/product-img10.png'],
+    images: ['/images/placeholders/no-product.svg'],
     stock: 100,
     isActive: true,
     createdAt: new Date(),
@@ -360,9 +360,9 @@ export const MOCK_VENDOR_PRODUCTS: Record<string, VendorProduct[]> = {
         { ...productBase, id: 'p12', images: ['/images/category/snacks.png'], name: 'Atta Whole Wheat', description: 'Chakki fresh atta', price: 480, category: 'Grains', subcategory: 'Flour', packSize: '10 kg', unit: 'kg', vendorId: 'v2', vendorName: 'Whole Food Market', bulkPrices: [{ minQty: 5, price: 460 }], creditBadge: true, minOrderQuantity: 1 },
     ],
     v3: [
-        { ...productBase, id: 'p13', images: ['/images/product/product-img3.png'], name: 'Fresh Tomatoes', description: 'Farm fresh red tomatoes', price: 40, category: 'Vegetables', subcategory: 'Tomato', packSize: '1 kg', unit: 'kg', vendorId: 'v3', vendorName: 'M Mart', bulkPrices: [{ minQty: 10, price: 35 }], creditBadge: false, minOrderQuantity: 2, frequentlyOrdered: true },
+        { ...productBase, id: 'p13', images: ['/images/placeholders/no-product.svg'], name: 'Fresh Tomatoes', description: 'Farm fresh red tomatoes', price: 40, category: 'Vegetables', subcategory: 'Tomato', packSize: '1 kg', unit: 'kg', vendorId: 'v3', vendorName: 'M Mart', bulkPrices: [{ minQty: 10, price: 35 }], creditBadge: false, minOrderQuantity: 2, frequentlyOrdered: true },
         { ...productBase, id: 'p14', images: ['/images/product/product-img5.png'], name: 'Onions', description: 'Premium quality onions', price: 35, category: 'Vegetables', subcategory: 'Onion', packSize: '1 kg', unit: 'kg', vendorId: 'v3', vendorName: 'M Mart', bulkPrices: [{ minQty: 10, price: 30 }], creditBadge: false, minOrderQuantity: 5, stock: 0, isActive: false },
-        { ...productBase, id: 'p15', images: ['/images/recom-product/product-img10.png'], name: 'Green Capsicum', description: 'Fresh green bell peppers', price: 80, category: 'Vegetables', subcategory: 'Capsicum', packSize: '1 kg', unit: 'kg', vendorId: 'v3', vendorName: 'M Mart', bulkPrices: [], creditBadge: false, minOrderQuantity: 1, frequentlyOrdered: true },
+        { ...productBase, id: 'p15', images: ['/images/placeholders/no-product.svg'], name: 'Green Capsicum', description: 'Fresh green bell peppers', price: 80, category: 'Vegetables', subcategory: 'Capsicum', packSize: '1 kg', unit: 'kg', vendorId: 'v3', vendorName: 'M Mart', bulkPrices: [], creditBadge: false, minOrderQuantity: 1, frequentlyOrdered: true },
         { ...productBase, id: 'p16', images: ['/images/product/brokali.png'], name: 'Fresh Coriander', description: 'Bunch of fresh coriander', price: 15, category: 'Herbs', subcategory: 'Coriander', packSize: '100 g', unit: 'g', vendorId: 'v3', vendorName: 'M Mart', bulkPrices: [], creditBadge: false, minOrderQuantity: 5 },
     ],
     v4: [
@@ -441,7 +441,7 @@ export const MOCK_ORDER_LISTS: OrderList[] = [
         userId: 'u1',
         vendorId: 'v1',
         vendorName: 'Emarket',
-        vendorLogo: '/images/top vendors/emarket.png',
+        vendorLogo: '/images/placeholders/no-vendor.svg',
         items: [
             { productId: 'p1', product: MOCK_VENDOR_PRODUCTS.v1[0], defaultQty: 10, lastOrderedQty: 10 },
             { productId: 'p2', product: MOCK_VENDOR_PRODUCTS.v1[1], defaultQty: 5, lastOrderedQty: 5 },
@@ -580,7 +580,7 @@ export const BRAND_STORE_DATA: Record<string, BrandStore> = {
             {
                 id: 'v1',
                 name: 'Emarket',
-                logo: '/images/top vendors/emarket.png',
+                logo: '/images/placeholders/no-vendor.svg',
                 location: 'Mumbai',
                 productIds: ['ks-1', 'ks-2', 'ks-3', 'ks-4', 'ks-5'],
                 prices: { 'ks-1': '120', 'ks-2': '450', 'ks-3': '85', 'ks-4': '95', 'ks-5': '110' },
@@ -624,7 +624,7 @@ export const BRAND_STORE_DATA: Record<string, BrandStore> = {
             {
                 id: 'v1',
                 name: 'Emarket',
-                logo: '/images/top vendors/emarket.png',
+                logo: '/images/placeholders/no-vendor.svg',
                 location: 'Mumbai',
                 productIds: ['k-1', 'k-2', 'k-3', 'k-4'],
                 prices: { 'k-1': '180', 'k-2': '150', 'k-3': '120', 'k-4': '130' },

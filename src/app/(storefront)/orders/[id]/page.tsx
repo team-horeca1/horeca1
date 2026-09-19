@@ -18,6 +18,7 @@ import {
 import CustomerReturnSection from '@/components/features/return/CustomerReturnSection';
 import { loadRazorpayScript, openRazorpayPopup } from '@/lib/razorpayClient';
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface ApiOrderItem {
     id: string;
@@ -34,6 +35,7 @@ interface ApiOrderItem {
 interface ApiOrderVendor {
     id: string;
     businessName: string;
+    displayName?: string | null;
     slug: string;
     logoUrl: string | null;
 }
@@ -208,7 +210,7 @@ export default function OrderDetailPage() {
             unitPrice: typeof item.unitPrice === 'string' ? parseFloat(item.unitPrice) : item.unitPrice,
             image: getImg(item),
             packSize: '',
-        }))))}&vendorId=${encodeURIComponent(order.vendor?.id || '')}&vendorName=${encodeURIComponent(order.vendor?.businessName || '')}`);
+        }))))}&vendorId=${encodeURIComponent(order.vendor?.id || '')}&vendorName=${encodeURIComponent(order.vendor ? storeDisplayName(order.vendor) : '')}`);
     };
 
     React.useEffect(() => {
@@ -470,13 +472,13 @@ export default function OrderDetailPage() {
                         <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 shadow-sm">
                             <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
                                 {order.vendor?.logoUrl
-                                    ? <img src={order.vendor.logoUrl} alt={order.vendor.businessName} className="w-full h-full object-contain p-1.5" />
+                                    ? <img src={order.vendor.logoUrl} alt={storeDisplayName(order.vendor)} className="w-full h-full object-contain p-1.5" />
                                     : <Store size={22} className="text-gray-400" />
                                 }
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-[11px] text-gray-400 font-medium mb-0.5">Vendor</p>
-                                <p className="text-[16px] font-black text-[#181725] truncate">{order.vendor?.businessName}</p>
+                                <p className="text-[16px] font-black text-[#181725] truncate">{order.vendor ? storeDisplayName(order.vendor) : ''}</p>
                                 <p className="text-[12px] text-gray-400 mt-0.5">{fmtDate(order.createdAt)} · {fmtTime(order.createdAt)}</p>
                             </div>
                         </div>
@@ -801,7 +803,7 @@ export default function OrderDetailPage() {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({
-                                                name: `${order.vendor?.businessName || 'Vendor'} — Order ${order.orderNumber}`,
+                                                name: `${order.vendor ? storeDisplayName(order.vendor) || 'Vendor' : 'Vendor'} — Order ${order.orderNumber}`,
                                                 vendorId: order.vendor?.id || '',
                                                 items: order.items.map(item => ({
                                                     productId: item.productId,

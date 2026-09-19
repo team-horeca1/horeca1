@@ -14,7 +14,7 @@ const BANNERS = [
     },
     {
         title: 'Daily Fresh Vegetables',
-        image: '/images/category/vegitable.png',
+        image: '/images/placeholders/no-category.svg',
         bgAsset: '/images/banner/vegitable-banner-bg.png',
         bgColor: '#dbf3dd',
         textColor: '#1a2b4b'

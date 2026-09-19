@@ -17,14 +17,25 @@ import {
 import { isRegisterEmailOtpEnabled } from '@/lib/config/registerEmailOtp';
 import { hasUsableDeliveryLocation } from '@/lib/addressUsability';
 import { effectiveCustomerUserId } from '@/lib/resolveCustomerImpersonation';
+import { resolveSupplierActorUserId } from '@/lib/resolveVendorId';
+import { VENDOR_ID_COOKIE } from '@/lib/adminImpersonationCookies';
 import { businessFacingName, storeDisplayName } from '@/modules/supplier/foundation.service';
 import { kindFromFlags, type BusinessKind } from '@/lib/businessCapability';
 import { provisionBusinessProfile } from '@/modules/account/provisionBusinessProfile';
 
-export const GET = withAuth(async (_req: NextRequest, ctx) => {
+export const GET = withAuth(async (req: NextRequest, ctx) => {
   try {
-    const targetUserId = effectiveCustomerUserId(ctx);
-    const impersonatedBaId = ctx.impersonatedBuyer?.businessAccountId;
+    // Under vendor Admin View, list the impersonated supplier's BAs (vendor + brand),
+    // not the admin's own restaurant / buyer-scoped filter.
+    const vendorAdminView =
+      ctx.role === 'admin' && Boolean(req.cookies.get(VENDOR_ID_COOKIE)?.value);
+
+    const targetUserId = vendorAdminView
+      ? await resolveSupplierActorUserId(ctx, req)
+      : effectiveCustomerUserId(ctx);
+    const impersonatedBaId = vendorAdminView
+      ? undefined
+      : ctx.impersonatedBuyer?.businessAccountId;
 
     const membershipWhere = {
       userId: targetUserId,

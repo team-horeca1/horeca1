@@ -260,9 +260,7 @@ export async function ensureDefaultOutletForStore(
   return outlet.id;
 }
 
-export function storeDisplayName(v: { displayName?: string | null; businessName: string }): string {
-  return (v.displayName?.trim() || v.businessName).trim();
-}
+export { storeDisplayName } from '@/lib/storeDisplayName';
 
 /**
  * Business-facing label for supplier UI / JWT.

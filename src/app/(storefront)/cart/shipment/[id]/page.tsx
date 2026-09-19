@@ -25,7 +25,7 @@ export default function ShipmentDetailPage() {
                         size: item.product.packSize || '1 pc',
                         pcs: item.quantity,
                         price: item.product.price || 0,
-                        image: (item.product.images && item.product.images[0]) || '/images/recom-product/product-img10.png',
+                        image: (item.product.images && item.product.images[0]) || '/images/placeholders/no-product.svg',
                     }))
             );
             return {
@@ -49,7 +49,7 @@ export default function ShipmentDetailPage() {
                     size: item.product.packSize || '1 pc',
                     pcs: item.quantity,
                     price: item.product.price || 0,
-                    image: item.product.images[0] || '/images/recom-product/product-img10.png',
+                    image: item.product.images[0] || '/images/placeholders/no-product.svg',
                 }))
             };
         }

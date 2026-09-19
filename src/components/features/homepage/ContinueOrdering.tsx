@@ -9,6 +9,7 @@ import { dal } from '@/lib/dal';
 import type { Vendor } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface ContinueCard {
   id: string;
@@ -29,7 +30,7 @@ interface ApiOrder {
   id: string;
   createdAt: string;
   vendorId?: string;
-  vendor?: { id: string; businessName: string; logoUrl: string | null };
+  vendor?: { id: string; businessName: string; displayName?: string | null; logoUrl: string | null };
   items?: Array<{ quantity: number }>;
 }
 
@@ -151,7 +152,7 @@ export function ContinueOrdering() {
           allCards.push({
             id: `order-${order.id}`,
             vendorId,
-            vendorName: order.vendor?.businessName || vendor?.name || 'Vendor',
+            vendorName: order.vendor ? storeDisplayName(order.vendor) || vendor?.name || 'Vendor' : vendor?.name || 'Vendor',
             vendorLogo: order.vendor?.logoUrl || vendor?.logo || '',
             coverImage: vendor?.coverImage,
             subtitle: itemCount > 0 ? `Ordered · ${itemCount} items` : 'Ordered',

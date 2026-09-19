@@ -760,7 +760,7 @@ export class OrderService {
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { createdAt: 'desc' },
       include: {
-        vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true } },
+        vendor: { select: { id: true, businessName: true, displayName: true, slug: true, logoUrl: true } },
         items: {
           include: {
             product: { select: { imageUrl: true, images: true } },
@@ -788,7 +788,7 @@ export class OrderService {
             product: { select: { imageUrl: true, images: true } },
           },
         },
-        vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true } },
+        vendor: { select: { id: true, businessName: true, displayName: true, slug: true, logoUrl: true } },
         payments: true,
         review: { select: { rating: true, comment: true, createdAt: true } },
       },

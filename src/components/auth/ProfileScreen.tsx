@@ -584,7 +584,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                             <div className="flex items-center gap-3 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm mb-4">
                                 <div className="relative shrink-0">
                                     <div className="w-[60px] h-[60px] rounded-full overflow-hidden border-[2px] border-primary bg-white">
-                                        <img src={userData.image || '/images/profile/sample-profile.png'} alt="Profile" className="w-full h-full object-cover" />
+                                        <img src={userData.image || '/images/placeholders/no-avatar.svg'} alt="Profile" className="w-full h-full object-cover" />
                                     </div>
                                     <button onClick={() => setIsEditProfileOpen(true)} className="absolute -bottom-0.5 -right-0.5 w-6 h-6 bg-white rounded-full flex items-center justify-center border border-gray-100 shadow-sm cursor-pointer">
                                         <Pencil size={11} className="text-gray-400" />
@@ -809,7 +809,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                     <div className="flex flex-col items-center text-center">
                                         <div className="relative mb-3">
                                             <div className="w-[80px] h-[80px] rounded-full overflow-hidden border-[2px] border-primary bg-white">
-                                                <img src={userData.image || '/images/profile/sample-profile.png'} alt="Profile" className="w-full h-full object-cover" />
+                                                <img src={userData.image || '/images/placeholders/no-avatar.svg'} alt="Profile" className="w-full h-full object-cover" />
                                             </div>
                                             <button
                                                 onClick={() => setIsEditProfileOpen(true)}

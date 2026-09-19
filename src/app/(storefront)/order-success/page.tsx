@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle2, Clock, Store, FileDown, ArrowRight, Home, Package, ShoppingCart } from 'lucide-react';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface OrderSummary {
     id: string;
@@ -38,7 +39,7 @@ export default function OrderSuccessPage() {
                         id: d.id,
                         orderNumber: d.orderNumber,
                         vendorId: d.vendor?.id || d.vendorId || d.vendor?.slug || '',
-                        vendorName: d.vendor?.businessName || d.vendorName || 'Vendor',
+                        vendorName: (d.vendor ? storeDisplayName(d.vendor) : '') || d.vendorName || 'Vendor',
                         totalAmount: Number(d.totalAmount) || 0,
                         savings: (Number(d.promoDiscount) || 0) + (Number(d.couponDiscount) || 0) + (Number(d.walletApplied) || 0),
                         itemCount: d.items?.length || 0,

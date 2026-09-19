@@ -29,9 +29,10 @@ export const PAGINATION = {
     maxPageSize: 100,
 } as const;
 
-// Image placeholders
+// Image placeholders — generic frames (no stock food / face photos)
 export const PLACEHOLDERS = {
-    product: '/images/placeholder-product.jpg',
-    avatar: '/images/placeholder-avatar.jpg',
-    category: '/images/placeholder-category.jpg',
+    product: '/images/placeholders/no-product.svg',
+    avatar: '/images/placeholders/no-avatar.svg',
+    category: '/images/placeholders/no-category.svg',
+    vendor: '/images/placeholders/no-vendor.svg',
 } as const;

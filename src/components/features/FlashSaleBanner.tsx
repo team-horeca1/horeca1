@@ -34,7 +34,7 @@ const FLASH_SALE_PRODUCTS: FlashSaleProduct[] = [
         price: 30.00,
         originalPrice: 36.00,
         discount: 35,
-        image: '/images/product/product-img3.png'
+        image: '/images/placeholders/no-product.svg'
     },
     {
         id: 3,
@@ -52,7 +52,7 @@ const FLASH_SALE_PRODUCTS: FlashSaleProduct[] = [
         price: 45.00,
         originalPrice: 55.00,
         discount: 15,
-        image: '/images/recom-product/product-img10.png'
+        image: '/images/placeholders/no-product.svg'
     },
     {
         id: 5,

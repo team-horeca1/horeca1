@@ -238,7 +238,7 @@ function SearchPageContent() {
                                                 className="flex items-center gap-4 bg-white rounded-2xl p-4 border border-gray-100 hover:shadow-lg hover:shadow-gray-100/50 transition-all group"
                                             >
                                                 <div className="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center p-2 shrink-0 border border-gray-100 relative overflow-hidden">
-                                                    <Image src={vendor.logo || '/placeholder.png'} alt={vendor.name} fill className="object-contain group-hover:scale-110 transition-transform" sizes="56px" />
+                                                    <Image src={vendor.logo || '/images/placeholders/no-product.svg'} alt={vendor.name} fill className="object-contain group-hover:scale-110 transition-transform" sizes="56px" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-[14px] font-bold text-[#181725]">{vendor.name}</p>

@@ -10,7 +10,7 @@ import { vendorShareContent } from '@/lib/share-cards/types';
 import { useStableSession } from '@/hooks/useStableSession';
 import { cn } from '@/lib/utils';
 import type { Vendor, StorePromotion } from '@/types';
-import { VENDOR_COVERS } from '@/components/features/homepage/VendorCardShared';
+import { PLACEHOLDERS } from '@/lib/constants';
 import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
 import { OffersSheet } from '@/components/features/promo/OffersSheet';
 
@@ -26,8 +26,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
     const { isAuthenticated } = useStableSession();
     const isLoggedIn = isAuthenticated;
     const [dealsOpen, setDealsOpen] = useState(false);
-    const coverIndex = Math.abs(vendor.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % VENDOR_COVERS.length;
-    const coverImage = vendor.coverImage || VENDOR_COVERS[coverIndex];
+    const coverImage = vendor.coverImage || PLACEHOLDERS.vendor;
     // The detail page hero box renders the vendor's LOGO, not their card cover.
     // Falls back to the cover image if no logo was uploaded.
     const heroImage = vendor.logo || coverImage;

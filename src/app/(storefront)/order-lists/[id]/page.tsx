@@ -336,7 +336,7 @@ export default function OrderListDetailPage() {
                                     <div className="flex items-center gap-2 min-[340px]:gap-3 md:gap-5">
                                         {/* Image */}
                                         <div className="w-10 h-10 min-[340px]:w-14 min-[340px]:h-14 md:w-[72px] md:h-[72px] rounded-xl md:rounded-2xl bg-[#F7F8F7] flex items-center justify-center shrink-0 border border-gray-100 p-1 md:p-2 group-hover:border-primary/10 transition-colors">
-                                            <img src={item.product.images[0] || '/images/recom-product/product-img10.png'} alt={item.product.name} className="max-w-full max-h-full object-contain" />
+                                            <img src={item.product.images[0] || '/images/placeholders/no-product.svg'} alt={item.product.name} className="max-w-full max-h-full object-contain" />
                                         </div>
 
                                         {/* Info */}

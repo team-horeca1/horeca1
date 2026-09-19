@@ -19,6 +19,7 @@ import {
     resolveSellableDisplayName,
     resolveSellableImages,
 } from '@/lib/productDisplayIdentity';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 // CartItem extended with API item ID (needed for PATCH/DELETE on server cart)
 interface CartItemWithId extends CartItem {
@@ -216,7 +217,10 @@ function parseApiCart(apiData: { vendorGroups: unknown[]; total: number }): {
                 createdAt: new Date(),
                 updatedAt: new Date(),
                 vendorId: (raw.vendorId as string) || (itemVendor.id as string) || '',
-                vendorName: (itemVendor.businessName as string) || '',
+                vendorName: storeDisplayName({
+                    displayName: itemVendor.displayName as string | null | undefined,
+                    businessName: itemVendor.businessName as string | null | undefined,
+                }),
                 vendorLogo: (itemVendor.logoUrl as string) || '',
                 // Bulk price slabs: store gross prices for display. Hidden when a
                 // customer price applies — the resolver ignores slabs for those.

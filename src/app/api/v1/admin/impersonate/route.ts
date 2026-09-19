@@ -30,9 +30,12 @@ const patchSchema = z.object({
 
 function setVendorImpersonationCookies(
   res: NextResponse,
-  vendor: { id: string; businessName: string },
+  vendor: { id: string; businessName: string; displayName?: string | null },
   outletId: string,
+  /** Override banner label (e.g. supplier full name). Defaults to store display name. */
+  nameOverride?: string,
 ) {
+  const name = (nameOverride?.trim() || storeLabel(vendor)).trim() || vendor.businessName;
   res.cookies.set(VENDOR_ID_COOKIE, vendor.id, {
     httpOnly: true,
     secure: IS_PROD,
@@ -40,7 +43,7 @@ function setVendorImpersonationCookies(
     path: '/',
     maxAge: COOKIE_MAX_AGE,
   });
-  res.cookies.set(VENDOR_NAME_COOKIE, vendor.businessName, {
+  res.cookies.set(VENDOR_NAME_COOKIE, name, {
     httpOnly: false,
     secure: IS_PROD,
     sameSite: 'lax',
@@ -77,7 +80,7 @@ async function resolveVendorPrimaryOutletId(businessAccountId: string): Promise<
 }
 
 function storeLabel(v: {
-  displayName: string | null;
+  displayName?: string | null;
   businessName: string;
 }): string {
   return (v.displayName ?? v.businessName).trim() || v.businessName;
@@ -315,7 +318,8 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       },
     });
     clearAllImpersonationCookies(res);
-    setVendorImpersonationCookies(res, { id: vendor.id, businessName: label }, outletId);
+    // Cookie name = store display name; buyer stamp may still use supplier label.
+    setVendorImpersonationCookies(res, vendor, outletId, storeLabel(vendor));
     await stampVendorBuyerCookies(res, vendor, label);
     return res;
   } catch (error) {

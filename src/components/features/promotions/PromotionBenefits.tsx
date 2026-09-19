@@ -98,7 +98,7 @@ export function FreeGiftLine({
     <div className="flex items-center gap-4 px-4 py-3 md:px-7 md:py-4 bg-purple-50/60 border border-purple-100/80 rounded-xl">
       <div className="w-14 h-14 md:w-[72px] md:h-[72px] rounded-xl bg-white border border-purple-100 shrink-0 relative overflow-hidden">
         <Image
-          src={image || '/images/recom-product/product-img10.png'}
+          src={image || '/images/placeholders/no-product.svg'}
           alt={name}
           fill
           className="object-contain p-1.5"

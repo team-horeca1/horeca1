@@ -14,6 +14,14 @@ export interface VendorContext {
 
 export async function resolveVendorContext(ctx: AuthContext, req: NextRequest): Promise<VendorContext> {
   if (ctx.role === 'admin') {
+    // Admin View cookie wins over the admin's own JWT store (avoids session bleed).
+    const impersonateId = req.cookies.get('admin_impersonate_vendor_id')?.value;
+    if (impersonateId) {
+      const vendor = await prisma.vendor.findUnique({ where: { id: impersonateId }, select: { id: true } });
+      if (!vendor) throw Errors.forbidden('Impersonated Online Store not found');
+      return { vendorId: vendor.id, teamRole: 'owner' };
+    }
+
     // Prefer JWT active Online Store when it belongs to the admin's active BA.
     if (ctx.activeVendorId && ctx.activeBusinessAccountId) {
       const active = await prisma.vendor.findFirst({
@@ -31,11 +39,7 @@ export async function resolveVendorContext(ctx: AuthContext, req: NextRequest): 
       if (ownVendor) return { vendorId: ownVendor.id, teamRole: 'owner' };
     }
 
-    const impersonateId = req.cookies.get('admin_impersonate_vendor_id')?.value;
-    if (!impersonateId) throw Errors.forbidden('No Online Store selected for admin view. Go back and click "View Dashboard" on a supplier store.');
-    const vendor = await prisma.vendor.findUnique({ where: { id: impersonateId }, select: { id: true } });
-    if (!vendor) throw Errors.forbidden('Impersonated Online Store not found');
-    return { vendorId: vendor.id, teamRole: 'owner' };
+    throw Errors.forbidden('No Online Store selected for admin view. Go back and click "View Dashboard" on a supplier store.');
   }
 
   if (ctx.activeVendorId) {

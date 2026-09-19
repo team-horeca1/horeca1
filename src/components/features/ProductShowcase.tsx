@@ -27,10 +27,10 @@ interface ColumnData {
 const ALL_PRODUCTS: Product[] = [
     { id: 1, name: 'Green Broccoli', image: '/images/product/brokali.png', oldPrice: '$28.99', newPrice: '$1500.00', rating: 4.8, reviews: '17k' },
     { id: 2, name: 'Fresh Carrots', image: '/images/product/product-img1.png', oldPrice: '$28.99', newPrice: '$1500.00', rating: 4.8, reviews: '17k' },
-    { id: 3, name: 'Organic Almonds', image: '/images/product/product-img3.png', oldPrice: '$28.99', newPrice: '$1500.00', rating: 4.8, reviews: '17k' },
+    { id: 3, name: 'Organic Almonds', image: '/images/placeholders/no-product.svg', oldPrice: '$28.99', newPrice: '$1500.00', rating: 4.8, reviews: '17k' },
     { id: 4, name: 'Sweet Oranges', image: '/images/product/product-img5.png', oldPrice: '$28.99', newPrice: '$1500.00', rating: 4.8, reviews: '17k' },
     { id: 5, name: 'Fresh Lettuce', image: '/images/product/product-img6.png', oldPrice: '$28.99', newPrice: '$1500.00', rating: 4.8, reviews: '17k' },
-    { id: 6, name: 'Red Apple', image: '/images/recom-product/product-img10.png', oldPrice: '$28.99', newPrice: '$1500.00', rating: 4.8, reviews: '17k' },
+    { id: 6, name: 'Red Apple', image: '/images/placeholders/no-product.svg', oldPrice: '$28.99', newPrice: '$1500.00', rating: 4.8, reviews: '17k' },
     { id: 7, name: 'Snack Pack', image: '/images/recom-product/product-img11.png', oldPrice: '$28.99', newPrice: '$1500.00', rating: 4.8, reviews: '17k' },
     { id: 8, name: 'Granola', image: '/images/recom-product/product-img12.png', oldPrice: '$28.99', newPrice: '$1500.00', rating: 4.8, reviews: '17k' },
     { id: 9, name: 'Mixed Nuts', image: '/images/recom-product/product-img14.png', oldPrice: '$28.99', newPrice: '$1500.00', rating: 4.8, reviews: '17k' },

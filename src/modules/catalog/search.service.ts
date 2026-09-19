@@ -15,7 +15,7 @@ interface TrgmRow {
 
 const PRODUCT_INCLUDE = {
   vendor: {
-    select: { id: true, businessName: true, slug: true, logoUrl: true, rating: true, minOrderValue: true },
+    select: { id: true, businessName: true, displayName: true, slug: true, logoUrl: true, rating: true, minOrderValue: true },
   },
   priceSlabs: { orderBy: { sortOrder: 'asc' as const } },
   inventories: { select: { outletId: true, qtyAvailable: true, qtyReserved: true } },

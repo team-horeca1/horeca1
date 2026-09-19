@@ -11,6 +11,7 @@ import { useSession } from 'next-auth/react';
 import { cn, formatPackSize } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
 import { useCart } from '@/context/CartContext';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface VendorProductCardProps {
     product: VendorProduct;
@@ -64,7 +65,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
     const [alternateVendors, setAlternateVendors] = useState<Array<{
         id: string;
         name: string;
-        vendor: { id: string; businessName: string; logoUrl?: string | null };
+        vendor: { id: string; businessName: string; displayName?: string | null; logoUrl?: string | null };
         inventory?: { qtyAvailable: number };
         imageUrl?: string | null;
         images?: string[];
@@ -86,7 +87,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
             setAlternateVendors(alternates.map((a: Record<string, unknown>) => ({
                 id: a.id as string,
                 name: a.name as string,
-                vendor: a.vendor as { id: string; businessName: string; logoUrl?: string | null },
+                vendor: a.vendor as { id: string; businessName: string; displayName?: string | null; logoUrl?: string | null },
                 inventory: a.inventory as { qtyAvailable: number } | undefined,
                 imageUrl: (a.imageUrl as string | null | undefined) ?? null,
                 images: a.images as string[] | undefined,
@@ -540,7 +541,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
             >
                 <div className="relative h-[112px] shrink-0 bg-ivory">
                     <Image
-                        src={product.images[0] || '/images/recom-product/product-img10.png'}
+                        src={product.images[0] || '/images/placeholders/no-product.svg'}
                         alt={product.name}
                         fill
                         sizes="(max-width: 768px) 100vw, 33vw"
@@ -707,7 +708,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         <div className="absolute top-0 left-0 right-0 bottom-7 flex items-center justify-center p-2">
                             <div className="relative w-full h-full">
                                 <Image
-                                    src={product.images[0] || '/images/recom-product/product-img10.png'}
+                                    src={product.images[0] || '/images/placeholders/no-product.svg'}
                                     alt={product.name}
                                     fill
                                     sizes="(max-width: 640px) 45vw, 320px"
@@ -828,7 +829,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                     <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-ivory via-white to-cream flex items-center justify-center">
                         <div className="relative w-[85%] h-[85%]">
                             <Image
-                                src={product.images[0] || '/images/recom-product/product-img10.png'}
+                                src={product.images[0] || '/images/placeholders/no-product.svg'}
                                 alt={product.name}
                                 fill
                                 sizes="(max-width: 1024px) 33vw, 320px"
@@ -955,7 +956,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     <div className="relative w-14 h-14 shrink-0">
                                         <div className="absolute inset-0 rounded-xl bg-gray-50 overflow-hidden">
                                             <Image
-                                                src={product.images[0] || '/images/recom-product/product-img10.png'}
+                                                src={product.images[0] || '/images/placeholders/no-product.svg'}
                                                 alt=""
                                                 fill
                                                 sizes="56px"
@@ -1072,7 +1073,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                         <div className="flex-1 min-w-0">
                                             <p className="text-[14px] font-black text-[#181725] truncate">{alt.name}</p>
                                             <p className="text-[12px] font-bold text-primary truncate">
-                                                {alt.vendor.businessName}
+                                                {storeDisplayName(alt.vendor)}
                                             </p>
                                             <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap mt-0.5">
                                                 {(alt.packSize || alt.unit) && (

@@ -45,7 +45,7 @@ async function respond<T extends { id: string; basePrice: unknown }>(
 }
 
 const productInclude = {
-  vendor: { select: { id: true, businessName: true, logoUrl: true, minOrderValue: true } },
+  vendor: { select: { id: true, businessName: true, displayName: true, logoUrl: true, minOrderValue: true } },
   inventories: { select: { qtyAvailable: true, qtyReserved: true } },
   category: { select: { id: true, name: true } },
   brandMappings: productBrandMappingsInclude,

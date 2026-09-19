@@ -11,7 +11,7 @@ import {
   type BrandVegMark,
 } from '@/lib/brandStoreUtils';
 
-const PRODUCT_IMAGE_FALLBACK = '/images/recom-product/product-img10.png';
+const PRODUCT_IMAGE_FALLBACK = '/images/placeholders/no-product.svg';
 
 export interface BrandCardProduct {
   id: string;

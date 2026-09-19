@@ -244,7 +244,7 @@ export default function RecentlyViewedPage() {
                                             <div key={product.id} className="px-3 py-3 min-[340px]:px-5 min-[340px]:py-4 md:px-7 md:py-5 flex items-center gap-2 min-[340px]:gap-3 md:gap-5 hover:bg-gray-50/40 transition-colors group">
                                                 {/* Image */}
                                                 <div className="w-10 h-10 min-[340px]:w-14 min-[340px]:h-14 md:w-[72px] md:h-[72px] rounded-xl md:rounded-2xl bg-[#F7F8F7] flex items-center justify-center shrink-0 border border-gray-100 p-1 md:p-2 group-hover:border-primary/10 transition-colors">
-                                                    <img src={product.image || '/images/recom-product/product-img10.png'} alt={product.name} className="max-w-full max-h-full object-contain" />
+                                                    <img src={product.image || '/images/placeholders/no-product.svg'} alt={product.name} className="max-w-full max-h-full object-contain" />
                                                 </div>
 
                                                 {/* Info */}

@@ -8,6 +8,7 @@ import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import type { Vendor } from '@/types';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { VendorCard } from '@/components/features/homepage/VendorCardShared';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 /** Frequently Ordered Vendors — top N vendors by order count for the logged-in user (last 90 days). */
 export function FrequentlyOrderedVendors() {
@@ -29,6 +30,7 @@ export function FrequentlyOrderedVendors() {
             .then((d) => setVendors((d.data?.vendors || []).map((v: {
                 id: string;
                 businessName?: string;
+                displayName?: string | null;
                 slug?: string;
                 logoUrl?: string;
                 rating?: number | string;
@@ -41,7 +43,7 @@ export function FrequentlyOrderedVendors() {
                 isVerified?: boolean;
             }) => ({
                 id: v.id,
-                name: v.businessName || '',
+                name: storeDisplayName(v),
                 slug: v.slug || '',
                 logo: v.logoUrl || '',
                 rating: Number(v.rating) || 0,
@@ -139,6 +141,7 @@ export function TopRatedVendors() {
             .then((d) => setVendors((d.data?.vendors || []).map((v: {
                 id: string;
                 businessName?: string;
+                displayName?: string | null;
                 slug?: string;
                 logoUrl?: string;
                 rating?: number | string;
@@ -151,7 +154,7 @@ export function TopRatedVendors() {
                 isVerified?: boolean;
             }) => ({
                 id: v.id,
-                name: v.businessName || '',
+                name: storeDisplayName(v),
                 slug: v.slug || '',
                 logo: v.logoUrl || '',
                 rating: Number(v.rating) || 0,

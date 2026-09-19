@@ -56,7 +56,7 @@ export interface GlobalCategory {
 // ─── 19 Global Categories ────────────────────────────────────────────────────
 
 export const globalCategories: GlobalCategory[] = [
-  { id: 'fruits-vegetables', name: 'Fruits & Vegetables', image: '/images/category/vegitable.png' },
+  { id: 'fruits-vegetables', name: 'Fruits & Vegetables', image: '/images/placeholders/no-category.svg' },
   { id: 'dairy', name: 'Dairy', image: '/images/category/milk.png' },
   { id: 'canned-imported', name: 'Canned & Imported', image: '/images/category/candy.png' },
   { id: 'flours', name: 'Flours', image: '/images/category/snacks.png' },
@@ -64,9 +64,9 @@ export const globalCategories: GlobalCategory[] = [
   { id: 'masala-salt-sugar', name: 'Masala, Salt & Sugar', image: '/images/masala-salt/masala-salt-logo.png' },
   { id: 'chicken-eggs', name: 'Chicken & Eggs', image: '/images/category/animal food.png' },
   { id: 'edible-oils', name: 'Edible Oils', image: '/images/edible-oil/ediable-oil-logo.png' },
-  { id: 'custom-packaging', name: 'Custom Packaging', image: '/images/category/vegitable.png' },
+  { id: 'custom-packaging', name: 'Custom Packaging', image: '/images/placeholders/no-category.svg' },
   { id: 'frozen-instant', name: 'Frozen & Instant Food', image: '/images/category/frozen foods.png' },
-  { id: 'packaging-material', name: 'Packaging Material', image: '/images/category/vegitable.png' },
+  { id: 'packaging-material', name: 'Packaging Material', image: '/images/placeholders/no-category.svg' },
   { id: 'bakery-chocolates', name: 'Bakery & Chocolates', image: '/images/category/candy.png' },
   { id: 'beverages-mixers', name: 'Beverages & Mixers', image: '/images/category/drink-juice.png' },
   { id: 'cleaning-consumables', name: 'Cleaning & Consumables', image: '/images/category/snacks.png' },
@@ -184,10 +184,10 @@ export const vendors: Vendor[] = [
       {
         id: 'fruits-vegetables',
         name: 'Fruits & Vegetables',
-        image: '/images/category/vegitable.png',
+        image: '/images/placeholders/no-category.svg',
         products: [
-          { id: 'fh-1', name: 'Fresh Tomato 1kg', image: '/images/product/product-img3.png', price: 35, originalPrice: 50, unit: '1 kg', inStock: true, discount: 30, isDeal: true, bulkPrices: [{ minQty: 5, price: 30 }, { minQty: 10, price: 27 }] },
-          { id: 'fh-2', name: 'Onion 1kg', image: '/images/category/vegitable.png', price: 40, originalPrice: 60, unit: '1 kg', inStock: false, discount: 33, isDeal: true },
+          { id: 'fh-1', name: 'Fresh Tomato 1kg', image: '/images/placeholders/no-product.svg', price: 35, originalPrice: 50, unit: '1 kg', inStock: true, discount: 30, isDeal: true, bulkPrices: [{ minQty: 5, price: 30 }, { minQty: 10, price: 27 }] },
+          { id: 'fh-2', name: 'Onion 1kg', image: '/images/placeholders/no-category.svg', price: 40, originalPrice: 60, unit: '1 kg', inStock: false, discount: 33, isDeal: true },
         ],
       },
       {
@@ -231,10 +231,10 @@ export const vendors: Vendor[] = [
       {
         id: 'custom-packaging',
         name: 'Custom Packaging',
-        image: '/images/category/vegitable.png',
+        image: '/images/placeholders/no-category.svg',
         products: [
-          { id: 'wm-p1', name: 'Branded Paper Cups 500pcs', image: '/images/category/vegitable.png', price: 750, originalPrice: 900, unit: '500 pcs', inStock: true, discount: 16 },
-          { id: 'wm-p2', name: 'Custom Carry Bags 200pcs', image: '/images/category/vegitable.png', price: 400, originalPrice: 500, unit: '200 pcs', inStock: true },
+          { id: 'wm-p1', name: 'Branded Paper Cups 500pcs', image: '/images/placeholders/no-category.svg', price: 750, originalPrice: 900, unit: '500 pcs', inStock: true, discount: 16 },
+          { id: 'wm-p2', name: 'Custom Carry Bags 200pcs', image: '/images/placeholders/no-category.svg', price: 400, originalPrice: 500, unit: '200 pcs', inStock: true },
         ],
       },
     ],
@@ -307,9 +307,9 @@ export const vendors: Vendor[] = [
       {
         id: 'packaging-material',
         name: 'Packaging Material',
-        image: '/images/category/vegitable.png',
+        image: '/images/placeholders/no-category.svg',
         products: [
-          { id: 'cm-pm1', name: 'Clear Wrap Roll', image: '/images/category/vegitable.png', price: 180, originalPrice: 220, unit: '1 roll', inStock: true },
+          { id: 'cm-pm1', name: 'Clear Wrap Roll', image: '/images/placeholders/no-category.svg', price: 180, originalPrice: 220, unit: '1 roll', inStock: true },
         ],
       },
     ],
@@ -320,7 +320,7 @@ export const vendors: Vendor[] = [
     id: 'v1',
     name: 'Emarket',
     slug: 'emarket',
-    logo: '/images/top vendors/emarket.png',
+    logo: '/images/placeholders/no-vendor.svg',
     tagline: 'Your everyday grocery and household needs',
     categories: ['Fruits & Vegetables', 'Cleaning & Consumables', 'Bakery & Chocolates'],
     rating: 4.1,
@@ -335,9 +335,9 @@ export const vendors: Vendor[] = [
       {
         id: 'fruits-vegetables',
         name: 'Fruits & Vegetables',
-        image: '/images/category/vegitable.png',
+        image: '/images/placeholders/no-category.svg',
         products: [
-          { id: 'em-1', name: 'Mixed Vegetable Pack 1kg', image: '/images/category/vegitable.png', price: 65, originalPrice: 80, unit: '1 kg', inStock: true, discount: 19, isDeal: true, bulkPrices: [{ minQty: 5, price: 58 }, { minQty: 10, price: 52 }], frequentlyOrdered: true },
+          { id: 'em-1', name: 'Mixed Vegetable Pack 1kg', image: '/images/placeholders/no-category.svg', price: 65, originalPrice: 80, unit: '1 kg', inStock: true, discount: 19, isDeal: true, bulkPrices: [{ minQty: 5, price: 58 }, { minQty: 10, price: 52 }], frequentlyOrdered: true },
           { id: 'em-2', name: 'Carrot 500g', image: '/images/organic/product-img20.png', price: 22, originalPrice: 28, unit: '500 g', inStock: true },
         ],
       },
@@ -381,7 +381,7 @@ export const vendors: Vendor[] = [
       {
         id: 'fruits-vegetables',
         name: 'Fruits & Vegetables',
-        image: '/images/category/vegitable.png',
+        image: '/images/placeholders/no-category.svg',
         products: [
           { id: 'wf-1', name: 'Organic Spinach 200g', image: '/images/fruits-vegetables/corriander.png', price: 35, originalPrice: 45, unit: '200 g', inStock: true, discount: 22, isDeal: true, bulkPrices: [{ minQty: 5, price: 30 }] },
           { id: 'wf-2', name: 'Avocado 2pcs', image: '/images/category/fruits.png', price: 180, originalPrice: 220, unit: '2 pcs', inStock: true, bulkPrices: [{ minQty: 4, price: 165 }, { minQty: 8, price: 155 }] },

@@ -293,7 +293,7 @@ export class CartService {
                 brandMappings: productBrandMappingsInclude,
               },
             },
-            vendor: { select: { id: true, businessName: true, slug: true, minOrderValue: true, logoUrl: true } },
+            vendor: { select: { id: true, businessName: true, displayName: true, slug: true, minOrderValue: true, logoUrl: true } },
           },
         },
       },
@@ -364,7 +364,7 @@ export class CartService {
             brandMappings: productBrandMappingsInclude,
           },
         },
-        vendor: { select: { id: true, businessName: true, slug: true, minOrderValue: true, logoUrl: true } },
+        vendor: { select: { id: true, businessName: true, displayName: true, slug: true, minOrderValue: true, logoUrl: true } },
       },
     });
 

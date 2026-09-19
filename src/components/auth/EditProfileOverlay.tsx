@@ -320,7 +320,7 @@ export function EditProfileOverlay({ isOpen, onClose, userData, onSave }: EditPr
         }
     };
 
-    const avatarSrc = image || '/images/profile/sample-profile.png';
+    const avatarSrc = image || '/images/placeholders/no-avatar.svg';
     const busy = saving || otpLoading;
     const saveLabel = phoneChanged && !phoneVerified
         ? (otpSent ? 'Verify & Save' : 'Verify Phone & Save')

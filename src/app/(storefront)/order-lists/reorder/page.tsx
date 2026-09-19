@@ -55,7 +55,7 @@ export default function ReorderPage() {
                     lastOrderedQty: item.quantity,
                     currentQty: 0,
                     unitPrice: item.unitPrice,
-                    image: item.image || '/images/recom-product/product-img10.png',
+                    image: item.image || '/images/placeholders/no-product.svg',
                     packSize: item.packSize || '',
                     vendorId,
                 })));

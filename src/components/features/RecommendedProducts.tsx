@@ -30,7 +30,7 @@ const PRODUCTS: Product[] = [
     {
         id: 1,
         name: 'C-500 Antioxidant Protect Dietary Supplement',
-        image: '/images/recom-product/product-img10.png',
+        image: '/images/placeholders/no-product.svg',
         oldPrice: '$28.99',
         newPrice: '$14.99',
         rating: 4.8,

@@ -69,7 +69,7 @@ const PRODUCTS_DATA: Record<string, Product> = {
 };
 
 const RELATED_PRODUCTS = [
-    { id: 101, name: 'Fresh Red Chili', image: '/images/recom-product/product-img10.png', price: '$ 120.07', unit: '/kg' },
+    { id: 101, name: 'Fresh Red Chili', image: '/images/placeholders/no-product.svg', price: '$ 120.07', unit: '/kg' },
     { id: 102, name: 'Fresh Onion', image: '/images/recom-product/product-img11.png', price: '$ 88.65', unit: '/kg' },
     { id: 103, name: 'Fresh Garlic', image: '/images/recom-product/product-img12.png', price: '$ 45.20', unit: '/kg' },
 ];

@@ -24,8 +24,8 @@ const CATEGORY_BG: Record<string, string> = {
 
 // High-fidelity fallback product cutouts per category/slug
 const CATEGORY_IMAGE_MAP: Record<string, string> = {
-  'fresh-produce': '/images/category/vegitable.png',
-  'vegetables': '/images/category/vegitable.png',
+  'fresh-produce': '/images/placeholders/no-category.svg',
+  'vegetables': '/images/placeholders/no-category.svg',
   'fruits': '/images/category/fruits.png',
   'herbs-seasonings': '/images/fruits-vegetables/corriander.png',
   'dairy-cheese-eggs': '/images/category/milk.png',
@@ -266,7 +266,7 @@ function MobileCategoryCard({ cat, activeCategory, onCategoryClick }: MobileCate
   const isActive = activeCategory === cat.name || activeCategory === `cat:${cat.name}`;
   const normalizedSlug = cat.slug || cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   const isBadImage = cat.image && (cat.image.includes('screenshot') || cat.image.includes('localhost') || cat.image.includes('66789-1788356520630_0xlKolVR5') || cat.image.length > 300);
-  const imageSrc = OVERRIDE_CATEGORY_IMAGES[normalizedSlug] || OVERRIDE_CATEGORY_IMAGES[cat.slug] || (!isBadImage && cat.image ? cat.image : null) || CATEGORY_IMAGE_MAP[normalizedSlug] || CATEGORY_IMAGE_MAP[cat.slug] || '/images/category/vegitable.png';
+  const imageSrc = OVERRIDE_CATEGORY_IMAGES[normalizedSlug] || OVERRIDE_CATEGORY_IMAGES[cat.slug] || (!isBadImage && cat.image ? cat.image : null) || CATEGORY_IMAGE_MAP[normalizedSlug] || CATEGORY_IMAGE_MAP[cat.slug] || '/images/placeholders/no-category.svg';
 
   const content = (
     <div className="w-full flex flex-col items-center text-center">
@@ -328,7 +328,7 @@ const DesktopCategoryCard = ({ cat, activeCategory, onCategoryClick }: DesktopCa
   // Resolve crisp product cutout and filter out bad/screenshot images
   const normalizedSlug = cat.slug || cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   const isBadImage = cat.image && (cat.image.includes('screenshot') || cat.image.includes('localhost') || cat.image.includes('66789-1788356520630_0xlKolVR5') || cat.image.length > 300);
-  const imageSrc = OVERRIDE_CATEGORY_IMAGES[normalizedSlug] || OVERRIDE_CATEGORY_IMAGES[cat.slug] || (!isBadImage && cat.image ? cat.image : null) || CATEGORY_IMAGE_MAP[normalizedSlug] || CATEGORY_IMAGE_MAP[cat.slug] || '/images/category/vegitable.png';
+  const imageSrc = OVERRIDE_CATEGORY_IMAGES[normalizedSlug] || OVERRIDE_CATEGORY_IMAGES[cat.slug] || (!isBadImage && cat.image ? cat.image : null) || CATEGORY_IMAGE_MAP[normalizedSlug] || CATEGORY_IMAGE_MAP[cat.slug] || '/images/placeholders/no-category.svg';
 
   const content = (
     <>

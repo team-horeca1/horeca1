@@ -7,15 +7,10 @@ import { Star, ArrowRight, Package, Clock, ShieldCheck } from 'lucide-react';
 import type { Vendor } from '@/types';
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { vendorShareContent } from '@/lib/share-cards/types';
+import { PLACEHOLDERS } from '@/lib/constants';
 
 export const VENDOR_COVERS = [
-  '/images/vendors/chad-peltola-BTvQ2ET_iKc-unsplash.webp',
-  '/images/vendors/eryka-ragna-K5dvZHBJp3k-unsplash.webp',
-  '/images/vendors/gioia-m-EGjfIKl_ZvE-unsplash.webp',
-  '/images/vendors/kylle-pangan-LjpD-uW4dH0-unsplash.webp',
-  '/images/vendors/m-veven-4oHtqbwy7Lo-unsplash.webp',
-  '/images/vendors/sleeba-thomas-h-T2VPkw9Kw-unsplash.webp',
-  '/images/vendors/young-kane-kSDOJRNol9E-unsplash.webp',
+  '/images/placeholders/no-vendor.svg',
 ];
 
 function vendorYears(createdAt?: string) {
@@ -42,7 +37,7 @@ interface VendorCardProps {
 }
 
 export function VendorCard({ vendor, index, fluid = false, priority = false }: VendorCardProps) {
-  const cover = vendor.coverImage || VENDOR_COVERS[index % VENDOR_COVERS.length];
+  const cover = vendor.coverImage || PLACEHOLDERS.vendor;
   const categoryPills = vendor.categories.slice(0, 3);
   const remainingCategories = Math.max(0, vendor.categories.length - 3);
   const years = vendorYears(vendor.createdAt);

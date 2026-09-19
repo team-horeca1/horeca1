@@ -7,14 +7,14 @@ export class ListService {
     return prisma.quickOrderList.findMany({
       where: { userId },
       include: {
-        vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true } },
+        vendor: { select: { id: true, businessName: true, displayName: true, slug: true, logoUrl: true } },
         items: {
           include: {
             product: {
               include: {
                 priceSlabs: { orderBy: { sortOrder: 'asc' } },
                 inventories: { select: { qtyAvailable: true } },
-                vendor: { select: { id: true, businessName: true, logoUrl: true } },
+                vendor: { select: { id: true, businessName: true, displayName: true, logoUrl: true } },
                 category: { select: { id: true, name: true } },
               },
             },
@@ -30,7 +30,7 @@ export class ListService {
     const list = await prisma.quickOrderList.findFirst({
       where: { id: listId, userId },
       include: {
-        vendor: { select: { id: true, businessName: true, slug: true } },
+        vendor: { select: { id: true, businessName: true, displayName: true, slug: true } },
         items: {
           include: {
             product: {

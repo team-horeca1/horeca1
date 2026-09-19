@@ -35,7 +35,7 @@ import { isAdminCustomerImpersonationActive, isAnyAdminImpersonationActive, read
 import { resolvePortalNav, type InitialNav } from '@/lib/navChrome';
 
 const CATEGORY_STYLE: Record<string, { image: string; bgColor: string }> = {
-    'vegetables': { image: '/images/category/vegitable.png', bgColor: '#e8f9e9' },
+    'vegetables': { image: '/images/placeholders/no-category.svg', bgColor: '#e8f9e9' },
     'fruits': { image: '/images/category/fruits.png', bgColor: '#f0fdf4' },
     'dairy-eggs': { image: '/images/category/milk.png', bgColor: '#eef2ff' },
     'spices-masala': { image: '/images/category/candy.png', bgColor: '#eff6ff' },
@@ -44,9 +44,9 @@ const CATEGORY_STYLE: Record<string, { image: string; bgColor: string }> = {
     'seafood': { image: '/images/category/fish & meat.png', bgColor: '#fff7ed' },
     'beverages': { image: '/images/category/drink-juice.png', bgColor: CDL.successLight },
     'oils-ghee': { image: '/images/category/fruits.png', bgColor: '#f0fdf4' },
-    'packaging-supplies': { image: '/images/category/vegitable.png', bgColor: '#f8fafc' },
+    'packaging-supplies': { image: '/images/placeholders/no-category.svg', bgColor: '#f8fafc' },
 };
-const DEFAULT_STYLE = { image: '/images/category/vegitable.png', bgColor: '#f7f8fa' };
+const DEFAULT_STYLE = { image: '/images/placeholders/no-category.svg', bgColor: '#f7f8fa' };
 
 const DESKTOP_NAV = [
     { name: 'Home', href: '/', Icon: HomeIcon },

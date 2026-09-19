@@ -46,7 +46,7 @@ const PRODUCTS: Product[] = [
     {
         id: 3,
         name: 'Mixed Fresh Vegetables Harvest',
-        image: '/images/product/product-img3.png',
+        image: '/images/placeholders/no-product.svg',
         oldPrice: '$28.99',
         newPrice: '$14.99',
         rating: 4.8,

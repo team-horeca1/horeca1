@@ -19,14 +19,14 @@ const VENDORS: Vendor[] = [
     {
         id: 1,
         name: 'Emarket',
-        logo: '/images/top vendors/emarket.png',
+        logo: '/images/placeholders/no-vendor.svg',
         deliveryTime: 'Delivery by 7:00am',
         offer: '₹50 off first order',
         bgColor: 'bg-[#f0f9ea]',
         productImages: [
             '/images/recom-product/product-img11.png',
             '/images/recom-product/product-img12.png',
-            '/images/recom-product/product-img10.png',
+            '/images/placeholders/no-product.svg',
             '/images/recom-product/product-img14.png',
             '/images/recom-product/product-img15.png',
         ]
@@ -41,7 +41,7 @@ const VENDORS: Vendor[] = [
         productImages: [
             '/images/recom-product/product-img11.png',
             '/images/recom-product/product-img12.png',
-            '/images/recom-product/product-img10.png',
+            '/images/placeholders/no-product.svg',
             '/images/recom-product/product-img14.png',
             '/images/recom-product/product-img15.png',
         ]
@@ -56,7 +56,7 @@ const VENDORS: Vendor[] = [
         productImages: [
             '/images/recom-product/product-img11.png',
             '/images/recom-product/product-img12.png',
-            '/images/recom-product/product-img10.png',
+            '/images/placeholders/no-product.svg',
             '/images/recom-product/product-img14.png',
             '/images/recom-product/product-img15.png',
         ]
@@ -71,7 +71,7 @@ const VENDORS: Vendor[] = [
         productImages: [
             '/images/recom-product/product-img11.png',
             '/images/recom-product/product-img12.png',
-            '/images/recom-product/product-img10.png',
+            '/images/placeholders/no-product.svg',
             '/images/recom-product/product-img14.png',
             '/images/recom-product/product-img15.png',
         ]
@@ -86,7 +86,7 @@ const VENDORS: Vendor[] = [
         productImages: [
             '/images/recom-product/product-img11.png',
             '/images/recom-product/product-img12.png',
-            '/images/recom-product/product-img10.png',
+            '/images/placeholders/no-product.svg',
             '/images/recom-product/product-img14.png',
             '/images/recom-product/product-img15.png',
         ]
@@ -101,7 +101,7 @@ const VENDORS: Vendor[] = [
         productImages: [
             '/images/recom-product/product-img11.png',
             '/images/recom-product/product-img12.png',
-            '/images/recom-product/product-img10.png',
+            '/images/placeholders/no-product.svg',
             '/images/recom-product/product-img14.png',
             '/images/recom-product/product-img15.png',
         ]
@@ -116,7 +116,7 @@ const VENDORS: Vendor[] = [
         productImages: [
             '/images/recom-product/product-img11.png',
             '/images/recom-product/product-img12.png',
-            '/images/recom-product/product-img10.png',
+            '/images/placeholders/no-product.svg',
             '/images/recom-product/product-img14.png',
             '/images/recom-product/product-img15.png',
         ]
@@ -131,7 +131,7 @@ const VENDORS: Vendor[] = [
         productImages: [
             '/images/recom-product/product-img11.png',
             '/images/recom-product/product-img12.png',
-            '/images/recom-product/product-img10.png',
+            '/images/placeholders/no-product.svg',
             '/images/recom-product/product-img14.png',
             '/images/recom-product/product-img15.png',
         ]

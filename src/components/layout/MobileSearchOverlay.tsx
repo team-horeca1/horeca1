@@ -274,7 +274,7 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                                                 className="flex flex-col items-center gap-2 min-w-[90px] p-3 border border-[#EEEEEE] rounded-[16px] hover:border-primary/30 hover:bg-gray-50/50 transition-all active:scale-[0.97] group"
                                             >
                                                 <div className="w-[56px] h-[56px] rounded-full bg-[#F7FBF8] flex items-center justify-center overflow-hidden border border-[#EEEEEE]">
-                                                    <img src={cat.image || '/images/category/vegitable.png'} alt={cat.name} className="w-[70%] h-[70%] object-contain" />
+                                                    <img src={cat.image || '/images/placeholders/no-category.svg'} alt={cat.name} className="w-[70%] h-[70%] object-contain" />
                                                 </div>
                                                 <span className="text-[12px] font-bold text-[#181725] text-center leading-tight line-clamp-2 group-hover:text-primary transition-colors">
                                                     {cat.name}

@@ -9,6 +9,7 @@ import { useStableSession } from '@/hooks/useStableSession';
 import { useCart } from '@/context/CartContext';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import type { VendorProduct } from '@/types';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface OrderItemRow {
   productId: string;
@@ -21,7 +22,7 @@ interface OrderItemRow {
 interface OrderRow {
   id: string;
   vendorId?: string;
-  vendor?: { id: string; businessName: string; logoUrl: string | null };
+  vendor?: { id: string; businessName: string; displayName?: string | null; logoUrl: string | null };
   items: OrderItemRow[];
 }
 
@@ -103,7 +104,7 @@ export function FrequentlyReorderedProducts() {
                 image: img,
                 price,
                 count: item.quantity || 1,
-                vendorName: order.vendor?.businessName || 'Vendor',
+                vendorName: order.vendor ? storeDisplayName(order.vendor) || 'Vendor' : 'Vendor',
               });
             }
           }
