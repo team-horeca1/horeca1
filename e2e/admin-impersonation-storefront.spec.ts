@@ -196,6 +196,46 @@ async function assertProfileShowsBuyerNotAdmin(page: Page) {
   }
 }
 
+test('vendor Admin View exit then View Storefront is not still shopping as supplier', async ({ page }) => {
+  await passwordLogin(page, ADMIN_EMAIL, 'admin123');
+
+  const started = await page.evaluate(async () => {
+    const listRes = await fetch('/api/v1/admin/vendors?view=suppliers&limit=100', {
+      credentials: 'include',
+    });
+    const listJson = await listRes.json();
+    const suppliers = (listJson.data?.suppliers ?? []) as Array<{
+      userId: string;
+      storeCount: number;
+    }>;
+    const s = suppliers.find((x) => x.storeCount >= 1) ?? suppliers[0];
+    if (!s?.userId) return { ok: false as const };
+    const res = await fetch('/api/v1/admin/impersonate', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ supplierUserId: s.userId }),
+    });
+    return { ok: res.ok };
+  });
+  expect(started.ok, 'vendor impersonate should succeed').toBeTruthy();
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  const whileImpersonating = await api<MeProfile>(page, '/api/v1/auth/me');
+  expect(whileImpersonating.json.impersonating?.userId).toBeTruthy();
+
+  // Simulate Exit Admin View: clear cookies then land on admin
+  await api(page, '/api/v1/admin/impersonate/customer', { method: 'DELETE' });
+  await page.goto('/admin/dashboard', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 30_000 });
+
+  // View Storefront after exit must not keep buyer cookies
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  const afterExit = await api<MeProfile>(page, '/api/v1/auth/me');
+  expect(afterExit.json.impersonating ?? null).toBeFalsy();
+  await expect(page.getByText(/shopping as/i)).toHaveCount(0);
+});
+
 test('vendor Admin View /profile shows supplier identity, not the admin', async ({ page }) => {
   await passwordLogin(page, ADMIN_EMAIL, 'admin123');
 

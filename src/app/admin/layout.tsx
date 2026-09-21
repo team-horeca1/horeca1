@@ -26,6 +26,7 @@ import { ADMIN_NAV_GROUPS, filterNavLinks, type PortalNavGroup, type PortalNavLi
 import { getFirstAllowedRoute, getRoutePermission } from '@/lib/permissions/routePermissions';
 import { PortalPageGuard } from '@/components/auth/PortalPageGuard';
 import { PortalNoAccess } from '@/components/auth/PortalNoAccess';
+import { clearAllAdminImpersonation } from '@/lib/clearImpersonation';
 import { Suspense } from 'react';
 
 function isNavActive(pathname: string, href: string): boolean {
@@ -138,6 +139,13 @@ export default function AdminLayout({
         links: filterNavLinks(g.links, can, 'admin'),
     })).filter((g) => g.links.length > 0);
     const allowedHrefs = visibleGroups.flatMap((g) => g.links.map((l) => l.href)).join('|');
+
+    const openCleanStorefront = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        setMobileOpen(false);
+        await clearAllAdminImpersonation();
+        window.location.assign('/');
+    };
 
     useEffect(() => {
         if (status !== 'authenticated' || userRole !== 'admin') return;
@@ -329,7 +337,7 @@ export default function AdminLayout({
                         <div className="px-3 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-divider pt-3">
                             <Link
                                 href="/"
-                                onClick={() => setMobileOpen(false)}
+                                onClick={openCleanStorefront}
                                 className="flex items-center gap-3 min-h-12 px-4 rounded-[12px] text-primary font-semibold hover:bg-primary-light"
                             >
                                 <Home size={22} />
@@ -362,6 +370,7 @@ export default function AdminLayout({
                         <div className="px-3 pb-2">
                             <Link
                                 href="/"
+                                onClick={openCleanStorefront}
                                 title={isCollapsed ? 'View Storefront' : undefined}
                                 className={cn(
                                     'flex items-center rounded-[12px] text-[14px] text-primary hover:bg-primary-light font-semibold min-h-12',
