@@ -11,8 +11,8 @@ import { DeliveryTab } from '@/components/features/vendor/settings/DeliveryTab';
 import { PaymentsTab } from '@/components/features/vendor/settings/PaymentsTab';
 import { PoliciesTab } from '@/components/features/vendor/settings/PoliciesTab';
 import { DocumentsTab } from '@/components/features/vendor/settings/DocumentsTab';
-import type { DeliverySlot, ServiceArea, SettingsTabId, VendorDocument, VendorSettings } from '@/components/features/vendor/settings/types';
-import { normalizeTimeInput, SETTINGS_TABS } from '@/components/features/vendor/settings/types';
+import type { ServiceArea, SettingsTabId, VendorDocument, VendorSettings } from '@/components/features/vendor/settings/types';
+import { SETTINGS_TABS } from '@/components/features/vendor/settings/types';
 
 function parseTab(raw: string | null): SettingsTabId {
   if (raw && SETTINGS_TABS.some((t) => t.id === raw)) return raw as SettingsTabId;
@@ -42,13 +42,6 @@ function VendorSettingsContent() {
   const [gstNumber, setGstNumber] = useState('');
   const [newPincode, setNewPincode] = useState('');
   const [addingArea, setAddingArea] = useState(false);
-  const [showSlotForm, setShowSlotForm] = useState(false);
-  const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
-  const [slotDay, setSlotDay] = useState(1);
-  const [slotStart, setSlotStart] = useState('');
-  const [slotEnd, setSlotEnd] = useState('');
-  const [slotCutoff, setSlotCutoff] = useState('');
-  const [savingSlot, setSavingSlot] = useState(false);
   const [paymentModes, setPaymentModes] = useState<string[]>(['cod', 'prepaid']);
   const [vendorType, setVendorType] = useState<'distributor' | 'wholesaler' | 'dark_store'>('distributor');
   const [multiWarehouseEnabled, setMultiWarehouseEnabled] = useState(false);
@@ -155,9 +148,6 @@ function VendorSettingsContent() {
 
   const scopedServiceAreas = settings?.serviceAreas.filter(
     (a) => !multiWarehouseEnabled || a.outletId === configOutletId,
-  ) ?? [];
-  const scopedDeliverySlots = settings?.deliverySlots.filter(
-    (s) => !multiWarehouseEnabled || s.outletId === configOutletId,
   ) ?? [];
 
   const fetchDocuments = useCallback(async () => {
@@ -371,107 +361,6 @@ function VendorSettingsContent() {
     }
   };
 
-  const resetSlotForm = () => {
-    setShowSlotForm(false);
-    setEditingSlotId(null);
-    setSlotDay(1);
-    setSlotStart('');
-    setSlotEnd('');
-    setSlotCutoff('');
-  };
-
-  const openAddSlot = () => {
-    setEditingSlotId(null);
-    setSlotDay(1);
-    setSlotStart('10:00');
-    setSlotEnd('20:00');
-    setSlotCutoff('17:00');
-    setShowSlotForm(true);
-  };
-
-  const openEditSlot = (slot: DeliverySlot) => {
-    setEditingSlotId(slot.id);
-    setSlotDay(slot.dayOfWeek);
-    setSlotStart(normalizeTimeInput(slot.slotStart));
-    setSlotEnd(normalizeTimeInput(slot.slotEnd));
-    setSlotCutoff(normalizeTimeInput(slot.cutoffTime));
-    setShowSlotForm(true);
-  };
-
-  const handleSaveSlot = async () => {
-    if (!slotStart || !slotEnd || !slotCutoff) { toast.error('Please fill all time fields'); return; }
-    try {
-      setSavingSlot(true);
-      if (editingSlotId) {
-        const res = await fetch('/api/v1/vendor/settings/delivery-slots', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editingSlotId, dayOfWeek: slotDay, slotStart, slotEnd, cutoffTime: slotCutoff }),
-        });
-        const json = await res.json();
-        if (!json.success) throw new Error(json.error?.message || 'Failed to update');
-        setSettings((prev) => prev ? { ...prev, deliverySlots: prev.deliverySlots.map((s) => s.id === editingSlotId ? json.data : s) } : prev);
-      } else {
-        const res = await fetch('/api/v1/vendor/settings/delivery-slots', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            dayOfWeek: slotDay,
-            slotStart,
-            slotEnd,
-            cutoffTime: slotCutoff,
-            ...(multiWarehouseEnabled && configOutletId ? { outletId: configOutletId } : {}),
-          }),
-        });
-        const json = await res.json();
-        if (!json.success) throw new Error(json.error?.message || 'Failed to add');
-        setSettings((prev) => prev ? { ...prev, deliverySlots: [...prev.deliverySlots, json.data] } : prev);
-      }
-      resetSlotForm();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save slot');
-    } finally {
-      setSavingSlot(false);
-    }
-  };
-
-  const handleToggleSlot = async (slot: DeliverySlot) => {
-    try {
-      const res = await fetch('/api/v1/vendor/settings/delivery-slots', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: slot.id, isActive: !slot.isActive }),
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error?.message || 'Failed to update');
-      setSettings((prev) => prev ? { ...prev, deliverySlots: prev.deliverySlots.map((s) => s.id === slot.id ? json.data : s) } : prev);
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update');
-    }
-  };
-
-  const handleDeleteSlot = async (slot: DeliverySlot) => {
-    const ok = await confirm({
-      title: 'Delete delivery slot?',
-      message: 'This slot will be removed. Try deactivating if linked to orders.',
-      confirmText: 'Delete',
-      tone: 'danger',
-    });
-    if (!ok) return;
-    try {
-      const res = await fetch('/api/v1/vendor/settings/delivery-slots', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: slot.id }),
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error?.message || 'Failed to delete');
-      setSettings((prev) => prev ? { ...prev, deliverySlots: prev.deliverySlots.filter((s) => s.id !== slot.id) } : prev);
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete');
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -520,19 +409,9 @@ function VendorSettingsContent() {
             configOutletId={configOutletId}
             setConfigOutletId={setConfigOutletId}
             scopedServiceAreas={scopedServiceAreas}
-            scopedDeliverySlots={scopedDeliverySlots}
             newPincode={newPincode} setNewPincode={setNewPincode}
             addingArea={addingArea} onAddArea={handleAddArea}
             onToggleArea={handleToggleArea} onDeleteArea={handleDeleteArea}
-            showSlotForm={showSlotForm} editingSlotId={editingSlotId}
-            slotDay={slotDay} setSlotDay={setSlotDay}
-            slotStart={slotStart} setSlotStart={setSlotStart}
-            slotEnd={slotEnd} setSlotEnd={setSlotEnd}
-            slotCutoff={slotCutoff} setSlotCutoff={setSlotCutoff}
-            savingSlot={savingSlot}
-            onOpenAddSlot={openAddSlot} onOpenEditSlot={openEditSlot}
-            onSaveSlot={handleSaveSlot} onResetSlotForm={resetSlotForm}
-            onToggleSlot={handleToggleSlot} onDeleteSlot={handleDeleteSlot}
             defaultMOQ={defaultMOQ} setDefaultMOQ={setDefaultMOQ}
             deliveryFeeVal={deliveryFeeVal} setDeliveryFeeVal={setDeliveryFeeVal}
             freeDeliveryAbove={freeDeliveryAbove} setFreeDeliveryAbove={setFreeDeliveryAbove}
