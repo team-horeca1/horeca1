@@ -39,8 +39,10 @@ ALTER TABLE "orders"
   ADD COLUMN IF NOT EXISTS "delivery_mode" "delivery_mode";
 
 -- Admin-fed holiday calendar
+-- NOTE: id has NO DB default — schema uses @default(uuid()) (Prisma client-side).
+-- A DEFAULT gen_random_uuid() here fails CI migrate-diff drift checks.
 CREATE TABLE IF NOT EXISTS "platform_holidays" (
-  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "id" UUID NOT NULL,
   "holiday_date" DATE NOT NULL,
   "label" VARCHAR(255) NOT NULL,
   "scope" "holiday_scope" NOT NULL DEFAULT 'all_india',
