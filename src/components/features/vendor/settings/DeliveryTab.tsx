@@ -89,93 +89,99 @@ export function DeliveryTab(props: DeliveryTabProps) {
         onRequestAddPincode={focusAddPincode}
         serviceAreasSlot={
           <section>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <MapPin size={18} className="text-primary" />
-                <h2 className="text-[16px] font-bold text-[#181725]">Service Areas</h2>
-                <span className="text-[13px] text-[#AEAEAE]">({scopedServiceAreas.length})</span>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <MapPin size={16} className="text-primary shrink-0" />
+                <h2 className="text-[15px] font-bold text-[#181725]">Service Areas</h2>
+                <span className="text-[12px] text-[#AEAEAE] tabular-nums">({scopedServiceAreas.length})</span>
               </div>
             </div>
             {outletPicker}
 
-            <div className="flex gap-2 mb-4">
+            <div className="flex gap-2 mb-3">
               <input
                 ref={addPincodeRef}
                 type="text"
+                inputMode="numeric"
                 value={newPincode}
                 onChange={(e) => setNewPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="Add pincode (e.g. 400001)"
+                placeholder="Add pincode"
                 maxLength={6}
-                className="flex-1 h-[44px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-primary/40"
+                aria-label="Add service area pincode"
+                className="w-[9.5rem] sm:w-[11rem] h-10 border border-[#E9E3DD] rounded-lg px-3 text-[13px] font-medium tabular-nums outline-none focus:border-primary/40 bg-white"
                 onKeyDown={(e) => { if (e.key === 'Enter') onAddArea(); }}
               />
               <button
                 type="button"
                 onClick={onAddArea}
                 disabled={addingArea || newPincode.length !== 6}
-                className="h-[44px] px-4 bg-primary text-white rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-50"
+                className="h-10 px-3.5 bg-primary text-white rounded-lg text-[12px] font-bold flex items-center gap-1 disabled:opacity-50 shrink-0"
               >
-                <Plus size={16} /> {addingArea ? 'Adding...' : 'Add'}
+                <Plus size={14} /> {addingArea ? '…' : 'Add'}
               </button>
             </div>
 
             {scopedServiceAreas.length === 0 ? (
-              <div className="p-8 text-center rounded-[12px] border border-dashed border-[#D1D5DB] bg-[#FAFAFA]">
-                <MapPin size={28} className="text-[#AEAEAE] mx-auto mb-2" />
-                <p className="text-[13px] font-bold text-[#374151]">No service areas yet</p>
-                <p className="text-[12px] text-[#AEAEAE] mt-1">Add a pincode to start accepting orders</p>
+              <div className="py-6 px-4 text-center rounded-xl border border-dashed border-[#E9E3DD] bg-[#FAF7F2]/60">
+                <p className="text-[13px] font-semibold text-[#374151]">No pincodes yet</p>
+                <p className="text-[12px] text-[#AEAEAE] mt-0.5">Add a pincode to start accepting orders</p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {scopedServiceAreas.map((area) => (
-                  <div
-                    key={area.id}
-                    className={cn(
-                      'flex items-center justify-between p-3 rounded-[10px] border',
-                      area.isActive ? 'border-[#EEEEEE] bg-white' : 'border-[#F5F5F5] bg-[#FAFAFA] opacity-60',
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        'w-8 h-8 rounded-lg flex items-center justify-center',
-                        area.isActive ? 'bg-primary-light' : 'bg-[#F5F5F5]',
-                      )}>
-                        <MapPin size={14} className={area.isActive ? 'text-primary' : 'text-[#AEAEAE]'} />
-                      </div>
-                      <div>
-                        <p className="text-[14px] font-bold text-[#181725]">{area.pincode}</p>
-                        {(area.cityLabel || area.areaLabel) && (
-                          <p className="text-[11px] text-[#AEAEAE]">
-                            {[area.cityLabel, area.areaLabel].filter(Boolean).join(' · ')}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
+              <div className="flex flex-wrap gap-1.5">
+                {scopedServiceAreas.map((area) => {
+                  const place = [area.cityLabel, area.areaLabel].filter(Boolean).join(' · ');
+                  return (
+                    <div
+                      key={area.id}
+                      className={cn(
+                        'group inline-flex items-center gap-1 max-w-full h-8 pl-2.5 pr-1 rounded-full border text-[12px] transition-colors',
+                        area.isActive
+                          ? 'border-[#6B1D2E]/25 bg-[#F8E8EC] text-[#1C1C1C]'
+                          : 'border-[#E9E3DD] bg-[#FAFAFA] text-[#9CA3AF]',
+                      )}
+                      title={place || area.pincode}
+                    >
                       <button
                         type="button"
                         onClick={() => onToggleArea(area)}
-                        className="relative inline-flex h-[20px] w-[36px] shrink-0 items-center rounded-full"
-                        style={{ backgroundColor: area.isActive ? '#6B1D2E' : '#D1D5DB' }}
-                        aria-label={area.isActive ? 'Deactivate area' : 'Activate area'}
+                        className="inline-flex items-center gap-1.5 min-w-0 text-left"
+                        aria-pressed={area.isActive}
+                        aria-label={
+                          area.isActive
+                            ? `Deactivate ${area.pincode}`
+                            : `Activate ${area.pincode}`
+                        }
                       >
                         <span
-                          className="inline-block h-[14px] w-[14px] rounded-full bg-white shadow-sm transition-transform"
-                          style={{ transform: area.isActive ? 'translateX(19px)' : 'translateX(3px)' }}
+                          className={cn(
+                            'w-1.5 h-1.5 rounded-full shrink-0',
+                            area.isActive ? 'bg-primary' : 'bg-[#D1D5DB]',
+                          )}
                         />
+                        <span className="font-bold tabular-nums tracking-wide">{area.pincode}</span>
+                        {place ? (
+                          <span className="truncate max-w-[7rem] text-[11px] text-[#667085] font-medium hidden sm:inline">
+                            {place}
+                          </span>
+                        ) : null}
                       </button>
                       <button
                         type="button"
                         onClick={() => onDeleteArea(area)}
                         aria-label={`Remove pincode ${area.pincode}`}
-                        className="p-0.5 rounded hover:bg-red-50"
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-[#9CA3AF] hover:text-[#DC2626] hover:bg-white/80 shrink-0"
                       >
-                        <X size={12} className="text-[#E74C3C]" />
+                        <X size={12} strokeWidth={2.5} />
                       </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+            )}
+            {scopedServiceAreas.length > 0 && (
+              <p className="mt-2 text-[11px] text-[#AEAEAE]">
+                Tap a pincode to pause or resume · × removes it
+              </p>
             )}
           </section>
         }
