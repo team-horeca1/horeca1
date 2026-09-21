@@ -19,6 +19,9 @@ export const createOrderSchema = z.object({
         })
       ).min(1),
       deliverySlotId: z.string().uuid().optional(),
+      deliveryMode: z.enum(['supplier_delivery', 'third_party', 'self_pickup']).optional(),
+      /** YYYY-MM-DD stamped at checkout for supplier_delivery — do not recompute. */
+      deliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
       notes: z.string().max(1000).optional(),
     })
   ).min(1),
@@ -38,6 +41,16 @@ export const createOrderSchema = z.object({
 ).refine(
   (d) => d.saveDraft || d.paymentMethod !== 'po_number' || !!d.customerPoNumber,
   { message: 'Purchase order number is required', path: ['customerPoNumber'] },
+).refine(
+  (d) =>
+    d.saveDraft ||
+    d.vendorOrders.every(
+      (vo) =>
+        !vo.deliveryMode ||
+        vo.deliveryMode !== 'supplier_delivery' ||
+        !!vo.deliveryDate,
+    ),
+  { message: 'deliveryDate is required for supplier_delivery', path: ['vendorOrders'] },
 );
 
 // PATCH /orders/:id/submit — drafts are saved with a placeholder method; the

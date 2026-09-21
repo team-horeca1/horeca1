@@ -88,6 +88,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
       { name: 'Promotions', icon: Gift, href: '/admin/promotions', feature: 'promotions', requiredPerm: 'promotions.view' },
       { name: 'Audit Logs', icon: ScrollText, href: '/admin/audit-logs', feature: 'auditLogs', requiredPerm: 'auditLogs.view' },
       { name: 'Team', icon: Users, href: '/admin/team', feature: 'users', requiredPerm: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
+      // Delivery defaults + holidays are discovered via Settings → Delivery (not a lone URL).
       { name: 'Settings', icon: Settings, href: '/admin/settings', feature: 'settings', requiredPerm: 'settings.view' },
     ],
   },

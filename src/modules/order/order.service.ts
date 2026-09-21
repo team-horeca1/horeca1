@@ -139,6 +139,9 @@ interface VendorOrderInput {
   vendorId: string;
   items: Array<{ productId: string; quantity: number }>;
   deliverySlotId?: string;
+  deliveryMode?: 'supplier_delivery' | 'third_party' | 'self_pickup';
+  /** YYYY-MM-DD from checkout — persisted as-is for supplier_delivery. */
+  deliveryDate?: string | null;
   notes?: string;
 }
 
@@ -277,7 +280,7 @@ export class OrderService {
         const vendor = await tx.vendor.findUnique({ where: { id: vo.vendorId } });
         if (!vendor) throw Errors.notFound('Vendor');
 
-        // 2b. Validate delivery slot — must belong to this vendor, be active, and not past cutoff
+        // 2b. Validate delivery slot (legacy) — optional; Delivery Plan modes are preferred
         if (vo.deliverySlotId) {
           const slot = await tx.deliverySlot.findUnique({ where: { id: vo.deliverySlotId } });
           if (!slot || slot.vendorId !== vo.vendorId || !slot.isActive) {
@@ -303,6 +306,54 @@ export class OrderService {
             const cutoffMins = (hh || 0) * 60 + (mm || 0);
             if (nowMins >= cutoffMins) {
               throw Errors.badRequest(`Cutoff time ${slot.cutoffTime} IST for this slot has passed`);
+            }
+          }
+        }
+
+        // 2c. Delivery Plan mode — soft-block when mode is set but unavailable for pincode
+        if (!isDraft && vo.deliveryMode) {
+          const modePincode = deliveryGeo?.pincode ?? outlet.pincode;
+          if (!modePincode) {
+            throw Errors.badRequest('Delivery pincode is required to select a delivery mode');
+          }
+          const planArea = await tx.serviceArea.findFirst({
+            where: {
+              vendorId: vo.vendorId,
+              pincode: modePincode,
+              isActive: true,
+            },
+            select: {
+              deliversMon: true,
+              deliversTue: true,
+              deliversWed: true,
+              deliversThu: true,
+              deliversFri: true,
+              deliversSat: true,
+              deliversSun: true,
+              thirdPartyDeliveryAvailable: true,
+            },
+          });
+          const hasDays = !!(
+            planArea &&
+            (planArea.deliversMon ||
+              planArea.deliversTue ||
+              planArea.deliversWed ||
+              planArea.deliversThu ||
+              planArea.deliversFri ||
+              planArea.deliversSat ||
+              planArea.deliversSun)
+          );
+          if (vo.deliveryMode === 'supplier_delivery') {
+            if (!hasDays || !vo.deliveryDate) {
+              throw Errors.badRequest('Supplier delivery is not available for this pincode');
+            }
+          } else if (vo.deliveryMode === 'third_party') {
+            if (!planArea?.thirdPartyDeliveryAvailable) {
+              throw Errors.badRequest('3rd-party delivery is not available for this pincode');
+            }
+          } else if (vo.deliveryMode === 'self_pickup') {
+            if (!vendor.selfPickupOffered) {
+              throw Errors.badRequest('Self-pickup is not offered by this supplier');
             }
           }
         }
@@ -616,6 +667,10 @@ export class OrderService {
               ? (input.customerPoNumber?.trim() || null)
               : null,
             deliverySlotId: vo.deliverySlotId,
+            deliveryMode: vo.deliveryMode ?? null,
+            deliveryDate: vo.deliveryDate
+              ? new Date(`${vo.deliveryDate}T00:00:00.000Z`)
+              : null,
             notes: vo.notes,
             salespersonId: p.salespersonId,
             items: { create: p.itemDetails },

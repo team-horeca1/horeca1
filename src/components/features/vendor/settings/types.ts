@@ -3,6 +3,17 @@ export interface ServiceArea {
   pincode: string;
   isActive: boolean;
   outletId?: string | null;
+  cityLabel?: string | null;
+  areaLabel?: string | null;
+  deliversMon?: boolean;
+  deliversTue?: boolean;
+  deliversWed?: boolean;
+  deliversThu?: boolean;
+  deliversFri?: boolean;
+  deliversSat?: boolean;
+  deliversSun?: boolean;
+  cutoffTime?: string;
+  thirdPartyDeliveryAvailable?: boolean;
 }
 
 export interface DeliverySlot {
@@ -28,6 +39,8 @@ export interface VendorSettings {
   autoDisableOos: boolean;
   deliveryFee: number;
   freeDeliveryAbove: number | null;
+  selfPickupOffered?: boolean;
+  deliverThroughPublicHolidays?: boolean;
   addressLine: string | null;
   city: string | null;
   state: string | null;

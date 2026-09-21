@@ -23,7 +23,7 @@ import { BusinessAccountSwitcherDropdown } from '@/components/account-switcher/B
 import { NotificationBell } from '@/components/features/NotificationBell';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ADMIN_NAV_GROUPS, filterNavLinks, type PortalNavGroup, type PortalNavLink } from '@/lib/permissions/portalNav';
-import { getFirstAllowedRoute } from '@/lib/permissions/routePermissions';
+import { getFirstAllowedRoute, getRoutePermission } from '@/lib/permissions/routePermissions';
 import { PortalPageGuard } from '@/components/auth/PortalPageGuard';
 import { PortalNoAccess } from '@/components/auth/PortalNoAccess';
 import { Suspense } from 'react';
@@ -141,12 +141,22 @@ export default function AdminLayout({
 
     useEffect(() => {
         if (status !== 'authenticated' || userRole !== 'admin') return;
-        if (!allowedHrefs || !firstAllowedRoute) return;
+        if (!firstAllowedRoute) return;
+        // Prefer route-permission rules so Settings sub-pages (e.g. /admin/holidays)
+        // stay reachable even when they are not sidebar links.
+        const required = getRoutePermission(pathname, 'admin');
+        if (required) {
+            if (!can(required)) {
+                router.replace(firstAllowedRoute);
+            }
+            return;
+        }
+        if (!allowedHrefs) return;
         const hrefs = allowedHrefs.split('|');
         if (!hrefs.some((h) => pathname === h || pathname.startsWith(`${h}/`))) {
             router.replace(firstAllowedRoute);
         }
-    }, [status, userRole, allowedHrefs, firstAllowedRoute, pathname, router]);
+    }, [status, userRole, allowedHrefs, firstAllowedRoute, pathname, router, can]);
 
     useEffect(() => {
         if (status !== 'authenticated') return;

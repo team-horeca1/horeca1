@@ -152,7 +152,7 @@ const ADMIN_FEATURES: PortalFeatureMap = {
   analytics:  { label: 'Reports', actions: MODULE_ACTIONS.analytics, routes: ['/admin/reports'] },
   users:      { label: 'Team', actions: MODULE_ACTIONS.users, routes: ['/admin/team'] },
   auditLogs:  { label: 'Audit Logs', actions: MODULE_ACTIONS.auditLogs, routes: ['/admin/audit-logs'] },
-  settings:   { label: 'Settings', actions: MODULE_ACTIONS.settings, routes: ['/admin/settings'] },
+  settings:   { label: 'Settings', actions: MODULE_ACTIONS.settings, routes: ['/admin/settings', '/admin/holidays'] },
 };
 
 // ─── Delivery (V2.3+) ───────────────────────────────────────────────────────

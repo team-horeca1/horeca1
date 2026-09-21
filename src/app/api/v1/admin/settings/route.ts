@@ -23,6 +23,14 @@ function serialize(s: PlatformSetting) {
     smsNotifications: s.smsNotifications,
     pushNotifications: s.pushNotifications,
     gstSlabs: normalizeGstSlabs(s.gstSlabs),
+    defaultDeliversMon: s.defaultDeliversMon,
+    defaultDeliversTue: s.defaultDeliversTue,
+    defaultDeliversWed: s.defaultDeliversWed,
+    defaultDeliversThu: s.defaultDeliversThu,
+    defaultDeliversFri: s.defaultDeliversFri,
+    defaultDeliversSat: s.defaultDeliversSat,
+    defaultDeliversSun: s.defaultDeliversSun,
+    defaultCutoffTime: s.defaultCutoffTime,
     updatedAt: s.updatedAt,
   };
 }
@@ -41,6 +49,8 @@ export const GET = adminOnly(async (_req: NextRequest, ctx) => {
   }
 });
 
+const cutoffTimeSchema = z.string().regex(/^\d{2}:\d{2}$/, 'Use HH:MM');
+
 const patchSchema = z.object({
   platformName: z.string().min(1).max(120).optional(),
   contactEmail: z.union([z.string().email(), z.literal('')]).optional(),
@@ -52,6 +62,14 @@ const patchSchema = z.object({
   smsNotifications: z.boolean().optional(),
   pushNotifications: z.boolean().optional(),
   gstSlabs: z.array(z.number().min(0).max(100)).min(1).optional(),
+  defaultDeliversMon: z.boolean().optional(),
+  defaultDeliversTue: z.boolean().optional(),
+  defaultDeliversWed: z.boolean().optional(),
+  defaultDeliversThu: z.boolean().optional(),
+  defaultDeliversFri: z.boolean().optional(),
+  defaultDeliversSat: z.boolean().optional(),
+  defaultDeliversSun: z.boolean().optional(),
+  defaultCutoffTime: cutoffTimeSchema.optional(),
 });
 
 export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
@@ -73,6 +91,14 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         ...(input.smsNotifications !== undefined && { smsNotifications: input.smsNotifications }),
         ...(input.pushNotifications !== undefined && { pushNotifications: input.pushNotifications }),
         ...(input.gstSlabs !== undefined && { gstSlabs: normalizeGstSlabs(input.gstSlabs) }),
+        ...(input.defaultDeliversMon !== undefined && { defaultDeliversMon: input.defaultDeliversMon }),
+        ...(input.defaultDeliversTue !== undefined && { defaultDeliversTue: input.defaultDeliversTue }),
+        ...(input.defaultDeliversWed !== undefined && { defaultDeliversWed: input.defaultDeliversWed }),
+        ...(input.defaultDeliversThu !== undefined && { defaultDeliversThu: input.defaultDeliversThu }),
+        ...(input.defaultDeliversFri !== undefined && { defaultDeliversFri: input.defaultDeliversFri }),
+        ...(input.defaultDeliversSat !== undefined && { defaultDeliversSat: input.defaultDeliversSat }),
+        ...(input.defaultDeliversSun !== undefined && { defaultDeliversSun: input.defaultDeliversSun }),
+        ...(input.defaultCutoffTime !== undefined && { defaultCutoffTime: input.defaultCutoffTime }),
       },
     });
     logAction(ctx, req, {

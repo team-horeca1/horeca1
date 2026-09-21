@@ -315,6 +315,9 @@ model Vendor {
   pickupState           String? @map("pickup_state") @db.VarChar(100)
   pickupPincode         String? @map("pickup_pincode") @db.VarChar(10)
   deliveryCapability    String? @map("delivery_capability") @db.VarChar(20)
+  // Delivery Plan — supplier-level toggles (not per pincode).
+  selfPickupOffered              Boolean @default(false) @map("self_pickup_offered")
+  deliverThroughPublicHolidays   Boolean @default(false) @map("deliver_through_public_holidays")
   fssaiNumber           String? @map("fssai_number") @db.VarChar(50)
   udyamNumber           String? @map("udyam_number") @db.VarChar(50)
   cinNumber             String? @map("cin_number") @db.VarChar(50)
@@ -343,6 +346,20 @@ model ServiceArea {
   outletId String? @map("outlet_id") @db.Uuid
   pincode  String  @db.VarChar(10)
   isActive Boolean @default(true) @map("is_active")
+
+  // Delivery Plan — schedule fields on the existing supplier↔pincode row.
+  // cityLabel / areaLabel are free-text suggestions (never FKs to a master list).
+  cityLabel                     String?  @map("city_label") @db.VarChar(100)
+  areaLabel                     String?  @map("area_label") @db.VarChar(100)
+  deliversMon                   Boolean  @default(true) @map("delivers_mon")
+  deliversTue                   Boolean  @default(false) @map("delivers_tue")
+  deliversWed                   Boolean  @default(true) @map("delivers_wed")
+  deliversThu                   Boolean  @default(false) @map("delivers_thu")
+  deliversFri                   Boolean  @default(true) @map("delivers_fri")
+  deliversSat                   Boolean  @default(false) @map("delivers_sat")
+  deliversSun                   Boolean  @default(false) @map("delivers_sun")
+  cutoffTime                    String   @default("16:00") @map("cutoff_time") @db.VarChar(10)
+  thirdPartyDeliveryAvailable   Boolean  @default(false) @map("third_party_delivery_available")
 
   vendor Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   outlet Outlet? @relation("ServiceAreaOutlet", fields: [outletId], references: [id], onDelete: Cascade)
@@ -871,6 +888,8 @@ model Order {
   customerPoNumber          String?      @map("customer_po_number") @db.VarChar(80)
   deliverySlotId            String?      @map("delivery_slot_id") @db.Uuid
   deliveryDate              DateTime?    @map("delivery_date") @db.Date
+  // Delivery Plan — mode chosen at checkout; date stamped at place (no recompute).
+  deliveryMode              DeliveryMode? @map("delivery_mode")
   notes                     String?      @db.Text
   rejectionReason           String?      @map("rejection_reason") @db.Text
   acceptedAt                DateTime?    @map("accepted_at") @db.Timestamptz
@@ -988,6 +1007,20 @@ enum OrderStatus {
   delivered
   returned // V2.2 Phase 5 — goods returned after delivery
   cancelled
+}
+
+enum DeliveryMode {
+  supplier_delivery
+  third_party
+  self_pickup
+
+  @@map("delivery_mode")
+}
+
+enum HolidayScope {
+  all_india
+
+  @@map("holiday_scope")
 }
 
 enum PaymentState {
@@ -3662,8 +3695,32 @@ model PlatformSetting {
   smsNotifications      Boolean  @default(true) @map("sms_notifications")
   pushNotifications     Boolean  @default(false) @map("push_notifications")
   gstSlabs              Int[]    @default([0, 5, 12, 18, 28]) @map("gst_slabs")
+  // Delivery Plan — defaults applied to every NEW ServiceArea row.
+  defaultDeliversMon    Boolean  @default(true) @map("default_delivers_mon")
+  defaultDeliversTue    Boolean  @default(false) @map("default_delivers_tue")
+  defaultDeliversWed    Boolean  @default(true) @map("default_delivers_wed")
+  defaultDeliversThu    Boolean  @default(false) @map("default_delivers_thu")
+  defaultDeliversFri    Boolean  @default(true) @map("default_delivers_fri")
+  defaultDeliversSat    Boolean  @default(false) @map("default_delivers_sat")
+  defaultDeliversSun    Boolean  @default(false) @map("default_delivers_sun")
+  defaultCutoffTime     String   @default("16:00") @map("default_cutoff_time") @db.VarChar(10)
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("platform_settings")
+}
+
+// Admin-fed holiday calendar — platform-wide; skipped unless supplier opts into
+// deliverThroughPublicHolidays.
+model PlatformHoliday {
+  id          String       @id @default(uuid()) @db.Uuid
+  holidayDate DateTime     @map("holiday_date") @db.Date
+  label       String       @db.VarChar(255)
+  scope       HolidayScope @default(all_india)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([holidayDate, scope])
+  @@index([holidayDate])
+  @@map("platform_holidays")
 }

@@ -8,7 +8,7 @@ import { Zap, CreditCard, Banknote, FileText } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useSession } from 'next-auth/react';
 import { dal } from '@/lib/dal';
-import { DeliverySlotPicker } from '@/components/features/checkout/DeliverySlotPicker';
+import { DeliveryModePicker, type DeliveryModeSelection } from '@/components/features/checkout/DeliveryModePicker';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { useAddress } from '@/context/AddressContext';
 import {
@@ -410,7 +410,7 @@ function CheckoutPageContent() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isCartLoading, groups.map((g) => g.vendorId).join(',')]);
 
-    const [slotByVendor, setSlotByVendor] = useState<Record<string, string | null>>({});
+    const [modeByVendor, setModeByVendor] = useState<Record<string, DeliveryModeSelection | null>>({});
     // Per-vendor order notes / delivery instructions (Req 7).
     const [notesByVendor, setNotesByVendor] = useState<Record<string, string>>({});
     // Promo Engine Phase 1 — coupon + Rewards Wallet (prepaid cashback balance,
@@ -479,7 +479,7 @@ function CheckoutPageContent() {
                 displayName: item.productName,
                 description: '',
                 price: Number(item.unitPrice),
-                images: item.product?.imageUrl ? [item.product.imageUrl] : (item.product?.images && item.product.images.length > 0 ? item.product.images : ['/images/recom-product/product-img10.png']),
+                images: item.product?.imageUrl ? [item.product.imageUrl] : (item.product?.images && item.product.images.length > 0 ? item.product.images : ['/images/placeholders/no-product.svg']),
                 category: '',
                 packSize: '',
                 unit: '',
@@ -909,18 +909,27 @@ function CheckoutPageContent() {
             setOrderError('Add a delivery address to this outlet before placing the order.');
             return;
         }
+        const missingMode = selectedGroups.find((g) => !modeByVendor[g.vendorId]?.mode);
+        if (missingMode) {
+            setOrderError(`Choose a delivery mode for ${missingMode.vendorName}.`);
+            return;
+        }
         setIsPlacingOrder(true);
         setOrderError(null);
         try {
-            const vendorOrders = selectedGroups.map(group => ({
-                vendorId: group.vendorId,
-                items: group.items.map((item: CartItem) => ({
-                    productId: item.productId,
-                    quantity: item.quantity,
-                })),
-                ...(slotByVendor[group.vendorId] ? { deliverySlotId: slotByVendor[group.vendorId] as string } : {}),
-                ...(notesByVendor[group.vendorId]?.trim() ? { notes: notesByVendor[group.vendorId].trim() } : {}),
-            }));
+            const vendorOrders = selectedGroups.map(group => {
+                const modeSel = modeByVendor[group.vendorId]!;
+                return {
+                    vendorId: group.vendorId,
+                    items: group.items.map((item: CartItem) => ({
+                        productId: item.productId,
+                        quantity: item.quantity,
+                    })),
+                    deliveryMode: modeSel.mode,
+                    deliveryDate: modeSel.deliveryDate,
+                    ...(notesByVendor[group.vendorId]?.trim() ? { notes: notesByVendor[group.vendorId].trim() } : {}),
+                };
+            });
 
             // 1. Create or submit order (draft vs new order)
             let createdOrders: Array<{ id: string; orderNumber: string }> = [];
@@ -1047,12 +1056,17 @@ function CheckoutPageContent() {
         setIsPlacingOrder(true);
         setOrderError(null);
         try {
-            const vendorOrders = selectedGroups.map(group => ({
-                vendorId: group.vendorId,
-                items: group.items.map((item: CartItem) => ({ productId: item.productId, quantity: item.quantity })),
-                ...(slotByVendor[group.vendorId] ? { deliverySlotId: slotByVendor[group.vendorId] as string } : {}),
-                ...(notesByVendor[group.vendorId]?.trim() ? { notes: notesByVendor[group.vendorId].trim() } : {}),
-            }));
+            const vendorOrders = selectedGroups.map(group => {
+                const modeSel = modeByVendor[group.vendorId];
+                return {
+                    vendorId: group.vendorId,
+                    items: group.items.map((item: CartItem) => ({ productId: item.productId, quantity: item.quantity })),
+                    ...(modeSel?.mode
+                        ? { deliveryMode: modeSel.mode, deliveryDate: modeSel.deliveryDate }
+                        : {}),
+                    ...(notesByVendor[group.vendorId]?.trim() ? { notes: notesByVendor[group.vendorId].trim() } : {}),
+                };
+            });
             await dal.orders.create(vendorOrders, selectedPayment || 'cod', true);
             clearCart();
             window.location.href = '/orders?status=draft';
@@ -1238,10 +1252,10 @@ function CheckoutPageContent() {
                                     </div>
                                 )}
 
-                                {/* Collapsible item list + slot/notes */}
+                                {/* Collapsible item list — delivery mode stays mounted even when collapsed
+                                    so checkout always has a default mode per PO (required to place). */}
                                 {expandedVendors.has(group.vendorId) ? (
                                     <>
-                                    {/* Items */}
                                     {group.items.map((item) => {
                                         if (item.isPromoFree) {
                                             const freeLabel = item.product.displayName ?? item.product.name;
@@ -1262,7 +1276,7 @@ function CheckoutPageContent() {
                                         return (
                                         <div key={item.productId} className="flex items-center gap-3 px-4 py-2 border-b border-gray-50">
                                             <div className="w-8 h-8 bg-gray-50 rounded-md flex items-center justify-center p-0.5 shrink-0 relative overflow-hidden">
-                                                <Image src={item.product.images[0] || '/images/recom-product/product-img10.png'} alt={itemLabel} fill className="object-contain" />
+                                                <Image src={item.product.images[0] || '/images/placeholders/no-product.svg'} alt={itemLabel} fill className="object-contain" />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -1281,33 +1295,8 @@ function CheckoutPageContent() {
                                         </div>
                                         );
                                     })}
-
-                                    {/* Delivery slot picker + order notes */}
-                                    {isSelected && (
-                                        <>
-                                        <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-100">
-                                            <DeliverySlotPicker
-                                                vendorId={group.vendorId}
-                                                selectedSlotId={slotByVendor[group.vendorId] ?? null}
-                                                onChange={(slotId) => setSlotByVendor(prev => ({ ...prev, [group.vendorId]: slotId }))}
-                                            />
-                                        </div>
-                                        <div className="px-4 py-2.5 bg-gray-50/50 border-t border-gray-100">
-                                            <label className="block text-[11px] font-semibold text-gray-500 mb-1">Order notes (optional)</label>
-                                            <textarea
-                                                value={notesByVendor[group.vendorId] ?? ''}
-                                                onChange={(e) => setNotesByVendor(prev => ({ ...prev, [group.vendorId]: e.target.value }))}
-                                                rows={2}
-                                                maxLength={1000}
-                                                placeholder="e.g. deliver before noon, call on arrival…"
-                                                className="w-full text-[12px] rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-                                            />
-                                        </div>
-                                        </>
-                                    )}
                                     </>
                                 ) : (
-                                    /* Collapsed compact summary */
                                     <button
                                         type="button"
                                         onClick={() => toggleVendorExpand(group.vendorId)}
@@ -1316,6 +1305,39 @@ function CheckoutPageContent() {
                                         {group.items.slice(0, 3).map(i => i.product.displayName ?? i.product.name).join(', ')}{group.items.length > 3 ? ` +${group.items.length - 3} more` : ''}
                                         <span className="text-primary ml-1 font-bold">↓ expand</span>
                                     </button>
+                                )}
+
+                                {isSelected && (
+                                    <>
+                                    <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-100">
+                                        <DeliveryModePicker
+                                            vendorId={group.vendorId}
+                                            pincode={
+                                                (selectedAddress?.pincode && /^\d{6}$/.test(selectedAddress.pincode)
+                                                    ? selectedAddress.pincode
+                                                    : null) ||
+                                                (currentOutlet?.pincode && /^\d{6}$/.test(currentOutlet.pincode)
+                                                    ? currentOutlet.pincode
+                                                    : null)
+                                            }
+                                            selected={modeByVendor[group.vendorId] ?? null}
+                                            onChange={(sel) =>
+                                                setModeByVendor((prev) => ({ ...prev, [group.vendorId]: sel }))
+                                            }
+                                        />
+                                    </div>
+                                    <div className="px-4 py-2.5 bg-gray-50/50 border-t border-gray-100">
+                                        <label className="block text-[11px] font-semibold text-gray-500 mb-1">Order notes (optional)</label>
+                                        <textarea
+                                            value={notesByVendor[group.vendorId] ?? ''}
+                                            onChange={(e) => setNotesByVendor(prev => ({ ...prev, [group.vendorId]: e.target.value }))}
+                                            rows={2}
+                                            maxLength={1000}
+                                            placeholder="e.g. deliver before noon, call on arrival…"
+                                            className="w-full text-[12px] rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                                        />
+                                    </div>
+                                    </>
                                 )}
                             </div>
                             );

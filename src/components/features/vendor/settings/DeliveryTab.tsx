@@ -1,11 +1,14 @@
 'use client';
 import { CDL } from '@/lib/cdl';
+import { useRef } from 'react';
 
 import { Clock, MapPin, Plus, Save, Trash2, Pencil, X, ArrowRight, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DeliverySlot, ServiceArea } from './types';
 import { DAY_NAMES, formatTime, SLOT_TIME_PRESETS } from './types';
 import { VendorSettingsSaveBar } from './VendorSettingsSaveBar';
+import { DeliveryPlanSection } from './DeliveryPlanSection';
+import type { DeliveryPlanDays } from '@/lib/deliveryPlanMessage';
 
 const timeInputCls =
   'w-full h-[44px] border border-[#EEEEEE] rounded-[10px] px-3 text-[14px] bg-white outline-none focus:border-[#8B5CF6]/50';
@@ -50,6 +53,13 @@ export interface DeliveryTabProps {
   setDeliveryFeeVal: (v: string) => void;
   freeDeliveryAbove: string;
   setFreeDeliveryAbove: (v: string) => void;
+  selfPickupOffered: boolean;
+  setSelfPickupOffered: (v: boolean) => void;
+  deliverThroughPublicHolidays: boolean;
+  setDeliverThroughPublicHolidays: (v: boolean) => void;
+  onPatchDeliveryPlanArea: (id: string, patch: Partial<ServiceArea>) => Promise<void>;
+  onBulkApplyDeliveryDays: (ids: string[], days: DeliveryPlanDays) => Promise<void>;
+  savingPlan: boolean;
   saving: boolean;
   saved: boolean;
   onSave: () => void;
@@ -65,8 +75,17 @@ export function DeliveryTab(props: DeliveryTabProps) {
     onOpenAddSlot, onOpenEditSlot, onSaveSlot, onResetSlotForm, onToggleSlot, onDeleteSlot,
     defaultMOQ, setDefaultMOQ,
     deliveryFeeVal, setDeliveryFeeVal, freeDeliveryAbove, setFreeDeliveryAbove,
+    selfPickupOffered, setSelfPickupOffered,
+    deliverThroughPublicHolidays, setDeliverThroughPublicHolidays,
+    onPatchDeliveryPlanArea, onBulkApplyDeliveryDays, savingPlan,
     saving, saved, onSave,
   } = props;
+
+  const addPincodeRef = useRef<HTMLInputElement>(null);
+  const focusAddPincode = () => {
+    addPincodeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    addPincodeRef.current?.focus();
+  };
 
   const outletPicker = multiWarehouseEnabled && configOutlets.length > 0 && (
     <div className="flex flex-wrap gap-2 mb-4">
@@ -88,49 +107,110 @@ export function DeliveryTab(props: DeliveryTabProps) {
 
   return (
     <div className="space-y-8">
-      <section>
-        <div className="flex items-center gap-2 mb-3">
-          <MapPin size={18} className="text-[#F59E0B]" />
-          <h2 className="text-[16px] font-bold text-[#181725]">Service areas</h2>
-          <span className="text-[13px] text-[#AEAEAE]">({scopedServiceAreas.length})</span>
-        </div>
-        {outletPicker}
-        <div className="flex flex-wrap items-center gap-3 mb-3">
-          <input
-            type="text"
-            value={newPincode}
-            onChange={(e) => setNewPincode(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && onAddArea()}
-            placeholder="Pincode"
-            className="h-[40px] w-[140px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-primary/40"
-          />
-          <button type="button" onClick={onAddArea} disabled={addingArea || !newPincode.trim()} className="h-[40px] px-4 bg-primary text-white rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-50">
-            <Plus size={14} /> {addingArea ? 'Adding...' : 'Add'}
-          </button>
-        </div>
-        {scopedServiceAreas.length === 0 ? (
-          <p className="text-[13px] text-[#AEAEAE]">No pincodes yet.</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {scopedServiceAreas.map((area) => (
-              <div key={area.id} className={cn('flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-[10px] border text-[12px] font-bold', area.isActive ? 'bg-[#FFF8E1] border-[#F59E0B]/20 text-[#976538]' : 'bg-[#F5F5F5] border-[#EEEEEE] text-[#AEAEAE]')}>
-                <MapPin size={12} />
-                {area.pincode}
-                <button type="button" onClick={() => onToggleArea(area)} className="relative ml-1 inline-flex h-[16px] w-[28px] shrink-0 cursor-pointer items-center rounded-full" style={{ backgroundColor: area.isActive ? CDL.primary : '#D1D5DB' }}>
-                  <span className="inline-block h-[12px] w-[12px] rounded-full bg-white shadow-sm transition-transform" style={{ transform: area.isActive ? 'translateX(14px)' : 'translateX(2px)' }} />
-                </button>
-                <button type="button" onClick={() => onDeleteArea(area)} className="p-0.5 rounded hover:bg-red-50"><X size={12} className="text-[#E74C3C]" /></button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      <div className="rounded-[14px] border border-[#EEEEEE] bg-white px-4 sm:px-5 py-4 shadow-sm">
+        <h1 className="text-[clamp(1.125rem,3vw,1.375rem)] font-bold text-[#181725]">Delivery</h1>
+        <p className="text-[13px] text-[#667085] mt-1 leading-relaxed max-w-[40rem]">
+          Manage how and when customers receive orders from your stores.
+        </p>
+      </div>
 
-      <section className="border-t border-[#F5F5F5] pt-6">
+      <DeliveryPlanSection
+        areas={scopedServiceAreas}
+        selfPickupOffered={selfPickupOffered}
+        setSelfPickupOffered={setSelfPickupOffered}
+        deliverThroughPublicHolidays={deliverThroughPublicHolidays}
+        setDeliverThroughPublicHolidays={setDeliverThroughPublicHolidays}
+        onPatchArea={onPatchDeliveryPlanArea}
+        onBulkApplyDays={onBulkApplyDeliveryDays}
+        savingPlan={savingPlan}
+        onRequestAddPincode={focusAddPincode}
+        serviceAreasSlot={
+          <section id="delivery-service-areas" className="scroll-mt-24 space-y-3">
+            <div className="flex items-center gap-2">
+              <MapPin size={18} className="text-[#F59E0B]" />
+              <h2 className="text-[16px] font-bold text-[#181725]">Service Areas</h2>
+              <span className="text-[13px] text-[#AEAEAE]">({scopedServiceAreas.length})</span>
+            </div>
+            <p className="text-[12px] text-[#667085] leading-relaxed">
+              Pincodes you serve. Add one here, then set its schedule in the table below.
+            </p>
+            {outletPicker}
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                ref={addPincodeRef}
+                type="text"
+                inputMode="numeric"
+                value={newPincode}
+                onChange={(e) => setNewPincode(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && onAddArea()}
+                placeholder="6-digit pincode"
+                aria-label="New delivery pincode"
+                className="h-[44px] w-[160px] border border-[#EEEEEE] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#6B1D2E]/40"
+              />
+              <button
+                type="button"
+                onClick={onAddArea}
+                disabled={addingArea || !newPincode.trim()}
+                className="h-[44px] px-4 bg-[#6B1D2E] text-white rounded-[10px] text-[13px] font-bold flex items-center gap-1.5 disabled:opacity-50 hover:bg-[#5A1926]"
+              >
+                <Plus size={14} /> {addingArea ? 'Adding…' : 'Add Pincode'}
+              </button>
+            </div>
+            {scopedServiceAreas.length === 0 ? (
+              <p className="text-[13px] text-[#AEAEAE]">No pincodes yet — add one to start your Delivery Plan.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {scopedServiceAreas.map((area) => (
+                  <div
+                    key={area.id}
+                    className={cn(
+                      'flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-[10px] border text-[12px] font-bold',
+                      area.isActive
+                        ? 'bg-[#FFF8E1] border-[#F59E0B]/20 text-[#976538]'
+                        : 'bg-[#F5F5F5] border-[#EEEEEE] text-[#AEAEAE]',
+                    )}
+                  >
+                    <MapPin size={12} />
+                    <span className="tabular-nums">{area.pincode}</span>
+                    {(area.cityLabel || area.areaLabel) && (
+                      <span className="font-medium text-[#667085] max-w-[100px] truncate">
+                        {[area.cityLabel, area.areaLabel].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onToggleArea(area)}
+                      aria-label={`${area.isActive ? 'Pause' : 'Activate'} pincode ${area.pincode}`}
+                      className="relative ml-1 inline-flex h-[16px] w-[28px] shrink-0 cursor-pointer items-center rounded-full"
+                      style={{ backgroundColor: area.isActive ? CDL.primary : '#D1D5DB' }}
+                    >
+                      <span
+                        className="inline-block h-[12px] w-[12px] rounded-full bg-white shadow-sm transition-transform"
+                        style={{ transform: area.isActive ? 'translateX(14px)' : 'translateX(2px)' }}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteArea(area)}
+                      aria-label={`Remove pincode ${area.pincode}`}
+                      className="p-0.5 rounded hover:bg-red-50"
+                    >
+                      <X size={12} className="text-[#E74C3C]" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        }
+      />
+
+      <section className="border-t border-[#E9E3DD] pt-6">
         <div className="flex items-center justify-between gap-3 mb-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Clock size={18} className="text-[#8B5CF6]" />
-            <h2 className="text-[16px] font-bold text-[#181725]">Delivery slots</h2>
+            <h2 className="text-[16px] font-bold text-[#181725]">Legacy Delivery Slots</h2>
+            <span className="text-[10px] font-bold uppercase tracking-wide text-[#667085] bg-[#F5F5F5] px-2 py-0.5 rounded-full">Ops only</span>
             <span className="text-[13px] text-[#AEAEAE]">({scopedDeliverySlots.length})</span>
           </div>
           {!showSlotForm && (
@@ -140,7 +220,7 @@ export function DeliveryTab(props: DeliveryTabProps) {
           )}
         </div>
         <p className="text-[12px] text-[#7C7C7C] mb-4 leading-relaxed max-w-[52rem]">
-          Set when you deliver on each day. Customers pick a slot at checkout and must order before the cutoff time.
+          Optional weekly time windows for internal ops. Customers choose delivery from your Delivery Plan — slots are not required at checkout.
         </p>
         {outletPicker}
 
@@ -249,8 +329,8 @@ export function DeliveryTab(props: DeliveryTabProps) {
             className="w-full p-8 text-center rounded-[12px] border border-dashed border-[#D1D5DB] bg-[#FAFAFA] hover:border-[#8B5CF6]/40 hover:bg-[#F5F3FF]/40 transition-colors"
           >
             <CalendarClock size={28} className="text-[#AEAEAE] mx-auto mb-2" />
-            <p className="text-[13px] font-bold text-[#374151]">No delivery slots yet</p>
-            <p className="text-[12px] text-[#AEAEAE] mt-1">Add your first slot so customers can pick a delivery time at checkout</p>
+            <p className="text-[13px] font-bold text-[#374151]">No legacy slots yet</p>
+            <p className="text-[12px] text-[#AEAEAE] mt-1">Optional — only needed for internal ops windows</p>
             <span className="inline-flex items-center gap-1 mt-3 h-[34px] px-4 bg-[#8B5CF6] text-white rounded-[10px] text-[12px] font-bold">
               <Plus size={13} /> Add slot
             </span>

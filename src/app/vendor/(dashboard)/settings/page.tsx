@@ -66,6 +66,9 @@ function VendorSettingsContent() {
   const [returnPolicy, setReturnPolicy] = useState('');
   const [cancellationPolicy, setCancellationPolicy] = useState('');
   const [autoDisableOos, setAutoDisableOos] = useState(false);
+  const [selfPickupOffered, setSelfPickupOffered] = useState(false);
+  const [deliverThroughPublicHolidays, setDeliverThroughPublicHolidays] = useState(false);
+  const [savingPlan, setSavingPlan] = useState(false);
   const [documents, setDocuments] = useState<VendorDocument[]>([]);
   const [docType, setDocType] = useState<VendorDocument['type']>('fssai');
   const [docFile, setDocFile] = useState<File | null>(null);
@@ -113,6 +116,8 @@ function VendorSettingsContent() {
         setReturnPolicy(data.returnPolicy || '');
         setCancellationPolicy(data.cancellationPolicy || '');
         setAutoDisableOos(Boolean(data.autoDisableOos));
+        setSelfPickupOffered(Boolean(data.selfPickupOffered));
+        setDeliverThroughPublicHolidays(Boolean(data.deliverThroughPublicHolidays));
         if (Array.isArray(data.paymentModes) && data.paymentModes.length > 0) setPaymentModes(data.paymentModes);
         if (data.vendorType === 'distributor' || data.vendorType === 'wholesaler' || data.vendorType === 'dark_store') {
           setVendorType(data.vendorType);
@@ -217,6 +222,8 @@ function VendorSettingsContent() {
           returnPolicy: returnPolicy || undefined,
           cancellationPolicy: cancellationPolicy || undefined,
           autoDisableOos,
+          selfPickupOffered,
+          deliverThroughPublicHolidays,
           bankAccountName: bankAccountName || null,
           bankAccountNumber: bankAccountNumber || null,
           bankIfsc: bankIfsc || null,
@@ -258,6 +265,72 @@ function VendorSettingsContent() {
       toast.error(err instanceof Error ? err.message : 'Failed to add service area');
     } finally {
       setAddingArea(false);
+    }
+  };
+
+  const handlePatchDeliveryPlanArea = async (id: string, patch: Partial<ServiceArea>) => {
+    try {
+      setSavingPlan(true);
+      const res = await fetch('/api/v1/vendor/settings/service-areas', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...patch }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'Failed to update');
+      setSettings((prev) =>
+        prev
+          ? {
+              ...prev,
+              serviceAreas: prev.serviceAreas.map((a) => (a.id === id ? { ...a, ...json.data } : a)),
+            }
+          : prev,
+      );
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update Delivery Plan');
+      throw err;
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
+  const handleBulkApplyDeliveryDays = async (
+    ids: string[],
+    days: {
+      deliversMon: boolean;
+      deliversTue: boolean;
+      deliversWed: boolean;
+      deliversThu: boolean;
+      deliversFri: boolean;
+      deliversSat: boolean;
+      deliversSun: boolean;
+    },
+  ) => {
+    try {
+      setSavingPlan(true);
+      const res = await fetch('/api/v1/vendor/settings/service-areas', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, ...days }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'Bulk apply failed');
+      const updated = Array.isArray(json.data) ? (json.data as ServiceArea[]) : [];
+      const byId = new Map(updated.map((a) => [a.id, a]));
+      setSettings((prev) =>
+        prev
+          ? {
+              ...prev,
+              serviceAreas: prev.serviceAreas.map((a) => (byId.has(a.id) ? { ...a, ...byId.get(a.id) } : a)),
+            }
+          : prev,
+      );
+      toast.success(`Applied days to ${ids.length} pincode${ids.length === 1 ? '' : 's'}`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Bulk apply failed');
+      throw err;
+    } finally {
+      setSavingPlan(false);
     }
   };
 
@@ -463,6 +536,12 @@ function VendorSettingsContent() {
             defaultMOQ={defaultMOQ} setDefaultMOQ={setDefaultMOQ}
             deliveryFeeVal={deliveryFeeVal} setDeliveryFeeVal={setDeliveryFeeVal}
             freeDeliveryAbove={freeDeliveryAbove} setFreeDeliveryAbove={setFreeDeliveryAbove}
+            selfPickupOffered={selfPickupOffered} setSelfPickupOffered={setSelfPickupOffered}
+            deliverThroughPublicHolidays={deliverThroughPublicHolidays}
+            setDeliverThroughPublicHolidays={setDeliverThroughPublicHolidays}
+            onPatchDeliveryPlanArea={handlePatchDeliveryPlanArea}
+            onBulkApplyDeliveryDays={handleBulkApplyDeliveryDays}
+            savingPlan={savingPlan}
             {...saveProps}
           />
         )}

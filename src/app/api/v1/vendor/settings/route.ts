@@ -55,6 +55,8 @@ const updateSettingsSchema = z.object({
   multiWarehouseEnabled: z.boolean().optional(),
   notificationPrefs: z.record(z.string(), z.array(z.string())).optional(),
   autoDisableOos: z.boolean().optional(),
+  selfPickupOffered: z.boolean().optional(),
+  deliverThroughPublicHolidays: z.boolean().optional(),
 });
 
 // GET — full vendor profile with service areas, delivery slots, and account info
@@ -71,7 +73,23 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       where: { id: vendorId },
       include: {
         serviceAreas: {
-          select: { id: true, pincode: true, isActive: true, outletId: true },
+          select: {
+            id: true,
+            pincode: true,
+            isActive: true,
+            outletId: true,
+            cityLabel: true,
+            areaLabel: true,
+            deliversMon: true,
+            deliversTue: true,
+            deliversWed: true,
+            deliversThu: true,
+            deliversFri: true,
+            deliversSat: true,
+            deliversSun: true,
+            cutoffTime: true,
+            thirdPartyDeliveryAvailable: true,
+          },
         },
         deliverySlots: {
           select: {
