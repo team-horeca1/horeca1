@@ -1,0 +1,207 @@
+name: CI / Deploy Demo
+
+# Mirror of ci-deploy.yml for the isolated demo stack.
+# master  → freshville.store (ci-deploy.yml) — NEVER touched by this workflow
+# demo    → demo.horeca1.com (this file)
+#
+# Same pattern: parallel gates → build on GitHub → SHA-pinned GHCR push →
+# SSH pull + migrate + restart. Only team-horeca1/horeca1 may build/deploy.
+
+on:
+  push:
+    branches: [demo]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.vscode/**'
+  pull_request:
+    branches: [demo]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.vscode/**'
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/team-horeca1/horeca1
+  NPM_FLAGS: --prefer-offline --no-audit --fund=false
+
+jobs:
+  checks:
+    name: Type check & lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: checks-demo-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci ${{ env.NPM_FLAGS }}
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npm run lint
+      - name: Audit API permissions (strict)
+        run: node scripts/audit-api-permissions.mjs --strict
+      - name: Verify RBAC matrix (static)
+        run: node scripts/verify-rbac-matrix.mjs
+
+  db:
+    name: Migrations & drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: db-demo-${{ github.ref }}
+      cancel-in-progress: true
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: horeca1
+          POSTGRES_PASSWORD: horeca1_dev
+          POSTGRES_DB: horeca1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U horeca1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://horeca1:horeca1_dev@localhost:5432/horeca1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci ${{ env.NPM_FLAGS }}
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Migrations apply cleanly to a fresh database
+        run: npx prisma migrate deploy
+      - name: schema.prisma has not drifted from the migrations
+        run: |
+          npx prisma migrate diff \
+            --from-config-datasource prisma.config.ts \
+            --to-schema prisma/schema.prisma \
+            --script > drift.sql 2>/dev/null || true
+          REAL=$(grep -vE '^[[:space:]]*(--.*)?$' drift.sql | grep -viE 'products_(name|brand)_trgm' || true)
+          if [ -n "$REAL" ]; then
+            echo "::error::Schema drift detected — schema.prisma differs from the migrations."
+            echo "Fix it by generating a migration:  npx prisma migrate dev --name <describe-change>"
+            echo "----- unexpected diff -----"
+            echo "$REAL"
+            exit 1
+          fi
+          echo "✓ No drift — migrations reproduce schema.prisma exactly."
+
+  build:
+    name: Build & push demo image
+    # Same as prod: build runs alongside gates; deploy still requires both.
+    if: >
+      github.repository == 'team-horeca1/horeca1' &&
+      github.ref == 'refs/heads/demo' &&
+      github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & push app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: runner
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:demo
+            ${{ env.IMAGE }}:demo-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build & push worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: worker
+          push: true
+          tags: |
+            ${{ env.IMAGE }}-worker:demo
+            ${{ env.IMAGE }}-worker:demo-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to demo.horeca1.com
+    needs: [checks, db, build]
+    if: >
+      github.repository == 'team-horeca1/horeca1' &&
+      github.ref == 'refs/heads/demo' &&
+      github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    concurrency:
+      group: deploy-demo
+      cancel-in-progress: false
+    permissions:
+      packages: read
+    steps:
+      - name: SSH deploy demo (isolated stack — production untouched)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 64.227.187.210
+          username: root
+          key: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+          command_timeout: 20m
+          envs: GHCR_TOKEN,GHCR_USER,DEPLOY_IMAGE,DEPLOY_SHA
+          script: |
+            set -e
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            export DEPLOY_IMAGE DEPLOY_SHA
+            cd /opt/horeca1
+            # Keep droplet on master so production deploys stay simple.
+            git fetch origin demo master
+            git checkout master
+            git reset --hard origin/master
+            # Overlay demo deploy assets (compose/script/seed) from the demo branch tip.
+            git checkout origin/demo -- \
+              deploy-demo.sh \
+              docker/docker-compose.demo.yml \
+              docker/nginx.conf \
+              docker/nginx.demo-http-only.conf \
+              prisma/scripts/seed-demo-accounts.ts
+            chmod +x deploy-demo.sh
+            sed -i 's/\r$//' deploy-demo.sh
+            bash deploy-demo.sh
+            # Return working tree to master; nginx on disk already reloaded by deploy-demo.sh.
+            # Master's nginx.conf must include demo.horeca1.com (committed with this work).
+            git reset --hard origin/master
+            if grep -q 'demo.horeca1.com' docker/nginx.conf; then
+              docker exec horeca1-nginx nginx -t && docker exec horeca1-nginx nginx -s reload || true
+            else
+              echo "::error::master nginx.conf missing demo.horeca1.com — demo HTTPS may break on next prod deploy"
+              exit 1
+            fi
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          DEPLOY_IMAGE: ${{ env.IMAGE }}
+          DEPLOY_SHA: demo-${{ github.sha }}

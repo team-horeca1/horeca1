@@ -1,0 +1,103 @@
+# Demo / staging stack on the SAME droplet as production.
+# Isolated DB + Redis + app + worker. Shares the production Docker network
+# so nginx (prod compose) can reverse-proxy to horeca1-demo-app.
+#
+# Usage (on droplet):
+#   docker compose -p demo -f docker/docker-compose.demo.yml --env-file docker/.env.demo up -d
+#
+# Does NOT touch production containers (horeca1-app / horeca1-db / horeca1-redis).
+
+name: demo
+
+services:
+  demo-app:
+    image: ghcr.io/team-horeca1/horeca1:${DEMO_DEPLOY_SHA:-latest}
+    container_name: horeca1-demo-app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      - NODE_ENV=production
+      - APP_ENV=demo
+      - DATABASE_URL=postgresql://horeca1_demo:${DEMO_POSTGRES_PASSWORD}@demo-postgres:5432/horeca1_demo
+      - REDIS_URL=redis://demo-redis:6379/0
+    env_file:
+      - ../.env.demo
+    volumes:
+      - demo_uploads:/app/uploads
+    depends_on:
+      demo-postgres:
+        condition: service_healthy
+      demo-redis:
+        condition: service_healthy
+    networks:
+      - demo_net
+      - docker_default
+
+  demo-worker:
+    image: ghcr.io/team-horeca1/horeca1-worker:${DEMO_DEPLOY_SHA:-latest}
+    container_name: horeca1-demo-worker
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - APP_ENV=demo
+      - DATABASE_URL=postgresql://horeca1_demo:${DEMO_POSTGRES_PASSWORD}@demo-postgres:5432/horeca1_demo
+      - REDIS_URL=redis://demo-redis:6379/0
+    env_file:
+      - ../.env.demo
+    depends_on:
+      demo-postgres:
+        condition: service_healthy
+      demo-redis:
+        condition: service_healthy
+    networks:
+      - demo_net
+
+  demo-postgres:
+    image: postgres:17-alpine
+    container_name: horeca1-demo-db
+    restart: unless-stopped
+    # Bound to localhost only — never expose demo DB publicly.
+    ports:
+      - "127.0.0.1:5433:5432"
+    environment:
+      POSTGRES_USER: horeca1_demo
+      POSTGRES_PASSWORD: ${DEMO_POSTGRES_PASSWORD}
+      POSTGRES_DB: horeca1_demo
+    volumes:
+      - demo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U horeca1_demo -d horeca1_demo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - demo_net
+
+  demo-redis:
+    image: redis:7-alpine
+    container_name: horeca1-demo-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - demo_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - demo_net
+
+volumes:
+  demo_pgdata:
+  demo_redisdata:
+  demo_uploads:
+
+networks:
+  demo_net:
+    name: demo_net
+  # Join the production compose network so nginx can reach horeca1-demo-app by name.
+  docker_default:
+    external: true

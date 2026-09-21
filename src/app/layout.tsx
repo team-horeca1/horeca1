@@ -9,6 +9,7 @@ import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 import { ScrollRestoration } from '@/components/layout/ScrollRestoration';
 import { CallbackUrlRedirect } from '@/components/auth/CallbackUrlRedirect';
 import { PostLoginAccountSelector } from '@/components/auth/PostLoginAccountSelector';
+import { DemoEnvBanner } from '@/components/layout/DemoEnvBanner';
 
 // Only weights used by UI tokens — fewer font files on cold start.
 const inter = Inter({
@@ -40,6 +41,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await auth();
+  // Runtime env (not build-time) so the same GHCR image can serve prod + demo.
+  const isDemo = process.env.APP_ENV === 'demo';
   return (
     <html lang="en" className={`${inter.variable}`}>
       <body className="font-sans antialiased bg-background">
@@ -53,6 +56,7 @@ export default async function RootLayout({
                 <CallbackUrlRedirect />
               </Suspense>
               <Toaster position="top-center" richColors />
+              <DemoEnvBanner enabled={isDemo} />
               {children}
               <PostLoginAccountSelector />
             </ConfirmProvider>
