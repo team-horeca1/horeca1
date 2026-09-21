@@ -206,9 +206,9 @@ function VendorSettingsContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           businessName,
-          description: description || null,
-          logoUrl: logoUrl || null,
-          bannerUrl: bannerUrl || null,
+          description: description || undefined,
+          logoUrl: logoUrl || undefined,
+          bannerUrl: bannerUrl || undefined,
           minOrderValue: parseFloat(minOrderValue) || 0,
           creditEnabled,
           addressLine: addressLine || undefined,

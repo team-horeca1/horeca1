@@ -402,7 +402,15 @@ function CheckoutPageContent() {
             if (excludedVendorIds.size > 0) setExcludedVendorIds(new Set());
             return;
         }
-        const pruned = pruneExcludedVendorIds(cartIds);
+        let pruned = pruneExcludedVendorIds(cartIds);
+        // Never leave every eligible PO unchecked — with a single vendor the
+        // select checkbox is hidden, so an all-excluded session is unrecoverable.
+        const eligibleIds = groups.filter((g) => g.meetsMinOrder).map((g) => g.vendorId);
+        const selectedEligible = eligibleIds.filter((id) => !pruned.includes(id));
+        if (eligibleIds.length > 0 && selectedEligible.length === 0) {
+            clearExcludedVendorIds();
+            pruned = [];
+        }
         const same =
             pruned.length === excludedVendorIds.size
             && pruned.every((id) => excludedVendorIds.has(id));
@@ -581,8 +589,15 @@ function CheckoutPageContent() {
     const toggleVendor = (vendorId: string) => {
         setExcludedVendorIds(prev => {
             const next = new Set(prev);
-            if (next.has(vendorId)) next.delete(vendorId);
-            else next.add(vendorId);
+            if (next.has(vendorId)) {
+                next.delete(vendorId);
+            } else {
+                // Keep at least one eligible PO selected so delivery modes stay reachable.
+                const eligibleIds = groups.filter((g) => g.meetsMinOrder).map((g) => g.vendorId);
+                const stillSelected = eligibleIds.filter((id) => id !== vendorId && !next.has(id));
+                if (stillSelected.length === 0) return prev;
+                next.add(vendorId);
+            }
             persistExcludedVendorIds(next);
             return next;
         });
@@ -1190,7 +1205,7 @@ function CheckoutPageContent() {
                             >
                                 {/* Vendor Header */}
                                 <div className="flex items-center gap-3 px-4 py-3 bg-gray-50/80 border-b border-gray-100">
-                                    {groups.length > 1 && (
+                                    {(groups.length > 1 || !isSelected) && (
                                         <button
                                             type="button"
                                             onClick={() => !belowMov && toggleVendor(group.vendorId)}

@@ -47,8 +47,12 @@ export async function GET(req: NextRequest) {
         },
       }),
       prisma.platformHoliday.findMany({
+        where: {
+          // Only upcoming / today — avoid dropping future holidays when past rows grow past `take`.
+          holidayDate: { gte: new Date(toLocalYmd(new Date()) + 'T00:00:00.000Z') },
+        },
         select: { holidayDate: true },
-        take: 120,
+        take: 60,
         orderBy: { holidayDate: 'asc' },
       }),
     ]);

@@ -26,7 +26,8 @@ const optionalUrlSchema = z.string()
 // Validation schema for profile updates — whitelist of allowed fields
 const updateSettingsSchema = z.object({
   businessName: z.string().min(1).optional(),
-  description: z.string().optional(),
+  // Client may send null when the store description is empty (common for delivery-only saves).
+  description: z.string().optional().nullable(),
   logoUrl: optionalUrlSchema,
   bannerUrl: optionalUrlSchema,
   minOrderValue: z.number().min(0).optional(),

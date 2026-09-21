@@ -196,8 +196,13 @@ export default function CartPage() {
     const toggleVendorSelection = (vendorId: string) => {
         setSelectedVendors(prev => {
             const next = new Set(prev);
-            if (next.has(vendorId)) next.delete(vendorId);
-            else next.add(vendorId);
+            if (next.has(vendorId)) {
+                // Keep at least one PO selected so checkout isn't a dead end.
+                if (next.size <= 1) return prev;
+                next.delete(vendorId);
+            } else {
+                next.add(vendorId);
+            }
             persistSelection(next);
             return next;
         });
