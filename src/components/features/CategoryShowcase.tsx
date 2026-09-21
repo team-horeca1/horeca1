@@ -278,7 +278,7 @@ function MobileCategoryCard({ cat, activeCategory, onCategoryClick }: MobileCate
             : "bg-[#F8F7F4] border border-[#ECE8E1] shadow-[0_1px_4px_rgba(0,0,0,0.02)] active:scale-95"
         )}
       >
-        <div className="relative w-[70%] h-[70%]">
+        <div className="relative w-[98%] h-[98%]">
           <Image
             src={imageSrc}
             alt={cat.name}
@@ -340,7 +340,7 @@ const DesktopCategoryCard = ({ cat, activeCategory, onCategoryClick }: DesktopCa
             : "bg-[#FBF9F5] border-border/80 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] group-hover:border-primary/40 group-hover:bg-white group-hover:shadow-[0_12px_24px_-4px_rgba(107,29,46,0.12)] group-hover:-translate-y-1.5"
         )}
       >
-        <div className="relative w-[72%] h-[72%] transition-transform duration-300 ease-out group-hover:scale-110">
+        <div className="relative w-[98%] h-[98%] transition-transform duration-300 ease-out group-hover:scale-110">
           <Image
             src={imageSrc}
             alt={cat.name}

@@ -32,9 +32,9 @@ export function RequirePermission({ perm, children, fallback }: RequirePermissio
         <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mb-4">
           <ShieldAlert className="text-red-500" size={28} />
         </div>
-        <h2 className="text-[18px] font-bold text-[#181725] mb-2">Access restricted</h2>
+        <h2 className="text-[18px] font-bold text-[#181725] mb-2">You do not have permission to perform this action.</h2>
         <p className="text-[13px] text-[#7C7C7C] max-w-md">
-          You don&apos;t have permission to view this page. Contact your team administrator if you need access.
+          Contact your account owner or team administrator if you need access.
         </p>
       </div>
     );

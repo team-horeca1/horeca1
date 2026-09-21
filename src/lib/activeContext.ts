@@ -43,6 +43,8 @@ export interface ActiveContext {
   permissions: PermissionKey[];
   /** True when user holds an owner-class role on the active account (full portal access). */
   isPermissionOwner: boolean;
+  /** Distinct AccountRole names on the active account (for Profile / access UI). */
+  activeRoleNames: string[];
   availableAccounts: AvailableAccountSummary[];
   availableAccountsTruncated: boolean;
   totalAccountCount: number;
@@ -377,6 +379,7 @@ export async function loadActiveContext(
       accessibleOutletIds,
       permissions,
       isPermissionOwner: isOwner,
+      activeRoleNames: [...new Set(userRoles.map((ur) => ur.role.name))],
       availableAccounts,
       availableAccountsTruncated,
       totalAccountCount,

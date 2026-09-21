@@ -15,6 +15,8 @@ declare module 'next-auth' {
       accessibleOutletIds?: string[];
       permissions?: PermissionKey[];
       isPermissionOwner?: boolean;
+      /** Role names on the active business account (e.g. Procurement Manager). */
+      activeRoleNames?: string[];
       adminPermissions?: PermissionKey[];
       isAdminPermissionOwner?: boolean;
       activeVendorId?: string | null;
@@ -55,6 +57,7 @@ declare module 'next-auth/jwt' {
     accessibleOutletIds?: string[];
     permissions?: PermissionKey[];
     isPermissionOwner?: boolean;
+    activeRoleNames?: string[];
     adminPermissions?: PermissionKey[];
     isAdminPermissionOwner?: boolean;
     activeVendorId?: string | null;

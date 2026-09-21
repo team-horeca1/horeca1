@@ -26,6 +26,7 @@ import {
   isAdminVendorImpersonationActive,
 } from '@/lib/clearImpersonation';
 import { toast } from 'sonner';
+import { isOwnerRoleName } from '@/lib/permissions/portalFeatures';
 
 interface AccountMemberApiRow {
   id: string;
@@ -175,9 +176,11 @@ export function TeamPanel({
         if (scope === 'account') {
           const mapped: TeamMemberRow[] = (teamJson.data as AccountMemberApiRow[]).map((row) => {
             const firstRole = row.user.userRoles[0]?.role ?? null;
+            const isOwner = row.user.userRoles.some((ur) => isOwnerRoleName(ur.role.name));
             return {
               id: row.id,
-              isOwner: row.isPrimary,
+              isOwner,
+              isPrimary: row.isPrimary,
               createdAt: row.createdAt,
               user: {
                 id: row.user.id,
@@ -312,7 +315,7 @@ export function TeamPanel({
           >
             <AlertCircle size={22} style={{ color: preset.accent }} />
           </div>
-          <h2 className="text-[18px] font-bold text-[#181725] mb-1">Access restricted</h2>
+          <h2 className="text-[18px] font-bold text-[#181725] mb-1">You do not have permission to perform this action.</h2>
           <p className="text-[#7C7C7C] text-[14px]">{preset.viewOnlyMessage}</p>
         </div>
       </div>

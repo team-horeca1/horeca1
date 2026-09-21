@@ -27,6 +27,7 @@ import {
     Loader2,
     ArrowLeftRight,
     Check,
+    Shield,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -39,6 +40,7 @@ import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { supplierDashboardPath } from '@/lib/businessCapability';
+import { summarizePermissions } from '@/lib/permissions/portalFeatures';
 import { useAddress } from '@/context/AddressContext';
 import { EditProfileOverlay } from './EditProfileOverlay';
 import { SavedAddressesOverlay } from './SavedAddressesOverlay';
@@ -106,7 +108,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     } | null>(null);
 
     const { data: session, update: updateSession } = useSession();
-    const { has, hasAny } = usePermissions();
+    const { has, hasAny, permissions, isPermissionOwner } = usePermissions();
     const {
         savedAddresses,
         selectedAddress,
@@ -497,6 +499,84 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     ];
 
     const isProfileComplete = !!(userData.fullName && userData.businessName && userData.pincode);
+
+    const sessionAccess = session?.user as {
+        activeRoleNames?: string[];
+        availableAccounts?: Array<{
+            id: string;
+            displayName: string | null;
+            isCustomer?: boolean;
+            isVendor?: boolean;
+            isBrand?: boolean;
+        }>;
+    } | undefined;
+    const activeRoleLabel =
+        (sessionAccess?.activeRoleNames?.length
+            ? sessionAccess.activeRoleNames.join(', ')
+            : null)
+        || (isPermissionOwner ? 'Owner' : null);
+    const customerAccounts = (sessionAccess?.availableAccounts ?? []).filter(
+        (a) => a.isCustomer === true,
+    );
+    // Prefer customer BAs; if none flagged, show all available accounts.
+    const accountsForAccessCard =
+        customerAccounts.length > 0
+            ? customerAccounts
+            : (sessionAccess?.availableAccounts ?? []);
+    const permissionLines = summarizePermissions('account', permissions, isPermissionOwner);
+    const showYourAccessCard =
+        !hideBusinessAccountForAdmin
+        && !viewingAsBuyer
+        && (!!activeRoleLabel || accountsForAccessCard.length > 0 || permissionLines.length > 0);
+
+    const yourAccessCard = showYourAccessCard ? (
+        <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-primary-light text-primary flex items-center justify-center shrink-0">
+                    <Shield size={15} strokeWidth={2.4} />
+                </div>
+                <div>
+                    <h4 className="text-[13px] font-[800] text-[#181725]">Your access</h4>
+                    <p className="text-[11px] text-gray-400 font-medium">Role, accounts &amp; what you can do</p>
+                </div>
+            </div>
+            {activeRoleLabel && (
+                <div className="mb-3">
+                    <p className="text-[10px] font-[800] text-gray-400 uppercase tracking-wider mb-1">Designation / role</p>
+                    <p className="text-[13px] font-[700] text-[#181725]">{activeRoleLabel}</p>
+                </div>
+            )}
+            {accountsForAccessCard.length > 0 && (
+                <div className="mb-3">
+                    <p className="text-[10px] font-[800] text-gray-400 uppercase tracking-wider mb-1">Customer accounts</p>
+                    <ul className="space-y-1">
+                        {accountsForAccessCard.map((a) => (
+                            <li key={a.id} className="text-[13px] font-[600] text-[#181725] truncate">
+                                {a.displayName || 'Business account'}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            {permissionLines.length > 0 && (
+                <div>
+                    <p className="text-[10px] font-[800] text-gray-400 uppercase tracking-wider mb-1">Authorized actions</p>
+                    <ul className="space-y-1">
+                        {permissionLines.slice(0, 8).map((line) => (
+                            <li key={line} className="text-[12px] font-[600] text-[#7C7C7C]">
+                                {line}
+                            </li>
+                        ))}
+                        {permissionLines.length > 8 && (
+                            <li className="text-[11px] text-gray-400 font-medium">
+                                +{permissionLines.length - 8} more
+                            </li>
+                        )}
+                    </ul>
+                </div>
+            )}
+        </div>
+    ) : null;
     // Deliver-to comes from AddressContext (selected / primary SavedAddress), not User profile fields.
     const deliverToAddress =
         selectedAddress
@@ -607,6 +687,10 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                     )}
                                 </div>
                             </div>
+
+                            {yourAccessCard && (
+                                <div className="mb-4">{yourAccessCard}</div>
+                            )}
 
                             {/* Mobile DiSCCO summary */}
                             {creditSummary && creditSummary.hasWallets && (
@@ -835,6 +919,8 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
                                         )}
                                     </div>
                                 </div>
+
+                                {yourAccessCard}
 
                                 {/* Grouped nav */}
                                 <nav className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.06)] p-2.5">

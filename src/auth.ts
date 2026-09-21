@@ -528,6 +528,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (Array.isArray(token.accessibleOutletIds)) u.accessibleOutletIds = token.accessibleOutletIds as string[];
         if (token.permissions) u.permissions = token.permissions as string[];
         if (typeof token.isPermissionOwner === 'boolean') u.isPermissionOwner = token.isPermissionOwner;
+        if (Array.isArray(token.activeRoleNames)) u.activeRoleNames = token.activeRoleNames as string[];
         u.adminPermissions = Array.isArray(token.adminPermissions) ? (token.adminPermissions as string[]) : [];
         u.isAdminPermissionOwner = token.isAdminPermissionOwner === true;
         if (token.availableAccounts) u.availableAccounts = token.availableAccounts as unknown[];
@@ -692,6 +693,7 @@ function applyActiveContext(token: Record<string, unknown>, active: ActiveContex
     delete token.accessibleOutletIds;
     delete token.permissions;
     delete token.isPermissionOwner;
+    delete token.activeRoleNames;
     delete token.availableAccounts;
     delete token.availableAccountsTruncated;
     delete token.totalAccountCount;
@@ -710,6 +712,7 @@ function applyActiveContext(token: Record<string, unknown>, active: ActiveContex
   token.accessibleOutletIds = active.accessibleOutletIds;
   token.permissions = active.permissions;
   token.isPermissionOwner = active.isPermissionOwner;
+  token.activeRoleNames = active.activeRoleNames;
   token.availableAccounts = active.availableAccounts;
   token.availableAccountsTruncated = active.availableAccountsTruncated;
   token.totalAccountCount = active.totalAccountCount;

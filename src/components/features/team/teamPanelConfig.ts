@@ -1,5 +1,5 @@
 import { CDL } from '@/lib/cdl';
-import { Crown, Shield, Edit3, Eye } from 'lucide-react';
+import { Crown, Shield, Edit3, Eye, ChefHat, Calculator, Store } from 'lucide-react';
 import type { ComponentType } from 'react';
 import type { RoleStyle } from './RoleCardsGrid';
 
@@ -8,6 +8,8 @@ export type TeamPanelScope = 'admin' | 'vendor' | 'brand' | 'account';
 export interface TeamMemberRow {
   id: string;
   isOwner: boolean;
+  /** Default BA for this user — display only; not the Owner-role signal. */
+  isPrimary?: boolean;
   createdAt: string;
   user: {
     id: string;
@@ -103,6 +105,10 @@ const ADMIN_ROLE_LOOK: Record<string, RoleStyle> = {
 
 const ACCOUNT_ROLE_LOOK: Record<string, RoleStyle> = {
   Owner: look('#F59E0B', '#FFF7E6', Crown),
+  'Procurement Manager': look('#3B82F6', '#EFF6FF', Shield),
+  'Store Manager': look('#0EA5E9', '#F0F9FF', Store),
+  Chef: look('#EA580C', '#FFF7ED', ChefHat),
+  Accountant: look('#10B981', CDL.successLight, Calculator),
   Manager: look('#3B82F6', '#EFF6FF', Shield),
   Editor: look('#8B5CF6', '#F3F0FF', Edit3),
   Viewer: look('#6B7280', '#F3F4F6', Eye),
@@ -191,7 +197,7 @@ export const TEAM_PANEL_PRESETS: Record<TeamPanelScope, TeamPanelPresetConfig> =
     rolesEditorEndpoint: (accountId) => `/api/v1/account/${accountId}/roles`,
     removeMessage: 'will lose access to this business account. They can be re-added later.',
     viewOnlyMessage:
-      'You need at least one of users.view, users.create, users.edit, or users.delete to manage the account team. Ask the account owner for access.',
+      'You do not have permission to perform this action. Ask the account owner for team access.',
     filterVisibleRoles: (roles) => roles.filter((r) => r.isTemplate && r.scope === 'account'),
     roleLook: ACCOUNT_ROLE_LOOK,
     defaultRoleLook: { color: '#6B1D2E', bg: '#F8E8EC', Icon: Shield },

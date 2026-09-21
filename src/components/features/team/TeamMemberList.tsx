@@ -13,6 +13,8 @@ import type { RoleStyle } from './RoleCardsGrid';
 export interface TeamMemberItem {
   id: string;
   isOwner: boolean;
+  /** Default BA flag — display only; not the Owner-role signal. */
+  isPrimary?: boolean;
   createdAt: string;
   user: {
     id: string;
@@ -76,6 +78,7 @@ export function TeamMemberList({
             const look = getRoleStyle(member.role.name);
             const isSelf = member.user.id === currentUserId;
             const isOwnerRow = member.isOwner;
+            const showPrimaryBadge = member.isPrimary === true;
             return (
               <li
                 key={member.id}
@@ -89,7 +92,7 @@ export function TeamMemberList({
                 <div className="flex-1 min-w-0 basis-[min(100%,12rem)] md:basis-auto">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-[14px] font-bold text-[#181725] truncate">{member.user.fullName}</p>
-                    {isOwnerRow && (
+                    {showPrimaryBadge && (
                       <span className="text-[11px] font-bold text-[#F59E0B] bg-[#FFF7E6] px-2 py-0.5 rounded-[5px]">Primary</span>
                     )}
                     {!member.user.isActive && (

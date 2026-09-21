@@ -179,6 +179,39 @@ export function moduleLabel(scope: RoleScope, module: string): string {
   return module.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase());
 }
 
+/** All distinct action column headers for a scope's matrix (sorted for stable UI). */
+const ACTION_ORDER = ['view', 'create', 'edit', 'delete', 'approve', 'order', 'pay'] as const;
+
+/**
+ * Collapses flattened permission keys into readable module lines for Profile UI.
+ * Example: "Orders: view, create, edit"
+ */
+export function summarizePermissions(
+  scope: RoleScope,
+  permissions: readonly string[],
+  isPermissionOwner: boolean,
+): string[] {
+  if (isPermissionOwner) return ['Full access to all account modules'];
+  const byModule = new Map<string, string[]>();
+  for (const key of permissions) {
+    const dot = key.indexOf('.');
+    if (dot <= 0) continue;
+    const mod = key.slice(0, dot);
+    const action = key.slice(dot + 1);
+    if (!action) continue;
+    const list = byModule.get(mod) ?? [];
+    if (!list.includes(action)) list.push(action);
+    byModule.set(mod, list);
+  }
+  const lines: string[] = [];
+  for (const [mod, actions] of byModule) {
+    const ordered = ACTION_ORDER.filter((a) => actions.includes(a));
+    const rest = actions.filter((a) => !(ACTION_ORDER as readonly string[]).includes(a));
+    lines.push(`${moduleLabel(scope, mod)}: ${[...ordered, ...rest].join(', ')}`);
+  }
+  return lines;
+}
+
 /** Valid actions for a module within a scope (intersection with MODULE_ACTIONS registry). */
 export function scopeModuleActions(scope: RoleScope, module: Module): readonly string[] {
   const feat = PORTAL_FEATURES[scope][module];
@@ -186,9 +219,6 @@ export function scopeModuleActions(scope: RoleScope, module: Module): readonly s
   const registryActions = MODULE_ACTIONS[module] as readonly string[];
   return feat.actions.filter((a) => registryActions.includes(a));
 }
-
-/** All distinct action column headers for a scope's matrix (sorted for stable UI). */
-const ACTION_ORDER = ['view', 'create', 'edit', 'delete', 'approve', 'order', 'pay'] as const;
 
 export function scopeActionColumns(scope: RoleScope): string[] {
   const set = new Set<string>();
