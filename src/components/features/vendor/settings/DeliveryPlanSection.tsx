@@ -7,7 +7,6 @@ import {
   Check,
   Loader2,
   MapPin,
-  Package,
   Pencil,
   Settings2,
   X,
@@ -84,25 +83,36 @@ function ToggleSwitch({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      disabled={disabled}
-      onClick={onToggle}
-      className={cn(
-        'relative w-[52px] h-[28px] rounded-full transition-colors shrink-0 disabled:opacity-50',
-        on ? 'bg-[#6B1D2E]' : 'bg-[#D1D5DB]',
-      )}
-    >
+    <span className="inline-flex items-center gap-2 shrink-0">
       <span
         className={cn(
-          'absolute top-[3px] w-[22px] h-[22px] rounded-full bg-white shadow-sm transition-transform',
-          on ? 'translate-x-[27px]' : 'translate-x-[3px]',
+          'text-[12px] font-bold',
+          on ? 'text-[#6B1D2E]' : 'text-[#667085]',
         )}
-      />
-    </button>
+      >
+        {on ? 'On' : 'Off'}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label={label}
+        disabled={disabled}
+        onClick={onToggle}
+        className={cn(
+          'relative inline-flex h-6 w-11 shrink-0 items-center overflow-hidden rounded-full transition-colors disabled:opacity-50',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6B1D2E]/40 focus-visible:ring-offset-2',
+          on ? 'bg-[#6B1D2E]' : 'bg-[#D1D5DB]',
+        )}
+      >
+        <span
+          className={cn(
+            'size-5 rounded-full bg-white shadow-sm transition-transform',
+            on ? 'translate-x-5' : 'translate-x-0.5',
+          )}
+        />
+      </button>
+    </span>
   );
 }
 
@@ -199,11 +209,6 @@ export function DeliveryPlanSection({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Partial<ServiceArea> | null>(null);
   const [rowSaving, setRowSaving] = useState(false);
-  const [previewAreaId, setPreviewAreaId] = useState<string | null>(null);
-  const [calendarMonth, setCalendarMonth] = useState(() => {
-    const n = new Date();
-    return new Date(n.getFullYear(), n.getMonth(), 1);
-  });
 
   const cityOptions = useMemo(() => {
     const set = new Set<string>();
@@ -220,77 +225,49 @@ export function DeliveryPlanSection({
   }, [areas, cityFilter]);
 
   const showCityFilter = cityOptions.length > 1;
-  const singleCity = cityOptions.length === 1 ? cityOptions[0] : null;
 
-  const weeklyStats = useMemo(() => {
-    return DELIVERY_DAY_KEYS.map((key, i) => {
-      const count = visible.filter((a) => !!a[key]).length;
-      const cutoffs = visible
-        .filter((a) => !!a[key])
-        .map((a) => a.cutoffTime || PLATFORM_DEFAULT_CUTOFF);
-      const commonCutoff =
-        cutoffs.length > 0
-          ? cutoffs.sort(
-              (a, b) =>
-                cutoffs.filter((c) => c === a).length - cutoffs.filter((c) => c === b).length,
-            ).pop()!
-          : PLATFORM_DEFAULT_CUTOFF;
-      return {
-        key,
-        label: DELIVERY_DAY_SHORT[i],
-        full: DELIVERY_DAY_FULL[i],
-        count,
-        active: count > 0,
-        cutoff: commonCutoff,
-      };
-    });
-  }, [visible]);
-
-  const previewArea = useMemo(() => {
+  const weekView = useMemo(() => {
     if (visible.length === 0) return null;
-    const found = previewAreaId ? visible.find((a) => a.id === previewAreaId) : null;
-    return found ?? visible[0];
-  }, [visible, previewAreaId]);
-
-  const monthCells = useMemo(() => {
-    const year = calendarMonth.getFullYear();
-    const month = calendarMonth.getMonth();
-    const first = new Date(year, month, 1);
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const startPad = (first.getDay() + 6) % 7; // Monday-first
-    const cells: Array<Date | null> = [];
-    for (let i = 0; i < startPad; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
-    while (cells.length % 7 !== 0) cells.push(null);
-    return cells;
-  }, [calendarMonth]);
-
-  const isDeliveryWeekday = (d: Date, area: ServiceArea) => {
-    const day = d.getDay(); // 0 Sun
-    const map: DeliveryDayKey[] = [
-      'deliversSun',
-      'deliversMon',
-      'deliversTue',
-      'deliversWed',
-      'deliversThu',
-      'deliversFri',
-      'deliversSat',
-    ];
-    return !!area[map[day]];
-  };
-
-  const summary = useMemo(() => {
-    const cities = cityOptions.length;
-    const thirdParty = areas.filter((a) => a.thirdPartyDeliveryAvailable).length;
-    const defaultDays = formatDaysCompact(PLATFORM_DEFAULT_DAYS);
+    const signature = (area: ServiceArea) =>
+      DELIVERY_DAY_KEYS.map((key) => (area[key] ? '1' : '0')).join('');
+    const counts = new Map<string, number>();
+    for (const area of visible) {
+      const sig = signature(area);
+      counts.set(sig, (counts.get(sig) ?? 0) + 1);
+    }
+    let majority = '';
+    let majorityCount = 0;
+    for (const [sig, n] of counts) {
+      if (n > majorityCount) {
+        majority = sig;
+        majorityCount = n;
+      }
+    }
+    const days: DeliveryPlanDays = emptyDays();
+    DELIVERY_DAY_KEYS.forEach((key, i) => {
+      days[key] = majority[i] === '1';
+    });
+    const cutoffCounts = new Map<string, number>();
+    for (const area of visible) {
+      const cutoff = area.cutoffTime || PLATFORM_DEFAULT_CUTOFF;
+      cutoffCounts.set(cutoff, (cutoffCounts.get(cutoff) ?? 0) + 1);
+    }
+    let cutoff = PLATFORM_DEFAULT_CUTOFF;
+    let cutoffCount = 0;
+    for (const [value, n] of cutoffCounts) {
+      if (n > cutoffCount) {
+        cutoff = value;
+        cutoffCount = n;
+      }
+    }
     return {
-      areas: areas.length,
-      cities,
-      thirdParty,
-      defaultDays,
-      defaultCutoff: formatCutoffDisplay(PLATFORM_DEFAULT_CUTOFF),
+      days,
+      cutoff,
+      patternLabel: formatDaysCompact(days),
+      differ: visible.length - majorityCount,
+      total: visible.length,
     };
-  }, [areas, cityOptions.length]);
+  }, [visible]);
 
   const editingArea = editingId ? areas.find((a) => a.id === editingId) ?? null : null;
 
@@ -384,57 +361,34 @@ export function DeliveryPlanSection({
 
       {subTab === 'preferences' ? (
         <div className="space-y-3">
-          <p className="text-[12px] text-[#667085]">
+          <p className="text-[12px] text-[#667085] text-pretty">
             These settings apply to your whole supplier account — not individual pincodes.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="rounded-[14px] border border-[#EEEEEE] bg-white p-4 sm:p-5 flex items-start justify-between gap-4 shadow-sm">
-              <div className="flex gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-[10px] bg-[#F8E8EC] text-[#6B1D2E] flex items-center justify-center shrink-0">
-                  <Package size={18} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[14px] font-bold text-[#181725]">Self Pickup</p>
-                  <p className="text-[12px] text-[#667085] mt-0.5 leading-relaxed">
-                    Allow customers to collect orders from your dispatch point.
-                  </p>
-                  <p className="text-[11px] font-semibold mt-2 text-[#667085]">
-                    Status:{' '}
-                    <span className={selfPickupOffered ? 'text-[#16A34A]' : 'text-[#667085]'}>
-                      {selfPickupOffered ? 'On' : 'Off'}
-                    </span>
-                  </p>
-                </div>
+          <div className="rounded-[14px] border border-[#EEEEEE] bg-white shadow-sm divide-y divide-[#F5F5F5]">
+            <div className="flex items-center justify-between gap-4 px-4 py-4">
+              <div className="min-w-0">
+                <p className="text-[14px] font-bold text-[#181725]">Self pickup</p>
+                <p className="text-[12px] text-[#667085] mt-0.5 text-pretty">
+                  Customers can collect from your dispatch point.
+                </p>
               </div>
               <ToggleSwitch
                 on={selfPickupOffered}
                 onToggle={() => setSelfPickupOffered(!selfPickupOffered)}
-                label="Self Pickup"
+                label="Self pickup"
               />
             </div>
-
-            <div className="rounded-[14px] border border-[#EEEEEE] bg-white p-4 sm:p-5 flex items-start justify-between gap-4 shadow-sm">
-              <div className="flex gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-[10px] bg-[#FFF8E1] text-[#976538] flex items-center justify-center shrink-0">
-                  <CalendarDays size={18} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[14px] font-bold text-[#181725]">Holiday Delivery</p>
-                  <p className="text-[12px] text-[#667085] mt-0.5 leading-relaxed">
-                    Continue deliveries on platform holidays. When off, holidays roll to the next delivery day.
-                  </p>
-                  <p className="text-[11px] font-semibold mt-2 text-[#667085]">
-                    Status:{' '}
-                    <span className={deliverThroughPublicHolidays ? 'text-[#16A34A]' : 'text-[#667085]'}>
-                      {deliverThroughPublicHolidays ? 'On' : 'Off'}
-                    </span>
-                  </p>
-                </div>
+            <div className="flex items-center justify-between gap-4 px-4 py-4">
+              <div className="min-w-0">
+                <p className="text-[14px] font-bold text-[#181725]">Deliver on public holidays</p>
+                <p className="text-[12px] text-[#667085] mt-0.5 text-pretty">
+                  If off, checkout skips platform holidays.
+                </p>
               </div>
               <ToggleSwitch
                 on={deliverThroughPublicHolidays}
                 onToggle={() => setDeliverThroughPublicHolidays(!deliverThroughPublicHolidays)}
-                label="Holiday Delivery"
+                label="Deliver on public holidays"
               />
             </div>
           </div>
@@ -444,231 +398,44 @@ export function DeliveryPlanSection({
         </div>
       ) : (
         <>
-          {/* Weekly schedule visualization — read-only summary of visible rows */}
-          {areas.length > 0 && (
-            <div className="rounded-[14px] border border-[#EEEEEE] bg-white shadow-sm overflow-hidden">
-              <div className="px-4 sm:px-5 py-3.5 border-b border-[#F5F5F5]">
-                <p className="text-[13px] font-bold text-[#181725]">Weekly Delivery Schedule</p>
-                <p className="text-[11px] text-[#667085] mt-0.5">
-                  Visual summary of {visible.length} visible pincode
-                  {visible.length === 1 ? '' : 's'}
-                  {cityFilter !== '__all__' ? ` in ${cityFilter}` : ''}. Edit days in the table
-                  below.
+          {weekView && (
+            <div className="rounded-[14px] border border-[#EEEEEE] bg-white shadow-sm px-4 sm:px-5 py-4 space-y-3">
+              <div>
+                <p className="text-[13px] font-bold text-[#181725]">Your week</p>
+                <p className="text-[12px] text-[#667085] mt-0.5 text-pretty">
+                  <span className="font-semibold text-[#181725]">{weekView.patternLabel}</span>
+                  {' · '}
+                  orders by {formatCutoffDisplay(weekView.cutoff)}
                 </p>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-center">
-                  <thead>
-                    <tr className="text-[11px] font-bold uppercase tracking-wider text-[#667085]">
-                      <th className="px-3 py-2.5 text-left font-bold text-[#AEAEAE]"> </th>
-                      {weeklyStats.map((d) => (
-                        <th key={d.key} className="px-2 py-2.5">
-                          {d.label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-t border-[#F5F5F5]">
-                      <td className="px-3 py-3 text-left text-[12px] font-bold text-[#181725]">
-                        Deliver
-                      </td>
-                      {weeklyStats.map((d) => (
-                        <td key={d.key} className="px-2 py-3">
-                          <span
-                            className={cn(
-                              'inline-flex items-center justify-center w-8 h-8 rounded-full text-[11px] font-bold',
-                              d.active
-                                ? 'bg-[#6B1D2E] text-white'
-                                : 'bg-[#F5F5F5] text-[#AEAEAE]',
-                            )}
-                            title={`${d.full}: ${d.count} of ${visible.length} pincodes`}
-                            aria-label={`${d.full}: ${d.count} of ${visible.length} pincodes deliver`}
-                          >
-                            {d.active ? '●' : '—'}
-                          </span>
-                          {visible.length > 1 && d.active && (
-                            <p className="text-[10px] text-[#AEAEAE] mt-1 tabular-nums">
-                              {d.count}/{visible.length}
-                            </p>
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                    <tr className="border-t border-[#F5F5F5]">
-                      <td className="px-3 py-3 text-left text-[12px] font-bold text-[#181725]">
-                        Cut-off
-                      </td>
-                      {weeklyStats.map((d) => (
-                        <td key={d.key} className="px-2 py-3 text-[11px] font-semibold text-[#667085]">
-                          {d.active ? formatCutoffDisplay(d.cutoff) : '—'}
-                        </td>
-                      ))}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {previewArea && (
-                <div className="border-t border-[#F5F5F5] px-4 sm:px-5 py-4 space-y-3 bg-[#FAF7F2]/50">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[12px] font-bold text-[#181725]">Schedule Calendar</p>
-                      <p className="text-[11px] text-[#667085]">
-                        Preview for{' '}
-                        <span className="font-semibold text-[#181725] tabular-nums">
-                          {previewArea.pincode}
-                        </span>
-                        {previewArea.areaLabel ? ` · ${previewArea.areaLabel}` : ''}
-                      </p>
+              <div className="grid grid-cols-7 gap-1" role="list" aria-label="Weekly delivery schedule">
+                {DELIVERY_DAY_KEYS.map((key, i) => {
+                  const on = weekView.days[key];
+                  return (
+                    <div key={key} role="listitem" className="flex flex-col items-center gap-1.5 min-w-0">
+                      <span className="text-[11px] font-bold text-[#667085]">{DELIVERY_DAY_SHORT[i]}</span>
+                      <span
+                        className={cn(
+                          'inline-flex size-8 items-center justify-center rounded-full text-[13px] font-bold',
+                          on ? 'bg-[#6B1D2E] text-white' : 'bg-[#F5F5F5] text-[#AEAEAE]',
+                        )}
+                        aria-label={`${DELIVERY_DAY_FULL[i]}: ${on ? 'delivers' : 'no delivery'}`}
+                      >
+                        {on ? <Check size={14} aria-hidden /> : '—'}
+                      </span>
                     </div>
-                    {visible.length > 1 && (
-                      <select
-                        value={previewArea.id}
-                        onChange={(e) => setPreviewAreaId(e.target.value)}
-                        className="h-9 rounded-[10px] border border-[#E9E3DD] bg-white px-2 text-[12px] font-semibold"
-                        aria-label="Pincode for schedule calendar"
-                      >
-                        {visible.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.pincode}
-                            {a.cityLabel ? ` · ${a.cityLabel}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCalendarMonth(
-                          new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1),
-                        )
-                      }
-                      className="h-8 px-2 rounded-lg border border-[#E9E3DD] text-[12px] font-semibold"
-                      aria-label="Previous month"
-                    >
-                      ‹
-                    </button>
-                    <p className="text-[13px] font-bold text-[#181725]">
-                      {calendarMonth.toLocaleDateString('en-IN', {
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCalendarMonth(
-                          new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1),
-                        )
-                      }
-                      className="h-8 px-2 rounded-lg border border-[#E9E3DD] text-[12px] font-semibold"
-                      aria-label="Next month"
-                    >
-                      ›
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-7 gap-1 max-w-md">
-                    {DELIVERY_DAY_SHORT.map((d) => (
-                      <div
-                        key={d}
-                        className="text-center text-[10px] font-bold text-[#667085] py-1"
-                      >
-                        {d}
-                      </div>
-                    ))}
-                    {monthCells.map((cell, idx) => {
-                      if (!cell) return <div key={`e-${idx}`} className="min-h-[36px]" />;
-                      const delivers = isDeliveryWeekday(cell, previewArea);
-                      return (
-                        <div
-                          key={cell.toISOString()}
-                          className={cn(
-                            'min-h-[36px] rounded-[8px] flex flex-col items-center justify-center text-[11px] font-semibold',
-                            delivers ? 'bg-[#F8E8EC] text-[#6B1D2E]' : 'bg-white text-[#AEAEAE]',
-                          )}
-                          aria-label={`${cell.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })}${delivers ? ' — delivery day' : ''}`}
-                        >
-                          {cell.getDate()}
-                          {delivers && (
-                            <span className="text-[8px] leading-none mt-0.5" aria-hidden>
-                              ●
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[11px] text-[#667085]">
-                    Next pattern:{' '}
-                    <strong className="text-[#181725]">
-                      {formatDaysCompact(daysFromArea(previewArea))}
-                    </strong>
-                    {' · '}
-                    Orders by {formatTime(previewArea.cutoffTime || PLATFORM_DEFAULT_CUTOFF)}
-                  </p>
-                </div>
+                  );
+                })}
+              </div>
+              {weekView.differ > 0 && (
+                <p className="text-[11px] text-[#667085]">
+                  {weekView.differ} of {weekView.total} pincodes differ — edit in the table.
+                </p>
               )}
             </div>
           )}
 
           {serviceAreasSlot}
-
-          {/* Summary hero */}
-          <div className="rounded-[14px] border border-[#EEEEEE] bg-white shadow-sm overflow-hidden">
-            <div className="px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#F5F5F5]">
-              <div>
-                <p className="text-[13px] font-bold text-[#181725]">Your coverage</p>
-                <p className="text-[11px] text-[#667085] mt-0.5">
-                  {singleCity ? `Serving ${singleCity}` : 'Pincodes you already serve'}
-                </p>
-              </div>
-              {onRequestAddPincode && (
-                <button
-                  type="button"
-                  onClick={onRequestAddPincode}
-                  className="h-10 px-4 rounded-[10px] bg-[#6B1D2E] text-white text-[12px] font-bold hover:bg-[#5A1926] transition-colors"
-                >
-                  Add Pincode
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-[#F5F5F5]">
-              {[
-                { label: 'Service areas', value: String(summary.areas) },
-                { label: 'Active cities', value: String(summary.cities) },
-                { label: 'Default days', value: summary.defaultDays },
-                { label: 'Default cut-off', value: summary.defaultCutoff },
-              ].map((stat) => (
-                <div key={stat.label} className="px-4 py-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#AEAEAE]">
-                    {stat.label}
-                  </p>
-                  <p className="text-[14px] font-bold text-[#181725] mt-0.5 tabular-nums">
-                    {stat.value}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className="px-4 sm:px-5 py-2.5 bg-[#FAF7F2] border-t border-[#F5F5F5] flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#667085]">
-              <span>
-                3rd-party enabled:{' '}
-                <strong className="text-[#181725]">{summary.thirdParty}</strong>
-              </span>
-              <span>
-                Self-pickup:{' '}
-                <strong className="text-[#181725]">{selfPickupOffered ? 'On' : 'Off'}</strong>
-              </span>
-              <span>
-                Holiday delivery:{' '}
-                <strong className="text-[#181725]">
-                  {deliverThroughPublicHolidays ? 'On' : 'Off'}
-                </strong>
-              </span>
-            </div>
-          </div>
 
           {areas.length === 0 ? (
             <div className="rounded-[14px] border border-dashed border-[#D1D5DB] bg-[#FAFAFA] px-5 py-10 text-center">
