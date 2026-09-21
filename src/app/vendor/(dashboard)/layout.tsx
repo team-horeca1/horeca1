@@ -424,11 +424,14 @@ export default function VendorLayout({
             .catch(() => {});
     }, [status, isAdmin, isActiveVendor, isApplicationPending, pathname, router]);
 
-    const handleExitAdminView = () => {
+    const handleExitAdminView = async () => {
         if (exitingAdminView) return;
         setExitingAdminView(true);
-        void clearAllAdminImpersonation();
-        window.location.assign('/admin/vendors');
+        try {
+            await clearAllAdminImpersonation();
+        } finally {
+            window.location.assign('/admin/vendors');
+        }
     };
 
     React.useEffect(() => {

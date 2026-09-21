@@ -61,18 +61,32 @@ export function setBuyerImpersonationCookies(
   }
 }
 
-/** Clear every admin impersonation cookie on a response (mutual exclusion / logout). */
+/** Clear every admin impersonation cookie on a response (mutual exclusion / logout).
+ * Must mirror set attributes (secure / sameSite / httpOnly) or Secure cookies survive on HTTPS. */
 export function clearAllImpersonationCookies(res: NextResponse): void {
-  res.cookies.set(VENDOR_ID_COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
-  res.cookies.set(VENDOR_NAME_COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
-  res.cookies.set(VENDOR_OUTLET_COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
-  res.cookies.set(BRAND_ID_COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
-  res.cookies.set(BRAND_NAME_COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
-  res.cookies.set(BUYER_USER_COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
-  res.cookies.set(BUYER_BA_COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
-  res.cookies.set(BUYER_NAME_COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
-  res.cookies.set(BUYER_MODE_COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
-  res.cookies.set(CUSTOMER_USER_COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
-  res.cookies.set(CUSTOMER_BA_COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
-  res.cookies.set(CUSTOMER_NAME_COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
+  const clearHttpOnly = {
+    httpOnly: true,
+    secure: IS_PROD,
+    sameSite: 'lax' as const,
+    path: COOKIE_PATH,
+    maxAge: 0,
+    expires: new Date(0),
+  };
+  const clearReadable = {
+    ...clearHttpOnly,
+    httpOnly: false,
+  };
+
+  res.cookies.set(VENDOR_ID_COOKIE, '', clearHttpOnly);
+  res.cookies.set(VENDOR_NAME_COOKIE, '', clearReadable);
+  res.cookies.set(VENDOR_OUTLET_COOKIE, '', clearHttpOnly);
+  res.cookies.set(BRAND_ID_COOKIE, '', clearHttpOnly);
+  res.cookies.set(BRAND_NAME_COOKIE, '', clearReadable);
+  res.cookies.set(BUYER_USER_COOKIE, '', clearHttpOnly);
+  res.cookies.set(BUYER_BA_COOKIE, '', clearHttpOnly);
+  res.cookies.set(BUYER_NAME_COOKIE, '', clearReadable);
+  res.cookies.set(BUYER_MODE_COOKIE, '', clearReadable);
+  res.cookies.set(CUSTOMER_USER_COOKIE, '', clearHttpOnly);
+  res.cookies.set(CUSTOMER_BA_COOKIE, '', clearHttpOnly);
+  res.cookies.set(CUSTOMER_NAME_COOKIE, '', clearReadable);
 }

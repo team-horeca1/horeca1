@@ -173,11 +173,14 @@ export default function BrandPortalLayout({ children }: { children: React.ReactN
         session?.user,
     ]);
 
-    const handleExitAdminView = () => {
+    const handleExitAdminView = async () => {
         if (exitingAdminView) return;
         setExitingAdminView(true);
-        void clearAllAdminImpersonation();
-        window.location.assign('/admin/brands');
+        try {
+            await clearAllAdminImpersonation();
+        } finally {
+            window.location.assign('/admin/brands');
+        }
     };
 
     // Only gate on the genuine initial load (no session yet). A background

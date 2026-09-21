@@ -91,10 +91,13 @@ export function useAdminImpersonate(target: ImpersonateTarget) {
           : target === 'brand'
             ? '/admin/brands'
             : '/admin/vendors');
-      // Fire-and-forget — awaiting DELETE delayed Exit and felt like a dead click
-      // (same rationale as ProfileScreen logout).
-      void clearAllAdminImpersonation();
-      window.location.assign(href);
+      // Await clear so Secure impersonation cookies are expired before navigation
+      // (fire-and-forget aborted the DELETE and left storefront shopping as the supplier).
+      try {
+        await clearAllAdminImpersonation();
+      } finally {
+        window.location.assign(href);
+      }
     },
     [loading, target],
   );
