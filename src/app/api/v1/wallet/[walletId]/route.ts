@@ -28,7 +28,7 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
     const wallet = await prisma.creditWallet.findUnique({
       where: { id: walletId },
       include: {
-        vendor: { select: { id: true, businessName: true } },
+        vendor: { select: { id: true, businessName: true, displayName: true } },
         transactions: { orderBy: { createdAt: 'desc' }, take: 50 },
         repayments: { orderBy: { createdAt: 'desc' }, take: 20 },
         penalties: { orderBy: { createdAt: 'desc' }, take: 20 },

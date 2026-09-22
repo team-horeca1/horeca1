@@ -2,6 +2,7 @@ import type { ApprovalStatus, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { aggregateInventories } from '@/lib/inventoryHelpers';
 import { getApprovedDistributorKeys, distributorAuthKey } from '@/lib/brandAuthorizedDistributor';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
@@ -251,6 +252,7 @@ export class BrandService {
                       select: {
                         id: true,
                         businessName: true,
+                        displayName: true,
                         slug: true,
                         logoUrl: true,
                         rating: true,
@@ -329,7 +331,7 @@ export class BrandService {
         if (!vendorMap.has(v.id)) {
           vendorMap.set(v.id, {
             id: v.id,
-            name: v.businessName,
+            name: storeDisplayName(v),
             slug: v.slug,
             logo: v.logoUrl,
             pincodes: vendorPincodes,
@@ -347,7 +349,7 @@ export class BrandService {
         return {
           vendorId: v.id,
           vendorSlug: v.slug,
-          vendorName: v.businessName,
+          vendorName: storeDisplayName(v),
           price: Math.round(priceWithTax * 100) / 100,
           basePrice: Number(m.distributorProduct.basePrice),
           taxPercent: Number(m.distributorProduct.taxPercent),
@@ -442,6 +444,7 @@ export class BrandService {
               select: {
                 id: true,
                 businessName: true,
+                displayName: true,
                 logoUrl: true,
                 serviceAreas: { where: { isActive: true }, select: { pincode: true } },
               },
@@ -525,7 +528,7 @@ export class BrandService {
     for (const m of mappings) {
       if (m.distributorProduct.vendor && m.distributorProduct.vendorId) {
         vendorIdToInfo.set(m.distributorProduct.vendorId, {
-          name: m.distributorProduct.vendor.businessName,
+          name: storeDisplayName(m.distributorProduct.vendor),
           logoUrl: m.distributorProduct.vendor.logoUrl,
         });
       }
@@ -1137,7 +1140,7 @@ export class BrandService {
                 packSize: true,
                 basePrice: true,
                 vendorId: true,
-                vendor: { select: { id: true, businessName: true, logoUrl: true } },
+                vendor: { select: { id: true, businessName: true, displayName: true, logoUrl: true } },
               },
             },
           },
@@ -1188,7 +1191,9 @@ export class BrandService {
           status: m.status,
           confidenceScore: Number(m.confidenceScore),
           vendorId: mappingVendorId,
-          vendorName: m.distributorProduct.vendor?.businessName ?? '—',
+          vendorName: m.distributorProduct.vendor
+            ? storeDisplayName(m.distributorProduct.vendor)
+            : '—',
           vendorLogo: m.distributorProduct.vendor?.logoUrl ?? null,
           distributorAuthStatus: auth?.status ?? null,
           isAuthApproved,
@@ -1317,7 +1322,7 @@ export class BrandService {
             id: true,
             name: true,
             basePrice: true,
-            vendor: { select: { id: true, businessName: true, logoUrl: true } },
+            vendor: { select: { id: true, businessName: true, displayName: true, logoUrl: true } },
           },
         },
       },

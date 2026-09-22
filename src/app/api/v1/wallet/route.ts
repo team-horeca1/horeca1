@@ -16,7 +16,7 @@ export const GET = withAuth(async (_req: NextRequest, ctx) => {
       where: { userId },
       orderBy: { createdAt: 'asc' },
       include: {
-        vendor: { select: { id: true, businessName: true } },
+        vendor: { select: { id: true, businessName: true, displayName: true } },
         transactions: { orderBy: { createdAt: 'desc' }, take: 15 },
         repayments: { orderBy: { createdAt: 'desc' }, take: 10 },
         penalties: { orderBy: { createdAt: 'desc' }, take: 10 },

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import DistributorMappedProductsModal from '@/components/features/brand/DistributorMappedProductsModal';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 const AddVendorWizard = dynamic(
     () => import('@/components/features/admin/AddVendorWizard').then((m) => m.AddVendorWizard),
@@ -28,6 +29,8 @@ interface AuthorizedDistributor {
     vendor: {
         id: string;
         businessName: string;
+        displayName?: string | null;
+        name?: string;
         slug: string;
         logoUrl: string | null;
         city: string | null;
@@ -38,6 +41,8 @@ interface AuthorizedDistributor {
 interface SearchVendor {
     id: string;
     businessName: string;
+    displayName?: string | null;
+    name?: string;
     slug: string;
     logoUrl: string | null;
     city: string | null;
@@ -256,7 +261,7 @@ export default function BrandDistributorsPage() {
                                 <div className="flex items-center gap-3 min-w-0">
                                     <VendorAvatar logoUrl={v.logoUrl} />
                                     <div className="min-w-0">
-                                        <p className="text-[13px] font-bold text-[#181725] truncate">{v.businessName}</p>
+                                        <p className="text-[13px] font-bold text-[#181725] truncate">{v.name || storeDisplayName(v)}</p>
                                         <p className="text-[11px] text-gray-500 flex items-center gap-1">
                                             {v.city && <><MapPin size={10} /> {v.city} · </>}
                                             {v._count.products} products
@@ -305,12 +310,13 @@ export default function BrandDistributorsPage() {
                             <div className="divide-y divide-gray-50 border border-gray-100 rounded-xl overflow-hidden">
                                 {approved.map((d) => {
                                     const mapped = d.vendor._count?.products ?? 0;
+                                    const label = d.vendor.name || storeDisplayName(d.vendor);
                                     return (
                                         <div key={d.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <VendorAvatar logoUrl={d.vendor.logoUrl} />
                                                 <div className="min-w-0">
-                                                    <p className="text-[13px] font-bold text-[#181725] truncate">{d.vendor.businessName}</p>
+                                                    <p className="text-[13px] font-bold text-[#181725] truncate">{label}</p>
                                                     <p className="text-[11px] text-gray-500 flex items-center gap-1 flex-wrap">
                                                         {d.vendor.city && (
                                                             <span className="inline-flex items-center gap-0.5">
@@ -322,7 +328,7 @@ export default function BrandDistributorsPage() {
                                                             count={mapped}
                                                             onOpen={() => setMappingPreview({
                                                                 vendorId: d.vendorId,
-                                                                vendorName: d.vendor.businessName,
+                                                                vendorName: label,
                                                                 status: 'approved',
                                                             })}
                                                         />
@@ -370,12 +376,13 @@ export default function BrandDistributorsPage() {
                                 {pending.map((d) => {
                                     const mapped = d.vendor._count?.products ?? 0;
                                     const busy = actingId === d.vendorId;
+                                    const label = d.vendor.name || storeDisplayName(d.vendor);
                                     return (
                                         <div key={d.id} className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <VendorAvatar logoUrl={d.vendor.logoUrl} />
                                                 <div className="min-w-0">
-                                                    <p className="text-[13px] font-bold text-[#181725] truncate">{d.vendor.businessName}</p>
+                                                    <p className="text-[13px] font-bold text-[#181725] truncate">{label}</p>
                                                     <p className="text-[11px] text-gray-500 flex items-center gap-1 flex-wrap">
                                                         {d.vendor.city && (
                                                             <span className="inline-flex items-center gap-0.5">
@@ -387,7 +394,7 @@ export default function BrandDistributorsPage() {
                                                             count={mapped}
                                                             onOpen={() => setMappingPreview({
                                                                 vendorId: d.vendorId,
-                                                                vendorName: d.vendor.businessName,
+                                                                vendorName: label,
                                                                 status: 'pending',
                                                             })}
                                                         />
@@ -396,7 +403,7 @@ export default function BrandDistributorsPage() {
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
                                                 <button
-                                                    onClick={() => approveRequest(d.vendorId, d.vendor.businessName)}
+                                                    onClick={() => approveRequest(d.vendorId, label)}
                                                     disabled={busy}
                                                     className="h-[32px] px-3 bg-primary text-white rounded-lg text-[12px] font-bold hover:bg-primary-dark disabled:opacity-50 flex items-center gap-1"
                                                 >

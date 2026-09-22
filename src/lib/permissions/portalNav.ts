@@ -27,6 +27,7 @@ import {
   Truck,
   Layers,
   Mic2,
+  ImageIcon,
 } from 'lucide-react';
 import type { PermissionKey } from '@/lib/permissions/registry';
 import type { Module, RoleScope } from '@/lib/permissions/portalFeatures';
@@ -65,6 +66,7 @@ export const ADMIN_NAV_GROUPS: PortalNavGroup[] = [
       { name: 'Categories', icon: Tag, href: '/admin/categories', feature: 'products', requiredPerm: 'products.view' },
       { name: 'Collections', icon: Layers, href: '/admin/collections', feature: 'products', requiredPerm: 'products.view' },
       { name: 'Brands', icon: Sparkles, href: '/admin/brands', feature: 'brands', requiredPerm: 'brands.view' },
+      { name: 'Homepage Hero', icon: ImageIcon, href: '/admin/homepage', requiredPerm: 'settings.view' },
       { name: 'Horeca1 Voices', icon: Mic2, href: '/admin/voices', requiredPerm: 'settings.view' },
     ],
   },

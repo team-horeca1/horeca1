@@ -9,6 +9,7 @@ import { useStableSession } from '@/hooks/useStableSession';
 import { toast } from 'sonner';
 import { dal } from '@/lib/dal';
 import { cn } from '@/lib/utils';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface ApiOrderItem {
     id: string;
@@ -23,6 +24,7 @@ interface ApiOrderItem {
 interface ApiOrderVendor {
     id: string;
     businessName: string;
+    displayName?: string | null;
     slug: string;
     logoUrl: string | null;
 }
@@ -358,11 +360,11 @@ function OrdersPageContent() {
                                                     <div className="flex items-center gap-2 min-w-0">
                                                         <div className="w-7 h-7 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden relative">
                                                             {order.vendor?.logoUrl
-                                                                ? <Image src={order.vendor.logoUrl} alt={order.vendor.businessName} fill className="object-contain p-0.5" sizes="28px" />
+                                                                ? <Image src={order.vendor.logoUrl} alt={storeDisplayName(order.vendor)} fill className="object-contain p-0.5" sizes="28px" />
                                                                 : <Store size={12} className="text-gray-400" />
                                                             }
                                                         </div>
-                                                        <span className="text-[12px] font-bold text-[#181725] truncate max-w-[160px]">{order.vendor?.businessName || 'Vendor'}</span>
+                                                        <span className="text-[12px] font-bold text-[#181725] truncate max-w-[160px]">{order.vendor ? storeDisplayName(order.vendor) || 'Vendor' : 'Vendor'}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -459,7 +461,7 @@ function OrdersPageContent() {
                                         <div className="flex items-center gap-3">
                                             <div className="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0 overflow-hidden relative">
                                                 {order.vendor?.logoUrl
-                                                    ? <Image src={order.vendor.logoUrl} alt={order.vendor.businessName} fill className="object-contain p-1" sizes="36px" />
+                                                    ? <Image src={order.vendor.logoUrl} alt={storeDisplayName(order.vendor)} fill className="object-contain p-1" sizes="36px" />
                                                     : <Store size={14} className="text-gray-400" />
                                                 }
                                             </div>
@@ -470,7 +472,7 @@ function OrdersPageContent() {
                                                 </div>
                                                 <div className="flex items-center justify-between gap-2 mt-0.5">
                                                     <p className="text-[11px] text-gray-400 font-medium truncate">
-                                                        {order.vendor?.businessName || 'Vendor'} · {formatDate(order.createdAt)} · {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                                                        {order.vendor ? storeDisplayName(order.vendor) || 'Vendor' : 'Vendor'} · {formatDate(order.createdAt)} · {order.items.length} item{order.items.length !== 1 ? 's' : ''}
                                                     </p>
                                                     <span className={cn('text-[10px] font-bold whitespace-nowrap', paymentCfg.color)}>{paymentCfg.label}</span>
                                                 </div>

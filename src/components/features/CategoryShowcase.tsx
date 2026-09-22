@@ -24,8 +24,8 @@ const CATEGORY_BG: Record<string, string> = {
 
 // High-fidelity fallback product cutouts per category/slug
 const CATEGORY_IMAGE_MAP: Record<string, string> = {
-  'fresh-produce': '/images/placeholders/no-category.svg',
-  'vegetables': '/images/placeholders/no-category.svg',
+  'fresh-produce': 'https://ik.imagekit.io/nasjugiz2/horeca/categories/fresh-produce-category-1789986627268_mpIfKdgQF.jpg',
+  'vegetables': 'https://ik.imagekit.io/nasjugiz2/horeca/categories/fresh-produce-category-1789986627268_mpIfKdgQF.jpg',
   'fruits': '/images/category/fruits.png',
   'herbs-seasonings': '/images/fruits-vegetables/corriander.png',
   'dairy-cheese-eggs': '/images/category/milk.png',
@@ -37,10 +37,10 @@ const CATEGORY_IMAGE_MAP: Record<string, string> = {
   'grains-rice': '/images/category/snacks.png',
   'pulses-dal': '/images/category/snacks.png',
   'oils-ghee': '/images/edible-oil/saffola-gold-oil.png',
-  'meat-poultry-seafood': '/images/category/fish & meat.png',
-  'poultry': '/images/category/fish & meat.png',
-  'mutton-lamb': '/images/category/fish & meat.png',
-  'seafood': '/images/category/fish & meat.png',
+  'meat-poultry-seafood': 'https://ik.imagekit.io/nasjugiz2/horeca/categories/meat-seafood-category-1789986629340_9d73oiuyw.jpg',
+  'poultry': 'https://ik.imagekit.io/nasjugiz2/horeca/categories/meat-seafood-category-1789986629340_9d73oiuyw.jpg',
+  'mutton-lamb': 'https://ik.imagekit.io/nasjugiz2/horeca/categories/meat-seafood-category-1789986629340_9d73oiuyw.jpg',
+  'seafood': 'https://ik.imagekit.io/nasjugiz2/horeca/categories/meat-seafood-category-1789986629340_9d73oiuyw.jpg',
   'beverages-drinks': '/images/category/drink-juice.png',
   'soft-drinks-water': '/images/category/drink-juice.png',
   'water': '/images/category/drink-juice.png',

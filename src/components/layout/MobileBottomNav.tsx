@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useCart } from '@/context/CartContext';
 import { useStableSession } from '@/hooks/useStableSession';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 type PopupId = 'orders' | 'credit' | 'profile' | null;
 
@@ -150,12 +151,14 @@ export function MobileBottomNav({
       .then((r) => (r.ok ? r.json() : null))
       .then((json) => {
         if (cancelled || !json?.success || !Array.isArray(json.data) || json.data.length === 0) return;
-        const w = json.data[0] as CreditSummary & { vendor?: { businessName: string } | null };
+        const w = json.data[0] as CreditSummary & {
+          vendor?: { businessName: string; displayName?: string | null } | null;
+        };
         setCreditSummary({
           availableCredit: w.availableCredit,
           outstandingAmount: w.outstandingAmount,
           currentDueDate: w.currentDueDate,
-          vendorName: w.vendor?.businessName ?? null,
+          vendorName: (w.vendor ? storeDisplayName(w.vendor) : null) ?? null,
         });
       })
       .catch(() => {});

@@ -32,6 +32,7 @@ import {
     resolveSellableDisplayName,
     resolveSellableImages,
 } from '@/lib/productDisplayIdentity';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 // --- API Product Type ---
 interface ApiProduct {
@@ -49,7 +50,7 @@ interface ApiProduct {
     brand: string | null;
     tags: string[];
     category: { id: string; name: string; slug: string } | null;
-    vendor: { id: string; businessName: string; slug: string; logoUrl: string | null; rating: number; minOrderValue: number } | null;
+    vendor: { id: string; businessName: string; displayName?: string | null; slug: string; logoUrl: string | null; rating: number; minOrderValue: number } | null;
     priceSlabs: { minQty: number; maxQty: number | null; price: number }[];
     inventory: { qtyAvailable: number } | null;
     brandMappings?: {
@@ -94,7 +95,7 @@ export default function ProductDetailPage() {
     const productName = resolveSellableDisplayName(rawProductName);
     const brandName = brandMapping?.brand?.name as string | undefined;
     const brandSlug = brandMapping?.brand?.slug as string | undefined;
-    const vendorName = apiProduct?.vendor?.businessName || '';
+    const vendorName = apiProduct?.vendor ? storeDisplayName(apiProduct.vendor) : '';
     // Customer-specific price (price list / override) outranks slabs — it's
     // what the cart will charge, so it's what the page must show.
     const customerPrice = apiProduct?.customerPricing?.unitPrice;
@@ -176,7 +177,7 @@ export default function ProductDetailPage() {
     const vendorProductForContext: VendorProduct = useMemo(() => ({
         id: apiProduct?.id || id,
         vendorId: apiProduct?.vendor?.id || '',
-        vendorName: apiProduct?.vendor?.businessName || '',
+        vendorName: apiProduct?.vendor ? storeDisplayName(apiProduct.vendor) : '',
         vendorLogo: apiProduct?.vendor?.logoUrl || '',
         name: rawProductName,
         displayName: productName,
@@ -211,7 +212,7 @@ export default function ProductDetailPage() {
         try {
             const matched = dalVendors.find(v => v.id === apiProduct.vendor?.id);
             const vId = apiProduct.vendor?.id || `product-vendor-${vendorName}`;
-            const vName = apiProduct.vendor?.businessName || vendorName;
+            const vName = (apiProduct.vendor ? storeDisplayName(apiProduct.vendor) : '') || vendorName;
             const vLogo = matched?.logo || apiProduct.vendor?.logoUrl || '';
 
             type ViewedProduct = { id: string; name: string; image: string; price: number; unit: string };

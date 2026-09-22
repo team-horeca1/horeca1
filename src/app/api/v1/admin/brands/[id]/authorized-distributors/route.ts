@@ -13,6 +13,7 @@ import {
   rejectDistributorAuth,
 } from '@/lib/brandAuthorizedDistributor';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 import type { AuthContext } from '@/middleware/auth';
 
 const patchSchema = z.object({
@@ -33,12 +34,27 @@ export const GET = adminOnly(async (req: NextRequest, ctx: AuthContext) => {
       orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
       include: {
         vendor: {
-          select: { id: true, businessName: true, slug: true, logoUrl: true, city: true },
+          select: {
+            id: true,
+            businessName: true,
+            displayName: true,
+            slug: true,
+            logoUrl: true,
+            city: true,
+          },
         },
       },
     });
 
-    return NextResponse.json({ success: true, data: { distributors: rows } });
+    const distributors = rows.map((row) => ({
+      ...row,
+      vendor: {
+        ...row.vendor,
+        name: storeDisplayName(row.vendor),
+      },
+    }));
+
+    return NextResponse.json({ success: true, data: { distributors } });
   } catch (error) {
     return errorResponse(error);
   }

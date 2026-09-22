@@ -721,13 +721,9 @@ export interface ProductExportRow {
   metadata?: Record<string, unknown>;
 }
 
-/** Canonical import/export column order (Vendor_Item_Template aligned). */
+/** Blank import template headers — same curated list as Export (aliases stay in HEADER_MAP only). */
 export function getImportTemplateHeaders(): string[] {
-  return [
-    'Vendor ID',
-    'Item ID',
-    ...Object.keys(productImportRowSchema.shape).filter((k) => k !== 'product image url'),
-  ];
+  return getProductExportHeaders();
 }
 
 /** Clean catalog export headers — covers every product form field for round-trip import. */
@@ -809,6 +805,7 @@ const TEMPLATE_INSTRUCTIONS: Record<string, string> = {
   'Net Rate': 'Taxable rate; vendor provided',
   'Taxable Rate': 'Taxable rate; vendor provided',
   'Taxable Rate (Amt)': 'Taxable rate; vendor provided',
+  'Gross Rate 1Pc (visible to the Customer)': 'Auto or vendor; customer-visible price with tax',
   'Account Code': 'System generated',
   'Platform Commission': 'non-editable field only; Admin assigns from admin panel',
   'Image URL': 'Full URL or leave blank if using Image Name',
@@ -819,6 +816,12 @@ const TEMPLATE_INSTRUCTIONS: Record<string, string> = {
   'Bulk Qty 1 - Quantity': 'Refer Hyperpure',
   'Bulk Qty 1 - Net Rate / Pc': 'Refer Hyperpure',
   'Bulk Qty 1 - Taxable Rate / Pc': 'Refer Hyperpure',
+  'Bulk Qty 2 - Quantity': 'Optional slab 2 min qty',
+  'Bulk Qty 2 - Taxable Rate / Pc': 'Optional slab 2 taxable rate',
+  'Bulk Qty 3 - Quantity': 'Optional slab 3 min qty',
+  'Bulk Qty 3 - Taxable Rate / Pc': 'Optional slab 3 taxable rate',
+  'MOQ': 'Minimum order quantity',
+  'Stock On Hand': 'Available stock qty',
   'Veg / Non-Veg': 'veg, nonveg, or egg',
   'Storage type': 'Ambient / Chilled / Frozen',
   'Pack Size': 'e.g. 1 Kg, 500 ml',
@@ -1014,21 +1017,24 @@ export function generateImportTemplate(): Buffer {
     'Brand': 'BrandName',
     'Parent Category': 'Dairy',
     'Sub-Category': 'Milk',
-    'Net Rate': 100,
+    'Taxable Rate': 100,
     'Tax %': 5,
+    'Gross Rate 1Pc (visible to the Customer)': 105,
     'Usage unit': 'Pc',
     'Pack Size': '1 Kg',
     'MRP': 120,
     'Stock On Hand': 500,
     'MOQ': 1,
     'Bulk Qty 1 - Quantity': 10,
-    'Bulk Qty 1 - Net Rate / Pc': 95,
+    'Bulk Qty 1 - Taxable Rate / Pc': 95,
     'Veg / Non-Veg': 'veg',
     'Storage type': 'Ambient',
     'Shelf Life (days)': 30,
     'Country of Origin': 'India',
     'Credit Eligible': 'Yes',
     'Tags': 'dairy, milk',
+    'Item Status': 'Active',
+    'Active on Online Store': 'Yes',
   };
 
   const instructionRow: Record<string, string> = {};

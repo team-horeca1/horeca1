@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
         isActive: true,
         approvalStatus: true,
         category: { select: { id: true, name: true, slug: true } },
-        vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true, rating: true, minOrderValue: true } },
+        vendor: { select: { id: true, businessName: true, displayName: true, slug: true, logoUrl: true, rating: true, minOrderValue: true } },
         priceSlabs: { orderBy: { minQty: 'asc' }, select: { minQty: true, maxQty: true, price: true, promoPrice: true } },
         inventories: { select: { qtyAvailable: true, qtyReserved: true } },
         brandMappings: productBrandMappingsInclude,

@@ -1,10 +1,17 @@
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
+import { storeDisplayName } from '@/lib/storeDisplayName';
+
+function labelVendor<T extends { displayName?: string | null; businessName?: string | null }>(
+  vendor: T,
+): T & { name: string } {
+  return { ...vendor, name: storeDisplayName(vendor) };
+}
 
 export class ListService {
   async getAll(userId: string) {
-    return prisma.quickOrderList.findMany({
+    const lists = await prisma.quickOrderList.findMany({
       where: { userId },
       include: {
         vendor: { select: { id: true, businessName: true, displayName: true, slug: true, logoUrl: true } },
@@ -24,6 +31,19 @@ export class ListService {
       },
       orderBy: { updatedAt: 'desc' },
     });
+    return lists.map((list) => ({
+      ...list,
+      vendor: list.vendor ? labelVendor(list.vendor) : list.vendor,
+      items: list.items.map((item) => ({
+        ...item,
+        product: item.product
+          ? {
+              ...item.product,
+              vendor: item.product.vendor ? labelVendor(item.product.vendor) : item.product.vendor,
+            }
+          : item.product,
+      })),
+    }));
   }
 
   async getById(listId: string, userId: string) {
@@ -45,7 +65,10 @@ export class ListService {
       },
     });
     if (!list) throw Errors.notFound('Quick Order List');
-    return list;
+    return {
+      ...list,
+      vendor: list.vendor ? labelVendor(list.vendor) : list.vendor,
+    };
   }
 
   async create(userId: string, businessAccountId: string, data: { name: string; vendorId: string; items?: Array<{ productId: string; defaultQty: number; vendorId?: string }> }) {
