@@ -16,7 +16,9 @@ export type ImagePreviewVariant =
     | 'brand-banner'      // The wide hero banner on the brand storefront
     | 'brand-card-top'    // Full-bleed brand store card cover (150x225)
     | 'product-square'    // Generic square product card image
-    | 'vendor-cover';     // Wide vendor cover/cards
+    | 'vendor-cover'      // Wide vendor cover/cards
+    | 'collection-card'   // Homepage / collections grid card (3:4)
+    | 'collection-banner'; // Collection detail page hero
 
 interface VariantConfig {
     label: string;
@@ -34,6 +36,8 @@ const VARIANTS: Record<ImagePreviewVariant, VariantConfig> = {
     'brand-card-top':   { label: 'Brand store card',       width: 150, height: 225, shape: 'rounded',      bg: '#6B1D2E',                  fit: 'cover'   },
     'product-square':   { label: 'Product card image',     width: 200, height: 200, shape: 'rounded',      bg: '#fff',                     fit: 'contain' },
     'vendor-cover':     { label: 'Vendor card cover',      width: 280, height: 160, shape: 'rounded',      bg: '#fafafa',                  fit: 'cover'   },
+    'collection-card':  { label: 'Collection card (3:4)',  width: 150, height: 200, shape: 'rounded',      bg: '#2d0912',                  fit: 'cover'   },
+    'collection-banner':{ label: 'Collection page hero',   width: 320, height: 120, shape: 'rounded',      bg: '#2d0912',                  fit: 'cover'   },
 };
 
 export function ImagePreview({

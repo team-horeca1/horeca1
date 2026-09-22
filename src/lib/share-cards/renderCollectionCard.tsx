@@ -26,6 +26,7 @@ export async function renderCollectionShareImage(
       slug: true,
       description: true,
       imageUrl: true,
+      bannerImageUrl: true,
       createdAt: true,
       _count: {
         select: {
@@ -49,7 +50,7 @@ export async function renderCollectionShareImage(
 
   const [qrDataUrl, imageUrl] = await Promise.all([
     qrPngDataUrl(pageUrl),
-    resolveOgImage(origin, collection.imageUrl),
+    resolveOgImage(origin, collection.bannerImageUrl || collection.imageUrl),
   ]);
 
   return new ImageResponse(
