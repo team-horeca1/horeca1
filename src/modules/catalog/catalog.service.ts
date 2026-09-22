@@ -1215,6 +1215,7 @@ export class CatalogService {
       slug: c.slug,
       description: c.description,
       imageUrl: c.imageUrl,
+      bannerImageUrl: c.bannerImageUrl,
       sortOrder: c.sortOrder,
       masters: c.masterProducts.map((link) => {
         const m = link.masterProduct;
@@ -1275,6 +1276,7 @@ export class CatalogService {
         slug: collection.slug,
         description: collection.description,
         imageUrl: collection.imageUrl,
+        bannerImageUrl: collection.bannerImageUrl,
         items: [] as Array<{
           master: {
             id: string;
@@ -1402,6 +1404,7 @@ export class CatalogService {
       slug: collection.slug,
       description: collection.description,
       imageUrl: collection.imageUrl,
+      bannerImageUrl: collection.bannerImageUrl,
       items,
     };
   }

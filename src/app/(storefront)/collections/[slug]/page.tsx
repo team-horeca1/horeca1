@@ -27,6 +27,7 @@ interface CollectionDetail {
   slug: string;
   description: string | null;
   imageUrl: string | null;
+  bannerImageUrl?: string | null;
   items: CollectionSkuItem[];
 }
 
@@ -210,7 +211,10 @@ export default function CollectionDetailPage() {
 
   const heroImage =
     !heroFailed &&
-    (collection.imageUrl || COLLECTION_STYLE[collection.slug]?.image || '/images/collections/kitchen.png');
+    (collection.bannerImageUrl ||
+      collection.imageUrl ||
+      COLLECTION_STYLE[collection.slug]?.image ||
+      '/images/collections/kitchen.png');
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] pb-28">
