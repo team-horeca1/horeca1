@@ -20,6 +20,7 @@ import { creditWalletService } from '@/modules/credit/creditWallet.service';
 import { creditVendorOnDelivery } from '@/modules/vendor/vendorSettlement.service';
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { DEFAULT_CHECKOUT_PAYMENT_MODES } from '@/lib/vendorPaymentModes';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 import {
   promotionService,
   evaluateVendorPromo,
@@ -374,7 +375,7 @@ export class OrderService {
         // blocked by one vendor can still order from every other vendor.
         if (!isDraft && vendorCustomer && BLOCKED_CUSTOMER_STATUSES.includes(vendorCustomer.status)) {
           throw Errors.forbidden(
-            `Ordering from ${vendor.businessName} is currently unavailable for your account. Please contact the vendor.`,
+            `Ordering from ${storeDisplayName(vendor)} is currently unavailable for your account. Please contact the vendor.`,
           );
         }
 
@@ -526,7 +527,7 @@ export class OrderService {
         }
 
         if (!isDraft && subtotal < Number(vendor.minOrderValue)) {
-          throw Errors.belowMOV(vendor.businessName, Number(vendor.minOrderValue), subtotal);
+          throw Errors.belowMOV(storeDisplayName(vendor), Number(vendor.minOrderValue), subtotal);
         }
 
         // 4a. Pick the best active vendor promotion (pct_discount or flat_discount)
@@ -997,7 +998,7 @@ export class OrderService {
       const vendor = await tx.vendor.findUnique({ where: { id: order.vendorId } });
       if (!vendor) throw Errors.notFound('Vendor');
       if (Number(order.subtotal) < Number(vendor.minOrderValue)) {
-        throw Errors.belowMOV(vendor.businessName, Number(vendor.minOrderValue), Number(order.subtotal));
+        throw Errors.belowMOV(storeDisplayName(vendor), Number(vendor.minOrderValue), Number(order.subtotal));
       }
 
       // Same CRM block gate as createOrder — a draft saved before the vendor
@@ -1008,7 +1009,7 @@ export class OrderService {
       });
       if (vendorCustomer && BLOCKED_CUSTOMER_STATUSES.includes(vendorCustomer.status)) {
         throw Errors.forbidden(
-          `Ordering from ${vendor.businessName} is currently unavailable for your account. Please contact the vendor.`,
+          `Ordering from ${storeDisplayName(vendor)} is currently unavailable for your account. Please contact the vendor.`,
         );
       }
       if (effectivePaymentMethod) {
@@ -1328,7 +1329,7 @@ export class OrderService {
         reserveNew.push({ productId: newProduct.id, quantity: item.quantity });
       }
 
-      if (subtotal < Number(newVendor.minOrderValue)) throw Errors.belowMOV(newVendor.businessName, Number(newVendor.minOrderValue), subtotal);
+      if (subtotal < Number(newVendor.minOrderValue)) throw Errors.belowMOV(storeDisplayName(newVendor), Number(newVendor.minOrderValue), subtotal);
 
       const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
       const newFulfillOutlet = await this.fulfillmentRouter.resolveFulfillmentOutlet({

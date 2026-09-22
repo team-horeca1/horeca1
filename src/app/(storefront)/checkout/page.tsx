@@ -32,6 +32,7 @@ import {
 } from '@/components/features/promo/CheckoutOffersPanel';
 import { loadRazorpayScript, openRazorpayPopup, type RazorpaySuccessPayload } from '@/lib/razorpayClient';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 // window.Razorpay is typed in src/types/razorpay.d.ts
 
@@ -55,7 +56,7 @@ interface DraftOrderDetail {
     subtotal: string | number;
     totalAmount: string | number;
     paymentMethod: string | null;
-    vendor?: { businessName: string; logoUrl: string | null } | null;
+    vendor?: { businessName: string; displayName?: string | null; logoUrl: string | null } | null;
     items: DraftOrderItem[];
 }
 
@@ -64,7 +65,7 @@ interface DraftOrderDetail {
 interface CustomerCreditWallet {
     id: string;
     vendorId: string | null;
-    vendor: { id: string; businessName: string } | null;
+    vendor: { id: string; businessName: string; displayName?: string | null } | null;
     status: string;
     creditLimit: string;
     availableCredit: string;
@@ -496,7 +497,7 @@ function CheckoutPageContent() {
                 createdAt: new Date(),
                 updatedAt: new Date(),
                 vendorId: draftOrder.vendorId,
-                vendorName: draftOrder.vendor?.businessName || 'Vendor',
+                vendorName: draftOrder.vendor ? storeDisplayName(draftOrder.vendor) || 'Vendor' : 'Vendor',
                 bulkPrices: [],
                 creditBadge: true,
                 minOrderQuantity: 1
@@ -511,7 +512,7 @@ function CheckoutPageContent() {
 
         return {
             vendorId: draftOrder.vendorId,
-            vendorName: draftOrder.vendor?.businessName || 'Vendor',
+            vendorName: draftOrder.vendor ? storeDisplayName(draftOrder.vendor) || 'Vendor' : 'Vendor',
             vendorLogo: draftOrder.vendor?.logoUrl || undefined,
             subtotal: Number(draftOrder.totalAmount),
             subtotalTaxable: Number(draftOrder.subtotal),
@@ -1491,7 +1492,7 @@ function CheckoutPageContent() {
                                                             const wallet = creditWalletsByVendor[selectedGroups[0].vendorId];
                                                             if (!wallet) return null;
                                                             const avail = Number(wallet.availableCredit) || 0;
-                                                            const name = wallet.vendor?.businessName ?? selectedGroups[0].vendorName;
+                                                            const name = (wallet.vendor ? storeDisplayName(wallet.vendor) : null) ?? selectedGroups[0].vendorName;
                                                             return (
                                                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${avail < selectedGroups[0].subtotal ? 'bg-rose-50 text-rose-600' : 'bg-primary-light text-primary'}`}>
                                                                     {name} · ₹{avail.toLocaleString('en-IN')}
@@ -1581,7 +1582,7 @@ function CheckoutPageContent() {
                                             <div className="flex items-center gap-2 mb-2">
                                                 <CreditCard size={15} className="text-purple-600" />
                                                 <span className="text-[13px] font-bold text-purple-800 truncate">
-                                                    {wallet?.vendor?.businessName ?? group.vendorName}
+                                                    {(wallet?.vendor ? storeDisplayName(wallet.vendor) : null) ?? group.vendorName}
                                                 </span>
                                             </div>
                                             <div className="space-y-1 text-[12px]">

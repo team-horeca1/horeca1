@@ -8,6 +8,7 @@ import { brandOnly } from '@/middleware/rbac';
 import { resolveBrandContext } from '@/lib/resolveBrandId';
 import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 import type { AuthContext } from '@/middleware/auth';
 
 const querySchema = z.object({
@@ -41,6 +42,8 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
         ...(params.q && {
           OR: [
             { businessName: { contains: params.q, mode: 'insensitive' } },
+            { displayName: { contains: params.q, mode: 'insensitive' } },
+            { tradeName: { contains: params.q, mode: 'insensitive' } },
             { slug: { contains: params.q, mode: 'insensitive' } },
             { city: { contains: params.q, mode: 'insensitive' } },
             { user: { email: { contains: params.q, mode: 'insensitive' } } },
@@ -48,10 +51,11 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
         }),
       },
       take: params.limit,
-      orderBy: [{ businessName: 'asc' }],
+      orderBy: [{ displayName: 'asc' }, { businessName: 'asc' }],
       select: {
         id: true,
         businessName: true,
+        displayName: true,
         slug: true,
         logoUrl: true,
         city: true,
@@ -59,7 +63,15 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
       },
     });
 
-    return NextResponse.json({ success: true, data: { vendors } });
+    return NextResponse.json({
+      success: true,
+      data: {
+        vendors: vendors.map((v) => ({
+          ...v,
+          name: storeDisplayName(v),
+        })),
+      },
+    });
   } catch (error) {
     return errorResponse(error);
   }

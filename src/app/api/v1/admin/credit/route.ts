@@ -7,6 +7,7 @@ import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import { creditWalletService } from '@/modules/credit/creditWallet.service';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 export const GET = adminOnly(async (req: NextRequest, ctx) => {
   requirePermission(ctx, 'payments.view');
@@ -37,12 +38,20 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       where,
       include: {
         user: { select: { id: true, fullName: true, phone: true, email: true } },
-        vendor: { select: { businessName: true } },
+        vendor: { select: { businessName: true, displayName: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ success: true, data: wallets });
+    return NextResponse.json({
+      success: true,
+      data: wallets.map((w) => ({
+        ...w,
+        vendor: w.vendor
+          ? { ...w.vendor, businessName: storeDisplayName(w.vendor) }
+          : null,
+      })),
+    });
   } catch (error) {
     return errorResponse(error);
   }

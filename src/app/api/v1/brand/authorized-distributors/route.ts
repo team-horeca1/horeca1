@@ -11,6 +11,7 @@ import { requirePermission } from '@/lib/permissions/engine';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { approveDistributorByBrand, rejectDistributorAuth, unapproveDistributorByBrand, healRejectedDistributorsWithLiveMappings } from '@/lib/brandAuthorizedDistributor';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 import type { AuthContext } from '@/middleware/auth';
 
 const actionSchema = z.object({
@@ -39,6 +40,7 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
           select: {
             id: true,
             businessName: true,
+            displayName: true,
             slug: true,
             logoUrl: true,
             city: true,
@@ -57,7 +59,15 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
       },
     });
 
-    return NextResponse.json({ success: true, data: { distributors: rows } });
+    const distributors = rows.map((row) => ({
+      ...row,
+      vendor: {
+        ...row.vendor,
+        name: storeDisplayName(row.vendor),
+      },
+    }));
+
+    return NextResponse.json({ success: true, data: { distributors } });
   } catch (error) {
     return errorResponse(error);
   }

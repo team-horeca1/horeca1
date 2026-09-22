@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 import type { OrderStatus } from '@prisma/client';
 
 export const GET = adminOnly(async (req: NextRequest, ctx) => {
@@ -40,6 +41,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         { user: { fullName: { contains: q, mode: 'insensitive' } } },
         { user: { email: { contains: q, mode: 'insensitive' } } },
         { vendor: { businessName: { contains: q, mode: 'insensitive' } } },
+        { vendor: { displayName: { contains: q, mode: 'insensitive' } } },
       ];
     }
 
@@ -63,7 +65,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         deliveryDate: true,
         createdAt: true,
         vendor: {
-          select: { id: true, businessName: true },
+          select: { id: true, businessName: true, displayName: true },
         },
         user: {
           select: { id: true, fullName: true, email: true },
@@ -88,7 +90,13 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
     return NextResponse.json({
       success: true,
       data: {
-        orders,
+        orders: orders.map((o) => ({
+          ...o,
+          vendor: {
+            ...o.vendor,
+            businessName: storeDisplayName(o.vendor),
+          },
+        })),
         nextCursor,
         hasMore,
       },

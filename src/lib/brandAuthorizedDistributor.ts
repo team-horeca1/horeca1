@@ -1,6 +1,15 @@
 import { prisma } from '@/lib/prisma';
 import type { BrandAuthorizedDistributorStatus, Prisma } from '@prisma/client';
 
+/** Vendor fields needed for store-facing distributor labels. */
+export const distributorVendorSelect = {
+  id: true,
+  businessName: true,
+  displayName: true,
+  slug: true,
+  logoUrl: true,
+} as const satisfies Prisma.VendorSelect;
+
 export function distributorAuthKey(brandId: string, vendorId: string): string {
   return `${brandId}:${vendorId}`;
 }
@@ -154,7 +163,7 @@ export async function approveDistributorByBrand(
       ...(note !== undefined && { note }),
     },
     include: {
-      vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true } },
+      vendor: { select: distributorVendorSelect },
     },
   });
 }
@@ -182,7 +191,7 @@ export async function unapproveDistributorByBrand(
       ...(note !== undefined && { note }),
     },
     include: {
-      vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true } },
+      vendor: { select: distributorVendorSelect },
     },
   });
 }
@@ -221,7 +230,7 @@ export async function approveDistributorByAdmin(
       ...(note !== undefined && { note }),
     },
     include: {
-      vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true } },
+      vendor: { select: distributorVendorSelect },
     },
   });
 }
@@ -250,7 +259,7 @@ export async function rejectDistributorAuth(
       ...(note !== undefined && { note }),
     },
     include: {
-      vendor: { select: { id: true, businessName: true, slug: true, logoUrl: true } },
+      vendor: { select: distributorVendorSelect },
     },
   });
 

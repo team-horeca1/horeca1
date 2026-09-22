@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AlertCircle, ChevronRight, CreditCard, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { dueLabel } from '@/lib/creditDueLabel';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface Txn {
   id: string;
@@ -17,7 +18,7 @@ interface Txn {
 
 interface CreditWallet {
   id: string;
-  vendor: { id: string; businessName: string } | null;
+  vendor: { id: string; businessName: string; displayName?: string | null } | null;
   status: string;
   creditLimit: string;
   availableCredit: string;
@@ -52,7 +53,7 @@ function loadRazorpay(): Promise<boolean> {
 }
 
 function lineTitle(w: CreditWallet) {
-  return w.vendor?.businessName ?? 'Horeca1 Credit';
+  return (w.vendor ? storeDisplayName(w.vendor) : null) ?? 'Horeca1 Credit';
 }
 
 function StatusBadge({ status }: { status: string }) {

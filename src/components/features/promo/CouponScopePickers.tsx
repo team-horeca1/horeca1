@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 export interface ScopeChip {
     id: string;
@@ -22,7 +23,7 @@ interface CatNode {
 interface ProductHit {
     id: string;
     name: string;
-    vendor?: { businessName?: string | null } | null;
+    vendor?: { businessName?: string | null; displayName?: string | null } | null;
 }
 
 interface BrandHit {
@@ -165,10 +166,13 @@ export function CouponScopeFields({
                 if (cancelled) return;
                 const raw = json.data;
                 const products = Array.isArray(raw) ? raw : (raw?.products ?? []);
-                const chips = products.map((p) => ({
-                    id: p.id,
-                    label: p.vendor?.businessName ? `${p.name} · ${p.vendor.businessName}` : p.name,
-                }));
+                const chips = products.map((p) => {
+                    const vendorLabel = p.vendor ? storeDisplayName(p.vendor) : '';
+                    return {
+                        id: p.id,
+                        label: vendorLabel ? `${p.name} · ${vendorLabel}` : p.name,
+                    };
+                });
                 setProdHits(chips);
                 setProdLabels((prev) => {
                     const next = { ...prev };
@@ -199,7 +203,8 @@ export function CouponScopeFields({
                         const id = missing[i];
                         const p = (json?.data ?? json) as ProductHit | undefined;
                         if (p && typeof p.name === 'string') {
-                            next[id] = p.vendor?.businessName ? `${p.name} · ${p.vendor.businessName}` : p.name;
+                            const vendorLabel = p.vendor ? storeDisplayName(p.vendor) : '';
+                            next[id] = vendorLabel ? `${p.name} · ${vendorLabel}` : p.name;
                         } else {
                             next[id] = id.slice(0, 8);
                         }

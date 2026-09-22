@@ -11,6 +11,7 @@ import { ApiError, errorResponse, Errors } from '@/middleware/errorHandler';
 import type { OrderStatus } from '@prisma/client';
 import { requirePermission } from '@/lib/permissions/engine';
 import { OrderService } from '@/modules/order/order.service';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 const VALID_STATUSES: OrderStatus[] = [
   'pending',
@@ -43,6 +44,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
           select: {
             id: true,
             businessName: true,
+            displayName: true,
             slug: true,
             logoUrl: true,
             addressLine: true,
@@ -106,7 +108,16 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       throw Errors.notFound('Order');
     }
 
-    return NextResponse.json({ success: true, data: order });
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...order,
+        vendor: {
+          ...order.vendor,
+          businessName: storeDisplayName(order.vendor),
+        },
+      },
+    });
   } catch (error) {
     return errorResponse(error);
   }

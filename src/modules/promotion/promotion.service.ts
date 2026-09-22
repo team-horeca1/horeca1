@@ -21,6 +21,7 @@
 import { prisma } from '@/lib/prisma';
 import type { Prisma, Coupon, CashbackEntry } from '@prisma/client';
 import { Errors } from '@/middleware/errorHandler';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 import * as programs from './promotion-issuance';
 import {
   resolveUnitPrice,
@@ -879,7 +880,7 @@ async function buildOfferChoicesForCheckout(
           vendorScope,
         ],
       },
-      include: { vendor: { select: { id: true, businessName: true } } },
+      include: { vendor: { select: { id: true, businessName: true, displayName: true } } },
       orderBy: { createdAt: 'desc' },
       take: CHECKOUT_COUPON_CHOICE_CAP,
     }),
@@ -892,7 +893,7 @@ async function buildOfferChoicesForCheckout(
           { OR: [{ vendorId: null }, { vendorId: { in: vendorIds } }] },
         ],
       },
-      include: { vendor: { select: { id: true, businessName: true } } },
+      include: { vendor: { select: { id: true, businessName: true, displayName: true } } },
       orderBy: { createdAt: 'desc' },
       take: CHECKOUT_CASHBACK_CHOICE_CAP,
     }),
@@ -902,7 +903,7 @@ async function buildOfferChoicesForCheckout(
         ...livePromotionWhere(now),
       },
       include: {
-        vendor: { select: { id: true, businessName: true } },
+        vendor: { select: { id: true, businessName: true, displayName: true } },
         buyProduct: { select: { id: true } },
         getProduct: { select: { id: true } },
       },
@@ -925,7 +926,7 @@ async function buildOfferChoicesForCheckout(
       minOrderValue: c.minOrderValue != null ? Number(c.minOrderValue) : null,
       endDate: c.endDate,
       vendorId: c.vendorId,
-      vendorName: c.vendor?.businessName ?? null,
+      vendorName: c.vendor ? storeDisplayName(c.vendor) : null,
       hasScope: c.productIds.length > 0 || c.categoryIds.length > 0 || c.brandNames.length > 0,
     };
     try {
@@ -972,7 +973,7 @@ async function buildOfferChoicesForCheckout(
       badgeLabel,
       description: c.description,
       vendorId: c.vendorId,
-      vendorName: c.vendor?.businessName ?? null,
+      vendorName: c.vendor ? storeDisplayName(c.vendor) : null,
       minOrderValue: c.minOrderValue != null ? Number(c.minOrderValue) : null,
       endDate: c.endDate,
     };
@@ -1124,7 +1125,7 @@ async function buildOfferChoicesForCheckout(
       badgeLabel: vendorPromoOfferBadge(p),
       type: p.type,
       vendorId: p.vendorId,
-      vendorName: p.vendor.businessName,
+      vendorName: storeDisplayName(p.vendor),
       minOrderValue: minVal > 0 ? minVal : null,
       endDate: p.endDate,
       eligible,
@@ -1888,7 +1889,7 @@ export const promotionService = {
             vendorScope,
           ],
         },
-        include: { vendor: { select: { id: true, businessName: true } } },
+        include: { vendor: { select: { id: true, businessName: true, displayName: true } } },
         orderBy: { createdAt: 'desc' },
         take: 100,
       }),
@@ -1897,7 +1898,7 @@ export const promotionService = {
           ...livePromotionWhere(now),
           ...(args.vendorId ? { vendorId: args.vendorId } : { vendor: vendorVisibility }),
         },
-        include: { vendor: { select: { id: true, businessName: true } } },
+        include: { vendor: { select: { id: true, businessName: true, displayName: true } } },
         orderBy: { createdAt: 'desc' },
         take: 100,
       }),
@@ -1912,7 +1913,7 @@ export const promotionService = {
               : { OR: [{ vendorId: null }, { vendor: vendorVisibility }] },
           ],
         },
-        include: { vendor: { select: { id: true, businessName: true } } },
+        include: { vendor: { select: { id: true, businessName: true, displayName: true } } },
         orderBy: { createdAt: 'desc' },
         take: 100,
       }),
@@ -1931,7 +1932,7 @@ export const promotionService = {
         minOrderValue: c.minOrderValue != null ? Number(c.minOrderValue) : null,
         endDate: c.endDate,
         vendorId: c.vendorId,
-        vendorName: c.vendor?.businessName ?? null,
+        vendorName: c.vendor ? storeDisplayName(c.vendor) : null,
         hasScope: c.productIds.length > 0 || c.categoryIds.length > 0 || c.brandNames.length > 0,
       }));
 
@@ -1944,7 +1945,7 @@ export const promotionService = {
         type: p.type,
         description: null,
         vendorId: p.vendorId,
-        vendorName: p.vendor.businessName,
+        vendorName: storeDisplayName(p.vendor),
         minOrderValue: p.minOrderValue != null ? Number(p.minOrderValue) : null,
         endDate: p.endDate,
       })),
@@ -1958,7 +1959,7 @@ export const promotionService = {
           type: c.cashbackType,
           description: c.description,
           vendorId: c.vendorId,
-          vendorName: c.vendor?.businessName ?? null,
+          vendorName: c.vendor ? storeDisplayName(c.vendor) : null,
           minOrderValue: c.minOrderValue != null ? Number(c.minOrderValue) : null,
           endDate: c.endDate,
         })),

@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { dueLabel } from '@/lib/creditDueLabel';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface Txn {
   id: string;
@@ -48,7 +49,7 @@ interface CreditTerms {
 
 interface CreditWallet {
   id: string;
-  vendor: { id: string; businessName: string } | null;
+  vendor: { id: string; businessName: string; displayName?: string | null } | null;
   status: string;
   creditLimit: string;
   availableCredit: string;
@@ -159,7 +160,7 @@ export default function DisccoCreditDetailPage() {
       if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
         throw new Error('Invalid repayment amount from server');
       }
-      const title = wallet.vendor?.businessName ?? 'Horeca1 Credit';
+      const title = (wallet.vendor ? storeDisplayName(wallet.vendor) : null) ?? 'Horeca1 Credit';
 
       const rzp = new RazorpayCtor({
         key: keyId,
@@ -219,7 +220,7 @@ export default function DisccoCreditDetailPage() {
 
   const outstanding = Number(wallet.outstandingAmount);
   const due = dueLabel(wallet.currentDueDate, outstanding);
-  const title = wallet.vendor?.businessName ?? 'Horeca1 Credit';
+  const title = (wallet.vendor ? storeDisplayName(wallet.vendor) : null) ?? 'Horeca1 Credit';
   const terms = wallet.terms;
   const dueClass =
     due.tone === 'overdue' ? 'text-rose-600'

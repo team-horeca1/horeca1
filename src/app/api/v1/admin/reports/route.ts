@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 function periodStart(period: string | null): Date {
   const now = Date.now();
@@ -43,9 +44,9 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       const vendorIds = rows.map((r) => r.vendorId);
       const vendors = await prisma.vendor.findMany({
         where: { id: { in: vendorIds } },
-        select: { id: true, businessName: true },
+        select: { id: true, businessName: true, displayName: true },
       });
-      const vendorMap = Object.fromEntries(vendors.map((v) => [v.id, v.businessName]));
+      const vendorMap = Object.fromEntries(vendors.map((v) => [v.id, storeDisplayName(v)]));
 
       const data = rows.map((r) => ({
         vendorId: r.vendorId,
@@ -117,7 +118,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       const returns = await prisma.returnRequest.findMany({
         where: { createdAt: { gte: start } },
         include: {
-          order: { select: { orderNumber: true, vendor: { select: { businessName: true } } } },
+          order: { select: { orderNumber: true, vendor: { select: { businessName: true, displayName: true } } } },
         },
         orderBy: { createdAt: 'desc' },
         take: 200,
@@ -126,7 +127,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         id: r.id,
         status: r.status,
         refundAmount: r.refundAmount != null ? Number(r.refundAmount) : null,
-        vendorName: r.order.vendor.businessName,
+        vendorName: storeDisplayName(r.order.vendor),
         orderNumber: r.order.orderNumber,
         createdAt: r.createdAt.toISOString(),
       }));
@@ -147,12 +148,12 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
     if (type === 'settlements') {
       const settlements = await prisma.vendorSettlement.findMany({
         where: { createdAt: { gte: start } },
-        include: { vendor: { select: { businessName: true } } },
+        include: { vendor: { select: { businessName: true, displayName: true } } },
         orderBy: { createdAt: 'desc' },
         take: 200,
       });
       const rows = settlements.map((s) => ({
-        vendorName: s.vendor.businessName,
+        vendorName: storeDisplayName(s.vendor),
         status: s.status,
         gross: Number(s.grossAmount),
         platformFee: Number(s.platformFee),

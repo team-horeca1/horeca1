@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 export const GET = adminOnly(async (_req: NextRequest, ctx) => {
   requirePermission(ctx, 'dashboard.view');
@@ -65,7 +66,7 @@ export const GET = adminOnly(async (_req: NextRequest, ctx) => {
           paymentStatus: true,
           createdAt: true,
           vendor: {
-            select: { id: true, businessName: true },
+            select: { id: true, businessName: true, displayName: true },
           },
           user: {
             select: { id: true, fullName: true, email: true },
@@ -119,7 +120,14 @@ export const GET = adminOnly(async (_req: NextRequest, ctx) => {
           vendors: pendingVendors,
           total: pendingProducts + pendingCategories + pendingVendors,
         },
-        recentOrders,
+        recentOrders: recentOrders.map((o) => ({
+          ...o,
+          vendor: {
+            ...o.vendor,
+            businessName: storeDisplayName(o.vendor),
+            name: storeDisplayName(o.vendor),
+          },
+        })),
         monthlyData: monthlyOrders.map(r => ({
           month: r.month,
           orders: Number(r.orders),
