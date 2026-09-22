@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { ShareButton } from '@/components/features/share/ShareButton';
-import { productShareContent } from '@/lib/share-cards/types';
+import { productShareContent, vendorProductHref } from '@/lib/share-cards/types';
 import { useSession } from 'next-auth/react';
 import { cn, formatPackSize } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
@@ -511,6 +511,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         () =>
             productShareContent({
                 id: product.id,
+                vendorId: product.vendorId,
                 title: product.displayName ?? product.name,
                 vendorName: product.vendorName,
                 image: product.images?.[0] ?? null,
@@ -1060,7 +1061,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                 // Resolve image with fallbacks: explicit images[] → imageUrl singular → vendor logo → none
                                 const altImg = alt.images?.[0] || alt.imageUrl || alt.vendor.logoUrl || null;
                                 return (
-                                    <a key={alt.id} href={`/vendor/${alt.vendor.id}`}
+                                    <a key={alt.id} href={vendorProductHref(alt.vendor.id, alt.id)}
                                         className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-primary/30 hover:bg-[#f7fbf8] transition-all group"
                                         onClick={(e) => e.stopPropagation()}>
                                         <div className="w-14 h-14 rounded-xl bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden relative">

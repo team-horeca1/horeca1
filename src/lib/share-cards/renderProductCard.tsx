@@ -14,6 +14,7 @@ import {
   shareSiteOrigin,
   toGrossPrice,
 } from '@/lib/share-cards/ogHelpers';
+import { vendorProductHref } from '@/lib/share-cards/types';
 
 export async function renderProductShareImage(
   id: string,
@@ -21,7 +22,6 @@ export async function renderProductShareImage(
   req?: Request,
 ): Promise<ImageResponse | null> {
   const origin = shareSiteOrigin(req);
-  const pageUrl = `${origin}/product/${id}`;
 
   const product = await prisma.product.findFirst({
     where: {
@@ -52,7 +52,9 @@ export async function renderProductShareImage(
     },
   });
 
-  if (!product) return null;
+  if (!product?.vendor?.id) return null;
+
+  const pageUrl = `${origin}${vendorProductHref(product.vendor.id, id)}`;
 
   const master = product.brandMappings?.[0]?.brandMasterProduct;
   const rawImage =

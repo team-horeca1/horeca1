@@ -2,6 +2,7 @@ import 'server-only';
 import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
 import { shareSiteOrigin } from '@/lib/share-cards/ogHelpers';
+import { vendorProductHref } from '@/lib/share-cards/types';
 
 export function catalogShareMetadata(opts: {
   title: string;
@@ -49,16 +50,31 @@ function clip(text: string | null | undefined, fallback: string): string {
   return trimmed.length > 160 ? `${trimmed.slice(0, 159).trimEnd()}…` : trimmed;
 }
 
-export async function productShareMetadata(id: string): Promise<Metadata> {
+export async function productShareMetadata(id: string, routeVendorId?: string): Promise<Metadata> {
   const product = await prisma.product.findFirst({
     where: { id, isActive: true, approvalStatus: 'approved', archivedAt: null },
-    select: { name: true, description: true },
+    select: {
+      name: true,
+      description: true,
+      vendorId: true,
+      vendor: { select: { id: true, slug: true } },
+    },
   });
-  const title = product?.name || 'Horeca1';
+  const vendor = product?.vendor;
+  if (!product || !vendor?.id) {
+    if (routeVendorId) return vendorShareMetadata(routeVendorId);
+    return { title: 'Horeca1' };
+  }
+  if (routeVendorId) {
+    const route = routeVendorId.trim();
+    const matches = route === vendor.id || (vendor.slug != null && route === vendor.slug);
+    if (!matches) return vendorShareMetadata(routeVendorId);
+  }
+  const title = product.name || 'Horeca1';
   return catalogShareMetadata({
     title,
-    description: clip(product?.description, `Shop ${title} on Horeca1`),
-    path: `/product/${id}`,
+    description: clip(product.description, `Shop ${title} on Horeca1`),
+    path: vendorProductHref(vendor.slug || vendor.id, id),
     ogPath: `/api/og/product/${id}?format=square`,
   });
 }

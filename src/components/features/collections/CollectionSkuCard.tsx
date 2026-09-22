@@ -146,6 +146,7 @@ export const CollectionSkuCard = React.memo(function CollectionSkuCard({
             <ShareButton
               content={productShareContent({
                 id: defaultOffer.id,
+                vendorId: defaultOffer.vendorId,
                 title: item.master.name,
                 vendorName: defaultOffer.vendorName,
                 image: img,
