@@ -564,6 +564,7 @@ export const dal = {
         slug: string;
         description: string | null;
         imageUrl: string | null;
+        bannerImageUrl: string | null;
         items: Array<{
           master: {
             id: string;
@@ -586,6 +587,7 @@ export const dal = {
         slug: data.slug,
         description: data.description,
         imageUrl: data.imageUrl,
+        bannerImageUrl: data.bannerImageUrl,
         items: (data.items ?? []).map((item) => ({
           master: item.master,
           vendorCount: item.vendorCount,

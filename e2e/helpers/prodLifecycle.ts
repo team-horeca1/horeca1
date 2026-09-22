@@ -2,7 +2,7 @@ import { type Page, expect } from '@playwright/test';
 import { credentialsLogin } from './auth';
 import { fetchProdEmailOtp } from './prodOtp';
 
-const BASE = process.env.PLAYWRIGHT_BASE_URL ?? 'https://freshville.store';
+const BASE = process.env.PLAYWRIGHT_BASE_URL ?? 'https://horeca1.com';
 
 /** Force Auth.js jwt callback (trigger=update) so role / BA flags refresh. */
 export async function refreshAuthSession(

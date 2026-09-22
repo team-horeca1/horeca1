@@ -23,7 +23,8 @@ export const GET = withAuth(async (req: NextRequest, ctx) => {
     if (!(await isAdminActingAsBusinessAccount(ctx, id))) {
       await assertAccountMember(ctx.userId, id);
     }
-    // Clean multi-click clones before listing (idempotent soft-deactivate).
+    // Clean multi-click clones before listing. Store stock outlets are restored,
+    // not treated as duplicate addresses.
     await softDeactivateDuplicateActiveOutlets(id).catch(() => 0);
     const outlets = await prisma.outlet.findMany({
       where: { businessAccountId: id, isActive: true },

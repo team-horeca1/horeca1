@@ -32,7 +32,7 @@ const ADMIN_STATE = path.join(AUTH_DIR, 'enter-buy-admin.json');
 const BASE = process.env.PLAYWRIGHT_BASE_URL ?? '';
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? '';
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? '';
-const PROD_HOST_RE = /freshville\.store|64\.227\.187\.210/i;
+const PROD_HOST_RE = /(?:^|\.)horeca1\.com$|freshville\.store|64\.227\.187\.210/i;
 
 function isProdTarget(): boolean {
   try {

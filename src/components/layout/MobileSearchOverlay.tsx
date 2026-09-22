@@ -8,6 +8,7 @@ import { dal } from '@/lib/dal';
 import type { Vendor, VendorProduct, VendorSummary, Category } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { BrandStoreCard } from '@/components/features/brand/BrandStoreCard';
+import { vendorProductHref } from '@/lib/share-cards/types';
 
 interface SearchBrand {
     id: string;
@@ -315,7 +316,7 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                                             return (
                                             <Link
                                                 key={item.id}
-                                                href={`/vendor/${item.vendorId}?q=${encodeURIComponent(label)}`}
+                                                href={vendorProductHref(item.vendorId, item.id)}
                                                 onClick={onClose}
                                                 className="flex items-center gap-4 p-4 border border-[#EEEEEE] rounded-[20px] active:scale-[0.98] transition-all hover:border-primary/30 hover:bg-gray-50/50 group w-full text-left"
                                             >

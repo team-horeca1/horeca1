@@ -10,6 +10,7 @@ import { useCart } from '@/context/CartContext';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import type { VendorProduct } from '@/types';
 import { storeDisplayName } from '@/lib/storeDisplayName';
+import { vendorProductHref } from '@/lib/share-cards/types';
 
 interface OrderItemRow {
   productId: string;
@@ -169,7 +170,7 @@ export function FrequentlyReorderedProducts() {
                     key={p.productId}
                     className="w-[96px] md:w-[110px] shrink-0 bg-white border border-divider rounded-[10px] p-1.5 shadow-cdl-1"
                   >
-                    <Link href={`/product/${p.productId}`} className="block">
+                    <Link href={vendorProductHref(p.vendorId, p.productId)} className="block">
                       <div className="relative h-11 md:h-12 rounded-md bg-ivory overflow-hidden mb-1.5">
                         {p.image ? (
                           <Image src={p.image} alt="" fill className="object-contain p-0.5" sizes="96px" />

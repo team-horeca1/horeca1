@@ -116,7 +116,7 @@ export function ImageUpload({
     };
 
     return (
-        <div className={className}>
+        <div className={cn('min-w-0 w-full', className)}>
             {label && (
                 <label className="block text-[12px] font-bold text-[#7C7C7C] uppercase tracking-wider mb-2">
                     {label}
@@ -157,39 +157,42 @@ export function ImageUpload({
                     )}
                 </div>
             ) : showUrlInput ? (
-                <div className={cn('rounded-[12px] border border-[#DCDCDC] p-3 flex flex-col gap-2', size === 'sm' ? 'w-[200px]' : size === 'md' ? 'w-[280px]' : 'w-full')}>
-                    <div className="flex items-center gap-2">
-                        <Link2 size={14} className="text-primary shrink-0" />
-                        <span className="text-[12px] font-semibold text-[#555]">Paste image URL</span>
+                <div className="w-full max-w-full rounded-[12px] border border-[#E9E3DD] bg-[#FAF7F2] p-3 flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <Link2 size={14} className="text-primary shrink-0" />
+                            <span className="text-[12px] font-semibold text-[#555] truncate">Paste image URL</span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => { setShowUrlInput(false); setUrlValue(''); setError(''); }}
+                            className="text-[11px] text-[#667085] hover:text-[#1C1C1C] shrink-0"
+                        >
+                            Cancel
+                        </button>
                     </div>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 min-w-0">
                         <input
                             type="url"
                             value={urlValue}
                             onChange={(e) => { setUrlValue(e.target.value); setError(''); }}
-                            onKeyDown={(e) => e.key === 'Enter' && handleUrlSubmit()}
+                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleUrlSubmit())}
                             placeholder="https://..."
-                            className="flex-1 min-w-0 px-2.5 py-1.5 text-[12px] border border-[#DCDCDC] rounded-[8px] outline-none focus:border-primary transition-colors"
+                            className="flex-1 min-w-0 px-2.5 py-2 text-[12px] border border-[#E9E3DD] rounded-[8px] bg-white outline-none focus:border-primary transition-colors"
                             autoFocus
                         />
                         <button
                             type="button"
                             onClick={handleUrlSubmit}
-                            className="px-2.5 py-1.5 rounded-[8px] bg-primary text-white hover:bg-primary-dark transition-colors"
+                            className="shrink-0 px-2.5 py-2 rounded-[8px] bg-primary text-white hover:bg-primary-dark transition-colors"
+                            title="Apply URL"
                         >
                             <Check size={14} />
                         </button>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => { setShowUrlInput(false); setUrlValue(''); setError(''); }}
-                        className="text-[11px] text-[#AEAEAE] hover:text-[#555] self-start transition-colors"
-                    >
-                        Back to file upload
-                    </button>
                 </div>
             ) : (
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1.5 items-start min-w-0">
                     <div
                         onClick={() => !uploading && !disabled && inputRef.current?.click()}
                         onDragOver={(e) => { e.preventDefault(); if (!disabled) setDragOver(true); }}
@@ -220,7 +223,7 @@ export function ImageUpload({
                         <button
                             type="button"
                             onClick={() => setShowUrlInput(true)}
-                            className="flex items-center justify-center gap-1.5 text-[11px] text-[#AEAEAE] hover:text-primary font-medium transition-colors"
+                            className="flex items-center gap-1.5 text-[11px] text-[#AEAEAE] hover:text-primary font-medium transition-colors"
                         >
                             <Link2 size={12} />
                             <span>Use image URL</span>

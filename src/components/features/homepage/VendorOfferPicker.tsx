@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { X, Plus, Loader2, ChevronRight, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
+import { vendorProductHref } from '@/lib/share-cards/types';
 
 export interface VendorOfferPickerProps {
   productName: string;
@@ -52,7 +53,7 @@ export function VendorOfferPicker({
   });
 
   const vendorHref = (offer: VendorProduct) =>
-    `/vendor/${offer.vendorId}?q=${encodeURIComponent(productName)}`;
+    vendorProductHref(offer.vendorId, offer.id);
 
   if (!mounted) return null;
 

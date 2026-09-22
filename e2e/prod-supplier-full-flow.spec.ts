@@ -20,7 +20,7 @@ const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? '';
 const VENDOR_EMAIL = process.env.E2E_VENDOR_EMAIL ?? '';
 const VENDOR_PASSWORD = process.env.E2E_VENDOR_PASSWORD ?? '';
 
-const PROD_HOST_RE = /freshville\.store|64\.227\.187\.210/i;
+const PROD_HOST_RE = /(?:^|\.)horeca1\.com$|freshville\.store|64\.227\.187\.210/i;
 
 function isProdTarget(): boolean {
   try {

@@ -265,7 +265,7 @@ export function VoiceShareCard(props: {
           </div>
           <div style={{ ...flexCol }}>
             <span style={{ fontSize: isPortrait ? 26 : 22, fontWeight: 900, color: INK_PRIMARY, letterSpacing: -0.3 }}>
-              HoReCa Hub
+              Horeca1
             </span>
             <span
               style={{
@@ -508,7 +508,7 @@ export function CommerceShareCard(props: {
           </div>
           <div style={{ ...flexCol }}>
             <span style={{ fontSize: isPortrait ? 26 : 22, fontWeight: 900, color: INK_PRIMARY, letterSpacing: -0.3 }}>
-              HoReCa Hub
+              Horeca1
             </span>
             <span
               style={{

@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { ImageUpload } from '@/components/ui/ImageUpload';
+import { ImageUploadField } from '@/components/ui/ImageUploadField';
+import { parseImageMeta } from '@/lib/imageMeta';
 import { usePermissions } from '@/hooks/usePermissions';
 import {
     AdminRegistryEmptyState,
@@ -519,7 +520,7 @@ export default function AdminCollectionsPage() {
                                     <div className="flex items-center gap-3">
                                         {col.imageUrl ? (
                                             <img
-                                                src={col.imageUrl}
+                                                src={parseImageMeta(col.imageUrl).src}
                                                 alt=""
                                                 className="size-10 rounded-[8px] object-cover border border-[#E9E3DD] shrink-0"
                                             />
@@ -695,35 +696,28 @@ export default function AdminCollectionsPage() {
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <ImageUpload
-                                    value={formData.imageUrl}
-                                    onChange={(url) => setFormData((prev) => ({ ...prev, imageUrl: url }))}
-                                    folder="collections"
-                                    label="Card image (homepage)"
-                                    size="md"
-                                />
-                                <p className="mt-2 text-[11px] text-[#667085] leading-relaxed">
-                                    Recommended 800×1000 or 1:1. Used on homepage collection
-                                    cards and the collections grid — keep subject centered.
-                                </p>
-                            </div>
-                            <div>
-                                <ImageUpload
-                                    value={formData.bannerImageUrl}
-                                    onChange={(url) =>
-                                        setFormData((prev) => ({ ...prev, bannerImageUrl: url }))
-                                    }
-                                    folder="collections"
-                                    label="Detail banner (optional)"
-                                    size="md"
-                                />
-                                <p className="mt-2 text-[11px] text-[#667085] leading-relaxed">
-                                    Recommended 1600×900 (16:9). Wide hero on the collection
-                                    page. Leave empty to reuse the card image.
-                                </p>
-                            </div>
+                        <p className="text-[12px] text-[#667085] -mb-2">
+                            After upload, an editor opens so you can set the focal point and zoom.
+                        </p>
+                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-4 items-start">
+                            <ImageUploadField
+                                value={formData.imageUrl || null}
+                                onChange={(url) => setFormData((prev) => ({ ...prev, imageUrl: url ?? '' }))}
+                                folder="collections"
+                                label="Card image (homepage)"
+                                aspectHint="800 × 1000 (4:5) — homepage card and collections grid"
+                                variant="collection-card"
+                            />
+                            <ImageUploadField
+                                value={formData.bannerImageUrl || null}
+                                onChange={(url) =>
+                                    setFormData((prev) => ({ ...prev, bannerImageUrl: url ?? '' }))
+                                }
+                                folder="collections"
+                                label="Detail banner (optional)"
+                                aspectHint="1600 × 900 (16:9) — collection page hero. Empty uses the card image."
+                                variant="collection-banner"
+                            />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">

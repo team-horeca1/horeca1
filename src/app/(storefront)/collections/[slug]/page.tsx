@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ChevronLeft, MapPin, Package, SlidersHorizontal } from 'lucide-react';
@@ -19,6 +18,7 @@ import {
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { collectionShareContent } from '@/lib/share-cards/types';
 import { cn } from '@/lib/utils';
+import { getDisplayStyle, parseImageMeta } from '@/lib/imageMeta';
 import type { VendorProduct } from '@/types';
 
 interface CollectionDetail {
@@ -209,25 +209,26 @@ export default function CollectionDetailPage() {
     );
   }
 
-  const heroImage =
+  const heroSource =
     !heroFailed &&
     (collection.bannerImageUrl ||
       collection.imageUrl ||
       COLLECTION_STYLE[collection.slug]?.image ||
       '/images/collections/kitchen.png');
+  const heroParsed = parseImageMeta(typeof heroSource === 'string' ? heroSource : '');
+  const heroStyle = getDisplayStyle(heroParsed.meta);
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] pb-28">
       <div className="md:max-w-[var(--container-max)] md:mx-auto md:px-[clamp(1rem,3vw,2rem)] md:pt-6">
         <div className="relative h-[clamp(10rem,28vw,16rem)] w-full overflow-hidden md:rounded-3xl">
-          {heroImage ? (
-            <Image
-              src={heroImage}
+          {heroParsed.src ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={heroParsed.src}
               alt=""
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover"
+              className="absolute inset-0 size-full object-cover"
+              style={heroStyle}
               onError={() => setHeroFailed(true)}
             />
           ) : (
@@ -263,7 +264,7 @@ export default function CollectionDetailPage() {
               content={collectionShareContent({
                 slug: collection.slug,
                 name: collection.name,
-                image: typeof heroImage === 'string' ? heroImage : null,
+                image: heroParsed.src || null,
                 itemCount: stats.skuCount,
               })}
               variant="icon"

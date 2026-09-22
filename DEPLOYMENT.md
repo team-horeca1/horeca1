@@ -2,7 +2,9 @@
 
 ## Live URL
 
-**http://64.227.187.210**
+**https://horeca1.com** (canonical) · **https://www.horeca1.com** → apex  
+Legacy rollback host (kept live, no redirect yet): **https://freshville.store**  
+Demo (isolated DB/Redis): **https://demo.horeca1.com**
 
 ---
 
@@ -195,7 +197,7 @@ ssh root@64.227.187.210
 | Key | Value |
 |-----|-------|
 | AUTH_SECRET | `8380ea62ee0408bea9c8165cdde7f332806b9ba552f6797da2be51e7976c5880` |
-| AUTH_URL | `http://64.227.187.210` |
+| AUTH_URL | `https://horeca1.com` |
 | AUTH_TRUST_HOST | `true` |
 
 ---

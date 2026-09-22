@@ -24,11 +24,21 @@ async function getStoreDefaultOutletId(
   defaultOutletId: string | null,
 ): Promise<string | null> {
   if (defaultOutletId) {
-    const ok = await prisma.outlet.findFirst({
-      where: { id: defaultOutletId, businessAccountId, isActive: true },
-      select: { id: true },
+    // Use this store's stock outlet even if address-dedupe marked it inactive.
+    // Falling back to the business primary outlet reads a different store's warehouse.
+    const outlet = await prisma.outlet.findFirst({
+      where: { id: defaultOutletId, businessAccountId },
+      select: { id: true, isActive: true },
     });
-    if (ok) return ok.id;
+    if (outlet) {
+      if (!outlet.isActive) {
+        await prisma.outlet.update({
+          where: { id: outlet.id },
+          data: { isActive: true },
+        }).catch(() => undefined);
+      }
+      return outlet.id;
+    }
   }
   const ba = await prisma.businessAccount.findUnique({
     where: { id: businessAccountId },

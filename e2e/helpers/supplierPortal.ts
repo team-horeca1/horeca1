@@ -1,10 +1,14 @@
 import type { Page } from '@playwright/test';
 
-/** True when Playwright is aimed at the live freshville host. */
+/** True when Playwright is aimed at live production (canonical or legacy host). */
 export function isProductionE2ETarget(baseURL = process.env.PLAYWRIGHT_BASE_URL ?? ''): boolean {
   try {
     const u = new URL(baseURL);
-    return u.protocol === 'https:' && /freshville\.store|64\.227\.187\.210/i.test(u.host);
+    return (
+      u.protocol === 'https:' &&
+      /(?:^|\.)horeca1\.com$|freshville\.store|64\.227\.187\.210/i.test(u.host) &&
+      !/^demo\./i.test(u.host)
+    );
   } catch {
     return false;
   }

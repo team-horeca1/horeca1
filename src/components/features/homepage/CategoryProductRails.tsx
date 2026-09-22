@@ -456,6 +456,7 @@ export function CategoryProductRails() {
                       const price = Number(item.defaultOffer.price);
                       const shareContent = productShareContent({
                         id: item.defaultOffer.id,
+                        vendorId: item.defaultOffer.vendorId,
                         title,
                         vendorName: item.defaultOffer.vendorName,
                         image: img,

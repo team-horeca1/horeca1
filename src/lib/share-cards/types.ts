@@ -8,7 +8,7 @@ export type ShareKind =
 
 /**
  * Structured payload for the universal Share Engine.
- * `path` is origin-relative (e.g. `/product/:id`) — never localhost.
+ * `path` is origin-relative (e.g. `/vendor/:id?product=:productId`) — never localhost.
  * `ogPath` is a same-origin OG API path (or CDN URL for pre-rendered Voices cards).
  */
 export type ShareableContent = {
@@ -40,8 +40,14 @@ export function shareAbsoluteUrl(path: string, origin?: string): string {
   return `${base}${p}`;
 }
 
+/** Supplier catalog URL that highlights one product card. */
+export function vendorProductHref(vendorId: string, productId: string): string {
+  return `/vendor/${encodeURIComponent(vendorId)}?product=${encodeURIComponent(productId)}`;
+}
+
 export function productShareContent(opts: {
   id: string;
+  vendorId: string;
   title: string;
   vendorName?: string | null;
   image?: string | null;
@@ -58,7 +64,7 @@ export function productShareContent(opts: {
     text: vendor
       ? `Check out ${opts.title} from ${vendor} on Horeca1.`
       : `Check out ${opts.title} on Horeca1.`,
-    path: `/product/${opts.id}`,
+    path: vendorProductHref(opts.vendorId, opts.id),
     image: opts.image,
     ogPath: `/api/og/product/${opts.id}?format=portrait${v}`,
     downloadName: `horeca1-product-${opts.id}.png`,

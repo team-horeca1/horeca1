@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { dal } from '@/lib/dal';
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { collectionShareContent } from '@/lib/share-cards/types';
+import { getDisplayStyle, parseImageMeta } from '@/lib/imageMeta';
 
 interface CollectionCard {
   id: string;
@@ -83,22 +84,27 @@ export default function CollectionsIndexPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-            {collections.map((col) => (
+            {collections.map((col) => {
+              const cardImage = parseImageMeta(col.image);
+              return (
               <Link key={col.id} href={`/collections/${col.slug}`} className="group block relative">
                 <div className="relative aspect-[3/4] rounded-xl overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={col.image}
-                    alt={col.name}
-                    className="absolute inset-0 size-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-                  />
+                  <div className="absolute inset-0 transition-transform duration-500 ease-out group-hover:scale-105">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={cardImage.src}
+                      alt={col.name}
+                      className="size-full object-cover"
+                      style={getDisplayStyle(cardImage.meta)}
+                    />
+                  </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
                   <div className="absolute top-2.5 right-2.5 z-20">
                     <ShareButton
                       content={collectionShareContent({
                         slug: col.slug,
                         name: col.name,
-                        image: col.image,
+                        image: cardImage.src,
                       })}
                       variant="overlay"
                       className="size-8"
@@ -117,7 +123,8 @@ export default function CollectionsIndexPage() {
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { dal } from '@/lib/dal';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { getDisplayStyle, parseImageMeta } from '@/lib/imageMeta';
 
 interface Collection {
   id: string;
@@ -88,19 +89,24 @@ export function Collections() {
               (content width minus 4 gaps) / 5
             */}
             <div className="flex gap-3 md:gap-4 px-4 md:px-[var(--container-padding)] w-max pb-1">
-              {collections.map((col) => (
+              {collections.map((col) => {
+                const cardImage = parseImageMeta(col.image);
+                return (
                 <Link
                   key={col.id}
                   href={`/collections/${col.slug}`}
                   className="group block shrink-0 w-[calc((100cqw-2rem-0.75rem)/2.15)] sm:w-[calc((100cqw-3rem-1.5rem)/3.2)] lg:w-[calc((100cqw-2*var(--container-padding)-4*1rem)/5)]"
                 >
                   <div className="relative aspect-[3/4] rounded-[12px] overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={col.image}
-                      alt={col.name}
-                      className="absolute inset-0 size-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-                    />
+                    <div className="absolute inset-0 transition-transform duration-500 ease-out group-hover:scale-105">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={cardImage.src}
+                        alt={col.name}
+                        className="size-full object-cover"
+                        style={getDisplayStyle(cardImage.meta)}
+                      />
+                    </div>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 p-3.5 md:p-4 z-10">
                       <h3 className="text-[16px] md:text-[18px] font-semibold text-white leading-snug text-balance line-clamp-2">
@@ -115,7 +121,8 @@ export function Collections() {
                     </div>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </div>
 

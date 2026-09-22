@@ -56,7 +56,7 @@ const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? '';
 const CUSTOMER_EMAIL = process.env.E2E_CUSTOMER_EMAIL ?? 'chef@tajpalace.com';
 const CUSTOMER_PASSWORD = process.env.E2E_CUSTOMER_PASSWORD ?? 'customer123';
 
-const PROD_HOST_RE = /freshville\.store|64\.227\.187\.210/i;
+const PROD_HOST_RE = /(?:^|\.)horeca1\.com$|freshville\.store|64\.227\.187\.210/i;
 
 function isProdTarget(): boolean {
   try {
