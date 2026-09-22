@@ -7,10 +7,11 @@
 //     - mapped:        one row per LIVE mapping (auto_mapped or verified). A vendor product may
 //                      appear more than once here if it's linked to multiple brand catalogs
 //                      (e.g. private-label SKU listed under two distinct brand storefronts).
-//   view=stores: brand-store index — every active+approved brand with authStatus,
+//   view=stores: brand-store index — approved Brand Stores only (real owner account),
+//                not catalog labels created from a product brand name. Includes authStatus,
 //                catalogSize, and mappedCount (distinct live-mapped brand SKUs for this vendor).
-//   view=table:  also returns every active+approved brand with per-brand authStatus
-//                (none | pending | approved | rejected) — vendors can browse any brand catalog.
+//   view=table:  same Brand Store list with per-brand authStatus
+//                (none | pending | approved | rejected).
 // POST /api/v1/vendor/brand-mappings — Vendor manually links one of their products to a brand SKU.
 //   BODY: { distributorProductId, brandMasterProductId }
 //   First mapping to a brand upserts a pending BrandAuthorizedDistributor request.
@@ -25,6 +26,7 @@ import { requirePermission } from '@/lib/permissions/engine';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { ensurePendingDistributorAuth, healRejectedDistributorsWithLiveMappings } from '@/lib/brandAuthorizedDistributor';
+import { publicStorefrontBrandWhere } from '@/modules/brand/brand.service';
 import type { AuthContext } from '@/middleware/auth';
 import type { BrandAuthorizedDistributorStatus } from '@prisma/client';
 
@@ -56,7 +58,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
     // Brand-store index: lightweight brand cards with catalog + mapped counts.
     if (view === 'stores') {
       const brandRows = await prisma.brand.findMany({
-        where: { isActive: true, approvalStatus: 'approved' },
+        where: publicStorefrontBrandWhere(),
         select: { id: true, name: true, slug: true, logoUrl: true },
         orderBy: { name: 'asc' },
       });
@@ -318,10 +320,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       }
 
       const brandRows = await prisma.brand.findMany({
-        where: {
-          isActive: true,
-          approvalStatus: 'approved',
-        },
+        where: publicStorefrontBrandWhere(),
         select: { id: true, name: true, slug: true, logoUrl: true },
         orderBy: { name: 'asc' },
       });
