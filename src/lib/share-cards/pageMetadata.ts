@@ -50,6 +50,15 @@ function clip(text: string | null | undefined, fallback: string): string {
   return trimmed.length > 160 ? `${trimmed.slice(0, 159).trimEnd()}…` : trimmed;
 }
 
+/** Resolve vendorId for legacy `/product/[id]` → vendor catalog redirects. */
+export async function resolveProductVendorId(id: string): Promise<string | null> {
+  const product = await prisma.product.findFirst({
+    where: { id },
+    select: { vendorId: true },
+  });
+  return product?.vendorId ?? null;
+}
+
 export async function productShareMetadata(id: string, routeVendorId?: string): Promise<Metadata> {
   const product = await prisma.product.findFirst({
     where: { id, isActive: true, approvalStatus: 'approved', archivedAt: null },
