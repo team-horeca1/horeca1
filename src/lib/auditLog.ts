@@ -23,6 +23,7 @@ export const AUDIT_ACTIONS = {
   userUpdate: 'user.update',
   userDelete: 'user.delete',
   settingsUpdate: 'settings.update',
+  homepageHeroUpdate: 'homepage_hero.update',
   adminTeamInvite: 'admin_team.invite',
   adminTeamRoleChange: 'admin_team.role_change',
   adminTeamRemove: 'admin_team.remove',

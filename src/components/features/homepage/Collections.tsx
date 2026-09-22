@@ -1,123 +1,136 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { dal } from '@/lib/dal';
 import { ChevronRight } from 'lucide-react';
+import { dal } from '@/lib/dal';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 
 interface Collection {
-    id: string;
-    name: string;
-    slug: string;
-    description: string;
-    image: string;
-    category: string;
+  id: string;
+  name: string;
+  slug: string;
+  image: string;
+  itemCount: number;
 }
 
-const COLLECTION_STYLE: Record<string, { image: string; category: string }> = {
-    'weekend-specials': {
-        image: '/images/collections/weekend.png',
-        category: 'WEEKEND DEALS',
-    },
-    'kitchen-essentials': {
-        image: '/images/collections/kitchen.png',
-        category: 'KITCHEN & DINING',
-    },
-    'new-arrivals': {
-        image: '/images/collections/new-arrivals.png',
-        category: 'JUST ARRIVED',
-    },
-};
+const FALLBACK_IMAGE = '/images/collections/kitchen.png';
 
-const FALLBACK_STYLE = {
-    image: '/images/collections/kitchen.png',
-    category: 'COLLECTION',
+const SLUG_IMAGES: Record<string, string> = {
+  'weekend-specials': '/images/collections/weekend.png',
+  'kitchen-essentials': '/images/collections/kitchen.png',
+  'new-arrivals': '/images/collections/new-arrivals.png',
 };
 
 export function Collections() {
-    const [collections, setCollections] = useState<Collection[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
-    useEffect(() => {
-        dal.collections.list().then((data) => {
-            const mapped = data.map((c) => {
-                const style = COLLECTION_STYLE[c.slug] || FALLBACK_STYLE;
-                return {
-                    id: c.id,
-                    name: c.name,
-                    slug: c.slug,
-                    description: c.description || '',
-                    image: c.imageUrl || style.image,
-                    category: style.category,
-                };
-            });
-            setCollections(mapped);
-        }).catch(() => {});
-    }, []);
+  useEffect(() => {
+    dal.collections
+      .list()
+      .then((data) => {
+        setCollections(
+          data.map((c) => ({
+            id: c.id,
+            name: c.name,
+            slug: c.slug,
+            image: c.imageUrl || SLUG_IMAGES[c.slug] || FALLBACK_IMAGE,
+            itemCount: c.masters?.length ?? 0,
+          })),
+        );
+      })
+      .catch(() => {});
+  }, []);
 
-    if (collections.length === 0) return null;
+  const checkScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 5);
+  };
 
-    return (
-        <section className="w-full py-6 md:py-8 bg-background">
-            <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)]">
-                <SectionHeader
-                    title="Curated Collections"
-                    subtitle="Wholesale bundles for commercial kitchens"
-                    actionLabel="View all →"
-                    actionHref="/collections"
-                    className="mb-4 md:mb-5"
-                />
+  useEffect(() => {
+    checkScroll();
+  }, [collections]);
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                    {collections.map((col) => (
-                        <Link
-                            key={col.id}
-                            href={`/collections/${col.slug}`}
-                            className="group block"
-                        >
-                            <CardInner col={col} />
-                        </Link>
-                    ))}
-                </div>
-            </div>
-        </section>
-    );
-}
+  const scrollRight = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Scroll by roughly one card (~1/5 of the visible track)
+    el.scrollBy({ left: el.clientWidth / 5, behavior: 'smooth' });
+    setTimeout(checkScroll, 350);
+  };
 
-function CardInner({ col }: { col: Collection }) {
-    return (
-        <div className="relative rounded-2xl overflow-hidden aspect-[5/6] md:aspect-[16/9] shadow-cdl-1 group-hover:shadow-cdl-3 transition-shadow duration-300">
-            {/* Image */}
-            <img
-                src={col.image}
-                alt={col.name}
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-            />
+  if (collections.length === 0) return null;
 
-            {/* Warm dark gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#2d0912]/95 via-[#2d0912]/35 to-transparent" />
-
-            {/* Category pill — frosted glass */}
-            <div className="absolute top-2.5 left-2.5 md:top-4 md:left-4 z-10">
-                <span className="inline-block px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md text-[8px] md:text-[10px] font-bold tracking-[0.14em] text-white uppercase border border-white/20">
-                    {col.category}
-                </span>
-            </div>
-
-            {/* Arrow button — CDL primary Burgundy */}
-            <div className="absolute top-2.5 right-2.5 md:top-4 md:right-4 size-7 md:size-9 rounded-full bg-primary flex items-center justify-center z-10 group-hover:bg-primary-dark transition-colors shadow-cdl-2">
-                <ChevronRight size={14} className="text-white md:!w-[18px] md:!h-[18px]" strokeWidth={2.5} />
-            </div>
-
-            {/* Title — bottom, clean white */}
-            <div className="absolute inset-x-0 bottom-0 p-3 md:p-5 z-10">
-                <h3 className="text-[14px] md:text-[20px] font-bold text-white leading-tight tracking-tight drop-shadow-sm">
-                    {col.name}
-                </h3>
-                <p className="text-[10px] md:text-[12px] text-white/80 font-medium mt-0.5 md:mt-1 line-clamp-1">
-                    {col.description}
-                </p>
-            </div>
+  return (
+    <section className="w-full py-6 md:py-8 bg-background overflow-hidden">
+      <div className="max-w-[var(--container-max)] mx-auto">
+        <div className="px-4 md:px-[var(--container-padding)]">
+          <SectionHeader
+            title="Collections"
+            subtitle="Explore curated lists of top products and wholesale deals"
+            actionLabel="All collections →"
+            actionHref="/collections"
+            className="mb-4 md:mb-5"
+          />
         </div>
-    );
+
+        <div className="relative w-full">
+          <div
+            ref={scrollRef}
+            onScroll={checkScroll}
+            className="overflow-x-auto no-scrollbar scroll-smooth w-full @container"
+          >
+            {/*
+              Card width: mobile ~2.2 visible, tablet ~3.2, desktop exactly 5
+              (content width minus 4 gaps) / 5
+            */}
+            <div className="flex gap-3 md:gap-4 px-4 md:px-[var(--container-padding)] w-max pb-1">
+              {collections.map((col) => (
+                <Link
+                  key={col.id}
+                  href={`/collections/${col.slug}`}
+                  className="group block shrink-0 w-[calc((100cqw-2rem-0.75rem)/2.15)] sm:w-[calc((100cqw-3rem-1.5rem)/3.2)] lg:w-[calc((100cqw-2*var(--container-padding)-4*1rem)/5)]"
+                >
+                  <div className="relative aspect-[3/4] rounded-[12px] overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={col.image}
+                      alt={col.name}
+                      className="absolute inset-0 size-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 p-3.5 md:p-4 z-10">
+                      <h3 className="text-[16px] md:text-[18px] font-semibold text-white leading-snug text-balance line-clamp-2">
+                        {col.name}
+                      </h3>
+                      {col.itemCount > 0 ? (
+                        <p className="mt-1 flex items-center gap-0.5 text-[13px] md:text-[14px] font-medium text-white/90 tabular-nums">
+                          {col.itemCount} {col.itemCount === 1 ? 'Product' : 'Products'}
+                          <ChevronRight size={15} strokeWidth={2.5} className="shrink-0 opacity-90" />
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {canScrollRight ? (
+            <button
+              type="button"
+              onClick={scrollRight}
+              className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 size-11 items-center justify-center rounded-full bg-white border border-[#E9E3DD] shadow-[0_8px_24px_rgba(0,0,0,0.12)] hover:scale-105 active:scale-95 transition-transform"
+              aria-label="Scroll collections"
+            >
+              <ChevronRight size={22} className="text-[#1C1C1C]" strokeWidth={2.5} />
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
 }

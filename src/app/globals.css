@@ -230,6 +230,12 @@
   .animate-infinite-scroll {
     animation: infinite-scroll 2s linear infinite;
   }
+
+  /* Homepage trust + benefits rail (duplicated track → -50%) */
+  @keyframes trust-marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
 }
 
 ::-webkit-scrollbar {

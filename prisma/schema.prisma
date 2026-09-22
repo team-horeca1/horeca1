@@ -3710,6 +3710,21 @@ model PlatformSetting {
   @@map("platform_settings")
 }
 
+/// Single-row homepage hero CMS (desktop + optional mobile art, editable copy).
+model HomepageHero {
+  id               String   @id @default(uuid()) @db.Uuid
+  desktopImageUrl  String?  @map("desktop_image_url") @db.VarChar(1024)
+  mobileImageUrl   String?  @map("mobile_image_url") @db.VarChar(1024)
+  eyebrow          String   @default("India's Hospitality Supply Network") @db.VarChar(255)
+  headline         String   @default("Everything your restaurant needs. In one place.") @db.VarChar(500)
+  ctaLabel         String   @default("Start exploring") @map("cta_label") @db.VarChar(120)
+  ctaHref          String   @default("/category") @map("cta_href") @db.VarChar(500)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("homepage_heroes")
+}
+
 // Admin-fed holiday calendar — platform-wide; skipped unless supplier opts into
 // deliverThroughPublicHolidays.
 model PlatformHoliday {

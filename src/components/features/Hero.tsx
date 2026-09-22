@@ -4,15 +4,31 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
+import { HERO_FALLBACK } from '@/modules/homepage/homepage-hero.constants';
 
-export function Hero() {
+export type HeroContent = {
+  eyebrow?: string;
+  headline?: string;
+  ctaLabel?: string;
+  ctaHref?: string;
+  desktopImageUrl?: string;
+  mobileImageUrl?: string;
+};
+
+export function Hero({
+  eyebrow = HERO_FALLBACK.eyebrow,
+  headline = HERO_FALLBACK.headline,
+  ctaLabel = HERO_FALLBACK.ctaLabel,
+  ctaHref = HERO_FALLBACK.ctaHref,
+  desktopImageUrl = HERO_FALLBACK.desktopImageUrl,
+  mobileImageUrl = HERO_FALLBACK.mobileImageUrl,
+}: HeroContent = {}) {
   return (
-    <section className="w-full pt-4 pb-5 md:pb-6">
+    <section className="w-full pt-3 pb-3 md:pb-4">
       <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
         {/* Desktop */}
         <div className="hidden md:block">
-          <div className="relative overflow-hidden rounded-[24px] min-h-[220px] lg:min-h-[260px] xl:min-h-[280px] shadow-cdl-2 bg-gradient-to-r from-[#4A141F] via-primary to-[#7A2438] flex items-center justify-between px-8 lg:px-12 xl:px-14 py-6 lg:py-8 gap-6">
-            {/* Ambient decorative background glows on the right */}
+          <div className="relative overflow-hidden rounded-[20px] min-h-[160px] lg:min-h-[190px] xl:min-h-[210px] shadow-cdl-2 bg-gradient-to-r from-[#4A141F] via-primary to-[#7A2438] flex items-center justify-between px-7 lg:px-10 xl:px-12 py-4 lg:py-5 gap-5">
             <div
               className="absolute right-0 top-1/2 -translate-y-1/2 w-[380px] h-[380px] rounded-full bg-white/[0.07] blur-2xl pointer-events-none"
               aria-hidden
@@ -22,27 +38,25 @@ export function Hero() {
               aria-hidden
             />
 
-            {/* Left Content */}
             <div className="relative z-10 flex-1 min-w-0 max-w-xl text-left pr-4">
-              <p className="text-[11px] lg:text-[12px] uppercase tracking-[0.14em] text-white/80 mb-2.5 font-semibold">
-                India&apos;s Hospitality Supply Network
+              <p className="text-[10px] lg:text-[11px] uppercase tracking-[0.14em] text-white/80 mb-1.5 font-semibold">
+                {eyebrow}
               </p>
-              <h1 className="text-[clamp(1.6rem,2.6vw,2.25rem)] font-bold text-white leading-tight text-balance mb-5">
-                Everything your restaurant needs. In one place.
+              <h1 className="text-[clamp(1.35rem,2.2vw,1.85rem)] font-bold text-white leading-tight text-balance mb-3.5">
+                {headline}
               </h1>
               <Link
-                href="/category"
-                className="inline-flex items-center justify-center gap-2 min-h-12 px-6 rounded-xl bg-white text-primary text-[14px] font-semibold hover:bg-ivory hover:shadow-lg active:scale-[0.97] transition-all shadow-md group"
+                href={ctaHref}
+                className="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-xl bg-white text-primary text-[13px] font-semibold hover:bg-ivory hover:shadow-lg active:scale-[0.97] transition-all shadow-md group"
               >
-                Start exploring
-                <ArrowRight size={16} strokeWidth={2.4} className="group-hover:translate-x-1 transition-transform" />
+                {ctaLabel}
+                <ArrowRight size={15} strokeWidth={2.4} className="group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
 
-            {/* Right Image: enlarged & pushed right */}
-            <div className="relative z-10 shrink-0 w-[280px] h-[190px] md:w-[320px] md:h-[210px] lg:w-[440px] lg:h-[260px] xl:w-[500px] xl:h-[280px] flex items-center justify-end">
+            <div className="relative z-10 shrink-0 w-[220px] h-[140px] md:w-[260px] md:h-[160px] lg:w-[340px] lg:h-[190px] xl:w-[400px] xl:h-[200px] flex items-center justify-end">
               <Image
-                src="/images/hero-right1.png"
+                src={desktopImageUrl}
                 alt="Hospitality and restaurant supply goods"
                 fill
                 sizes="(max-width: 1024px) 340px, (max-width: 1280px) 460px, 520px"
@@ -55,25 +69,25 @@ export function Hero() {
 
         {/* Mobile */}
         <div className="md:hidden">
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4A141F] via-primary to-[#7A2438] px-5 py-5 min-h-[158px] flex items-center shadow-cdl-1">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4A141F] via-primary to-[#7A2438] px-4 py-3.5 min-h-[132px] flex items-center shadow-cdl-1">
             <div className="flex-1 pr-2 z-10 text-left">
-              <p className="text-[10px] uppercase tracking-wider text-white/75 mb-1.5">
-                India&apos;s Hospitality Supply Network
+              <p className="text-[9px] uppercase tracking-wider text-white/75 mb-1">
+                {eyebrow}
               </p>
-              <h2 className="text-[1.05rem] font-bold text-white leading-snug text-balance mb-4 max-w-[240px]">
-                Everything your restaurant needs. In one place.
+              <h2 className="text-[0.95rem] font-bold text-white leading-snug text-balance mb-3 max-w-[220px]">
+                {headline}
               </h2>
               <Link
-                href="/category"
-                className="inline-flex items-center justify-center gap-1.5 min-h-12 bg-white text-primary font-semibold text-[13px] px-5 rounded-lg active:scale-[0.97] transition-transform"
+                href={ctaHref}
+                className="inline-flex items-center justify-center gap-1.5 min-h-10 bg-white text-primary font-semibold text-[12px] px-4 rounded-lg active:scale-[0.97] transition-transform"
               >
-                Start exploring
-                <ArrowRight size={16} />
+                {ctaLabel}
+                <ArrowRight size={14} />
               </Link>
             </div>
-            <div className="relative w-[36%] h-[110px] shrink-0 z-10">
+            <div className="relative w-[34%] h-[96px] shrink-0 z-10">
               <Image
-                src="/images/mobile-hero-right.png"
+                src={mobileImageUrl}
                 alt=""
                 fill
                 className="object-contain"

@@ -3,10 +3,9 @@ import { Hero } from '@/components/features/Hero';
 import { QuickActions } from '@/components/features/homepage/QuickActions';
 import { CompleteProfileBanner } from '@/components/features/homepage/CompleteProfileBanner';
 import { listHomepageVoiceStories } from '@/modules/voices/voice.service';
+import { getHomepageHeroDto } from '@/modules/homepage/homepage-hero.service';
+import { HERO_FALLBACK } from '@/modules/homepage/homepage-hero.constants';
 
-const HomeTicker = dynamic(
-  () => import('@/components/features/homepage/HomeTicker').then((m) => m.HomeTicker),
-);
 const ContinueOrdering = dynamic(
   () => import('@/components/features/homepage/ContinueOrdering').then((m) => m.ContinueOrdering),
 );
@@ -47,7 +46,12 @@ const DistributorCTA = dynamic(
 );
 
 export default async function Home() {
-  const voiceStories = (await listHomepageVoiceStories()).map((s) => ({
+  const [voiceStoriesRaw, hero] = await Promise.all([
+    listHomepageVoiceStories().catch(() => []),
+    getHomepageHeroDto().catch(() => null),
+  ]);
+
+  const voiceStories = voiceStoriesRaw.map((s) => ({
     id: s.id,
     slug: s.slug,
     badge: s.badge,
@@ -62,11 +66,17 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col w-full min-w-0 overflow-x-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
-      <Hero />
+      <Hero
+        eyebrow={hero?.eyebrow ?? HERO_FALLBACK.eyebrow}
+        headline={hero?.headline ?? HERO_FALLBACK.headline}
+        ctaLabel={hero?.ctaLabel ?? HERO_FALLBACK.ctaLabel}
+        ctaHref={hero?.ctaHref ?? HERO_FALLBACK.ctaHref}
+        desktopImageUrl={hero?.resolvedDesktopImageUrl ?? HERO_FALLBACK.desktopImageUrl}
+        mobileImageUrl={hero?.resolvedMobileImageUrl ?? HERO_FALLBACK.mobileImageUrl}
+      />
       <CompleteProfileBanner />
       <ContinueOrdering />
       <CreditStatusStrip />
-      <HomeTicker />
       <QuickActions />
       <CategoryShowcase />
       <FrequentlyOrderedVendors />

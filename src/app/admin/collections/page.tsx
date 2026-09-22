@@ -685,13 +685,20 @@ export default function AdminCollectionsPage() {
                             />
                         </div>
 
-                        <ImageUpload
-                            value={formData.imageUrl}
-                            onChange={(url) => setFormData((prev) => ({ ...prev, imageUrl: url }))}
-                            folder="collections"
-                            label="Collection Image"
-                            size="md"
-                        />
+                        <div>
+                            <ImageUpload
+                                value={formData.imageUrl}
+                                onChange={(url) => setFormData((prev) => ({ ...prev, imageUrl: url }))}
+                                folder="collections"
+                                label="Collection Image"
+                                size="md"
+                            />
+                            <p className="mt-2 text-[11px] text-[#667085] leading-relaxed max-w-md">
+                                Recommended 1600×900 (16:9). Same image is used for homepage
+                                collection cards, the collections grid, and the collection page
+                                banner — keep the subject centered (sides/top crop on some layouts).
+                            </p>
+                        </div>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
