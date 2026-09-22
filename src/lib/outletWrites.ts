@@ -193,37 +193,30 @@ export async function adoptOrCreateOutlet(
   return { outlet, adopted: false };
 }
 
+type DedupeOutlet = {
+  id: string;
+  placeId?: string | null;
+  addressLine?: string | null;
+  pincode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
 /**
- * Soft-deactivate duplicate active outlets for one BA (same placeId / address+pin /
- * coords). Keeps primary when present, else the oldest. Idempotent.
+ * Which active outlets are duplicate delivery branches.
+ * An Online Store's stock outlet (`Vendor.defaultOutletId`) is never a duplicate,
+ * even when several stores share one street address — each store keeps its own stock.
  */
-export async function softDeactivateDuplicateActiveOutlets(
-  businessAccountId: string,
-): Promise<number> {
-  const account = await prisma.businessAccount.findUnique({
-    where: { id: businessAccountId },
-    select: { primaryOutletId: true },
-  });
-  const primaryId = account?.primaryOutletId ?? null;
-
-  const active = await prisma.outlet.findMany({
-    where: { businessAccountId, isActive: true },
-    orderBy: { createdAt: 'asc' },
-    select: {
-      id: true,
-      placeId: true,
-      addressLine: true,
-      pincode: true,
-      latitude: true,
-      longitude: true,
-      createdAt: true,
-    },
-  });
-
+export function selectDuplicateOutletIds(
+  outlets: DedupeOutlet[],
+  primaryId: string | null,
+  protectedIds: ReadonlySet<string> = new Set(),
+): string[] {
   const keepByKey = new Map<string, string>();
   const toDeactivate: string[] = [];
 
-  for (const o of active) {
+  for (const o of outlets) {
+    if (protectedIds.has(o.id)) continue;
     const key = locationDedupeKey(o);
     if (!key) continue;
     const existing = keepByKey.get(key);
@@ -240,6 +233,74 @@ export async function softDeactivateDuplicateActiveOutlets(
       toDeactivate.push(o.id);
     }
   }
+
+  return toDeactivate;
+}
+
+/** Stock outlets for active Online Stores on this business. */
+export async function activeStoreDefaultOutletIds(
+  businessAccountId: string,
+): Promise<Set<string>> {
+  const vendors = await prisma.vendor.findMany({
+    where: { businessAccountId, isActive: true, defaultOutletId: { not: null } },
+    select: { defaultOutletId: true },
+  });
+  return new Set(
+    vendors
+      .map((v) => v.defaultOutletId)
+      .filter((id): id is string => Boolean(id)),
+  );
+}
+
+/**
+ * Turn store stock outlets back on. Address dedupe used to soft-deactivate them
+ * when two stores shared a street address, which hid that store's inventory.
+ */
+export async function reactivateStoreStockOutlets(
+  businessAccountId: string,
+  protectedIds?: ReadonlySet<string>,
+): Promise<number> {
+  const ids = protectedIds ?? await activeStoreDefaultOutletIds(businessAccountId);
+  const idList = [...ids];
+  if (idList.length === 0) return 0;
+  const result = await prisma.outlet.updateMany({
+    where: { id: { in: idList }, businessAccountId, isActive: false },
+    data: { isActive: true },
+  });
+  return result.count;
+}
+
+/**
+ * Soft-deactivate duplicate active outlets for one BA (same placeId / address+pin /
+ * coords). Keeps primary when present, else the oldest. Idempotent.
+ * Store stock outlets are restored and then left alone.
+ */
+export async function softDeactivateDuplicateActiveOutlets(
+  businessAccountId: string,
+): Promise<number> {
+  const account = await prisma.businessAccount.findUnique({
+    where: { id: businessAccountId },
+    select: { primaryOutletId: true },
+  });
+  const primaryId = account?.primaryOutletId ?? null;
+  const protectedIds = await activeStoreDefaultOutletIds(businessAccountId);
+  await reactivateStoreStockOutlets(businessAccountId, protectedIds);
+
+  const active = await prisma.outlet.findMany({
+    where: { businessAccountId, isActive: true },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      placeId: true,
+      addressLine: true,
+      pincode: true,
+      latitude: true,
+      longitude: true,
+      createdAt: true,
+    },
+  });
+
+  const toDeactivate = selectDuplicateOutletIds(active, primaryId, protectedIds);
 
   if (toDeactivate.length === 0) return 0;
 
