@@ -40,6 +40,7 @@ interface CollectionRow {
     slug: string;
     description: string | null;
     imageUrl: string | null;
+    bannerImageUrl: string | null;
     sortOrder: number;
     isActive: boolean;
     _count: { masterProducts: number };
@@ -57,6 +58,7 @@ interface CollectionFormData {
     slug: string;
     description: string;
     imageUrl: string;
+    bannerImageUrl: string;
     sortOrder: number;
     isActive: boolean;
 }
@@ -66,6 +68,7 @@ const INITIAL_FORM: CollectionFormData = {
     slug: '',
     description: '',
     imageUrl: '',
+    bannerImageUrl: '',
     sortOrder: 0,
     isActive: true,
 };
@@ -184,6 +187,7 @@ export default function AdminCollectionsPage() {
             slug: col.slug,
             description: col.description ?? '',
             imageUrl: col.imageUrl ?? '',
+            bannerImageUrl: col.bannerImageUrl ?? '',
             sortOrder: col.sortOrder,
             isActive: col.isActive,
         });
@@ -199,6 +203,11 @@ export default function AdminCollectionsPage() {
             if (res.ok && json.success) {
                 setFormSkus(json.data.masterProducts ?? []);
                 setFormSkusReady(true);
+                setFormData((prev) => ({
+                    ...prev,
+                    imageUrl: json.data.imageUrl ?? prev.imageUrl,
+                    bannerImageUrl: json.data.bannerImageUrl ?? prev.bannerImageUrl,
+                }));
             }
         } catch {
             // Keep the panel usable even if SKU prefetch fails.
@@ -228,6 +237,7 @@ export default function AdminCollectionsPage() {
             slug: formData.slug.trim(),
             description: formData.description.trim() || null,
             imageUrl: formData.imageUrl.trim() || null,
+            bannerImageUrl: formData.bannerImageUrl.trim() || null,
             sortOrder: formData.sortOrder,
             isActive: formData.isActive,
         };
@@ -685,19 +695,35 @@ export default function AdminCollectionsPage() {
                             />
                         </div>
 
-                        <div>
-                            <ImageUpload
-                                value={formData.imageUrl}
-                                onChange={(url) => setFormData((prev) => ({ ...prev, imageUrl: url }))}
-                                folder="collections"
-                                label="Collection Image"
-                                size="md"
-                            />
-                            <p className="mt-2 text-[11px] text-[#667085] leading-relaxed max-w-md">
-                                Recommended 1600×900 (16:9). Same image is used for homepage
-                                collection cards, the collections grid, and the collection page
-                                banner — keep the subject centered (sides/top crop on some layouts).
-                            </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <ImageUpload
+                                    value={formData.imageUrl}
+                                    onChange={(url) => setFormData((prev) => ({ ...prev, imageUrl: url }))}
+                                    folder="collections"
+                                    label="Card image (homepage)"
+                                    size="md"
+                                />
+                                <p className="mt-2 text-[11px] text-[#667085] leading-relaxed">
+                                    Recommended 800×1000 or 1:1. Used on homepage collection
+                                    cards and the collections grid — keep subject centered.
+                                </p>
+                            </div>
+                            <div>
+                                <ImageUpload
+                                    value={formData.bannerImageUrl}
+                                    onChange={(url) =>
+                                        setFormData((prev) => ({ ...prev, bannerImageUrl: url }))
+                                    }
+                                    folder="collections"
+                                    label="Detail banner (optional)"
+                                    size="md"
+                                />
+                                <p className="mt-2 text-[11px] text-[#667085] leading-relaxed">
+                                    Recommended 1600×900 (16:9). Wide hero on the collection
+                                    page. Leave empty to reuse the card image.
+                                </p>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">

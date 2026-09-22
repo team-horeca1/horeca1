@@ -41,6 +41,7 @@ const updateCollectionSchema = z.object({
   slug: z.string().max(255).optional(),
   description: z.string().max(4000).optional().nullable(),
   imageUrl: z.string().max(512).optional().nullable(),
+  bannerImageUrl: z.string().max(512).optional().nullable(),
   sortOrder: z.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
   masterProductIds: z.array(z.string().uuid()).optional(),
@@ -78,6 +79,7 @@ async function loadCollection(id: string) {
     slug: collection.slug,
     description: collection.description,
     imageUrl: collection.imageUrl,
+    bannerImageUrl: collection.bannerImageUrl,
     sortOrder: collection.sortOrder,
     isActive: collection.isActive,
     createdAt: collection.createdAt,
@@ -129,6 +131,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       slug?: string;
       description?: string | null;
       imageUrl?: string | null;
+      bannerImageUrl?: string | null;
       sortOrder?: number;
       isActive?: boolean;
     } = {};
@@ -136,6 +139,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     if (data.name !== undefined) patchData.name = data.name.trim();
     if (data.description !== undefined) patchData.description = emptyToNull(data.description);
     if (data.imageUrl !== undefined) patchData.imageUrl = emptyToNull(data.imageUrl);
+    if (data.bannerImageUrl !== undefined) patchData.bannerImageUrl = emptyToNull(data.bannerImageUrl);
     if (data.sortOrder !== undefined) patchData.sortOrder = data.sortOrder;
     if (data.isActive !== undefined) patchData.isActive = data.isActive;
 
