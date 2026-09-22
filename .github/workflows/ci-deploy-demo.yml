@@ -1,7 +1,7 @@
 name: CI / Deploy Demo
 
 # Mirror of ci-deploy.yml for the isolated demo stack.
-# master  → freshville.store (ci-deploy.yml) — NEVER touched by this workflow
+# master  → horeca1.com (+ freshville.store legacy) via ci-deploy.yml — NEVER touched here
 # demo    → demo.horeca1.com (this file)
 #
 # Same pattern: parallel gates → build on GitHub → SHA-pinned GHCR push →

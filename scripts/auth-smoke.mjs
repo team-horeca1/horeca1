@@ -1,11 +1,11 @@
 /**
  * Security-first auth smoke — unauthenticated route protection check.
  * Run: node scripts/auth-smoke.mjs [BASE_URL...]
- * Default: localhost:3000 and https://freshville.store (prod).
+ * Default: localhost:3000 and https://horeca1.com (prod).
  */
 const BASES = process.argv.slice(2).length
   ? process.argv.slice(2)
-  : ['http://localhost:3000', 'https://freshville.store'];
+  : ['http://localhost:3000', 'https://horeca1.com'];
 
 const ROUTES = [
   { path: '/checkout', expect: [307, 308], label: 'customer protected' },
