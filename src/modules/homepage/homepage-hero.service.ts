@@ -1,5 +1,13 @@
 import { prisma } from '@/lib/prisma';
-import { HERO_FALLBACK } from '@/modules/homepage/homepage-hero.constants';
+import {
+  HERO_FALLBACK,
+  clampHeroPos,
+  isHeroAlignX,
+  isHeroAlignY,
+  resolveHeroImages,
+  type HeroAlignX,
+  type HeroAlignY,
+} from '@/modules/homepage/homepage-hero.constants';
 
 export { HERO_FALLBACK };
 
@@ -11,22 +19,22 @@ export type HomepageHeroDto = {
   headline: string;
   ctaLabel: string;
   ctaHref: string;
+  showText: boolean;
+  showCta: boolean;
+  copyAlignX: HeroAlignX;
+  copyAlignY: HeroAlignY;
+  copyOffsetX: number;
+  copyOffsetY: number;
+  showTextMobile: boolean;
+  showCtaMobile: boolean;
+  copyAlignXMobile: HeroAlignX;
+  copyAlignYMobile: HeroAlignY;
+  copyOffsetXMobile: number;
+  copyOffsetYMobile: number;
   /** Resolved URLs for storefront (never blank). */
   resolvedDesktopImageUrl: string;
   resolvedMobileImageUrl: string;
 };
-
-function resolveImages(row: {
-  desktopImageUrl: string | null;
-  mobileImageUrl: string | null;
-}): Pick<HomepageHeroDto, 'resolvedDesktopImageUrl' | 'resolvedMobileImageUrl'> {
-  const desktop = row.desktopImageUrl?.trim() || HERO_FALLBACK.desktopImageUrl;
-  const mobile =
-    row.mobileImageUrl?.trim() ||
-    row.desktopImageUrl?.trim() ||
-    HERO_FALLBACK.mobileImageUrl;
-  return { resolvedDesktopImageUrl: desktop, resolvedMobileImageUrl: mobile };
-}
 
 /** Ensure a single HomepageHero row exists; return it. */
 export async function ensureHomepageHero() {
@@ -44,15 +52,27 @@ export async function ensureHomepageHero() {
 
 export async function getHomepageHeroDto(): Promise<HomepageHeroDto> {
   const row = await ensureHomepageHero();
-  const images = resolveImages(row);
+  const images = resolveHeroImages(row.desktopImageUrl, row.mobileImageUrl);
   return {
     id: row.id,
     desktopImageUrl: row.desktopImageUrl,
     mobileImageUrl: row.mobileImageUrl,
-    eyebrow: row.eyebrow || HERO_FALLBACK.eyebrow,
-    headline: row.headline || HERO_FALLBACK.headline,
-    ctaLabel: row.ctaLabel || HERO_FALLBACK.ctaLabel,
-    ctaHref: row.ctaHref || HERO_FALLBACK.ctaHref,
+    eyebrow: row.eyebrow,
+    headline: row.headline,
+    ctaLabel: row.ctaLabel,
+    ctaHref: row.ctaHref,
+    showText: row.showText,
+    showCta: row.showCta,
+    copyAlignX: isHeroAlignX(row.copyAlignX) ? row.copyAlignX : 'left',
+    copyAlignY: isHeroAlignY(row.copyAlignY) ? row.copyAlignY : 'bottom',
+    copyOffsetX: clampHeroPos(row.copyOffsetX),
+    copyOffsetY: clampHeroPos(row.copyOffsetY),
+    showTextMobile: row.showTextMobile,
+    showCtaMobile: row.showCtaMobile,
+    copyAlignXMobile: isHeroAlignX(row.copyAlignXMobile) ? row.copyAlignXMobile : 'left',
+    copyAlignYMobile: isHeroAlignY(row.copyAlignYMobile) ? row.copyAlignYMobile : 'bottom',
+    copyOffsetXMobile: clampHeroPos(row.copyOffsetXMobile),
+    copyOffsetYMobile: clampHeroPos(row.copyOffsetYMobile),
     ...images,
   };
 }

@@ -3721,6 +3721,23 @@ model HomepageHero {
   headline         String   @default("Everything your restaurant needs. In one place.") @db.VarChar(500)
   ctaLabel         String   @default("Start exploring") @map("cta_label") @db.VarChar(120)
   ctaHref          String   @default("/category") @map("cta_href") @db.VarChar(500)
+  /// Desktop: when false the storefront shows the photo only. Copy is kept.
+  showText         Boolean  @default(true) @map("show_text")
+  showCta          Boolean  @default(true) @map("show_cta")
+  /// Desktop: left | center | right
+  copyAlignX       String   @default("left") @map("copy_align_x") @db.VarChar(16)
+  /// Desktop: top | center | bottom
+  copyAlignY       String   @default("bottom") @map("copy_align_y") @db.VarChar(16)
+  /// Desktop: nudge from the chosen corner (px).
+  copyOffsetX      Int      @default(0) @map("copy_offset_x")
+  copyOffsetY      Int      @default(0) @map("copy_offset_y")
+  /// Mobile placement (independent of desktop).
+  showTextMobile   Boolean  @default(true) @map("show_text_mobile")
+  showCtaMobile    Boolean  @default(true) @map("show_cta_mobile")
+  copyAlignXMobile String   @default("left") @map("copy_align_x_mobile") @db.VarChar(16)
+  copyAlignYMobile String   @default("bottom") @map("copy_align_y_mobile") @db.VarChar(16)
+  copyOffsetXMobile Int     @default(0) @map("copy_offset_x_mobile")
+  copyOffsetYMobile Int     @default(0) @map("copy_offset_y_mobile")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
