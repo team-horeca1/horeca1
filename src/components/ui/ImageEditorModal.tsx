@@ -262,6 +262,8 @@ function PreviewWithMeta({
         'vendor-cover':      { w: 280, h: 160, shape: 'rounded-2xl',      bg: '#fafafa',  fit: 'cover'  },
         'collection-card':   { w: 150, h: 200, shape: 'rounded-2xl',      bg: '#2d0912',  fit: 'cover'  },
         'collection-banner': { w: 320, h: 120, shape: 'rounded-2xl',      bg: '#2d0912',  fit: 'cover'  },
+        'homepage-hero-desktop': { w: 320, h: 160, shape: 'rounded-2xl', bg: '#4A141F', fit: 'cover' },
+        'homepage-hero-mobile':  { w: 320, h: 178, shape: 'rounded-2xl', bg: '#4A141F', fit: 'cover' },
     };
     const cfg = VARIANT_DIMS[variant];
     return (

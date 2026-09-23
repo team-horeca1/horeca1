@@ -18,7 +18,9 @@ export type ImagePreviewVariant =
     | 'product-square'    // Generic square product card image
     | 'vendor-cover'      // Wide vendor cover/cards
     | 'collection-card'   // Homepage / collections grid card (3:4)
-    | 'collection-banner'; // Collection detail page hero
+    | 'collection-banner' // Collection detail page hero
+    | 'homepage-hero-desktop' // Homepage burgundy banner, desktop photo (2:1)
+    | 'homepage-hero-mobile'; // Homepage burgundy banner, mobile photo (~1.8:1)
 
 interface VariantConfig {
     label: string;
@@ -38,6 +40,8 @@ const VARIANTS: Record<ImagePreviewVariant, VariantConfig> = {
     'vendor-cover':     { label: 'Vendor card cover',      width: 280, height: 160, shape: 'rounded',      bg: '#fafafa',                  fit: 'cover'   },
     'collection-card':  { label: 'Collection card (3:4)',  width: 150, height: 200, shape: 'rounded',      bg: '#2d0912',                  fit: 'cover'   },
     'collection-banner':{ label: 'Collection page hero',   width: 320, height: 120, shape: 'rounded',      bg: '#2d0912',                  fit: 'cover'   },
+    'homepage-hero-desktop': { label: 'Homepage hero, desktop', width: 320, height: 160, shape: 'rounded', bg: '#4A141F', fit: 'cover' },
+    'homepage-hero-mobile':  { label: 'Homepage hero, mobile',  width: 320, height: 178, shape: 'rounded', bg: '#4A141F', fit: 'cover' },
 };
 
 export function ImagePreview({

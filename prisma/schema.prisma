@@ -3721,6 +3721,13 @@ model HomepageHero {
   headline         String   @default("Everything your restaurant needs. In one place.") @db.VarChar(500)
   ctaLabel         String   @default("Start exploring") @map("cta_label") @db.VarChar(120)
   ctaHref          String   @default("/category") @map("cta_href") @db.VarChar(500)
+  /// When false the storefront shows the photo only. Copy is kept so it can be turned back on.
+  showText         Boolean  @default(true) @map("show_text")
+  showCta          Boolean  @default(true) @map("show_cta")
+  /// left | center | right
+  copyAlignX       String   @default("left") @map("copy_align_x") @db.VarChar(16)
+  /// top | center | bottom
+  copyAlignY       String   @default("bottom") @map("copy_align_y") @db.VarChar(16)
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 

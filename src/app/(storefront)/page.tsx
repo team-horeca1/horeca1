@@ -71,6 +71,10 @@ export default async function Home() {
         headline={hero?.headline ?? HERO_FALLBACK.headline}
         ctaLabel={hero?.ctaLabel ?? HERO_FALLBACK.ctaLabel}
         ctaHref={hero?.ctaHref ?? HERO_FALLBACK.ctaHref}
+        showText={hero?.showText ?? HERO_FALLBACK.showText}
+        showCta={hero?.showCta ?? HERO_FALLBACK.showCta}
+        copyAlignX={hero?.copyAlignX ?? HERO_FALLBACK.copyAlignX}
+        copyAlignY={hero?.copyAlignY ?? HERO_FALLBACK.copyAlignY}
         desktopImageUrl={hero?.resolvedDesktopImageUrl ?? HERO_FALLBACK.desktopImageUrl}
         mobileImageUrl={hero?.resolvedMobileImageUrl ?? HERO_FALLBACK.mobileImageUrl}
       />

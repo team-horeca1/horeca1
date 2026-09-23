@@ -1,6 +1,7 @@
 // GET   /api/v1/admin/homepage/hero — read CMS row
 // PATCH /api/v1/admin/homepage/hero — update images + copy
 
+import { revalidatePath } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
@@ -9,26 +10,46 @@ import { requirePermission } from '@/lib/permissions/engine';
 import { errorResponse } from '@/middleware/errorHandler';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import {
+  HERO_ALIGN_X,
+  HERO_ALIGN_Y,
+  isSafeHeroHref,
+  isSafeHeroImageUrl,
+} from '@/modules/homepage/homepage-hero.constants';
+import {
   ensureHomepageHero,
   getHomepageHeroDto,
 } from '@/modules/homepage/homepage-hero.service';
 
-const optionalUrl = z
+const optionalImageUrl = z
   .union([z.string().max(1024), z.literal(''), z.null()])
   .optional()
   .transform((v) => {
     if (v === undefined) return undefined;
-    if (v === null || v === '') return null;
+    if (v === null || v.trim() === '') return null;
     return v.trim();
+  })
+  .refine((v) => v == null || isSafeHeroImageUrl(v), {
+    message: 'Use a site path or an https image URL',
   });
 
 const patchSchema = z.object({
-  desktopImageUrl: optionalUrl,
-  mobileImageUrl: optionalUrl,
-  eyebrow: z.string().min(1).max(255).optional(),
-  headline: z.string().min(1).max(500).optional(),
-  ctaLabel: z.string().min(1).max(120).optional(),
-  ctaHref: z.string().min(1).max(500).optional(),
+  desktopImageUrl: optionalImageUrl,
+  mobileImageUrl: optionalImageUrl,
+  eyebrow: z.string().trim().max(255).optional(),
+  headline: z.string().trim().max(500).optional(),
+  ctaLabel: z.string().trim().max(120).optional(),
+  ctaHref: z
+    .string()
+    .trim()
+    .max(500)
+    .refine((value) => value === '' || isSafeHeroHref(value), {
+      message: 'Use a site path or an http(s) URL',
+    })
+    .optional(),
+  showText: z.boolean().optional(),
+  showCta: z.boolean().optional(),
+  copyAlignX: z.enum(HERO_ALIGN_X).optional(),
+  copyAlignY: z.enum(HERO_ALIGN_Y).optional(),
 });
 
 export const GET = adminOnly(async (_req: NextRequest, ctx) => {
@@ -54,14 +75,22 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       headline?: string;
       ctaLabel?: string;
       ctaHref?: string;
+      showText?: boolean;
+      showCta?: boolean;
+      copyAlignX?: string;
+      copyAlignY?: string;
     } = {};
 
     if (body.desktopImageUrl !== undefined) data.desktopImageUrl = body.desktopImageUrl;
     if (body.mobileImageUrl !== undefined) data.mobileImageUrl = body.mobileImageUrl;
-    if (body.eyebrow !== undefined) data.eyebrow = body.eyebrow.trim();
-    if (body.headline !== undefined) data.headline = body.headline.trim();
-    if (body.ctaLabel !== undefined) data.ctaLabel = body.ctaLabel.trim();
-    if (body.ctaHref !== undefined) data.ctaHref = body.ctaHref.trim();
+    if (body.eyebrow !== undefined) data.eyebrow = body.eyebrow;
+    if (body.headline !== undefined) data.headline = body.headline;
+    if (body.ctaLabel !== undefined) data.ctaLabel = body.ctaLabel;
+    if (body.ctaHref !== undefined) data.ctaHref = body.ctaHref;
+    if (body.showText !== undefined) data.showText = body.showText;
+    if (body.showCta !== undefined) data.showCta = body.showCta;
+    if (body.copyAlignX !== undefined) data.copyAlignX = body.copyAlignX;
+    if (body.copyAlignY !== undefined) data.copyAlignY = body.copyAlignY;
 
     const updated = await prisma.homepageHero.update({
       where: { id: existing.id },
@@ -79,6 +108,10 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         headline: existing.headline,
         ctaLabel: existing.ctaLabel,
         ctaHref: existing.ctaHref,
+        showText: existing.showText,
+        showCta: existing.showCta,
+        copyAlignX: existing.copyAlignX,
+        copyAlignY: existing.copyAlignY,
       },
       after: {
         desktopImageUrl: updated.desktopImageUrl,
@@ -87,8 +120,14 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         headline: updated.headline,
         ctaLabel: updated.ctaLabel,
         ctaHref: updated.ctaHref,
+        showText: updated.showText,
+        showCta: updated.showCta,
+        copyAlignX: updated.copyAlignX,
+        copyAlignY: updated.copyAlignY,
       },
     });
+
+    revalidatePath('/');
 
     const dto = await getHomepageHeroDto();
     return NextResponse.json({ success: true, data: dto });
