@@ -1,5 +1,14 @@
 import { parseImageMeta } from '@/lib/imageMeta';
 
+/** Live homepage card sizes used by the admin preview. */
+export const HERO_DESKTOP_CARD_WIDTH = 1300; // 1380 container − 2 × 40px padding
+export const HERO_DESKTOP_CARD_HEIGHT = 240;
+export const HERO_MOBILE_FRAME_WIDTH = 390;
+export const HERO_MOBILE_SIDE_PADDING = 12; // matches --container-padding at 390px
+export const HERO_MOBILE_CARD_HEIGHT = 200;
+export const HERO_OFFSET_MIN = -80;
+export const HERO_OFFSET_MAX = 120;
+
 /** Static hero fallbacks — safe for client + server (no Prisma). */
 export const HERO_FALLBACK = {
   desktopImageUrl: '/images/hero-right1.png',
@@ -10,9 +19,17 @@ export const HERO_FALLBACK = {
   ctaHref: '/category',
   showText: true,
   showCta: true,
-  copyAlignX: 'left',
-  copyAlignY: 'bottom',
-} as const;
+  copyAlignX: 'left' as const,
+  copyAlignY: 'bottom' as const,
+  copyOffsetX: 0,
+  copyOffsetY: 0,
+  showTextMobile: true,
+  showCtaMobile: true,
+  copyAlignXMobile: 'left' as const,
+  copyAlignYMobile: 'bottom' as const,
+  copyOffsetXMobile: 0,
+  copyOffsetYMobile: 0,
+};
 
 export const HERO_ALIGN_X = ['left', 'center', 'right'] as const;
 export const HERO_ALIGN_Y = ['top', 'center', 'bottom'] as const;
@@ -37,6 +54,16 @@ export function isHeroAlignX(value: unknown): value is HeroAlignX {
 
 export function isHeroAlignY(value: unknown): value is HeroAlignY {
   return typeof value === 'string' && (HERO_ALIGN_Y as readonly string[]).includes(value);
+}
+
+/** Keep internal newlines (Shift+Enter); strip only leading/trailing whitespace. */
+export function trimHeroCopy(value: string): string {
+  return value.replace(/^\s+|\s+$/g, '');
+}
+
+export function clampHeroOffset(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(HERO_OFFSET_MIN, Math.min(HERO_OFFSET_MAX, Math.round(value)));
 }
 
 /** Empty mobile art reuses desktop, then the built-in asset. Never returns a blank URL. */

@@ -75,6 +75,14 @@ export default async function Home() {
         showCta={hero?.showCta ?? HERO_FALLBACK.showCta}
         copyAlignX={hero?.copyAlignX ?? HERO_FALLBACK.copyAlignX}
         copyAlignY={hero?.copyAlignY ?? HERO_FALLBACK.copyAlignY}
+        copyOffsetX={hero?.copyOffsetX ?? HERO_FALLBACK.copyOffsetX}
+        copyOffsetY={hero?.copyOffsetY ?? HERO_FALLBACK.copyOffsetY}
+        showTextMobile={hero?.showTextMobile ?? HERO_FALLBACK.showTextMobile}
+        showCtaMobile={hero?.showCtaMobile ?? HERO_FALLBACK.showCtaMobile}
+        copyAlignXMobile={hero?.copyAlignXMobile ?? HERO_FALLBACK.copyAlignXMobile}
+        copyAlignYMobile={hero?.copyAlignYMobile ?? HERO_FALLBACK.copyAlignYMobile}
+        copyOffsetXMobile={hero?.copyOffsetXMobile ?? HERO_FALLBACK.copyOffsetXMobile}
+        copyOffsetYMobile={hero?.copyOffsetYMobile ?? HERO_FALLBACK.copyOffsetYMobile}
         desktopImageUrl={hero?.resolvedDesktopImageUrl ?? HERO_FALLBACK.desktopImageUrl}
         mobileImageUrl={hero?.resolvedMobileImageUrl ?? HERO_FALLBACK.mobileImageUrl}
       />

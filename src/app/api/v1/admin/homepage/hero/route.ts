@@ -12,8 +12,12 @@ import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import {
   HERO_ALIGN_X,
   HERO_ALIGN_Y,
+  HERO_OFFSET_MAX,
+  HERO_OFFSET_MIN,
+  clampHeroOffset,
   isSafeHeroHref,
   isSafeHeroImageUrl,
+  trimHeroCopy,
 } from '@/modules/homepage/homepage-hero.constants';
 import {
   ensureHomepageHero,
@@ -32,11 +36,19 @@ const optionalImageUrl = z
     message: 'Use a site path or an https image URL',
   });
 
+const offsetSchema = z
+  .number()
+  .int()
+  .min(HERO_OFFSET_MIN)
+  .max(HERO_OFFSET_MAX)
+  .optional()
+  .transform((v) => (v === undefined ? undefined : clampHeroOffset(v)));
+
 const patchSchema = z.object({
   desktopImageUrl: optionalImageUrl,
   mobileImageUrl: optionalImageUrl,
-  eyebrow: z.string().trim().max(255).optional(),
-  headline: z.string().trim().max(500).optional(),
+  eyebrow: z.string().max(255).transform(trimHeroCopy).optional(),
+  headline: z.string().max(500).transform(trimHeroCopy).optional(),
   ctaLabel: z.string().trim().max(120).optional(),
   ctaHref: z
     .string()
@@ -50,7 +62,78 @@ const patchSchema = z.object({
   showCta: z.boolean().optional(),
   copyAlignX: z.enum(HERO_ALIGN_X).optional(),
   copyAlignY: z.enum(HERO_ALIGN_Y).optional(),
+  copyOffsetX: offsetSchema,
+  copyOffsetY: offsetSchema,
+  showTextMobile: z.boolean().optional(),
+  showCtaMobile: z.boolean().optional(),
+  copyAlignXMobile: z.enum(HERO_ALIGN_X).optional(),
+  copyAlignYMobile: z.enum(HERO_ALIGN_Y).optional(),
+  copyOffsetXMobile: offsetSchema,
+  copyOffsetYMobile: offsetSchema,
 });
+
+type HeroPatchData = {
+  desktopImageUrl?: string | null;
+  mobileImageUrl?: string | null;
+  eyebrow?: string;
+  headline?: string;
+  ctaLabel?: string;
+  ctaHref?: string;
+  showText?: boolean;
+  showCta?: boolean;
+  copyAlignX?: string;
+  copyAlignY?: string;
+  copyOffsetX?: number;
+  copyOffsetY?: number;
+  showTextMobile?: boolean;
+  showCtaMobile?: boolean;
+  copyAlignXMobile?: string;
+  copyAlignYMobile?: string;
+  copyOffsetXMobile?: number;
+  copyOffsetYMobile?: number;
+};
+
+function snapshotHero(row: {
+  desktopImageUrl: string | null;
+  mobileImageUrl: string | null;
+  eyebrow: string;
+  headline: string;
+  ctaLabel: string;
+  ctaHref: string;
+  showText: boolean;
+  showCta: boolean;
+  copyAlignX: string;
+  copyAlignY: string;
+  copyOffsetX: number;
+  copyOffsetY: number;
+  showTextMobile: boolean;
+  showCtaMobile: boolean;
+  copyAlignXMobile: string;
+  copyAlignYMobile: string;
+  copyOffsetXMobile: number;
+  copyOffsetYMobile: number;
+}) {
+  return {
+    desktopImageUrl: row.desktopImageUrl,
+    mobileImageUrl: row.mobileImageUrl,
+    eyebrow: row.eyebrow,
+    headline: row.headline,
+    ctaLabel: row.ctaLabel,
+    ctaHref: row.ctaHref,
+    showText: row.showText,
+    showCta: row.showCta,
+    copyAlignX: row.copyAlignX,
+    copyAlignY: row.copyAlignY,
+    copyOffsetX: row.copyOffsetX,
+    copyOffsetY: row.copyOffsetY,
+    showTextMobile: row.showTextMobile,
+    showCtaMobile: row.showCtaMobile,
+    copyAlignXMobile: row.copyAlignXMobile,
+    copyAlignYMobile: row.copyAlignYMobile,
+    copyOffsetXMobile: row.copyOffsetXMobile,
+    copyOffsetYMobile: row.copyOffsetYMobile,
+  };
+}
 
 export const GET = adminOnly(async (_req: NextRequest, ctx) => {
   try {
@@ -68,19 +151,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     const body = patchSchema.parse(await req.json());
     const existing = await ensureHomepageHero();
 
-    const data: {
-      desktopImageUrl?: string | null;
-      mobileImageUrl?: string | null;
-      eyebrow?: string;
-      headline?: string;
-      ctaLabel?: string;
-      ctaHref?: string;
-      showText?: boolean;
-      showCta?: boolean;
-      copyAlignX?: string;
-      copyAlignY?: string;
-    } = {};
-
+    const data: HeroPatchData = {};
     if (body.desktopImageUrl !== undefined) data.desktopImageUrl = body.desktopImageUrl;
     if (body.mobileImageUrl !== undefined) data.mobileImageUrl = body.mobileImageUrl;
     if (body.eyebrow !== undefined) data.eyebrow = body.eyebrow;
@@ -91,6 +162,14 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     if (body.showCta !== undefined) data.showCta = body.showCta;
     if (body.copyAlignX !== undefined) data.copyAlignX = body.copyAlignX;
     if (body.copyAlignY !== undefined) data.copyAlignY = body.copyAlignY;
+    if (body.copyOffsetX !== undefined) data.copyOffsetX = body.copyOffsetX;
+    if (body.copyOffsetY !== undefined) data.copyOffsetY = body.copyOffsetY;
+    if (body.showTextMobile !== undefined) data.showTextMobile = body.showTextMobile;
+    if (body.showCtaMobile !== undefined) data.showCtaMobile = body.showCtaMobile;
+    if (body.copyAlignXMobile !== undefined) data.copyAlignXMobile = body.copyAlignXMobile;
+    if (body.copyAlignYMobile !== undefined) data.copyAlignYMobile = body.copyAlignYMobile;
+    if (body.copyOffsetXMobile !== undefined) data.copyOffsetXMobile = body.copyOffsetXMobile;
+    if (body.copyOffsetYMobile !== undefined) data.copyOffsetYMobile = body.copyOffsetYMobile;
 
     const updated = await prisma.homepageHero.update({
       where: { id: existing.id },
@@ -101,30 +180,8 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       action: AUDIT_ACTIONS.homepageHeroUpdate,
       entity: 'HomepageHero',
       entityId: updated.id,
-      before: {
-        desktopImageUrl: existing.desktopImageUrl,
-        mobileImageUrl: existing.mobileImageUrl,
-        eyebrow: existing.eyebrow,
-        headline: existing.headline,
-        ctaLabel: existing.ctaLabel,
-        ctaHref: existing.ctaHref,
-        showText: existing.showText,
-        showCta: existing.showCta,
-        copyAlignX: existing.copyAlignX,
-        copyAlignY: existing.copyAlignY,
-      },
-      after: {
-        desktopImageUrl: updated.desktopImageUrl,
-        mobileImageUrl: updated.mobileImageUrl,
-        eyebrow: updated.eyebrow,
-        headline: updated.headline,
-        ctaLabel: updated.ctaLabel,
-        ctaHref: updated.ctaHref,
-        showText: updated.showText,
-        showCta: updated.showCta,
-        copyAlignX: updated.copyAlignX,
-        copyAlignY: updated.copyAlignY,
-      },
+      before: snapshotHero(existing),
+      after: snapshotHero(updated),
     });
 
     revalidatePath('/');

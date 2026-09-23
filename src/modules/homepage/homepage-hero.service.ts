@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import {
   HERO_FALLBACK,
+  clampHeroOffset,
   isHeroAlignX,
   isHeroAlignY,
   resolveHeroImages,
@@ -22,6 +23,14 @@ export type HomepageHeroDto = {
   showCta: boolean;
   copyAlignX: HeroAlignX;
   copyAlignY: HeroAlignY;
+  copyOffsetX: number;
+  copyOffsetY: number;
+  showTextMobile: boolean;
+  showCtaMobile: boolean;
+  copyAlignXMobile: HeroAlignX;
+  copyAlignYMobile: HeroAlignY;
+  copyOffsetXMobile: number;
+  copyOffsetYMobile: number;
   /** Resolved URLs for storefront (never blank). */
   resolvedDesktopImageUrl: string;
   resolvedMobileImageUrl: string;
@@ -56,6 +65,14 @@ export async function getHomepageHeroDto(): Promise<HomepageHeroDto> {
     showCta: row.showCta,
     copyAlignX: isHeroAlignX(row.copyAlignX) ? row.copyAlignX : 'left',
     copyAlignY: isHeroAlignY(row.copyAlignY) ? row.copyAlignY : 'bottom',
+    copyOffsetX: clampHeroOffset(row.copyOffsetX),
+    copyOffsetY: clampHeroOffset(row.copyOffsetY),
+    showTextMobile: row.showTextMobile,
+    showCtaMobile: row.showCtaMobile,
+    copyAlignXMobile: isHeroAlignX(row.copyAlignXMobile) ? row.copyAlignXMobile : 'left',
+    copyAlignYMobile: isHeroAlignY(row.copyAlignYMobile) ? row.copyAlignYMobile : 'bottom',
+    copyOffsetXMobile: clampHeroOffset(row.copyOffsetXMobile),
+    copyOffsetYMobile: clampHeroOffset(row.copyOffsetYMobile),
     ...images,
   };
 }

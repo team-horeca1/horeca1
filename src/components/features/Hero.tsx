@@ -9,25 +9,39 @@ import { getDisplayStyle, parseImageMeta } from '@/lib/imageMeta';
 import {
   HERO_FALLBACK,
   isSafeHeroHref,
+  trimHeroCopy,
   type HeroAlignX,
   type HeroAlignY,
 } from '@/modules/homepage/homepage-hero.constants';
 
 export type HeroLayout = 'responsive' | 'mobile' | 'desktop';
+export type HeroChrome = 'page' | 'card';
 
 export type HeroContent = {
   eyebrow?: string;
   headline?: string;
   ctaLabel?: string;
   ctaHref?: string;
+  /** Desktop visibility and placement (also used when layout is forced to desktop). */
   showText?: boolean;
   showCta?: boolean;
   copyAlignX?: HeroAlignX;
   copyAlignY?: HeroAlignY;
+  copyOffsetX?: number;
+  copyOffsetY?: number;
+  /** Mobile visibility and placement. */
+  showTextMobile?: boolean;
+  showCtaMobile?: boolean;
+  copyAlignXMobile?: HeroAlignX;
+  copyAlignYMobile?: HeroAlignY;
+  copyOffsetXMobile?: number;
+  copyOffsetYMobile?: number;
   desktopImageUrl?: string;
   mobileImageUrl?: string;
   /** `responsive` follows the viewport. Force `mobile` or `desktop` for admin preview. */
   layout?: HeroLayout;
+  /** `page` wraps with homepage padding. `card` is the banner only (admin preview). */
+  chrome?: HeroChrome;
   /** Storefront desktop uses h1. Pass h2 when this banner is not the page title. */
   heading?: 'h1' | 'h2';
 };
@@ -142,6 +156,7 @@ function HeroBanner({
   frameClassName,
   copyClassName,
   ctaClassName,
+  headlineClassName,
   eyebrow,
   headline,
   ctaLabel,
@@ -151,6 +166,8 @@ function HeroBanner({
   showCta,
   copyAlignX,
   copyAlignY,
+  copyOffsetX,
+  copyOffsetY,
 }: {
   imageUrl: string;
   fallbackUrl: string;
@@ -159,6 +176,7 @@ function HeroBanner({
   frameClassName: string;
   copyClassName: string;
   ctaClassName: string;
+  headlineClassName: string;
   eyebrow: string;
   headline: string;
   ctaLabel: string;
@@ -168,15 +186,22 @@ function HeroBanner({
   showCta: boolean;
   copyAlignX: HeroAlignX;
   copyAlignY: HeroAlignY;
+  copyOffsetX: number;
+  copyOffsetY: number;
 }) {
-  const eyebrowText = showText ? eyebrow.trim() : '';
-  const headlineText = showText ? headline.trim() : '';
+  const eyebrowText = showText ? trimHeroCopy(eyebrow) : '';
+  const headlineText = showText ? trimHeroCopy(headline) : '';
   const labelText = ctaLabel.trim();
   const showButton = showCta && labelText.length > 0 && isSafeHeroHref(ctaHref);
   const hasCopy = Boolean(eyebrowText || headlineText || showButton);
 
   return (
-    <div className={cn('relative isolate overflow-hidden bg-[#4A141F]', frameClassName)}>
+    <div
+      className={cn(
+        'relative isolate overflow-hidden bg-[#4A141F] [container-type:inline-size]',
+        frameClassName,
+      )}
+    >
       <HeroMedia
         key={imageUrl}
         url={imageUrl}
@@ -186,27 +211,42 @@ function HeroBanner({
         alt={hasCopy ? '' : headlineText || 'Homepage banner'}
       />
       {hasCopy && (
-        <div className={cn('relative z-10 flex w-full flex-col', alignYClass[copyAlignY], alignXClass[copyAlignX], copyClassName)}>
-          {eyebrowText && (
-            <p className="text-[11px] uppercase tracking-[0.14em] text-white font-semibold leading-snug mb-1.5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
-              {eyebrowText}
-            </p>
+        <div
+          className={cn(
+            'relative z-10 flex w-full flex-col',
+            alignYClass[copyAlignY],
+            alignXClass[copyAlignX],
+            copyClassName,
           )}
-          {headlineText && (
-            <HeroHeading
-              as={heading}
-              className="text-[clamp(1.25rem,2.2vw,1.85rem)] font-bold text-white leading-tight text-balance mb-3 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]"
-            >
-              {headlineText}
-            </HeroHeading>
-          )}
-          {showButton && (
-            <HeroCta
-              href={ctaHref.trim()}
-              label={labelText}
-              className={cn(ctaClass, ctaSelfClass[copyAlignX], ctaClassName)}
-            />
-          )}
+        >
+          <div
+            className={cn('flex max-w-full flex-col', alignXClass[copyAlignX])}
+            style={{ transform: `translate(${copyOffsetX}px, ${copyOffsetY}px)` }}
+          >
+            {eyebrowText && (
+              <p className="mb-1.5 whitespace-pre-line text-[11px] font-semibold uppercase leading-snug tracking-[0.14em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+                {eyebrowText}
+              </p>
+            )}
+            {headlineText && (
+              <HeroHeading
+                as={heading}
+                className={cn(
+                  'mb-3 whitespace-pre-line font-bold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]',
+                  headlineClassName,
+                )}
+              >
+                {headlineText}
+              </HeroHeading>
+            )}
+            {showButton && (
+              <HeroCta
+                href={ctaHref.trim()}
+                label={labelText}
+                className={cn(ctaClass, ctaSelfClass[copyAlignX], ctaClassName)}
+              />
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -222,63 +262,88 @@ export function Hero({
   showCta = HERO_FALLBACK.showCta,
   copyAlignX = HERO_FALLBACK.copyAlignX,
   copyAlignY = HERO_FALLBACK.copyAlignY,
+  copyOffsetX = HERO_FALLBACK.copyOffsetX,
+  copyOffsetY = HERO_FALLBACK.copyOffsetY,
+  showTextMobile = HERO_FALLBACK.showTextMobile,
+  showCtaMobile = HERO_FALLBACK.showCtaMobile,
+  copyAlignXMobile = HERO_FALLBACK.copyAlignXMobile,
+  copyAlignYMobile = HERO_FALLBACK.copyAlignYMobile,
+  copyOffsetXMobile = HERO_FALLBACK.copyOffsetXMobile,
+  copyOffsetYMobile = HERO_FALLBACK.copyOffsetYMobile,
   desktopImageUrl = HERO_FALLBACK.desktopImageUrl,
   mobileImageUrl = HERO_FALLBACK.mobileImageUrl,
   layout = 'responsive',
+  chrome = 'page',
   heading,
 }: HeroContent = {}) {
   const showMobile = layout === 'mobile' || layout === 'responsive';
   const showDesktop = layout === 'desktop' || layout === 'responsive';
   const priority = layout === 'responsive';
 
+  const banners = (
+    <>
+      {showDesktop && (
+        <div className={layout === 'responsive' ? 'hidden md:block' : undefined}>
+          <HeroBanner
+            imageUrl={desktopImageUrl}
+            fallbackUrl={HERO_FALLBACK.desktopImageUrl}
+            sizes="100vw"
+            priority={priority}
+            frameClassName="h-[240px] min-h-[220px] xl:min-h-[240px] rounded-[20px] shadow-cdl-2"
+            copyClassName="h-full min-h-[220px] xl:min-h-[240px] px-7 lg:px-10 xl:px-12 py-5"
+            ctaClassName="min-h-11 px-5 text-[13px]"
+            headlineClassName="text-[clamp(1.25rem,2.2cqw,1.85rem)]"
+            eyebrow={eyebrow}
+            headline={headline}
+            ctaLabel={ctaLabel}
+            ctaHref={ctaHref}
+            heading={heading ?? 'h1'}
+            showText={showText}
+            showCta={showCta}
+            copyAlignX={copyAlignX}
+            copyAlignY={copyAlignY}
+            copyOffsetX={copyOffsetX}
+            copyOffsetY={copyOffsetY}
+          />
+        </div>
+      )}
+
+      {showMobile && (
+        <div className={layout === 'responsive' ? 'md:hidden' : undefined}>
+          <HeroBanner
+            imageUrl={mobileImageUrl}
+            fallbackUrl={HERO_FALLBACK.mobileImageUrl}
+            sizes="100vw"
+            priority={priority}
+            frameClassName="h-[200px] min-h-[200px] rounded-2xl shadow-cdl-1"
+            copyClassName="h-full min-h-[200px] px-4 py-4"
+            ctaClassName="min-h-12 px-5 text-[13px]"
+            headlineClassName="text-[clamp(1.25rem,4.8cqw,1.5rem)]"
+            eyebrow={eyebrow}
+            headline={headline}
+            ctaLabel={ctaLabel}
+            ctaHref={ctaHref}
+            heading={heading ?? 'h2'}
+            showText={showTextMobile}
+            showCta={showCtaMobile}
+            copyAlignX={copyAlignXMobile}
+            copyAlignY={copyAlignYMobile}
+            copyOffsetX={copyOffsetXMobile}
+            copyOffsetY={copyOffsetYMobile}
+          />
+        </div>
+      )}
+    </>
+  );
+
+  if (chrome === 'card') {
+    return <div className="w-full">{banners}</div>;
+  }
+
   return (
     <section className="w-full pt-3 pb-3 md:pb-4">
-      <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
-        {showDesktop && (
-          <div className={layout === 'responsive' ? 'hidden md:block' : undefined}>
-            <HeroBanner
-              imageUrl={desktopImageUrl}
-              fallbackUrl={HERO_FALLBACK.desktopImageUrl}
-              sizes="100vw"
-              priority={priority}
-              frameClassName="min-h-[220px] xl:min-h-[240px] rounded-[20px] shadow-cdl-2"
-              copyClassName="min-h-[220px] xl:min-h-[240px] px-7 lg:px-10 xl:px-12 py-5"
-              ctaClassName="min-h-11 px-5 text-[13px]"
-              eyebrow={eyebrow}
-              headline={headline}
-              ctaLabel={ctaLabel}
-              ctaHref={ctaHref}
-              heading={heading ?? 'h1'}
-              showText={showText}
-              showCta={showCta}
-              copyAlignX={copyAlignX}
-              copyAlignY={copyAlignY}
-            />
-          </div>
-        )}
-
-        {showMobile && (
-          <div className={layout === 'responsive' ? 'md:hidden' : undefined}>
-            <HeroBanner
-              imageUrl={mobileImageUrl}
-              fallbackUrl={HERO_FALLBACK.mobileImageUrl}
-              sizes="100vw"
-              priority={priority}
-              frameClassName="min-h-[200px] rounded-2xl shadow-cdl-1"
-              copyClassName="min-h-[200px] px-4 py-4"
-              ctaClassName="min-h-12 px-5 text-[13px]"
-              eyebrow={eyebrow}
-              headline={headline}
-              ctaLabel={ctaLabel}
-              ctaHref={ctaHref}
-              heading={heading ?? 'h2'}
-              showText={showText}
-              showCta={showCta}
-              copyAlignX={copyAlignX}
-              copyAlignY={copyAlignY}
-            />
-          </div>
-        )}
+      <div className="mx-auto max-w-[var(--container-max)] px-[var(--container-padding)]">
+        {banners}
       </div>
     </section>
   );
