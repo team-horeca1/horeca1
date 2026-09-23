@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import {
   HERO_FALLBACK,
-  clampHeroOffset,
+  clampHeroPos,
   isHeroAlignX,
   isHeroAlignY,
   resolveHeroImages,
@@ -65,14 +65,14 @@ export async function getHomepageHeroDto(): Promise<HomepageHeroDto> {
     showCta: row.showCta,
     copyAlignX: isHeroAlignX(row.copyAlignX) ? row.copyAlignX : 'left',
     copyAlignY: isHeroAlignY(row.copyAlignY) ? row.copyAlignY : 'bottom',
-    copyOffsetX: clampHeroOffset(row.copyOffsetX),
-    copyOffsetY: clampHeroOffset(row.copyOffsetY),
+    copyOffsetX: clampHeroPos(row.copyOffsetX),
+    copyOffsetY: clampHeroPos(row.copyOffsetY),
     showTextMobile: row.showTextMobile,
     showCtaMobile: row.showCtaMobile,
     copyAlignXMobile: isHeroAlignX(row.copyAlignXMobile) ? row.copyAlignXMobile : 'left',
     copyAlignYMobile: isHeroAlignY(row.copyAlignYMobile) ? row.copyAlignYMobile : 'bottom',
-    copyOffsetXMobile: clampHeroOffset(row.copyOffsetXMobile),
-    copyOffsetYMobile: clampHeroOffset(row.copyOffsetYMobile),
+    copyOffsetXMobile: clampHeroPos(row.copyOffsetXMobile),
+    copyOffsetYMobile: clampHeroPos(row.copyOffsetYMobile),
     ...images,
   };
 }

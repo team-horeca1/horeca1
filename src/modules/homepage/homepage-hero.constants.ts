@@ -6,8 +6,12 @@ export const HERO_DESKTOP_CARD_HEIGHT = 240;
 export const HERO_MOBILE_FRAME_WIDTH = 390;
 export const HERO_MOBILE_SIDE_PADDING = 12; // matches --container-padding at 390px
 export const HERO_MOBILE_CARD_HEIGHT = 200;
-export const HERO_OFFSET_MIN = -80;
-export const HERO_OFFSET_MAX = 120;
+/** Position is 0–100% from the top-left of the banner (studio-style). */
+export const HERO_POS_MIN = 0;
+export const HERO_POS_MAX = 100;
+/** @deprecated use HERO_POS_* — kept for older imports */
+export const HERO_OFFSET_MIN = HERO_POS_MIN;
+export const HERO_OFFSET_MAX = HERO_POS_MAX;
 
 /** Static hero fallbacks — safe for client + server (no Prisma). */
 export const HERO_FALLBACK = {
@@ -21,14 +25,15 @@ export const HERO_FALLBACK = {
   showCta: true,
   copyAlignX: 'left' as const,
   copyAlignY: 'bottom' as const,
-  copyOffsetX: 0,
-  copyOffsetY: 0,
+  /** Desktop text stack position (% from top-left). */
+  copyOffsetX: 4,
+  copyOffsetY: 58,
   showTextMobile: true,
   showCtaMobile: true,
   copyAlignXMobile: 'left' as const,
   copyAlignYMobile: 'bottom' as const,
-  copyOffsetXMobile: 0,
-  copyOffsetYMobile: 0,
+  copyOffsetXMobile: 4,
+  copyOffsetYMobile: 58,
 };
 
 export const HERO_ALIGN_X = ['left', 'center', 'right'] as const;
@@ -61,9 +66,14 @@ export function trimHeroCopy(value: string): string {
   return value.replace(/^\s+|\s+$/g, '');
 }
 
-export function clampHeroOffset(value: number): number {
+export function clampHeroPos(value: number): number {
   if (!Number.isFinite(value)) return 0;
-  return Math.max(HERO_OFFSET_MIN, Math.min(HERO_OFFSET_MAX, Math.round(value)));
+  return Math.max(HERO_POS_MIN, Math.min(HERO_POS_MAX, Math.round(value)));
+}
+
+/** @deprecated use clampHeroPos */
+export function clampHeroOffset(value: number): number {
+  return clampHeroPos(value);
 }
 
 /** Empty mobile art reuses desktop, then the built-in asset. Never returns a blank URL. */

@@ -12,9 +12,9 @@ import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import {
   HERO_ALIGN_X,
   HERO_ALIGN_Y,
-  HERO_OFFSET_MAX,
-  HERO_OFFSET_MIN,
-  clampHeroOffset,
+  HERO_POS_MAX,
+  HERO_POS_MIN,
+  clampHeroPos,
   isSafeHeroHref,
   isSafeHeroImageUrl,
   trimHeroCopy,
@@ -39,10 +39,10 @@ const optionalImageUrl = z
 const offsetSchema = z
   .number()
   .int()
-  .min(HERO_OFFSET_MIN)
-  .max(HERO_OFFSET_MAX)
+  .min(HERO_POS_MIN)
+  .max(HERO_POS_MAX)
   .optional()
-  .transform((v) => (v === undefined ? undefined : clampHeroOffset(v)));
+  .transform((v) => (v === undefined ? undefined : clampHeroPos(v)));
 
 const patchSchema = z.object({
   desktopImageUrl: optionalImageUrl,

@@ -130,16 +130,10 @@ function HeroCta({
 const ctaClass =
   'group inline-flex items-center justify-center gap-2 rounded-xl bg-white text-primary font-semibold shadow-md transition-all hover:bg-ivory hover:shadow-lg active:scale-[0.97]';
 
-const alignXClass: Record<HeroAlignX, string> = {
-  left: 'items-start text-left',
-  center: 'items-center text-center',
-  right: 'items-end text-right',
-};
-
-const alignYClass: Record<HeroAlignY, string> = {
-  top: 'justify-start',
-  center: 'justify-center',
-  bottom: 'justify-end',
+const textAlignClass: Record<HeroAlignX, string> = {
+  left: 'text-left items-start',
+  center: 'text-center items-center',
+  right: 'text-right items-end',
 };
 
 const ctaSelfClass: Record<HeroAlignX, string> = {
@@ -148,13 +142,19 @@ const ctaSelfClass: Record<HeroAlignX, string> = {
   right: 'self-end',
 };
 
+function originTransform(alignX: HeroAlignX): string {
+  if (alignX === 'center') return 'translate(-50%, 0)';
+  if (alignX === 'right') return 'translate(-100%, 0)';
+  return 'translate(0, 0)';
+}
+
 function HeroBanner({
   imageUrl,
   fallbackUrl,
   sizes,
   priority,
   frameClassName,
-  copyClassName,
+  copyPadClassName,
   ctaClassName,
   headlineClassName,
   eyebrow,
@@ -165,7 +165,6 @@ function HeroBanner({
   showText,
   showCta,
   copyAlignX,
-  copyAlignY,
   copyOffsetX,
   copyOffsetY,
 }: {
@@ -174,7 +173,7 @@ function HeroBanner({
   sizes: string;
   priority: boolean;
   frameClassName: string;
-  copyClassName: string;
+  copyPadClassName: string;
   ctaClassName: string;
   headlineClassName: string;
   eyebrow: string;
@@ -185,7 +184,6 @@ function HeroBanner({
   showText: boolean;
   showCta: boolean;
   copyAlignX: HeroAlignX;
-  copyAlignY: HeroAlignY;
   copyOffsetX: number;
   copyOffsetY: number;
 }) {
@@ -213,40 +211,39 @@ function HeroBanner({
       {hasCopy && (
         <div
           className={cn(
-            'relative z-10 flex w-full flex-col',
-            alignYClass[copyAlignY],
-            alignXClass[copyAlignX],
-            copyClassName,
+            'absolute z-10 flex max-w-[78%] flex-col',
+            textAlignClass[copyAlignX],
+            copyPadClassName,
           )}
+          style={{
+            left: `${copyOffsetX}%`,
+            top: `${copyOffsetY}%`,
+            transform: originTransform(copyAlignX),
+          }}
         >
-          <div
-            className={cn('flex max-w-full flex-col', alignXClass[copyAlignX])}
-            style={{ transform: `translate(${copyOffsetX}px, ${copyOffsetY}px)` }}
-          >
-            {eyebrowText && (
-              <p className="mb-1.5 whitespace-pre-line text-[11px] font-semibold uppercase leading-snug tracking-[0.14em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
-                {eyebrowText}
-              </p>
-            )}
-            {headlineText && (
-              <HeroHeading
-                as={heading}
-                className={cn(
-                  'mb-3 whitespace-pre-line font-bold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]',
-                  headlineClassName,
-                )}
-              >
-                {headlineText}
-              </HeroHeading>
-            )}
-            {showButton && (
-              <HeroCta
-                href={ctaHref.trim()}
-                label={labelText}
-                className={cn(ctaClass, ctaSelfClass[copyAlignX], ctaClassName)}
-              />
-            )}
-          </div>
+          {eyebrowText && (
+            <p className="mb-1.5 whitespace-pre-line text-[11px] font-semibold uppercase leading-snug tracking-[0.14em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+              {eyebrowText}
+            </p>
+          )}
+          {headlineText && (
+            <HeroHeading
+              as={heading}
+              className={cn(
+                'mb-3 whitespace-pre-line font-bold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]',
+                headlineClassName,
+              )}
+            >
+              {headlineText}
+            </HeroHeading>
+          )}
+          {showButton && (
+            <HeroCta
+              href={ctaHref.trim()}
+              label={labelText}
+              className={cn(ctaClass, ctaSelfClass[copyAlignX], ctaClassName)}
+            />
+          )}
         </div>
       )}
     </div>
@@ -261,13 +258,13 @@ export function Hero({
   showText = HERO_FALLBACK.showText,
   showCta = HERO_FALLBACK.showCta,
   copyAlignX = HERO_FALLBACK.copyAlignX,
-  copyAlignY = HERO_FALLBACK.copyAlignY,
+  copyAlignY: _copyAlignY = HERO_FALLBACK.copyAlignY,
   copyOffsetX = HERO_FALLBACK.copyOffsetX,
   copyOffsetY = HERO_FALLBACK.copyOffsetY,
   showTextMobile = HERO_FALLBACK.showTextMobile,
   showCtaMobile = HERO_FALLBACK.showCtaMobile,
   copyAlignXMobile = HERO_FALLBACK.copyAlignXMobile,
-  copyAlignYMobile = HERO_FALLBACK.copyAlignYMobile,
+  copyAlignYMobile: _copyAlignYMobile = HERO_FALLBACK.copyAlignYMobile,
   copyOffsetXMobile = HERO_FALLBACK.copyOffsetXMobile,
   copyOffsetYMobile = HERO_FALLBACK.copyOffsetYMobile,
   desktopImageUrl = HERO_FALLBACK.desktopImageUrl,
@@ -290,7 +287,7 @@ export function Hero({
             sizes="100vw"
             priority={priority}
             frameClassName="h-[240px] min-h-[220px] xl:min-h-[240px] rounded-[20px] shadow-cdl-2"
-            copyClassName="h-full min-h-[220px] xl:min-h-[240px] px-7 lg:px-10 xl:px-12 py-5"
+            copyPadClassName="px-1"
             ctaClassName="min-h-11 px-5 text-[13px]"
             headlineClassName="text-[clamp(1.25rem,2.2cqw,1.85rem)]"
             eyebrow={eyebrow}
@@ -301,7 +298,6 @@ export function Hero({
             showText={showText}
             showCta={showCta}
             copyAlignX={copyAlignX}
-            copyAlignY={copyAlignY}
             copyOffsetX={copyOffsetX}
             copyOffsetY={copyOffsetY}
           />
@@ -316,7 +312,7 @@ export function Hero({
             sizes="100vw"
             priority={priority}
             frameClassName="h-[200px] min-h-[200px] rounded-2xl shadow-cdl-1"
-            copyClassName="h-full min-h-[200px] px-4 py-4"
+            copyPadClassName="px-1"
             ctaClassName="min-h-12 px-5 text-[13px]"
             headlineClassName="text-[clamp(1.25rem,4.8cqw,1.5rem)]"
             eyebrow={eyebrow}
@@ -327,7 +323,6 @@ export function Hero({
             showText={showTextMobile}
             showCta={showCtaMobile}
             copyAlignX={copyAlignXMobile}
-            copyAlignY={copyAlignYMobile}
             copyOffsetX={copyOffsetXMobile}
             copyOffsetY={copyOffsetYMobile}
           />
