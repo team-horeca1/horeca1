@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { dal } from '@/lib/dal';
+import { CATEGORY_FETCH_CONCURRENCY, mapWithConcurrency } from '@/lib/mapWithConcurrency';
 import { useDeliveryPincode } from '@/hooks/useDeliveryPincode';
 import {
   parseCat,
@@ -24,16 +25,14 @@ function titleFromSlug(slug: string) {
 
 async function loadMergedProducts(ids: string[], pincode?: string): Promise<CategorySkuItem[]> {
   if (ids.length === 0) return [];
-  const groups = await Promise.all(
-    ids.map(async (id) => {
-      try {
-        const { items } = await dal.categories.getProducts(id, { pincode, limit: PRODUCT_LIMIT });
-        return items;
-      } catch {
-        return [];
-      }
-    }),
-  );
+  const groups = await mapWithConcurrency(ids, CATEGORY_FETCH_CONCURRENCY, async (id) => {
+    try {
+      const { items } = await dal.categories.getProducts(id, { pincode, limit: PRODUCT_LIMIT });
+      return items;
+    } catch {
+      return [];
+    }
+  });
   return mergeCategorySkuItems(groups);
 }
 

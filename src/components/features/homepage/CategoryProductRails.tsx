@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { LayoutGrid, Package, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import { dal } from '@/lib/dal';
+import { CATEGORY_FETCH_CONCURRENCY, mapWithConcurrency } from '@/lib/mapWithConcurrency';
 import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { useCart } from '@/context/CartContext';
@@ -191,8 +192,10 @@ async function fetchRails(
   targets: RailCategory[],
   pincode?: string,
 ): Promise<RailData[]> {
-  const results = await Promise.all(
-    targets.map(async (category) => {
+  const results = await mapWithConcurrency(
+    targets,
+    CATEGORY_FETCH_CONCURRENCY,
+    async (category) => {
       try {
         const { items } = await dal.categories.getProducts(category.id, {
           pincode,
@@ -210,7 +213,7 @@ async function fetchRails(
           items: [],
         } satisfies RailData;
       }
-    }),
+    },
   );
   return results.filter((r) => r.items.length > 0);
 }
