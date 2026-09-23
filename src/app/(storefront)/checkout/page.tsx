@@ -30,7 +30,7 @@ import {
     CheckoutOffersPanel,
     type CheckoutOfferChoicesView,
 } from '@/components/features/promo/CheckoutOffersPanel';
-import { loadRazorpayScript, openRazorpayPopup, type RazorpaySuccessPayload } from '@/lib/razorpayClient';
+import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel, type RazorpaySuccessPayload } from '@/lib/razorpayClient';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 
@@ -1001,12 +1001,18 @@ function CheckoutPageContent() {
                         description,
                     });
                 } catch (popupErr) {
-                    // Dismiss / cancel — roll back pending orders + reserved stock.
-                    await fetch('/api/v1/payments/abandon', {
+                    // Unlock UI immediately — never block the Pay button on abandon.
+                    void fetch('/api/v1/payments/abandon', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ razorpay_order_id }),
-                    }).catch(() => { /* best-effort; reconciliation is the safety net */ });
+                        signal: AbortSignal.timeout(15_000),
+                    }).catch(() => { /* reconciliation / payment.failed webhook is the safety net */ });
+
+                    if (isRazorpayUserCancel(popupErr)) {
+                        setOrderError('Payment cancelled. You can try again when ready.');
+                        return;
+                    }
                     throw popupErr;
                 }
 

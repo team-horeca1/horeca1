@@ -16,7 +16,7 @@ import {
     orderTimelineCurrentKey,
 } from '@/components/features/finance/StatusTimeline';
 import CustomerReturnSection from '@/components/features/return/CustomerReturnSection';
-import { loadRazorpayScript, openRazorpayPopup } from '@/lib/razorpayClient';
+import { loadRazorpayScript, openRazorpayPopup, isRazorpayUserCancel } from '@/lib/razorpayClient';
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 
@@ -258,11 +258,16 @@ export default function OrderDetailPage() {
                     description: `Order ${order.orderNumber}`,
                 });
             } catch (popupErr) {
-                await fetch('/api/v1/payments/abandon', {
+                void fetch('/api/v1/payments/abandon', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ razorpay_order_id }),
+                    signal: AbortSignal.timeout(15_000),
                 }).catch(() => {});
+                if (isRazorpayUserCancel(popupErr)) {
+                    toast.message('Payment cancelled. You can try again when ready.');
+                    return;
+                }
                 throw popupErr;
             }
             const verifyRes = await fetch('/api/v1/payments/verify', {
