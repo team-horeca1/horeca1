@@ -102,7 +102,7 @@ export default function BrandPortalDashboard() {
             icon: GitMerge,
             color: CDL.primary,
             bg: CDL.primaryLight,
-            href: '/brand/portal/mappings',
+            href: '/brand/portal/distributors',
         },
         {
             label: 'Brand Status',
@@ -113,14 +113,15 @@ export default function BrandPortalDashboard() {
             href: '/brand/portal/settings',
         },
         {
-            label: 'Coverage Rate',
+            // One SKU can map to many distributors — show avg maps/SKU, not a % that can exceed 100.
+            label: 'Maps per SKU',
             value: profile._count.masterProducts > 0
-                ? `${Math.round((profile._count.productMappings / profile._count.masterProducts) * 100)}%`
-                : '0%',
+                ? `${(profile._count.productMappings / profile._count.masterProducts).toFixed(1)}×`
+                : '—',
             icon: TrendingUp,
             color: '#8B5CF6',
             bg: '#F3F0FF',
-            href: '/brand/portal/mappings',
+            href: '/brand/portal/distributors',
         },
     ];
 
@@ -298,7 +299,7 @@ export default function BrandPortalDashboard() {
                     <div className="space-y-2">
                         {[
                             { label: 'Add New Product', sub: 'Expand your catalog', icon: Package, href: '/brand/portal/products', color: '#3B82F6', bg: '#EFF6FF' },
-                            { label: 'Run Auto-Mapping', sub: 'Find distributor matches', icon: GitMerge, href: '/brand/portal/mappings', color: CDL.primary, bg: CDL.primaryLight },
+                            { label: 'Run Auto-Mapping', sub: 'Find distributor matches', icon: GitMerge, href: '/brand/portal/distributors', color: CDL.primary, bg: CDL.primaryLight },
                             { label: 'Edit Brand Profile', sub: 'Update logo, tagline, etc.', icon: Sparkles, href: '/brand/portal/settings', color: '#8B5CF6', bg: '#F3F0FF' },
                         ].map(action => (
                             <Link key={action.label} href={action.href}

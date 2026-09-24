@@ -175,11 +175,17 @@ export function seedApprovalProductForm(source: ApprovalProductSeedSource): Appr
     const veg = pickVeg(source.vegNonVeg);
     const slabsSource = source.priceSlabs ?? [];
 
+    // Pending vendor listings keep the supplier POS code in vendorSku while
+    // platform sku stays null until Accept composes the catalog listing SKU.
+    // Prefill the editable SKU field from vendorSku so Admin Edit does not look blank.
+    const posSku = str(source.vendorSku ?? source.sku);
+    const platformSku = str(source.sku) || posSku;
+
     return {
         ...EMPTY_APPROVAL_PRODUCT_FORM,
         name: str(source.name),
-        sku: str(source.sku),
-        vendorSku: str(source.vendorSku ?? source.sku),
+        sku: platformSku,
+        vendorSku: posSku,
         catalogSku: str(source.masterProduct?.sku),
         hsn: str(source.hsn),
         brand: str(source.brand),
@@ -253,8 +259,9 @@ export function buildVendorProductPatch(form: ApprovalProductFormData): Record<s
     };
     if (!Number.isNaN(parsedBase)) payload.basePrice = parsedBase;
     if (form.imageUrl.trim()) payload.imageUrl = form.imageUrl.trim();
+    const posSku = form.vendorSku.trim() || form.sku.trim();
     if (form.sku.trim()) payload.sku = form.sku.trim();
-    if (form.vendorSku.trim()) payload.vendorSku = form.vendorSku.trim();
+    if (posSku) payload.vendorSku = posSku;
     if (form.hsn.trim()) payload.hsn = form.hsn.trim();
     if (form.barcode.trim()) payload.barcode = form.barcode.trim();
     if (form.brand.trim()) payload.brand = form.brand.trim();
@@ -405,7 +412,11 @@ export function ApprovalProductEditForm({
                 hsn={form.hsn}
                 brand={form.brand}
                 skuReadOnly={skuReadOnly}
-                onSkuChange={(v) => update('sku', v)}
+                onSkuChange={(v) => {
+                    update('sku', v);
+                    // Standalone pending edit: keep POS + displayed SKU in sync
+                    if (identityMode === 'standalone') update('vendorSku', v);
+                }}
                 onVendorSkuChange={(v) => update('vendorSku', v)}
                 onHsnChange={(v) => update('hsn', v)}
                 onBrandChange={(v) => update('brand', v)}
