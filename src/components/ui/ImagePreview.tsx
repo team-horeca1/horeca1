@@ -16,11 +16,26 @@ export type ImagePreviewVariant =
     | 'brand-banner'      // The wide hero banner on the brand storefront
     | 'brand-card-top'    // Full-bleed brand store card cover (150x225)
     | 'product-square'    // Generic square product card image
-    | 'vendor-cover'      // Wide vendor cover/cards
+    | 'vendor-logo'       // Supplier store logo on vendor cards (square)
+    | 'vendor-cover'      // Wide vendor cover/cards (840×480 / 7:4)
     | 'collection-card'   // Homepage / collections grid card (3:4)
     | 'collection-banner' // Collection detail page hero
     | 'homepage-hero-desktop' // Homepage burgundy banner, desktop photo (2:1)
     | 'homepage-hero-mobile'; // Homepage burgundy banner, mobile photo (~1.8:1)
+
+/** Dropzone / upload-frame classes so settings previews match live aspect ratios. */
+export const IMAGE_UPLOAD_FRAME: Record<ImagePreviewVariant, string> = {
+    'brand-logo': 'aspect-square w-full max-w-[160px]',
+    'brand-banner': 'aspect-[4/1] w-full',
+    'brand-card-top': 'aspect-[2/3] w-full max-w-[150px]',
+    'product-square': 'aspect-square w-full max-w-[200px]',
+    'vendor-logo': 'aspect-square w-full max-w-[160px]',
+    'vendor-cover': 'aspect-[840/480] w-full',
+    'collection-card': 'aspect-[3/4] w-full max-w-[150px]',
+    'collection-banner': 'aspect-[8/3] w-full',
+    'homepage-hero-desktop': 'aspect-[2/1] w-full',
+    'homepage-hero-mobile': 'aspect-[9/5] w-full',
+};
 
 interface VariantConfig {
     label: string;
@@ -37,7 +52,8 @@ const VARIANTS: Record<ImagePreviewVariant, VariantConfig> = {
     'brand-banner':     { label: 'Storefront hero (4:1)',  width: 320, height: 80,  shape: 'rounded',      bg: '#6B1D2E',                  fit: 'cover'   },
     'brand-card-top':   { label: 'Brand store card',       width: 150, height: 225, shape: 'rounded',      bg: '#6B1D2E',                  fit: 'cover'   },
     'product-square':   { label: 'Product card image',     width: 200, height: 200, shape: 'rounded',      bg: '#fff',                     fit: 'contain' },
-    'vendor-cover':     { label: 'Vendor card cover',      width: 280, height: 160, shape: 'rounded',      bg: '#fafafa',                  fit: 'cover'   },
+    'vendor-logo':      { label: 'Store logo on card',     width: 112, height: 112, shape: 'rounded',      bg: '#fff',     border: true,  fit: 'contain' },
+    'vendor-cover':     { label: 'Vendor card cover (840×480)', width: 280, height: 160, shape: 'rounded', bg: '#fafafa',                  fit: 'cover'   },
     'collection-card':  { label: 'Collection card (3:4)',  width: 150, height: 200, shape: 'rounded',      bg: '#2d0912',                  fit: 'cover'   },
     'collection-banner':{ label: 'Collection page hero',   width: 320, height: 120, shape: 'rounded',      bg: '#2d0912',                  fit: 'cover'   },
     'homepage-hero-desktop': { label: 'Homepage hero, desktop', width: 320, height: 160, shape: 'rounded', bg: '#4A141F', fit: 'cover' },

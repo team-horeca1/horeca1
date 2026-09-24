@@ -55,8 +55,8 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
         hover:border-primary/40 hover:-translate-y-1.5 transition-all duration-300
         ${fluid ? 'w-full max-w-[480px] mx-auto min-[500px]:max-w-none' : 'flex-none w-[280px] sm:w-[295px]'}`}
     >
-      {/* Top Banner with Cover & Floating Glass Badges */}
-      <Link href={vendorHref} className="relative block h-[135px] sm:h-[145px] overflow-hidden bg-gray-100" tabIndex={-1}>
+      {/* Cover — 840×480 (7:4) matches vendor upload / ImagePreview vendor-cover */}
+      <Link href={vendorHref} className="relative block aspect-[840/480] overflow-hidden bg-gray-100" tabIndex={-1}>
         <Image
           src={cover}
           alt={vendor.name}
@@ -66,61 +66,42 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
           loading={priority ? 'eager' : 'lazy'}
           priority={priority}
         />
-        {/* Subtle Dark Gradient Overlay for Badge Contrast */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent pointer-events-none" />
+        {/* Soft bottom fade — keeps share readable without covering hero art */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
 
-        {/* Floating Badges */}
-        <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-auto">
-          {vendor.isVerified ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white bg-black/40 backdrop-blur-md border border-white/20 shadow-sm">
-              <ShieldCheck size={12} className="text-emerald-400" />
-              Verified
-            </span>
-          ) : (
-            <span />
-          )}
-          <div className="flex items-center gap-1.5">
-            {vendor.minOrderValue > 0 ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white bg-primary/85 backdrop-blur-md border border-white/20 shadow-sm pointer-events-none">
-                MOV ₹{vendor.minOrderValue}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold text-white bg-emerald-600/85 backdrop-blur-md border border-white/20 shadow-sm pointer-events-none">
-                No Min. Order
-              </span>
-            )}
-            <ShareButton content={shareContent} variant="overlay" className="size-9" />
-          </div>
+        {/* Share — stays top-right */}
+        <div className="absolute top-2.5 right-2.5 z-10 pointer-events-auto">
+          <ShareButton content={shareContent} variant="overlay" className="size-9" />
         </div>
       </Link>
 
       {/* Card Body */}
       <div className="px-4 pb-4 pt-2.5 flex flex-col flex-1">
-        {/* Avatar & Right Metrics Row with Generous Breathing Room */}
-        <div className="flex items-center justify-between mb-3 relative">
-          {/* Brand Logo Avatar - Overlapping the cover with crisp white ring */}
+        {/* Avatar overlaps cover; trust chips sit in body so cover art stays clean */}
+        <div className="flex items-end justify-between gap-2 mb-3 relative">
           <Link
             href={vendorHref}
-            className="relative -mt-9 size-14 rounded-2xl overflow-hidden ring-4 ring-white shadow-md bg-white shrink-0 group-hover:ring-primary/25 transition-all duration-300 z-10"
+            className="relative -mt-9 size-14 shrink-0 z-10 rounded-2xl ring-4 ring-white shadow-md"
           >
-            {vendor.logo ? (
-              <Image
-                src={vendor.logo}
-                alt={vendor.name}
-                fill
-                sizes="56px"
-                className="object-cover transition-transform duration-300 group-hover:scale-105"
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary to-primary-dark text-white flex items-center justify-center font-bold text-sm tracking-wide">
-                {getInitials(vendor.name)}
-              </div>
-            )}
+            <span className="absolute inset-0 overflow-hidden rounded-[inherit] bg-white [transform:translateZ(0)]">
+              {vendor.logo ? (
+                <Image
+                  src={vendor.logo}
+                  alt={vendor.name}
+                  fill
+                  sizes="56px"
+                  className="object-cover transition-transform duration-500 ease-out group-hover:scale-110"
+                />
+              ) : (
+                <span className="flex size-full items-center justify-center bg-gradient-to-br from-primary to-primary-dark font-bold text-sm tracking-wide text-white">
+                  {getInitials(vendor.name)}
+                </span>
+              )}
+            </span>
           </Link>
 
-          {/* Metrics Badges: Balanced vertical padding, centered in white card area */}
-          <div className="flex items-center gap-1.5 pt-1">
-            <div className="inline-flex items-center gap-1 bg-amber-50/90 border border-amber-200/80 text-amber-950 px-2.5 py-1 rounded-full text-xs font-bold shadow-xs">
+          <div className="flex items-center justify-end gap-1.5 pt-1 shrink-0">
+            <div className="inline-flex items-center gap-1 bg-amber-50/90 border border-amber-200/80 text-amber-950 px-2.5 py-1 rounded-full text-xs font-bold">
               <Star size={13} className="text-amber-500 fill-amber-500" />
               <span>{vendor.rating ? Number(vendor.rating).toFixed(1) : '4.8'}</span>
             </div>
@@ -132,31 +113,39 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
           </div>
         </div>
 
-        {/* Supplier Name */}
+        {/* Supplier Name — verified is a mark on the name, not a chip */}
         <div className="mb-2">
           <Link href={vendorHref} className="group/title block">
-            <h3 className="text-[15px] sm:text-[16px] font-bold text-text group-hover/title:text-primary transition-colors line-clamp-1">
-              {vendor.name}
+            <h3 className="flex items-center gap-1 text-[15px] sm:text-[16px] font-bold text-text group-hover/title:text-primary transition-colors">
+              <span className="truncate">{vendor.name}</span>
+              {vendor.isVerified ? (
+                <ShieldCheck size={15} className="shrink-0 text-emerald-600" aria-label="Verified supplier" />
+              ) : null}
             </h3>
           </Link>
 
-          {/* Trust meta line */}
-          <div className="flex items-center gap-2 text-[12px] text-text-secondary mt-0.5">
+          <div className="flex items-center gap-1.5 text-[12px] text-text-secondary mt-0.5 min-w-0">
             {vendor.productCount != null && vendor.productCount > 0 && (
-              <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 shrink-0">
                 <Package size={12} className="text-text-muted" />
                 <span>{vendor.productCount}+ Products</span>
               </span>
             )}
             {vendor.productCount != null && vendor.productCount > 0 && (vendor.deliveryTime || vendor.deliverySchedule) && (
-              <span className="text-text-muted">·</span>
+              <span className="text-text-muted shrink-0">·</span>
             )}
             {(vendor.deliveryTime || vendor.deliverySchedule) && (
-              <span className="inline-flex items-center gap-1 text-emerald-700 font-medium truncate">
-                <Clock size={12} />
-                <span>{vendor.deliverySchedule || vendor.deliveryTime}</span>
+              <span className="inline-flex items-center gap-1 text-emerald-700 font-medium truncate min-w-0">
+                <Clock size={12} className="shrink-0" />
+                <span className="truncate">{vendor.deliverySchedule || vendor.deliveryTime}</span>
               </span>
             )}
+            {(vendor.productCount != null && vendor.productCount > 0) || vendor.deliveryTime || vendor.deliverySchedule ? (
+              <span className="text-text-muted shrink-0">·</span>
+            ) : null}
+            <span className={`shrink-0 font-medium ${vendor.minOrderValue > 0 ? 'text-text-secondary' : 'text-emerald-700'}`}>
+              {vendor.minOrderValue > 0 ? `Min. ₹${vendor.minOrderValue}` : 'No min. order'}
+            </span>
           </div>
         </div>
 

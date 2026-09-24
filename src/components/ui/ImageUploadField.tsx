@@ -6,7 +6,7 @@ import { Upload, X, Loader2, Crosshair } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ImageEditorModal } from '@/components/ui/ImageEditorModal';
-import type { ImagePreviewVariant } from '@/components/ui/ImagePreview';
+import { IMAGE_UPLOAD_FRAME, type ImagePreviewVariant } from '@/components/ui/ImagePreview';
 import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
 
 // Shared image uploader with:
@@ -57,7 +57,9 @@ export function ImageUploadField({
         }
     };
 
-    const previewStyle = value ? getDisplayStyle(parseImageMeta(value).meta) : {};
+    const parsed = value ? parseImageMeta(value) : null;
+    const previewSrc = parsed?.src || '';
+    const previewStyle = parsed ? getDisplayStyle(parsed.meta) : {};
 
     return (
         <div className="space-y-2">
@@ -68,13 +70,23 @@ export function ImageUploadField({
                 className={cn(
                     'relative border-2 border-dashed border-gray-200 rounded-2xl overflow-hidden group',
                     'hover:border-primary transition-colors',
-                    value ? 'h-[160px]' : 'h-[120px] flex items-center justify-center bg-gray-50 cursor-pointer'
+                    IMAGE_UPLOAD_FRAME[variant],
+                    !previewSrc && 'flex items-center justify-center bg-gray-50 cursor-pointer min-h-[96px]',
                 )}
-                onClick={() => !value && inputRef.current?.click()}
+                onClick={() => !previewSrc && inputRef.current?.click()}
             >
-                {value ? (
+                {previewSrc ? (
                     <>
-                        <Image src={value} alt={label} fill className="object-cover" sizes="400px" style={previewStyle} />
+                        <Image
+                            src={previewSrc}
+                            alt={label}
+                            fill
+                            sizes="400px"
+                            className={variant === 'vendor-logo' || variant === 'brand-logo' || variant === 'product-square'
+                                ? 'object-contain p-2'
+                                : 'object-cover'}
+                            style={previewStyle}
+                        />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                             <button
                                 type="button"

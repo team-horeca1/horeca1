@@ -14,11 +14,11 @@ const brandService = new BrandService();
 
 export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
-    await resolveBrandContext(ctx, req);
+    const { brandId } = await resolveBrandContext(ctx, req);
     requirePermission(ctx, 'products.create');
     const userId = await resolveUserId(ctx, req);
     const input = brandMasterSubmitSchema.parse(await req.json());
-    const master = await brandService.submitPendingMasterProduct(userId, input, ctx.activeBrandId);
+    const master = await brandService.submitPendingMasterProduct(userId, input, brandId);
     return NextResponse.json({ success: true, data: master }, { status: 201 });
   } catch (error) {
     return errorResponse(error);

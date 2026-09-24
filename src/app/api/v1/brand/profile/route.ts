@@ -15,8 +15,9 @@ const brandService = new BrandService();
 
 export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   requirePermission(ctx, 'settings.view');
+  const { brandId } = await resolveBrandContext(ctx, req);
   const userId = await resolveUserId(ctx, req);
-  const profile = await brandService.getMyProfile(userId, ctx.activeBrandId);
+  const profile = await brandService.getMyProfile(userId, brandId);
   return NextResponse.json({ success: true, data: profile });
 });
 
@@ -30,12 +31,12 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
 });
 
 export const PATCH = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
-  await resolveBrandContext(ctx, req); // tenant guard
+  const { brandId } = await resolveBrandContext(ctx, req);
   requirePermission(ctx, 'settings.edit');
   const userId = await resolveUserId(ctx, req);
   const body = await req.json();
   const input = updateBrandSchema.parse(body);
-  const brand = await brandService.updateProfile(userId, input, ctx.activeBrandId);
+  const brand = await brandService.updateProfile(userId, input, brandId);
   return NextResponse.json({ success: true, data: brand });
 });
 
