@@ -542,18 +542,20 @@ async function main() {
     console.log(`  Brand: ${b.name} (${b.email})`);
   }
 
-  // ═══ HOMEPAGE HERO CMS ═══
-  const existingHero = await prisma.homepageHero.findFirst({ select: { id: true } });
-  if (!existingHero) {
-    await prisma.homepageHero.create({
+  // ═══ HOMEPAGE HERO SLIDES ═══
+  const existingHeroSlide = await prisma.homepageHeroSlide.findFirst({ select: { id: true } });
+  if (!existingHeroSlide) {
+    await prisma.homepageHeroSlide.create({
       data: {
         eyebrow: "India's Hospitality Supply Network",
         headline: 'Everything your restaurant needs. In one place.',
         ctaLabel: 'Start exploring',
         ctaHref: '/category',
+        sortOrder: 0,
+        isActive: true,
       },
     });
-    console.log('  Homepage hero: seeded defaults');
+    console.log('  Homepage hero slide: seeded defaults');
   }
 
   // ═══ CREDIT ACCOUNTS + WALLETS ═══
