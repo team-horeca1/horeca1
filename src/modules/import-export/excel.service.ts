@@ -381,6 +381,8 @@ const HEADER_MAP: Record<string, string> = (() => {
 
 // Normalized row after parsing — flat fields + bulk slabs + hierarchical categories
 export interface ParsedProductRow {
+  /** 1-based Excel sheet row (header = 1). Preserved across instruction-row skips. */
+  sheetRow: number;
   sku?: string;
   name: string;
   hsn?: string;
@@ -569,6 +571,7 @@ export function parseProductImport(buffer: Buffer): ProductImportResult {
     }
 
     const parsedRow: ParsedProductRow = {
+      sheetRow: rowNum,
       sku: r['SKU'],
       name,
       hsn: r['HSN'] || r['HSN Code'],

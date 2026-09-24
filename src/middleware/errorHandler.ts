@@ -74,7 +74,7 @@ export function friendlyErrorMessage(error: unknown, fallback = 'Something went 
     }
     if (code === 'P2028') {
       console.error('[API Error] P2028 transaction timeout', error);
-      return 'Delete took too long and was rolled back. Please try again.';
+      return 'This save took too long and was rolled back. Please try again.';
     }
     if (code === 'P2000') return 'A value is too long for its field';
   }

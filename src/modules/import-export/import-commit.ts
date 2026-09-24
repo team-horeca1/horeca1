@@ -3,6 +3,13 @@
 
 import type { ImportError } from '@/modules/import-export/excel.service';
 
+/**
+ * Interactive transaction budget for product import commits.
+ * Default Prisma timeout is 5s — too low for multi-row creates (inventory,
+ * categories, slabs, master lock). Matches the pattern in userHardDelete.
+ */
+export const IMPORT_TX_OPTS = { maxWait: 15_000, timeout: 60_000 } as const;
+
 export interface PartitionInput {
   /** All data row numbers in the sheet (1-based sheet rows, i.e. header is row 1). */
   rowNumbers: number[];

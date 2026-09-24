@@ -38,7 +38,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
     const pageParam = params.get('page');
     const cursor = params.get('cursor') || undefined;
 
-    const where: Prisma.MasterProductWhereInput = {};
+    const where: Prisma.MasterProductWhereInput = { isActive: true };
     if (approvalStatus) where.approvalStatus = approvalStatus as 'pending' | 'approved' | 'rejected';
     if (categoryId) where.categoryId = categoryId;
     if (search) {

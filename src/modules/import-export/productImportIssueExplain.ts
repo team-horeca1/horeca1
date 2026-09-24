@@ -143,12 +143,13 @@ const RULES: Rule[] = [
     }),
   },
   {
-    test: (m) => /rolled back/i.test(m),
+    test: (m) => /took too long|timed out|rolled back/i.test(m),
     explain: (m) => ({
       severity: 'error',
-      title: 'Import rolled back',
+      title: 'Import timed out',
       reason: m,
-      solution: 'Nothing was saved. Fix the listed rows (or skip them), then import again. Download the error report CSV for a full list.',
+      solution:
+        'Nothing from this attempt was kept. Try again with fewer rows, or use Commit valid rows anyway after fixing any real validation issues.',
     }),
   },
   {
