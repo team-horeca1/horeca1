@@ -266,13 +266,11 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 ? { label: 'Out of stock', className: 'bg-gray-800' }
                 : product.storePromotion
                     ? { label: product.storePromotion.badgeLabel, className: 'bg-primary' }
-                    : product.isDeal
-                        ? { label: 'Deal', className: 'bg-primary' }
-                        : product.creditBadge
-                            ? { label: 'Credit', className: 'bg-primary' }
-                            : product.customerPriceApplied
-                                ? { label: 'Your price', className: 'bg-primary' }
-                                : null;
+                    : product.creditBadge
+                        ? { label: 'Credit', className: 'bg-primary' }
+                        : product.customerPriceApplied
+                            ? { label: 'Your price', className: 'bg-primary' }
+                            : null;
 
     // ── Renders a single bulk-tier pill (used by the desktop grid card).
     //    Directly adds the tier's minimum quantity to the cart on click. ──
@@ -454,7 +452,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         );
     };
 
-    // ── Image badges (Deal / Top / Out / Credit) shared by both variants. ──
+    // ── Image badges (promo / Top / Out / Credit) shared by both variants. ──
     const imageBadges = (
         <>
             <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
@@ -485,11 +483,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             )}>
                                 {product.storePromotion.badgeLabel}
                             </span>
-                        ) : product.isDeal && (
-                            <span className="bg-gradient-to-r from-[#FF4D4D] to-[#FF6B6B] text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-red-500/20 tracking-wide">
-                                Deal
-                            </span>
-                        )}
+                        ) : null}
                         {product.frequentlyOrdered && (
                             <span className="bg-gradient-to-r from-[#FBC02D] to-[#FFD54F] text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-yellow-500/20 tracking-wide">
                                 Top
