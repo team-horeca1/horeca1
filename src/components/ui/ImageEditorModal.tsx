@@ -259,6 +259,7 @@ function PreviewWithMeta({
         'brand-banner':   { w: 320, h: 80,  shape: 'rounded-2xl',      bg: '#6B1D2E',  fit: 'cover'  },
         'brand-card-top': { w: 150, h: 225, shape: 'rounded-[16px]',   bg: '#6B1D2E',  fit: 'cover'  },
         'product-square':    { w: 200, h: 200, shape: 'rounded-2xl',      bg: '#fff',     fit: 'contain' },
+        'vendor-logo':       { w: 112, h: 112, shape: 'rounded-2xl',      bg: '#fff',     fit: 'contain', border: true },
         'vendor-cover':      { w: 280, h: 160, shape: 'rounded-2xl',      bg: '#fafafa',  fit: 'cover'  },
         'collection-card':   { w: 150, h: 200, shape: 'rounded-2xl',      bg: '#2d0912',  fit: 'cover'  },
         'collection-banner': { w: 320, h: 120, shape: 'rounded-2xl',      bg: '#2d0912',  fit: 'cover'  },

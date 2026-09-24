@@ -147,15 +147,15 @@ export function StoreProfileTab(props: StoreProfileTabProps) {
         <div className={cn('grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4', readOnly && 'pointer-events-none opacity-80')}>
           <ImageUploadField
             label="Store logo"
-            aspectHint="Square — 200×200 recommended"
+            aspectHint="Square — 200×200 recommended (shown as on the supplier card)"
             value={logoUrl || null}
             onChange={(url) => setLogoUrl(url ?? '')}
             folder="vendors"
-            variant="brand-logo"
+            variant="vendor-logo"
           />
           <ImageUploadField
             label="Store card image"
-            aspectHint="Vendor card — 280×160 recommended"
+            aspectHint="Vendor card — 840×480 recommended (7:4, matches homepage card)"
             value={bannerUrl || null}
             onChange={(url) => setBannerUrl(url ?? '')}
             folder="vendors"

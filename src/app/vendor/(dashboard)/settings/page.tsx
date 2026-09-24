@@ -13,6 +13,7 @@ import { PoliciesTab } from '@/components/features/vendor/settings/PoliciesTab';
 import { DocumentsTab } from '@/components/features/vendor/settings/DocumentsTab';
 import type { ServiceArea, SettingsTabId, VendorDocument, VendorSettings } from '@/components/features/vendor/settings/types';
 import { SETTINGS_TABS } from '@/components/features/vendor/settings/types';
+import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 
 function parseTab(raw: string | null): SettingsTabId {
   if (raw && SETTINGS_TABS.some((t) => t.id === raw)) return raw as SettingsTabId;
@@ -23,6 +24,7 @@ function VendorSettingsContent() {
   const confirm = useConfirm();
   const searchParams = useSearchParams();
   const activeTab = parseTab(searchParams.get('tab'));
+  const { activeVendorId } = useBusinessAccountSwitcher();
 
   const [settings, setSettings] = useState<VendorSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,7 +162,7 @@ function VendorSettingsContent() {
     }
   }, []);
 
-  useEffect(() => { void fetchSettings(); void fetchDocuments(); }, [fetchSettings, fetchDocuments]);
+  useEffect(() => { void fetchSettings(); void fetchDocuments(); }, [fetchSettings, fetchDocuments, activeVendorId]);
 
   const handleUploadDoc = async () => {
     if (!docFile) return;

@@ -14,12 +14,12 @@ const brandService = new BrandService();
 
 export const PATCH = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
-    await resolveBrandContext(ctx, req);
+    const { brandId } = await resolveBrandContext(ctx, req);
     requirePermission(ctx, 'products.edit');
     const userId = await resolveUserId(ctx, req);
     const productId = req.nextUrl.pathname.split('/').at(-1)!;
     const input = brandMasterUpdateSchema.parse(await req.json());
-    const master = await brandService.updatePendingMasterProduct(userId, productId, input, ctx.activeBrandId);
+    const master = await brandService.updatePendingMasterProduct(userId, productId, input, brandId);
     return NextResponse.json({ success: true, data: master });
   } catch (error) {
     return errorResponse(error);

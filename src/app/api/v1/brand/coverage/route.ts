@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { BrandService } from '@/modules/brand/brand.service';
 import { brandOnly } from '@/middleware/rbac';
-import { resolveUserId } from '@/lib/resolveBrandId';
+import { resolveUserId, resolveBrandContext } from '@/lib/resolveBrandId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
 import type { AuthContext } from '@/middleware/auth';
@@ -18,6 +18,7 @@ const vendorIdQuery = z.string().uuid();
 
 export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    const { brandId } = await resolveBrandContext(ctx, req);
     requirePermission(ctx, 'products.view');
     const userId = await resolveUserId(ctx, req);
     const rawVendorId = req.nextUrl.searchParams.get('vendorId');
@@ -27,7 +28,7 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
       if (!parsed.success) throw Errors.badRequest('vendorId must be a valid UUID');
       vendorId = parsed.data;
     }
-    const coverage = await brandService.getDistributorCoverage(userId, vendorId, ctx.activeBrandId);
+    const coverage = await brandService.getDistributorCoverage(userId, vendorId, brandId);
     return NextResponse.json({ success: true, data: coverage });
   } catch (err) {
     return errorResponse(err);
@@ -35,8 +36,9 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
 });
 
 export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
+  const { brandId } = await resolveBrandContext(ctx, req);
   requirePermission(ctx, 'products.edit');
   const userId = await resolveUserId(ctx, req);
-  const result = await brandService.triggerMapping(userId, ctx.activeBrandId);
+  const result = await brandService.triggerMapping(userId, brandId);
   return NextResponse.json({ success: true, data: result });
 });

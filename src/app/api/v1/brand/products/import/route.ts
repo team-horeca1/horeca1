@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { BrandService } from '@/modules/brand/brand.service';
 import { brandOnly } from '@/middleware/rbac';
-import { resolveUserId } from '@/lib/resolveBrandId';
+import { resolveUserId, resolveBrandContext } from '@/lib/resolveBrandId';
 import { errorResponse, friendlyErrorMessage } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
 import {
@@ -36,6 +36,7 @@ export const GET = brandOnly(async (req: NextRequest, ctx) => {
 
 export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
   try {
+    const { brandId } = await resolveBrandContext(ctx, req);
     requirePermission(ctx, 'products.edit');
     const userId = await resolveUserId(ctx, req);
     const form = await req.formData();
@@ -92,7 +93,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
       try {
         const fields = brandImportProductFields(row);
         const existing = row.sku
-          ? await brandService.findBrandProductBySku(userId, row.sku, ctx.activeBrandId)
+          ? await brandService.findBrandProductBySku(userId, row.sku, brandId)
           : null;
 
         if (existing) {
@@ -121,7 +122,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
             dimensionUnit: fields.dimensionUnit,
             tags: fields.tags,
             aliasNames: fields.aliasNames,
-          }, ctx.activeBrandId);
+          }, brandId);
           updated += 1;
           continue;
         }
@@ -137,7 +138,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
           continue;
         }
 
-        const pending = await brandService.findPendingMasterBySku(userId, skuCheck.normalized, ctx.activeBrandId);
+        const pending = await brandService.findPendingMasterBySku(userId, skuCheck.normalized, brandId);
         const categoryId = categoryIds[0];
         if (pending) {
           await brandService.updatePendingMasterProduct(userId, pending.id, {
@@ -166,13 +167,13 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
             dimensionUnit: fields.dimensionUnit,
             tags: fields.tags,
             aliasNames: fields.aliasNames,
-          }, ctx.activeBrandId);
+          }, brandId);
           updated += 1;
         } else {
           await brandService.submitPendingMasterProduct(
             userId,
             toPendingMasterSubmit(row, categoryId),
-            ctx.activeBrandId,
+            brandId,
           );
           created += 1;
         }
