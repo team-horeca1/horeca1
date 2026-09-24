@@ -15,6 +15,7 @@ import { syncProductToBrand, findOrCreateBrandByName } from '@/modules/brand/bra
 import {
   partitionImportRows,
   buildImportErrorReportCsv,
+  IMPORT_TX_OPTS,
   type ImportErrorRowData,
 } from '@/modules/import-export/import-commit';
 import {
@@ -215,7 +216,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       const skips = 0;
 
       rows.forEach((r, idx) => {
-        const rowNum = idx + 2;
+        const rowNum = r.sheetRow ?? idx + 2;
         const existing = findExisting(r);
 
         // Surface the actual slab tier prices so the UI can show them
@@ -485,7 +486,10 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     }
 
     const rowData = new Map<number, ImportErrorRowData>(
-      rows.map((r, idx) => [idx + 2, { name: r.name, sku: r.sku, hsn: r.hsn, brand: r.brand, netRate: r.basePrice }])
+      rows.map((r, idx) => [
+        r.sheetRow ?? idx + 2,
+        { name: r.name, sku: r.sku, hsn: r.hsn, brand: r.brand, netRate: r.basePrice },
+      ]),
     );
 
     if (parseErrors.length > 0 && !force) {
@@ -508,10 +512,22 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     }
 
     try {
+      const brandSyncJobs: Array<{
+        brand: string;
+        name: string;
+        categoryId: string | null;
+        imageUrl: string | null;
+        packSize: string | null | undefined;
+        unit: string | null | undefined;
+        sku: string | null | undefined;
+        masterProductId: string | undefined;
+        productId: string;
+      }> = [];
+
       await prisma.$transaction(async (tx) => {
         for (let i = 0; i < rows.length; i++) {
           const parsedRow = rows[i];
-          const rowNum = i + 2;
+          const rowNum = parsedRow.sheetRow ?? i + 2;
 
           if (skipRows.has(rowNum)) continue;
 
@@ -651,7 +667,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           let vendorSku: string | undefined;
           if (vendorId && r.sku) {
             vendorSku = r.sku.trim();
-            composedSku = await composeVendorListingSku(vendorId, vendorSku, existing.id);
+            composedSku = await composeVendorListingSku(vendorId, vendorSku, existing.id, tx);
           }
 
           const updatedProduct = await tx.product.update({
@@ -714,7 +730,7 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           // one is safe because the FK to vendor is preserved.
           if (r.stock !== undefined) {
             if (vendorId) {
-              const outletId = await getPrimaryOutletIdForVendor(vendorId);
+              const outletId = await getPrimaryOutletIdForVendor(vendorId, tx);
               await tx.inventory.upsert({
                 where: { productId_outletId: { productId: existing.id, outletId } },
                 update: { qtyAvailable: r.stock },
@@ -743,17 +759,20 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           }
 
           if (updatedProduct.brand) {
-            syncProductToBrand(
-              updatedProduct.brand,
-              updatedProduct.name,
-              updatedProduct.categoryId,
-              updatedProduct.imageUrl,
-              updatedProduct.packSize ?? undefined,
-              updatedProduct.unit ?? undefined,
-              updatedProduct.sku ?? undefined,
-              updatedProduct.masterProductId || undefined,
-              updatedProduct.id,
-            ).catch(console.error);
+            // Defer brand sync until AFTER the import transaction commits —
+            // syncProductToBrand uses the global prisma client and would leave
+            // BrandMasterProduct ghosts if this transaction later rolls back.
+            brandSyncJobs.push({
+              brand: updatedProduct.brand,
+              name: updatedProduct.name,
+              categoryId: updatedProduct.categoryId,
+              imageUrl: updatedProduct.imageUrl,
+              packSize: updatedProduct.packSize,
+              unit: updatedProduct.unit,
+              sku: updatedProduct.sku,
+              masterProductId: updatedProduct.masterProductId || undefined,
+              productId: updatedProduct.id,
+            });
           }
 
           updated++;
@@ -763,14 +782,14 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           // leaf category resolved — keeps bulk-imported items in the central
           // item master, same invariant the single-create path enforces.
           const masterProductId = categoryId
-            ? await findOrCreateMaster({ name: r.name, brand: r.brand ?? null, categoryId })
+            ? await findOrCreateMaster({ name: r.name, brand: r.brand ?? null, categoryId }, tx)
             : null;
 
           let composedSku: string | null = null;
           let vendorSku: string | null = null;
           if (vendorId && r.sku) {
             vendorSku = r.sku.trim();
-            composedSku = await composeVendorListingSku(vendorId, vendorSku);
+            composedSku = await composeVendorListingSku(vendorId, vendorSku, undefined, tx);
           }
 
           const productData: Record<string, unknown> = {
@@ -851,17 +870,17 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           if (vendorId) await updatePriceSlabs(product.id, vendorId, r, tx);
 
           if (product.brand) {
-            syncProductToBrand(
-              product.brand,
-              product.name,
-              product.categoryId,
-              product.imageUrl,
-              product.packSize ?? undefined,
-              product.unit ?? undefined,
-              product.sku ?? undefined,
-              product.masterProductId || undefined,
-              product.id,
-            ).catch(console.error);
+            brandSyncJobs.push({
+              brand: product.brand,
+              name: product.name,
+              categoryId: product.categoryId,
+              imageUrl: product.imageUrl,
+              packSize: product.packSize,
+              unit: product.unit,
+              sku: product.sku,
+              masterProductId: product.masterProductId || undefined,
+              productId: product.id,
+            });
           }
 
           // Register so a later duplicate row in the same file updates THIS
@@ -878,28 +897,55 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
             if (!force) {
               throw err;
             }
+            // force=true: skip this row, but if the tx itself is already dead
+            // (P2028), rethrow so the outer catch zeros the counters.
+            const code = (err as { code?: string })?.code;
+            if (code === 'P2028') throw err;
           }
         }
-      });
-    } catch {
-      if (!force) {
-        const strictErrorReport = buildImportErrorReportCsv(rowData, commitErrors);
-        return NextResponse.json({
-          success: true,
-          data: {
-            blocked: true,
-            totalRows: rows.length,
-            validRows: 0,
-            created: 0,
-            updated: 0,
-            imported: 0,
-            errors: commitErrors,
-            errorReport: strictErrorReport,
-            backupId,
-            backup: productsToBackup,
-          } satisfies CommitResponse & { backup: typeof productsToBackup },
+      }, IMPORT_TX_OPTS);
+
+      // Only sync brand catalog after a successful commit — never during the tx.
+      for (const job of brandSyncJobs) {
+        syncProductToBrand(
+          job.brand,
+          job.name,
+          job.categoryId,
+          job.imageUrl,
+          job.packSize ?? undefined,
+          job.unit ?? undefined,
+          job.sku ?? undefined,
+          job.masterProductId,
+          job.productId,
+        ).catch(console.error);
+      }
+    } catch (txErr) {
+      // Transaction aborted — nothing persisted. Do not trust in-memory counters.
+      created = 0;
+      updated = 0;
+      const msg = friendlyErrorMessage(txErr, 'unexpected error');
+      if (!commitErrors.some((e) => e.message.includes(msg) || /took too long|rolled back/i.test(e.message))) {
+        commitErrors.push({
+          row: 0,
+          message: `Import rolled back: ${msg}`,
         });
       }
+      const timeoutReport = buildImportErrorReportCsv(rowData, commitErrors);
+      return NextResponse.json({
+        success: true,
+        data: {
+          blocked: true,
+          totalRows: rows.length,
+          validRows: 0,
+          created: 0,
+          updated: 0,
+          imported: 0,
+          errors: commitErrors,
+          errorReport: timeoutReport,
+          backupId,
+          backup: productsToBackup,
+        } satisfies CommitResponse & { backup: typeof productsToBackup },
+      });
     }
 
     const errorReport = commitErrors.length > 0 ? buildImportErrorReportCsv(rowData, commitErrors) : undefined;

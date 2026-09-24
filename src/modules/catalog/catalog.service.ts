@@ -132,8 +132,13 @@ export async function createMasterProductWithSku(
 /**
  * Admin import / backfill helper — auto-creates an approved master with H1-SKU-* when
  * no (name, brand) match exists.
+ * Pass `db` when already inside a transaction (e.g. product import) so we do NOT open a
+ * nested transaction + exclusive lock that races the outer tx and burns the 5s default.
  */
-export async function findOrCreateMaster(input: { name: string; brand: string | null; categoryId: string }): Promise<string> {
+export async function findOrCreateMaster(
+  input: { name: string; brand: string | null; categoryId: string },
+  db: Db = prisma,
+): Promise<string> {
   const masterMatchWhere = {
     name: { equals: input.name, mode: 'insensitive' as const },
     brand: input.brand ? { equals: input.brand, mode: 'insensitive' as const } : null,
@@ -141,13 +146,13 @@ export async function findOrCreateMaster(input: { name: string; brand: string | 
     isActive: true,
   };
 
-  const existing = await prisma.masterProduct.findFirst({
+  const existing = await db.masterProduct.findFirst({
     where: masterMatchWhere,
     select: { id: true },
   });
   if (existing) return existing.id;
 
-  return prisma.$transaction(async (tx) => {
+  const createUnderLock = async (tx: Db): Promise<string> => {
     // Acquire table lock to serialize concurrent SKU generation and inserts
     await tx.$executeRawUnsafe('LOCK TABLE master_products IN EXCLUSIVE MODE;');
 
@@ -167,7 +172,14 @@ export async function findOrCreateMaster(input: { name: string; brand: string | 
       data: { masterProductId: master.id, categoryId: input.categoryId, isPrimary: true },
     });
     return master.id;
-  });
+  };
+
+  // Already in a transaction — run on that client (no nested $transaction).
+  if (db !== prisma) {
+    return createUnderLock(db);
+  }
+
+  return prisma.$transaction(async (tx) => createUnderLock(tx));
 }
 
 // Mirrors the slug rule in /api/v1/vendor/categories/suggest so a name maps to
@@ -562,8 +574,8 @@ export async function syncMasterProductCategories(
 // listings, suggestions, and duplicate-name checks.
 export const TOMBSTONE_PREFIX = '_deleted_';
 
-async function getVendorCode(vendorId: string): Promise<string> {
-  const vendor = await prisma.vendor.findUnique({
+async function getVendorCode(vendorId: string, db: Db = prisma): Promise<string> {
+  const vendor = await db.vendor.findUnique({
     where: { id: vendorId },
     select: { vendorCode: true, slug: true },
   });
@@ -575,33 +587,46 @@ async function composeVendorProductSku(
   vendorId: string,
   posSku: string,
   excludeProductId?: string,
+  db: Db = prisma,
 ): Promise<string> {
   const trimmed = posSku.trim();
   if (!trimmed) throw Errors.badRequest('Your POS SKU is required.');
-  await assertVendorPosSkuUnique(vendorId, trimmed, excludeProductId);
-  const vendorCode = await getVendorCode(vendorId);
+  await assertVendorPosSkuUnique(vendorId, trimmed, excludeProductId, db);
+  const vendorCode = await getVendorCode(vendorId, db);
   const composed = formatVendorSku(vendorCode, trimmed);
-  await assertVendorSkuUnique(vendorId, composed, excludeProductId);
+  await assertVendorSkuUnique(vendorId, composed, excludeProductId, db);
   return composed;
 }
 
-/** Find another listing for this vendor that already uses the same POS code. */
+/**
+ * Find another listing for this vendor that already uses the same POS code.
+ * Targeted OR on vendorSku / composed sku / bare sku — never loads the full catalog.
+ */
 export async function findVendorListingWithPosSku(
   vendorId: string,
   posSku: string,
   excludeProductId?: string,
+  db: Db = prisma,
 ): Promise<{ id: string; name: string } | null> {
   const trimmed = posSku.trim();
   if (!trimmed) return null;
 
-  const vendorCode = await getVendorCode(vendorId);
-  const candidates = await prisma.product.findMany({
+  const vendorCode = await getVendorCode(vendorId, db);
+  const composed = formatVendorSku(vendorCode, trimmed);
+
+  const candidates = await db.product.findMany({
     where: {
       vendorId,
       slug: { not: { startsWith: TOMBSTONE_PREFIX } },
       ...(excludeProductId ? { id: { not: excludeProductId } } : {}),
+      OR: [
+        { vendorSku: { equals: trimmed, mode: 'insensitive' } },
+        { sku: { equals: trimmed, mode: 'insensitive' } },
+        { sku: { equals: composed, mode: 'insensitive' } },
+      ],
     },
     select: { id: true, name: true, vendorSku: true, sku: true },
+    take: 20,
   });
 
   for (const row of candidates) {
@@ -616,10 +641,11 @@ export async function assertVendorPosSkuUnique(
   vendorId: string,
   posSku: string,
   excludeProductId?: string,
+  db: Db = prisma,
 ): Promise<void> {
   const trimmed = posSku.trim();
   if (!trimmed) return;
-  const dup = await findVendorListingWithPosSku(vendorId, trimmed, excludeProductId);
+  const dup = await findVendorListingWithPosSku(vendorId, trimmed, excludeProductId, db);
   if (dup) {
     throw Errors.conflict(
       `You already have a product with POS SKU "${trimmed}" (${dup.name}).`,
@@ -631,8 +657,9 @@ async function assertVendorSkuUnique(
   vendorId: string,
   sku: string,
   excludeProductId?: string,
+  db: Db = prisma,
 ): Promise<void> {
-  const dup = await prisma.product.findFirst({
+  const dup = await db.product.findFirst({
     where: {
       vendorId,
       sku: { equals: sku, mode: 'insensitive' },
@@ -651,8 +678,9 @@ export async function composeVendorListingSku(
   vendorId: string,
   posSku: string,
   excludeProductId?: string,
+  db: Db = prisma,
 ): Promise<string> {
-  return composeVendorProductSku(vendorId, posSku, excludeProductId);
+  return composeVendorProductSku(vendorId, posSku, excludeProductId, db);
 }
 
 /** Lookup an approved master catalog row by admin-entered catalog SKU. */
@@ -2497,7 +2525,15 @@ export class CatalogService {
   async deleteProduct(productId: string, vendorId?: string): Promise<{ hardDeleted: boolean }> {
     const product = await prisma.product.findFirst({
       where: { id: productId, ...(vendorId ? { vendorId } : {}) },
-      select: { id: true, slug: true, name: true, vendorId: true },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        vendorId: true,
+        brand: true,
+        sku: true,
+        masterProductId: true,
+      },
     });
     if (!product) throw Errors.notFound('Product');
 
@@ -2506,9 +2542,10 @@ export class CatalogService {
       throw Errors.conflict('Cannot delete: this SKU has order history.');
     }
 
+    let hardDeleted = false;
     try {
       await prisma.product.delete({ where: { id: productId } });
-      return { hardDeleted: true };
+      hardDeleted = true;
     } catch (e) {
       // Prisma FK-violation: P2003 (referenced rows exist with no cascade).
       // Expected blockers without order history: cart_items, quick_order_list_items.
@@ -2524,8 +2561,20 @@ export class CatalogService {
           isActive: false,
         },
       });
-      return { hardDeleted: false };
+      hardDeleted = false;
     }
+
+    // Drop brand-store / catalog ghosts left behind by import sync or tombstone.
+    const { cleanupBrandArtifactsAfterProductRemoval } = await import('@/modules/brand/brand.service');
+    await cleanupBrandArtifactsAfterProductRemoval({
+      productId: product.id,
+      name: product.name,
+      brand: product.brand,
+      sku: product.sku,
+      masterProductId: product.masterProductId,
+    }).catch((err) => console.error('cleanupBrandArtifactsAfterProductRemoval', err));
+
+    return { hardDeleted };
   }
 
   async approveProduct(productId: string, adminUserId: string, note?: string) {

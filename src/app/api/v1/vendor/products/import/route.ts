@@ -43,6 +43,7 @@ import { findOrCreateBrandByName } from '@/modules/brand/brand.service';
 import {
   partitionImportRows,
   buildImportErrorReportCsv,
+  IMPORT_TX_OPTS,
   type ImportErrorRowData,
 } from '@/modules/import-export/import-commit';
 import {
@@ -283,7 +284,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       const skips = 0;
 
       rows.forEach((r, idx) => {
-        const rowNum = idx + 2;
+        const rowNum = r.sheetRow ?? idx + 2;
         const existing = findExisting(r);
 
         const slabPreview = r.bulkSlabs.map((s) => ({
@@ -559,7 +560,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
 
     for (let i = 0; i < rows.length; i++) {
       const parsedRow = rows[i];
-      const rowNum = i + 2;
+      const rowNum = parsedRow.sheetRow ?? i + 2;
 
       if (skipRows.has(rowNum)) continue;
 
@@ -953,7 +954,7 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
             created++;
           }
         }
-      });
+      }, IMPORT_TX_OPTS);
     } catch (txErr) {
       // Atomic rollback — nothing was committed.
       created = 0;
@@ -961,6 +962,21 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       responseErrors.push({
         row: 0,
         message: `Import rolled back: ${friendlyErrorMessage(txErr, 'unexpected error')}`,
+      });
+      return NextResponse.json({
+        success: true,
+        data: {
+          blocked: true,
+          totalRows: rows.length,
+          validRows: commitRowNumbers.length,
+          created: 0,
+          updated: 0,
+          imported: 0,
+          errors: responseErrors,
+          errorReport: buildImportErrorReportCsv(rowData, responseErrors),
+          backupId,
+          backup: productsToBackup,
+        } satisfies CommitResponse & { backup: typeof productsToBackup },
       });
     }
 

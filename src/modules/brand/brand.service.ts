@@ -1547,6 +1547,74 @@ export async function syncProductToBrand(
   }
 }
 
+/**
+ * After a vendor/admin listing is removed (hard-delete or tombstone), drop brand
+ * mappings and any BrandMasterProduct / MasterProduct that no longer has a live
+ * listing. Prevents "ghost" brand-store + catalog rows after failed/rolled-back
+ * imports or intentional deletes.
+ */
+export async function cleanupBrandArtifactsAfterProductRemoval(input: {
+  productId: string;
+  name: string;
+  brand: string | null;
+  sku: string | null;
+  masterProductId: string | null;
+}): Promise<void> {
+  const { productId, brand, sku, masterProductId } = input;
+  const liveName = input.name.replace(/^\[Deleted\]\s*/i, '').trim();
+
+  // Tombstone path: Product row still exists, so mapping Cascade never fires.
+  await prisma.brandProductMapping.deleteMany({ where: { distributorProductId: productId } });
+
+  if (brand?.trim()) {
+    const brandRow = await prisma.brand.findFirst({
+      where: { name: { equals: brand.trim(), mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (brandRow) {
+      const or: Prisma.BrandMasterProductWhereInput[] = [
+        { name: { equals: liveName, mode: 'insensitive' } },
+      ];
+      if (masterProductId) or.push({ masterProductId });
+      if (sku?.trim()) or.push({ sku: { equals: sku.trim(), mode: 'insensitive' } });
+
+      const candidates = await prisma.brandMasterProduct.findMany({
+        where: { brandId: brandRow.id, OR: or },
+        select: { id: true, _count: { select: { mappings: true } } },
+      });
+      for (const bmp of candidates) {
+        if (bmp._count.mappings === 0) {
+          await prisma.brandMasterProduct.delete({ where: { id: bmp.id } }).catch(() => {});
+        }
+      }
+    }
+  }
+
+  if (masterProductId) {
+    const remainingListings = await prisma.product.count({
+      where: {
+        masterProductId,
+        id: { not: productId },
+        slug: { not: { startsWith: '_deleted_' } },
+      },
+    });
+    if (remainingListings === 0) {
+      const bmpLeft = await prisma.brandMasterProduct.count({
+        where: { masterProductId },
+      });
+      if (bmpLeft === 0) {
+        // Soft-hide orphan master so admin Catalog / Brand views stop listing it.
+        await prisma.masterProduct
+          .update({
+            where: { id: masterProductId },
+            data: { isActive: false },
+          })
+          .catch(() => {});
+      }
+    }
+  }
+}
+
 export interface ResolvedBrand {
   id: string;
   name: string;

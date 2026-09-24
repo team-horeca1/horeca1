@@ -7,18 +7,21 @@ import { prisma } from '@/lib/prisma';
 
 type Db = PrismaClient | Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
 
-export async function getPrimaryOutletIdForVendor(vendorId: string): Promise<string> {
-  const vendor = await prisma.vendor.findUnique({
+export async function getPrimaryOutletIdForVendor(
+  vendorId: string,
+  db: Db = prisma,
+): Promise<string> {
+  const vendor = await db.vendor.findUnique({
     where: { id: vendorId },
     select: { businessAccountId: true },
   });
   if (!vendor) throw new Error('Vendor not found');
-  const ba = await prisma.businessAccount.findUnique({
+  const ba = await db.businessAccount.findUnique({
     where: { id: vendor.businessAccountId },
     select: { primaryOutletId: true },
   });
   if (ba?.primaryOutletId) return ba.primaryOutletId;
-  const first = await prisma.outlet.findFirst({
+  const first = await db.outlet.findFirst({
     where: { businessAccountId: vendor.businessAccountId, isActive: true },
     orderBy: { createdAt: 'asc' },
     select: { id: true },
