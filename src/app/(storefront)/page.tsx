@@ -3,7 +3,7 @@ import { Hero } from '@/components/features/Hero';
 import { QuickActions } from '@/components/features/homepage/QuickActions';
 import { CompleteProfileBanner } from '@/components/features/homepage/CompleteProfileBanner';
 import { listHomepageVoiceStories } from '@/modules/voices/voice.service';
-import { getHomepageHeroDto } from '@/modules/homepage/homepage-hero.service';
+import { getHomepageHeroSlides } from '@/modules/homepage/homepage-hero.service';
 import { HERO_FALLBACK } from '@/modules/homepage/homepage-hero.constants';
 
 const ContinueOrdering = dynamic(
@@ -46,9 +46,9 @@ const DistributorCTA = dynamic(
 );
 
 export default async function Home() {
-  const [voiceStoriesRaw, hero] = await Promise.all([
+  const [voiceStoriesRaw, heroSlides] = await Promise.all([
     listHomepageVoiceStories().catch(() => []),
-    getHomepageHeroDto().catch(() => null),
+    getHomepageHeroSlides().catch(() => []),
   ]);
 
   const voiceStories = voiceStoriesRaw.map((s) => ({
@@ -64,28 +64,55 @@ export default async function Home() {
     storyPortraitUrl: s.storyPortraitUrl,
   }));
 
+  const slides =
+    heroSlides.length > 0
+      ? heroSlides.map((s) => ({
+          id: s.id,
+          eyebrow: s.eyebrow,
+          headline: s.headline,
+          ctaLabel: s.ctaLabel,
+          ctaHref: s.ctaHref,
+          showText: s.showText,
+          showCta: s.showCta,
+          copyAlignX: s.copyAlignX,
+          copyAlignY: s.copyAlignY,
+          copyOffsetX: s.copyOffsetX,
+          copyOffsetY: s.copyOffsetY,
+          showTextMobile: s.showTextMobile,
+          showCtaMobile: s.showCtaMobile,
+          copyAlignXMobile: s.copyAlignXMobile,
+          copyAlignYMobile: s.copyAlignYMobile,
+          copyOffsetXMobile: s.copyOffsetXMobile,
+          copyOffsetYMobile: s.copyOffsetYMobile,
+          desktopImageUrl: s.resolvedDesktopImageUrl,
+          mobileImageUrl: s.resolvedMobileImageUrl,
+        }))
+      : [
+          {
+            eyebrow: HERO_FALLBACK.eyebrow,
+            headline: HERO_FALLBACK.headline,
+            ctaLabel: HERO_FALLBACK.ctaLabel,
+            ctaHref: HERO_FALLBACK.ctaHref,
+            showText: HERO_FALLBACK.showText,
+            showCta: HERO_FALLBACK.showCta,
+            copyAlignX: HERO_FALLBACK.copyAlignX,
+            copyAlignY: HERO_FALLBACK.copyAlignY,
+            copyOffsetX: HERO_FALLBACK.copyOffsetX,
+            copyOffsetY: HERO_FALLBACK.copyOffsetY,
+            showTextMobile: HERO_FALLBACK.showTextMobile,
+            showCtaMobile: HERO_FALLBACK.showCtaMobile,
+            copyAlignXMobile: HERO_FALLBACK.copyAlignXMobile,
+            copyAlignYMobile: HERO_FALLBACK.copyAlignYMobile,
+            copyOffsetXMobile: HERO_FALLBACK.copyOffsetXMobile,
+            copyOffsetYMobile: HERO_FALLBACK.copyOffsetYMobile,
+            desktopImageUrl: HERO_FALLBACK.desktopImageUrl,
+            mobileImageUrl: HERO_FALLBACK.mobileImageUrl,
+          },
+        ];
+
   return (
     <div className="flex flex-col w-full min-w-0 overflow-x-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
-      <Hero
-        eyebrow={hero?.eyebrow ?? HERO_FALLBACK.eyebrow}
-        headline={hero?.headline ?? HERO_FALLBACK.headline}
-        ctaLabel={hero?.ctaLabel ?? HERO_FALLBACK.ctaLabel}
-        ctaHref={hero?.ctaHref ?? HERO_FALLBACK.ctaHref}
-        showText={hero?.showText ?? HERO_FALLBACK.showText}
-        showCta={hero?.showCta ?? HERO_FALLBACK.showCta}
-        copyAlignX={hero?.copyAlignX ?? HERO_FALLBACK.copyAlignX}
-        copyAlignY={hero?.copyAlignY ?? HERO_FALLBACK.copyAlignY}
-        copyOffsetX={hero?.copyOffsetX ?? HERO_FALLBACK.copyOffsetX}
-        copyOffsetY={hero?.copyOffsetY ?? HERO_FALLBACK.copyOffsetY}
-        showTextMobile={hero?.showTextMobile ?? HERO_FALLBACK.showTextMobile}
-        showCtaMobile={hero?.showCtaMobile ?? HERO_FALLBACK.showCtaMobile}
-        copyAlignXMobile={hero?.copyAlignXMobile ?? HERO_FALLBACK.copyAlignXMobile}
-        copyAlignYMobile={hero?.copyAlignYMobile ?? HERO_FALLBACK.copyAlignYMobile}
-        copyOffsetXMobile={hero?.copyOffsetXMobile ?? HERO_FALLBACK.copyOffsetXMobile}
-        copyOffsetYMobile={hero?.copyOffsetYMobile ?? HERO_FALLBACK.copyOffsetYMobile}
-        desktopImageUrl={hero?.resolvedDesktopImageUrl ?? HERO_FALLBACK.desktopImageUrl}
-        mobileImageUrl={hero?.resolvedMobileImageUrl ?? HERO_FALLBACK.mobileImageUrl}
-      />
+      <Hero slides={slides} />
       <CompleteProfileBanner />
       <ContinueOrdering />
       <CreditStatusStrip />

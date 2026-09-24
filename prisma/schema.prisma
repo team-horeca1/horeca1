@@ -3712,36 +3712,39 @@ model PlatformSetting {
   @@map("platform_settings")
 }
 
-/// Single-row homepage hero CMS (desktop + optional mobile art, editable copy).
-model HomepageHero {
-  id               String   @id @default(uuid()) @db.Uuid
-  desktopImageUrl  String?  @map("desktop_image_url") @db.VarChar(1024)
-  mobileImageUrl   String?  @map("mobile_image_url") @db.VarChar(1024)
-  eyebrow          String   @default("India's Hospitality Supply Network") @db.VarChar(255)
-  headline         String   @default("Everything your restaurant needs. In one place.") @db.VarChar(500)
-  ctaLabel         String   @default("Start exploring") @map("cta_label") @db.VarChar(120)
-  ctaHref          String   @default("/category") @map("cta_href") @db.VarChar(500)
+/// Homepage hero slider slides (desktop + optional mobile art, editable copy).
+model HomepageHeroSlide {
+  id                String   @id @default(uuid()) @db.Uuid
+  desktopImageUrl   String?  @map("desktop_image_url") @db.VarChar(1024)
+  mobileImageUrl    String?  @map("mobile_image_url") @db.VarChar(1024)
+  eyebrow           String   @default("India's Hospitality Supply Network") @db.VarChar(255)
+  headline          String   @default("Everything your restaurant needs. In one place.") @db.VarChar(500)
+  ctaLabel          String   @default("Start exploring") @map("cta_label") @db.VarChar(120)
+  ctaHref           String   @default("/category") @map("cta_href") @db.VarChar(500)
   /// Desktop: when false the storefront shows the photo only. Copy is kept.
-  showText         Boolean  @default(true) @map("show_text")
-  showCta          Boolean  @default(true) @map("show_cta")
+  showText          Boolean  @default(true) @map("show_text")
+  showCta           Boolean  @default(true) @map("show_cta")
   /// Desktop: left | center | right
-  copyAlignX       String   @default("left") @map("copy_align_x") @db.VarChar(16)
+  copyAlignX        String   @default("left") @map("copy_align_x") @db.VarChar(16)
   /// Desktop: top | center | bottom
-  copyAlignY       String   @default("bottom") @map("copy_align_y") @db.VarChar(16)
-  /// Desktop: nudge from the chosen corner (px).
-  copyOffsetX      Int      @default(0) @map("copy_offset_x")
-  copyOffsetY      Int      @default(0) @map("copy_offset_y")
+  copyAlignY        String   @default("bottom") @map("copy_align_y") @db.VarChar(16)
+  /// Desktop: position 0–100% from top-left.
+  copyOffsetX       Int      @default(0) @map("copy_offset_x")
+  copyOffsetY       Int      @default(0) @map("copy_offset_y")
   /// Mobile placement (independent of desktop).
-  showTextMobile   Boolean  @default(true) @map("show_text_mobile")
-  showCtaMobile    Boolean  @default(true) @map("show_cta_mobile")
-  copyAlignXMobile String   @default("left") @map("copy_align_x_mobile") @db.VarChar(16)
-  copyAlignYMobile String   @default("bottom") @map("copy_align_y_mobile") @db.VarChar(16)
-  copyOffsetXMobile Int     @default(0) @map("copy_offset_x_mobile")
-  copyOffsetYMobile Int     @default(0) @map("copy_offset_y_mobile")
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  showTextMobile    Boolean  @default(true) @map("show_text_mobile")
+  showCtaMobile     Boolean  @default(true) @map("show_cta_mobile")
+  copyAlignXMobile  String   @default("left") @map("copy_align_x_mobile") @db.VarChar(16)
+  copyAlignYMobile  String   @default("bottom") @map("copy_align_y_mobile") @db.VarChar(16)
+  copyOffsetXMobile Int      @default(0) @map("copy_offset_x_mobile")
+  copyOffsetYMobile Int      @default(0) @map("copy_offset_y_mobile")
+  sortOrder         Int      @default(0) @map("sort_order")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  @@map("homepage_heroes")
+  @@index([isActive, sortOrder])
+  @@map("homepage_hero_slides")
 }
 
 // Admin-fed holiday calendar — platform-wide; skipped unless supplier opts into
