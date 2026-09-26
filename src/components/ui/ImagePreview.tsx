@@ -33,8 +33,8 @@ export const IMAGE_UPLOAD_FRAME: Record<ImagePreviewVariant, string> = {
     'vendor-cover': 'aspect-[840/480] w-full',
     'collection-card': 'aspect-[3/4] w-full max-w-[150px]',
     'collection-banner': 'aspect-[8/3] w-full',
-    'homepage-hero-desktop': 'aspect-[2/1] w-full',
-    'homepage-hero-mobile': 'aspect-[9/5] w-full',
+    'homepage-hero-desktop': 'aspect-[1300/240] w-full',
+    'homepage-hero-mobile': 'aspect-[366/200] w-full',
 };
 
 interface VariantConfig {
@@ -56,8 +56,8 @@ const VARIANTS: Record<ImagePreviewVariant, VariantConfig> = {
     'vendor-cover':     { label: 'Vendor card cover (840×480)', width: 280, height: 160, shape: 'rounded', bg: '#fafafa',                  fit: 'cover'   },
     'collection-card':  { label: 'Collection card (3:4)',  width: 150, height: 200, shape: 'rounded',      bg: '#2d0912',                  fit: 'cover'   },
     'collection-banner':{ label: 'Collection page hero',   width: 320, height: 120, shape: 'rounded',      bg: '#2d0912',                  fit: 'cover'   },
-    'homepage-hero-desktop': { label: 'Homepage hero, desktop', width: 320, height: 160, shape: 'rounded', bg: '#4A141F', fit: 'cover' },
-    'homepage-hero-mobile':  { label: 'Homepage hero, mobile',  width: 320, height: 178, shape: 'rounded', bg: '#4A141F', fit: 'cover' },
+    'homepage-hero-desktop': { label: 'Homepage hero, desktop (5.4:1)', width: 280, height: 52, shape: 'rounded', bg: '#4A141F', fit: 'cover' },
+    'homepage-hero-mobile':  { label: 'Homepage hero, mobile (1.8:1)',  width: 280, height: 153, shape: 'rounded', bg: '#4A141F', fit: 'cover' },
 };
 
 export function ImagePreview({
