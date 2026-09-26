@@ -33,7 +33,7 @@ export const HERO_FALLBACK = {
   copyAlignXMobile: 'left' as const,
   copyAlignYMobile: 'bottom' as const,
   copyOffsetXMobile: 4,
-  copyOffsetYMobile: 58,
+  copyOffsetYMobile: 16,
 };
 
 export const HERO_ALIGN_X = ['left', 'center', 'right'] as const;

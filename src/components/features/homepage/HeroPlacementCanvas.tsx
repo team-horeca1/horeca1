@@ -38,10 +38,16 @@ type Props = {
   onChange: (next: HeroPlacementValue) => void;
 };
 
-const ALIGN_PRESETS: Record<HeroAlignX, { x: number; y: number }> = {
+const DESKTOP_ALIGN_PRESETS: Record<HeroAlignX, { x: number; y: number }> = {
   left: { x: 4, y: 58 },
   center: { x: 50, y: 50 },
   right: { x: 72, y: 58 },
+};
+
+const MOBILE_ALIGN_PRESETS: Record<HeroAlignX, { x: number; y: number }> = {
+  left: { x: 4, y: 16 },
+  center: { x: 50, y: 16 },
+  right: { x: 64, y: 16 },
 };
 
 function VisibilityChip({
@@ -160,7 +166,14 @@ export function HeroPlacementCanvas({
     });
   };
 
-  const endDrag = () => {
+  const endDrag = (e?: React.PointerEvent) => {
+    if (e && e.currentTarget && 'releasePointerCapture' in e.currentTarget) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore capture release error
+      }
+    }
     dragRef.current = null;
   };
 
@@ -172,13 +185,13 @@ export function HeroPlacementCanvas({
     });
   };
 
+  const isMobile = width <= 500;
+  const presets = isMobile ? MOBILE_ALIGN_PRESETS : DESKTOP_ALIGN_PRESETS;
+
   const snapAlign = (side: HeroAlignX) => {
-    const preset = ALIGN_PRESETS[side];
+    const preset = presets[side];
     patch({ alignX: side, posX: preset.x, posY: preset.y });
   };
-
-  const textAlign =
-    value.alignX === 'center' ? 'text-center' : value.alignX === 'right' ? 'text-right' : 'text-left';
 
   return (
     <div className="space-y-3">
@@ -255,105 +268,149 @@ export function HeroPlacementCanvas({
         buttons nudge 1%. Live size {width}×{height}, scaled to fit.
       </p>
 
-      <div
-        ref={wrapRef}
-        className="w-full overflow-hidden rounded-2xl border border-[#E9E3DD] bg-[#FAF7F2]"
-        style={{ height: height * scale }}
-      >
+      <div ref={wrapRef} className="w-full">
         <div
-          className="relative origin-top-left overflow-hidden bg-[#4A141F] [container-type:inline-size]"
+          className="overflow-hidden rounded-2xl border border-[#E9E3DD] bg-[#FAF7F2] shadow-sm"
           style={{
-            width,
-            height,
-            transform: `scale(${scale})`,
+            width: width * scale,
+            height: height * scale,
           }}
         >
-          {parsed.src ? (
-            <Image
-              src={parsed.src}
-              alt=""
-              fill
-              sizes={`${width}px`}
-              className="object-cover"
-              style={getDisplayStyle(parsed.meta)}
-            />
-          ) : null}
+          <div
+            className="relative origin-top-left overflow-hidden bg-[#4A141F] [container-type:inline-size]"
+            style={{
+              width,
+              height,
+              transform: `scale(${scale})`,
+            }}
+          >
+            {parsed.src ? (
+              <Image
+                src={parsed.src}
+                alt=""
+                fill
+                sizes={`${width}px`}
+                className="object-cover"
+                style={getDisplayStyle(parsed.meta)}
+              />
+            ) : null}
 
-          {hasCopy ? (
-            <div
-              role="button"
-              tabIndex={0}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={endDrag}
-              onPointerCancel={endDrag}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowLeft') {
-                  e.preventDefault();
-                  nudge(e.shiftKey ? -4 : -1, 0);
-                }
-                if (e.key === 'ArrowRight') {
-                  e.preventDefault();
-                  nudge(e.shiftKey ? 4 : 1, 0);
-                }
-                if (e.key === 'ArrowUp') {
-                  e.preventDefault();
-                  nudge(0, e.shiftKey ? -4 : -1);
-                }
-                if (e.key === 'ArrowDown') {
-                  e.preventDefault();
-                  nudge(0, e.shiftKey ? 4 : 1);
-                }
-              }}
-              className={cn(
-                'absolute z-10 max-w-[78%] cursor-grab touch-none select-none rounded-xl border border-white/40 bg-black/10 p-3 backdrop-blur-[1px] active:cursor-grabbing',
-                textAlign,
-                disabled && 'pointer-events-none opacity-80',
-              )}
-              style={{
-                left: `${clampHeroPos(value.posX)}%`,
-                top: `${clampHeroPos(value.posY)}%`,
-                transform:
+            {hasCopy ? (
+              <div
+                role="button"
+                tabIndex={0}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    nudge(e.shiftKey ? -4 : -1, 0);
+                  }
+                  if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    nudge(e.shiftKey ? 4 : 1, 0);
+                  }
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    nudge(0, e.shiftKey ? -4 : -1);
+                  }
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    nudge(0, e.shiftKey ? 4 : 1);
+                  }
+                }}
+                className={cn(
+                  'absolute z-10 flex flex-col max-w-[82%] cursor-grab touch-none select-none rounded-xl active:cursor-grabbing',
+                  isMobile ? 'p-2' : 'p-3',
                   value.alignX === 'center'
-                    ? 'translate(-50%, 0)'
+                    ? 'items-center text-center'
                     : value.alignX === 'right'
-                      ? 'translate(-100%, 0)'
-                      : 'translate(0, 0)',
-              }}
-            >
-              {eyebrowText ? (
-                <p className="mb-1.5 whitespace-pre-line text-[11px] font-semibold uppercase leading-snug tracking-[0.14em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
-                  {eyebrowText}
-                </p>
-              ) : null}
-              {headlineText ? (
-                <p
-                  className={cn(
-                    'mb-3 whitespace-pre-line font-bold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]',
-                    width > 500
-                      ? 'text-[clamp(1.25rem,2.2cqw,1.85rem)]'
-                      : 'text-[clamp(1.25rem,4.8cqw,1.5rem)]',
-                  )}
-                >
-                  {headlineText}
-                </p>
-              ) : null}
-              {showButton ? (
-                <span
-                  className={cn(
-                    'inline-flex items-center justify-center rounded-xl bg-white px-5 font-semibold text-primary shadow-md',
-                    width > 500 ? 'min-h-11 text-[13px]' : 'min-h-12 text-[13px]',
-                  )}
-                >
-                  {labelText}
+                      ? 'items-end text-right'
+                      : 'items-start text-left',
+                  'border border-white/60 bg-black/25 backdrop-blur-[2px] shadow-lg ring-1 ring-black/10 transition-shadow hover:border-white/80',
+                  disabled && 'pointer-events-none opacity-80',
+                )}
+                style={{
+                  left: `${clampHeroPos(value.posX)}%`,
+                  top: `${clampHeroPos(value.posY)}%`,
+                  transform:
+                    value.alignX === 'center'
+                      ? 'translate(-50%, 0)'
+                      : value.alignX === 'right'
+                        ? 'translate(-100%, 0)'
+                        : 'translate(0, 0)',
+                }}
+              >
+                {/* Canva-style corner selection handles */}
+                <span className="pointer-events-none absolute -top-1 -left-1 h-2 w-2 rounded-full border border-primary bg-white shadow-sm" />
+                <span className="pointer-events-none absolute -top-1 -right-1 h-2 w-2 rounded-full border border-primary bg-white shadow-sm" />
+                <span className="pointer-events-none absolute -bottom-1 -left-1 h-2 w-2 rounded-full border border-primary bg-white shadow-sm" />
+                <span className="pointer-events-none absolute -bottom-1 -right-1 h-2 w-2 rounded-full border border-primary bg-white shadow-sm" />
+
+                {eyebrowText ? (
+                  <p
+                    className={cn(
+                      'whitespace-pre-line font-semibold uppercase leading-snug tracking-[0.14em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]',
+                      isMobile ? 'text-[10px] mb-1 tracking-wider' : 'text-[11px] mb-1.5',
+                    )}
+                  >
+                    {eyebrowText}
+                  </p>
+                ) : null}
+                {headlineText ? (
+                  <p
+                    className={cn(
+                      'whitespace-pre-line font-bold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]',
+                      isMobile
+                        ? 'text-[clamp(0.95rem,3.8cqw,1.15rem)] mb-2'
+                        : 'text-[clamp(1.25rem,2.2cqw,1.85rem)] mb-3',
+                    )}
+                  >
+                    {headlineText}
+                  </p>
+                ) : null}
+                {showButton ? (
+                  <span
+                    className={cn(
+                      'inline-flex items-center justify-center gap-1.5 rounded-xl bg-white font-semibold text-primary shadow-md',
+                      isMobile
+                        ? 'min-h-8.5 h-8.5 px-3.5 text-[11px] rounded-lg'
+                        : 'min-h-11 px-5 text-[13px]',
+                    )}
+                  >
+                    {labelText}
+                    <svg
+                      className={isMobile ? 'w-3 h-3' : 'w-3.5 h-3.5'}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.4}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M14 5l7 7m0 0l-7 7m7-7H3"
+                      />
+                    </svg>
+                  </span>
+                ) : null}
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => patch({ showText: true })}
+                className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-4 text-[13px] font-medium text-white/80 transition-colors hover:bg-black/20"
+              >
+                <span>Image only</span>
+                <span className="text-[11px] underline opacity-90">
+                  Click here or use toggles above to turn Text or Button on
                 </span>
-              ) : null}
-            </div>
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-[13px] font-medium text-white/70">
-              Image only — turn Text or Button on to place them
-            </div>
-          )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -249,7 +249,7 @@ function HeroBanner({
           }}
         >
           {eyebrowText && (
-            <p className="mb-1.5 whitespace-pre-line text-[11px] font-semibold uppercase leading-snug tracking-[0.14em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
+            <p className="mb-1 sm:mb-1.5 whitespace-pre-line text-[10px] sm:text-[11px] font-semibold uppercase leading-snug tracking-[0.14em] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]">
               {eyebrowText}
             </p>
           )}
@@ -257,7 +257,7 @@ function HeroBanner({
             <HeroHeading
               as={heading}
               className={cn(
-                'mb-3 whitespace-pre-line font-bold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]',
+                'mb-2 sm:mb-3 whitespace-pre-line font-bold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)]',
                 headlineClassName,
               )}
             >
@@ -346,8 +346,8 @@ function SlidePair({
             priority={priority}
             frameClassName="h-[200px] min-h-[200px] rounded-2xl shadow-cdl-1"
             copyPadClassName="px-1"
-            ctaClassName="min-h-12 px-5 text-[13px]"
-            headlineClassName="text-[clamp(1.25rem,4.8cqw,1.5rem)]"
+            ctaClassName="min-h-8.5 h-8.5 px-3.5 text-[11px] rounded-lg"
+            headlineClassName="text-[clamp(0.95rem,3.8cqw,1.15rem)] leading-snug"
             eyebrow={eyebrow}
             headline={headline}
             ctaLabel={ctaLabel}
