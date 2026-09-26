@@ -484,7 +484,7 @@ export default function AdminHomepageHeroPage() {
               value={form.desktopImageUrl}
               onChange={(url) => setForm((f) => ({ ...f, desktopImageUrl: url }))}
               folder="banners"
-              aspectHint="1200 × 600. Fills the entire desktop banner."
+              aspectHint="2600 × 480 or 1300 × 240 (5.4:1 panoramic). Fills the entire desktop banner."
               variant="homepage-hero-desktop"
             />
 
@@ -493,7 +493,7 @@ export default function AdminHomepageHeroPage() {
               value={form.mobileImageUrl}
               onChange={(url) => setForm((f) => ({ ...f, mobileImageUrl: url }))}
               folder="banners"
-              aspectHint="900 × 500. Leave empty to reuse the desktop photo."
+              aspectHint="1080 × 590 or 732 × 400 (1.8:1). Leave empty to reuse the desktop photo."
               variant="homepage-hero-mobile"
             />
 
