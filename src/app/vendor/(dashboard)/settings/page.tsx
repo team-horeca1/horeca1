@@ -14,6 +14,12 @@ import { DocumentsTab } from '@/components/features/vendor/settings/DocumentsTab
 import type { ServiceArea, SettingsTabId, VendorDocument, VendorSettings } from '@/components/features/vendor/settings/types';
 import { SETTINGS_TABS } from '@/components/features/vendor/settings/types';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
+import { usePermissions } from '@/hooks/usePermissions';
+import {
+  HeroSlideManager,
+  PAGE_HERO_CREATE_BODY,
+  PageHeroIdentityNote,
+} from '@/components/features/homepage/HeroSlideManager';
 
 function parseTab(raw: string | null): SettingsTabId {
   if (raw && SETTINGS_TABS.some((t) => t.id === raw)) return raw as SettingsTabId;
@@ -25,6 +31,7 @@ function VendorSettingsContent() {
   const searchParams = useSearchParams();
   const activeTab = parseTab(searchParams.get('tab'));
   const { activeVendorId } = useBusinessAccountSwitcher();
+  const { can } = usePermissions();
 
   const [settings, setSettings] = useState<VendorSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -385,24 +392,39 @@ function VendorSettingsContent() {
     <>
       <VendorSettingsShell activeTab={activeTab} userEmail={settings.user.email}>
         {activeTab === 'store' && (
-          <StoreProfileTab
-            businessName={businessName} setBusinessName={setBusinessName}
-            description={description} setDescription={setDescription}
-            logoUrl={logoUrl} setLogoUrl={setLogoUrl}
-            bannerUrl={bannerUrl} setBannerUrl={setBannerUrl}
-            vendorType={vendorType} setVendorType={setVendorType}
-            multiWarehouseEnabled={true}
-            setMultiWarehouseEnabled={() => {}}
-            onRequestMultiWarehouseEnable={() => {}}
-            minOrderValue={minOrderValue} setMinOrderValue={setMinOrderValue}
-            creditEnabled={creditEnabled} setCreditEnabled={setCreditEnabled}
-            addressLine={addressLine} setAddressLine={setAddressLine}
-            city={city} setCity={setCity}
-            stateName={stateName} setStateName={setStateName}
-            addressPincode={addressPincode} setAddressPincode={setAddressPincode}
-            gstNumber={gstNumber} setGstNumber={setGstNumber}
-            {...saveProps}
-          />
+          <>
+            <StoreProfileTab
+              businessName={businessName} setBusinessName={setBusinessName}
+              description={description} setDescription={setDescription}
+              logoUrl={logoUrl} setLogoUrl={setLogoUrl}
+              bannerUrl={bannerUrl} setBannerUrl={setBannerUrl}
+              vendorType={vendorType} setVendorType={setVendorType}
+              multiWarehouseEnabled={true}
+              setMultiWarehouseEnabled={() => {}}
+              onRequestMultiWarehouseEnable={() => {}}
+              minOrderValue={minOrderValue} setMinOrderValue={setMinOrderValue}
+              creditEnabled={creditEnabled} setCreditEnabled={setCreditEnabled}
+              addressLine={addressLine} setAddressLine={setAddressLine}
+              city={city} setCity={setCity}
+              stateName={stateName} setStateName={setStateName}
+              addressPincode={addressPincode} setAddressPincode={setAddressPincode}
+              gstNumber={gstNumber} setGstNumber={setGstNumber}
+              {...saveProps}
+            />
+            <div className="mt-8">
+              <HeroSlideManager
+                apiBase="/api/v1/vendor/hero"
+                title="Store page slider"
+                titleAs="h2"
+                description="Same editor as the homepage hero. Desktop banners are 240px tall and mobile banners are 200px. Start Ordering and Deals stay under the slider. The store card image above is only for supplier cards."
+                canEdit={can('settings.edit')}
+                activeLabel="Show on store page"
+                listStatusActive="Active on store page"
+                createBody={PAGE_HERO_CREATE_BODY}
+                footer={<PageHeroIdentityNote kind="store" name={businessName} logoUrl={logoUrl} />}
+              />
+            </div>
+          </>
         )}
         {activeTab === 'delivery' && (
           <DeliveryTab

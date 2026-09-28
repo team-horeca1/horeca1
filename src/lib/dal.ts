@@ -99,6 +99,7 @@ function toVendor(v: Record<string, unknown>): Vendor {
     createdAt: v.createdAt ? String(v.createdAt) : undefined,
     productCount: typeof v.productCount === 'number' ? v.productCount : undefined,
     nextDeliveryDate: typeof v.nextDeliveryDate === 'string' ? v.nextDeliveryDate : undefined,
+    heroSlides: Array.isArray(v.heroSlides) ? (v.heroSlides as Vendor['heroSlides']) : [],
     address: (v.city || v.state)
       ? {
           line1: String(v.addressLine || ''),

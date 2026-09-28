@@ -9,10 +9,41 @@ import { ShareButton } from '@/components/features/share/ShareButton';
 import { vendorShareContent } from '@/lib/share-cards/types';
 import { useStableSession } from '@/hooks/useStableSession';
 import { cn } from '@/lib/utils';
-import type { Vendor, StorePromotion } from '@/types';
+import type { StoreHeroSlide, StorePromotion, Vendor } from '@/types';
 import { PLACEHOLDERS } from '@/lib/constants';
 import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
 import { OffersSheet } from '@/components/features/promo/OffersSheet';
+import { Hero, type HeroContent } from '@/components/features/Hero';
+
+function toHeroSlides(slides: StoreHeroSlide[] | undefined): HeroContent[] {
+    return (slides ?? [])
+        .filter((slide) => slide.desktopImageUrl || slide.mobileImageUrl)
+        .map((slide) => {
+            const desktop = slide.desktopImageUrl || slide.mobileImageUrl || undefined;
+            const mobile = slide.mobileImageUrl || slide.desktopImageUrl || undefined;
+            return {
+                id: slide.id,
+                eyebrow: slide.eyebrow,
+                headline: slide.headline,
+                ctaLabel: slide.ctaLabel,
+                ctaHref: slide.ctaHref,
+                showText: slide.showText,
+                showCta: slide.showCta,
+                copyAlignX: slide.copyAlignX,
+                copyAlignY: slide.copyAlignY,
+                copyOffsetX: slide.copyOffsetX,
+                copyOffsetY: slide.copyOffsetY,
+                showTextMobile: slide.showTextMobile,
+                showCtaMobile: slide.showCtaMobile,
+                copyAlignXMobile: slide.copyAlignXMobile,
+                copyAlignYMobile: slide.copyAlignYMobile,
+                copyOffsetXMobile: slide.copyOffsetXMobile,
+                copyOffsetYMobile: slide.copyOffsetYMobile,
+                desktopImageUrl: desktop,
+                mobileImageUrl: mobile,
+            };
+        });
+}
 
 interface VendorStoreHeaderProps {
     vendor: Vendor;
@@ -26,10 +57,8 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
     const { isAuthenticated } = useStableSession();
     const isLoggedIn = isAuthenticated;
     const [dealsOpen, setDealsOpen] = useState(false);
-    const coverImage = vendor.coverImage || PLACEHOLDERS.vendor;
-    // The detail page hero box renders the vendor's LOGO, not their card cover.
-    // Falls back to the cover image if no logo was uploaded.
-    const heroImage = vendor.logo || coverImage;
+    const heroSlides = toHeroSlides(vendor.heroSlides);
+    const heroImage = vendor.logo || vendor.coverImage || PLACEHOLDERS.vendor;
     // Apply the saved focal point + zoom so a wide logo is cropped to the part
     // the vendor chose in the Adjust modal — same behavior as the brand-logo
     // live preview circle (object-cover that fills the frame).
@@ -50,33 +79,34 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
         image: vendor.logo || vendor.coverImage || null,
     });
 
-    const locationLine = [vendor.address?.city, vendor.address?.state].filter(Boolean).join(', ')
-        || vendor.categories.slice(0, 2).join(' · ');
+    const startOrdering = () => {
+        onTabChange('all');
+        setTimeout(() => {
+            window.scrollTo({ top: window.innerHeight * 0.45, behavior: 'smooth' });
+        }, 50);
+    };
 
     return (
-        <div className="w-full bg-white md:bg-white md:pb-6 md:pt-4">
-            {/* ── MOBILE HEADER — full cover, then name + contact ── */}
-            <div className="block md:hidden">
-                <div className="relative h-[136px] overflow-hidden bg-primary">
-                    <Image
-                        src={coverImage}
-                        alt=""
-                        fill
-                        className="object-cover"
-                        sizes="100vw"
-                        priority
-                    />
-                    {locationLine ? (
-                        <p className="absolute top-3 left-3 right-3 text-[12px] font-medium text-white truncate">
-                            <span className="inline-block max-w-full truncate rounded-md bg-black/45 px-2 py-1">
-                                {locationLine}
-                            </span>
-                        </p>
-                    ) : null}
-                </div>
+        <div className="w-full bg-white md:pb-6">
+            <div className="hidden md:block max-w-[var(--container-max)] mx-auto px-[var(--container-padding)] pt-4">
+                <button
+                    type="button"
+                    onClick={() => router.back()}
+                    className="inline-flex size-10 items-center justify-center rounded-full border border-divider bg-white text-primary shadow-sm"
+                    aria-label="Back"
+                >
+                    <ChevronLeft size={20} strokeWidth={2.5} />
+                </button>
+            </div>
 
-                <div className="px-3 flex items-end gap-3">
-                    <div className="relative size-16 -mt-7 shrink-0 rounded-[14px] overflow-hidden bg-white border border-divider shadow-sm">
+            {heroSlides.length > 0 ? (
+                <Hero slides={heroSlides} chrome="page" heading="h2" />
+            ) : null}
+
+            {/* ── MOBILE — name and actions sit under the slider ── */}
+            <div className="block md:hidden">
+                <div className="px-3 pt-3 flex items-end gap-3">
+                    <div className="relative size-16 shrink-0 rounded-[14px] overflow-hidden bg-white border border-divider shadow-sm">
                         <Image
                             src={parseImageMeta(heroImage).src}
                             alt={vendor.name}
@@ -135,6 +165,29 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                     </span>
                 </p>
 
+                <div className="mt-3 px-3 grid grid-cols-2 gap-2">
+                    <button
+                        type="button"
+                        onClick={startOrdering}
+                        className="min-h-12 rounded-xl bg-primary text-white text-[13px] font-semibold"
+                    >
+                        Start Ordering
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setDealsOpen(true)}
+                        className="min-h-12 rounded-xl border border-divider bg-white text-[13px] font-semibold text-text inline-flex items-center justify-center gap-1.5"
+                    >
+                        <Tag size={14} strokeWidth={2} />
+                        Deals
+                        {storePromos.length > 0 ? (
+                            <span className="min-w-[1.2rem] h-4 px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                                {storePromos.length}
+                            </span>
+                        ) : null}
+                    </button>
+                </div>
+
                 {storePromos.length > 0 && (
                     <div className="mt-2 px-3 flex gap-2 overflow-x-auto no-scrollbar">
                         {storePromos.map((p) => (
@@ -174,95 +227,56 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                 </div>
             </div>
 
-            {/* ── DESKTOP HEADER — compact Burgundy hero (matches CDL brand) ── */}
             <div className="hidden md:block max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
-                <div className="relative w-full h-[180px] lg:h-[220px] rounded-2xl overflow-hidden bg-gradient-to-r from-[#4A141F] via-[#6B1D2E] to-[#8B2C3E] flex items-center px-6 md:px-10 lg:px-16 shadow-cdl-2">
-                    {/* Decorative circles */}
-                    <div className="absolute left-0 top-0 w-full h-full opacity-10 pointer-events-none">
-                        <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="10%" cy="50%" r="150" stroke="white" strokeWidth="2" />
-                            <circle cx="90%" cy="20%" r="80" stroke="white" strokeWidth="2" />
-                        </svg>
+                <div className="flex items-center gap-5 pt-4">
+                    <div className="relative size-[88px] shrink-0 rounded-xl bg-white border border-divider overflow-hidden shadow-sm">
+                        <Image src={heroImage} alt={vendor.name} fill className="object-contain p-2" style={heroImageStyle} priority />
                     </div>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <span className="bg-ivory border border-divider text-text px-2.5 py-0.5 rounded-md flex items-center gap-1 text-xs font-bold">
+                                {vendor.rating} <Star size={11} className="fill-amber-400 text-amber-400" />
+                            </span>
+                            <span className="bg-ivory border border-divider text-text-secondary text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md">
+                                {vendor.deliverySchedule || 'Next day'}
+                            </span>
+                            {vendor.creditEnabled && (
+                                <span className="bg-primary-light text-primary border border-primary/20 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    <CreditCard size={11} strokeWidth={2} /> DiSCCO Credit
+                                </span>
+                            )}
+                        </div>
+                        <h1 className="text-[clamp(1.5rem,2vw,2.25rem)] font-bold leading-tight text-text line-clamp-1">
+                            {vendor.name}
+                        </h1>
+                        <p className="text-sm font-medium text-text-secondary mt-1 line-clamp-1">
+                            {vendor.categories.slice(0, 3).join(' · ')}
+                            {vendor.minOrderValue ? <> <span className="opacity-60">|</span> Min ₹{vendor.minOrderValue}</> : null}
+                        </p>
+                    </div>
+                </div>
 
-                    {/* Back button */}
+                <div className="mt-4 flex flex-wrap gap-2">
                     <button
                         type="button"
-                        onClick={() => router.back()}
-                        className="absolute top-4 left-4 p-2 bg-white/20 backdrop-blur-md rounded-full text-white z-20 hover:bg-white/30 transition"
-                        aria-label="Back"
+                        onClick={startOrdering}
+                        className="min-h-12 px-5 rounded-xl bg-primary text-white text-[13px] font-semibold hover:bg-primary-dark"
                     >
-                        <ChevronLeft size={20} strokeWidth={2.5} />
+                        Start Ordering
                     </button>
-
-                    {/* Content */}
-                    <div className="flex items-center w-full relative z-10">
-                        {/* Vendor logo */}
-                        <div className="flex-shrink-0 mr-4 md:mr-8 lg:mr-10">
-                            <div className="relative w-[110px] h-[110px] md:w-[130px] md:h-[130px] rounded-xl bg-white border-2 border-white/40 overflow-hidden shadow-cdl-2">
-                                <Image src={heroImage} alt={vendor.name} fill className="object-contain p-2" style={heroImageStyle} priority />
-                            </div>
-                        </div>
-
-                        {/* Title + badges */}
-                        <div className="flex-grow flex flex-col items-start justify-center text-white min-w-0">
-                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                <span className="bg-white text-text px-2.5 py-0.5 rounded-md flex items-center gap-1 text-xs font-bold shadow-sm">
-                                    {vendor.rating} <Star size={11} className="fill-amber-400 text-amber-400" />
-                                </span>
-                                {vendor.deliverySchedule ? (
-                                    <span className="bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[10px] md:text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md">
-                                        {vendor.deliverySchedule}
-                                    </span>
-                                ) : (
-                                    <span className="bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[10px] md:text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md">
-                                        Open till 8:00 PM
-                                    </span>
-                                )}
-                                {vendor.creditEnabled && (
-                                    <span className="bg-white/20 backdrop-blur-sm text-white border border-white/30 text-[10px] md:text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md flex items-center gap-1">
-                                        <CreditCard size={11} strokeWidth={2} /> DiSCCO Credit
-                                    </span>
-                                )}
-                            </div>
-                            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold leading-tight tracking-tight text-white drop-shadow-sm line-clamp-1">
-                                {vendor.name}
-                            </h1>
-                            <p className="text-xs md:text-sm font-medium text-white/80 mt-1 line-clamp-1">
-                                {vendor.categories.slice(0, 3).join(' · ')}
-                                {vendor.minOrderValue ? <> <span className="opacity-60">|</span> Min ₹{vendor.minOrderValue}</> : null}
-                            </p>
-                        </div>
-
-                        {/* Right-side CTAs */}
-                        <div className="flex-shrink-0 ml-4 hidden lg:flex flex-col items-stretch justify-center gap-2 w-[min(100%,200px)]">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onTabChange('all');
-                                    setTimeout(() => {
-                                        window.scrollTo({ top: window.innerHeight * 0.45, behavior: 'smooth' });
-                                    }, 50);
-                                }}
-                                className="w-full bg-white text-primary px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-bold shadow-md hover:bg-ivory transition-colors active:scale-95"
-                            >
-                                Start Ordering →
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setDealsOpen(true)}
-                                className="w-full bg-white/15 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold border border-white/30 hover:bg-white/25 transition-colors"
-                            >
-                                <Tag size={14} strokeWidth={2} />
-                                Deals &amp; Coupons
-                                {storePromos.length > 0 && (
-                                    <span className="min-w-[1.2rem] h-4 px-1 rounded-full bg-white text-primary text-[10px] font-bold flex items-center justify-center">
-                                        {storePromos.length}
-                                    </span>
-                                )}
-                            </button>
-                        </div>
-                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setDealsOpen(true)}
+                        className="min-h-12 px-5 rounded-xl border border-divider bg-white text-[13px] font-semibold text-text inline-flex items-center gap-2 hover:bg-ivory"
+                    >
+                        <Tag size={14} strokeWidth={2} />
+                        Deals &amp; Coupons
+                        {storePromos.length > 0 && (
+                            <span className="min-w-[1.2rem] h-5 px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                                {storePromos.length}
+                            </span>
+                        )}
+                    </button>
                 </div>
 
                 {/* ── INFO BAR ── */}

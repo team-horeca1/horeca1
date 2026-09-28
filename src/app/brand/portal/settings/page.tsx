@@ -8,6 +8,12 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { CategoryMultiPicker } from '@/components/features/brand/CategoryMultiPicker';
 import { ImagePreview } from '@/components/ui/ImagePreview';
+import { usePermissions } from '@/hooks/usePermissions';
+import {
+    HeroSlideManager,
+    PAGE_HERO_CREATE_BODY,
+    PageHeroIdentityNote,
+} from '@/components/features/homepage/HeroSlideManager';
 
 interface BrandProfile {
     id: string;
@@ -25,6 +31,7 @@ interface BrandProfile {
 }
 
 export default function BrandSettingsPage() {
+    const { can } = usePermissions();
     const [profile, setProfile] = useState<BrandProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -96,10 +103,8 @@ export default function BrandSettingsPage() {
 
     // Hooks must run on every render — do not put after early return below.
     const logoRef = useRef<HTMLInputElement>(null);
-    const bannerRef = useRef<HTMLInputElement>(null);
     const showcaseRef = useRef<HTMLInputElement>(null);
     const [uploadingLogo, setUploadingLogo] = useState(false);
-    const [uploadingBanner, setUploadingBanner] = useState(false);
     const [uploadingShowcase, setUploadingShowcase] = useState(false);
 
     if (loading) {
@@ -124,13 +129,6 @@ export default function BrandSettingsPage() {
         finally { setUploadingLogo(false); }
     };
 
-    const handleBannerFile = async (file: File) => {
-        setUploadingBanner(true);
-        try { const url = await uploadImage(file); setForm(p => ({ ...p, bannerUrl: url })); toast.success('Banner uploaded'); }
-        catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Upload failed'); }
-        finally { setUploadingBanner(false); }
-    };
-
     const handleShowcaseFile = async (file: File) => {
         if (form.showcaseImages.length >= 5) { toast.error('Max 5 showcase images'); return; }
         setUploadingShowcase(true);
@@ -140,7 +138,7 @@ export default function BrandSettingsPage() {
     };
 
     return (
-        <div className="max-w-[700px] mx-auto space-y-6 animate-in fade-in duration-500">
+        <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
             <div>
                 <h1 className="text-[26px] font-[900] text-[#181725] tracking-tight">Brand Settings</h1>
                 <p className="text-[#7C7C7C] font-medium mt-0.5 text-[14px]">Update your brand profile and team</p>
@@ -211,27 +209,6 @@ export default function BrandSettingsPage() {
                         onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoFile(f); e.target.value = ''; }} />
                 </div>
 
-                {/* Banner */}
-                <div className="space-y-2">
-                    <label className="block text-[12px] font-bold text-[#7C7C7C] uppercase tracking-wider">Store Banner <span className="font-normal normal-case text-gray-400">(1200×400px)</span></label>
-                    <div onClick={() => bannerRef.current?.click()}
-                        className={cn('relative border-2 border-dashed border-gray-200 hover:border-primary transition-colors cursor-pointer rounded-xl overflow-hidden',
-                            form.bannerUrl ? 'h-[120px]' : 'h-[80px] flex items-center justify-center bg-gray-50')}>
-                        {uploadingBanner ? <Loader2 size={20} className="animate-spin text-primary" /> :
-                            form.bannerUrl ? <>
-                                <Image src={form.bannerUrl} alt="banner" fill className="object-cover" sizes="700px" />
-                                <button type="button" onClick={e => { e.stopPropagation(); setForm(p => ({ ...p, bannerUrl: null })); }}
-                                    className="absolute top-2 right-2 w-6 h-6 bg-white/90 rounded-full flex items-center justify-center shadow"><X size={12} /></button>
-                            </> :
-                            <div className="flex items-center gap-2 text-gray-400"><Upload size={18} /><span className="text-[13px] font-medium">Click to upload banner</span></div>}
-                    </div>
-                    <input ref={bannerRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
-                        onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerFile(f); e.target.value = ''; }} />
-                    <input type="url" value={form.bannerUrl ?? ''} onChange={e => setForm(p => ({ ...p, bannerUrl: e.target.value || null }))}
-                        placeholder="Or paste banner URL…"
-                        className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-[12px] focus:outline-none focus:border-primary/50 bg-[#FAFAFA]" />
-                </div>
-
                 {/* Card Banner Image — single image shown on the brand card */}
                 <div className="space-y-2">
                     <label className="block text-[12px] font-bold text-[#7C7C7C] uppercase tracking-wider">Card Banner Image <span className="font-normal normal-case text-gray-400">(shows on brand card top section)</span></label>
@@ -263,11 +240,22 @@ export default function BrandSettingsPage() {
                     <div className="bg-[#FAFAFA] border border-[#EEEEEE] rounded-2xl p-4 space-y-5 self-start lg:sticky lg:top-6">
                         <p className="text-[12px] font-bold text-gray-700 uppercase tracking-wider">Live preview</p>
                         <ImagePreview src={form.logoUrl} variant="brand-logo" />
-                        <ImagePreview src={form.bannerUrl} variant="brand-banner" />
                         <ImagePreview src={form.showcaseImages[0] ?? null} variant="brand-card-top" />
                     </div>
                 </div>
             </div>
+
+            <HeroSlideManager
+                apiBase="/api/v1/brand/hero"
+                title="Brand page slider"
+                titleAs="h2"
+                description="Same editor as the homepage hero. Desktop banners are 240px tall and mobile banners are 200px. The logo and name sit under the slider. The card image above stays on brand cards."
+                canEdit={can('settings.edit')}
+                activeLabel="Show on brand page"
+                listStatusActive="Active on brand page"
+                createBody={PAGE_HERO_CREATE_BODY}
+                footer={<PageHeroIdentityNote kind="brand" name={form.name} logoUrl={form.logoUrl} />}
+            />
 
             {/* Categories */}
             <div className="bg-white rounded-[20px] border border-[#EEEEEE] p-6">

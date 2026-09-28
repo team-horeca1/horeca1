@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
 import { computeNextDeliveryDate, toLocalYmd } from '@/modules/delivery/nextDeliveryDate';
+import { listActivePageHeroSlides } from '@/modules/homepage/page-hero.service';
 
 interface ListVendorsInput {
   pincode?: string;
@@ -137,11 +138,13 @@ export class VendorService {
 
     // Flatten products→category into a simple categories string array
     const { products, _count, ...rest } = vendor;
+    const heroSlides = await listActivePageHeroSlides({ vendorId: vendor.id });
     return {
       ...rest,
       productCount: _count.products,
       totalRatings: _count.reviews,
       categories: [...new Set(products.map(p => p.category?.name).filter(Boolean))],
+      heroSlides,
     };
   }
 
@@ -162,9 +165,11 @@ export class VendorService {
     if (!vendor) throw Errors.notFound('Vendor');
 
     const { products, ...rest } = vendor;
+    const heroSlides = await listActivePageHeroSlides({ vendorId: vendor.id });
     return {
       ...rest,
       categories: [...new Set(products.map(p => p.category?.name).filter(Boolean))],
+      heroSlides,
     };
   }
 

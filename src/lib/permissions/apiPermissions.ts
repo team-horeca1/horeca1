@@ -18,10 +18,14 @@ export const API_PERMISSION_RULES: readonly ApiPermissionRule[] = [
   { methods: ['GET'], pattern: /^admin\/users(?:\/|$)/, permission: 'customers.view' },
   { methods: ['GET'], pattern: /^admin\/products(?:\/|$)/, permission: 'products.view' },
   { methods: ['GET'], pattern: /^admin\/categories(?:\/|$)/, permission: 'products.view' },
+  { methods: ['GET'], pattern: /^admin\/brands\/[^/]+\/hero(?:\/|$)/, permission: 'brands.view' },
+  { methods: ['POST', 'PATCH', 'DELETE'], pattern: /^admin\/brands\/[^/]+\/hero(?:\/|$)/, permission: 'brands.edit' },
   { methods: ['GET'], pattern: /^admin\/brands(?:\/|$)/, permission: 'brands.view' },
   { methods: ['GET'], pattern: /^admin\/master-products(?:\/|$)/, permission: 'products.view' },
   { methods: ['GET'], pattern: /^admin\/approvals\/summary$/, permission: ['vendors.approve', 'brands.approve', 'products.approve'] },
   { methods: ['GET'], pattern: /^admin\/roles(?:\/|$)/, permission: ['users.view', 'users.create', 'users.edit', 'users.delete'] },
+  { methods: ['GET'], pattern: /^admin\/vendors\/[^/]+\/hero(?:\/|$)/, permission: 'vendors.view' },
+  { methods: ['POST', 'PATCH', 'DELETE'], pattern: /^admin\/vendors\/[^/]+\/hero(?:\/|$)/, permission: 'vendors.edit' },
   { methods: ['GET'], pattern: /^admin\/vendors(?:\/|$)/, permission: 'vendors.view' },
   { methods: ['PATCH'], pattern: /^admin\/vendors\/[^/]+$/, permission: 'vendors.edit' },
   { methods: ['DELETE'], pattern: /^admin\/vendors\/[^/]+$/, permission: 'vendors.delete' },
@@ -58,6 +62,8 @@ export const API_PERMISSION_RULES: readonly ApiPermissionRule[] = [
   { methods: ['PATCH'], pattern: /^admin\/vendors\/[^/]+\/documents\/[^/]+$/, permission: 'vendors.approve' },
 
   // Vendor
+  { methods: ['GET'], pattern: /^vendor\/hero(?:\/|$)/, permission: 'settings.view' },
+  { methods: ['POST', 'PATCH', 'DELETE'], pattern: /^vendor\/hero(?:\/|$)/, permission: 'settings.edit' },
   { methods: ['GET'], pattern: /^vendor\/outlets(?:\/|$)/, permission: 'outlets.view' },
   { methods: ['GET'], pattern: /^vendor\/notifications(?:\/|$)/, permission: 'settings.view' },
   { methods: ['GET'], pattern: /^vendor\/team(?:\/|$)/, permission: 'users.view' },
@@ -75,6 +81,8 @@ export const API_PERMISSION_RULES: readonly ApiPermissionRule[] = [
   { methods: ['POST'], pattern: /^vendor\/price-lists\/[^/]+\/bulk-upload$/, permission: 'products.edit' },
 
   // Brand
+  { methods: ['GET'], pattern: /^brand\/hero(?:\/|$)/, permission: 'settings.view' },
+  { methods: ['POST', 'PATCH', 'DELETE'], pattern: /^brand\/hero(?:\/|$)/, permission: 'settings.edit' },
   { methods: ['GET'], pattern: /^brand\/authorized-distributors(?:\/|$)/, permission: 'vendors.view' },
   { methods: ['GET'], pattern: /^brand\/roles(?:\/|$)/, permission: 'users.view' },
   { methods: ['GET'], pattern: /^brand\/coverage(?:\/|$)/, permission: 'products.view' },

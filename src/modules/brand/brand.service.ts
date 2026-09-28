@@ -5,6 +5,7 @@ import { getApprovedDistributorKeys, distributorAuthKey } from '@/lib/brandAutho
 import { storeDisplayName } from '@/lib/storeDisplayName';
 import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
+import { listActivePageHeroSlides } from '@/modules/homepage/page-hero.service';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
 import { runMappingForProduct, runMappingForBrand, embedBrandMasterProduct } from './brand-mapper';
 import { assertLeafCategory, createMasterProductWithSku, syncMasterProductCategories } from '@/modules/catalog/catalog.service';
@@ -409,12 +410,15 @@ export class BrandService {
     const allVendors = [...vendorMap.values()];
     const servicedVendors = pincode ? allVendors.filter(v => v.servicesPincode) : allVendors;
 
+    const heroSlides = await listActivePageHeroSlides({ brandId: brand.id });
+
     return {
       id: brand.id,
       name: brand.name,
       slug: brand.slug,
       logo: brand.logoUrl,
       banner: brand.bannerUrl,
+      heroSlides,
       tagline: brand.tagline,
       description: brand.description,
       products,

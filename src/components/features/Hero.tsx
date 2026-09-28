@@ -399,7 +399,7 @@ export function Hero(props: HeroProps = {}) {
   } = props;
 
   const slides = normalizeSlides(props);
-  const multi = slides.length > 1 && chrome === 'page';
+  const multi = slides.length > 1;
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 

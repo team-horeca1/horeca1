@@ -28,6 +28,11 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { CategoryMultiPicker } from '@/components/features/brand/CategoryMultiPicker';
 import { ImageUploadField } from '@/components/ui/ImageUploadField';
+import {
+    HeroSlideManager,
+    PAGE_HERO_CREATE_BODY,
+    PageHeroIdentityNote,
+} from '@/components/features/homepage/HeroSlideManager';
 import { AdminUserTeamPanel } from '@/components/features/admin/AdminUserTeamPanel';
 import BrandFormModal from '@/components/features/admin/BrandFormModal';
 import {
@@ -560,15 +565,18 @@ export default function AdminBrandEditPage() {
                                                 aspectHint="Square PNG/WebP recommended (200×200 px)"
                                                 variant="brand-logo"
                                             />
-                                            <ImageUploadField
-                                                label="Banner / Store Header"
-                                                value={form.bannerUrl}
-                                                onChange={(url) => setForm(p => ({ ...p, bannerUrl: url }))}
-                                                folder="brands"
-                                                aspectHint="Wide hero — 1600×400 px recommended (4:1 ratio)."
-                                                variant="brand-banner"
-                                            />
                                         </div>
+                                        <HeroSlideManager
+                                            apiBase={`/api/v1/admin/brands/${id}/hero`}
+                                            title="Brand page slider"
+                                            titleAs="h2"
+                                            description="Same editor as the homepage hero. Desktop banners are 240px tall and mobile banners are 200px. The logo and name sit under the slider."
+                                            canEdit={canEditBrand}
+                                            activeLabel="Show on brand page"
+                                            listStatusActive="Active on brand page"
+                                            createBody={PAGE_HERO_CREATE_BODY}
+                                            footer={<PageHeroIdentityNote kind="brand" name={form.name} logoUrl={form.logoUrl} />}
+                                        />
                                         <ImageUploadField
                                             label="Card Banner Image"
                                             value={form.showcaseImages[0] ?? null}

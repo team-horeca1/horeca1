@@ -277,6 +277,7 @@ model Vendor {
   deliveryResources       DeliveryResource[]
   deliveryBoyAccessTokens DeliveryBoyAccessToken[]
   storeScopedRoles        UserRole[]                   @relation("UserRoleOnlineStore")
+  pageHeroSlides          PageHeroSlide[]
 
   // Ordering defaults applied to new products and checkout
   defaultMOQ         Int?     @map("default_moq")
@@ -1622,6 +1623,7 @@ model Brand {
   authorizedDistributors BrandAuthorizedDistributor[]
   // V2.2 Phase 4 — pricelists assigned to this brand
   priceListAssignments   PriceListAssignment[]        @relation("PriceListAssignmentBrand")
+  pageHeroSlides         PageHeroSlide[]
 
   @@index([slug])
   @@index([approvalStatus])
@@ -3745,6 +3747,42 @@ model HomepageHeroSlide {
 
   @@index([isActive, sortOrder])
   @@map("homepage_hero_slides")
+}
+
+/// Store or brand page hero. Exactly one of vendorId / brandId (DB check).
+model PageHeroSlide {
+  id                String   @id @default(uuid()) @db.Uuid
+  vendorId          String?  @map("vendor_id") @db.Uuid
+  brandId           String?  @map("brand_id") @db.Uuid
+  desktopImageUrl   String?  @map("desktop_image_url") @db.VarChar(1024)
+  mobileImageUrl    String?  @map("mobile_image_url") @db.VarChar(1024)
+  eyebrow           String   @default("") @db.VarChar(255)
+  headline          String   @default("") @db.VarChar(500)
+  ctaLabel          String   @default("") @map("cta_label") @db.VarChar(120)
+  ctaHref           String   @default("") @map("cta_href") @db.VarChar(500)
+  showText          Boolean  @default(false) @map("show_text")
+  showCta           Boolean  @default(false) @map("show_cta")
+  copyAlignX        String   @default("left") @map("copy_align_x") @db.VarChar(16)
+  copyAlignY        String   @default("bottom") @map("copy_align_y") @db.VarChar(16)
+  copyOffsetX       Int      @default(0) @map("copy_offset_x")
+  copyOffsetY       Int      @default(0) @map("copy_offset_y")
+  showTextMobile    Boolean  @default(false) @map("show_text_mobile")
+  showCtaMobile     Boolean  @default(false) @map("show_cta_mobile")
+  copyAlignXMobile  String   @default("left") @map("copy_align_x_mobile") @db.VarChar(16)
+  copyAlignYMobile  String   @default("bottom") @map("copy_align_y_mobile") @db.VarChar(16)
+  copyOffsetXMobile Int      @default(0) @map("copy_offset_x_mobile")
+  copyOffsetYMobile Int      @default(0) @map("copy_offset_y_mobile")
+  sortOrder         Int      @default(0) @map("sort_order")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  vendor Vendor? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  brand  Brand?  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId, isActive, sortOrder])
+  @@index([brandId, isActive, sortOrder])
+  @@map("page_hero_slides")
 }
 
 // Admin-fed holiday calendar — platform-wide; skipped unless supplier opts into

@@ -13,6 +13,7 @@ import { BrandAttributeFilters, matchesBrandAttrFilters, type BrandAttrFilter } 
 import { BrandSuppliersPanel, type BrandSupplier } from '@/components/features/brand/BrandSuppliersPanel';
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { brandShareContent } from '@/lib/share-cards/types';
+import { Hero, type HeroContent } from '@/components/features/Hero';
 
 const PRODUCT_IMAGE_FALLBACK = '/images/placeholders/no-product.svg';
 
@@ -54,11 +55,34 @@ interface BrandProduct {
     distributors: BrandDistributor[];
 }
 
+interface BrandHeroSlide {
+    id: string;
+    desktopImageUrl?: string | null;
+    mobileImageUrl?: string | null;
+    eyebrow?: string;
+    headline?: string;
+    ctaLabel?: string;
+    ctaHref?: string;
+    showText?: boolean;
+    showCta?: boolean;
+    copyAlignX?: 'left' | 'center' | 'right';
+    copyAlignY?: 'top' | 'center' | 'bottom';
+    copyOffsetX?: number;
+    copyOffsetY?: number;
+    showTextMobile?: boolean;
+    showCtaMobile?: boolean;
+    copyAlignXMobile?: 'left' | 'center' | 'right';
+    copyAlignYMobile?: 'top' | 'center' | 'bottom';
+    copyOffsetXMobile?: number;
+    copyOffsetYMobile?: number;
+}
+
 interface BrandStoreData {
     id: string;
     slug: string;
     name: string;
     bannerImage: string;
+    heroSlides: BrandHeroSlide[];
     logoImage: string;
     tagline: string;
     products: BrandProduct[];
@@ -104,6 +128,7 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
                     slug: d.slug,
                     name: d.name,
                     bannerImage: d.banner ?? '',
+                    heroSlides: Array.isArray(d.heroSlides) ? d.heroSlides as BrandHeroSlide[] : [],
                     logoImage: d.logo ?? '',
                     tagline: d.tagline ?? '',
                     coverage: d.coverage ?? undefined,
@@ -257,7 +282,6 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
     }
 
     const bannerParsed = parseImageMeta(brand.bannerImage);
-    const bannerStyle = getDisplayStyle(bannerParsed.meta);
     const logoParsed = parseImageMeta(brand.logoImage || brand.bannerImage);
     const logoStyle = getDisplayStyle(logoParsed.meta);
     const supplierCount = pincode && brand.coverage
@@ -275,20 +299,33 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
         image: logoParsed.src || bannerParsed.src || null,
     });
 
+    const heroSlides: HeroContent[] = (brand.heroSlides.length > 0
+        ? brand.heroSlides
+        : brand.bannerImage
+            ? [{
+                id: 'banner',
+                desktopImageUrl: brand.bannerImage,
+                mobileImageUrl: brand.bannerImage,
+                showText: false,
+                showCta: false,
+                showTextMobile: false,
+                showCtaMobile: false,
+            }]
+            : []
+    ).filter((slide) => slide.desktopImageUrl || slide.mobileImageUrl).map((slide) => ({
+        ...slide,
+        desktopImageUrl: slide.desktopImageUrl || slide.mobileImageUrl || undefined,
+        mobileImageUrl: slide.mobileImageUrl || slide.desktopImageUrl || undefined,
+    }));
+
     return (
         <div className="min-h-dvh bg-page pb-20 md:pb-24">
-            <div className="relative">
-                <div className="h-[120px] md:h-[200px] bg-primary overflow-hidden">
-                    {bannerParsed.src ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={bannerParsed.src} alt="" className="w-full h-full object-cover" style={bannerStyle} />
-                    ) : (
-                        <div className="w-full h-full bg-primary" />
-                    )}
-                    <div className="absolute inset-x-0 top-0 h-[120px] md:h-[200px] bg-black/20 pointer-events-none" />
-                </div>
+            {heroSlides.length > 0 ? (
+                <Hero slides={heroSlides} chrome="page" heading="h2" />
+            ) : null}
 
-                <div className="relative max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)] -mt-8">
+            <div className="relative">
+                <div className="relative max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)] pt-4">
                     <div className="size-16 md:size-20 rounded-2xl bg-white border border-divider overflow-hidden flex items-center justify-center">
                         {logoParsed.src ? (
                             // eslint-disable-next-line @next/next/no-img-element
