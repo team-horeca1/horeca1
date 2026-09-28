@@ -310,14 +310,14 @@ export function ContinueOrdering() {
   };
 
   return (
-    <section className="w-full py-2 md:py-4 bg-background">
+    <section className="w-full py-2 md:py-2 bg-background">
       <div className="max-w-[var(--container-max)] mx-auto overflow-hidden">
         <div className="px-4 md:px-[var(--container-padding)]">
           <SectionHeader
             title="Continue Ordering"
             actionLabel="View all →"
             actionHref="/continue-ordering"
-            className="mb-1.5 md:mb-3"
+            className="mb-1.5 md:mb-2"
           />
         </div>
 
@@ -326,9 +326,9 @@ export function ContinueOrdering() {
             type="button"
             onClick={() => scroll('left')}
             disabled={!canScrollLeft}
-            className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 size-12 bg-white rounded-full shadow-cdl-2 items-center justify-center hover:scale-105 active:scale-95 transition-all border border-divider disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 size-8 bg-white rounded-full shadow-cdl-2 items-center justify-center hover:scale-105 active:scale-95 transition-all border border-divider disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
-            <ChevronLeft size={22} className="text-[#1C1C1C]" strokeWidth={2.5} />
+            <ChevronLeft size={16} className="text-[#1C1C1C]" strokeWidth={2.5} />
           </button>
 
           <div ref={scrollRef} onScroll={checkScroll} className="overflow-x-auto no-scrollbar scroll-smooth w-full">
@@ -341,9 +341,9 @@ export function ContinueOrdering() {
                   <Link
                     key={card.id}
                     href={card.href}
-                    className="flex items-center gap-2 md:gap-3 shrink-0 min-w-[200px] md:min-w-[300px] bg-white border border-divider rounded-xl md:rounded-2xl px-2.5 py-2 md:px-3 md:py-3 shadow-cdl-1 hover:shadow-cdl-2 hover:border-primary/25 transition-all group"
+                    className="flex items-center gap-2 md:gap-2.5 shrink-0 min-w-[200px] md:min-w-[220px] bg-white border border-divider rounded-xl px-2.5 py-2 md:px-2.5 md:py-2 shadow-cdl-1 hover:shadow-cdl-2 hover:border-primary/25 transition-all group"
                   >
-                    <div className="size-9 md:size-14 rounded-[10px] bg-ivory border border-divider overflow-hidden shrink-0 flex items-center justify-center">
+                    <div className="size-9 md:size-10 rounded-[10px] bg-ivory border border-divider overflow-hidden shrink-0 flex items-center justify-center">
                       {card.vendorLogos && card.vendorLogos.length > 1 ? (
                         <div className="relative w-full h-full">
                           {card.vendorLogos.slice(0, 4).map((logoUrl, i) => (
@@ -370,14 +370,14 @@ export function ContinueOrdering() {
                     </div>
 
                     <div className="flex-1 min-w-0 text-left">
-                      <p className="text-[13px] md:text-[15px] font-bold text-[#1C1C1C] leading-tight line-clamp-1 group-hover:text-primary">
+                      <p className="text-[13px] md:text-[14px] font-bold text-[#1C1C1C] leading-tight line-clamp-1 group-hover:text-primary">
                         {card.vendorName}
                       </p>
                       <p className="text-[11px] md:text-[12px] text-[#667085] mt-0.5 line-clamp-1">{lineFor(card)}</p>
                     </div>
 
-                    <div className="size-7 md:size-10 rounded-full bg-primary-light text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-white transition-colors">
-                      <ChevronRight className="size-3.5 md:size-[18px]" strokeWidth={2.5} />
+                    <div className="size-7 md:size-auto rounded-full md:rounded-none bg-primary-light md:bg-transparent text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-white md:group-hover:bg-transparent md:group-hover:text-primary transition-colors">
+                      <ChevronRight className="size-3.5 md:size-4" strokeWidth={2.5} />
                     </div>
                   </Link>
                 );
@@ -389,9 +389,9 @@ export function ContinueOrdering() {
             type="button"
             onClick={() => scroll('right')}
             disabled={!canScrollRight}
-            className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 size-12 bg-white rounded-full shadow-cdl-2 items-center justify-center hover:scale-105 active:scale-95 transition-all border border-divider disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 size-8 bg-white rounded-full shadow-cdl-2 items-center justify-center hover:scale-105 active:scale-95 transition-all border border-divider disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
-            <ChevronRight size={22} className="text-[#1C1C1C]" strokeWidth={2.5} />
+            <ChevronRight size={16} className="text-[#1C1C1C]" strokeWidth={2.5} />
           </button>
         </div>
       </div>
