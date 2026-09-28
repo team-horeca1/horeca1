@@ -593,7 +593,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
     <>
       {/* Full-tab panel — fills the whole viewport so the review grid has all
           the space it needs (replaces the old cramped centered popup). */}
-      <div className="fixed inset-0 z-[61] bg-white flex flex-col animate-in fade-in duration-150">
+      <div className="fixed inset-0 z-[10006] bg-white flex flex-col animate-in fade-in duration-150">
 
           {/* Header */}
           <div className={cn("flex items-center justify-between border-b border-[#EEEEEE] shrink-0", step === 'review' && viewMode === 'list' ? "px-6 py-3" : "px-8 py-5")}>
