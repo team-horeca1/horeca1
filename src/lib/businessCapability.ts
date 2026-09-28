@@ -78,9 +78,6 @@ export function nextPathForKind(kind: BusinessKind, businessAccountId?: string):
 export const PURCHASE_BLOCKED_MESSAGE =
   'Switch to a restaurant or retail business to order. Supplier and Brand accounts can only browse.';
 
-export const GUEST_PURCHASE_MESSAGE =
-  'Log in with a restaurant or retail business to order.';
-
 export type PurchaseAccess = {
   allowed: boolean;
   message: string;
@@ -97,12 +94,13 @@ export function describePurchaseAccess(input: {
   if (input.role === 'admin') {
     return { allowed: true, message: '', ctaLabel: 'Add', href: '' };
   }
+  // Guests may fill a local cart. Checkout sends them to login before an order is placed.
   if (!input.isLoggedIn) {
     return {
-      allowed: false,
-      message: GUEST_PURCHASE_MESSAGE,
-      ctaLabel: 'Log in to order',
-      href: '/login',
+      allowed: true,
+      message: '',
+      ctaLabel: 'Add',
+      href: '',
     };
   }
   if (canPurchaseAs(input.active, input.role)) {

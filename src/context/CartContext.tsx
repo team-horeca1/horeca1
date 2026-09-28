@@ -442,7 +442,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                     setIsInitialized(true);
                 });
         } else {
-            if (!silent) setCart([]);
+            if (!silent) setCart(loadLocalCart(null));
             lastContextKeyRef.current = contextKey;
             setIsInitialized(true);
         }
@@ -455,7 +455,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Skip while Admin View is on — otherwise the customer's cart overwrites the admin mirror key.
     useEffect(() => {
         if (!isInitialized || buyerImpersonating) return;
-        if (!shouldUseServerCart) return;
+        // Supplier/Brand stay browse-only. Guests still persist so checkout login can merge.
+        if (isLoggedIn && !shouldUseServerCart) return;
         saveLocalCart(cart, isLoggedIn ? userId : null, activeBAId, activeOutletId);
     }, [cart, isInitialized, isLoggedIn, userId, activeBAId, activeOutletId, buyerImpersonating, shouldUseServerCart]);
 
