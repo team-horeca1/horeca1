@@ -41,6 +41,7 @@ export function FrequentlyOrderedVendors() {
                 createdAt?: string;
                 productCount?: number;
                 isVerified?: boolean;
+                nextDeliveryDate?: string | null;
             }) => ({
                 id: v.id,
                 name: storeDisplayName(v),
@@ -59,6 +60,7 @@ export function FrequentlyOrderedVendors() {
                 createdAt: v.createdAt,
                 productCount: v.productCount,
                 isVerified: v.isVerified ?? true,
+                nextDeliveryDate: v.nextDeliveryDate || undefined,
             }))))
             .catch(() => setVendors([]));
     }, [status, pincode]);
@@ -152,6 +154,7 @@ export function TopRatedVendors() {
                 createdAt?: string;
                 productCount?: number;
                 isVerified?: boolean;
+                nextDeliveryDate?: string | null;
             }) => ({
                 id: v.id,
                 name: storeDisplayName(v),
@@ -170,6 +173,7 @@ export function TopRatedVendors() {
                 createdAt: v.createdAt,
                 productCount: v.productCount,
                 isVerified: v.isVerified ?? true,
+                nextDeliveryDate: v.nextDeliveryDate || undefined,
             }))))
             .catch(() => setVendors([]));
     }, [pincode]);

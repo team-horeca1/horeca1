@@ -25,6 +25,8 @@ export interface Vendor {
     description?: string;
     createdAt?: string;
     productCount?: number;
+    /** Next delivery calendar day, `YYYY-MM-DD`. */
+    nextDeliveryDate?: string;
 }
 
 export interface VendorSummary {

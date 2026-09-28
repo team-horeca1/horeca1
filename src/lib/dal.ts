@@ -98,6 +98,7 @@ function toVendor(v: Record<string, unknown>): Vendor {
     description: (v.description as string) || '',
     createdAt: v.createdAt ? String(v.createdAt) : undefined,
     productCount: typeof v.productCount === 'number' ? v.productCount : undefined,
+    nextDeliveryDate: typeof v.nextDeliveryDate === 'string' ? v.nextDeliveryDate : undefined,
     address: (v.city || v.state)
       ? {
           line1: String(v.addressLine || ''),

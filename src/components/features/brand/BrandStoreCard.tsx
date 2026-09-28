@@ -69,23 +69,6 @@ export function BrandStoreCard({
 
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
 
-            <div className="absolute top-2.5 left-2.5 z-10 size-10 md:size-11 rounded-[10px] bg-white overflow-hidden ring-4 ring-white shadow-md">
-                {logoSrc || cover ? (
-                    <Image
-                        src={logoSrc || cover!}
-                        alt={name}
-                        fill
-                        sizes="44px"
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
-                        style={logoSrc ? logoStyle : img ? imgStyle : logoStyle}
-                    />
-                ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center">
-                        <span className="text-[15px] font-bold text-white select-none">{name[0]}</span>
-                    </div>
-                )}
-            </div>
-
             <div className="absolute top-2.5 right-2.5 z-20">
                 <ShareButton content={shareContent} variant="overlay" className="size-9" />
             </div>
@@ -104,9 +87,22 @@ export function BrandStoreCard({
                         {productCount} {productCount === 1 ? 'product' : 'products'}
                     </p>
                 ) : null}
-                <span className="mt-2 inline-flex min-h-8 items-center px-3 rounded-full bg-white text-[#1C1C1C] text-[11px] font-semibold shadow-sm">
-                    Explore Store
-                </span>
+                <div className="mt-2 mx-auto flex h-10 w-[84%] items-center justify-center rounded-full bg-white px-3 shadow-sm">
+                    {logoSrc ? (
+                        <span className="relative block h-6 w-full">
+                            <Image
+                                src={logoSrc}
+                                alt=""
+                                fill
+                                sizes="120px"
+                                className="object-contain"
+                                style={logoStyle}
+                            />
+                        </span>
+                    ) : (
+                        <span className="text-[13px] font-bold text-primary select-none">{name[0]}</span>
+                    )}
+                </div>
             </div>
         </Link>
     );

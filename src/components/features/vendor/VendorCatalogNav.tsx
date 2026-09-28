@@ -67,20 +67,20 @@ export function VendorCatalogNav({
     return (
         <div className="w-full bg-white/95 backdrop-blur-md sticky top-0 z-40 border-b border-divider shadow-cdl-1">
             <div className="max-w-[var(--container-max)] mx-auto px-3 md:px-[var(--container-padding)]">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 py-2 md:py-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-1.5 md:gap-4 py-1.5 md:py-4">
                     <div className="relative group flex-1 md:max-w-[450px] lg:max-w-[600px] flex items-center gap-2 md:gap-3">
                         <div className="relative flex-1">
                             <Search
-                                size={17}
-                                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-primary transition-colors"
-                                strokeWidth={2}
+                                size={16}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-primary group-focus-within:text-primary transition-colors"
+                                strokeWidth={2.25}
                             />
                             <input
                                 type="text"
                                 placeholder={searchPlaceholder}
                                 value={searchQuery}
                                 onChange={(e) => onSearchChange(e.target.value)}
-                                className="w-full pl-10 pr-9 py-2 bg-ivory/50 border border-divider rounded-xl text-xs md:text-sm font-semibold text-text placeholder:text-text-muted focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/10 transition-all shadow-sm"
+                                className="w-full h-9 md:h-10 pl-9 pr-9 bg-[#FFF7F0] border border-primary/45 rounded-xl text-[13px] md:text-sm font-medium text-text placeholder:text-[#667085] placeholder:font-medium focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/15 transition-all shadow-sm"
                             />
                             {searchQuery && (
                                 <button

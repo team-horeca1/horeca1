@@ -75,26 +75,25 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                     ) : null}
                 </div>
 
-                <div className="px-3 flex items-start gap-3">
-                    <div className="relative size-16 -mt-7 rounded-[12px] overflow-hidden bg-white border border-divider shadow-sm shrink-0">
+                <div className="px-3 flex items-end gap-3">
+                    <div className="relative size-16 -mt-7 shrink-0 rounded-[14px] overflow-hidden bg-white border border-divider shadow-sm">
                         <Image
-                            src={heroImage}
+                            src={parseImageMeta(heroImage).src}
                             alt={vendor.name}
                             fill
                             className="object-contain p-1.5"
-                            style={heroImageStyle}
                             priority
                         />
                     </div>
-                    <div className="min-w-0 flex-1 pt-2">
-                        <div className="flex items-start gap-2">
-                            <h1 className="min-w-0 flex-1 text-[17px] font-semibold text-text leading-tight line-clamp-2 text-balance">
+                    <div className="min-w-0 flex-1 pb-1.5">
+                        <div className="flex items-center gap-1.5">
+                            <h1 className="min-w-0 flex-1 text-[16px] font-semibold text-text leading-none line-clamp-1">
                                 {vendor.name}
                                 {vendor.isVerified ? (
                                     <span className="ml-1 text-primary align-middle" aria-label="Verified">✓</span>
                                 ) : null}
                             </h1>
-                            <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="flex items-center gap-1 shrink-0 mt-1">
                                 <ShareButton content={shareContent} variant="icon" className="size-9" />
                                 <button
                                     type="button"
@@ -109,38 +108,32 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                     </div>
                 </div>
 
-                <div className="px-3 mt-2 pb-1 space-y-1.5">
-                    <p className="text-[12px] text-text-secondary font-medium flex items-center gap-1.5 flex-wrap">
-                        <span className="inline-flex items-center gap-0.5 tabular-nums">
-                            <Star size={11} className="text-primary fill-primary" />
-                            {vendor.rating}
-                            {vendor.totalRatings ? (
-                                <span className="text-text-muted">({vendor.totalRatings.toLocaleString('en-IN')})</span>
-                            ) : null}
+                <p className="px-3 mt-1 text-[11px] text-text-secondary font-medium flex items-center gap-1 min-w-0 overflow-hidden">
+                    <span className="inline-flex items-center gap-0.5 tabular-nums shrink-0">
+                        <Star size={11} className="text-primary fill-primary" />
+                        {vendor.rating}
+                    </span>
+                    {vendor.productCount ? (
+                        <span className="truncate">
+                            <span className="text-text-muted"> · </span>
+                            {vendor.productCount.toLocaleString('en-IN')}+ products
                         </span>
-                        {vendor.productCount ? (
-                            <>
-                                <span className="text-text-muted">·</span>
-                                <span className="tabular-nums">{vendor.productCount.toLocaleString('en-IN')}+ products</span>
-                            </>
-                        ) : null}
-                    </p>
-                    <p className="text-[12px] text-text-secondary font-medium flex items-center gap-1.5 flex-wrap">
-                        {vendor.creditEnabled && (
-                            <span className="inline-flex items-center gap-1">
-                                <CreditCard size={11} className="text-primary" strokeWidth={2} />
-                                Credit
-                            </span>
-                        )}
-                        {vendor.creditEnabled && <span className="text-text-muted">·</span>}
-                        <span className="tabular-nums">MOV ₹{vendor.minOrderValue.toLocaleString('en-IN')}</span>
-                        <span className="text-text-muted">·</span>
-                        <span className="inline-flex items-center gap-1">
-                            <Clock size={11} className="text-primary" />
-                            {vendor.deliverySchedule || 'Next day'}
+                    ) : null}
+                    <span className="text-text-muted shrink-0">·</span>
+                    {vendor.creditEnabled && (
+                        <span className="inline-flex items-center gap-0.5 shrink-0">
+                            <CreditCard size={11} className="text-primary" strokeWidth={2} />
+                            Credit
+                            <span className="text-text-muted"> · </span>
                         </span>
-                    </p>
-                </div>
+                    )}
+                    <span className="tabular-nums shrink-0">MOV ₹{vendor.minOrderValue.toLocaleString('en-IN')}</span>
+                    <span className="text-text-muted shrink-0">·</span>
+                    <span className="inline-flex items-center gap-0.5 truncate min-w-0">
+                        <Clock size={11} className="text-primary shrink-0" />
+                        <span className="truncate">{vendor.deliverySchedule || 'Next day'}</span>
+                    </span>
+                </p>
 
                 {storePromos.length > 0 && (
                     <div className="mt-2 px-3 flex gap-2 overflow-x-auto no-scrollbar">
@@ -156,7 +149,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                     </div>
                 )}
 
-                <div className="flex items-center border-b border-divider mt-2">
+                <div className="flex items-center border-b border-divider mt-1">
                     {[
                         { key: 'all', label: 'Catalog' },
                         { key: 'orders', label: 'Orders' },
@@ -168,7 +161,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                             type="button"
                             onClick={() => onTabChange(tab.key)}
                             className={cn(
-                                'flex-1 min-h-11 px-1 text-[12px] font-semibold text-center relative',
+                                'flex-1 h-8 px-1 text-[12px] font-semibold text-center relative',
                                 activeTab === tab.key ? 'text-primary' : 'text-text-muted',
                             )}
                         >

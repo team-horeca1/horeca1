@@ -39,13 +39,13 @@ const ACTIONS = [
 
 export function QuickActions() {
   return (
-    <section className="w-full py-3.5 md:py-5 bg-background">
+    <section className="w-full py-2 md:py-5 bg-background">
       <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)]">
-        <div className="mb-3 md:mb-4">
-          <SectionHeader
-            title="Quick actions"
-            subtitle="Essential shortcuts to streamline your operations"
-          />
+        <div className="mb-2 md:mb-4">
+          <SectionHeader title="Quick actions" className="mb-0" />
+          <p className="hidden md:block text-[13px] text-text-secondary mt-0.5 text-pretty">
+            Essential shortcuts to streamline your operations
+          </p>
         </div>
 
         {/* Tablet / desktop: horizontal cards matching design */}
@@ -90,19 +90,19 @@ export function QuickActions() {
         </div>
 
         {/* Mobile: same four actions, compact dock */}
-        <div className="md:hidden grid grid-cols-4 gap-2">
+        <div className="md:hidden grid grid-cols-4 gap-1.5">
           {ACTIONS.map((action) => (
             <Link
               key={action.label}
               href={action.href}
               className={cn(
-                'group flex flex-col items-center justify-center p-2.5',
-                'bg-white border border-divider rounded-xl min-h-[78px]',
+                'group flex flex-col items-center justify-center p-1.5',
+                'bg-white border border-divider rounded-lg min-h-[58px]',
                 'shadow-cdl-1 active:scale-95 transition-all duration-150 text-center',
               )}
             >
-              <div className="size-10 rounded-xl bg-primary-light text-primary flex items-center justify-center mb-1.5 group-hover:bg-primary group-hover:text-white transition-colors">
-                <action.icon className="size-5" strokeWidth={2} />
+              <div className="size-8 rounded-lg bg-primary-light text-primary flex items-center justify-center mb-1 group-hover:bg-primary group-hover:text-white transition-colors">
+                <action.icon className="size-4" strokeWidth={2} />
               </div>
               <span className="text-[10.5px] font-bold text-text leading-tight tracking-tight text-center">
                 {action.mobileLabel}

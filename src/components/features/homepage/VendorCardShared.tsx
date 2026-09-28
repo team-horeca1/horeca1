@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Star, ArrowRight, Package, Clock, ShieldCheck } from 'lucide-react';
+import { Star, ArrowRight, Package, ShieldCheck } from 'lucide-react';
 import type { Vendor } from '@/types';
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { vendorShareContent } from '@/lib/share-cards/types';
@@ -19,14 +19,23 @@ function vendorYears(createdAt?: string) {
   return `${years}+ Yrs`;
 }
 
-function getInitials(name: string) {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/** `YYYY-MM-DD` → `Mon 28 Sep 26`. Returns null when the value is not a calendar date. */
+function formatNextDelivery(ymd: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return `${WEEKDAYS[date.getDay()]} ${day} ${MONTHS[month - 1]} ${String(year).slice(2)}`;
+}
+
+function formatMov(value: number): string {
+  return `Rs. ${Math.round(value).toLocaleString('en-IN')}`;
 }
 
 interface VendorCardProps {
@@ -41,6 +50,7 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
   const categoryPills = vendor.categories.slice(0, 3);
   const remainingCategories = Math.max(0, vendor.categories.length - 3);
   const years = vendorYears(vendor.createdAt);
+  const nextDelivery = vendor.nextDeliveryDate ? formatNextDelivery(vendor.nextDeliveryDate) : null;
   const vendorHref = `/vendor/${vendor.id}`;
   const shareContent = vendorShareContent({
     id: vendor.id,
@@ -66,114 +76,81 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
           loading={priority ? 'eager' : 'lazy'}
           priority={priority}
         />
-        {/* Soft bottom fade — keeps share readable without covering hero art */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none" />
-
         {/* Share — stays top-right */}
         <div className="absolute top-2.5 right-2.5 z-10 pointer-events-auto">
           <ShareButton content={shareContent} variant="overlay" className="size-9" />
         </div>
       </Link>
 
-      {/* Card Body */}
-      <div className="px-4 pb-4 pt-2.5 flex flex-col flex-1">
-        {/* Avatar overlaps cover; trust chips sit in body so cover art stays clean */}
-        <div className="flex items-end justify-between gap-2 mb-3 relative">
+      {/* Name tag sits up on the banner, the way the logo used to */}
+      <div className="px-3.5 pb-3.5 flex flex-col flex-1">
+        <div className="flex justify-center -mt-4 relative z-10 px-1">
           <Link
             href={vendorHref}
-            className="relative -mt-9 size-14 shrink-0 z-10 rounded-2xl ring-4 ring-white shadow-md"
+            className="group/title inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-lg bg-[#FFF7F0] px-5 py-2 border border-[#E9E3DD] shadow-[0_4px_14px_-6px_rgba(28,28,28,0.28)]"
           >
-            <span className="absolute inset-0 overflow-hidden rounded-[inherit] bg-white [transform:translateZ(0)]">
-              {vendor.logo ? (
-                <Image
-                  src={vendor.logo}
-                  alt={vendor.name}
-                  fill
-                  sizes="56px"
-                  className="object-cover transition-transform duration-500 ease-out group-hover:scale-110"
-                />
-              ) : (
-                <span className="flex size-full items-center justify-center bg-gradient-to-br from-primary to-primary-dark font-bold text-sm tracking-wide text-white">
-                  {getInitials(vendor.name)}
-                </span>
-              )}
-            </span>
-          </Link>
-
-          <div className="flex items-center justify-end gap-1.5 pt-1 shrink-0">
-            <div className="inline-flex items-center gap-1 bg-amber-50/90 border border-amber-200/80 text-amber-950 px-2.5 py-1 rounded-full text-xs font-bold">
-              <Star size={13} className="text-amber-500 fill-amber-500" />
-              <span>{vendor.rating ? Number(vendor.rating).toFixed(1) : '4.8'}</span>
-            </div>
-            {years && (
-              <span className="text-xs font-medium text-text-secondary bg-stone-100 px-2.5 py-1 rounded-full border border-stone-200/70">
-                {years}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Supplier Name — verified is a mark on the name, not a chip */}
-        <div className="mb-2">
-          <Link href={vendorHref} className="group/title block">
-            <h3 className="flex items-center gap-1 text-[15px] sm:text-[16px] font-bold text-text group-hover/title:text-primary transition-colors">
-              <span className="truncate">{vendor.name}</span>
-              {vendor.isVerified ? (
-                <ShieldCheck size={15} className="shrink-0 text-emerald-600" aria-label="Verified supplier" />
-              ) : null}
+            <h3 className="truncate text-[14px] font-bold text-text leading-none group-hover/title:text-primary transition-colors">
+              {vendor.name}
             </h3>
-          </Link>
-
-          <div className="flex items-center gap-1.5 text-[12px] text-text-secondary mt-0.5 min-w-0">
-            {vendor.productCount != null && vendor.productCount > 0 && (
-              <span className="inline-flex items-center gap-1 shrink-0">
-                <Package size={12} className="text-text-muted" />
-                <span>{vendor.productCount}+ Products</span>
-              </span>
-            )}
-            {vendor.productCount != null && vendor.productCount > 0 && (vendor.deliveryTime || vendor.deliverySchedule) && (
-              <span className="text-text-muted shrink-0">·</span>
-            )}
-            {(vendor.deliveryTime || vendor.deliverySchedule) && (
-              <span className="inline-flex items-center gap-1 text-emerald-700 font-medium truncate min-w-0">
-                <Clock size={12} className="shrink-0" />
-                <span className="truncate">{vendor.deliverySchedule || vendor.deliveryTime}</span>
-              </span>
-            )}
-            {(vendor.productCount != null && vendor.productCount > 0) || vendor.deliveryTime || vendor.deliverySchedule ? (
-              <span className="text-text-muted shrink-0">·</span>
+            {vendor.isVerified ? (
+              <ShieldCheck size={14} className="shrink-0 text-emerald-600" aria-label="Verified supplier" />
             ) : null}
-            <span className={`shrink-0 font-medium ${vendor.minOrderValue > 0 ? 'text-text-secondary' : 'text-emerald-700'}`}>
-              {vendor.minOrderValue > 0 ? `Min. ₹${vendor.minOrderValue}` : 'No min. order'}
-            </span>
-          </div>
+          </Link>
         </div>
 
-        {/* Categories Pills - Crisp, modern soft tint */}
+        <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1">
+          {vendor.productCount != null && vendor.productCount > 0 && (
+            <span className="inline-flex items-center gap-1 text-[12px] text-text-secondary leading-none">
+              <Package size={13} className="text-text-muted shrink-0" />
+              <span className="tabular-nums">{vendor.productCount}+ products</span>
+            </span>
+          )}
+          <span className="inline-flex h-6 items-center gap-1 bg-amber-50 border border-amber-200/80 text-amber-950 px-2 rounded-full text-[11px] font-bold tabular-nums">
+            <Star size={12} className="text-amber-500 fill-amber-500" />
+            {vendor.rating ? Number(vendor.rating).toFixed(1) : '4.8'}
+          </span>
+          {years && (
+            <span className="inline-flex h-6 items-center text-[11px] font-medium text-text-secondary bg-stone-100 px-2 rounded-full border border-stone-200/70">
+              {years}
+            </span>
+          )}
+        </div>
+
         {categoryPills.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 mb-3.5">
+          <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
             {categoryPills.map((cat) => (
               <span
                 key={cat}
-                className="text-[11px] font-medium bg-primary-light/60 text-primary-dark px-2.5 py-0.5 rounded-md border border-primary/10 transition-colors hover:bg-primary-light"
+                className="inline-flex h-[22px] items-center text-[11px] font-medium leading-none bg-[#FAF5EC] text-[#1C1C1C] px-2 rounded-md border border-[#E9E3DD]"
               >
                 {cat}
               </span>
             ))}
             {remainingCategories > 0 && (
-              <span className="text-[10px] font-semibold text-text-muted bg-stone-100 px-1.5 py-0.5 rounded-md">
+              <span className="inline-flex h-[22px] items-center text-[10px] font-semibold leading-none text-[#1C1C1C] bg-[#FAF5EC] px-1.5 rounded-md border border-[#E9E3DD]">
                 +{remainingCategories}
               </span>
             )}
           </div>
         )}
 
-        {/* CTA Button */}
-        <div className="mt-auto pt-1">
+        <div className="mt-auto pt-3">
+          <div className="mb-2.5 space-y-1">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[11.5px] font-medium text-text-secondary">Min. order value</span>
+              <span className="text-[12.5px] font-semibold text-[#16A34A] tabular-nums">{formatMov(vendor.minOrderValue)}</span>
+            </div>
+            {nextDelivery ? (
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-[11.5px] font-medium text-text-secondary">Next delivery</span>
+                <span className="text-[12.5px] font-semibold text-[#16A34A] tabular-nums">{nextDelivery}</span>
+              </div>
+            ) : null}
+          </div>
           <Link
             href={vendorHref}
             className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl 
-              bg-primary hover:bg-primary-dark active:bg-primary-pressed text-white text-[13px] sm:text-[14px] font-semibold 
+              bg-primary hover:bg-primary-dark active:bg-primary-pressed text-white text-[13px] font-semibold 
               shadow-sm hover:shadow-md hover:shadow-primary/25 transition-all duration-200 active:scale-[0.98]"
           >
             <span>Browse Store</span>

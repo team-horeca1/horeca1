@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
+import { computeNextDeliveryDate, toLocalYmd } from '@/modules/delivery/nextDeliveryDate';
 
 interface ListVendorsInput {
   pincode?: string;
@@ -25,46 +26,82 @@ export class VendorService {
       where.products = { some: { categoryId, isActive: true } };
     }
 
-    const vendors = await prisma.vendor.findMany({
-      where,
-      take: limit + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      // 'frequent' = most-ordered vendors (by order count); others map to a column.
-      orderBy:
-        sort === 'frequent'
-          ? { orders: { _count: order } }
-          : { [sort === 'min_order_value' ? 'minOrderValue' : sort]: order },
-      select: {
-        id: true,
-        businessName: true,
-        displayName: true,
-        slug: true,
-        logoUrl: true,
-        bannerUrl: true,
-        rating: true,
-        minOrderValue: true,
-        creditEnabled: true,
-        description: true,
-        isVerified: true,
-        createdAt: true,
-        _count: { select: { products: { where: { isActive: true } } } },
-        products: {
-          where: { isActive: true },
-          select: { category: { select: { name: true } } },
-          distinct: ['categoryId'],
+    const orderAt = new Date();
+    const [vendors, holidays] = await Promise.all([
+      prisma.vendor.findMany({
+        where,
+        take: limit + 1,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        // 'frequent' = most-ordered vendors (by order count); others map to a column.
+        orderBy:
+          sort === 'frequent'
+            ? { orders: { _count: order } }
+            : { [sort === 'min_order_value' ? 'minOrderValue' : sort]: order },
+        select: {
+          id: true,
+          businessName: true,
+          displayName: true,
+          slug: true,
+          logoUrl: true,
+          bannerUrl: true,
+          rating: true,
+          minOrderValue: true,
+          creditEnabled: true,
+          description: true,
+          isVerified: true,
+          createdAt: true,
+          deliverThroughPublicHolidays: true,
+          serviceAreas: {
+            where: pincode ? { pincode, isActive: true } : { isActive: true },
+            take: 1,
+            select: {
+              deliversMon: true,
+              deliversTue: true,
+              deliversWed: true,
+              deliversThu: true,
+              deliversFri: true,
+              deliversSat: true,
+              deliversSun: true,
+              cutoffTime: true,
+            },
+          },
+          _count: { select: { products: { where: { isActive: true } } } },
+          products: {
+            where: { isActive: true },
+            select: { category: { select: { name: true } } },
+            distinct: ['categoryId'],
+          },
         },
-      },
-    });
+      }),
+      prisma.platformHoliday.findMany({
+        where: {
+          holidayDate: { gte: new Date(`${toLocalYmd(orderAt)}T00:00:00.000Z`) },
+        },
+        select: { holidayDate: true },
+        take: 60,
+      }),
+    ]);
+
+    const holidayDates = holidays.map((h) => h.holidayDate.toISOString().slice(0, 10));
 
     const hasMore = vendors.length > limit;
     if (hasMore) vendors.pop();
 
     // Flatten products→category into a simple categories string array
-    const vendorsWithCategories = vendors.map(({ products, _count, ...rest }) => ({
-      ...rest,
-      productCount: _count.products,
-      categories: [...new Set(products.map(p => p.category?.name).filter(Boolean))],
-    }));
+    const vendorsWithCategories = vendors.map(({ products, _count, serviceAreas, deliverThroughPublicHolidays, ...rest }) => {
+      const next = computeNextDeliveryDate({
+        plan: serviceAreas[0] ?? null,
+        orderAt,
+        deliverThroughPublicHolidays,
+        holidayDates,
+      });
+      return {
+        ...rest,
+        productCount: _count.products,
+        categories: [...new Set(products.map(p => p.category?.name).filter(Boolean))],
+        nextDeliveryDate: next ? toLocalYmd(next) : null,
+      };
+    });
 
     return {
       vendors: vendorsWithCategories,
