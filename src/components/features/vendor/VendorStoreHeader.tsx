@@ -11,7 +11,7 @@ import { useStableSession } from '@/hooks/useStableSession';
 import { cn } from '@/lib/utils';
 import type { StoreHeroSlide, StorePromotion, Vendor } from '@/types';
 import { PLACEHOLDERS } from '@/lib/constants';
-import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
+import { parseImageMeta, supplierLogoSrc } from '@/lib/imageMeta';
 import { OffersSheet } from '@/components/features/promo/OffersSheet';
 import { Hero, type HeroContent } from '@/components/features/Hero';
 
@@ -58,11 +58,8 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
     const isLoggedIn = isAuthenticated;
     const [dealsOpen, setDealsOpen] = useState(false);
     const heroSlides = toHeroSlides(vendor.heroSlides);
-    const heroImage = vendor.logo || vendor.coverImage || PLACEHOLDERS.vendor;
-    // Apply the saved focal point + zoom so a wide logo is cropped to the part
-    // the vendor chose in the Adjust modal — same behavior as the brand-logo
-    // live preview circle (object-cover that fills the frame).
-    const heroImageStyle = getDisplayStyle(parseImageMeta(heroImage).meta);
+    const logoSrc = vendor.logo ? supplierLogoSrc(vendor.logo) : '';
+    const coverSrc = parseImageMeta(vendor.coverImage || PLACEHOLDERS.vendor).src;
     
     const handleMyListsClick = (e: React.MouseEvent) => {
         if (!isLoggedIn) {
@@ -106,14 +103,15 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
             {/* ── MOBILE — name and actions sit under the slider ── */}
             <div className="block md:hidden">
                 <div className="px-3 pt-3 flex items-end gap-3">
-                    <div className="relative size-16 shrink-0 rounded-[14px] overflow-hidden bg-white border border-divider shadow-sm">
-                        <Image
-                            src={parseImageMeta(heroImage).src}
-                            alt={vendor.name}
-                            fill
-                            className="object-contain p-1.5"
-                            priority
-                        />
+                    <div className="flex h-16 max-w-[148px] shrink-0 items-center rounded-[14px] bg-white border border-divider px-2 shadow-sm">
+                        {logoSrc ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={logoSrc} alt={vendor.name} className="h-12 w-auto max-w-full object-contain" />
+                        ) : (
+                            <div className="relative size-12">
+                                <Image src={coverSrc} alt={vendor.name} fill className="object-cover" priority />
+                            </div>
+                        )}
                     </div>
                     <div className="min-w-0 flex-1 pb-1.5">
                         <div className="flex items-center gap-1.5">
@@ -229,8 +227,15 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
 
             <div className="hidden md:block max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
                 <div className="flex items-center gap-5 pt-4">
-                    <div className="relative size-[88px] shrink-0 rounded-xl bg-white border border-divider overflow-hidden shadow-sm">
-                        <Image src={heroImage} alt={vendor.name} fill className="object-contain p-2" style={heroImageStyle} priority />
+                    <div className="flex h-[88px] max-w-[280px] shrink-0 items-center rounded-xl bg-white border border-divider px-3 shadow-sm">
+                        {logoSrc ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={logoSrc} alt={vendor.name} className="h-[64px] w-auto max-w-full object-contain" />
+                        ) : (
+                            <div className="relative size-[64px]">
+                                <Image src={coverSrc} alt={vendor.name} fill className="object-cover" priority />
+                            </div>
+                        )}
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">

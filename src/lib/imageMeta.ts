@@ -63,6 +63,34 @@ export function buildImageMetaUrl(url: string, meta: Partial<ImageMeta>): string
     return `${src}#${params.toString()}`;
 }
 
+/**
+ * Supplier logos are square canvases with the artwork in a short band.
+ * Scaling that canvas with CSS clips the name and still leaves the mark small.
+ * Strip the #fp fragment (it must not be sent to the image loader) and ask
+ * ImageKit to trim the empty border so the artwork can be sized by its real shape.
+ */
+export function supplierLogoSrc(url: string | null | undefined): string {
+    const { src } = parseImageMeta(url);
+    if (!src) return '';
+    try {
+        const parsed = new URL(src);
+        if (parsed.hostname !== 'ik.imagekit.io') return src;
+        const parts = parsed.pathname.split('/').filter(Boolean);
+        if (parts.length < 2) return src;
+        if (parts[1].startsWith('tr:')) {
+            const flags = parts[1].split(',');
+            if (!flags.includes('t-true')) parts[1] = `${parts[1]},t-true`;
+        } else {
+            parts.splice(1, 0, 'tr:t-true');
+        }
+        parsed.pathname = `/${parts.join('/')}`;
+        parsed.hash = '';
+        return parsed.toString();
+    } catch {
+        return src;
+    }
+}
+
 /** Helper for display: ready-to-use object-position + transform-origin strings. */
 export function getDisplayStyle(meta: ImageMeta): { objectPosition: string; transform?: string; transformOrigin?: string } {
     const objectPosition = `${meta.x}% ${meta.y}%`;
