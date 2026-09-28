@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Clock, ChevronRight, ClipboardList, ChevronLeft, Trash2, Edit2, Heart, ShoppingCart, Home, Building2, AlertCircle, X as XIcon } from 'lucide-react';
 import { dal } from '@/lib/dal';
-import type { Vendor, VendorProduct, OrderList } from '@/types';
+import type { Vendor, OrderList } from '@/types';
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
 import { useCart } from '@/context/CartContext';
 import { toast } from 'sonner';
@@ -16,7 +16,7 @@ export default function OrderListsPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const vendorFilterId = searchParams.get('vendorId');
-    const { session, isAuthenticated, isResolved } = useStableSession();
+    const { isAuthenticated, isResolved } = useStableSession();
     const isLoggedIn = isAuthenticated;
     const { totalItems, addToCart } = useCart();
     const [allLists, setAllLists] = React.useState<OrderList[]>([]);
@@ -24,30 +24,11 @@ export default function OrderListsPage() {
     const [editingList, setEditingList] = React.useState<OrderList | null>(null);
     const [listToDelete, setListToDelete] = React.useState<string | null>(null);
     const [vendorsList, setVendorsList] = React.useState<Vendor[]>([]);
-    const [vendorProductsMap, setVendorProductsMap] = React.useState<Record<string, VendorProduct[]>>({});
 
-    // Load vendors and their products from the DAL
     React.useEffect(() => {
         dal.vendors.list()
-            .then(result => {
-                setVendorsList(result.vendors);
-                return Promise.all(
-                    result.vendors.map(v =>
-                        dal.vendors.getProducts(v.id)
-                            .then(r => ({ vendorId: v.id, products: r.products }))
-                            .catch(() => ({ vendorId: v.id, products: [] as VendorProduct[] }))
-                    )
-                );
-            })
-            .then(results => {
-                const map: Record<string, VendorProduct[]> = {};
-                results.forEach(r => { map[r.vendorId] = r.products; });
-                setVendorProductsMap(map);
-            })
-            .catch(() => {
-                setVendorsList([]);
-                setVendorProductsMap({});
-            });
+            .then(result => setVendorsList(result.vendors))
+            .catch(() => setVendorsList([]));
     }, []);
 
     // Initial load: only for authenticated users. Order lists are tied to a user
@@ -105,24 +86,6 @@ export default function OrderListsPage() {
         if (vendors.length === 0) return;
 
         const primaryVendor = vendors[0];
-        // Display name: single vendor name OR "VendorName +N more"
-        const vendorName = vendors.length === 1
-            ? vendors[0].name
-            : `${vendors[0].name} +${vendors.length - 1} more`;
-
-        // Map each item to its product using per-item vendorId
-        const mappedItems = data.items
-            .map(item => {
-                const product = (vendorProductsMap[item.vendorId] || []).find(p => p.id === item.productId);
-                if (!product) return null;
-                return {
-                    productId: item.productId,
-                    product,
-                    defaultQty: item.quantity,
-                    lastOrderedQty: item.quantity
-                };
-            })
-            .filter((item): item is NonNullable<typeof item> => item !== null);
 
         // Items payload for the API — carries each item's true vendorId so a
         // multi-vendor list keeps each item attached to the correct vendor.
@@ -143,15 +106,12 @@ export default function OrderListsPage() {
                     await dal.lists.delete(editingList.id);
                 }
                 const created = await dal.lists.create(data.name, primaryVendor.id, apiItems);
+                const saved = await dal.lists.getById(created.id);
+                const vendorLogo = saved.vendorLogo || vendorsList.find(v => v.id === saved.vendorId)?.logo;
                 const updatedList: OrderList = {
-                    ...editingList,
-                    id: created.id,
-                    name: data.name,
-                    vendorId: primaryVendor.id,
-                    vendorName,
-                    vendorLogo: primaryVendor.logo,
-                    items: mappedItems,
-                    updatedAt: new Date(),
+                    ...saved,
+                    ...(vendorLogo ? { vendorLogo } : {}),
+                    ...(editingList.lastUsed ? { lastUsed: editingList.lastUsed } : {}),
                 };
                 updated = allLists.map(l => l.id === editingList.id ? updatedList : l);
                 toast.success(`List "${data.name}" updated!`);
@@ -163,19 +123,9 @@ export default function OrderListsPage() {
         } else {
             try {
                 const created = await dal.lists.create(data.name, primaryVendor.id, apiItems);
-                const newList: OrderList = {
-                    id: created.id,
-                    name: data.name,
-                    userId: session?.user?.id || '',
-                    vendorId: primaryVendor.id,
-                    vendorName,
-                    vendorLogo: primaryVendor.logo,
-                    items: mappedItems,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    // lastUsed intentionally undefined for new lists
-                };
-                updated = [...allLists, newList];
+                const saved = await dal.lists.getById(created.id);
+                const vendorLogo = saved.vendorLogo || vendorsList.find(v => v.id === saved.vendorId)?.logo;
+                updated = [...allLists, vendorLogo ? { ...saved, vendorLogo } : saved];
                 toast.success(`List "${data.name}" created!`);
             } catch {
                 toast.error('Failed to create order list');
