@@ -10,7 +10,9 @@ import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { useCart } from '@/context/CartContext';
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
+import { VendorCategoryRail } from '@/components/features/vendor/VendorCategoryRail';
 import { VendorOfferPicker } from '@/components/features/homepage/VendorOfferPicker';
+import { buildCategoryTree, filterProductsByCatalogTab } from '@/lib/categoryTree';
 import {
   CollectionSkuCard,
   type CollectionSkuItem,
@@ -85,6 +87,7 @@ export default function CollectionDetailPage() {
   const [addingId, setAddingId] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('curated');
   const [inStockOnly, setInStockOnly] = useState(false);
+  const [catalogTab, setCatalogTab] = useState('all');
   const [heroFailed, setHeroFailed] = useState(false);
 
   const { addToCart } = useCart();
@@ -96,6 +99,7 @@ export default function CollectionDetailPage() {
   useEffect(() => {
     if (!slug) return;
     let cancelled = false;
+    setCatalogTab('all');
     setLoading(true);
     setNotFound(false);
 
@@ -143,8 +147,24 @@ export default function CollectionDetailPage() {
     };
   }, [items]);
 
+  const categoryTree = useMemo(
+    () =>
+      buildCategoryTree(
+        items.map((item) => ({
+          id: item.master.id,
+          image: item.master.imageUrl ?? undefined,
+          images: item.master.images,
+          subCategories: item.subCategories,
+        })),
+      ),
+    [items],
+  );
+
   const visibleItems = useMemo(() => {
-    let list = items;
+    let list = filterProductsByCatalogTab(
+      items.map((item) => ({ ...item, id: item.master.id })),
+      catalogTab,
+    );
     if (inStockOnly) {
       list = list.filter(itemHasStock);
     }
@@ -165,12 +185,13 @@ export default function CollectionDetailPage() {
       copy.sort((a, b) => b.vendorCount - a.vendorCount);
     }
     return copy;
-  }, [items, sortKey, inStockOnly]);
+  }, [items, sortKey, inStockOnly, catalogTab]);
 
   const handleAddOffer = (offer: VendorProduct) => {
     setAddingId(offer.id);
     try {
-      addToCart(offer, offer.minOrderQuantity || 1);
+      const added = addToCart(offer, offer.minOrderQuantity || 1);
+      if (!added) return;
       toast.success(`Added from ${offer.vendorName || 'supplier'}`);
       setPicker(null);
     } catch {
@@ -188,6 +209,7 @@ export default function CollectionDetailPage() {
   const clearFilters = () => {
     setSortKey('curated');
     setInStockOnly(false);
+    setCatalogTab('all');
   };
 
   if (loading) {
@@ -370,34 +392,47 @@ export default function CollectionDetailPage() {
               </div>
             </div>
 
-            {visibleItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-2xl border border-[#E9E3DD]">
-                <Package size={28} className="text-[#D9D0C8] mb-3" />
-                <p className="text-[15px] font-bold text-[#1C1C1C]">No SKUs match these filters</p>
-                <p className="mt-1 text-[13px] text-[#667085]">
-                  Try showing all products, or switch back to curated order.
-                </p>
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="mt-5 inline-flex items-center justify-center min-h-12 px-5 rounded-xl bg-primary text-white text-[14px] font-bold hover:bg-primary-dark active:scale-[0.97] transition-[background-color,transform] duration-150 ease-out"
-                >
-                  Clear filters
-                </button>
+            <div className="flex gap-2 md:gap-4 lg:gap-6 items-start">
+              {categoryTree.length > 0 ? (
+                <VendorCategoryRail
+                  tree={categoryTree}
+                  activeTab={catalogTab}
+                  productCount={items.length}
+                  onSelect={setCatalogTab}
+                  showYourItems={false}
+                />
+              ) : null}
+              <div className="flex-1 min-w-0">
+                {visibleItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-2xl border border-[#E9E3DD]">
+                    <Package size={28} className="text-[#D9D0C8] mb-3" />
+                    <p className="text-[15px] font-bold text-[#1C1C1C]">No SKUs match these filters</p>
+                    <p className="mt-1 text-[13px] text-[#667085]">
+                      Try showing all products, or switch back to curated order.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="mt-5 inline-flex items-center justify-center min-h-12 px-5 rounded-xl bg-primary text-white text-[14px] font-bold hover:bg-primary-dark active:scale-[0.97] transition-[background-color,transform] duration-150 ease-out"
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4">
+                    {visibleItems.map((item) => (
+                      <CollectionSkuCard
+                        key={item.master.id}
+                        item={item}
+                        addingId={addingId}
+                        onCompare={openCompare}
+                        onAdd={handleAddOffer}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4">
-                {visibleItems.map((item) => (
-                  <CollectionSkuCard
-                    key={item.master.id}
-                    item={item}
-                    addingId={addingId}
-                    onCompare={openCompare}
-                    onAdd={handleAddOffer}
-                  />
-                ))}
-              </div>
-            )}
+            </div>
           </>
         )}
       </div>

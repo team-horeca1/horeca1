@@ -566,36 +566,45 @@ export const dal = {
         description: string | null;
         imageUrl: string | null;
         bannerImageUrl: string | null;
-        items: Array<{
-          master: {
-            id: string;
-            name: string;
-            sku?: string;
-            imageUrl: string | null;
-            images?: string[];
-            packSize: string | null;
-            unit: string | null;
-          };
-          vendorCount: number;
-          defaultOffer: Record<string, unknown> | null;
-          offers: Record<string, unknown>[];
-        }>;
-      }>(`/api/v1/collections/${encodeURIComponent(slug)}${qs}`);
+          items: Array<{
+            master: {
+              id: string;
+              name: string;
+              sku?: string;
+              imageUrl: string | null;
+              images?: string[];
+              packSize: string | null;
+              unit: string | null;
+            };
+            subCategories?: Array<{
+              id: string;
+              name: string;
+              image?: string | null;
+              parentId?: string | null;
+              parentName?: string | null;
+              parentImage?: string | null;
+            }>;
+            vendorCount: number;
+            defaultOffer: Record<string, unknown> | null;
+            offers: Record<string, unknown>[];
+          }>;
+        }>(`/api/v1/collections/${encodeURIComponent(slug)}${qs}`);
 
-      return {
-        id: data.id,
-        name: data.name,
-        slug: data.slug,
-        description: data.description,
-        imageUrl: data.imageUrl,
-        bannerImageUrl: data.bannerImageUrl,
-        items: (data.items ?? []).map((item) => ({
-          master: item.master,
-          vendorCount: item.vendorCount,
-          defaultOffer: item.defaultOffer ? toVendorProduct(item.defaultOffer) : null,
-          offers: (item.offers ?? []).map((o) => toVendorProduct(o)),
-        })),
-      };
+        return {
+          id: data.id,
+          name: data.name,
+          slug: data.slug,
+          description: data.description,
+          imageUrl: data.imageUrl,
+          bannerImageUrl: data.bannerImageUrl,
+          items: (data.items ?? []).map((item) => ({
+            master: item.master,
+            subCategories: item.subCategories ?? [],
+            vendorCount: item.vendorCount,
+            defaultOffer: item.defaultOffer ? toVendorProduct(item.defaultOffer) : null,
+            offers: (item.offers ?? []).map((o) => toVendorProduct(o)),
+          })),
+        };
     },
   },
 

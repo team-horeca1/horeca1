@@ -9,6 +9,7 @@ import { cn, formatPackSize } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { productShareContent } from '@/lib/share-cards/types';
+import type { CategoryLinkInput } from '@/lib/categoryTree';
 
 export interface CollectionSkuItem {
   master: {
@@ -20,6 +21,7 @@ export interface CollectionSkuItem {
     packSize: string | null;
     unit: string | null;
   };
+  subCategories?: CategoryLinkInput[];
   vendorCount: number;
   defaultOffer: VendorProduct | null;
   offers: VendorProduct[];
@@ -110,7 +112,7 @@ export const CollectionSkuCard = React.memo(function CollectionSkuCard({
         hasOffers ? 'hover:shadow-[0_8px_24px_-12px_rgba(45,9,18,0.18)] hover:border-[#D9D0C8]' : 'opacity-70',
       )}
     >
-      <div className="relative aspect-square bg-[#FAF5EC]">
+      <div className="relative aspect-square bg-white">
         {img ? (
           <Image
             src={img}

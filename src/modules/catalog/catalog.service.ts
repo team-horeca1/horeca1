@@ -1269,6 +1269,14 @@ export class CatalogService {
     const { attachActivePromotions } = await import('@/modules/promotion/promotion-catalog');
     const { totalStockQty } = await import('@/lib/inventoryHelpers');
 
+    const collectionCategorySelect = {
+      id: true,
+      name: true,
+      imageUrl: true,
+      parentId: true,
+      parent: { select: { id: true, name: true, imageUrl: true } },
+    } as const;
+
     const collection = await prisma.collection.findFirst({
       where: {
         isActive: true,
@@ -1287,6 +1295,10 @@ export class CatalogService {
                 uom: true,
                 imageUrl: true,
                 images: true,
+                category: { select: collectionCategorySelect },
+                categoryLinks: {
+                  select: { category: { select: collectionCategorySelect } },
+                },
               },
             },
           },
@@ -1406,10 +1418,30 @@ export class CatalogService {
     }
 
     const OFFERS_CAP = 12;
+    const toCategoryLink = (cat: {
+      id: string;
+      name: string;
+      imageUrl: string | null;
+      parentId: string | null;
+      parent: { id: string; name: string; imageUrl: string | null } | null;
+    }) => ({
+      id: cat.id,
+      name: cat.name,
+      image: cat.imageUrl,
+      parentId: cat.parent?.id ?? cat.parentId,
+      parentName: cat.parent?.name ?? null,
+      parentImage: cat.parent?.imageUrl ?? null,
+    });
     const items = collection.masterProducts.map((link) => {
       const master = link.masterProduct;
       const offers = (byMaster.get(master.id) ?? []).slice().sort(sortOffers).slice(0, OFFERS_CAP);
       const defaultOffer = offers[0] ?? null;
+      const linked = master.categoryLinks.map((row) => toCategoryLink(row.category));
+      const subCategories = linked.length > 0
+        ? linked
+        : master.category
+          ? [toCategoryLink(master.category)]
+          : [];
       return {
         master: {
           id: master.id,
@@ -1420,6 +1452,7 @@ export class CatalogService {
           packSize: master.packSize,
           unit: master.uom,
         },
+        subCategories,
         vendorCount: offers.length,
         defaultOffer,
         offers,
