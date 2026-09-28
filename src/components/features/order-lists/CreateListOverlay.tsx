@@ -27,6 +27,9 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [vendorProductsMap, setVendorProductsMap] = useState<Record<string, VendorProduct[]>>({});
+    const [searchHits, setSearchHits] = useState<VendorProduct[]>([]);
+    const [browseLoading, setBrowseLoading] = useState(false);
+    const [searchLoading, setSearchLoading] = useState(false);
 
     // Fetch vendors from DAL on mount
     useEffect(() => {
@@ -40,16 +43,66 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
             .catch((err) => console.error('Failed to load vendors:', err));
     }, []);
 
-    // Fetch products when active vendor changes
+    // Browse catalog for the active vendor. The API defaults to 20 rows, which
+    // hid later products (e.g. Nutralite) from this picker. Match the store page ceiling.
     useEffect(() => {
         if (!activeVendor) return;
-        if (vendorProductsMap[activeVendor.id]) return; // already cached
-        dal.vendors.getProducts(activeVendor.id)
+        let cancelled = false;
+        if (vendorProductsMap[activeVendor.id]) {
+            Promise.resolve().then(() => {
+                if (!cancelled) setBrowseLoading(false);
+            });
+            return () => { cancelled = true; };
+        }
+        Promise.resolve().then(() => {
+            if (!cancelled) setBrowseLoading(true);
+        });
+        dal.vendors.getProducts(activeVendor.id, { limit: 200 })
             .then(({ products }) => {
+                if (cancelled) return;
                 setVendorProductsMap(prev => ({ ...prev, [activeVendor.id]: products }));
             })
-            .catch((err) => console.error('Failed to load vendor products:', err));
+            .catch((err) => console.error('Failed to load vendor products:', err))
+            .finally(() => {
+                if (!cancelled) setBrowseLoading(false);
+            });
+        return () => { cancelled = true; };
     }, [activeVendor, vendorProductsMap]);
+
+    // Typed search hits the full vendor catalog. Do not filter the cached page.
+    useEffect(() => {
+        if (!activeVendor) return;
+        const q = searchQuery.trim();
+        let cancelled = false;
+        if (!q) {
+            Promise.resolve().then(() => {
+                if (cancelled) return;
+                setSearchHits([]);
+                setSearchLoading(false);
+            });
+            return () => { cancelled = true; };
+        }
+        Promise.resolve().then(() => {
+            if (!cancelled) setSearchLoading(true);
+        });
+        const timer = window.setTimeout(() => {
+            dal.vendors.getProducts(activeVendor.id, { search: q, limit: 50 })
+                .then(({ products }) => {
+                    if (!cancelled) setSearchHits(products);
+                })
+                .catch((err) => {
+                    console.error('Failed to search vendor products:', err);
+                    if (!cancelled) setSearchHits([]);
+                })
+                .finally(() => {
+                    if (!cancelled) setSearchLoading(false);
+                });
+        }, 300);
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
+    }, [activeVendor, searchQuery]);
 
     useEffect(() => {
         if (isOpen) {
@@ -86,13 +139,13 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
         }
     }, [isOpen, initialData, dalVendors]);
 
-    // Products for active vendor filtered by search
+    const queryActive = searchQuery.trim().length > 0;
     const vendorProducts = useMemo(() => {
         if (!activeVendor) return [];
-        const products = vendorProductsMap[activeVendor.id] || [];
-        if (!searchQuery) return products;
-        return products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
-    }, [activeVendor, searchQuery, vendorProductsMap]);
+        if (searchQuery.trim()) return searchHits;
+        return vendorProductsMap[activeVendor.id] || [];
+    }, [activeVendor, searchQuery, searchHits, vendorProductsMap]);
+    const listLoading = queryActive ? searchLoading : browseLoading && vendorProducts.length === 0;
 
     // All categories across vendors (deduped) — for category-suggestion chips
     const allCategories = useMemo(() => {
@@ -423,7 +476,11 @@ export function CreateListOverlay({ isOpen, onClose, onSave, initialData }: Crea
 
                             {/* Product list for active vendor */}
                             <div className="space-y-3 mt-4">
-                                {vendorProducts.length > 0 ? (
+                                {listLoading ? (
+                                    <div className="text-center py-10">
+                                        <p className="text-[13px] text-gray-400 font-medium">Searching…</p>
+                                    </div>
+                                ) : vendorProducts.length > 0 ? (
                                     vendorProducts.map(product => {
                                         const qty = selectedItems[product.id] || 0;
                                         return (
