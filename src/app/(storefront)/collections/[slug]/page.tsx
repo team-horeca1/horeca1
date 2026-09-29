@@ -277,9 +277,9 @@ export default function CollectionDetailPage() {
             <div>
             <Link
               href="/collections"
-              className="md:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/15 backdrop-blur-md text-white text-[13px] font-bold hover:bg-white/25 active:scale-[0.97] transition-[background-color,transform] duration-150 ease-out"
+              className="md:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/30 backdrop-blur-md border border-white/15 text-white text-[11.5px] font-semibold hover:bg-black/45 active:scale-95 transition-all shadow-xs"
             >
-              <ChevronLeft size={16} strokeWidth={2.5} />
+              <ChevronLeft size={13} strokeWidth={2.5} />
               Collections
             </Link>
             <nav

@@ -225,11 +225,10 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                 </section>
             )}
 
-            {/* Mobile identity card - elevates over the banner for depth and polish */}
-            <div className="md:hidden relative z-20 px-3 -mt-6">
-                <div className="rounded-2xl bg-white p-3.5 shadow-[0_4px_20px_rgba(37,24,0,0.07)] border border-divider/70">
-                    {/* Top: Avatar, Name, Verified, Actions */}
-                    <div className="flex items-start gap-3">
+            {/* Mobile identity sheet - full-width sheet overlapping the banner */}
+            <div className="md:hidden relative z-20 -mt-6 w-full bg-white rounded-t-3xl pt-4 px-4 pb-2.5 border-t border-divider/60 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+                {/* Top: Avatar, Name, Verified, Actions */}
+                <div className="flex items-start gap-3">
                         <div className="relative size-14 shrink-0 rounded-xl overflow-hidden bg-white p-1 border border-divider shadow-xs ring-2 ring-white flex items-center justify-center">
                             {logoSrc ? (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -360,7 +359,6 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                     </div>
                     */}
                 </div>
-            </div>
 
             <div className="hidden md:block max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
                 <div className="mt-1 flex flex-wrap gap-2">

@@ -429,11 +429,10 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
                 </section>
             )}
 
-            {/* Mobile Brand Card - elevated over the banner for depth and luxury feel */}
-            <div className="md:hidden relative z-20 px-3 -mt-6">
-                <div className="rounded-2xl bg-white p-3.5 shadow-[0_4px_20px_rgba(37,24,0,0.07)] border border-divider/70">
-                    {/* Top: Avatar, Name, Verified, Actions */}
-                    <div className="flex items-start gap-3">
+            {/* Mobile Brand Card - full-width sheet overlapping the banner */}
+            <div className="md:hidden relative z-20 -mt-6 w-full bg-white rounded-t-3xl pt-4 px-4 pb-2 border-t border-divider/60 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+                {/* Top: Avatar, Name, Verified, Actions */}
+                <div className="flex items-start gap-3">
                         <div className="relative size-14 shrink-0 rounded-xl overflow-hidden bg-white p-1 border border-divider shadow-xs ring-2 ring-white flex items-center justify-center">
                             {logoParsed.src ? (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -528,11 +527,10 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
                         </div>
                     </div>
                 </div>
-            </div>
 
             {/* Sticky Search and Filter Controls */}
-            <div className="w-full bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-divider shadow-[0_2px_8px_rgba(37,24,0,0.04)] mt-2 md:mt-4">
-                <div className="max-w-[var(--container-max)] mx-auto px-3 md:px-[var(--container-padding)] py-2 md:py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="w-full bg-white/95 backdrop-blur-md sticky top-0 z-30 border-b border-divider shadow-[0_2px_8px_rgba(37,24,0,0.04)] mt-0 md:mt-4">
+                <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)] py-2 md:py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div className="relative flex-1 md:max-w-[450px] lg:max-w-[600px]">
                         <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-primary" strokeWidth={2.25} />
                         <input

@@ -77,8 +77,8 @@ export function VendorCatalogNav({
 
     return (
         <div className={cn('w-full bg-white/95 backdrop-blur-md sticky z-30 border-b border-divider/80 shadow-[0_2px_10px_rgba(37,24,0,0.03)]', barClassName ?? 'top-0')}>
-            <div className="max-w-[var(--container-max)] mx-auto px-3 md:px-[var(--container-padding)]">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 py-2.5 md:py-3">
+            <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)]">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 py-2 md:py-3">
                     {/* Highlighted Single Solo Search Bar */}
                     <div className="relative group w-full flex-1 md:max-w-[540px] lg:max-w-[640px] flex items-center gap-2">
                         <div className="relative flex-1">
