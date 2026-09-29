@@ -10,6 +10,7 @@ import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import { useCart } from '@/context/CartContext';
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
+import { VendorCatalogNav } from '@/components/features/vendor/VendorCatalogNav';
 import { VendorCategoryRail } from '@/components/features/vendor/VendorCategoryRail';
 import { VendorOfferPicker } from '@/components/features/homepage/VendorOfferPicker';
 import { buildCategoryTree, filterProductsByCatalogTab } from '@/lib/categoryTree';
@@ -88,6 +89,7 @@ export default function CollectionDetailPage() {
   const [sortKey, setSortKey] = useState<SortKey>('curated');
   const [inStockOnly, setInStockOnly] = useState(false);
   const [catalogTab, setCatalogTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [heroFailed, setHeroFailed] = useState(false);
 
   const { addToCart } = useCart();
@@ -100,6 +102,7 @@ export default function CollectionDetailPage() {
     if (!slug) return;
     let cancelled = false;
     setCatalogTab('all');
+    setSearchQuery('');
     setLoading(true);
     setNotFound(false);
 
@@ -168,6 +171,17 @@ export default function CollectionDetailPage() {
     if (inStockOnly) {
       list = list.filter(itemHasStock);
     }
+    const query = searchQuery.trim().toLowerCase();
+    if (query) {
+      list = list.filter((item) => {
+        const title = item.master.name.toLowerCase();
+        const vendorHit = item.offers.some((offer) =>
+          (offer.name || '').toLowerCase().includes(query) ||
+          (offer.vendorName || '').toLowerCase().includes(query),
+        );
+        return title.includes(query) || vendorHit;
+      });
+    }
     if (sortKey === 'curated') return list;
     const copy = list.slice();
     if (sortKey === 'price_asc') {
@@ -185,7 +199,7 @@ export default function CollectionDetailPage() {
       copy.sort((a, b) => b.vendorCount - a.vendorCount);
     }
     return copy;
-  }, [items, sortKey, inStockOnly, catalogTab]);
+  }, [items, sortKey, inStockOnly, catalogTab, searchQuery]);
 
   const handleAddOffer = (offer: VendorProduct) => {
     setAddingId(offer.id);
@@ -210,6 +224,7 @@ export default function CollectionDetailPage() {
     setSortKey('curated');
     setInStockOnly(false);
     setCatalogTab('all');
+    setSearchQuery('');
   };
 
   if (loading) {
@@ -324,6 +339,16 @@ export default function CollectionDetailPage() {
         </div>
       </div>
 
+      <VendorCatalogNav
+        activeTab={catalogTab}
+        onTabChange={setCatalogTab}
+        categories={[]}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder={`Search in ${collection.name}`}
+        showStoreTabs={false}
+      />
+
       <div className="max-w-[var(--container-max)] mx-auto px-[clamp(1rem,3vw,2rem)] py-6 md:py-8">
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-2xl border border-[#E9E3DD]">
@@ -343,7 +368,7 @@ export default function CollectionDetailPage() {
           </div>
         ) : (
           <>
-            <div className="sticky top-[3.6rem] lg:top-[4.75rem] z-30 -mx-[clamp(1rem,3vw,2rem)] px-[clamp(1rem,3vw,2rem)] py-3 mb-4 bg-[#FAF7F2]/95 backdrop-blur-md border-b border-[#E9E3DD]">
+            <div className="-mx-[clamp(1rem,3vw,2rem)] px-[clamp(1rem,3vw,2rem)] py-3 mb-4 border-b border-[#E9E3DD]">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-[13px] font-semibold text-[#667085]">
                   {visibleItems.length === items.length
@@ -419,7 +444,7 @@ export default function CollectionDetailPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
                     {visibleItems.map((item) => (
                       <CollectionSkuCard
                         key={item.master.id}

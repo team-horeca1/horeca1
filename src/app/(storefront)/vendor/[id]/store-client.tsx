@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 import { VendorStoreHeader } from '@/components/features/vendor/VendorStoreHeader';
 import { VendorCatalogNav } from '@/components/features/vendor/VendorCatalogNav';
 import { VendorCategoryRail } from '@/components/features/vendor/VendorCategoryRail';
+import { VendorCategoryHeaderBar } from '@/components/features/vendor/VendorCategoryHeaderBar';
 import { VendorProductCard } from '@/components/features/vendor/VendorProductCard';
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
 import { dal } from '@/lib/dal';
@@ -403,9 +404,7 @@ export default function VendorStorePage() {
                     categories={vendor.categories}
                     searchQuery={searchQuery}
                     onSearchChange={setSearchQuery}
-                    layoutMode={layoutMode}
-                    onLayoutModeChange={updateLayoutMode}
-                    searchPlaceholder={`Search in ${vendor.name}`}
+                    searchPlaceholder={`Search in ${vendor.name}...`}
                 />
             )}
 
@@ -435,7 +434,7 @@ export default function VendorStorePage() {
                                     </div>
                                     <button
                                         onClick={() => {
-                                            (order.items || []).forEach((item) => {
+                                             (order.items || []).forEach((item) => {
                                                 const productId = item.productId || item.product?.id;
                                                 if (!productId) return;
                                                 const found = products.find(p => p.id === productId);
@@ -460,6 +459,19 @@ export default function VendorStorePage() {
                         />
 
                         <div className="flex-1 min-w-0">
+                            {/* Vendor Category Header Bar: Change Category Trigger + Item Count + Layout Switcher + Quick Filter Chips */}
+                            <VendorCategoryHeaderBar
+                                activeTab={activeTab}
+                                onTabChange={setActiveTab}
+                                tree={vendorCategoryTree}
+                                productCount={filteredProducts.length}
+                                totalProductsCount={products.length}
+                                vendorName={vendor.name}
+                                layoutMode={layoutMode}
+                                onLayoutModeChange={updateLayoutMode}
+                                hasDeals={products.some(p => p.isDeal)}
+                                hasFrequent={products.some(p => p.frequentlyOrdered)}
+                            />
                             {brandFilter && (
                                 <div className="flex flex-wrap items-center gap-2 mb-3 rounded-xl border border-primary/20 bg-primary-tint px-3 py-2">
                                     <p className="flex-1 min-w-0 text-[12px] font-medium text-text">

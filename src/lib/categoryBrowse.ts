@@ -1,3 +1,5 @@
+import type { CategoryTreeNode } from '@/lib/categoryTree';
+
 export interface CatNode {
   id: string;
   name: string;
@@ -50,6 +52,36 @@ export function productCategoryIds(
   return [...childIds, found.parent.id];
 }
 
+/** Supplier-store rail for one category: its children, with SKU counts when known. */
+export function categoryRailTree(
+  parent: CatNode,
+  items: Array<{ subCategories?: Array<{ id: string }> }>,
+): CategoryTreeNode[] {
+  const countFor = (id: string) =>
+    items.reduce((sum, item) => sum + (item.subCategories?.some((link) => link.id === id) ? 1 : 0), 0);
+
+  return parent.children.map((child) => ({
+    id: child.id,
+    name: child.name,
+    image: child.image,
+    count: countFor(child.id),
+    children: child.children.map((grand) => ({
+      id: grand.id,
+      name: grand.name,
+      image: grand.image,
+      count: countFor(grand.id),
+    })),
+  }));
+}
+
+export function unionCategoryLinks<T extends { id: string }>(a?: T[], b?: T[]): T[] {
+  const map = new Map<string, T>();
+  for (const link of [...(a ?? []), ...(b ?? [])]) {
+    if (link.id) map.set(link.id, link);
+  }
+  return Array.from(map.values());
+}
+
 export function skuItemKey(item: {
   master: { id: string } | null;
   defaultOffer: { id: string };
@@ -62,6 +94,7 @@ type MergeableSku = {
   vendorCount: number;
   defaultOffer: { id: string; price: number };
   offers: Array<{ id: string; price: number }>;
+  subCategories?: Array<{ id: string }>;
 };
 
 /** Dedupes SKUs across sub-categories and merges competing vendor offers. */
@@ -88,6 +121,7 @@ export function mergeCategorySkuItems<T extends MergeableSku>(groups: T[][]): T[
         offers,
         vendorCount: offers.length,
         defaultOffer: cheaper,
+        subCategories: unionCategoryLinks(existing.subCategories, item.subCategories),
       });
     }
   }

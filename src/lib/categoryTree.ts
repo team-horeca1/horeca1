@@ -70,8 +70,12 @@ export function buildCategoryTree(products: CatalogProductForTree[]): CategoryTr
           parent = { id: sc.parentId, name: sc.parentName, count: 0, children: [] };
           parents.set(sc.parentId, parent);
         }
-        if (!parent.image && sc.parentId === p.categoryParentId) {
-          parent.image = p.categoryParentImage ?? sc.parentImage ?? undefined;
+        // Prefer the link's own parent image. Store/brand catalogs also stamp
+        // the image on the product's primary parent, which collection SKUs omit.
+        if (!parent.image) {
+          const fromPrimary =
+            sc.parentId === p.categoryParentId ? p.categoryParentImage ?? undefined : undefined;
+          parent.image = sc.parentImage || fromPrimary || undefined;
         }
 
         let child = parent.children.find((c) => c.id === sc.id);

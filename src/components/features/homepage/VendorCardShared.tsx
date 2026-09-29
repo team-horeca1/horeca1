@@ -87,13 +87,13 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
         <div className="flex justify-center -mt-4 relative z-10 px-1">
           <Link
             href={vendorHref}
-            className="group/title inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-lg bg-[#FFF7F0] px-5 py-2 border border-[#E9E3DD] shadow-[0_4px_14px_-6px_rgba(28,28,28,0.28)]"
+            className="group/title inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-xl bg-[#FFF9F4] px-4.5 py-1.5 md:py-2 border border-[#E8DFD5] shadow-[0_4px_14px_-6px_rgba(28,28,28,0.2)] hover:border-primary/40 transition-all"
           >
-            <h3 className="truncate text-[14px] font-bold text-text leading-none group-hover/title:text-primary transition-colors">
+            <h3 className="truncate text-[15.5px] md:text-[16px] font-extrabold text-[#181725] tracking-tight leading-none group-hover/title:text-primary transition-colors">
               {vendor.name}
             </h3>
             {vendor.isVerified ? (
-              <ShieldCheck size={14} className="shrink-0 text-emerald-600" aria-label="Verified supplier" />
+              <ShieldCheck size={15} className="shrink-0 text-emerald-600" aria-label="Verified supplier" />
             ) : null}
           </Link>
         </div>
@@ -121,13 +121,13 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
             {categoryPills.map((cat) => (
               <span
                 key={cat}
-                className="inline-flex h-[22px] items-center text-[11px] font-medium leading-none bg-[#FAF5EC] text-[#1C1C1C] px-2 rounded-md border border-[#E9E3DD]"
+                className="inline-flex h-[23px] items-center text-[11px] font-semibold leading-none bg-[#EDF5FA] text-[#1E3F5A] px-2.5 rounded-md border border-[#D0E2EF] shadow-[0_1px_2px_rgba(30,63,90,0.04)]"
               >
                 {cat}
               </span>
             ))}
             {remainingCategories > 0 && (
-              <span className="inline-flex h-[22px] items-center text-[10px] font-semibold leading-none text-[#1C1C1C] bg-[#FAF5EC] px-1.5 rounded-md border border-[#E9E3DD]">
+              <span className="inline-flex h-[23px] items-center text-[10.5px] font-bold leading-none text-[#183954] bg-[#E1EDF6] px-2 rounded-md border border-[#C5DCEB]">
                 +{remainingCategories}
               </span>
             )}

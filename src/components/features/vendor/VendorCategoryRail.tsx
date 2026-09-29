@@ -75,7 +75,7 @@ function RailButton({
       >
         {label}
       </span>
-      {typeof count === 'number' && (
+      {typeof count === 'number' && count > 0 && (
         <span className="hidden md:inline text-[11px] font-medium text-text-muted tabular-nums shrink-0">
           {count}
         </span>

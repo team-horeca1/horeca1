@@ -60,7 +60,10 @@ export const CollectionSkuCard = React.memo(function CollectionSkuCard({
   );
   const hasOffers = item.offers.length > 0;
   const defaultOffer = item.defaultOffer;
+  // Two or more suppliers: Add opens the compare picker so the buyer chooses a vendor.
+  const chooseSupplier = item.offers.length > 1;
   const canAdd = Boolean(defaultOffer && offerInStock(defaultOffer));
+  const addEnabled = chooseSupplier || canAdd;
   const isAdding = Boolean(defaultOffer && addingId === defaultOffer.id);
   const price = defaultOffer ? Number(defaultOffer.price) : NaN;
   const hasPrice = Number.isFinite(price);
@@ -81,7 +84,12 @@ export const CollectionSkuCard = React.memo(function CollectionSkuCard({
   const cartOffer = cartMatch?.offer ?? defaultOffer;
 
   const handleAdd = () => {
-    if (!defaultOffer || !canAdd || isAdding) return;
+    if (isAdding) return;
+    if (chooseSupplier) {
+      onCompare(item);
+      return;
+    }
+    if (!defaultOffer || !canAdd) return;
     onAdd(defaultOffer);
   };
 
@@ -217,10 +225,10 @@ export const CollectionSkuCard = React.memo(function CollectionSkuCard({
             <button
               type="button"
               onClick={handleAdd}
-              disabled={!canAdd || isAdding}
+              disabled={!addEnabled || isAdding}
               className={cn(
                 'inline-flex items-center justify-center gap-1.5 min-h-12 rounded-xl text-[13px] font-bold transition-[background-color,transform] duration-150 ease-out',
-                canAdd
+                addEnabled
                   ? 'bg-primary text-white hover:bg-primary-dark active:scale-[0.97] shadow-[0_6px_18px_-6px_rgba(107,29,46,0.45)]'
                   : 'bg-[#F3EEE8] text-[#9CA3AF] cursor-not-allowed',
                 isAdding && 'opacity-70',

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { dal } from '@/lib/dal';
 import { CATEGORY_FETCH_CONCURRENCY, mapWithConcurrency } from '@/lib/mapWithConcurrency';
 import { useDeliveryPincode } from '@/hooks/useDeliveryPincode';
@@ -13,6 +13,7 @@ import {
   productCategoryIds,
   mergeCategorySkuItems,
   skuItemKey,
+  categoryRailTree,
   type CatNode,
 } from '@/lib/categoryBrowse';
 import { CategoryBrowseLayout } from '@/components/features/category/CategoryBrowseLayout';
@@ -21,10 +22,21 @@ import type { CategorySkuItem } from '@/components/features/category/CategorySku
 
 const PRODUCT_LIMIT = 60;
 
+function findChildByName(parent: CatNode, name: string): CatNode | null {
+  for (const child of parent.children) {
+    if (child.name === name) return child;
+    const grand = child.children.find((node) => node.name === name);
+    if (grand) return grand;
+  }
+  return null;
+}
+
 function CategorySkuVendorsContent() {
   const params = useParams();
+  const router = useRouter();
   const slug = params.slug as string;
   const masterId = params.masterId as string;
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [tree, setTree] = useState<CatNode[]>([]);
   const [item, setItem] = useState<CategorySkuItem | null>(null);
@@ -116,6 +128,20 @@ function CategorySkuVendorsContent() {
   }
 
   const offers = item?.offers ?? [];
+  const query = searchQuery.trim().toLowerCase();
+  const visibleOffers = query
+    ? offers.filter((offer) => (offer.vendorName || '').toLowerCase().includes(query))
+    : offers;
+  const catalogTab = activeChild ? `cat:${activeChild.name}` : 'all';
+  const railTree = categoryRailTree(activeParent, []);
+  const onCatalogTab = (tab: string) => {
+    if (tab === 'all' || !tab.startsWith('cat:')) {
+      router.push(`/category/${activeParent.slug}`);
+      return;
+    }
+    const child = findChildByName(activeParent, tab.slice(4));
+    if (child) router.push(`/category/${child.slug}`);
+  };
   const vendorHref = (offer: CategorySkuItem['offers'][number]) => {
     const dest = offer.vendorSlug || offer.vendorId;
     const qs = new URLSearchParams();
@@ -138,10 +164,14 @@ function CategorySkuVendorsContent() {
           : []),
         { label: productName },
       ]}
-      parent={activeParent}
-      activeChildSlug={activeChild?.slug ?? null}
+      railTree={railTree}
+      catalogTab={catalogTab}
+      onCatalogTab={onCatalogTab}
+      productCount={0}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
     >
-      {offers.length === 0 ? (
+      {visibleOffers.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 md:py-24 text-center max-w-md mx-auto px-2">
           <div className="size-16 rounded-full bg-primary-light flex items-center justify-center mb-4 text-primary">
             <ShoppingBag size={28} />
@@ -158,8 +188,8 @@ function CategorySkuVendorsContent() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 md:gap-4">
-          {offers.map((offer, index) => (
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
+          {visibleOffers.map((offer, index) => (
             <CategoryVendorCard
               key={offer.id}
               href={vendorHref(offer)}

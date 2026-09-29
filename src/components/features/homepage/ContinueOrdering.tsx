@@ -10,6 +10,7 @@ import type { Vendor } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { storeDisplayName } from '@/lib/storeDisplayName';
+import { cn } from '@/lib/utils';
 
 interface ContinueCard {
   id: string;
@@ -301,6 +302,12 @@ export function ContinueOrdering() {
     };
   }, [isMounted, isLoggedIn, cartGroups, pathname, vendors, orderLists, pastOrders]);
 
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener('resize', checkScroll);
+    return () => window.removeEventListener('resize', checkScroll);
+  }, [cards]);
+
   if (!isMounted || !isLoggedIn || cards.length === 0) return null;
 
   const lineFor = (card: ContinueCard) => {
@@ -310,89 +317,100 @@ export function ContinueOrdering() {
   };
 
   return (
-    <section className="w-full py-2 md:py-2 bg-background">
-      <div className="max-w-[var(--container-max)] mx-auto overflow-hidden">
-        <div className="px-4 md:px-[var(--container-padding)]">
-          <SectionHeader
-            title="Continue Ordering"
-            actionLabel="View all →"
-            actionHref="/continue-ordering"
-            className="mb-1.5 md:mb-2"
-          />
-        </div>
-
-        <div className="relative w-full">
-          <button
-            type="button"
-            onClick={() => scroll('left')}
-            disabled={!canScrollLeft}
-            className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 size-8 bg-white rounded-full shadow-cdl-2 items-center justify-center hover:scale-105 active:scale-95 transition-all border border-divider disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
-          >
-            <ChevronLeft size={16} className="text-[#1C1C1C]" strokeWidth={2.5} />
-          </button>
-
-          <div ref={scrollRef} onScroll={checkScroll} className="overflow-x-auto no-scrollbar scroll-smooth w-full">
-            <div className="flex flex-nowrap gap-2 md:gap-3 py-1 md:py-2 px-4 md:px-[var(--container-padding)] w-max">
-              {cards.map((card) => {
-                const vendor = vendors.find((v) => v.id === card.vendorId);
-                const logo = card.vendorLogo || vendor?.logo || '';
-
-                return (
-                  <Link
-                    key={card.id}
-                    href={card.href}
-                    className="flex items-center gap-2 md:gap-2.5 shrink-0 min-w-[200px] md:min-w-[220px] bg-white border border-divider rounded-xl px-2.5 py-2 md:px-2.5 md:py-2 shadow-cdl-1 hover:shadow-cdl-2 hover:border-primary/25 transition-all group"
-                  >
-                    <div className="size-9 md:size-10 rounded-[10px] bg-ivory border border-divider overflow-hidden shrink-0 flex items-center justify-center">
-                      {card.vendorLogos && card.vendorLogos.length > 1 ? (
-                        <div className="relative w-full h-full">
-                          {card.vendorLogos.slice(0, 4).map((logoUrl, i) => (
-                            <img
-                              key={i}
-                              src={logoUrl}
-                              alt=""
-                              className="absolute object-cover rounded-[4px] border border-white"
-                              style={{
-                                width: '52%',
-                                height: '52%',
-                                left: i === 1 || i === 3 ? '42%' : '6%',
-                                top: i === 2 || i === 3 ? '42%' : '6%',
-                                zIndex: 4 - i,
-                              }}
-                            />
-                          ))}
-                        </div>
-                      ) : logo ? (
-                        <img src={logo} alt="" className="w-full h-full object-contain p-1" />
-                      ) : (
-                        <span className="text-[15px] font-bold text-primary">{card.vendorName?.[0] || '?'}</span>
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0 text-left">
-                      <p className="text-[13px] md:text-[14px] font-bold text-[#1C1C1C] leading-tight line-clamp-1 group-hover:text-primary">
-                        {card.vendorName}
-                      </p>
-                      <p className="text-[11px] md:text-[12px] text-[#667085] mt-0.5 line-clamp-1">{lineFor(card)}</p>
-                    </div>
-
-                    <div className="size-7 md:size-auto rounded-full md:rounded-none bg-primary-light md:bg-transparent text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-white md:group-hover:bg-transparent md:group-hover:text-primary transition-colors">
-                      <ChevronRight className="size-3.5 md:size-4" strokeWidth={2.5} />
-                    </div>
-                  </Link>
-                );
-              })}
+    <section className="w-full pt-3 pb-1 md:pt-4 md:pb-1.5 bg-background">
+      <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)]">
+        {/* Header with Title and Scroll Controls */}
+        <div className="flex items-center justify-between gap-3 mb-2 md:mb-2.5">
+          <h2 className="text-primary font-bold text-[clamp(1.125rem,3vw,1.25rem)] leading-snug">
+            Continue Ordering
+          </h2>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/continue-ordering"
+              className="text-[13px] font-semibold text-primary shrink-0 hover:underline"
+            >
+              View all →
+            </Link>
+            <div className="hidden md:flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => scroll('left')}
+                disabled={!canScrollLeft}
+                aria-label="Scroll left"
+                className="size-7 rounded-lg border border-divider/80 bg-white text-[#181725] flex items-center justify-center hover:bg-ivory hover:border-primary/40 disabled:opacity-25 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
+              >
+                <ChevronLeft size={15} strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                onClick={() => scroll('right')}
+                disabled={!canScrollRight}
+                aria-label="Scroll right"
+                className="size-7 rounded-lg border border-divider/80 bg-white text-[#181725] flex items-center justify-center hover:bg-ivory hover:border-primary/40 disabled:opacity-25 disabled:pointer-events-none transition-all shadow-2xs cursor-pointer"
+              >
+                <ChevronRight size={15} strokeWidth={2.5} />
+              </button>
             </div>
           </div>
+        </div>
 
-          <button
-            type="button"
-            onClick={() => scroll('right')}
-            disabled={!canScrollRight}
-            className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 size-8 bg-white rounded-full shadow-cdl-2 items-center justify-center hover:scale-105 active:scale-95 transition-all border border-divider disabled:opacity-20 disabled:cursor-not-allowed disabled:hover:scale-100"
-          >
-            <ChevronRight size={16} className="text-[#1C1C1C]" strokeWidth={2.5} />
-          </button>
+        {/* Carousel strip */}
+        <div
+          ref={scrollRef}
+          onScroll={checkScroll}
+          className="overflow-x-auto no-scrollbar scroll-smooth w-full -mx-4 px-4 md:mx-0 md:px-0"
+        >
+          <div className="flex flex-nowrap gap-2 md:gap-0 py-1 md:py-0 w-max md:min-w-full md:bg-white md:border md:border-divider/80 md:rounded-2xl md:overflow-hidden md:shadow-2xs">
+            {cards.map((card) => {
+              const vendor = vendors.find((v) => v.id === card.vendorId);
+              const logo = card.vendorLogo || vendor?.logo || '';
+
+              return (
+                <Link
+                  key={card.id}
+                  href={card.href}
+                  className="flex items-center gap-2.5 md:gap-3 shrink-0 min-w-[190px] md:min-w-[185px] lg:min-w-[200px] md:flex-1 bg-white md:bg-transparent border border-divider md:border-y-0 md:border-l-0 md:border-r md:border-divider/70 md:last:border-r-0 rounded-xl md:rounded-none px-3 py-2 md:px-3.5 md:py-2.5 shadow-2xs md:shadow-none md:hover:bg-[#FAF8F5] transition-colors group"
+                >
+                  <div className="size-9 md:size-10 rounded-xl bg-ivory border border-divider/70 overflow-hidden shrink-0 flex items-center justify-center">
+                    {card.vendorLogos && card.vendorLogos.length > 1 ? (
+                      <div className="relative w-full h-full">
+                        {card.vendorLogos.slice(0, 4).map((logoUrl, i) => (
+                          <img
+                            key={i}
+                            src={logoUrl}
+                            alt=""
+                            className="absolute object-cover rounded-[4px] border border-white"
+                            style={{
+                              width: '52%',
+                              height: '52%',
+                              left: i === 1 || i === 3 ? '42%' : '6%',
+                              top: i === 2 || i === 3 ? '42%' : '6%',
+                              zIndex: 4 - i,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    ) : logo ? (
+                      <img src={logo} alt="" className="w-full h-full object-contain p-1" />
+                    ) : (
+                      <span className="text-[15px] font-bold text-primary">{card.vendorName?.[0] || '?'}</span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-[13px] md:text-[13.5px] font-bold text-[#181725] leading-tight truncate group-hover:text-primary transition-colors">
+                      {card.vendorName}
+                    </p>
+                    <p className="text-[11px] md:text-[11.5px] text-[#667085] mt-0.5 truncate">{lineFor(card)}</p>
+                  </div>
+
+                  <div className="md:hidden size-7 rounded-full bg-primary-light text-primary flex items-center justify-center shrink-0">
+                    <ChevronRight className="size-3.5" strokeWidth={2.5} />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
