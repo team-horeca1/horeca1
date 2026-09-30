@@ -46,7 +46,7 @@ export function VendorCategoryHeaderBar({
     if (!activeName) return null;
     return (
       tree.find((p) => p.name === activeName) ||
-      tree.find((p) => p.children.some((c) => c.name === activeName)) ||
+      tree.find((p) => p.children?.some((c) => c.name === activeName)) ||
       null
     );
   }, [tree, activeName]);
@@ -62,24 +62,37 @@ export function VendorCategoryHeaderBar({
 
   return (
     <>
-      <div className="mb-3.5 space-y-2">
-        {/* Top Control Bar: "Change Category" Pill + Items Count + Layout Toggle */}
-        <div className="flex items-center justify-between gap-2 bg-white/90 backdrop-blur-md rounded-2xl border border-divider/80 p-2 md:p-2.5 shadow-2xs">
+      <div className="mb-3.5 space-y-2 md:space-y-0">
+        {/* Top Control Bar: Trigger on Left, Items Count & Layout Mode on Right.
+            On Desktop (md+), subcategory chips sit in the middle on the exact same row! */}
+        <div className="flex items-center justify-between gap-2 md:gap-3 bg-white/90 backdrop-blur-md rounded-2xl border border-divider/80 p-2 md:p-2.5 shadow-2xs">
           {/* Left: Change Category Trigger Button */}
           <button
             type="button"
             aria-label="Browse and change category"
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 rounded-xl bg-ivory/80 hover:bg-primary-tint/40 border border-divider hover:border-primary/40 transition-all duration-200 group active:scale-[0.98] text-left shrink min-w-0"
+            className="flex items-center gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 rounded-xl bg-ivory/80 hover:bg-primary-tint/40 border border-divider hover:border-primary/40 transition-all duration-200 group active:scale-[0.98] text-left shrink-0"
           >
             <div className="size-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
               <Layers size={13} strokeWidth={2.2} />
             </div>
-            <span className="text-[12.5px] md:text-[13.5px] font-extrabold text-[#181725] group-hover:text-primary transition-colors truncate block">
+            <span className="text-[12.5px] md:text-[13.5px] font-extrabold text-[#181725] group-hover:text-primary transition-colors truncate max-w-[110px] sm:max-w-[140px] md:max-w-[170px] block">
               {currentLabel}
             </span>
             <ChevronDown size={13} strokeWidth={2.5} className="text-primary shrink-0 group-hover:translate-y-0.5 transition-transform ml-0.5" />
           </button>
+
+          {/* Desktop Only: Horizontal scrollable subcategory & filter chips in the same line */}
+          <div className="hidden md:flex flex-1 min-w-0 items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth">
+            <CategoryFilterChips
+              activeTab={activeTab}
+              onTabChange={onTabChange}
+              currentParent={currentParent}
+              tree={tree}
+              hasDeals={hasDeals}
+              hasFrequent={hasFrequent}
+            />
+          </div>
 
           {/* Right: Items Count & Layout Mode Switcher */}
           <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
@@ -124,128 +137,16 @@ export function VendorCategoryHeaderBar({
           </div>
         </div>
 
-        {/* Quick Filter Strip / Subcategory Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth">
-          {/* If drilled down into a parent category with subcategories */}
-          {currentParent && currentParent.children.length > 0 ? (
-            <>
-              <button
-                type="button"
-                onClick={() => onTabChange(`cat:${currentParent.name}`)}
-                className={cn(
-                  'px-3 py-1 rounded-full text-[11.5px] font-semibold shrink-0 transition-all shadow-2xs',
-                  activeTab === `cat:${currentParent.name}`
-                    ? 'bg-primary text-white shadow-xs'
-                    : 'bg-white text-text-secondary border border-divider hover:border-gray-300 hover:bg-ivory',
-                )}
-              >
-                All {currentParent.name}
-              </button>
-              {currentParent.children.map((child) => {
-                const isChildActive = activeTab === `cat:${child.name}`;
-                return (
-                  <button
-                    key={child.id || child.name}
-                    type="button"
-                    onClick={() => onTabChange(`cat:${child.name}`)}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-[11.5px] font-semibold shrink-0 transition-all flex items-center gap-1.5 shadow-2xs',
-                      isChildActive
-                        ? 'bg-primary text-white shadow-xs'
-                        : 'bg-white text-text-secondary border border-divider hover:border-gray-300 hover:bg-ivory',
-                    )}
-                  >
-                    <span>{child.name}</span>
-                    <span
-                      className={cn(
-                        'text-[10px] px-1.5 py-0.2 rounded-full tabular-nums',
-                        isChildActive ? 'bg-white/20 text-white' : 'bg-ivory text-text-muted',
-                      )}
-                    >
-                      {child.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </>
-          ) : (
-            /* Root chips: All, Deals, Frequent, and Top Categories */
-            <>
-              <button
-                type="button"
-                onClick={() => onTabChange('all')}
-                className={cn(
-                  'px-3 py-1 rounded-full text-[11.5px] font-semibold shrink-0 transition-all shadow-2xs',
-                  activeTab === 'all'
-                    ? 'bg-primary text-white shadow-xs'
-                    : 'bg-white text-text-secondary border border-divider hover:border-gray-300 hover:bg-ivory',
-                )}
-              >
-                All Items
-              </button>
-
-              {hasDeals && (
-                <button
-                  type="button"
-                  onClick={() => onTabChange('deals')}
-                  className={cn(
-                    'px-3 py-1 rounded-full text-[11.5px] font-semibold shrink-0 transition-all flex items-center gap-1 shadow-2xs',
-                    activeTab === 'deals'
-                      ? 'bg-rose-600 text-white shadow-xs'
-                      : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100',
-                  )}
-                >
-                  <Tag size={12} strokeWidth={2.2} />
-                  <span>Deals</span>
-                </button>
-              )}
-
-              {hasFrequent && (
-                <button
-                  type="button"
-                  onClick={() => onTabChange('frequent')}
-                  className={cn(
-                    'px-3 py-1 rounded-full text-[11.5px] font-semibold shrink-0 transition-all flex items-center gap-1 shadow-2xs',
-                    activeTab === 'frequent'
-                      ? 'bg-amber-600 text-white shadow-xs'
-                      : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100',
-                  )}
-                >
-                  <Zap size={12} strokeWidth={2.2} />
-                  <span>Frequent</span>
-                </button>
-              )}
-
-              {tree.slice(0, 8).map((cat) => {
-                const isActive =
-                  activeTab === `cat:${cat.name}` ||
-                  cat.children.some((c) => activeTab === `cat:${c.name}`);
-                return (
-                  <button
-                    key={cat.id || cat.name}
-                    type="button"
-                    onClick={() => onTabChange(`cat:${cat.name}`)}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-[11.5px] font-semibold shrink-0 transition-all flex items-center gap-1 shadow-2xs',
-                      isActive
-                        ? 'bg-primary text-white shadow-xs'
-                        : 'bg-white text-text-secondary border border-divider hover:border-gray-300 hover:bg-ivory',
-                    )}
-                  >
-                    <span>{cat.name}</span>
-                    <span
-                      className={cn(
-                        'text-[10px] px-1.5 py-0.2 rounded-full tabular-nums',
-                        isActive ? 'bg-white/20 text-white' : 'bg-ivory text-text-muted',
-                      )}
-                    >
-                      {cat.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </>
-          )}
+        {/* Mobile Only: Quick Filter Strip / Subcategory Chips row below */}
+        <div className="flex md:hidden items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 scroll-smooth">
+          <CategoryFilterChips
+            activeTab={activeTab}
+            onTabChange={onTabChange}
+            currentParent={currentParent}
+            tree={tree}
+            hasDeals={hasDeals}
+            hasFrequent={hasFrequent}
+          />
         </div>
       </div>
 
@@ -264,3 +165,145 @@ export function VendorCategoryHeaderBar({
     </>
   );
 }
+
+interface CategoryFilterChipsProps {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  currentParent: CategoryTreeNode | null;
+  tree: CategoryTreeNode[];
+  hasDeals: boolean;
+  hasFrequent: boolean;
+}
+
+function CategoryFilterChips({
+  activeTab,
+  onTabChange,
+  currentParent,
+  tree,
+  hasDeals,
+  hasFrequent,
+}: CategoryFilterChipsProps) {
+  if (currentParent && (currentParent.children?.length ?? 0) > 0) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => onTabChange(`cat:${currentParent.name}`)}
+          className={cn(
+            'px-3 py-1 rounded-full text-[11.5px] font-semibold shrink-0 transition-all shadow-2xs',
+            activeTab === `cat:${currentParent.name}`
+              ? 'bg-primary text-white shadow-xs'
+              : 'bg-white text-text-secondary border border-divider hover:border-gray-300 hover:bg-ivory',
+          )}
+        >
+          All {currentParent.name}
+        </button>
+        {currentParent.children.map((child) => {
+          const isChildActive = activeTab === `cat:${child.name}`;
+          return (
+            <button
+              key={child.id || child.name}
+              type="button"
+              onClick={() => onTabChange(`cat:${child.name}`)}
+              className={cn(
+                'px-3 py-1 rounded-full text-[11.5px] font-semibold shrink-0 transition-all flex items-center gap-1.5 shadow-2xs',
+                isChildActive
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'bg-white text-text-secondary border border-divider hover:border-gray-300 hover:bg-ivory',
+              )}
+            >
+              <span>{child.name}</span>
+              <span
+                className={cn(
+                  'text-[10px] px-1.5 py-0.2 rounded-full tabular-nums',
+                  isChildActive ? 'bg-white/20 text-white' : 'bg-ivory text-text-muted',
+                )}
+              >
+                {child.count}
+              </span>
+            </button>
+          );
+        })}
+      </>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => onTabChange('all')}
+        className={cn(
+          'px-3 py-1 rounded-full text-[11.5px] font-semibold shrink-0 transition-all shadow-2xs',
+          activeTab === 'all'
+            ? 'bg-primary text-white shadow-xs'
+            : 'bg-white text-text-secondary border border-divider hover:border-gray-300 hover:bg-ivory',
+        )}
+      >
+        All Items
+      </button>
+
+      {hasDeals && (
+        <button
+          type="button"
+          onClick={() => onTabChange('deals')}
+          className={cn(
+            'px-3 py-1 rounded-full text-[11.5px] font-semibold shrink-0 transition-all flex items-center gap-1 shadow-2xs',
+            activeTab === 'deals'
+              ? 'bg-rose-600 text-white shadow-xs'
+              : 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100',
+          )}
+        >
+          <Tag size={12} strokeWidth={2.2} />
+          <span>Deals</span>
+        </button>
+      )}
+
+      {hasFrequent && (
+        <button
+          type="button"
+          onClick={() => onTabChange('frequent')}
+          className={cn(
+            'px-3 py-1 rounded-full text-[11.5px] font-semibold shrink-0 transition-all flex items-center gap-1 shadow-2xs',
+            activeTab === 'frequent'
+              ? 'bg-amber-600 text-white shadow-xs'
+              : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100',
+          )}
+        >
+          <Zap size={12} strokeWidth={2.2} />
+          <span>Frequent</span>
+        </button>
+      )}
+
+      {tree.slice(0, 8).map((cat) => {
+        const isActive =
+          activeTab === `cat:${cat.name}` ||
+          cat.children?.some((c) => activeTab === `cat:${c.name}`);
+        return (
+          <button
+            key={cat.id || cat.name}
+            type="button"
+            onClick={() => onTabChange(`cat:${cat.name}`)}
+            className={cn(
+              'px-3 py-1 rounded-full text-[11.5px] font-semibold shrink-0 transition-all flex items-center gap-1 shadow-2xs',
+              isActive
+                ? 'bg-primary text-white shadow-xs'
+                : 'bg-white text-text-secondary border border-divider hover:border-gray-300 hover:bg-ivory',
+            )}
+          >
+            <span>{cat.name}</span>
+            <span
+              className={cn(
+                'text-[10px] px-1.5 py-0.2 rounded-full tabular-nums',
+                isActive ? 'bg-white/20 text-white' : 'bg-ivory text-text-muted',
+              )}
+            >
+              {cat.count}
+            </span>
+          </button>
+        );
+      })}
+    </>
+  );
+}
+

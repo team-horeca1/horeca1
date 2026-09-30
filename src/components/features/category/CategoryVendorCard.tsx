@@ -8,6 +8,7 @@ import { PLACEHOLDERS } from '@/lib/constants';
 export function CategoryVendorCard({
   href,
   name,
+  image,
   rating,
   minOrderValue,
   deliveryTime = '24 hrs',
@@ -15,12 +16,13 @@ export function CategoryVendorCard({
 }: {
   href: string;
   name: string;
+  image?: string | null;
   rating?: number;
   minOrderValue: number;
   deliveryTime?: string;
   index: number;
 }) {
-  const cover = PLACEHOLDERS.vendor;
+  const cover = image || PLACEHOLDERS.vendor;
   const showRating = typeof rating === 'number' && rating > 0;
 
   return (
@@ -28,13 +30,13 @@ export function CategoryVendorCard({
       href={href}
       className="bg-white rounded-xl border border-divider overflow-hidden shadow-cdl-1 hover:shadow-cdl-2 hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-200 group flex flex-col justify-between"
     >
-      <div className="relative w-full h-[96px] md:h-[130px] overflow-hidden bg-ivory">
+      <div className="relative w-full h-[96px] md:h-[130px] overflow-hidden bg-white">
         <Image
           src={cover}
           alt={name}
           fill
           sizes="(max-width: 768px) 50vw, 220px"
-          className="object-cover group-hover:scale-105 transition-transform duration-500"
+          className="object-contain p-2 group-hover:scale-105 transition-transform duration-500"
         />
       </div>
       <div className="p-2 md:p-3 flex flex-col flex-1 justify-between">

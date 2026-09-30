@@ -18,6 +18,11 @@ import {
 import { filterProductsByCatalogTab, type CategoryLinkInput } from '@/lib/categoryTree';
 import { CategoryBrowseLayout } from '@/components/features/category/CategoryBrowseLayout';
 import { CategorySkuCard, type CategorySkuItem } from '@/components/features/category/CategorySkuCard';
+import { VendorOfferPicker } from '@/components/features/homepage/VendorOfferPicker';
+import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
+import { useCart } from '@/context/CartContext';
+import { toast } from 'sonner';
+import type { VendorProduct } from '@/types';
 
 const PRODUCT_LIMIT = 60;
 
@@ -78,6 +83,29 @@ function CategoryBrowseContent() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const loadedKeyRef = useRef('');
+
+  const { addToCart } = useCart();
+  const [picker, setPicker] = useState<CategorySkuItem | null>(null);
+  const [addingId, setAddingId] = useState<string | null>(null);
+
+  const handleAddOffer = (offer: VendorProduct) => {
+    setAddingId(offer.id);
+    try {
+      const added = addToCart(offer, offer.minOrderQuantity || 1);
+      if (!added) return;
+      toast.success(`Added from ${offer.vendorName || 'supplier'}`);
+      setPicker(null);
+    } catch {
+      toast.error('Could not add to cart');
+    } finally {
+      queueMicrotask(() => setAddingId(null));
+    }
+  };
+
+  const openCompare = (item: CategorySkuItem) => {
+    if (item.offers.length === 0) return;
+    setPicker(item);
+  };
 
   const pincode = useDeliveryPincode();
   const validPin = pincode && /^\d{6}$/.test(pincode) ? pincode : undefined;
@@ -231,16 +259,32 @@ function CategoryBrowseContent() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5 pt-1.5 pb-2">
           {visibleProducts.map((item) => (
             <CategorySkuCard
               key={item.master?.id || item.defaultOffer.id}
               categorySlug={slug}
               item={item}
+              onCompare={openCompare}
+              onAdd={handleAddOffer}
+              addingId={addingId}
             />
           ))}
         </div>
       )}
+
+      {picker ? (
+        <VendorOfferPicker
+          productName={picker.master?.name || picker.defaultOffer.displayName || picker.defaultOffer.name}
+          offers={picker.offers}
+          pincode={validPin}
+          addingId={addingId}
+          onClose={() => setPicker(null)}
+          onAdd={handleAddOffer}
+        />
+      ) : null}
+
+      <StickyCartBar />
     </CategoryBrowseLayout>
   );
 }

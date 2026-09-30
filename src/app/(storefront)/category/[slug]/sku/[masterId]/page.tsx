@@ -145,7 +145,7 @@ function CategorySkuVendorsContent() {
   const vendorHref = (offer: CategorySkuItem['offers'][number]) => {
     const dest = offer.vendorSlug || offer.vendorId;
     const qs = new URLSearchParams();
-    qs.set('q', productName);
+    qs.set('product', offer.id);
     qs.set('cat', slug);
     return `/vendor/${dest}?${qs.toString()}`;
   };
@@ -188,17 +188,21 @@ function CategorySkuVendorsContent() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5">
-          {visibleOffers.map((offer, index) => (
-            <CategoryVendorCard
-              key={offer.id}
-              href={vendorHref(offer)}
-              name={offer.vendorName || 'Vendor'}
-              rating={offer.vendorRating}
-              minOrderValue={offer.vendorMinOrderValue ?? 0}
-              index={index}
-            />
-          ))}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5 pt-1.5 pb-2">
+          {visibleOffers.map((offer, index) => {
+            const offerImg = offer.images?.[0] || productImage || offer.vendorLogo || null;
+            return (
+              <CategoryVendorCard
+                key={offer.id}
+                href={vendorHref(offer)}
+                name={offer.vendorName || 'Vendor'}
+                image={offerImg}
+                rating={offer.vendorRating}
+                minOrderValue={offer.vendorMinOrderValue ?? 0}
+                index={index}
+              />
+            );
+          })}
         </div>
       )}
     </CategoryBrowseLayout>

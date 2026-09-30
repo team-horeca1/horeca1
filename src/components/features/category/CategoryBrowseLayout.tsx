@@ -118,7 +118,7 @@ export function CategoryBrowseLayout({
             onSelect={onCatalogTab}
             showYourItems={false}
           />
-          <div className="flex-1 min-w-0 overflow-x-hidden">{children}</div>
+          <div className="flex-1 min-w-0">{children}</div>
         </div>
       </div>
 

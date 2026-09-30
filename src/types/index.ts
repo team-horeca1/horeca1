@@ -28,6 +28,7 @@ export interface Vendor {
     /** Next delivery calendar day, `YYYY-MM-DD`. */
     nextDeliveryDate?: string;
     heroSlides?: StoreHeroSlide[];
+    phone?: string;
 }
 
 export interface StoreHeroSlide {

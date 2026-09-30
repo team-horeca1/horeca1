@@ -40,21 +40,42 @@ export interface CategoryTreeNode {
   children: CategoryTreeChild[];
 }
 
+/** Safely extracts a category name string from a string or object. */
+export function extractCategoryName(val: unknown): string {
+  if (typeof val === 'string') return val.trim();
+  if (val && typeof val === 'object') {
+    if ('name' in val && typeof (val as { name?: unknown }).name === 'string') {
+      return ((val as { name: string }).name || '').trim();
+    }
+  }
+  return '';
+}
+
 /** Build hierarchical category sidebar nodes from catalog products. */
 export function buildCategoryTree(products: CatalogProductForTree[]): CategoryTreeNode[] {
   const parents = new Map<string, CategoryTreeNode>();
 
   for (const p of products) {
+    const rawCatName = extractCategoryName(p.category);
+    const rawParentName = extractCategoryName(p.categoryParentName);
+
     const links: CategoryLinkInput[] = (p.subCategories && p.subCategories.length > 0)
-      ? p.subCategories
-      : (p.categoryId && p.category
+      ? p.subCategories.map((sc) => ({
+          id: String(sc.id || ''),
+          name: extractCategoryName(sc.name),
+          image: sc.image ?? undefined,
+          parentId: sc.parentId ? String(sc.parentId) : undefined,
+          parentName: extractCategoryName(sc.parentName) || undefined,
+          parentImage: sc.parentImage ?? undefined,
+        })).filter((sc) => sc.id && sc.name)
+      : (p.categoryId && rawCatName
         ? [{
-          id: p.categoryId,
-          name: p.category,
-          image: p.categoryImage,
-          parentId: p.categoryParentId,
-          parentName: p.categoryParentName ?? undefined,
-          parentImage: p.categoryParentImage,
+          id: String(p.categoryId),
+          name: rawCatName,
+          image: p.categoryImage ?? undefined,
+          parentId: p.categoryParentId ? String(p.categoryParentId) : undefined,
+          parentName: rawParentName || undefined,
+          parentImage: p.categoryParentImage ?? undefined,
         }]
         : []);
 
@@ -129,13 +150,19 @@ export function filterProductsByCatalogTab<T extends CatalogProductForTree>(
   if (!catalogTab.startsWith('cat:')) return products;
 
   const category = catalogTab.slice(4);
-  return products.filter((p) =>
-    p.subCategories?.some((sc) => sc.name === category || sc.parentName === category) ||
-    p.category === category ||
-    p.categoryParentName === category,
-  );
+  return products.filter((p) => {
+    const pCat = extractCategoryName(p.category);
+    const pParentCat = extractCategoryName(p.categoryParentName);
+    return (
+      p.subCategories?.some((sc) => sc.name === category || sc.parentName === category) ||
+      pCat === category ||
+      pParentCat === category
+    );
+  });
 }
 
-export function slugifyCategory(s: string): string {
+export function slugifyCategory(s: unknown): string {
+  if (typeof s !== 'string') return '';
   return s.toLowerCase().trim().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
+

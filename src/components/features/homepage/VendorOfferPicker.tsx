@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useEffect, useSyncExternalStore } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { X, Plus, Loader2, ChevronRight, AlertCircle } from 'lucide-react';
+import { X, Plus, Loader2, ChevronRight, AlertCircle, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
 import { vendorProductHref } from '@/lib/share-cards/types';
@@ -36,7 +36,16 @@ export function VendorOfferPicker({
   onClose,
   onAdd,
 }: VendorOfferPickerProps) {
+  const [showAll, setShowAll] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -51,6 +60,10 @@ export function VendorOfferPicker({
     if (stockDiff !== 0) return stockDiff;
     return offerPrice(a) - offerPrice(b);
   });
+
+  const limit = isMobile ? 4 : 6;
+  const hasMore = sorted.length > limit;
+  const displayedOffers = showAll || !hasMore ? sorted : sorted.slice(0, limit);
 
   const vendorHref = (offer: VendorProduct) =>
     vendorProductHref(offer.vendorId, offer.id);
@@ -99,7 +112,7 @@ export function VendorOfferPicker({
 
         {/* Offers list */}
         <div className="flex-1 overflow-y-auto divide-y divide-divider overscroll-contain px-1 py-1 pb-6 sm:pb-2">
-          {sorted.map((offer) => {
+          {displayedOffers.map((offer) => {
             const stocked = inStock(offer);
             const isAdding = addingId === offer.id;
             const addDisabled = !stocked || isAdding;
@@ -168,6 +181,19 @@ export function VendorOfferPicker({
               </div>
             );
           })}
+
+          {!showAll && hasMore && (
+            <div className="p-3 bg-white">
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className="w-full py-2.5 px-4 rounded-xl border border-divider hover:border-primary/40 bg-[#FAF7F2] hover:bg-primary-tint/30 text-[13px] font-bold text-primary flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+              >
+                <span>Show All Vendors ({sorted.length})</span>
+                <ChevronDown size={15} strokeWidth={2.5} />
+              </button>
+            </div>
+          )}
 
           {sorted.length === 0 && (
             <div className="p-8 text-center text-[13px] text-text-secondary">

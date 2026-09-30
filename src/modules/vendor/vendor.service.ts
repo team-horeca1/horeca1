@@ -123,7 +123,21 @@ export class VendorService {
     const vendor = await prisma.vendor.findFirst({
       where,
       include: {
-        serviceAreas: { where: { isActive: true }, select: { pincode: true } },
+        serviceAreas: {
+          where: { isActive: true },
+          take: 1,
+          select: {
+            pincode: true,
+            deliversMon: true,
+            deliversTue: true,
+            deliversWed: true,
+            deliversThu: true,
+            deliversFri: true,
+            deliversSat: true,
+            deliversSun: true,
+            cutoffTime: true,
+          },
+        },
         deliverySlots: { where: { isActive: true } },
         products: {
           where: { isActive: true },
@@ -131,16 +145,38 @@ export class VendorService {
           distinct: ['categoryId'],
         },
         _count: { select: { products: { where: { isActive: true } }, reviews: true } },
+        user: { select: { phone: true } },
+        businessAccount: { select: { mobilePhone: true, workPhone: true } },
       },
     });
 
     if (!vendor) throw Errors.notFound('Vendor');
 
     // Flatten products→category into a simple categories string array
-    const { products, _count, ...rest } = vendor;
-    const heroSlides = await listActivePageHeroSlides({ vendorId: vendor.id });
+    const { products, _count, user, businessAccount, ...rest } = vendor;
+    const orderAt = new Date();
+    const [heroSlides, holidays] = await Promise.all([
+      listActivePageHeroSlides({ vendorId: vendor.id }),
+      prisma.platformHoliday.findMany({
+        where: {
+          holidayDate: { gte: new Date(`${toLocalYmd(orderAt)}T00:00:00.000Z`) },
+        },
+        select: { holidayDate: true },
+        take: 60,
+      }),
+    ]);
+    const holidayDates = holidays.map((h) => h.holidayDate.toISOString().slice(0, 10));
+    const nextDelivery = computeNextDeliveryDate({
+      plan: vendor.serviceAreas[0] ?? null,
+      orderAt,
+      deliverThroughPublicHolidays: vendor.deliverThroughPublicHolidays,
+      holidayDates,
+    });
+    const phone = businessAccount?.mobilePhone || businessAccount?.workPhone || user?.phone || null;
     return {
       ...rest,
+      phone,
+      nextDeliveryDate: nextDelivery ? toLocalYmd(nextDelivery) : null,
       productCount: _count.products,
       totalRatings: _count.reviews,
       categories: [...new Set(products.map(p => p.category?.name).filter(Boolean))],
@@ -152,22 +188,58 @@ export class VendorService {
     const vendor = await prisma.vendor.findUnique({
       where: { slug },
       include: {
-        serviceAreas: { where: { isActive: true }, select: { pincode: true } },
+        serviceAreas: {
+          where: { isActive: true },
+          take: 1,
+          select: {
+            pincode: true,
+            deliversMon: true,
+            deliversTue: true,
+            deliversWed: true,
+            deliversThu: true,
+            deliversFri: true,
+            deliversSat: true,
+            deliversSun: true,
+            cutoffTime: true,
+          },
+        },
         deliverySlots: { where: { isActive: true } },
         products: {
           where: { isActive: true },
           select: { category: { select: { name: true } } },
           distinct: ['categoryId'],
         },
+        user: { select: { phone: true } },
+        businessAccount: { select: { mobilePhone: true, workPhone: true } },
       },
     });
 
     if (!vendor) throw Errors.notFound('Vendor');
 
-    const { products, ...rest } = vendor;
-    const heroSlides = await listActivePageHeroSlides({ vendorId: vendor.id });
+    const { products, user, businessAccount, ...rest } = vendor;
+    const orderAt = new Date();
+    const [heroSlides, holidays] = await Promise.all([
+      listActivePageHeroSlides({ vendorId: vendor.id }),
+      prisma.platformHoliday.findMany({
+        where: {
+          holidayDate: { gte: new Date(`${toLocalYmd(orderAt)}T00:00:00.000Z`) },
+        },
+        select: { holidayDate: true },
+        take: 60,
+      }),
+    ]);
+    const holidayDates = holidays.map((h) => h.holidayDate.toISOString().slice(0, 10));
+    const nextDelivery = computeNextDeliveryDate({
+      plan: vendor.serviceAreas[0] ?? null,
+      orderAt,
+      deliverThroughPublicHolidays: vendor.deliverThroughPublicHolidays,
+      holidayDates,
+    });
+    const phone = businessAccount?.mobilePhone || businessAccount?.workPhone || user?.phone || null;
     return {
       ...rest,
+      phone,
+      nextDeliveryDate: nextDelivery ? toLocalYmd(nextDelivery) : null,
       categories: [...new Set(products.map(p => p.category?.name).filter(Boolean))],
       heroSlides,
     };

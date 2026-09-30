@@ -19,6 +19,7 @@ interface BrowseCategoriesModalProps {
 }
 
 function getCategoryEmoji(name: string): string {
+  if (!name || typeof name !== 'string') return '📦';
   const n = name.toLowerCase();
   if (n.includes('dairy') || n.includes('milk') || n.includes('cheese') || n.includes('paneer') || n.includes('butter')) return '🧀';
   if (n.includes('beverage') || n.includes('syrup') || n.includes('drink') || n.includes('juice') || n.includes('tea') || n.includes('coffee') || n.includes('bar & brew')) return '☕';
@@ -73,8 +74,8 @@ export function BrowseCategoriesModal({
     const q = filterQuery.toLowerCase().trim();
     return categories.filter(
       (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.children.some((child) => child.name.toLowerCase().includes(q)),
+        (typeof c.name === 'string' && c.name.toLowerCase().includes(q)) ||
+        c.children?.some((child) => typeof child.name === 'string' && child.name.toLowerCase().includes(q)),
     );
   }, [categories, filterQuery]);
 
@@ -268,9 +269,10 @@ export function BrowseCategoriesModal({
             {/* Category Cards from Category Tree */}
             {filteredCategories.map((category) => {
               const tabKey = `cat:${category.name}`;
+              const cChildren = category.children || [];
               const isSelected =
                 activeTab === tabKey ||
-                category.children.some((c) => activeTab === `cat:${c.name}`);
+                cChildren.some((c) => activeTab === `cat:${c.name}`);
               const emoji = getCategoryEmoji(category.name);
 
               return (
@@ -317,9 +319,9 @@ export function BrowseCategoriesModal({
                   </div>
 
                   {/* Subcategories indicator */}
-                  {category.children.length > 0 && (
+                  {cChildren.length > 0 && (
                     <div className="mt-1.5 flex items-center gap-0.5 text-[10px] text-primary font-semibold">
-                      <span>{category.children.length} subcategories</span>
+                      <span>{cChildren.length} subcategories</span>
                       <ChevronRight size={10} strokeWidth={2.5} />
                     </div>
                   )}

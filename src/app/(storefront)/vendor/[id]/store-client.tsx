@@ -12,7 +12,7 @@ import { VendorProductCard } from '@/components/features/vendor/VendorProductCar
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
 import { dal } from '@/lib/dal';
 import { cn } from '@/lib/utils';
-import { buildCategoryTree, filterProductsByCatalogTab } from '@/lib/categoryTree';
+import { buildCategoryTree, filterProductsByCatalogTab, slugifyCategory, extractCategoryName } from '@/lib/categoryTree';
 import { useCart } from '@/context/CartContext';
 import { useDeliveryPincode } from '@/hooks/useDeliveryPincode';
 import type { Vendor, VendorProduct } from '@/types';
@@ -249,14 +249,13 @@ export default function VendorStorePage() {
         if (!activeTab.startsWith('cat:')) return;
         const current = activeTab.slice(4);
         // If activeTab is already a real category OR parent-category name (not the raw slug), nothing to do.
-        if (products.some(p => p.category === current || p.categoryParentName === current)) return;
-        const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-        const slug = slugify(initialCatSlug);
+        if (products.some(p => extractCategoryName(p.category) === current || extractCategoryName(p.categoryParentName) === current)) return;
+        const slug = slugifyCategory(initialCatSlug);
         // Prefer a sub-category match (shows products); fall back to a parent match (shows sub-category tiles).
-        const subMatch = products.find(p => slugify(p.category) === slug);
-        if (subMatch) { setActiveTab(`cat:${subMatch.category}`); return; }
-        const parentMatch = products.find(p => p.categoryParentName && slugify(p.categoryParentName) === slug);
-        if (parentMatch?.categoryParentName) setActiveTab(`cat:${parentMatch.categoryParentName}`);
+        const subMatch = products.find(p => slugifyCategory(p.category) === slug);
+        if (subMatch) { setActiveTab(`cat:${extractCategoryName(subMatch.category)}`); return; }
+        const parentMatch = products.find(p => p.categoryParentName && slugifyCategory(p.categoryParentName) === slug);
+        if (parentMatch?.categoryParentName) setActiveTab(`cat:${extractCategoryName(parentMatch.categoryParentName)}`);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [products, initialCatSlug]);
 
@@ -268,7 +267,7 @@ export default function VendorStorePage() {
 
     const activeCatName = activeTab.startsWith('cat:') ? activeTab.slice(4) : '';
     const parentOfActiveSub = useMemo(
-        () => vendorCategoryTree.find(p => p.children.some(c => c.name === activeCatName)),
+        () => vendorCategoryTree.find(p => p.children?.some(c => c.name === activeCatName)),
         [vendorCategoryTree, activeCatName],
     );
     const brandFilterName = useMemo(() => {
@@ -310,9 +309,9 @@ export default function VendorStorePage() {
                 (p.displayName ?? '').toLowerCase().includes(q) ||
                 (p.brandName ?? '').toLowerCase().includes(q) ||
                 (p.sku ?? '').toLowerCase().includes(q) ||
-                (p.category ?? '').toLowerCase().includes(q) ||
+                extractCategoryName(p.category).toLowerCase().includes(q) ||
                 (p.description ?? '').toLowerCase().includes(q) ||
-                (p.tags ?? []).some(t => t.toLowerCase().includes(q))
+                (p.tags ?? []).some(t => typeof t === 'string' && t.toLowerCase().includes(q))
             );
         }
 
@@ -330,6 +329,21 @@ export default function VendorStorePage() {
         const el = document.querySelector(`[data-product-id="${highlightProductId}"]`);
         if (el instanceof HTMLElement) el.scrollIntoView({ block: 'center' });
     }, [highlightProductId, loading, filteredProducts.length]);
+
+    const handleCategoryTabChange = useCallback((tab: string) => {
+        setActiveTab(tab);
+        // Clear search query so products in the selected category/subcategory are not blocked or showing 'no item'
+        if (searchQuery) {
+            setSearchQuery('');
+            if (typeof window !== 'undefined') {
+                const params = new URLSearchParams(window.location.search);
+                params.delete('q');
+                const newSearch = params.toString();
+                const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`;
+                window.history.replaceState(null, '', newUrl);
+            }
+        }
+    }, [searchQuery]);
 
     if (loading) {
         return (
@@ -359,7 +373,7 @@ export default function VendorStorePage() {
             <VendorStoreHeader 
                 vendor={vendor} 
                 activeTab={activeTab}
-                onTabChange={setActiveTab}
+                onTabChange={handleCategoryTabChange}
                 storePromos={storePromos}
             />
 
@@ -400,7 +414,7 @@ export default function VendorStorePage() {
             {activeTab !== 'ratings' && activeTab !== 'about' && activeTab !== 'orders' && (
                 <VendorCatalogNav
                     activeTab={activeTab}
-                    onTabChange={setActiveTab}
+                    onTabChange={handleCategoryTabChange}
                     categories={vendor.categories}
                     searchQuery={searchQuery}
                     onSearchChange={setSearchQuery}
@@ -455,14 +469,14 @@ export default function VendorStorePage() {
                             tree={vendorCategoryTree}
                             activeTab={activeTab}
                             productCount={products.length}
-                            onSelect={setActiveTab}
+                            onSelect={handleCategoryTabChange}
                         />
 
                         <div className="flex-1 min-w-0">
                             {/* Vendor Category Header Bar: Change Category Trigger + Item Count + Layout Switcher + Quick Filter Chips */}
                             <VendorCategoryHeaderBar
                                 activeTab={activeTab}
-                                onTabChange={setActiveTab}
+                                onTabChange={handleCategoryTabChange}
                                 tree={vendorCategoryTree}
                                 productCount={filteredProducts.length}
                                 totalProductsCount={products.length}
@@ -501,19 +515,20 @@ export default function VendorStorePage() {
                             {filteredProducts.length > 0 ? (
                                 <div className={cn(
                                     layoutMode === 'grid'
-                                        ? 'grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5'
-                                        : 'grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4'
+                                        ? 'grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-5 pt-1.5 pb-2'
+                                        : 'grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 pt-1.5 pb-2'
                                 )}>
                                     {filteredProducts.map((product) => (
                                         <div
                                             key={product.id}
                                             data-product-id={product.id}
-                                            className={cn(
-                                                'h-full',
-                                                highlightProductId === product.id ? 'ring-2 ring-primary rounded-xl' : undefined
-                                            )}
+                                            className="h-full"
                                         >
-                                            <VendorProductCard product={product} variant={layoutMode} />
+                                            <VendorProductCard
+                                                product={product}
+                                                variant={layoutMode}
+                                                isHighlighted={highlightProductId === product.id}
+                                            />
                                         </div>
                                     ))}
                                 </div>

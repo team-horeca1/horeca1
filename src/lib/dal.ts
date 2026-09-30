@@ -54,29 +54,33 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 // ---- TRANSFORMERS ----
 // These convert API response shapes → frontend type shapes
 
-function nextDeliveryLabel(slots: Array<{ dayOfWeek: number; slotStart: string }>): string {
-  if (!slots || slots.length === 0) return 'Tomorrow 7:00 AM';
+function nextDeliveryLabel(slots: Array<{ dayOfWeek: number; slotStart: string }>, nextDeliveryDate?: string): string {
+  if (nextDeliveryDate) {
+    const [y, m, d] = nextDeliveryDate.split('-').map(Number);
+    if (y && m && d) {
+      return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' });
+    }
+  }
+  if (!slots || slots.length === 0) return 'Tomorrow';
   const now = new Date();
   const todayDay = now.getDay(); // 0=Sun
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
   let bestDiff = Infinity;
   let bestLabel = '';
   for (const slot of slots) {
-    const [h, m] = slot.slotStart.split(':').map(Number);
-    const slotMinutes = h * 60 + m;
     let diff = (slot.dayOfWeek - todayDay + 7) % 7;
-    if (diff === 0 && slotMinutes <= nowMinutes) diff = 7; // passed today
+    if (diff === 0) diff = 7;
     if (diff < bestDiff) {
       bestDiff = diff;
-      const label = diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][slot.dayOfWeek];
-      bestLabel = `${label} ${slot.slotStart}`;
+      const label = diff === 1 ? 'Tomorrow' : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][slot.dayOfWeek];
+      bestLabel = label;
     }
   }
-  return bestLabel || 'Tomorrow 7:00 AM';
+  return bestLabel || 'Tomorrow';
 }
 
 function toVendor(v: Record<string, unknown>): Vendor {
   const slots = Array.isArray(v.deliverySlots) ? (v.deliverySlots as Array<{ dayOfWeek: number; slotStart: string }>) : [];
+  const nextDeliveryDate = typeof v.nextDeliveryDate === 'string' ? v.nextDeliveryDate : undefined;
   return {
     id: v.id as string,
     name: storeDisplayName({
@@ -88,7 +92,7 @@ function toVendor(v: Record<string, unknown>): Vendor {
     coverImage: (v.bannerUrl as string) || '',
     rating: Number(v.rating) || 0,
     totalRatings: typeof v.totalRatings === 'number' ? v.totalRatings : 0,
-    deliverySchedule: nextDeliveryLabel(slots),
+    deliverySchedule: nextDeliveryLabel(slots, nextDeliveryDate),
     deliveryTime: '24 hrs',
     minOrderValue: Number(v.minOrderValue) || 0,
     creditEnabled: (v.creditEnabled as boolean) || false,
@@ -100,6 +104,7 @@ function toVendor(v: Record<string, unknown>): Vendor {
     productCount: typeof v.productCount === 'number' ? v.productCount : undefined,
     nextDeliveryDate: typeof v.nextDeliveryDate === 'string' ? v.nextDeliveryDate : undefined,
     heroSlides: Array.isArray(v.heroSlides) ? (v.heroSlides as Vendor['heroSlides']) : [],
+    phone: (v.phone as string) || (v.user as { phone?: string })?.phone || (v.businessAccount as { mobilePhone?: string })?.mobilePhone || (v.businessAccount as { workPhone?: string })?.workPhone || undefined,
     address: (v.city || v.state)
       ? {
           line1: String(v.addressLine || ''),

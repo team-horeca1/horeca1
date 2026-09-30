@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import {
     Star,
-    MapPin,
     Phone,
     ClipboardList,
     CreditCard,
@@ -19,25 +18,11 @@ import { ShareButton } from '@/components/features/share/ShareButton';
 import { vendorShareContent } from '@/lib/share-cards/types';
 import { useStableSession } from '@/hooks/useStableSession';
 import { cn } from '@/lib/utils';
-import type { Address, StoreHeroSlide, StorePromotion, Vendor } from '@/types';
+import type { StoreHeroSlide, StorePromotion, Vendor } from '@/types';
 import { PLACEHOLDERS } from '@/lib/constants';
 import { parseImageMeta, supplierLogoSrc } from '@/lib/imageMeta';
 import { OffersSheet } from '@/components/features/promo/OffersSheet';
 import { Hero, type HeroContent } from '@/components/features/Hero';
-
-function formatVendorAddress(address?: Address): string {
-    if (!address) return '';
-    const parts = [address.line1, address.line2, address.city, address.state, address.postalCode || address.pincode]
-        .map((part) => part?.trim())
-        .filter((part): part is string => Boolean(part));
-    const unique: string[] = [];
-    for (const part of parts) {
-        const folded = part.toLowerCase();
-        if (unique.some((prev) => prev.toLowerCase().includes(folded))) continue;
-        unique.push(part);
-    }
-    return unique.join(', ');
-}
 
 function toHeroSlides(slides: StoreHeroSlide[] | undefined): HeroContent[] {
     return (slides ?? [])
@@ -67,6 +52,18 @@ function toHeroSlides(slides: StoreHeroSlide[] | undefined): HeroContent[] {
                 mobileImageUrl: mobile,
             };
         });
+}
+
+function formatDeliveryDate(nextDeliveryDate?: string | null): string {
+    if (!nextDeliveryDate) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' }).replace(/,/g, '');
+    }
+    const [y, m, d] = nextDeliveryDate.split('-').map(Number);
+    if (!y || !m || !d) return nextDeliveryDate;
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' }).replace(/,/g, '');
 }
 
 function StoreBannerIdentity({
@@ -107,18 +104,6 @@ function StoreBannerIdentity({
                             <Star size={11} className="fill-amber-400 text-amber-400" /> {vendor.rating}
                         </span>
                     ) : null}
-                    <span className="flex items-center gap-1 rounded-full border border-white/30 bg-white/20 backdrop-blur-xs px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-white">
-                        <Clock size={11} /> {vendor.deliverySchedule || 'Next day'}
-                    </span>
-                    {vendor.minOrderValue <= 0 ? (
-                        <span className="rounded-full border border-emerald-400/40 bg-emerald-500/25 backdrop-blur-xs px-2.5 py-0.5 text-[11px] font-semibold text-emerald-200">
-                            No Min. Order
-                        </span>
-                    ) : (
-                        <span className="rounded-full border border-white/30 bg-white/20 backdrop-blur-xs px-2.5 py-0.5 text-[11px] font-semibold text-white">
-                            Min. ₹{vendor.minOrderValue.toLocaleString('en-IN')}
-                        </span>
-                    )}
                     {vendor.creditEnabled ? (
                         <span className="flex items-center gap-1 rounded-full border border-purple-300/40 bg-purple-500/25 backdrop-blur-xs px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-purple-200">
                             <CreditCard size={11} strokeWidth={2} /> DiSCCO Credit
@@ -135,7 +120,7 @@ function StoreBannerIdentity({
                         </span>
                     ) : null}
                 </div>
-                {vendor.categories.length > 0 ? (
+                {vendor.categories && vendor.categories.length > 0 ? (
                     <p className="mt-1 line-clamp-1 text-sm font-medium text-white/85">
                         {vendor.categories.slice(0, 4).join(' · ')}
                     </p>
@@ -160,7 +145,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
     const heroSlides = toHeroSlides(vendor.heroSlides);
     const logoSrc = vendor.logo ? supplierLogoSrc(vendor.logo) : '';
     const coverSrc = parseImageMeta(vendor.coverImage || PLACEHOLDERS.vendor).src;
-    const addressLabel = formatVendorAddress(vendor.address);
+    const deliveryDateDisplay = formatDeliveryDate(vendor.nextDeliveryDate);
     
     const handleMyListsClick = (e: React.MouseEvent) => {
         if (!isLoggedIn) {
@@ -171,18 +156,45 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
         router.push(`/order-lists?vendorId=${vendor.id}`);
     };
 
+    const handleCallVendor = () => {
+        const rawPhone = vendor.phone || (vendor as { user?: { phone?: string } })?.user?.phone;
+        if (!rawPhone || !rawPhone.trim()) {
+            toast.error(`Contact phone number is not available for ${vendor.name}`);
+            return;
+        }
+        const phone = rawPhone.trim();
+        const digits = phone.replace(/[^0-9]/g, '');
+        const cleanPhone = phone.startsWith('+')
+            ? phone
+            : digits.length === 10
+                ? `+91${digits}`
+                : phone;
+        const telUri = `tel:${cleanPhone}`;
+
+        try {
+            window.location.href = telUri;
+        } catch {
+            // fallback
+        }
+
+        toast.success(`Calling ${vendor.name} (${phone})`, {
+            description: 'Dialer opened. You can also copy the number below.',
+            action: {
+                label: 'Copy Number',
+                onClick: () => {
+                    navigator.clipboard.writeText(phone);
+                    toast.success('Phone number copied to clipboard');
+                },
+            },
+            duration: 7000,
+        });
+    };
+
     const shareContent = vendorShareContent({
         id: vendor.id,
         name: vendor.name,
         image: vendor.logo || vendor.coverImage || null,
     });
-
-    const startOrdering = () => {
-        onTabChange('all');
-        setTimeout(() => {
-            window.scrollTo({ top: window.innerHeight * 0.45, behavior: 'smooth' });
-        }, 50);
-    };
 
     return (
         <div className="w-full md:bg-white md:pb-6">
@@ -266,10 +278,10 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                             />
                             <button
                                 type="button"
-                                onClick={() => onTabChange('about')}
+                                onClick={handleCallVendor}
                                 className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-light hover:bg-primary/20 border border-primary/20 text-primary transition-all active:scale-90 shadow-2xs"
-                                aria-label="Call or view vendor info"
-                                title="Vendor Info & Contact"
+                                aria-label={`Call ${vendor.name}`}
+                                title={vendor.phone ? `Call ${vendor.name} (${vendor.phone})` : `Call ${vendor.name}`}
                             >
                                 <Phone size={13} strokeWidth={2.25} />
                             </button>
@@ -305,7 +317,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
 
                         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-50/80 border border-blue-200/60 px-2 py-0.5 text-[10.5px] font-medium text-blue-900">
                             <Clock size={10.5} className="text-blue-600 shrink-0" />
-                            <span className="truncate max-w-[125px]">{vendor.deliverySchedule || 'Next day'}</span>
+                            <span className="truncate max-w-[125px]">{deliveryDateDisplay}</span>
                         </span>
 
                         {vendor.creditEnabled ? (
@@ -361,54 +373,81 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                 </div>
 
             <div className="hidden md:block max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
-                <div className="mt-1 flex flex-wrap gap-2">
-                    <button
-                        type="button"
-                        onClick={startOrdering}
-                        className="min-h-12 px-5 rounded-xl bg-primary text-white text-[13px] font-semibold hover:bg-primary-dark"
-                    >
-                        Start Ordering
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setDealsOpen(true)}
-                        className="min-h-12 px-5 rounded-xl border border-divider bg-white text-[13px] font-semibold text-text inline-flex items-center gap-2 hover:bg-ivory"
-                    >
-                        <Tag size={14} strokeWidth={2} />
-                        Deals &amp; Coupons
-                        {storePromos.length > 0 && (
-                            <span className="min-w-[1.2rem] h-5 px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
-                                {storePromos.length}
-                            </span>
-                        )}
-                    </button>
-                </div>
+                {/* Desktop Action Band: Deals, Quick Order List, Share, Call Vendor, MOV, Next Delivery */}
+                <div className="pt-3 pb-1">
+                    <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-[#FAF7F2] border border-divider/80 shadow-[0_2px_8px_rgba(37,24,0,0.03)]">
+                        {/* Left: Action Buttons */}
+                        <div className="flex items-center flex-wrap gap-2.5">
+                            {/* 1. Deals & Coupons */}
+                            <button
+                                type="button"
+                                onClick={() => setDealsOpen(true)}
+                                className="h-10 px-4 rounded-xl border border-primary/30 bg-white text-xs font-bold text-primary inline-flex items-center gap-2 hover:bg-primary-light/60 hover:border-primary/50 transition-all shadow-2xs active:scale-98 cursor-pointer"
+                                title="View Deals & Coupons"
+                            >
+                                <Tag size={14} strokeWidth={2.25} className="text-primary" />
+                                <span>Deals &amp; Coupons</span>
+                                {storePromos.length > 0 && (
+                                    <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary text-white text-[10px] font-black flex items-center justify-center">
+                                        {storePromos.length}
+                                    </span>
+                                )}
+                            </button>
 
-                {/* ── INFO BAR ── */}
-                <div className="flex items-center justify-between gap-3 px-1 pt-4 pb-3 border-b border-divider">
-                    {addressLabel ? (
-                        <div className="flex items-center gap-2 min-w-0">
-                            <MapPin size={16} className="text-primary shrink-0" strokeWidth={2} />
-                            <span className="text-xs md:text-sm font-medium text-text-secondary truncate">
-                                {addressLabel}
-                            </span>
+                            {/* 2. Quick Order List */}
+                            <button
+                                type="button"
+                                onClick={handleMyListsClick}
+                                className="h-10 px-4 rounded-xl border border-divider bg-white text-xs font-semibold text-text inline-flex items-center gap-2 hover:bg-[#FAF5EE] hover:border-primary/30 hover:text-primary transition-all shadow-2xs active:scale-98 cursor-pointer"
+                                title="Quick Order List"
+                            >
+                                <ClipboardList size={14} strokeWidth={2} className="text-text-secondary" />
+                                <span>Quick Order List</span>
+                            </button>
+
+                            {/* 3. Share */}
+                            <ShareButton
+                                content={shareContent}
+                                variant="chip"
+                                label="Share"
+                                className="h-10 px-4 rounded-xl border border-divider bg-white text-xs font-semibold text-text inline-flex items-center gap-2 hover:bg-[#FAF5EE] hover:border-primary/30 hover:text-primary transition-all shadow-2xs active:scale-98 cursor-pointer"
+                            />
+
+                            {/* 4. Call Vendor */}
+                            <button
+                                type="button"
+                                onClick={handleCallVendor}
+                                className="h-10 px-4 rounded-xl border border-divider bg-white text-xs font-semibold text-text inline-flex items-center gap-2 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all shadow-2xs active:scale-98 cursor-pointer"
+                                title={vendor.phone ? `Call ${vendor.name} (${vendor.phone})` : `Call ${vendor.name}`}
+                            >
+                                <Phone size={14} strokeWidth={2} className="text-emerald-600" />
+                                <span>Call Vendor</span>
+                                {vendor.phone && (
+                                    <span className="text-[11px] font-medium text-text-muted hidden lg:inline">
+                                        ({vendor.phone})
+                                    </span>
+                                )}
+                            </button>
                         </div>
-                    ) : null}
 
-                    <div className="flex items-center gap-2 shrink-0 ml-auto">
-                        <button type="button" className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-ivory border border-divider text-xs font-semibold text-text hover:bg-primary-light hover:border-primary/40 hover:text-primary transition-all">
-                            <Phone size={14} strokeWidth={2} />
-                            Call Vendor
-                        </button>
-                        <ShareButton content={shareContent} variant="chip" label="Share" />
-                        <button
-                            type="button"
-                            onClick={handleMyListsClick}
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-ivory border border-divider text-xs font-semibold text-text hover:bg-primary-light hover:border-primary/40 hover:text-primary transition-all"
-                        >
-                            <ClipboardList size={14} strokeWidth={2} />
-                            My Lists
-                        </button>
+                        {/* Right: MOV & Next Delivery */}
+                        <div className="flex items-center flex-wrap gap-2 shrink-0">
+                            {/* Min Order Value */}
+                            <div className="h-10 px-3.5 rounded-xl border border-divider bg-white text-xs inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap">
+                                <span className="font-semibold text-text-secondary">Min. order value:</span>
+                                <span className="font-bold text-emerald-700">
+                                    {vendor.minOrderValue <= 0 ? 'Rs. 0' : `Rs. ${vendor.minOrderValue.toLocaleString('en-IN')}`}
+                                </span>
+                            </div>
+
+                            {/* Next Delivery */}
+                            <div className="h-10 px-3.5 rounded-xl border border-divider bg-white text-xs inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap">
+                                <span className="font-semibold text-text-secondary">Next delivery:</span>
+                                <span className="font-bold text-emerald-700">
+                                    {deliveryDateDisplay}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
