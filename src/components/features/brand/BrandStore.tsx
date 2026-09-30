@@ -316,6 +316,24 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
         return list;
     }, [brand, selectedSku, searchQuery, activeTab]);
 
+    const allBannerImages = useMemo(() => {
+        if (!brand) return [];
+        const set = new Set<string>();
+        if (brand.bannerImage) {
+            brand.bannerImage.split(/[,|]/).forEach((u) => {
+                const s = u.trim();
+                if (s) set.add(s);
+            });
+        }
+        if (brand.showcaseImages) {
+            brand.showcaseImages.forEach((u) => {
+                const s = u.trim();
+                if (s) set.add(s);
+            });
+        }
+        return Array.from(set);
+    }, [brand]);
+
     const brandWideUnavailable = !!(
         pincode &&
         brand?.coverage &&
@@ -364,24 +382,6 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
         name: brand.name,
         image: logoParsed.src || bannerParsed.src || null,
     });
-
-    const allBannerImages = useMemo(() => {
-        if (!brand) return [];
-        const set = new Set<string>();
-        if (brand.bannerImage) {
-            brand.bannerImage.split(/[,|]/).forEach((u) => {
-                const s = u.trim();
-                if (s) set.add(s);
-            });
-        }
-        if (brand.showcaseImages) {
-            brand.showcaseImages.forEach((u) => {
-                const s = u.trim();
-                if (s) set.add(s);
-            });
-        }
-        return Array.from(set);
-    }, [brand]);
 
     const heroSlides: HeroContent[] = (brand.heroSlides.length > 0
         ? brand.heroSlides
