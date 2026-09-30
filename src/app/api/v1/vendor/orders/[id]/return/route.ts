@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { resolveVendorId } from '@/lib/resolveVendorId';
+import { requirePermission } from '@/lib/permissions/engine';
 import {
   remainingReturnableByOrderItem,
   returnService,
@@ -20,6 +21,7 @@ function extractOrderId(req: NextRequest): string {
 
 export const GET = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'returns.view');
     const vendorId = await resolveVendorId(ctx, req);
     const orderId = extractOrderId(req);
 
@@ -86,6 +88,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
 
 export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'returns.edit');
     const vendorId = await resolveVendorId(ctx, req);
     const orderId = extractOrderId(req);
     const body = staffInitiatedReturnSchema.parse(await req.json());

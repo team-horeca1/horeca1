@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
+import { requirePermission } from '@/lib/permissions/engine';
 import {
   remainingReturnableByOrderItem,
   returnService,
@@ -17,8 +18,9 @@ function extractOrderId(req: NextRequest): string {
   return segments[segments.length - 2];
 }
 
-export const GET = adminOnly(async (req: NextRequest) => {
+export const GET = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'orders.view');
     const orderId = extractOrderId(req);
 
     const order = await prisma.order.findUnique({
@@ -84,6 +86,7 @@ export const GET = adminOnly(async (req: NextRequest) => {
 
 export const POST = adminOnly(async (req: NextRequest, ctx) => {
   try {
+    requirePermission(ctx, 'orders.edit');
     const orderId = extractOrderId(req);
     const body = staffInitiatedReturnSchema.parse(await req.json());
 
