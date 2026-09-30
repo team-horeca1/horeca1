@@ -30,8 +30,10 @@ interface ContinueCard {
 interface ApiOrder {
   id: string;
   createdAt: string;
+  status?: string;
+  paymentStatus?: string;
   vendorId?: string;
-  vendor?: { id: string; businessName: string; displayName?: string | null; logoUrl: string | null };
+  vendor?: { id: string; businessName: string; displayName?: string | null; slug?: string; logoUrl: string | null };
   items?: Array<{ quantity: number }>;
 }
 
@@ -133,7 +135,7 @@ export function ContinueOrdering() {
           coverImage: group.items[0]?.product?.images?.[0] || vendor?.coverImage,
           subtitle: `${itemCount} ${itemCount === 1 ? 'item' : 'items'} in cart • ₹${total.toLocaleString('en-IN')}`,
           subtitleIcon: 'cart',
-          href: '/cart',
+          href: `/vendor/${vendor?.slug || group.vendorId}`,
           priority: 1,
           timestamp: Date.now(),
         });
@@ -141,6 +143,14 @@ export function ContinueOrdering() {
 
       pastOrders
         .slice()
+        .filter((order) => {
+          // Once paid and completed, it should disappear from continue ordering section
+          const isPaidOrCompleted =
+            order.paymentStatus === 'paid' ||
+            order.status === 'completed' ||
+            order.status === 'delivered';
+          return !isPaidOrCompleted;
+        })
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .forEach((order) => {
           const vendorId = order.vendorId || order.vendor?.id;
@@ -156,10 +166,10 @@ export function ContinueOrdering() {
             vendorName: order.vendor ? storeDisplayName(order.vendor) || vendor?.name || 'Vendor' : vendor?.name || 'Vendor',
             vendorLogo: order.vendor?.logoUrl || vendor?.logo || '',
             coverImage: vendor?.coverImage,
-            subtitle: itemCount > 0 ? `Ordered · ${itemCount} items` : 'Ordered',
+            subtitle: itemCount > 0 ? `In Progress · ${itemCount} items` : 'In Progress',
             subtitle2: getRelativeTime(new Date(order.createdAt).getTime()),
             subtitleIcon: 'order',
-            href: `/orders`,
+            href: `/vendor/${order.vendor?.slug || vendor?.slug || vendorId}`,
             priority: 2,
             timestamp: new Date(order.createdAt).getTime(),
           });

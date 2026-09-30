@@ -20,10 +20,12 @@ import {
     FileText,
     FileDown,
     Mail,
+    RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
+import { InitiateReturnModal } from '@/components/features/orders/InitiateReturnModal';
 
 interface OrderVendor {
     id: string;
@@ -193,6 +195,7 @@ export default function OrderDetailsPage() {
     const [error, setError] = useState<string | null>(null);
     const [updatingStatus, setUpdatingStatus] = useState(false);
     const [selectedStatus, setSelectedStatus] = useState('');
+    const [showReturnModal, setShowReturnModal] = useState(false);
     // Ops: edit quantities
     const [editedQty, setEditedQty] = useState<Record<string, number>>({});
     const [savingQty, setSavingQty] = useState(false);
@@ -413,6 +416,18 @@ export default function OrderDetailsPage() {
                         </div>
                         <p className="text-[#6B7280] text-[12px] font-medium mt-1">ID: {order.orderNumber} &bull; Created at {formatDate(order.createdAt)}</p>
                     </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    {order.status !== 'cancelled' && (
+                        <button
+                            type="button"
+                            onClick={() => setShowReturnModal(true)}
+                            className="h-[34px] px-4 rounded-[10px] border border-amber-300 bg-amber-50 text-[13px] font-bold text-amber-800 hover:bg-amber-100 flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                        >
+                            <RotateCcw size={15} />
+                            Initiate Return
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -913,6 +928,18 @@ export default function OrderDetailsPage() {
                     )}
                 </div>
             </div>
+
+            <InitiateReturnModal
+                isOpen={showReturnModal}
+                onClose={() => setShowReturnModal(false)}
+                orderId={order.id}
+                orderNumber={order.orderNumber}
+                apiEndpoint={`/api/v1/admin/orders/${order.id}/return`}
+                onSuccess={() => {
+                    // Refetch order
+                    window.location.reload();
+                }}
+            />
         </div>
     );
 }

@@ -67,25 +67,31 @@ export default function ContinueOrderingPage() {
                 seenVendors.add(group.vendorId);
 
                 const itemCount = group.items.reduce((sum, item) => sum + item.quantity, 0);
+                const vendor = vendorsList.find(v => v.id === group.vendorId);
                 allCards.push({
                     id: `cart-${group.vendorId}`,
                     vendorId: group.vendorId,
                     vendorName: group.vendorName,
-                    vendorLogo: group.vendorLogo || vendorsList.find(v => v.id === group.vendorId)?.logo || '',
+                    vendorLogo: group.vendorLogo || vendor?.logo || '',
                     subtitle: `${itemCount} items in cart • ₹${group.subtotal.toLocaleString('en-IN')}`,
                     subtitleIcon: 'cart',
-                    href: '/cart',
+                    href: `/vendor/${vendor?.slug || group.vendorId}`,
                     priority: 1,
                     timestamp: Date.now(),
                 });
             });
 
-            // SOURCE 2: Past Orders
+            // SOURCE 2: Past Orders (in progress / unpaid only)
             try {
                 const savedOrders = localStorage.getItem('horeca_orders');
                 if (savedOrders) {
-                    const orders: Array<{id: string; vendorId: string; vendorName?: string; vendorLogo?: string; createdAt: string}> = JSON.parse(savedOrders);
-                    orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    const orders: Array<{id: string; vendorId: string; vendorName?: string; vendorLogo?: string; createdAt: string; status?: string; paymentStatus?: string}> = JSON.parse(savedOrders);
+                    orders
+                        .filter((order) => {
+                            const isPaidOrCompleted = order.paymentStatus === 'paid' || order.status === 'completed' || order.status === 'delivered';
+                            return !isPaidOrCompleted;
+                        })
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                         .forEach((order) => {
                             if (!order.vendorId || seenVendors.has(order.vendorId)) return;
                             seenVendors.add(order.vendorId);
@@ -95,10 +101,10 @@ export default function ContinueOrderingPage() {
                                 vendorId: order.vendorId,
                                 vendorName: order.vendorName || vendor?.name || 'Vendor',
                                 vendorLogo: order.vendorLogo || vendor?.logo || '',
-                                subtitle: `Ordered`,
+                                subtitle: `In Progress`,
                                 subtitle2: getRelativeTime(new Date(order.createdAt).getTime()),
                                 subtitleIcon: 'order',
-                                href: '/orders',
+                                href: `/vendor/${vendor?.slug || order.vendorId}`,
                                 priority: 2,
                                 timestamp: new Date(order.createdAt).getTime(),
                             });

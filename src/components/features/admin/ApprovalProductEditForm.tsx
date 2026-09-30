@@ -178,15 +178,21 @@ export function seedApprovalProductForm(source: ApprovalProductSeedSource): Appr
     // Pending vendor listings keep the supplier POS code in vendorSku while
     // platform sku stays null until Accept composes the catalog listing SKU.
     // Prefill the editable SKU field from vendorSku so Admin Edit does not look blank.
-    const posSku = str(source.vendorSku ?? source.sku);
-    const platformSku = str(source.sku) || posSku;
+    const pending = asRecord(source.pendingEditPayload);
+    const posSku = str(
+        source.vendorSku ??
+        pending.vendorSku ??
+        source.sku ??
+        pending.sku
+    );
+    const platformSku = str(source.sku ?? pending.sku) || posSku;
 
     return {
         ...EMPTY_APPROVAL_PRODUCT_FORM,
-        name: str(source.name),
+        name: str(source.name ?? pending.name),
         sku: platformSku,
         vendorSku: posSku,
-        catalogSku: str(source.masterProduct?.sku),
+        catalogSku: str(source.masterProduct?.sku ?? pending.catalogSku),
         hsn: str(source.hsn),
         brand: str(source.brand),
         categoryIds: categoryIdsFromSource(source),

@@ -992,7 +992,33 @@ export class CatalogService {
       where.approvalStatus = 'approved';
     }
     if (categoryId) where.categoryId = categoryId;
-    if (search) where.name = { contains: search, mode: 'insensitive' };
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { brand: { contains: q, mode: 'insensitive' } },
+        { sku: { contains: q, mode: 'insensitive' } },
+        { vendorSku: { contains: q, mode: 'insensitive' } },
+        { tags: { has: q } },
+        {
+          category: {
+            name: { contains: q, mode: 'insensitive' },
+          },
+        },
+        {
+          brandMappings: {
+            some: {
+              status: { in: ['verified', 'auto_mapped'] },
+              OR: [
+                { brandMasterProduct: { name: { contains: q, mode: 'insensitive' } } },
+                { brandMasterProduct: { sku: { contains: q, mode: 'insensitive' } } },
+                { brand: { name: { contains: q, mode: 'insensitive' } } },
+              ],
+            },
+          },
+        },
+      ];
+    }
 
     const useFulfillmentStock = !aggregateStock;
     const stockCtx = useFulfillmentStock

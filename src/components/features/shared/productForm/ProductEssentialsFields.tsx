@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import FormSection from '@/components/features/shared/FormSection';
 import { CategoryHierarchyPicker } from '@/components/features/brand/CategoryHierarchyPicker';
 import { BrandSinglePicker } from '@/components/features/brand/BrandSinglePicker';
-import { ImageUpload } from '@/components/ui/ImageUpload';
+import { ImageUpload, MultiImageUpload } from '@/components/ui/ImageUpload';
 import {
   FieldLabel,
   productFormInputCls,
@@ -57,6 +57,8 @@ export interface ProductEssentialsFieldsProps {
   maxAdditionalCategories?: number;
   imageUrl: string;
   onImageUrlChange: (url: string) => void;
+  images?: string[];
+  onImagesChange?: (urls: string[]) => void;
   imageFolder?: 'products' | 'categories' | 'vendors' | 'banners' | 'misc';
   pricing: ProductEssentialsPricing;
   onBasePriceChange: (value: string) => void;
@@ -107,6 +109,8 @@ export function ProductEssentialsFields({
   maxAdditionalCategories,
   imageUrl,
   onImageUrlChange,
+  images,
+  onImagesChange,
   imageFolder,
   pricing,
   onBasePriceChange,
@@ -296,6 +300,17 @@ export function ProductEssentialsFields({
             />
             <FieldError message={errors.imageUrl} />
           </div>
+          {onImagesChange && (
+            <div id="ff-images" className="pt-2">
+              <MultiImageUpload
+                values={(images || []).filter(Boolean)}
+                onChange={onImagesChange}
+                folder={imageFolder}
+                label="Additional Pictures (Optional)"
+                max={6}
+              />
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">

@@ -83,6 +83,7 @@ interface BrandStoreData {
     slug: string;
     name: string;
     bannerImage: string;
+    showcaseImages?: string[];
     heroSlides: BrandHeroSlide[];
     logoImage: string;
     tagline: string;
@@ -192,6 +193,7 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
                     slug: d.slug,
                     name: d.name,
                     bannerImage: d.banner ?? '',
+                    showcaseImages: Array.isArray(d.showcaseImages) ? (d.showcaseImages as string[]) : [],
                     heroSlides: Array.isArray(d.heroSlides) ? d.heroSlides as BrandHeroSlide[] : [],
                     logoImage: d.logo ?? '',
                     tagline: d.tagline ?? '',
@@ -363,18 +365,36 @@ export function BrandStore({ brandId, initialCatSlug = '', initialSkuId = '' }: 
         image: logoParsed.src || bannerParsed.src || null,
     });
 
+    const allBannerImages = useMemo(() => {
+        if (!brand) return [];
+        const set = new Set<string>();
+        if (brand.bannerImage) {
+            brand.bannerImage.split(/[,|]/).forEach((u) => {
+                const s = u.trim();
+                if (s) set.add(s);
+            });
+        }
+        if (brand.showcaseImages) {
+            brand.showcaseImages.forEach((u) => {
+                const s = u.trim();
+                if (s) set.add(s);
+            });
+        }
+        return Array.from(set);
+    }, [brand]);
+
     const heroSlides: HeroContent[] = (brand.heroSlides.length > 0
         ? brand.heroSlides
-        : brand.bannerImage
-            ? [{
-                id: 'banner',
-                desktopImageUrl: brand.bannerImage,
-                mobileImageUrl: brand.bannerImage,
+        : allBannerImages.length > 0
+            ? allBannerImages.map((imgUrl, i) => ({
+                id: `banner-${i}`,
+                desktopImageUrl: imgUrl,
+                mobileImageUrl: imgUrl,
                 showText: false,
                 showCta: false,
                 showTextMobile: false,
                 showCtaMobile: false,
-            }]
+            }))
             : []
     ).filter((slide) => slide.desktopImageUrl || slide.mobileImageUrl).map((slide) => ({
         ...slide,

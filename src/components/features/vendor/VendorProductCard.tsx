@@ -714,12 +714,31 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     fill
                                     sizes="(max-width: 640px) 45vw, 320px"
                                     className={cn(
-                                        "object-contain transition-transform duration-500 ease-out p-1 group-hover:scale-[1.04]",
+                                        "object-contain transition-all duration-500 ease-out p-1",
+                                        product.images[1] ? "group-hover:opacity-0" : "group-hover:scale-[1.04]",
                                         isOutOfStock ? "grayscale" : ""
                                     )}
                                 />
+                                {product.images[1] && (
+                                    <Image
+                                        src={product.images[1]}
+                                        alt={product.name}
+                                        fill
+                                        sizes="(max-width: 640px) 45vw, 320px"
+                                        className={cn(
+                                            "object-contain transition-all duration-500 ease-out p-1 opacity-0 group-hover:opacity-100 group-hover:scale-[1.04]",
+                                            isOutOfStock ? "grayscale" : ""
+                                        )}
+                                    />
+                                )}
                             </div>
                         </div>
+
+                        {product.images && product.images.length > 1 && (
+                            <span className="absolute bottom-8 right-2 z-20 px-1.5 py-0.5 rounded-[5px] bg-black/60 text-white text-[9px] font-bold backdrop-blur-xs">
+                                1/{product.images.length}
+                            </span>
+                        )}
 
                         {imageBadges}
 

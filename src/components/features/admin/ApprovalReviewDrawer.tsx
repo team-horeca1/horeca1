@@ -1112,7 +1112,14 @@ export function ApprovalReviewDrawer({ target, onClose, onComplete }: Props) {
                                     </span>
                                 )}
                             </div>
-                            {vendorProduct.sku && <p className="text-[12px] text-[#AEAEAE]">SKU: {vendorProduct.sku}</p>}
+                            {(vendorProduct.sku || vendorProduct.vendorSku) && (
+                                <p className="text-[12px] text-[#AEAEAE]">
+                                    SKU: {vendorProduct.sku || vendorProduct.vendorSku}
+                                    {!vendorProduct.sku && vendorProduct.vendorSku && (
+                                        <span className="ml-1 text-[11px] text-[#8B6914] font-medium">(Supplier POS)</span>
+                                    )}
+                                </p>
+                            )}
                             {vendorProduct.brandMappings?.[0]?.brandMasterProduct?.brand?.name && (
                                 <p className="text-[12px] text-[#6B1D2E] font-semibold mt-0.5">
                                     {vendorProduct.brandMappings[0].brandMasterProduct.brand.name}

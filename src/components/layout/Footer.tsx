@@ -23,6 +23,7 @@ const FOOTER_LINKS: Record<string, Array<{ label: string; href: string }>> = {
         { label: 'Brands', href: '/brands' },
         { label: 'Deals', href: '/deals' },
         { label: 'Collections', href: '/collections' },
+        { label: 'Horeca1 Voices', href: '/voices' },
     ],
     support: [
         { label: 'Help Center', href: 'mailto:sales@horeca1.com' },

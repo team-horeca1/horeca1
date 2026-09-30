@@ -3350,6 +3350,8 @@ export default function VendorProductsPage() {
                                         }
                                         imageUrl={form.imageUrl}
                                         onImageUrlChange={(url) => updateField('imageUrl', url)}
+                                        images={form.images}
+                                        onImagesChange={(urls) => updateField('images', urls)}
                                         pricing={{
                                             basePrice: form.basePrice,
                                             originalPrice: form.originalPrice,

@@ -418,6 +418,7 @@ export class BrandService {
       slug: brand.slug,
       logo: brand.logoUrl,
       banner: brand.bannerUrl,
+      showcaseImages: brand.showcaseImages ?? [],
       heroSlides,
       tagline: brand.tagline,
       description: brand.description,
