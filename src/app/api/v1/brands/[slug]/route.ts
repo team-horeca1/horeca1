@@ -13,6 +13,7 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
+    const brandService = new BrandService();
     const { slug } = await params;
     const pincode = req.nextUrl.searchParams.get('pincode')?.trim() || undefined;
     const result = await brandService.getStoreBySlug(slug, { pincode });
