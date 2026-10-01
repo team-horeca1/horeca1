@@ -14,6 +14,7 @@ import { runMappingForVendorProduct, embedDistributorProduct } from '@/modules/b
 import {
   formatVendorSku,
   nextMasterSku,
+  parseVendorSku,
   posSkuMatchesListing,
   resolveVendorCode,
   validateMasterSku,
@@ -577,9 +578,17 @@ export const TOMBSTONE_PREFIX = '_deleted_';
 async function getVendorCode(vendorId: string, db: Db = prisma): Promise<string> {
   const vendor = await db.vendor.findUnique({
     where: { id: vendorId },
-    select: { vendorCode: true, slug: true },
+    select: { vendorCode: true, slug: true, businessAccountId: true },
   });
   if (!vendor) throw Errors.notFound('Vendor');
+  if (vendor.vendorCode?.trim()) return vendor.vendorCode.trim().toUpperCase();
+  if (vendor.businessAccountId) {
+    const primary = await db.vendor.findFirst({
+      where: { businessAccountId: vendor.businessAccountId, isPrimaryStore: true },
+      select: { vendorCode: true },
+    });
+    if (primary?.vendorCode?.trim()) return primary.vendorCode.trim().toUpperCase();
+  }
   return resolveVendorCode(vendor);
 }
 
@@ -591,9 +600,11 @@ async function composeVendorProductSku(
 ): Promise<string> {
   const trimmed = posSku.trim();
   if (!trimmed) throw Errors.badRequest('Your POS SKU is required.');
-  await assertVendorPosSkuUnique(vendorId, trimmed, excludeProductId, db);
   const vendorCode = await getVendorCode(vendorId, db);
-  const composed = formatVendorSku(vendorCode, trimmed);
+  const parsed = parseVendorSku(trimmed, vendorCode);
+  const purePosSku = parsed.posSku || trimmed;
+  await assertVendorPosSkuUnique(vendorId, purePosSku, excludeProductId, db);
+  const composed = formatVendorSku(vendorCode, purePosSku);
   await assertVendorSkuUnique(vendorId, composed, excludeProductId, db);
   return composed;
 }

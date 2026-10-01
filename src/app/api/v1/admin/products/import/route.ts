@@ -11,6 +11,7 @@ import {
   syncImportProductCategories,
   composeVendorListingSku,
 } from '@/modules/catalog/catalog.service';
+import { formatVendorSku, parseVendorSku, resolveVendorCode } from '@/lib/sku';
 import { syncProductToBrand, findOrCreateBrandByName } from '@/modules/brand/brand.service';
 import {
   partitionImportRows,
@@ -99,7 +100,7 @@ interface CommitResponse {
   backupId: string;
 }
 
-export const POST = adminOnly(async (req: NextRequest, ctx) => {
+export async function handleAdminProductImport(req: NextRequest, ctx: any) {
   try {
     requirePermission(ctx, 'products.create');
     const formData = await req.formData();
@@ -140,19 +141,55 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       catMap.set(c.slug.toLowerCase(), c.id);
     }
 
+    // Resolve vendor and inherit Supplier Code across stores of the same business account
+    let vendorCode: string | null = null;
+    if (vendorId) {
+      const vendorRecord = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: { vendorCode: true, businessAccountId: true, slug: true },
+      });
+      vendorCode = vendorRecord?.vendorCode?.trim() ? vendorRecord.vendorCode.trim().toUpperCase() : null;
+      if (!vendorCode && vendorRecord?.businessAccountId) {
+        const primary = await prisma.vendor.findFirst({
+          where: { businessAccountId: vendorRecord.businessAccountId, isPrimaryStore: true },
+          select: { vendorCode: true },
+        });
+        if (primary?.vendorCode?.trim()) vendorCode = primary.vendorCode.trim().toUpperCase();
+      }
+      if (!vendorCode && vendorRecord) {
+        vendorCode = resolveVendorCode(vendorRecord);
+      }
+    }
+
     // Fetch existing products for duplicate detection (by SKU or name)
     // When vendor selected: match within that vendor
     // When no vendor (catalog): match across ALL products to detect duplicates
     const vendorFilter: Record<string, unknown> = vendorId ? { vendorId } : {};
 
     // 1. Match by SKU
-    const skus = rows.filter(r => r.sku).map(r => r.sku!);
-    const existingProducts = skus.length > 0
+    const rawSkus = rows.filter(r => r.sku?.trim()).map(r => r.sku!.trim());
+    const querySkus = new Set<string>();
+    for (const s of rawSkus) {
+      querySkus.add(s);
+      querySkus.add(s.toLowerCase());
+      querySkus.add(s.toUpperCase());
+      if (vendorCode) {
+        const parsed = parseVendorSku(s, vendorCode);
+        if (parsed.posSku) {
+          querySkus.add(parsed.posSku);
+          querySkus.add(parsed.posSku.toLowerCase());
+          querySkus.add(parsed.posSku.toUpperCase());
+          querySkus.add(formatVendorSku(vendorCode, parsed.posSku));
+        }
+      }
+    }
+    const skusArray = Array.from(querySkus);
+    const existingProducts = skusArray.length > 0
       ? await prisma.product.findMany({
           where: {
             OR: [
-              { sku: { in: skus } },
-              ...(vendorId ? [{ vendorSku: { in: skus } }] : []),
+              { sku: { in: skusArray } },
+              ...(vendorId ? [{ vendorSku: { in: skusArray } }] : []),
             ],
             ...vendorFilter,
           },
@@ -166,6 +203,10 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     for (const p of existingProducts) {
       if (p.sku) existingBySku.set(p.sku.toLowerCase(), p);
       if (p.vendorSku) existingBySku.set(p.vendorSku.toLowerCase(), p);
+      if (p.sku && vendorCode) {
+        const parsed = parseVendorSku(p.sku, vendorCode);
+        if (parsed.posSku) existingBySku.set(parsed.posSku.toLowerCase(), p);
+      }
     }
 
     // 2. Match by name (fallback for rows without SKU or no SKU match)
@@ -184,9 +225,17 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
 
     // Helper: find existing product by SKU first, then by name
     function findExisting(row: { sku?: string; name: string }) {
-      if (row.sku) {
-        const match = existingBySku.get(row.sku.toLowerCase());
+      if (row.sku?.trim()) {
+        const raw = row.sku.trim();
+        const match = existingBySku.get(raw.toLowerCase());
         if (match) return match;
+        if (vendorCode) {
+          const parsed = parseVendorSku(raw, vendorCode);
+          if (parsed.posSku) {
+            const pMatch = existingBySku.get(parsed.posSku.toLowerCase());
+            if (pMatch) return pMatch;
+          }
+        }
       }
       return existingByName.get(row.name.toLowerCase());
     }
@@ -196,9 +245,17 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     // duplicate (the snapshot maps above predate any writes in this run).
     const createdThisRun = new Map<string, { id: string; sku: string | null; vendorSku?: string | null; categoryId: string | null; slug: string }>();
     function findCreated(row: { sku?: string; name: string }) {
-      if (row.sku) {
-        const bySku = createdThisRun.get('sku:' + row.sku.toLowerCase());
+      if (row.sku?.trim()) {
+        const raw = row.sku.trim().toLowerCase();
+        const bySku = createdThisRun.get('sku:' + raw);
         if (bySku) return bySku;
+        if (vendorCode) {
+          const parsed = parseVendorSku(row.sku.trim(), vendorCode);
+          if (parsed.posSku) {
+            const byPos = createdThisRun.get('sku:' + parsed.posSku.toLowerCase());
+            if (byPos) return byPos;
+          }
+        }
       }
       return createdThisRun.get('name:' + row.name.toLowerCase());
     }
@@ -206,6 +263,10 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
       const ref = { id: p.id, sku: p.sku, vendorSku: p.vendorSku, categoryId: p.categoryId, slug: p.slug };
       if (p.sku) createdThisRun.set('sku:' + p.sku.toLowerCase(), ref);
       if (p.vendorSku) createdThisRun.set('sku:' + p.vendorSku.toLowerCase(), ref);
+      if (p.sku && vendorCode) {
+        const parsed = parseVendorSku(p.sku, vendorCode);
+        if (parsed.posSku) createdThisRun.set('sku:' + parsed.posSku.toLowerCase(), ref);
+      }
       createdThisRun.set('name:' + p.name.toLowerCase(), ref);
     }
 
@@ -318,15 +379,6 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     }
 
     // ── COMMIT MODE ──
-    let vendorCode: string | null = null;
-    if (vendorId) {
-      const vendorRecord = await prisma.vendor.findUnique({
-        where: { id: vendorId },
-        select: { vendorCode: true },
-      });
-      vendorCode = vendorRecord?.vendorCode ?? null;
-    }
-
     // Step 1: Create backup of existing products that will be updated
     const backupId = `import_${Date.now()}_${(vendorId || 'catalog').slice(0, 8)}`;
     const backupSource = Array.from(
@@ -666,7 +718,8 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           let composedSku: string | undefined;
           let vendorSku: string | undefined;
           if (vendorId && r.sku) {
-            vendorSku = r.sku.trim();
+            const parsed = parseVendorSku(r.sku.trim(), vendorCode || undefined);
+            vendorSku = parsed.posSku || r.sku.trim();
             composedSku = await composeVendorListingSku(vendorId, vendorSku, existing.id, tx);
           }
 
@@ -788,7 +841,8 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
           let composedSku: string | null = null;
           let vendorSku: string | null = null;
           if (vendorId && r.sku) {
-            vendorSku = r.sku.trim();
+            const parsed = parseVendorSku(r.sku.trim(), vendorCode || undefined);
+            vendorSku = parsed.posSku || r.sku.trim();
             composedSku = await composeVendorListingSku(vendorId, vendorSku, undefined, tx);
           }
 
@@ -969,7 +1023,9 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
   } catch (error) {
     return errorResponse(error);
   }
-});
+}
+
+export const POST = adminOnly(handleAdminProductImport);
 
 // Helper: replace price slabs for a product from import row
 async function updatePriceSlabs(

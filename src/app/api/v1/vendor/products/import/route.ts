@@ -39,6 +39,7 @@ import {
   resolveImportCategoryIds,
   syncImportProductCategories,
 } from '@/modules/catalog/catalog.service';
+import { formatVendorSku, parseVendorSku, resolveVendorCode } from '@/lib/sku';
 import { findOrCreateBrandByName } from '@/modules/brand/brand.service';
 import {
   partitionImportRows,
@@ -160,7 +161,7 @@ export const GET = vendorOnly(async (req: NextRequest) => {
   }
 });
 
-export const POST = vendorOnly(async (req: NextRequest, ctx) => {
+export async function handleVendorProductImport(req: NextRequest, ctx: any) {
   try {
     const { vendorId } = await resolveVendorContext(ctx, req);
     const outletCtx = await resolveVendorOutletContext(ctx, req);
@@ -198,15 +199,48 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       catMap.set(c.slug.toLowerCase(), c.id);
     }
 
+    // Resolve vendor and inherit Supplier Code across stores of the same business account
+    const vendorRecord = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { vendorCode: true, businessAccountId: true, slug: true },
+    });
+    let vendorCode = vendorRecord?.vendorCode?.trim() ? vendorRecord.vendorCode.trim().toUpperCase() : null;
+    if (!vendorCode && vendorRecord?.businessAccountId) {
+      const primary = await prisma.vendor.findFirst({
+        where: { businessAccountId: vendorRecord.businessAccountId, isPrimaryStore: true },
+        select: { vendorCode: true },
+      });
+      if (primary?.vendorCode?.trim()) vendorCode = primary.vendorCode.trim().toUpperCase();
+    }
+    if (!vendorCode && vendorRecord) {
+      vendorCode = resolveVendorCode(vendorRecord);
+    }
+
     // ── Existing-product detection, scoped strictly to this vendor and
     //    excluding tombstones. Match by SKU first, then by name. ──
-    const skus = rows.filter(r => r.sku).map(r => r.sku!);
-    const existingProducts = skus.length > 0
+    const rawSkus = rows.filter(r => r.sku?.trim()).map(r => r.sku!.trim());
+    const querySkus = new Set<string>();
+    for (const s of rawSkus) {
+      querySkus.add(s);
+      querySkus.add(s.toLowerCase());
+      querySkus.add(s.toUpperCase());
+      if (vendorCode) {
+        const parsed = parseVendorSku(s, vendorCode);
+        if (parsed.posSku) {
+          querySkus.add(parsed.posSku);
+          querySkus.add(parsed.posSku.toLowerCase());
+          querySkus.add(parsed.posSku.toUpperCase());
+          querySkus.add(formatVendorSku(vendorCode, parsed.posSku));
+        }
+      }
+    }
+    const skusArray = Array.from(querySkus);
+    const existingProducts = skusArray.length > 0
       ? await prisma.product.findMany({
           where: {
             OR: [
-              { sku: { in: skus } },
-              { vendorSku: { in: skus } },
+              { sku: { in: skusArray } },
+              { vendorSku: { in: skusArray } },
             ],
             vendorId,
             ...NOT_TOMBSTONED,
@@ -221,6 +255,10 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     for (const p of existingProducts) {
       if (p.sku) existingBySku.set(p.sku.toLowerCase(), p);
       if (p.vendorSku) existingBySku.set(p.vendorSku.toLowerCase(), p);
+      if (p.sku && vendorCode) {
+        const parsed = parseVendorSku(p.sku, vendorCode);
+        if (parsed.posSku) existingBySku.set(parsed.posSku.toLowerCase(), p);
+      }
     }
 
     const names = rows.map(r => r.name);
@@ -237,9 +275,17 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     }
 
     function findExisting(row: { sku?: string; name: string }) {
-      if (row.sku) {
-        const match = existingBySku.get(row.sku.toLowerCase());
+      if (row.sku?.trim()) {
+        const raw = row.sku.trim();
+        const match = existingBySku.get(raw.toLowerCase());
         if (match) return match;
+        if (vendorCode) {
+          const parsed = parseVendorSku(raw, vendorCode);
+          if (parsed.posSku) {
+            const pMatch = existingBySku.get(parsed.posSku.toLowerCase());
+            if (pMatch) return pMatch;
+          }
+        }
       }
       return existingByName.get(row.name.toLowerCase());
     }
@@ -251,9 +297,17 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     // creations lets the duplicate row update that product instead.
     const createdThisRun = new Map<string, { id: string; sku: string | null; vendorSku?: string | null; categoryId: string | null; basePrice: number }>();
     function findCreated(row: { sku?: string; name: string }) {
-      if (row.sku) {
-        const bySku = createdThisRun.get('sku:' + row.sku.toLowerCase());
+      if (row.sku?.trim()) {
+        const raw = row.sku.trim().toLowerCase();
+        const bySku = createdThisRun.get('sku:' + raw);
         if (bySku) return bySku;
+        if (vendorCode) {
+          const parsed = parseVendorSku(row.sku.trim(), vendorCode);
+          if (parsed.posSku) {
+            const byPos = createdThisRun.get('sku:' + parsed.posSku.toLowerCase());
+            if (byPos) return byPos;
+          }
+        }
       }
       return createdThisRun.get('name:' + row.name.toLowerCase());
     }
@@ -274,6 +328,10 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
       };
       if (p.sku) createdThisRun.set('sku:' + p.sku.toLowerCase(), ref);
       if (p.vendorSku) createdThisRun.set('sku:' + p.vendorSku.toLowerCase(), ref);
+      if (p.sku && vendorCode) {
+        const parsed = parseVendorSku(p.sku, vendorCode);
+        if (parsed.posSku) createdThisRun.set('sku:' + parsed.posSku.toLowerCase(), ref);
+      }
       createdThisRun.set('name:' + p.name.toLowerCase(), ref);
     }
 
@@ -383,12 +441,6 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     }
 
     // ── COMMIT MODE ──
-    const vendorRecord = await prisma.vendor.findUnique({
-      where: { id: vendorId },
-      select: { vendorCode: true },
-    });
-    const vendorCode = vendorRecord?.vendorCode ?? null;
-
     // Backup every product that could be updated so the UI can offer a
     // complete Undo. A product can be matched by SKU *or* by name, so we
     // union both maps and dedupe by id — backing up only the SKU matches
@@ -700,7 +752,11 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
         let masterProductId: string | null = null;
         let approvalStatus: 'pending' | 'approved' = 'pending';
         let composedSku: string | null = null;
-        const vendorSku: string | null = r.sku?.trim() || null;
+        let vendorSku: string | null = null;
+        if (r.sku?.trim()) {
+          const parsed = parseVendorSku(r.sku.trim(), vendorCode || undefined);
+          vendorSku = parsed.posSku || r.sku.trim();
+        }
 
         if (!existing) {
           // SKU-centric: link to approved master when matched; always compose listing SKU.
@@ -998,7 +1054,9 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
   } catch (error) {
     return errorResponse(error);
   }
-});
+}
+
+export const POST = vendorOnly(handleVendorProductImport);
 
 // Replace a product's price slabs from an import row (vendor-scoped).
 // Accepts a tx client so it participates in the atomic commit transaction.
