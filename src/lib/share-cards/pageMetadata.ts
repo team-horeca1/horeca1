@@ -72,7 +72,7 @@ export async function productShareMetadata(id: string, routeVendorId?: string): 
   const vendor = product?.vendor;
   if (!product || !vendor?.id) {
     if (routeVendorId) return vendorShareMetadata(routeVendorId);
-    return { title: 'Horeca1' };
+    return { title: "Horeca1 - Bharat's Food & Grocery Distribution OS" };
   }
   if (routeVendorId) {
     const route = routeVendorId.trim();
@@ -82,7 +82,7 @@ export async function productShareMetadata(id: string, routeVendorId?: string): 
   const title = product.name || 'Horeca1';
   return catalogShareMetadata({
     title,
-    description: clip(product.description, `Shop ${title} on Horeca1`),
+    description: clip(product.description, `Shop ${title} on Horeca1 — Bharat's Food & Grocery Distribution OS`),
     path: vendorProductHref(vendor.slug || vendor.id, id),
     ogPath: `/api/og/product/${id}?format=square`,
   });
@@ -101,7 +101,7 @@ export async function vendorShareMetadata(idOrSlug: string): Promise<Metadata> {
   const pathId = vendor?.slug || vendor?.id || idOrSlug;
   return catalogShareMetadata({
     title,
-    description: clip(vendor?.description, `Order from ${title} on Horeca1`),
+    description: clip(vendor?.description, `Order from ${title} on Horeca1 — Bharat's Food & Grocery Distribution OS`),
     path: `/vendor/${pathId}`,
     ogPath: `/api/og/vendor/${encodeURIComponent(pathId)}?format=square`,
   });
@@ -115,7 +115,7 @@ export async function brandShareMetadata(slug: string): Promise<Metadata> {
   const title = brand?.name || 'Horeca1';
   return catalogShareMetadata({
     title,
-    description: clip(brand?.description, `Find ${title} on Horeca1`),
+    description: clip(brand?.description, `Find ${title} on Horeca1 — Bharat's Food & Grocery Distribution OS`),
     path: `/brand/${slug}`,
     ogPath: `/api/og/brand/${encodeURIComponent(slug)}?format=square`,
   });
@@ -129,7 +129,7 @@ export async function collectionShareMetadata(slug: string): Promise<Metadata> {
   const title = collection?.name || 'Horeca1';
   return catalogShareMetadata({
     title,
-    description: clip(collection?.description, `Browse ${title} on Horeca1`),
+    description: clip(collection?.description, `Browse ${title} on Horeca1 — Bharat's Food & Grocery Distribution OS`),
     path: `/collections/${slug}`,
     ogPath: `/api/og/collection/${encodeURIComponent(slug)}?format=square`,
   });

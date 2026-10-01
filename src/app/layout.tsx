@@ -17,13 +17,55 @@ const inter = Inter({
   variable: '--font-inter',
 });
 
+const SITE_URL = process.env.AUTH_URL || process.env.NEXTAUTH_URL || 'https://horeca1.com';
+
 export const metadata: Metadata = {
-  title: 'horeca1 - B2B E-commerce for Restaurant Products',
-  description: 'High speed, optimized B2B platform for restaurant and eating products.',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Horeca1 - Bharat's Food & Grocery Distribution OS",
+    template: '%s | Horeca1',
+  },
+  description: "Bharat's Food & Grocery Distribution OS. F&B Wholesale Made Easy.",
+  applicationName: 'Horeca1',
+  keywords: [
+    'Horeca1',
+    "Bharat's Food & Grocery Distribution OS",
+    'F&B Wholesale Made Easy',
+    'B2B Food Distribution',
+    'HoReCa Wholesale Procurement',
+    'Restaurant Grocery Supplier',
+    'Commercial Kitchen Supplies',
+    'Bulk Food Procurement India',
+  ],
+  authors: [{ name: 'Horeca1' }],
+  creator: 'Horeca1',
+  publisher: 'Horeca1',
   icons: {
     icon: '/horeca1_logo.jpg',
     shortcut: '/horeca1_logo.jpg',
     apple: '/horeca1_logo.jpg',
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'en_IN',
+    url: SITE_URL,
+    siteName: 'Horeca1',
+    title: "Horeca1 - Bharat's Food & Grocery Distribution OS",
+    description: "Bharat's Food & Grocery Distribution OS. F&B Wholesale Made Easy.",
+    images: [
+      {
+        url: '/horeca1_logo.jpg',
+        width: 800,
+        height: 800,
+        alt: "Horeca1 - Bharat's Food & Grocery Distribution OS",
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "Horeca1 - Bharat's Food & Grocery Distribution OS",
+    description: "Bharat's Food & Grocery Distribution OS. F&B Wholesale Made Easy.",
+    images: ['/horeca1_logo.jpg'],
   },
 };
 
