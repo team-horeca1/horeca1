@@ -289,7 +289,6 @@ export const POST = withRateLimit(adminOnly(async (req: NextRequest, ctx) => {
     const email = rawEmail && EMAIL_RE.test(rawEmail) ? rawEmail : null;
     const businessName = String(body.businessName ?? (cp?.companyName ?? cp?.legalName ?? '')).trim() || null;
     const gstNumber = String(body.gstNumber ?? (cp?.gstin ?? '')).trim() || null;
-    const pincode = String(body.pincode ?? (cp?.billingPincode ?? '')).trim() || null;
     const password = String(body.password ?? '');
     const role: Role = body.role === 'vendor' ? 'vendor' : 'customer';
 
@@ -329,6 +328,25 @@ export const POST = withRateLimit(adminOnly(async (req: NextRequest, ctx) => {
     const pwd = password ? await passwordFieldsWithReveal(password, 10) : null;
     const hcidDisplay = await uniqueHcid();
 
+    const da = (body.deliveryAddress && typeof body.deliveryAddress === 'object') ? body.deliveryAddress : {};
+    const ba = (body.billingAddress && typeof body.billingAddress === 'object') ? body.billingAddress : {};
+
+    const outletName = String(da.outletName ?? body.outletName ?? cp?.outletName ?? '').trim() || null;
+    const addressLine = String(da.addressLine ?? body.addressLine ?? cp?.addressLine ?? '').trim() || null;
+    const flatInfo = String(da.flatInfo ?? body.flatInfo ?? cp?.flatInfo ?? '').trim() || null;
+    const landmark = String(da.landmark ?? body.landmark ?? cp?.landmark ?? '').trim() || null;
+    const city = String(da.city ?? body.city ?? cp?.city ?? '').trim() || null;
+    const state = String(da.state ?? body.state ?? cp?.state ?? '').trim() || null;
+    const pincode = String(da.pincode ?? body.pincode ?? cp?.pincode ?? cp?.billingPincode ?? '').trim() || null;
+    const latitude = typeof da.latitude === 'number' ? da.latitude : typeof body.latitude === 'number' ? body.latitude : typeof cp?.latitude === 'number' ? cp.latitude : null;
+    const longitude = typeof da.longitude === 'number' ? da.longitude : typeof body.longitude === 'number' ? body.longitude : typeof cp?.longitude === 'number' ? cp.longitude : null;
+    const placeId = String(da.placeId ?? body.placeId ?? cp?.placeId ?? '').trim() || null;
+
+    const billingAddressLine = String(ba.addressLine ?? body.billingAddressLine ?? cp?.billingAddressLine ?? addressLine ?? '').trim() || null;
+    const billingCity = String(ba.city ?? body.billingCity ?? cp?.billingCity ?? city ?? '').trim() || null;
+    const billingState = String(ba.state ?? body.billingState ?? cp?.billingState ?? state ?? '').trim() || null;
+    const billingPincode = String(ba.pincode ?? body.billingPincode ?? cp?.billingPincode ?? pincode ?? '').trim() || null;
+
     const user = await prisma.user.create({
       data: {
         fullName,
@@ -336,7 +354,7 @@ export const POST = withRateLimit(adminOnly(async (req: NextRequest, ctx) => {
         email,
         businessName,
         gstNumber,
-        pincode,
+        pincode: pincode || billingPincode,
         password: pwd?.password ?? null,
         adminPasswordCipher: pwd?.adminPasswordCipher ?? null,
         role,
@@ -362,7 +380,66 @@ export const POST = withRateLimit(adminOnly(async (req: NextRequest, ctx) => {
       businessName,
       fullName,
       gstNumber,
+      outletName: outletName || undefined,
+      addressLine: addressLine || undefined,
+      flatInfo: flatInfo || undefined,
+      landmark: landmark || undefined,
+      city: city || undefined,
+      state: state || undefined,
+      pincode: (pincode || billingPincode) || undefined,
+      latitude,
+      longitude,
+      placeId: placeId || undefined,
+      billingAddressLine: billingAddressLine || undefined,
+      billingCity: billingCity || undefined,
+      billingState: billingState || undefined,
+      billingPincode: billingPincode || undefined,
     });
+
+    if (role === 'customer' && addressLine) {
+      const existingSaved = await prisma.savedAddress.findFirst({
+        where: { userId: user.id },
+      });
+      if (!existingSaved) {
+        await prisma.savedAddress.create({
+          data: {
+            userId: user.id,
+            outletId: provision.outletId,
+            label: outletName || 'Primary Delivery Address',
+            businessName: businessName || fullName,
+            fullAddress: addressLine,
+            shortAddress: addressLine.split(',').slice(0, 2).join(', '),
+            flatInfo,
+            landmark,
+            city,
+            state,
+            pincode,
+            latitude: latitude ?? 0,
+            longitude: longitude ?? 0,
+            placeId,
+            isDefault: true,
+          },
+        });
+      }
+    }
+
+    if (addressLine || outletName || city || state || pincode) {
+      await prisma.outlet.update({
+        where: { id: provision.outletId },
+        data: {
+          ...(outletName ? { name: outletName } : {}),
+          ...(addressLine ? { addressLine, requiresAddressUpdate: false } : {}),
+          ...(flatInfo !== null ? { flatInfo } : {}),
+          ...(landmark !== null ? { landmark } : {}),
+          ...(city ? { city } : {}),
+          ...(state ? { state } : {}),
+          ...(pincode ? { pincode } : {}),
+          ...(latitude !== null ? { latitude } : {}),
+          ...(longitude !== null ? { longitude } : {}),
+          ...(placeId !== null ? { placeId } : {}),
+        },
+      }).catch(() => {});
+    }
 
     if (role === 'vendor') {
       await prisma.vendor.create({

@@ -88,42 +88,34 @@ export function VoiceStoryCard({
         </div>
 
         {/* Card Content */}
-        <div className={cn('flex flex-col flex-1 bg-white justify-between', compact ? 'p-4' : 'p-5')}>
+        <div className={cn('flex flex-col flex-1 bg-white justify-between', compact ? 'p-3.5 sm:p-4' : 'p-5')}>
           <div>
-            {/* Role & Venue Header */}
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-primary/85 uppercase tracking-wide truncate">
-              <span className="truncate">{story.role || 'Industry Voice'}</span>
-              {story.venue && (
-                <>
-                  <span className="text-neutral-300 font-bold shrink-0">·</span>
-                  <span className="text-neutral-500 font-normal normal-case tracking-normal truncate">{story.venue}</span>
-                </>
-              )}
-            </div>
-
             {/* Profile Name */}
-            <h3 className="text-[16.5px] sm:text-[17.5px] font-extrabold text-neutral-900 group-hover:text-primary transition-colors leading-tight mt-1 line-clamp-1 tracking-tight">
+            <h3 className="text-[15px] sm:text-[16px] font-bold text-neutral-900 group-hover:text-primary transition-colors leading-snug line-clamp-1">
               {story.name}
             </h3>
 
-            {/* Curated Pull-Quote Box */}
-            <div className="my-2.5 p-3 rounded-xl bg-[#FAF8F5] border border-[#ECE6DB]/80 relative flex items-start gap-2">
-              <Quote size={13} className="text-primary/50 shrink-0 mt-0.5" />
-              <p className="text-[12px] sm:text-[12.5px] leading-relaxed text-neutral-700 italic font-medium line-clamp-2">
+            {/* Role & Venue Subtitle */}
+            {(story.role || story.venue) && (
+              <p className="text-[12px] text-neutral-500 line-clamp-1 mt-0.5 font-medium">
+                {[story.role, story.venue].filter(Boolean).join(' · ')}
+              </p>
+            )}
+
+            {/* Editorial Pull-Quote */}
+            {story.quote && (
+              <p className="mt-2 text-[12px] sm:text-[12.5px] leading-relaxed text-neutral-600 italic line-clamp-2">
                 &ldquo;{story.quote}&rdquo;
               </p>
-            </div>
+            )}
           </div>
 
-          {/* Footer Action */}
-          {variant !== 'related' ? (
-            <div className="pt-2.5 border-t border-neutral-100 flex items-center justify-between mt-auto">
-              <span className="inline-flex items-center gap-1.5 text-[12px] sm:text-[12.5px] font-bold text-primary group-hover:text-primary-dark transition-colors">
-                Read full story
-                <ArrowRight size={13} className="transition-transform duration-300 group-hover:translate-x-1" strokeWidth={2.5} />
-              </span>
-              <span className="text-[11px] text-neutral-400 font-medium">
-                Spotlight
+          {/* Footer Action — only on full listing page */}
+          {variant === 'listing' ? (
+            <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between">
+              <span className="inline-flex items-center gap-1 text-[12px] font-bold text-primary group-hover:text-primary-dark transition-colors">
+                Read story
+                <ArrowRight size={12} className="transition-transform duration-300 group-hover:translate-x-1" strokeWidth={2.5} />
               </span>
             </div>
           ) : null}
@@ -141,7 +133,7 @@ export function VoiceStoryCard({
         <ShareButton 
           content={shareContent} 
           variant="overlay" 
-          className="size-8.5 rounded-full bg-white/90 hover:bg-white text-neutral-700 shadow-sm border border-white/60 transition-transform active:scale-95" 
+          className="size-8 rounded-full bg-white/90 hover:bg-white text-neutral-700 shadow-xs border border-white/60 transition-transform active:scale-95" 
         />
       </div>
     </article>

@@ -18,8 +18,8 @@ const reviewSchema = z.object({
 
 function getOrderId(req: NextRequest): string {
   const segments = new URL(req.url).pathname.split('/');
-  // /api/v1/orders/{id}/review → id is at index [5]
-  return segments[5];
+  // /api/v1/orders/{id}/review → id is second-to-last segment
+  return segments[segments.length - 2];
 }
 
 export const POST = withAuth(async (req: NextRequest, ctx) => {

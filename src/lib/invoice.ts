@@ -227,11 +227,19 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     cell(LEFT + colW * 3, y, colW, cellH, 'Last Payment Date',  lastPaymentDate);
     y += cellH;
 
+    const isPaid = order.paymentStatus?.toLowerCase() === 'paid';
+    const payStatusDisplay = isPaid ? 'PAID' : (order.paymentStatus ? order.paymentStatus.toUpperCase() : 'PENDING');
+    const payMethodDisplay = formatPaymentMethodName(order.paymentMethod);
+    const refPo = order.customerPoNumber || '-';
+
     // Row 2
     cell(LEFT,           y, colW, cellH, 'Order Date',          invDate);
     cell(LEFT + colW,     y, colW, cellH, 'Delivery Time Slot', slot);
-    cell(LEFT + colW * 2, y, colW, cellH, 'Reference PO',       '-');
-    cell(LEFT + colW * 3, y, colW, cellH, 'Payment Status',     order.paymentStatus);
+    cell(LEFT + colW * 2, y, colW, cellH, 'Reference PO / Terms', refPo);
+    cell(LEFT + colW * 3, y, colW, cellH, 'Payment Status', `${payStatusDisplay} (${payMethodDisplay})`, {
+      bold: true,
+      valueSize: 7.5,
+    });
     y += cellH + 4;
 
     // ── Bill From / Shipped From boxes ──────────────────────────────────────
@@ -447,6 +455,26 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     doc.text('—', LEFT + 40, y + 4, { width: PAGE_W - 50 });
     y += irnH + 4;
 
+    // ── Payment / Remittance Box (for Pending / Offline / Credit payments) ──
+    const hasBankDetails = Boolean(order.vendor.bankAccountNumber && order.vendor.bankIfsc);
+    if (!isPaid) {
+      const remitH = hasBankDetails ? 30 : 22;
+      doc.lineWidth(0.6).strokeColor('#000').rect(LEFT, y, PAGE_W, remitH).stroke();
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#c0392b');
+      doc.text('PAYMENT PENDING / REMITTANCE INSTRUCTIONS:', LEFT + 5, y + 3);
+      doc.font('Helvetica').fontSize(7.5).fillColor('#000');
+      
+      let remitText = `Please remit payment against Invoice #${order.orderNumber} via ${payMethodDisplay}.`;
+      if (hasBankDetails) {
+        remitText += ` Bank: ${order.vendor.bankName || 'Vendor Bank'} | A/C Name: ${order.vendor.bankAccountName || order.vendor.businessName} | A/C No: ${order.vendor.bankAccountNumber} | IFSC: ${order.vendor.bankIfsc}`;
+      }
+      if (order.customerPoNumber) {
+        remitText += ` | PO Ref: ${order.customerPoNumber}`;
+      }
+      doc.text(remitText, LEFT + 5, y + 13, { width: PAGE_W - 10, lineGap: 1 });
+      y += remitH + 4;
+    }
+
     // ── Declaration ─────────────────────────────────────────────────────────
     doc.font('Helvetica-Bold').fontSize(9).fillColor('#000');
     doc.text('Declaration', LEFT, y);
@@ -477,6 +505,24 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
 // --------------------------------------------------------------------------
 // Helpers
 // --------------------------------------------------------------------------
+
+function formatPaymentMethodName(method: string | null | undefined): string {
+  if (!method) return 'Custom Payment';
+  switch (method) {
+    case 'online': return 'Online Payment';
+    case 'cod': return 'Cash on Delivery';
+    case 'prepaid': return 'Prepaid';
+    case 'bank_transfer': return 'Bank Transfer / NEFT';
+    case 'po_number': return 'Purchase Order (PO)';
+    case 'cheque': return 'Cheque';
+    case 'credit': return 'Credit Terms';
+    case 'vendor_credit': return 'Vendor Credit';
+    case 'wallet':
+    case 'h1_wallet': return 'H1 Wallet';
+    case 'discco': return 'DiSCCO Credit';
+    default: return method.replace(/_/g, ' ').toUpperCase();
+  }
+}
 
 function fmtNum(amount: number): string {
   return amount.toLocaleString('en-IN', {

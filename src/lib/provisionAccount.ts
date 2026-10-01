@@ -7,6 +7,7 @@
 import type { PrismaClient, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { mapToBusinessAccount, mapToPrimaryOutlet } from '@/lib/customerProfileMapper';
+import { PLACEHOLDER_OUTLET_ADDRESS } from '@/lib/constants/customerProfile';
 import type { CustomerProfileInput } from '@/lib/validators/customer-profile';
 
 export type AccountKind = 'customer' | 'vendor' | 'brand';
@@ -43,16 +44,26 @@ function toProfileInput(input: ProvisionInput): CustomerProfileInput {
     displayName: input.displayName ?? undefined,
     pan: input.pan ?? undefined,
     fssaiNumber: input.fssaiNumber ?? undefined,
+    outletName: input.outletName ?? undefined,
     addressLine: input.addressLine ?? undefined,
+    flatInfo: input.flatInfo ?? undefined,
+    landmark: input.landmark ?? undefined,
     city: input.city ?? undefined,
     state: input.state ?? undefined,
     pincode: input.pincode ?? undefined,
+    latitude: input.latitude ?? undefined,
+    longitude: input.longitude ?? undefined,
+    placeId: input.placeId ?? undefined,
+    billingAddressLine: input.billingAddressLine ?? input.addressLine ?? undefined,
+    billingCity: input.billingCity ?? input.city ?? undefined,
+    billingState: input.billingState ?? input.state ?? undefined,
+    billingPincode: input.billingPincode ?? input.pincode ?? undefined,
   };
 }
 
 export async function provisionDefaultAccount(
   input: ProvisionInput,
-  client?: Pick<PrismaClient, 'user' | 'businessAccountMember' | 'businessAccount' | 'outlet' | 'userRole' | 'accountRole'>,
+  client?: Pick<PrismaClient, 'user' | 'businessAccountMember' | 'businessAccount' | 'outlet' | 'userRole' | 'accountRole' | 'savedAddress'>,
 ): Promise<ProvisionResult> {
   const db = client ?? prisma;
   const profile = toProfileInput(input);
@@ -150,6 +161,45 @@ export async function provisionDefaultAccount(
     where: { id: account.id },
     data: { primaryOutletId: outlet.id },
   });
+
+  // V2.2: Ensure customer has a default SavedAddress matching this primary outlet
+  // so storefront checkout, cart delivery address, and order placement immediately resolve.
+  if (flags.isCustomer && outletData.addressLine && outletData.addressLine !== PLACEHOLDER_OUTLET_ADDRESS) {
+    const existingSaved = await db.savedAddress.findFirst({
+      where: { userId: input.userId },
+    });
+    if (!existingSaved) {
+      await db.savedAddress.create({
+        data: {
+          userId: input.userId,
+          outletId: outlet.id,
+          label: outletData.name || 'Primary Delivery Address',
+          businessName: (baData as { legalName?: string }).legalName || input.businessName || input.fullName,
+          fullAddress: outletData.addressLine,
+          shortAddress: outletData.addressLine.split(',').slice(0, 2).join(', '),
+          flatInfo: outletData.flatInfo,
+          landmark: outletData.landmark,
+          city: outletData.city,
+          state: outletData.state,
+          pincode: outletData.pincode,
+          latitude: outletData.latitude ?? 0,
+          longitude: outletData.longitude ?? 0,
+          placeId: outletData.placeId,
+          isDefault: true,
+        },
+      });
+    }
+
+    if (outletData.pincode) {
+      await db.user.update({
+        where: { id: input.userId },
+        data: {
+          pincode: outletData.pincode,
+          ...((baData as { legalName?: string }).legalName ? { businessName: (baData as { legalName?: string }).legalName } : {}),
+        },
+      }).catch(() => {});
+    }
+  }
 
   await db.businessAccountMember.create({
     data: {

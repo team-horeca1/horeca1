@@ -70,6 +70,7 @@ const STATUS_CONFIG: Record<string, { label: string; textColor: string; bgColor:
     pending:    { label: 'Pending',              textColor: 'text-amber-700',  bgColor: 'bg-amber-50',   borderColor: 'border-amber-200', icon: <Clock size={14} /> },
     confirmed:  { label: 'Confirmed',            textColor: 'text-blue-700',   bgColor: 'bg-blue-50',    borderColor: 'border-blue-200',  icon: <CheckCircle2 size={14} /> },
     processing: { label: 'Being Processed',       textColor: 'text-purple-700', bgColor: 'bg-purple-50',  borderColor: 'border-purple-200',icon: <Loader2 size={14} /> },
+    ready_for_dispatch: { label: 'Ready for Dispatch', textColor: 'text-cyan-700', bgColor: 'bg-cyan-50', borderColor: 'border-cyan-200', icon: <Package size={14} /> },
     shipped:    { label: 'Out for Delivery',      textColor: 'text-indigo-700', bgColor: 'bg-indigo-50',  borderColor: 'border-indigo-200',icon: <Truck size={14} /> },
     out_for_delivery: { label: 'Out for Delivery', textColor: 'text-indigo-700', bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200', icon: <Truck size={14} /> },
     partially_delivered: { label: 'Partially Fulfilled', textColor: 'text-amber-700', bgColor: 'bg-amber-50', borderColor: 'border-amber-200', icon: <Package size={14} /> },
@@ -542,6 +543,13 @@ export default function OrderDetailPage() {
                             </div>
                         )}
 
+                        {/* Returns & Replacements Section */}
+                        <CustomerReturnSection
+                            orderId={orderId}
+                            orderStatus={order.status}
+                            items={order.items}
+                        />
+
                         {/* Items */}
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                             <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
@@ -785,14 +793,14 @@ export default function OrderDetailPage() {
 
                         {/* Actions */}
                         <div className="space-y-3">
-                            {order.paymentStatus === 'paid' && (
+                            {order.status !== 'draft' && order.status !== 'cancelled' && (
                                 <a
                                     href={`/api/v1/orders/${order.id}/invoice`}
                                     download
-                                    className="w-full flex items-center justify-center gap-2 py-3.5 border-2 border-primary/40 text-primary text-[14px] font-black rounded-2xl hover:bg-primary/5 transition-all"
+                                    className="w-full flex items-center justify-center gap-2 py-3.5 border-2 border-primary/40 text-primary text-[14px] font-black rounded-2xl hover:bg-primary/5 transition-all shadow-sm active:scale-[0.99]"
                                 >
                                     <FileDown size={16} />
-                                    Download Invoice
+                                    Download Tax Invoice {order.paymentStatus !== 'paid' ? '(Payment Pending)' : ''}
                                 </a>
                             )}
                             <button onClick={handleReorder}
@@ -886,11 +894,6 @@ export default function OrderDetailPage() {
                                     </div>
                                 </div>
                             )}
-                            <CustomerReturnSection
-                                orderId={orderId}
-                                orderStatus={order.status}
-                                items={order.items}
-                            />
                             <Link href="/orders"
                                 className="w-full py-3 flex items-center justify-center gap-1 text-[13px] font-bold text-gray-400 hover:text-gray-600 transition-colors">
                                 <ChevronLeft size={14} />

@@ -1583,14 +1583,14 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                             )}
                         </div>
 
-                        {order.paymentStatus === 'paid' && (
+                        {order.status !== 'cancelled' && (
                             <a
                                 href={`/api/v1/vendor/orders/${order.id}/invoice`}
                                 download
                                 className="w-full h-[38px] rounded-[8px] text-[12px] font-bold border border-primary/40 text-primary hover:bg-primary-light transition-colors flex items-center justify-center gap-1.5"
                             >
                                 <FileDown size={14} />
-                                Download Invoice
+                                Download Tax Invoice {order.paymentStatus !== 'paid' ? '(Payment Pending)' : '(Paid)'}
                             </a>
                         )}
                     </div>

@@ -26,6 +26,8 @@ import {
     Users,
     SlidersHorizontal,
     MapPin,
+    Truck,
+    Store,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useParams, useRouter } from 'next/navigation';
@@ -92,6 +94,16 @@ interface UserData {
             designation: string | null;
             leadStatus: string | null;
             creditType: string | null;
+            outlets?: Array<{
+                id: string;
+                name: string;
+                code: string | null;
+                addressLine: string;
+                city: string | null;
+                state: string | null;
+                pincode: string | null;
+                isActive: boolean;
+            }>;
         };
     }>;
     creditWallets?: Array<{
@@ -537,6 +549,57 @@ export default function CustomerDetailsPage() {
                                                     <InfoCardField label="Designation" value={primaryBa?.designation} />
                                                     <InfoCardField label="Lead Status" value={primaryBa?.leadStatus} />
                                                 </div>
+                                            </div>
+
+                                            {/* Primary Delivery Address & Outlets */}
+                                            <div className="bg-white rounded-[20px] border border-[#D1D5DB] p-6 shadow-sm">
+                                                <div className="flex items-center justify-between border-b pb-2.5 mb-4">
+                                                    <h3 className="font-extrabold text-[15px] text-[#181725] flex items-center gap-2">
+                                                        <Truck size={16} className="text-[#6B1D2E]" />
+                                                        Primary Delivery Address &amp; Outlets
+                                                    </h3>
+                                                    {primaryBa?.outlets && primaryBa.outlets.length > 0 && (
+                                                        <span className="text-[11px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                                                            {primaryBa.outlets.length} outlet{primaryBa.outlets.length !== 1 ? 's' : ''}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {(() => {
+                                                    const primaryOutlet = primaryBa?.outlets?.[0];
+                                                    const deliveryAddress = primaryOutlet?.addressLine && primaryOutlet.addressLine !== 'Address not set' ? primaryOutlet.addressLine : null;
+                                                    return (
+                                                        <div className="space-y-4">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                                                <InfoCardField label="Primary Outlet Name" value={primaryOutlet?.name || user.businessName || 'Main Outlet'} />
+                                                                <div className="sm:col-span-2">
+                                                                    <InfoCardField label="Delivery Address" value={deliveryAddress || 'Not set'} />
+                                                                </div>
+                                                                <InfoCardField label="Delivery City" value={primaryOutlet?.city || primaryBa?.billingCity} />
+                                                                <InfoCardField label="Delivery State" value={primaryOutlet?.state || primaryBa?.billingState} />
+                                                                <InfoCardField label="Delivery Pincode" value={primaryOutlet?.pincode || user.pincode} />
+                                                            </div>
+
+                                                            {primaryBa?.outlets && primaryBa.outlets.length > 1 && (
+                                                                <div className="pt-3 border-t border-gray-100">
+                                                                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">All Branch Outlets</p>
+                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                                        {primaryBa.outlets.map((o) => (
+                                                                            <div key={o.id} className="p-3 rounded-xl border border-gray-100 bg-[#FAFAFA] flex items-start gap-2.5 text-[12px]">
+                                                                                <Store size={14} className="text-gray-400 shrink-0 mt-0.5" />
+                                                                                <div className="min-w-0">
+                                                                                    <p className="font-bold text-[#181725] truncate">{o.name}</p>
+                                                                                    <p className="text-gray-500 truncate">{o.addressLine || 'Address pending'}</p>
+                                                                                    <p className="text-gray-400 text-[11px]">{[o.city, o.pincode].filter(Boolean).join(' - ')}</p>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
 
                                             {/* Billing & Address */}

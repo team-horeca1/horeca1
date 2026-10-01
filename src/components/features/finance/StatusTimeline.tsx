@@ -138,7 +138,10 @@ export const ORDER_STATUS_STEPS: TimelineStep[] = [
 
 export function orderTimelineCurrentKey(status: string): string {
   if (status === 'returned') return 'delivered';
-  if (status === 'shipped' || status === 'out_for_delivery') return 'out_for_delivery';
+  if (status === 'shipped' || status === 'out_for_delivery' || status === 'partially_delivered') {
+    return 'out_for_delivery';
+  }
+  if (status === 'ready_for_dispatch') return 'processing';
   if (['pending', 'confirmed', 'processing', 'delivered', 'cancelled'].includes(status)) {
     return status === 'cancelled' ? 'pending' : status;
   }
