@@ -198,7 +198,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         where: { id },
         data: updatePayload,
         include: {
-          vendor: { select: { id: true, businessName: true } },
+          vendor: { select: { id: true, businessName: true, displayName: true } },
           category: { select: { id: true, name: true } },
           inventories: { select: { qtyAvailable: true } },
           priceSlabs: { orderBy: { sortOrder: 'asc' } },

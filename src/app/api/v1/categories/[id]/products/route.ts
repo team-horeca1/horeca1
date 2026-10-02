@@ -29,6 +29,7 @@ type Listing = {
   vendor: {
     id: string;
     businessName: string;
+    displayName?: string | null;
     logoUrl: string | null;
     minOrderValue: unknown;
     rating: unknown;
@@ -115,6 +116,7 @@ export async function GET(
             id: true,
             slug: true,
             businessName: true,
+            displayName: true,
             logoUrl: true,
             minOrderValue: true,
             rating: true,

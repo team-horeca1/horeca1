@@ -40,6 +40,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
           select: {
             id: true,
             businessName: true,
+            displayName: true,
             slug: true,
             logoUrl: true,
             addressLine: true,

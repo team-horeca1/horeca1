@@ -64,6 +64,7 @@ import {
     AdminRegistryViewToggle,
     useAdminDesktop,
 } from '@/components/features/admin/entity';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 // Types
 // ---------------------------------------------------------------------------
@@ -87,7 +88,7 @@ interface Product {
     approvalStatus: 'pending' | 'approved' | 'rejected';
     approvalNote: string | null;
     createdAt: string;
-    vendor: { id: string; businessName: string; vendorCode?: string | null } | null;
+    vendor: { id: string; businessName: string; displayName?: string | null; vendorCode?: string | null } | null;
     category: { id: string; name: string; parentId?: string | null } | null;
     categoryLinks?: { categoryId: string; isPrimary: boolean; category: { id: string; name: string } }[];
     inventory?: { qtyAvailable: number } | null;
@@ -114,6 +115,7 @@ interface Product {
 interface Vendor {
     id: string;
     businessName: string;
+    displayName?: string | null;
     vendorCode?: string | null;
 }
 
@@ -732,7 +734,7 @@ export default function ProductsPage() {
                         uom: string | null;
                         category: { id: string; name: string } | null;
                         vendorCount: number;
-                        vendor?: { id: string; businessName: string; vendorCode?: string | null } | null;
+                        vendor?: { id: string; businessName: string; displayName?: string | null; vendorCode?: string | null } | null;
                         hsn?: string | null;
                         metadata?: any;
                     }) => ({
@@ -1100,7 +1102,7 @@ export default function ProductsPage() {
                     tags?: string[] | null;
                     aliasNames?: string[] | null;
                     priceSlabs?: { minQty: number; price: number }[];
-                    vendor?: { id: string; businessName: string } | null;
+                    vendor?: { id: string; businessName: string; displayName?: string | null } | null;
                 } | undefined : undefined;
                 const links = Array.isArray(p.categoryLinks)
                     ? (p.categoryLinks as Array<{ categoryId: string; isPrimary: boolean }>)
@@ -2707,7 +2709,7 @@ export default function ProductsPage() {
                                     >
                                         <option value="">No vendor (Catalog product)</option>
                                         {vendors.map(v => (
-                                            <option key={v.id} value={v.id}>{v.businessName}</option>
+                                            <option key={v.id} value={v.id}>{storeDisplayName(v)}</option>
                                         ))}
                                     </select>
                                 </FormSection>

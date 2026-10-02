@@ -78,6 +78,7 @@ export class SearchService {
         { brand: { contains: query, mode: 'insensitive' } },
         { category: { name: { contains: query, mode: 'insensitive' } } },
         { vendor: { businessName: { contains: query, mode: 'insensitive' } } },
+        { vendor: { displayName: { contains: query, mode: 'insensitive' } } },
         {
           brandMappings: {
             some: {

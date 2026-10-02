@@ -74,7 +74,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
             select: { categoryId: true, isPrimary: true },
             orderBy: [{ isPrimary: 'desc' }, { categoryId: 'asc' }],
           },
-          vendor: { select: { businessName: true } },
+          vendor: { select: { businessName: true, displayName: true } },
         },
         take: 8,
         orderBy: { name: 'asc' },

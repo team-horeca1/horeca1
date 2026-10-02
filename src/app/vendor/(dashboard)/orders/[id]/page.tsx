@@ -70,6 +70,7 @@ interface OrderPayment {
 interface OrderVendor {
     id: string;
     businessName: string;
+    displayName?: string | null;
     slug: string;
     logoUrl: string | null;
     addressLine: string | null;
@@ -1307,7 +1308,7 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                             {order.vendor && (
                                 <div className="mt-3 pt-2 border-t border-[#F3F4F6] text-[12px] text-[#4B5563]">
                                     <span className="text-[10px] uppercase font-bold text-[#9CA3AF] block mb-1">Vendor Partner:</span>
-                                    <span className="font-bold text-primary block truncate">{order.vendor.businessName}</span>
+                                    <span className="font-bold text-primary block truncate">{order.vendor.displayName || order.vendor.businessName}</span>
                                     {(() => {
                                         const vendorAddress = [
                                             order.vendor.addressLine,

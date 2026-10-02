@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import {
     Star,
-    Phone,
     ClipboardList,
     CreditCard,
     Clock,
@@ -23,6 +22,17 @@ import { PLACEHOLDERS } from '@/lib/constants';
 import { parseImageMeta, supplierLogoSrc } from '@/lib/imageMeta';
 import { OffersSheet } from '@/components/features/promo/OffersSheet';
 import { Hero, type HeroContent } from '@/components/features/Hero';
+
+function WhatsAppGlyph({ className }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+            <path
+                fill="currentColor"
+                d="M12.04 2C6.58 2 2.15 6.4 2.15 11.84c0 1.74.46 3.44 1.33 4.94L2 22l5.37-1.4a10.1 10.1 0 0 0 4.67 1.14h.01c5.46 0 9.89-4.4 9.89-9.84C21.94 6.4 17.5 2 12.04 2zm5.76 14.16c-.24.68-1.4 1.25-1.94 1.33-.5.07-1.13.1-1.83-.11-.42-.14-.96-.31-1.65-.61-2.9-1.25-4.79-4.17-4.93-4.36-.14-.2-1.16-1.54-1.16-2.94 0-1.4.73-2.08.99-2.36.26-.28.57-.35.76-.35h.55c.18 0 .42-.07.65.5.24.58.82 2 .89 2.15.07.14.12.31.02.5-.1.2-.14.31-.28.48-.14.16-.3.37-.42.5-.14.14-.29.29-.12.56.16.28.73 1.2 1.56 1.95 1.08.96 1.98 1.26 2.26 1.4.28.14.44.12.6-.07.16-.2.7-.81.88-1.09.18-.28.37-.23.61-.14.24.1 1.54.73 1.8.86.26.14.44.2.5.31.07.12.07.68-.17 1.36z"
+            />
+        </svg>
+    );
+}
 
 function toHeroSlides(slides: StoreHeroSlide[] | undefined): HeroContent[] {
     return (slides ?? [])
@@ -156,38 +166,23 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
         router.push(`/order-lists?vendorId=${vendor.id}`);
     };
 
-    const handleCallVendor = () => {
+    const handleWhatsAppClick = () => {
         const rawPhone = vendor.phone || (vendor as { user?: { phone?: string } })?.user?.phone;
         if (!rawPhone || !rawPhone.trim()) {
-            toast.error(`Contact phone number is not available for ${vendor.name}`);
+            toast.error(`WhatsApp contact is not available for ${vendor.name}`);
             return;
         }
         const phone = rawPhone.trim();
         const digits = phone.replace(/[^0-9]/g, '');
-        const cleanPhone = phone.startsWith('+')
-            ? phone
-            : digits.length === 10
-                ? `+91${digits}`
-                : phone;
-        const telUri = `tel:${cleanPhone}`;
+        const cleanPhone = digits.length === 10 ? `91${digits}` : digits;
+        const text = encodeURIComponent(`Hi ${vendor.name}, I am contacting you from Horeca1.`);
+        const waUrl = `https://wa.me/${cleanPhone}?text=${text}`;
 
         try {
-            window.location.href = telUri;
+            window.open(waUrl, '_blank', 'noopener,noreferrer');
         } catch {
-            // fallback
+            window.location.href = waUrl;
         }
-
-        toast.success(`Calling ${vendor.name} (${phone})`, {
-            description: 'Dialer opened. You can also copy the number below.',
-            action: {
-                label: 'Copy Number',
-                onClick: () => {
-                    navigator.clipboard.writeText(phone);
-                    toast.success('Phone number copied to clipboard');
-                },
-            },
-            duration: 7000,
-        });
     };
 
     const shareContent = vendorShareContent({
@@ -278,12 +273,12 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                             />
                             <button
                                 type="button"
-                                onClick={handleCallVendor}
-                                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-light hover:bg-primary/20 border border-primary/20 text-primary transition-all active:scale-90 shadow-2xs"
-                                aria-label={`Call ${vendor.name}`}
-                                title={vendor.phone ? `Call ${vendor.name} (${vendor.phone})` : `Call ${vendor.name}`}
+                                onClick={handleWhatsAppClick}
+                                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#FAF7F2] hover:bg-emerald-50 border border-divider hover:border-emerald-200 text-[#25D366] transition-all active:scale-90 shadow-2xs"
+                                aria-label={`Chat with ${vendor.name} on WhatsApp`}
+                                title={`Chat with ${vendor.name} on WhatsApp`}
                             >
-                                <Phone size={13} strokeWidth={2.25} />
+                                <WhatsAppGlyph className="size-4" />
                             </button>
                         </div>
                     </div>
@@ -413,20 +408,15 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                                 className="h-10 px-4 rounded-xl border border-divider bg-white text-xs font-semibold text-text inline-flex items-center gap-2 hover:bg-[#FAF5EE] hover:border-primary/30 hover:text-primary transition-all shadow-2xs active:scale-98 cursor-pointer"
                             />
 
-                            {/* 4. Call Vendor */}
+                            {/* 4. WhatsApp */}
                             <button
                                 type="button"
-                                onClick={handleCallVendor}
-                                className="h-10 px-4 rounded-xl border border-divider bg-white text-xs font-semibold text-text inline-flex items-center gap-2 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all shadow-2xs active:scale-98 cursor-pointer"
-                                title={vendor.phone ? `Call ${vendor.name} (${vendor.phone})` : `Call ${vendor.name}`}
+                                onClick={handleWhatsAppClick}
+                                className="size-10 rounded-xl border border-divider bg-white text-[#25D366] inline-flex items-center justify-center hover:bg-emerald-50 hover:border-emerald-300 transition-all shadow-2xs active:scale-98 cursor-pointer"
+                                aria-label={`Chat with ${vendor.name} on WhatsApp`}
+                                title={`Chat with ${vendor.name} on WhatsApp`}
                             >
-                                <Phone size={14} strokeWidth={2} className="text-emerald-600" />
-                                <span>Call Vendor</span>
-                                {vendor.phone && (
-                                    <span className="text-[11px] font-medium text-text-muted hidden lg:inline">
-                                        ({vendor.phone})
-                                    </span>
-                                )}
+                                <WhatsAppGlyph className="size-5" />
                             </button>
                         </div>
 

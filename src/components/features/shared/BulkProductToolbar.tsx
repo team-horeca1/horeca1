@@ -3,11 +3,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FileSpreadsheet, Upload, FileDown, Loader2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 export type BulkWorkspaceTab = 'import' | 'spreadsheet' | null;
 
 interface BulkProductToolbarProps {
-  vendors?: { id: string; businessName: string }[];
+  vendors?: { id: string; businessName: string; displayName?: string | null }[];
   gridVendorId: string;
   onGridVendorChange: (id: string) => void;
   onImport: () => void;
@@ -100,7 +101,7 @@ export default function BulkProductToolbar({
           >
             <option value="">All vendors</option>
             {vendors.map((v) => (
-              <option key={v.id} value={v.id}>{v.businessName}</option>
+              <option key={v.id} value={v.id}>{storeDisplayName(v)}</option>
             ))}
           </select>
           <div className="hidden sm:block w-px h-7 bg-[#E5E7EB] shrink-0" aria-hidden />

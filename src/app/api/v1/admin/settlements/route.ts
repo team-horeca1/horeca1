@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 import { requirePermission } from '@/lib/permissions/engine';
 import { vendorSettlementService } from '@/modules/vendor/vendorSettlement.service';
 
@@ -29,7 +30,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         skip: (page - 1) * take,
         take,
         include: {
-          vendor: { select: { id: true, businessName: true, slug: true } },
+          vendor: { select: { id: true, businessName: true, displayName: true, slug: true } },
           _count: { select: { orders: true } },
         },
       }),
@@ -42,7 +43,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         settlements: items.map((s) => ({
           id: s.id,
           vendorId: s.vendorId,
-          vendorName: s.vendor.businessName,
+          vendorName: storeDisplayName(s.vendor),
           grossAmount: Number(s.grossAmount),
           platformFee: Number(s.platformFee),
           gatewayFee: Number(s.gatewayFee),

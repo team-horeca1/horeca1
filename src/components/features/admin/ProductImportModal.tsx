@@ -10,7 +10,7 @@
 
 import SharedProductImportModal from '@/components/features/shared/ProductImportModal';
 
-interface VendorOption { id: string; businessName: string }
+interface VendorOption { id: string; businessName: string; displayName?: string | null }
 
 interface Props {
   open: boolean;

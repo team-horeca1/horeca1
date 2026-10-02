@@ -78,7 +78,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
               vendorSku: true,
               hsn: true,
               metadata: true,
-              vendor: { select: { id: true, businessName: true, vendorCode: true } }
+              vendor: { select: { id: true, businessName: true, displayName: true, vendorCode: true } }
             },
             take: 5,
             orderBy: { updatedAt: 'desc' },
@@ -102,7 +102,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
               vendorSku: true,
               hsn: true,
               metadata: true,
-              vendor: { select: { id: true, businessName: true, vendorCode: true } }
+              vendor: { select: { id: true, businessName: true, displayName: true, vendorCode: true } }
             },
             take: 5,
             orderBy: { updatedAt: 'desc' },

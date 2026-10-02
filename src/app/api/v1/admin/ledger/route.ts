@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { adminOnly } from '@/middleware/rbac';
 import { errorResponse } from '@/middleware/errorHandler';
 import { requirePermission } from '@/lib/permissions/engine';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 export const GET = adminOnly(async (req: NextRequest, ctx) => {
   requirePermission(ctx, 'payments.view');
@@ -37,7 +38,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
           settlementPlatformFee: true,
           settlementGatewayFee: true,
           settlementNetVendorAmount: true,
-          vendor: { select: { id: true, businessName: true } },
+          vendor: { select: { id: true, businessName: true, displayName: true } },
         },
         orderBy: { deliveredAt: 'desc' },
         take: 500,
@@ -47,7 +48,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         id: o.id,
         date: o.deliveredAt?.toISOString() ?? '',
         vendorId: o.vendor.id,
-        vendorName: o.vendor.businessName,
+        vendorName: storeDisplayName(o.vendor),
         reference: o.orderNumber,
         gross: Number(o.settlementGrossAmount ?? 0),
         platformFee: Number(o.settlementPlatformFee ?? 0),
@@ -96,7 +97,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
           ...(Object.keys(dateFilter).length ? { createdAt: dateFilter } : {}),
         },
         include: {
-          vendor: { select: { businessName: true } },
+          vendor: { select: { businessName: true, displayName: true } },
         },
         orderBy: { createdAt: 'desc' },
         take: 200,
@@ -104,7 +105,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
 
       const rows = settlements.map((s) => ({
         id: s.id,
-        vendorName: s.vendor.businessName,
+        vendorName: storeDisplayName(s.vendor),
         status: s.status,
         gross: Number(s.grossAmount),
         platformFee: Number(s.platformFee),
@@ -148,7 +149,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         ...(vendorId ? { vendorId } : {}),
       },
       include: {
-        vendor: { select: { businessName: true } },
+        vendor: { select: { businessName: true, displayName: true } },
       },
       orderBy: { balance: 'desc' },
       take: 100,
@@ -156,7 +157,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
 
     const rows = wallets.map((w) => ({
       vendorId: w.vendorId,
-      vendorName: w.vendor.businessName,
+      vendorName: storeDisplayName(w.vendor),
       balance: Number(w.balance),
       pendingAmount: Number(w.pendingAmount),
     }));

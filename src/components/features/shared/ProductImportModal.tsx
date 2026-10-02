@@ -22,6 +22,7 @@ import {
   groupProductImportIssues,
   type GroupedImportIssue,
 } from '@/modules/import-export/productImportIssueExplain';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface ColumnDef {
   key: string;
@@ -44,7 +45,7 @@ export interface ImportModalConfig {
   /** GET categories endpoint (tolerates tree or {categories:[]} shapes). */
   categoriesEndpoint: string;
   /** When provided, renders a vendor selector (admin importing on behalf of a vendor). */
-  vendors?: Array<{ id: string; businessName: string }>;
+  vendors?: Array<{ id: string; businessName: string; displayName?: string | null }>;
 }
 
 type EditSlab = { minQty: number; grossRate: number; promoGrossRate?: number | null };
@@ -639,7 +640,7 @@ export default function ProductImportModal({ open, onClose, onComplete, config }
                     <p className="text-[13px] text-[#7C7C7C] font-medium">Choose whose catalog these products belong to. Leave blank for a catalog-level import (no stock/slabs).</p>
                     <select value={vendorId} onChange={e => setVendorId(e.target.value)} className={selectCls}>
                       <option value="">— Catalog level (no vendor) —</option>
-                      {config.vendors.map(v => <option key={v.id} value={v.id}>{v.businessName}</option>)}
+                      {config.vendors.map(v => <option key={v.id} value={v.id}>{storeDisplayName(v)}</option>)}
                     </select>
                   </div>
                 )}

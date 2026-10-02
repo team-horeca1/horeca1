@@ -1070,7 +1070,7 @@ export class CatalogService {
           },
         },
       },
-      vendor: { select: { id: true, businessName: true, displayName: true, logoUrl: true, vendorCode: true } },
+      vendor: { select: { id: true, businessName: true, displayName: true, slug: true, logoUrl: true, vendorCode: true, minOrderValue: true, rating: true } },
       brandMappings: productBrandMappingsInclude,
     };
 
@@ -1398,6 +1398,7 @@ export class CatalogService {
                   id: true,
                   businessName: true,
                   displayName: true,
+                  slug: true,
                   logoUrl: true,
                   minOrderValue: true,
                   rating: true,
@@ -1931,9 +1932,9 @@ export class CatalogService {
     // Resolve store-scoped unique slug format: [store]-[product-name]-[sku] with auto-increment fallback
     const vendorRow = await prisma.vendor.findUnique({
       where: { id: vendorId },
-      select: { slug: true, businessName: true },
+      select: { slug: true, businessName: true, displayName: true },
     });
-    const storeSlug = vendorRow?.slug || vendorRow?.businessName || '';
+    const storeSlug = vendorRow?.slug || vendorRow?.displayName || vendorRow?.businessName || '';
     const finalSlug = await resolveUniqueProductSlug(
       prisma,
       vendorId,
