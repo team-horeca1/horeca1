@@ -40,6 +40,7 @@ import {
   syncImportProductCategories,
 } from '@/modules/catalog/catalog.service';
 import { formatVendorSku, parseVendorSku, resolveVendorCode } from '@/lib/sku';
+import { mintUniqueImportSlug } from '@/lib/productSlug';
 import { findOrCreateBrandByName } from '@/modules/brand/brand.service';
 import {
   partitionImportRows,
@@ -202,8 +203,9 @@ export async function handleVendorProductImport(req: NextRequest, ctx: any) {
     // Resolve vendor and inherit Supplier Code across stores of the same business account
     const vendorRecord = await prisma.vendor.findUnique({
       where: { id: vendorId },
-      select: { vendorCode: true, businessAccountId: true, slug: true },
+      select: { vendorCode: true, businessAccountId: true, slug: true, displayName: true, businessName: true },
     });
+    const storeSlug = vendorRecord?.slug || vendorRecord?.displayName || vendorRecord?.businessName || 'store';
     let vendorCode = vendorRecord?.vendorCode?.trim() ? vendorRecord.vendorCode.trim().toUpperCase() : null;
     if (!vendorCode && vendorRecord?.businessAccountId) {
       const primary = await prisma.vendor.findFirst({
@@ -286,6 +288,8 @@ export async function handleVendorProductImport(req: NextRequest, ctx: any) {
             if (pMatch) return pMatch;
           }
         }
+        // Explicit SKU given and not found: treat as new product, do NOT overwrite an existing product with same name
+        return null;
       }
       return existingByName.get(row.name.toLowerCase());
     }
@@ -308,6 +312,8 @@ export async function handleVendorProductImport(req: NextRequest, ctx: any) {
             if (byPos) return byPos;
           }
         }
+        // Explicit SKU given and not created in this run: do NOT match an earlier row that just shared the name
+        return undefined;
       }
       return createdThisRun.get('name:' + row.name.toLowerCase());
     }
@@ -578,19 +584,12 @@ export async function handleVendorProductImport(req: NextRequest, ctx: any) {
 
     // Slug uniqueness guard — seed from this vendor's existing slugs (incl.
     // tombstones, since those still occupy the unique key) and reserve each
-    // new slug as we mint it so two rows with the same name don't collide.
+    // new slug using [store]-[product-name]-[sku] with auto-increment -1, -2, -3...
     const usedSlugs = new Set(
-      (await prisma.product.findMany({ where: { vendorId }, select: { slug: true } })).map(p => p.slug),
+      (await prisma.product.findMany({ where: { vendorId }, select: { slug: true } })).map(p => p.slug.toLowerCase()),
     );
-    function uniqueSlug(name: string): string {
-      const base = toSlug(name) || 'product';
-      let candidate = base;
-      let n = 2;
-      while (usedSlugs.has(candidate)) {
-        candidate = `${base}-${n++}`;
-      }
-      usedSlugs.add(candidate);
-      return candidate;
+    function uniqueSlug(name: string, sku?: string | null): string {
+      return mintUniqueImportSlug(usedSlugs, storeSlug, name, sku);
     }
 
     // ── PASS 1: resolve reference data + validate every row. NO product writes.
@@ -947,7 +946,7 @@ export async function handleVendorProductImport(req: NextRequest, ctx: any) {
                 categoryId: p.categoryId,
                 masterProductId: p.masterProductId,
                 name: r.name,
-                slug: uniqueSlug(r.name),
+                slug: uniqueSlug(r.name, p.composedSku || p.vendorSku || r.sku),
                 sku: p.composedSku,
                 vendorSku: p.vendorSku,
                 hsn: r.hsn || null,

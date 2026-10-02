@@ -19,6 +19,7 @@ import {
   resolveVendorCode,
   validateMasterSku,
 } from '@/lib/sku';
+import { resolveUniqueProductSlug } from '@/lib/productSlug';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import {
   detectMaterialChanges,
@@ -1509,7 +1510,7 @@ export class CatalogService {
 
   async createProduct(vendorId: string, data: {
     name: string;
-    slug: string;
+    slug?: string;
     categoryId?: string;
     categoryIds?: string[];
     description?: string;
@@ -1915,16 +1916,6 @@ export class CatalogService {
       delete productData.masterProductId;
       delete productData.sku;
 
-      const dupSlug = await prisma.product.findFirst({
-        where: {
-          vendorId,
-          slug: productData.slug,
-        },
-        select: { id: true, name: true, slug: true },
-      });
-      if (dupSlug && !dupSlug.slug.startsWith(TOMBSTONE_PREFIX)) {
-        throw Errors.conflict(`You already have a product named "${dupSlug.name}". Edit it instead.`);
-      }
     } else if (isDraft) {
       if (!resolvedVendorSku && typeof productData.sku === 'string' && productData.sku.trim()) {
         resolvedVendorSku = productData.sku.trim();
@@ -1936,6 +1927,20 @@ export class CatalogService {
     if (resolvedVendorSku) {
       await assertVendorPosSkuUnique(vendorId, resolvedVendorSku);
     }
+
+    // Resolve store-scoped unique slug format: [store]-[product-name]-[sku] with auto-increment fallback
+    const vendorRow = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { slug: true, businessName: true },
+    });
+    const storeSlug = vendorRow?.slug || vendorRow?.businessName || '';
+    const finalSlug = await resolveUniqueProductSlug(
+      prisma,
+      vendorId,
+      storeSlug,
+      productData.name,
+      resolvedVendorSku || (typeof productData.sku === 'string' ? productData.sku : undefined),
+    );
 
     // Do NOT silently create Brand rows from a free-text product.brand string.
     // That auto-pending Brand blocked product approval (QA-04). New brands must
@@ -1950,6 +1955,7 @@ export class CatalogService {
     const created = await prisma.product.create({
       data: {
         ...productFields,
+        slug: finalSlug,
         ...(productMetadata !== undefined
           ? { metadata: productMetadata as Prisma.InputJsonValue }
           : {}),

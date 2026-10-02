@@ -12,6 +12,7 @@ import {
   composeVendorListingSku,
 } from '@/modules/catalog/catalog.service';
 import { formatVendorSku, parseVendorSku, resolveVendorCode } from '@/lib/sku';
+import { mintUniqueImportSlug } from '@/lib/productSlug';
 import { syncProductToBrand, findOrCreateBrandByName } from '@/modules/brand/brand.service';
 import {
   partitionImportRows,
@@ -143,11 +144,13 @@ export async function handleAdminProductImport(req: NextRequest, ctx: any) {
 
     // Resolve vendor and inherit Supplier Code across stores of the same business account
     let vendorCode: string | null = null;
+    let storeSlug = 'catalog';
     if (vendorId) {
       const vendorRecord = await prisma.vendor.findUnique({
         where: { id: vendorId },
-        select: { vendorCode: true, businessAccountId: true, slug: true },
+        select: { vendorCode: true, businessAccountId: true, slug: true, displayName: true, businessName: true },
       });
+      storeSlug = vendorRecord?.slug || vendorRecord?.displayName || vendorRecord?.businessName || 'store';
       vendorCode = vendorRecord?.vendorCode?.trim() ? vendorRecord.vendorCode.trim().toUpperCase() : null;
       if (!vendorCode && vendorRecord?.businessAccountId) {
         const primary = await prisma.vendor.findFirst({
@@ -236,6 +239,8 @@ export async function handleAdminProductImport(req: NextRequest, ctx: any) {
             if (pMatch) return pMatch;
           }
         }
+        // Explicit SKU given and not found: treat as new product, do NOT overwrite an existing product with same name
+        return null;
       }
       return existingByName.get(row.name.toLowerCase());
     }
@@ -256,6 +261,8 @@ export async function handleAdminProductImport(req: NextRequest, ctx: any) {
             if (byPos) return byPos;
           }
         }
+        // Explicit SKU given and not created in this run: do NOT match an earlier row that just shared the name
+        return undefined;
       }
       return createdThisRun.get('name:' + row.name.toLowerCase());
     }
@@ -521,20 +528,10 @@ export async function handleAdminProductImport(req: NextRequest, ctx: any) {
       (await prisma.product.findMany({
         where: vendorId ? { vendorId } : { vendorId: null },
         select: { slug: true }
-      })).map(p => p.slug)
+      })).map(p => p.slug.toLowerCase())
     );
-    function toSlug(name: string): string {
-      return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    }
-    function uniqueSlug(name: string): string {
-      const base = toSlug(name) || 'product';
-      let candidate = base;
-      let n = 2;
-      while (usedSlugs.has(candidate)) {
-        candidate = `${base}-${n++}`;
-      }
-      usedSlugs.add(candidate);
-      return candidate;
+    function uniqueSlug(name: string, sku?: string | null): string {
+      return mintUniqueImportSlug(usedSlugs, storeSlug, name, sku);
     }
 
     const rowData = new Map<number, ImportErrorRowData>(
@@ -709,7 +706,6 @@ export async function handleAdminProductImport(req: NextRequest, ctx: any) {
               await findOrCreateBrandByName({ name: r.brand, autoApprove: true });
             }
             const existing = findExisting(r) ?? findCreated(r);
-            const slug = existing ? existing.slug : uniqueSlug(r.name);
 
             if (existing) {
           // ── UPDATE existing product ──
@@ -846,13 +842,16 @@ export async function handleAdminProductImport(req: NextRequest, ctx: any) {
             composedSku = await composeVendorListingSku(vendorId, vendorSku, undefined, tx);
           }
 
+          const createdSku = vendorId ? composedSku : (r.sku || null);
+          const slug = uniqueSlug(r.name, createdSku || vendorSku || r.sku);
+
           const productData: Record<string, unknown> = {
             vendorId: vendorId || null,
             categoryId,
             masterProductId,
             name: r.name,
             slug,
-            sku: vendorId ? composedSku : (r.sku || null),
+            sku: createdSku,
             vendorSku: vendorId ? vendorSku : null,
             hsn: r.hsn || null,
             unit: r.unit || null,

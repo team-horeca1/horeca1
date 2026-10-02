@@ -16,6 +16,7 @@ import { syncProductToBrand } from '@/modules/brand/brand.service';
 import { totalStockQty } from '@/lib/inventoryHelpers';
 import { ensureInventoryForAllOutlets } from '@/lib/inventoryOutlet';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
+import { resolveUniqueProductSlug } from '@/lib/productSlug';
 
 // Validation schema for admin product creation
 // vendorId is optional — admin can create catalog products without a vendor
@@ -376,12 +377,22 @@ export const POST = adminOnly(async (req: NextRequest, ctx) => {
     productData.name = displayName;
     productData.basePrice = productData.basePrice ?? (isDraft ? 0.01 : productData.basePrice!);
 
-    // Auto-generate slug from name if not provided
-    const slug = providedSlug || displayName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      + '-' + Date.now().toString(36);
+    // Generate unique slug: [store]-[product-name]-[sku] with auto-increment suffix on collision
+    let storeSlug = 'catalog';
+    if (vendorId) {
+      const v = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: { slug: true, displayName: true, businessName: true },
+      });
+      storeSlug = v?.slug || v?.displayName || v?.businessName || 'store';
+    }
+    const slug = await resolveUniqueProductSlug(
+      prisma,
+      vendorId || null,
+      storeSlug,
+      displayName,
+      productData.sku || null,
+    );
 
     let masterCategoryId: string | null = null;
     if (productData.masterProductId) {
