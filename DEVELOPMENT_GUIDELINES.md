@@ -6,7 +6,7 @@
 
 ## 📋 Project Overview
 
-**Project**: B2B E-commerce platform for Restaurant & Eating Products  
+**Project**: Horeca1 - Bharat's Food & Grocery Distribution OS (F&B Wholesale Made Easy)  
 **Focus**: Speed, Performance, Clean Code, Mobile & Desktop UI  
 **Stack**: Next.js 16 + React 19 + TypeScript + Tailwind CSS 4
 

@@ -93,10 +93,6 @@ function reasonLabel(reason: string): string {
 }
 
 export default function CustomerReturnSection({ orderId, orderStatus, items }: Props) {
-  const canViewReturns = orderStatus === 'delivered' || orderStatus === 'returned';
-  /** Service create gate is delivered-only. */
-  const canRequestNew = orderStatus === 'delivered';
-
   const [loading, setLoading] = React.useState(false);
   const [returns, setReturns] = React.useState<CustomerReturnRequest[]>([]);
   const [remainingByOrderItem, setRemainingByOrderItem] = React.useState<Record<string, number>>(
@@ -107,8 +103,10 @@ export default function CustomerReturnSection({ orderId, orderStatus, items }: P
   const [lineDrafts, setLineDrafts] = React.useState<Record<string, LineDraft>>({});
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  const canRequestNew = orderStatus === 'delivered' || orderStatus === 'partially_delivered';
+
   const refresh = React.useCallback(async () => {
-    if (!canViewReturns) return;
+    if (orderStatus === 'draft') return;
     setLoading(true);
     try {
       const res = await fetch(`/api/v1/orders/${orderId}/return`);
@@ -129,7 +127,7 @@ export default function CustomerReturnSection({ orderId, orderStatus, items }: P
     } finally {
       setLoading(false);
     }
-  }, [canViewReturns, orderId]);
+  }, [orderId, orderStatus]);
 
   React.useEffect(() => {
     void refresh();
@@ -197,7 +195,25 @@ export default function CustomerReturnSection({ orderId, orderStatus, items }: P
     }
   };
 
-  if (!canViewReturns) return null;
+  const hasReturns = returns.length > 0;
+  const isReturnEligible = orderStatus === 'delivered' || orderStatus === 'partially_delivered' || orderStatus === 'returned';
+
+  if (!hasReturns && !canRequestNew && !loading) {
+    if (orderStatus === 'cancelled' || orderStatus === 'draft') return null;
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex items-center gap-3" data-testid="customer-return-policy-badge">
+        <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 border border-amber-100">
+          <RotateCcw size={18} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-bold text-[#181725]">Horeca1 Return &amp; Quality Guarantee</p>
+          <p className="text-[11.5px] text-gray-500 mt-0.5">
+            Eligible for 7-day hassle-free return or replacement once delivery is completed.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const openReturns = returns.filter((r) => isOpenReturn(r.status));
   const pastReturns = returns.filter((r) => !isOpenReturn(r.status));
@@ -220,15 +236,30 @@ export default function CustomerReturnSection({ orderId, orderStatus, items }: P
       ))}
 
       {!showForm && canRequestNew && totalRemaining > 0 && (
-        <button
-          type="button"
-          onClick={openForm}
-          data-testid="request-return-btn"
-          className="w-full py-3.5 border-2 border-gray-200 text-[14px] font-black text-gray-600 rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
-        >
-          <RotateCcw size={16} />
-          {returns.length > 0 ? 'Request Another Return' : 'Request Return'}
-        </button>
+        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
+                <RotateCcw size={16} />
+              </div>
+              <div>
+                <p className="text-[13px] font-black text-[#181725]">Return or Replacement</p>
+                <p className="text-[11.5px] text-gray-500 mt-0.5">
+                  Items damaged, missing, or substandard? Request a return or replacement within 7 days of delivery.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={openForm}
+              data-testid="request-return-btn"
+              className="px-4 py-2 bg-primary text-white text-[12px] font-bold rounded-xl hover:bg-primary-dark transition-colors shrink-0 shadow-sm flex items-center justify-center gap-1.5"
+            >
+              <RotateCcw size={14} />
+              {returns.length > 0 ? 'Request Another Return' : 'Request Return'}
+            </button>
+          </div>
+        </div>
       )}
 
       {showForm && canRequestNew && (
@@ -418,63 +449,98 @@ function ReturnStatusCard({
   tone: 'open' | 'past';
 }) {
   const pickupSkipped = Boolean(ret.pickupSkippedAt);
+  const isApprovedOrClosed = ret.status === 'approved' || ret.status === 'closed' || ret.status === 'refunded';
+  const isRejected = ret.status === 'rejected';
+
   return (
     <div
       className={cn(
-        'space-y-3 p-4 border-2 rounded-2xl',
-        tone === 'open'
-          ? 'border-amber-100 bg-amber-50/40'
-          : 'border-gray-100 bg-gray-50/60',
+        'bg-white rounded-2xl border p-5 shadow-sm space-y-4 transition-all',
+        tone === 'open' ? 'border-amber-200/80 shadow-amber-500/5' : 'border-gray-100',
       )}
       data-testid="return-request-status"
       data-return-id={ret.id}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-[13px] font-bold text-[#181725]">
-            Return:{' '}
-            <span className="capitalize">{ret.status.replace(/_/g, ' ')}</span>
-          </p>
-          <p className="text-[11px] text-gray-400 mt-0.5">
-            Submitted {fmtShortDate(ret.createdAt)}
-            {ret.creditNoteNumber ? ` · CN ${ret.creditNoteNumber}` : ''}
-          </p>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3.5">
+        <div className="flex items-center gap-2.5">
+          <div className={cn(
+            'size-8 rounded-xl flex items-center justify-center shrink-0',
+            isRejected ? 'bg-red-50 text-red-600' : isApprovedOrClosed ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+          )}>
+            <RotateCcw size={15} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-[14px] font-black text-[#181725]">Return Request</h3>
+              <span className={cn(
+                'px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border',
+                isRejected ? 'bg-red-50 text-red-700 border-red-200' :
+                isApprovedOrClosed ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                'bg-amber-50 text-amber-800 border-amber-200'
+              )}>
+                {ret.status.replace(/_/g, ' ')}
+              </span>
+            </div>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              Submitted on {fmtShortDate(ret.createdAt)}
+              {ret.creditNoteNumber ? ` · Credit Note: ${ret.creditNoteNumber}` : ''}
+            </p>
+          </div>
         </div>
         {tone === 'past' && (
-          <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400 shrink-0">
-            Past
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md shrink-0">
+            Resolved
           </span>
         )}
       </div>
 
-      {ret.reason && <p className="text-[12px] text-gray-600">{ret.reason}</p>}
+      {ret.reason && (
+        <div className="text-[12.5px] text-gray-600 bg-gray-50/80 rounded-xl px-3 py-2 border border-gray-100">
+          <span className="font-semibold text-gray-700">Reason: </span>
+          {ret.reason}
+        </div>
+      )}
+
       {ret.adminNote && (
-        <p className="text-[12px] text-gray-500">Store note: {ret.adminNote}</p>
+        <div className="text-[12px] text-gray-500 bg-blue-50/50 rounded-xl px-3 py-2 border border-blue-100/60">
+          <span className="font-semibold text-blue-900">Store note: </span>
+          {ret.adminNote}
+        </div>
       )}
 
       {ret.items && ret.items.length > 0 && (
-        <ul className="space-y-1.5">
-          {ret.items.map((line) => (
-            <li
-              key={line.id}
-              className="text-[12px] text-gray-600 flex justify-between gap-2"
-            >
-              <span className="min-w-0 truncate">
-                {line.orderItem?.productName ?? 'Item'}{' '}
-                <span className="text-gray-400">×{line.requestedQty}</span>
-              </span>
-              <span className="shrink-0 text-gray-400 capitalize">
-                {reasonLabel(line.reason)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Items to Return</p>
+          <ul className="divide-y divide-gray-100 rounded-xl border border-gray-100 overflow-hidden bg-gray-50/30">
+            {ret.items.map((line) => (
+              <li
+                key={line.id}
+                className="px-3.5 py-2.5 text-[12.5px] text-gray-700 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-bold text-[#181725] truncate">
+                    {line.orderItem?.productName ?? 'Item'}
+                  </p>
+                  <p className="text-[11px] text-gray-400">
+                    Reason: {reasonLabel(line.reason)}
+                  </p>
+                </div>
+                <span className="font-mono font-bold text-[12px] text-primary bg-primary/5 px-2 py-0.5 rounded-md shrink-0">
+                  Qty: {line.requestedQty}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
-      <StatusTimeline
-        steps={returnTimelineStepsForStatus(ret.status, { pickupSkipped })}
-        currentKey={returnTimelineCurrentKey(ret.status)}
-      />
+      <div>
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">Return Progress</p>
+        <StatusTimeline
+          steps={returnTimelineStepsForStatus(ret.status, { pickupSkipped })}
+          currentKey={returnTimelineCurrentKey(ret.status)}
+        />
+      </div>
     </div>
   );
 }

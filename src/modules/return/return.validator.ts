@@ -68,6 +68,22 @@ export const customerCreateReturnSchema = z.object({
     .optional(),
 });
 
+export const staffInitiatedReturnSchema = z.object({
+  reason: z.string().min(2, 'Please provide a reason').max(2000),
+  type: z.enum(CREATE_RETURN_TYPES).optional().default('return'),
+  items: z
+    .array(
+      z.object({
+        orderItemId: z.string().uuid(),
+        quantity: z.number().int().positive(),
+        reason: z.enum(RETURN_ITEM_REASONS),
+        note: z.string().max(500).optional(),
+      }),
+    )
+    .min(1)
+    .optional(),
+});
+
 const activeReturnActionSchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('approve'),

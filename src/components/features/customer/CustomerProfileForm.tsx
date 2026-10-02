@@ -147,6 +147,9 @@ export function CustomerProfileForm({
   const isModal = layout === 'modal';
   const isTextTypes = businessTypeInput === 'text';
   const relaxedContact = isRegisterEmailOtpEnabled() && mode !== 'register' && !omitCoreFields;
+  const [sameAsDelivery, setSameAsDelivery] = useState(
+    !value.billingAddressLine || value.billingAddressLine === value.addressLine,
+  );
   const GRID = isModal
     ? 'flex flex-col gap-4 min-w-0'
     : isWide
@@ -177,17 +180,19 @@ export function CustomerProfileForm({
     const resolvedAddress = place.fullAddress || place.shortAddress || '';
     const patch: Partial<CustomerProfileValues> = {
       addressLine: resolvedAddress,
-      billingAddressLine: resolvedAddress,
       city: place.city,
-      billingCity: place.city,
       state: place.state,
-      billingState: place.state,
       pincode: place.pincode,
-      billingPincode: place.pincode,
       latitude: place.latitude,
       longitude: place.longitude,
       placeId: place.placeId,
     };
+    if (sameAsDelivery) {
+      patch.billingAddressLine = resolvedAddress;
+      patch.billingCity = place.city;
+      patch.billingState = place.state;
+      patch.billingPincode = place.pincode;
+    }
     if (!value.outletName?.trim() && place.businessName) {
       patch.outletName = `${place.businessName} Outlet`;
     } else if (!value.outletName?.trim() && (display || legal)) {
@@ -294,34 +299,57 @@ export function CustomerProfileForm({
 
   const addressContent = (
     <div className="space-y-4">
+      <div className="rounded-xl border border-gray-100 bg-[#FAFAFA] p-3 text-[12px] text-gray-600 flex items-center gap-2">
+        <MapPin size={15} className="text-primary shrink-0" />
+        <span>Configure the primary delivery outlet where client orders will be delivered.</span>
+      </div>
+
       <AddressAutocomplete
-        label="Search address or place name"
+        label="Search delivery location or place name"
         placeholder="e.g. Vashi Rockville Diner, Digha, Linking Road..."
         hint="Selecting a place from maps auto-fills the coordinates, address, and city for you."
         onPick={handleAddressPick}
       />
-      <TextField label="Primary Branch / Outlet name" required value={value.outletName ?? ''}
+      <TextField label="Primary Branch / Outlet Name" required value={value.outletName ?? ''}
         error={errors.outletName}
         onChange={v => set({ outletName: v })}
-        placeholder="e.g. Rockville Vashi Branch" />
-      <TextField label="Address Line" required value={value.addressLine ?? value.billingAddressLine ?? ''}
+        placeholder="e.g. Rockville Vashi Branch / Central Kitchen" />
+      <TextField label="Delivery Address (Street, Building, Area)" required value={value.addressLine ?? ''}
         error={errors.addressLine}
-        onChange={v => set({ addressLine: v, billingAddressLine: v })}
+        onChange={v => {
+          set({
+            addressLine: v,
+            ...(sameAsDelivery ? { billingAddressLine: v } : {}),
+          });
+        }}
         placeholder="Building, street, area" />
       <div className={GRID}>
         <TextField label="Address Line 2 (optional)" value={value.flatInfo ?? ''}
           onChange={v => set({ flatInfo: v })} placeholder="e.g. Flat 12A, near metro station" />
-        <TextField label="Pincode" value={value.pincode ?? value.billingPincode ?? ''} maxLength={6}
+        <TextField label="Delivery Pincode" value={value.pincode ?? ''} maxLength={6}
           error={errors.pincode} placeholder="6-digit PIN" inputMode="numeric"
           onChange={v => {
             const n = v.replace(/\D/g, '').slice(0, 6);
-            set({ pincode: n, billingPincode: n });
+            set({
+              pincode: n,
+              ...(sameAsDelivery ? { billingPincode: n } : {}),
+            });
           }}
-          onBlur={() => blur('pincode', value.pincode ?? value.billingPincode ?? '')} />
-        <TextField label="City" value={value.city ?? value.billingCity ?? ''}
-          onChange={v => set({ city: v, billingCity: v })} placeholder="City" />
-        <TextField label="State" value={value.state ?? value.billingState ?? ''}
-          onChange={v => set({ state: v, billingState: v })} placeholder="State" />
+          onBlur={() => blur('pincode', value.pincode ?? '')} />
+        <TextField label="City" value={value.city ?? ''}
+          onChange={v => {
+            set({
+              city: v,
+              ...(sameAsDelivery ? { billingCity: v } : {}),
+            });
+          }} placeholder="City" />
+        <TextField label="State" value={value.state ?? ''}
+          onChange={v => {
+            set({
+              state: v,
+              ...(sameAsDelivery ? { billingState: v } : {}),
+            });
+          }} placeholder="State" />
       </div>
       {value.latitude != null && value.longitude != null && (
         <div className="rounded-xl border border-primary/20 bg-primary-light/60 p-3 flex items-center gap-2">
@@ -333,6 +361,67 @@ export function CustomerProfileForm({
           </p>
         </div>
       )}
+
+      {/* Billing Address Toggle & Separate Form */}
+      <div className="pt-3 border-t border-[#EEEEEE]">
+        <label className="flex items-center gap-2.5 text-[13px] font-bold text-[#181725] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={sameAsDelivery}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              setSameAsDelivery(checked);
+              if (checked) {
+                set({
+                  billingAddressLine: value.addressLine,
+                  billingCity: value.city,
+                  billingState: value.state,
+                  billingPincode: value.pincode,
+                });
+              }
+            }}
+            className="accent-primary w-4 h-4 rounded"
+          />
+          Billing address is same as delivery address
+        </label>
+
+        {!sameAsDelivery && (
+          <div className="mt-3.5 space-y-3 p-4 rounded-xl border border-gray-200 bg-[#FAFAFA] animate-in fade-in duration-150">
+            <div className="flex items-center gap-1.5 text-[12px] font-extrabold text-[#6B1D2E] uppercase tracking-wider">
+              <Receipt size={14} />
+              <span>Registered Billing Office / Invoice Address</span>
+            </div>
+            <TextField
+              label="Billing Address Line"
+              value={value.billingAddressLine ?? ''}
+              onChange={(v) => set({ billingAddressLine: v })}
+              placeholder="Corporate office, registered address"
+            />
+            <div className={GRID}>
+              <TextField
+                label="Billing Pincode"
+                value={value.billingPincode ?? ''}
+                maxLength={6}
+                placeholder="6-digit PIN"
+                inputMode="numeric"
+                onChange={(v) => set({ billingPincode: v.replace(/\D/g, '').slice(0, 6) })}
+              />
+              <TextField
+                label="Billing City"
+                value={value.billingCity ?? ''}
+                onChange={(v) => set({ billingCity: v })}
+                placeholder="City"
+              />
+              <TextField
+                label="Billing State"
+                value={value.billingState ?? ''}
+                onChange={(v) => set({ billingState: v })}
+                placeholder="State"
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 

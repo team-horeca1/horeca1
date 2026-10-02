@@ -23,43 +23,61 @@ export function FrequentlyOrderedVendors() {
 
     useEffect(() => {
         if (status !== 'authenticated') return;
-        const params = new URLSearchParams({ sort: 'frequent', limit: '10' });
+        const params = new URLSearchParams({ sort: 'frequent', limit: '15' });
         if (pincode && /^\d{6}$/.test(pincode)) params.set('pincode', pincode);
-        fetch(`/api/v1/vendors?${params.toString()}`)
-            .then((r) => r.json())
-            .then((d) => setVendors((d.data?.vendors || []).map((v: {
-                id: string;
-                businessName?: string;
-                displayName?: string | null;
-                slug?: string;
-                logoUrl?: string;
-                rating?: number | string;
-                minOrderValue?: number | string;
-                creditEnabled?: boolean;
-                categories?: string[];
-                bannerUrl?: string;
-                createdAt?: string;
-                productCount?: number;
-                isVerified?: boolean;
-            }) => ({
-                id: v.id,
-                name: storeDisplayName(v),
-                slug: v.slug || '',
-                logo: v.logoUrl || '',
-                rating: Number(v.rating) || 0,
-                minOrderValue: Number(v.minOrderValue) || 0,
-                creditEnabled: v.creditEnabled || false,
-                categories: v.categories || [],
-                isActive: true,
-                deliverySchedule: '',
-                deliveryTime: '',
-                totalRatings: 0,
-                coverImage: v.bannerUrl || '',
-                description: '',
-                createdAt: v.createdAt,
-                productCount: v.productCount,
-                isVerified: v.isVerified ?? true,
-            }))))
+        Promise.all([
+            fetch(`/api/v1/vendors?${params.toString()}`).then((r) => r.json()).catch(() => ({ data: { vendors: [] } })),
+            fetch('/api/v1/orders?limit=30').then((r) => r.json()).catch(() => ({ data: { orders: [] } })),
+        ])
+            .then(([vRes, oRes]) => {
+                const allVendors = vRes.data?.vendors || [];
+                const userOrders = oRes.data?.orders || [];
+                const userOrderedVendorIds = new Set<string>();
+                userOrders.forEach((o: { vendorId?: string; vendor?: { id: string } }) => {
+                    const vid = o.vendorId || o.vendor?.id;
+                    if (vid) userOrderedVendorIds.add(vid);
+                });
+                const sorted = [...allVendors].sort((a, b) => {
+                    const aOrdered = userOrderedVendorIds.has(a.id) ? 1 : 0;
+                    const bOrdered = userOrderedVendorIds.has(b.id) ? 1 : 0;
+                    return bOrdered - aOrdered;
+                });
+                setVendors(sorted.slice(0, 10).map((v: {
+                    id: string;
+                    businessName?: string;
+                    displayName?: string | null;
+                    slug?: string;
+                    logoUrl?: string;
+                    rating?: number | string;
+                    minOrderValue?: number | string;
+                    creditEnabled?: boolean;
+                    categories?: string[];
+                    bannerUrl?: string;
+                    createdAt?: string;
+                    productCount?: number;
+                    isVerified?: boolean;
+                    nextDeliveryDate?: string | null;
+                }) => ({
+                    id: v.id,
+                    name: storeDisplayName(v),
+                    slug: v.slug || '',
+                    logo: v.logoUrl || '',
+                    rating: Number(v.rating) || 0,
+                    minOrderValue: Number(v.minOrderValue) || 0,
+                    creditEnabled: v.creditEnabled || false,
+                    categories: v.categories || [],
+                    isActive: true,
+                    deliverySchedule: '',
+                    deliveryTime: '',
+                    totalRatings: 0,
+                    coverImage: v.bannerUrl || '',
+                    description: '',
+                    createdAt: v.createdAt,
+                    productCount: v.productCount,
+                    isVerified: v.isVerified ?? true,
+                    nextDeliveryDate: v.nextDeliveryDate || undefined,
+                })));
+            })
             .catch(() => setVendors([]));
     }, [status, pincode]);
 
@@ -152,6 +170,7 @@ export function TopRatedVendors() {
                 createdAt?: string;
                 productCount?: number;
                 isVerified?: boolean;
+                nextDeliveryDate?: string | null;
             }) => ({
                 id: v.id,
                 name: storeDisplayName(v),
@@ -170,6 +189,7 @@ export function TopRatedVendors() {
                 createdAt: v.createdAt,
                 productCount: v.productCount,
                 isVerified: v.isVerified ?? true,
+                nextDeliveryDate: v.nextDeliveryDate || undefined,
             }))))
             .catch(() => setVendors([]));
     }, [pincode]);

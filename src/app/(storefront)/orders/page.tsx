@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Star, Home, Package, LogIn, X, Loader2, Store, Clock, CheckCircle2, XCircle, Truck, Trash2, RotateCcw, ListPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Star, Home, Package, LogIn, X, Loader2, Store, Clock, CheckCircle2, XCircle, Truck, Trash2, RotateCcw, ListPlus, FileDown } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useStableSession } from '@/hooks/useStableSession';
@@ -423,6 +423,15 @@ function OrdersPageContent() {
                                                                     className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-primary-light transition-colors">
                                                                     <ListPlus size={14} />
                                                                 </button>
+                                                                <a
+                                                                    href={`/api/v1/orders/${order.id}/invoice`}
+                                                                    download
+                                                                    title={`Download Invoice (${order.paymentStatus === 'paid' ? 'Paid' : 'Payment Pending'})`}
+                                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-primary-light transition-colors"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    <FileDown size={14} />
+                                                                </a>
                                                                 <button onClick={(e) => handleOrderAgain(order, e)} title="Reorder"
                                                                     className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-primary-light transition-colors">
                                                                     <RotateCcw size={14} />
@@ -509,6 +518,15 @@ function OrdersPageContent() {
                                                             className="p-1.5 rounded-lg text-gray-400 active:text-primary">
                                                             <ListPlus size={15} />
                                                         </button>
+                                                        <a
+                                                            href={`/api/v1/orders/${order.id}/invoice`}
+                                                            download
+                                                            title={`Download Invoice (${order.paymentStatus === 'paid' ? 'Paid' : 'Payment Pending'})`}
+                                                            className="p-1.5 rounded-lg text-gray-400 active:text-primary"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                            <FileDown size={15} />
+                                                        </a>
                                                         <button onClick={(e) => handleOrderAgain(order, e)}
                                                             className="p-1.5 rounded-lg text-gray-400 active:text-primary">
                                                             <RotateCcw size={15} />

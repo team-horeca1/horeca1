@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { FORM, FormErrorBanner, useFormFeedback } from '@/components/ui/form';
@@ -122,6 +122,26 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
 
     setSubmitting(true);
     try {
+      const deliveryAddress = {
+        outletName: profile.outletName?.trim() || undefined,
+        addressLine: profile.addressLine?.trim() || undefined,
+        flatInfo: profile.flatInfo?.trim() || undefined,
+        landmark: profile.landmark?.trim() || undefined,
+        city: profile.city?.trim() || undefined,
+        state: profile.state?.trim() || undefined,
+        pincode: profile.pincode?.trim() || undefined,
+        latitude: profile.latitude,
+        longitude: profile.longitude,
+        placeId: profile.placeId?.trim() || undefined,
+      };
+
+      const billingAddress = {
+        addressLine: (profile.billingAddressLine || profile.addressLine)?.trim() || undefined,
+        city: (profile.billingCity || profile.city)?.trim() || undefined,
+        state: (profile.billingState || profile.state)?.trim() || undefined,
+        pincode: (profile.billingPincode || profile.pincode)?.trim() || undefined,
+      };
+
       const companyProfile = buildCompanyProfile({ ...profile, contactPersons: contacts });
       let res: Response;
       if (mode === 'create') {
@@ -136,6 +156,8 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
             businessName: userFields.businessName || undefined,
             password: password || undefined,
             role: 'customer',
+            deliveryAddress,
+            billingAddress,
             companyProfile,
           }),
         });
@@ -143,7 +165,11 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
         res = await fetch(`/api/v1/admin/users/${userId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ companyProfile }),
+          body: JSON.stringify({
+            deliveryAddress,
+            billingAddress,
+            companyProfile,
+          }),
         });
       }
       const json = await parseJsonResponse(res);
@@ -229,9 +255,15 @@ export default function CustomerFormModal({ mode, userId, initial, onClose, onSa
           />
 
           {tab === 'address' && (
-            <p className="text-[12px] text-gray-500 mt-4">
-              Billing address. Delivery outlets are managed on the customer detail page.
-            </p>
+            <div className="mt-4 p-3 rounded-xl bg-blue-50/70 border border-blue-100 flex items-start gap-2.5 text-[12px] text-blue-900">
+              <MapPin size={16} className="text-blue-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-bold">Primary Delivery &amp; Billing Location:</strong>
+                <p className="text-blue-700/90 mt-0.5 leading-relaxed">
+                  This address is saved as the customer&apos;s primary outlet and default delivery address. Orders placed by or for this customer will dispatch here.
+                </p>
+              </div>
+            </div>
           )}
         </div>
 

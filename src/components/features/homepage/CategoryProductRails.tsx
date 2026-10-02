@@ -334,7 +334,8 @@ export function CategoryProductRails() {
   const handleAddOffer = (offer: VendorProduct) => {
     setAddingId(offer.id);
     try {
-      addToCart(offer, offer.minOrderQuantity || 1);
+      const added = addToCart(offer, offer.minOrderQuantity || 1);
+      if (!added) return;
       toast.success(`Added from ${offer.vendorName || 'supplier'}`);
       setPicker(null);
     } catch {
@@ -474,7 +475,7 @@ export function CategoryProductRails() {
                           onClick={() => openSuppliers(item)}
                           className="w-[160px] md:w-[180px] shrink-0 text-left bg-white rounded-xl border border-[#E9E3DD] overflow-hidden hover:shadow-md transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 relative"
                         >
-                          <div className="relative aspect-square bg-[#FAF5EC]">
+                          <div className="relative aspect-square bg-white">
                             {img ? (
                               <Image
                                 src={img}

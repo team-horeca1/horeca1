@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Image from 'next/image';
-import { LayoutGrid, Package, Undo2 } from 'lucide-react';
+import { LayoutGrid, Package, ShoppingBag, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CategoryTreeChild, CategoryTreeNode } from '@/lib/categoryTree';
 
@@ -11,7 +11,7 @@ interface VendorCategoryRailProps {
   activeTab: string;
   productCount: number;
   onSelect: (tab: string) => void;
-  /** Tab used when Your Items is tapped at root. Drilled state always returns to `all`. */
+  /** Tab used when Your Items is tapped. Defaults to `prev-ordered`. */
   yourItemsRootTab?: string;
   /** Brand stores omit Your Items — a brand is not a transacting entity. */
   showYourItems?: boolean;
@@ -75,7 +75,7 @@ function RailButton({
       >
         {label}
       </span>
-      {typeof count === 'number' && (
+      {typeof count === 'number' && count > 0 && (
         <span className="hidden md:inline text-[11px] font-medium text-text-muted tabular-nums shrink-0">
           {count}
         </span>
@@ -94,8 +94,8 @@ export function VendorCategoryRail({
 }: VendorCategoryRailProps) {
   const activeName = activeTab.startsWith('cat:') ? activeTab.slice(4) : '';
   const drilledParent =
-    tree.find((p) => p.name === activeName && p.children.length > 0)
-    ?? tree.find((p) => p.children.some((c) => c.name === activeName))
+    tree.find((p) => p.name === activeName && (p.children?.length ?? 0) > 0)
+    ?? tree.find((p) => p.children?.some((c) => c.name === activeName))
     ?? null;
 
   const isYourItems = activeTab === yourItemsRootTab && yourItemsRootTab !== 'all';
@@ -106,20 +106,23 @@ export function VendorCategoryRail({
   return (
     <aside className="w-[72px] md:w-[200px] lg:w-[240px] shrink-0 sticky top-[4.25rem] md:top-24 max-h-[calc(100dvh-5rem)] overflow-y-auto no-scrollbar">
       <div className="bg-white md:rounded-2xl md:border md:border-divider py-1.5 md:p-2">
-        {(showYourItems || drilledParent) && (
+        {showYourItems && (
           <RailButton
-            label={showYourItems ? 'Your Items' : 'Back'}
+            label="Your Items"
             active={isYourItems}
-            onClick={() => {
-              if (drilledParent) goHome();
-              else onSelect(yourItemsRootTab);
-            }}
-            fallback={<Undo2 size={16} className={isYourItems ? 'text-primary' : 'text-text-muted'} strokeWidth={2} />}
+            onClick={() => onSelect(yourItemsRootTab)}
+            fallback={<ShoppingBag size={16} className={isYourItems ? 'text-primary' : 'text-text-muted'} strokeWidth={1.8} />}
           />
         )}
 
         {drilledParent ? (
           <>
+            <RailButton
+              label="All Categories"
+              active={false}
+              onClick={goHome}
+              fallback={<ArrowLeft size={16} className="text-text-muted" strokeWidth={2} />}
+            />
             <RailButton
               label={drilledParent.name}
               active={activeTab === `cat:${drilledParent.name}`}

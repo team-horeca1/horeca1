@@ -131,3 +131,6 @@ fi
 
 echo "Demo deploy complete: ${DEPLOY_SHA}"
 echo "URL: https://demo.horeca1.com"
+
+# ci-trigger: demo pipeline 2026-09-21T14:14:53.3829533+05:30
+

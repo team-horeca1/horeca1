@@ -85,7 +85,7 @@ export function BrandProductCard({
       }}
       className="group w-full text-left bg-white rounded-xl border border-divider overflow-hidden hover:border-primary/30 transition-colors cursor-pointer"
     >
-      <div className="relative aspect-square bg-ivory">
+      <div className="relative aspect-square bg-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={image || PRODUCT_IMAGE_FALLBACK}

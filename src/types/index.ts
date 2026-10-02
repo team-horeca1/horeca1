@@ -25,6 +25,32 @@ export interface Vendor {
     description?: string;
     createdAt?: string;
     productCount?: number;
+    /** Next delivery calendar day, `YYYY-MM-DD`. */
+    nextDeliveryDate?: string;
+    heroSlides?: StoreHeroSlide[];
+    phone?: string;
+}
+
+export interface StoreHeroSlide {
+    id: string;
+    desktopImageUrl?: string | null;
+    mobileImageUrl?: string | null;
+    eyebrow?: string;
+    headline?: string;
+    ctaLabel?: string;
+    ctaHref?: string;
+    showText?: boolean;
+    showCta?: boolean;
+    copyAlignX?: 'left' | 'center' | 'right';
+    copyAlignY?: 'top' | 'center' | 'bottom';
+    copyOffsetX?: number;
+    copyOffsetY?: number;
+    showTextMobile?: boolean;
+    showCtaMobile?: boolean;
+    copyAlignXMobile?: 'left' | 'center' | 'right';
+    copyAlignYMobile?: 'top' | 'center' | 'bottom';
+    copyOffsetXMobile?: number;
+    copyOffsetYMobile?: number;
 }
 
 export interface VendorSummary {

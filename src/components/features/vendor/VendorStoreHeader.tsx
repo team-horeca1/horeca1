@@ -1,7 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Star, MapPin, Phone, ChevronLeft, ClipboardList, CreditCard, Clock, Megaphone, Tag } from 'lucide-react';
+import {
+    Star,
+    Phone,
+    ClipboardList,
+    CreditCard,
+    Clock,
+    Tag,
+    BadgeCheck,
+    ShoppingBag,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
@@ -9,10 +18,117 @@ import { ShareButton } from '@/components/features/share/ShareButton';
 import { vendorShareContent } from '@/lib/share-cards/types';
 import { useStableSession } from '@/hooks/useStableSession';
 import { cn } from '@/lib/utils';
-import type { Vendor, StorePromotion } from '@/types';
+import type { StoreHeroSlide, StorePromotion, Vendor } from '@/types';
 import { PLACEHOLDERS } from '@/lib/constants';
-import { parseImageMeta, getDisplayStyle } from '@/lib/imageMeta';
+import { parseImageMeta, supplierLogoSrc } from '@/lib/imageMeta';
 import { OffersSheet } from '@/components/features/promo/OffersSheet';
+import { Hero, type HeroContent } from '@/components/features/Hero';
+
+function toHeroSlides(slides: StoreHeroSlide[] | undefined): HeroContent[] {
+    return (slides ?? [])
+        .filter((slide) => slide.desktopImageUrl || slide.mobileImageUrl)
+        .map((slide) => {
+            const desktop = slide.desktopImageUrl || slide.mobileImageUrl || undefined;
+            const mobile = slide.mobileImageUrl || slide.desktopImageUrl || undefined;
+            return {
+                id: slide.id,
+                eyebrow: slide.eyebrow,
+                headline: slide.headline,
+                ctaLabel: slide.ctaLabel,
+                ctaHref: slide.ctaHref,
+                showText: slide.showText,
+                showCta: slide.showCta,
+                copyAlignX: slide.copyAlignX,
+                copyAlignY: slide.copyAlignY,
+                copyOffsetX: slide.copyOffsetX,
+                copyOffsetY: slide.copyOffsetY,
+                showTextMobile: slide.showTextMobile,
+                showCtaMobile: slide.showCtaMobile,
+                copyAlignXMobile: slide.copyAlignXMobile,
+                copyAlignYMobile: slide.copyAlignYMobile,
+                copyOffsetXMobile: slide.copyOffsetXMobile,
+                copyOffsetYMobile: slide.copyOffsetYMobile,
+                desktopImageUrl: desktop,
+                mobileImageUrl: mobile,
+            };
+        });
+}
+
+function formatDeliveryDate(nextDeliveryDate?: string | null): string {
+    if (!nextDeliveryDate) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return tomorrow.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' }).replace(/,/g, '');
+    }
+    const [y, m, d] = nextDeliveryDate.split('-').map(Number);
+    if (!y || !m || !d) return nextDeliveryDate;
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' }).replace(/,/g, '');
+}
+
+function StoreBannerIdentity({
+    vendor,
+    logoSrc,
+    coverSrc,
+    scrim,
+}: {
+    vendor: Vendor;
+    logoSrc: string;
+    coverSrc: string;
+    scrim: boolean;
+}) {
+    const hasRating = vendor.rating && Number(vendor.rating) > 0;
+    return (
+        <div
+            className={cn(
+                'pointer-events-none absolute inset-0 z-10 hidden items-center gap-4 rounded-[20px] px-6 md:flex',
+                scrim
+                    ? 'bg-gradient-to-r from-black/85 via-black/45 to-transparent'
+                    : 'bg-gradient-to-r from-black/75 via-black/35 to-transparent',
+            )}
+        >
+            <div className="flex h-[80px] w-[80px] shrink-0 items-center justify-center rounded-2xl bg-white p-2 shadow-cdl-2 ring-2 ring-white/20">
+                {logoSrc ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={logoSrc} alt={vendor.name} className="h-full w-full object-contain" />
+                ) : (
+                    <div className="relative size-full rounded-xl overflow-hidden">
+                        <Image src={coverSrc} alt="" fill className="object-cover" />
+                    </div>
+                )}
+            </div>
+            <div className="min-w-0 flex-1">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                    {hasRating ? (
+                        <span className="flex items-center gap-1 rounded-full border border-white/30 bg-white/20 backdrop-blur-xs px-2.5 py-0.5 text-xs font-bold text-white">
+                            <Star size={11} className="fill-amber-400 text-amber-400" /> {vendor.rating}
+                        </span>
+                    ) : null}
+                    {vendor.creditEnabled ? (
+                        <span className="flex items-center gap-1 rounded-full border border-purple-300/40 bg-purple-500/25 backdrop-blur-xs px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-purple-200">
+                            <CreditCard size={11} strokeWidth={2} /> DiSCCO Credit
+                        </span>
+                    ) : null}
+                </div>
+                <div className="flex items-center gap-2">
+                    <h1 className="line-clamp-1 text-[clamp(1.5rem,2.2vw,2.25rem)] font-extrabold leading-tight text-white tracking-tight drop-shadow-sm">
+                        {vendor.name}
+                    </h1>
+                    {vendor.isVerified ? (
+                        <span className="inline-flex items-center text-blue-400 shrink-0" title="Verified Supplier">
+                            <BadgeCheck size={22} className="fill-blue-500 text-white" />
+                        </span>
+                    ) : null}
+                </div>
+                {vendor.categories && vendor.categories.length > 0 ? (
+                    <p className="mt-1 line-clamp-1 text-sm font-medium text-white/85">
+                        {vendor.categories.slice(0, 4).join(' · ')}
+                    </p>
+                ) : null}
+            </div>
+        </div>
+    );
+}
 
 interface VendorStoreHeaderProps {
     vendor: Vendor;
@@ -26,14 +142,10 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
     const { isAuthenticated } = useStableSession();
     const isLoggedIn = isAuthenticated;
     const [dealsOpen, setDealsOpen] = useState(false);
-    const coverImage = vendor.coverImage || PLACEHOLDERS.vendor;
-    // The detail page hero box renders the vendor's LOGO, not their card cover.
-    // Falls back to the cover image if no logo was uploaded.
-    const heroImage = vendor.logo || coverImage;
-    // Apply the saved focal point + zoom so a wide logo is cropped to the part
-    // the vendor chose in the Adjust modal — same behavior as the brand-logo
-    // live preview circle (object-cover that fills the frame).
-    const heroImageStyle = getDisplayStyle(parseImageMeta(heroImage).meta);
+    const heroSlides = toHeroSlides(vendor.heroSlides);
+    const logoSrc = vendor.logo ? supplierLogoSrc(vendor.logo) : '';
+    const coverSrc = parseImageMeta(vendor.coverImage || PLACEHOLDERS.vendor).src;
+    const deliveryDateDisplay = formatDeliveryDate(vendor.nextDeliveryDate);
     
     const handleMyListsClick = (e: React.MouseEvent) => {
         if (!isLoggedIn) {
@@ -44,261 +156,303 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
         router.push(`/order-lists?vendorId=${vendor.id}`);
     };
 
+    const handleCallVendor = () => {
+        const rawPhone = vendor.phone || (vendor as { user?: { phone?: string } })?.user?.phone;
+        if (!rawPhone || !rawPhone.trim()) {
+            toast.error(`Contact phone number is not available for ${vendor.name}`);
+            return;
+        }
+        const phone = rawPhone.trim();
+        const digits = phone.replace(/[^0-9]/g, '');
+        const cleanPhone = phone.startsWith('+')
+            ? phone
+            : digits.length === 10
+                ? `+91${digits}`
+                : phone;
+        const telUri = `tel:${cleanPhone}`;
+
+        try {
+            window.location.href = telUri;
+        } catch {
+            // fallback
+        }
+
+        toast.success(`Calling ${vendor.name} (${phone})`, {
+            description: 'Dialer opened. You can also copy the number below.',
+            action: {
+                label: 'Copy Number',
+                onClick: () => {
+                    navigator.clipboard.writeText(phone);
+                    toast.success('Phone number copied to clipboard');
+                },
+            },
+            duration: 7000,
+        });
+    };
+
     const shareContent = vendorShareContent({
         id: vendor.id,
         name: vendor.name,
         image: vendor.logo || vendor.coverImage || null,
     });
 
-    const locationLine = [vendor.address?.city, vendor.address?.state].filter(Boolean).join(', ')
-        || vendor.categories.slice(0, 2).join(' · ');
-
     return (
-        <div className="w-full bg-white md:bg-white md:pb-6 md:pt-4">
-            {/* ── MOBILE HEADER — full cover, then name + contact ── */}
-            <div className="block md:hidden">
-                <div className="relative h-[136px] overflow-hidden bg-primary">
-                    <Image
-                        src={coverImage}
-                        alt=""
-                        fill
-                        className="object-cover"
-                        sizes="100vw"
-                        priority
-                    />
-                    {locationLine ? (
-                        <p className="absolute top-3 left-3 right-3 text-[12px] font-medium text-white truncate">
-                            <span className="inline-block max-w-full truncate rounded-md bg-black/45 px-2 py-1">
-                                {locationLine}
-                            </span>
-                        </p>
-                    ) : null}
-                </div>
-
-                <div className="px-3 flex items-start gap-3">
-                    <div className="relative size-16 -mt-7 rounded-[12px] overflow-hidden bg-white border border-divider shadow-sm shrink-0">
-                        <Image
-                            src={heroImage}
-                            alt={vendor.name}
-                            fill
-                            className="object-contain p-1.5"
-                            style={heroImageStyle}
-                            priority
+        <div className="w-full md:bg-white md:pb-6">
+            {heroSlides.length > 0 ? (
+                <Hero
+                    slides={heroSlides}
+                    chrome="page"
+                    heading="h2"
+                    overlay={(
+                        <StoreBannerIdentity
+                            vendor={vendor}
+                            logoSrc={logoSrc}
+                            coverSrc={coverSrc}
+                            scrim
                         />
-                    </div>
-                    <div className="min-w-0 flex-1 pt-2">
-                        <div className="flex items-start gap-2">
-                            <h1 className="min-w-0 flex-1 text-[17px] font-semibold text-text leading-tight line-clamp-2 text-balance">
-                                {vendor.name}
-                                {vendor.isVerified ? (
-                                    <span className="ml-1 text-primary align-middle" aria-label="Verified">✓</span>
-                                ) : null}
-                            </h1>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                                <ShareButton content={shareContent} variant="icon" className="size-9" />
-                                <button
-                                    type="button"
-                                    onClick={() => onTabChange('about')}
-                                    className="size-9 rounded-full bg-white border border-divider shadow-sm flex items-center justify-center"
-                                    aria-label="Call or contact vendor"
-                                >
-                                    <Phone size={15} className="text-primary" strokeWidth={2} />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="px-3 mt-2 pb-1 space-y-1.5">
-                    <p className="text-[12px] text-text-secondary font-medium flex items-center gap-1.5 flex-wrap">
-                        <span className="inline-flex items-center gap-0.5 tabular-nums">
-                            <Star size={11} className="text-primary fill-primary" />
-                            {vendor.rating}
-                            {vendor.totalRatings ? (
-                                <span className="text-text-muted">({vendor.totalRatings.toLocaleString('en-IN')})</span>
+                    )}
+                />
+            ) : (
+                <section className="w-full pt-2 pb-2 md:pt-3 md:pb-4">
+                    <div className="mx-auto max-w-[var(--container-max)] px-3 md:px-[var(--container-padding)]">
+                        <div className="relative h-[160px] sm:h-[190px] md:h-[240px] overflow-hidden rounded-2xl md:rounded-[20px] bg-[#4A141F] shadow-cdl-1 md:shadow-cdl-2">
+                            {coverSrc ? (
+                                <Image
+                                    src={coverSrc}
+                                    alt={vendor.name}
+                                    fill
+                                    priority
+                                    className="object-cover"
+                                />
                             ) : null}
-                        </span>
-                        {vendor.productCount ? (
-                            <>
-                                <span className="text-text-muted">·</span>
-                                <span className="tabular-nums">{vendor.productCount.toLocaleString('en-IN')}+ products</span>
-                            </>
-                        ) : null}
-                    </p>
-                    <p className="text-[12px] text-text-secondary font-medium flex items-center gap-1.5 flex-wrap">
-                        {vendor.creditEnabled && (
-                            <span className="inline-flex items-center gap-1">
-                                <CreditCard size={11} className="text-primary" strokeWidth={2} />
-                                Credit
-                            </span>
-                        )}
-                        {vendor.creditEnabled && <span className="text-text-muted">·</span>}
-                        <span className="tabular-nums">MOV ₹{vendor.minOrderValue.toLocaleString('en-IN')}</span>
-                        <span className="text-text-muted">·</span>
-                        <span className="inline-flex items-center gap-1">
-                            <Clock size={11} className="text-primary" />
-                            {vendor.deliverySchedule || 'Next day'}
-                        </span>
-                    </p>
-                </div>
-
-                {storePromos.length > 0 && (
-                    <div className="mt-2 px-3 flex gap-2 overflow-x-auto no-scrollbar">
-                        {storePromos.map((p) => (
-                            <div
-                                key={p.id}
-                                className="shrink-0 flex items-center gap-1.5 bg-primary-light border border-primary/20 text-primary px-3 py-1.5 rounded-full text-xs font-semibold"
-                            >
-                                <Megaphone size={12} className="text-primary" />
-                                {p.badgeLabel}
-                            </div>
-                        ))}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/20 to-transparent md:hidden" />
+                            <StoreBannerIdentity
+                                vendor={vendor}
+                                logoSrc={logoSrc}
+                                coverSrc={coverSrc}
+                                scrim={false}
+                            />
+                        </div>
                     </div>
-                )}
+                </section>
+            )}
 
-                <div className="flex items-center border-b border-divider mt-2">
-                    {[
-                        { key: 'all', label: 'Catalog' },
-                        { key: 'orders', label: 'Orders' },
-                        { key: 'ratings', label: 'Ratings' },
-                        { key: 'about', label: 'Info' },
-                    ].map((tab) => (
-                        <button
-                            key={tab.key}
-                            type="button"
-                            onClick={() => onTabChange(tab.key)}
-                            className={cn(
-                                'flex-1 min-h-11 px-1 text-[12px] font-semibold text-center relative',
-                                activeTab === tab.key ? 'text-primary' : 'text-text-muted',
+            {/* Mobile identity sheet - full-width sheet overlapping the banner */}
+            <div className="md:hidden relative z-20 -mt-6 w-full bg-white rounded-t-3xl pt-4 px-4 pb-2.5 border-t border-divider/60 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+                {/* Top: Avatar, Name, Verified, Actions */}
+                <div className="flex items-start gap-3">
+                        <div className="relative size-14 shrink-0 rounded-xl overflow-hidden bg-white p-1 border border-divider shadow-xs ring-2 ring-white flex items-center justify-center">
+                            {logoSrc ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={logoSrc} alt={vendor.name} className="h-full w-full object-contain" />
+                            ) : (
+                                <div className="relative size-full rounded-lg overflow-hidden">
+                                    <Image src={coverSrc} alt={vendor.name} fill className="object-cover" />
+                                </div>
                             )}
-                        >
-                            {tab.label}
-                            {activeTab === tab.key && (
-                                <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-primary rounded-full" />
-                            )}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* ── DESKTOP HEADER — compact Burgundy hero (matches CDL brand) ── */}
-            <div className="hidden md:block max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
-                <div className="relative w-full h-[180px] lg:h-[220px] rounded-2xl overflow-hidden bg-gradient-to-r from-[#4A141F] via-[#6B1D2E] to-[#8B2C3E] flex items-center px-6 md:px-10 lg:px-16 shadow-cdl-2">
-                    {/* Decorative circles */}
-                    <div className="absolute left-0 top-0 w-full h-full opacity-10 pointer-events-none">
-                        <svg width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="10%" cy="50%" r="150" stroke="white" strokeWidth="2" />
-                            <circle cx="90%" cy="20%" r="80" stroke="white" strokeWidth="2" />
-                        </svg>
-                    </div>
-
-                    {/* Back button */}
-                    <button
-                        type="button"
-                        onClick={() => router.back()}
-                        className="absolute top-4 left-4 p-2 bg-white/20 backdrop-blur-md rounded-full text-white z-20 hover:bg-white/30 transition"
-                        aria-label="Back"
-                    >
-                        <ChevronLeft size={20} strokeWidth={2.5} />
-                    </button>
-
-                    {/* Content */}
-                    <div className="flex items-center w-full relative z-10">
-                        {/* Vendor logo */}
-                        <div className="flex-shrink-0 mr-4 md:mr-8 lg:mr-10">
-                            <div className="relative w-[110px] h-[110px] md:w-[130px] md:h-[130px] rounded-xl bg-white border-2 border-white/40 overflow-hidden shadow-cdl-2">
-                                <Image src={heroImage} alt={vendor.name} fill className="object-contain p-2" style={heroImageStyle} priority />
-                            </div>
                         </div>
 
-                        {/* Title + badges */}
-                        <div className="flex-grow flex flex-col items-start justify-center text-white min-w-0">
-                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                                <span className="bg-white text-text px-2.5 py-0.5 rounded-md flex items-center gap-1 text-xs font-bold shadow-sm">
-                                    {vendor.rating} <Star size={11} className="fill-amber-400 text-amber-400" />
-                                </span>
-                                {vendor.deliverySchedule ? (
-                                    <span className="bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[10px] md:text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md">
-                                        {vendor.deliverySchedule}
+                        <div className="min-w-0 flex-1 pt-0.5">
+                            <div className="flex items-center gap-1.5">
+                                <h1 className="text-[15px] font-bold text-text tracking-tight leading-snug line-clamp-2">
+                                    {vendor.name}
+                                </h1>
+                                {vendor.isVerified ? (
+                                    <span className="inline-flex items-center shrink-0" title="Verified Supplier">
+                                        <BadgeCheck size={16} className="fill-blue-500 text-white" />
                                     </span>
-                                ) : (
-                                    <span className="bg-white/15 backdrop-blur-sm border border-white/25 text-white text-[10px] md:text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md">
-                                        Open till 8:00 PM
-                                    </span>
-                                )}
-                                {vendor.creditEnabled && (
-                                    <span className="bg-white/20 backdrop-blur-sm text-white border border-white/30 text-[10px] md:text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md flex items-center gap-1">
-                                        <CreditCard size={11} strokeWidth={2} /> DiSCCO Credit
-                                    </span>
-                                )}
+                                ) : null}
                             </div>
-                            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold leading-tight tracking-tight text-white drop-shadow-sm line-clamp-1">
-                                {vendor.name}
-                            </h1>
-                            <p className="text-xs md:text-sm font-medium text-white/80 mt-1 line-clamp-1">
-                                {vendor.categories.slice(0, 3).join(' · ')}
-                                {vendor.minOrderValue ? <> <span className="opacity-60">|</span> Min ₹{vendor.minOrderValue}</> : null}
+                            <p className="text-[11px] font-medium text-text-secondary truncate mt-0.5">
+                                {vendor.categories && vendor.categories.length > 0
+                                    ? vendor.categories.slice(0, 3).join(' • ')
+                                    : 'Verified B2B HoReCa Supplier'}
                             </p>
                         </div>
 
-                        {/* Right-side CTAs */}
-                        <div className="flex-shrink-0 ml-4 hidden lg:flex flex-col items-stretch justify-center gap-2 w-[min(100%,200px)]">
+                        <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                            <ShareButton
+                                content={shareContent}
+                                variant="icon"
+                                className="size-8 rounded-full bg-[#FAF7F2] hover:bg-gray-100 border border-divider text-text-secondary flex items-center justify-center transition-all active:scale-90 shadow-2xs"
+                            />
                             <button
                                 type="button"
-                                onClick={() => {
-                                    onTabChange('all');
-                                    setTimeout(() => {
-                                        window.scrollTo({ top: window.innerHeight * 0.45, behavior: 'smooth' });
-                                    }, 50);
-                                }}
-                                className="w-full bg-white text-primary px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs font-bold shadow-md hover:bg-ivory transition-colors active:scale-95"
+                                onClick={handleCallVendor}
+                                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-light hover:bg-primary/20 border border-primary/20 text-primary transition-all active:scale-90 shadow-2xs"
+                                aria-label={`Call ${vendor.name}`}
+                                title={vendor.phone ? `Call ${vendor.name} (${vendor.phone})` : `Call ${vendor.name}`}
                             >
-                                Start Ordering →
+                                <Phone size={13} strokeWidth={2.25} />
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Middle: Micro-Stats Row */}
+                    <div className="mt-3 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                        {vendor.rating && Number(vendor.rating) > 0 ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50/90 border border-amber-200/80 px-2 py-0.5 text-[10.5px] font-bold text-amber-900">
+                                <Star size={10.5} className="fill-amber-400 text-amber-500" />
+                                <span>{vendor.rating}</span>
+                                {vendor.totalRatings ? (
+                                    <span className="font-normal text-amber-700">({vendor.totalRatings})</span>
+                                ) : null}
+                            </span>
+                        ) : null}
+
+                        {vendor.productCount ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#FAF7F2] border border-divider px-2 py-0.5 text-[10.5px] font-medium text-text-secondary">
+                                <ShoppingBag size={10.5} className="text-text-muted" />
+                                <span>{vendor.productCount.toLocaleString('en-IN')}+ items</span>
+                            </span>
+                        ) : null}
+
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#FAF7F2] border border-divider px-2 py-0.5 text-[10.5px] font-medium text-text-secondary">
+                            {vendor.minOrderValue <= 0 ? (
+                                <span className="text-emerald-700 font-semibold">No Min. Order</span>
+                            ) : (
+                                <span>Min. ₹{vendor.minOrderValue.toLocaleString('en-IN')}</span>
+                            )}
+                        </span>
+
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-50/80 border border-blue-200/60 px-2 py-0.5 text-[10.5px] font-medium text-blue-900">
+                            <Clock size={10.5} className="text-blue-600 shrink-0" />
+                            <span className="truncate max-w-[125px]">{deliveryDateDisplay}</span>
+                        </span>
+
+                        {vendor.creditEnabled ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-purple-50 border border-purple-200/70 px-2 py-0.5 text-[10.5px] font-semibold text-purple-800">
+                                <CreditCard size={10.5} className="text-purple-600" />
+                                Credit
+                            </span>
+                        ) : null}
+
+                        {storePromos.length > 0 ? (
                             <button
                                 type="button"
                                 onClick={() => setDealsOpen(true)}
-                                className="w-full bg-white/15 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold border border-white/30 hover:bg-white/25 transition-colors"
+                                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gradient-to-r from-primary-light to-[#fce4ec] border border-primary/30 px-2.5 py-0.5 text-[10.5px] font-bold text-primary active:scale-95 shadow-2xs"
                             >
-                                <Tag size={14} strokeWidth={2} />
-                                Deals &amp; Coupons
+                                <Tag size={10} className="fill-primary/20 text-primary" strokeWidth={2.5} />
+                                <span>{storePromos.length} {storePromos.length === 1 ? 'Deal' : 'Deals'}</span>
+                                <span className="text-[10px]">&rsaquo;</span>
+                            </button>
+                        ) : null}
+                    </div>
+
+                    {/* Bottom: Modern Segmented Navigation Tabs (commented out for now) */}
+                    {/*
+                    <div className="mt-3 pt-2.5 border-t border-divider/70">
+                        <div className="grid grid-cols-4 gap-1 p-0.5 rounded-xl bg-[#F6F3EE] border border-divider/60">
+                            {[
+                                { key: 'all', label: 'Catalog' },
+                                { key: 'orders', label: 'Orders' },
+                                { key: 'ratings', label: 'Ratings' },
+                                { key: 'about', label: 'Info' },
+                            ].map((tab) => {
+                                const isActive = activeTab === tab.key || (activeTab === 'all' && tab.key === 'all');
+                                return (
+                                    <button
+                                        key={tab.key}
+                                        type="button"
+                                        onClick={() => onTabChange(tab.key)}
+                                        className={cn(
+                                            'h-8.5 rounded-lg text-[12px] font-semibold transition-all duration-150 flex items-center justify-center active:scale-98',
+                                            isActive
+                                                ? 'bg-primary text-white shadow-xs font-bold'
+                                                : 'text-text-muted hover:text-text hover:bg-white/60'
+                                        )}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    */}
+                </div>
+
+            <div className="hidden md:block max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
+                {/* Desktop Action Band: Deals, Quick Order List, Share, Call Vendor, MOV, Next Delivery */}
+                <div className="pt-3 pb-1">
+                    <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-[#FAF7F2] border border-divider/80 shadow-[0_2px_8px_rgba(37,24,0,0.03)]">
+                        {/* Left: Action Buttons */}
+                        <div className="flex items-center flex-wrap gap-2.5">
+                            {/* 1. Deals & Coupons */}
+                            <button
+                                type="button"
+                                onClick={() => setDealsOpen(true)}
+                                className="h-10 px-4 rounded-xl border border-primary/30 bg-white text-xs font-bold text-primary inline-flex items-center gap-2 hover:bg-primary-light/60 hover:border-primary/50 transition-all shadow-2xs active:scale-98 cursor-pointer"
+                                title="View Deals & Coupons"
+                            >
+                                <Tag size={14} strokeWidth={2.25} className="text-primary" />
+                                <span>Deals &amp; Coupons</span>
                                 {storePromos.length > 0 && (
-                                    <span className="min-w-[1.2rem] h-4 px-1 rounded-full bg-white text-primary text-[10px] font-bold flex items-center justify-center">
+                                    <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-primary text-white text-[10px] font-black flex items-center justify-center">
                                         {storePromos.length}
                                     </span>
                                 )}
                             </button>
+
+                            {/* 2. Quick Order List */}
+                            <button
+                                type="button"
+                                onClick={handleMyListsClick}
+                                className="h-10 px-4 rounded-xl border border-divider bg-white text-xs font-semibold text-text inline-flex items-center gap-2 hover:bg-[#FAF5EE] hover:border-primary/30 hover:text-primary transition-all shadow-2xs active:scale-98 cursor-pointer"
+                                title="Quick Order List"
+                            >
+                                <ClipboardList size={14} strokeWidth={2} className="text-text-secondary" />
+                                <span>Quick Order List</span>
+                            </button>
+
+                            {/* 3. Share */}
+                            <ShareButton
+                                content={shareContent}
+                                variant="chip"
+                                label="Share"
+                                className="h-10 px-4 rounded-xl border border-divider bg-white text-xs font-semibold text-text inline-flex items-center gap-2 hover:bg-[#FAF5EE] hover:border-primary/30 hover:text-primary transition-all shadow-2xs active:scale-98 cursor-pointer"
+                            />
+
+                            {/* 4. Call Vendor */}
+                            <button
+                                type="button"
+                                onClick={handleCallVendor}
+                                className="h-10 px-4 rounded-xl border border-divider bg-white text-xs font-semibold text-text inline-flex items-center gap-2 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all shadow-2xs active:scale-98 cursor-pointer"
+                                title={vendor.phone ? `Call ${vendor.name} (${vendor.phone})` : `Call ${vendor.name}`}
+                            >
+                                <Phone size={14} strokeWidth={2} className="text-emerald-600" />
+                                <span>Call Vendor</span>
+                                {vendor.phone && (
+                                    <span className="text-[11px] font-medium text-text-muted hidden lg:inline">
+                                        ({vendor.phone})
+                                    </span>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Right: MOV & Next Delivery */}
+                        <div className="flex items-center flex-wrap gap-2 shrink-0">
+                            {/* Min Order Value */}
+                            <div className="h-10 px-3.5 rounded-xl border border-divider bg-white text-xs inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap">
+                                <span className="font-semibold text-text-secondary">Min. order value:</span>
+                                <span className="font-bold text-emerald-700">
+                                    {vendor.minOrderValue <= 0 ? 'Rs. 0' : `Rs. ${vendor.minOrderValue.toLocaleString('en-IN')}`}
+                                </span>
+                            </div>
+
+                            {/* Next Delivery */}
+                            <div className="h-10 px-3.5 rounded-xl border border-divider bg-white text-xs inline-flex items-center gap-1.5 shadow-2xs whitespace-nowrap">
+                                <span className="font-semibold text-text-secondary">Next delivery:</span>
+                                <span className="font-bold text-emerald-700">
+                                    {deliveryDateDisplay}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* ── INFO BAR ── */}
-                <div className="flex items-center justify-between px-1 pt-4 pb-3 border-b border-divider">
-                    <div className="flex items-center gap-2 min-w-0">
-                        <MapPin size={16} className="text-primary shrink-0" strokeWidth={2} />
-                        <span className="text-xs md:text-sm font-medium text-text-secondary truncate">
-                            Plot No 114/3, Sector 5, Navi Mumbai
-                        </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0 ml-4">
-                        <button type="button" className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-ivory border border-divider text-xs font-semibold text-text hover:bg-primary-light hover:border-primary/40 hover:text-primary transition-all">
-                            <Phone size={14} strokeWidth={2} />
-                            Call Vendor
-                        </button>
-                        <ShareButton content={shareContent} variant="chip" label="Share" />
-                        <button
-                            type="button"
-                            onClick={handleMyListsClick}
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-ivory border border-divider text-xs font-semibold text-text hover:bg-primary-light hover:border-primary/40 hover:text-primary transition-all"
-                        >
-                            <ClipboardList size={14} strokeWidth={2} />
-                            My Lists
-                        </button>
-                    </div>
-                </div>
-
-                {/* ── TABS ── */}
+                {/* ── TABS (commented out for now) ── */}
+                {/*
                 <div className="flex items-center gap-8 overflow-x-auto no-scrollbar">
                     {[
                         { key: 'all', label: 'Catalog' },
@@ -325,6 +479,7 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
                         </button>
                     ))}
                 </div>
+                */}
             </div>
 
             <OffersSheet

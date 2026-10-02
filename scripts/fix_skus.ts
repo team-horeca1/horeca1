@@ -80,13 +80,16 @@ async function main() {
       throw new Error('Refusing to add unique index while duplicates remain.');
     }
 
-    // DB-level guarantee: partial unique index on lower(sku), excluding tombstoned rows.
+    // Drop legacy global index if present
+    await pool.query('DROP INDEX IF EXISTS products_sku_unique_ci');
+
+    // DB-level guarantee: partial unique index on (vendor_id, lower(sku)), excluding tombstoned rows.
     await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS products_sku_unique_ci
-      ON products (lower(sku))
+      CREATE UNIQUE INDEX IF NOT EXISTS products_vendor_id_sku_unique_ci
+      ON products (vendor_id, lower(sku))
       WHERE sku IS NOT NULL AND sku <> '' AND slug NOT LIKE '_deleted_%'
     `);
-    console.log('Unique index products_sku_unique_ci ensured.');
+    console.log('Unique index products_vendor_id_sku_unique_ci ensured.');
   } catch (err) {
     console.error('ERROR:', err);
     process.exitCode = 1;

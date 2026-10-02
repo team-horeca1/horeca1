@@ -40,11 +40,32 @@ export function friendlyErrorMessage(error: unknown, fallback = 'Something went 
     const code = (error as { code?: unknown }).code;
     const target = (error as { meta?: { target?: unknown } }).meta?.target;
     if (code === 'P2002') {
-      const field = Array.isArray(target) ? String(target[target.length - 1]) : 'Record';
-      if (field === 'slug' || field === 'Record') {
-        return 'A product with this name or slug already exists';
+      const meta = (error as { meta?: Record<string, unknown> }).meta;
+      const target = meta?.target;
+      const constraint = String(
+        (meta?.driverAdapterError as { cause?: { constraint?: { fields?: string[] }; originalMessage?: string } })?.cause?.constraint?.fields?.[0] ||
+        (meta?.driverAdapterError as { cause?: { originalMessage?: string } })?.cause?.originalMessage ||
+        ''
+      );
+      const field = Array.isArray(target) ? String(target[target.length - 1]) : '';
+      const combined = `${field} ${constraint}`.toLowerCase();
+
+      if (combined.includes('sku')) {
+        return 'A product with this SKU already exists in this store';
       }
-      return `${field} already exists`;
+      if (combined.includes('slug') || combined.includes('name')) {
+        return 'A product with this name or slug already exists in this store';
+      }
+      if (combined.includes('email')) {
+        return 'A record with this email already exists';
+      }
+      if (combined.includes('phone')) {
+        return 'A record with this phone number already exists';
+      }
+      if (field && field !== 'Record') {
+        return `${field} already exists`;
+      }
+      return 'A record with these details already exists';
     }
     if (code === 'P2003') {
       // P2003 is ANY foreign-key failure — create/update with a missing parent

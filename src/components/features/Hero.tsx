@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getDisplayStyle, parseImageMeta } from '@/lib/imageMeta';
 import {
@@ -69,6 +69,8 @@ export type HeroProps = {
   chrome?: HeroChrome;
   /** Storefront desktop uses h1. Pass h2 when this banner is not the page title. */
   heading?: 'h1' | 'h2';
+  /** Fixed content on top of the slides. It does not move when the photo changes. */
+  overlay?: React.ReactNode;
 };
 
 const AUTOPLAY_MS = 5000;
@@ -396,12 +398,16 @@ export function Hero(props: HeroProps = {}) {
     layout = 'responsive',
     chrome = 'page',
     heading,
+    overlay,
   } = props;
 
   const slides = normalizeSlides(props);
-  const multi = slides.length > 1 && chrome === 'page';
+  const multi = slides.length > 1;
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [dragX, setDragX] = useState(0);
+  const dragRef = useRef<{ x: number; y: number; pointerId: number } | null>(null);
+  const swipedRef = useRef(false);
 
   const safeIndex = slides.length === 0 ? 0 : index % slides.length;
 
@@ -426,12 +432,27 @@ export function Hero(props: HeroProps = {}) {
     return () => window.clearInterval(id);
   }, [multi, paused, go]);
 
+  const endDrag = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const start = dragRef.current;
+    dragRef.current = null;
+    setDragX(0);
+    if (!start || start.pointerId !== e.pointerId) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    const swiped = Math.abs(dx) >= 48 && Math.abs(dx) > Math.abs(dy);
+    if (swiped) {
+      swipedRef.current = true;
+      go(dx < 0 ? 1 : -1);
+    }
+    if (e.pointerType !== 'mouse') setPaused(false);
+  }, [go]);
+
   const active = slides[safeIndex] ?? slides[0];
   if (!active) return null;
 
   const banners = (
     <div
-      className="relative"
+      className={cn('relative', multi && 'cursor-grab touch-pan-y select-none active:cursor-grabbing')}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
@@ -440,36 +461,60 @@ export function Hero(props: HeroProps = {}) {
           setPaused(false);
         }
       }}
+      onPointerDown={(e) => {
+        if (!multi) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        dragRef.current = { x: e.clientX, y: e.clientY, pointerId: e.pointerId };
+        setPaused(true);
+      }}
+      onPointerMove={(e) => {
+        const start = dragRef.current;
+        if (!start || start.pointerId !== e.pointerId) return;
+        const dx = e.clientX - start.x;
+        const dy = e.clientY - start.y;
+        if (Math.abs(dx) < 8 || Math.abs(dy) > Math.abs(dx)) return;
+        if (!e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }
+        setDragX(dx);
+      }}
+      onPointerUp={endDrag}
+      onPointerCancel={() => {
+        dragRef.current = null;
+        setDragX(0);
+        setPaused(false);
+      }}
+      onClickCapture={(e) => {
+        if (!swipedRef.current) return;
+        e.preventDefault();
+        e.stopPropagation();
+        swipedRef.current = false;
+      }}
+      onDragStart={(e) => e.preventDefault()}
     >
-      <SlidePair
-        key={active.id ?? safeIndex}
-        slide={active}
-        layout={layout}
-        priority={chrome === 'page' && safeIndex === 0}
-        desktopHeading={heading ?? (safeIndex === 0 ? 'h1' : 'h2')}
-        mobileHeading={heading ?? 'h2'}
-      />
+      <div
+        className={dragX === 0 ? 'transition-transform duration-200' : undefined}
+        style={dragX === 0 ? undefined : { transform: `translateX(${dragX}px)` }}
+      >
+        <SlidePair
+          key={active.id ?? safeIndex}
+          slide={active}
+          layout={layout}
+          priority={chrome === 'page' && safeIndex === 0}
+          desktopHeading={heading ?? (safeIndex === 0 ? 'h1' : 'h2')}
+          mobileHeading={heading ?? 'h2'}
+        />
+      </div>
+
+      {overlay}
 
       {multi && (
         <>
-          <button
-            type="button"
-            aria-label="Previous banner"
-            onClick={() => go(-1)}
-            className="absolute left-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-primary shadow-md transition hover:bg-white md:left-3 md:h-10 md:w-10"
-          >
-            <ChevronLeft size={20} strokeWidth={2.5} />
-          </button>
-          <button
-            type="button"
-            aria-label="Next banner"
-            onClick={() => go(1)}
-            className="absolute right-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-primary shadow-md transition hover:bg-white md:right-3 md:h-10 md:w-10"
-          >
-            <ChevronRight size={20} strokeWidth={2.5} />
-          </button>
           <div
-            className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5"
+            className={cn(
+              "absolute left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5",
+              overlay ? "bottom-8 md:bottom-3" : "bottom-3"
+            )}
             role="tablist"
             aria-label="Banner slides"
           >

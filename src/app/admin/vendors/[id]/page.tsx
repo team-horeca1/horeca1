@@ -39,6 +39,11 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
+    HeroSlideManager,
+    PAGE_HERO_CREATE_BODY,
+    PageHeroIdentityNote,
+} from '@/components/features/homepage/HeroSlideManager';
+import {
   formatVendorTypeSelections,
   normalizeVendorTypeSelections,
 } from '@/lib/constants/vendorProfile';
@@ -254,7 +259,7 @@ export default function VendorDetailsPage() {
     const [previewError, setPreviewError] = useState(false);
 
     // Active tab
-    const [activeTab, setActiveTab] = useState<'overview' | 'kyc_bank' | 'documents' | 'products' | 'delivery'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'kyc_bank' | 'documents' | 'products' | 'delivery' | 'storefront'>('overview');
 
     // Edit states
     const [isEditing, setIsEditing] = useState(false);
@@ -876,6 +881,7 @@ export default function VendorDetailsPage() {
                                     ) : undefined,
                                 },
                                 { id: 'delivery', label: 'Slots & Coverage', icon: Truck },
+                                { id: 'storefront', label: 'Storefront', icon: ImageIcon },
                             ]}
                         />
                         <AdminEntityTabContent>
@@ -1787,6 +1793,26 @@ export default function VendorDetailsPage() {
                                 </div>
                             </div>
                         </div>
+                    )}
+
+                    {activeTab === 'storefront' && (
+                        <HeroSlideManager
+                            apiBase={`/api/v1/admin/vendors/${vendor.id}/hero`}
+                            title="Store page slider"
+                            titleAs="h2"
+                            description="Same editor as the homepage hero. Desktop banners are 240px tall and mobile banners are 200px. Start Ordering and Deals stay under the slider."
+                            canEdit={can('vendors.edit')}
+                            activeLabel="Show on store page"
+                            listStatusActive="Active on store page"
+                            createBody={PAGE_HERO_CREATE_BODY}
+                            footer={
+                                <PageHeroIdentityNote
+                                    kind="store"
+                                    name={vendor.businessName}
+                                    logoUrl={vendor.logoUrl}
+                                />
+                            }
+                        />
                     )}
                 </AdminEntityTabContent>
 

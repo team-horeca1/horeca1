@@ -14,10 +14,12 @@ import { runMappingForVendorProduct, embedDistributorProduct } from '@/modules/b
 import {
   formatVendorSku,
   nextMasterSku,
+  parseVendorSku,
   posSkuMatchesListing,
   resolveVendorCode,
   validateMasterSku,
 } from '@/lib/sku';
+import { resolveUniqueProductSlug } from '@/lib/productSlug';
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import {
   detectMaterialChanges,
@@ -577,9 +579,17 @@ export const TOMBSTONE_PREFIX = '_deleted_';
 async function getVendorCode(vendorId: string, db: Db = prisma): Promise<string> {
   const vendor = await db.vendor.findUnique({
     where: { id: vendorId },
-    select: { vendorCode: true, slug: true },
+    select: { vendorCode: true, slug: true, businessAccountId: true },
   });
   if (!vendor) throw Errors.notFound('Vendor');
+  if (vendor.vendorCode?.trim()) return vendor.vendorCode.trim().toUpperCase();
+  if (vendor.businessAccountId) {
+    const primary = await db.vendor.findFirst({
+      where: { businessAccountId: vendor.businessAccountId, isPrimaryStore: true },
+      select: { vendorCode: true },
+    });
+    if (primary?.vendorCode?.trim()) return primary.vendorCode.trim().toUpperCase();
+  }
   return resolveVendorCode(vendor);
 }
 
@@ -591,9 +601,11 @@ async function composeVendorProductSku(
 ): Promise<string> {
   const trimmed = posSku.trim();
   if (!trimmed) throw Errors.badRequest('Your POS SKU is required.');
-  await assertVendorPosSkuUnique(vendorId, trimmed, excludeProductId, db);
   const vendorCode = await getVendorCode(vendorId, db);
-  const composed = formatVendorSku(vendorCode, trimmed);
+  const parsed = parseVendorSku(trimmed, vendorCode);
+  const purePosSku = parsed.posSku || trimmed;
+  await assertVendorPosSkuUnique(vendorId, purePosSku, excludeProductId, db);
+  const composed = formatVendorSku(vendorCode, purePosSku);
   await assertVendorSkuUnique(vendorId, composed, excludeProductId, db);
   return composed;
 }
@@ -992,7 +1004,33 @@ export class CatalogService {
       where.approvalStatus = 'approved';
     }
     if (categoryId) where.categoryId = categoryId;
-    if (search) where.name = { contains: search, mode: 'insensitive' };
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { brand: { contains: q, mode: 'insensitive' } },
+        { sku: { contains: q, mode: 'insensitive' } },
+        { vendorSku: { contains: q, mode: 'insensitive' } },
+        { tags: { has: q } },
+        {
+          category: {
+            name: { contains: q, mode: 'insensitive' },
+          },
+        },
+        {
+          brandMappings: {
+            some: {
+              status: { in: ['verified', 'auto_mapped'] },
+              OR: [
+                { brandMasterProduct: { name: { contains: q, mode: 'insensitive' } } },
+                { brandMasterProduct: { sku: { contains: q, mode: 'insensitive' } } },
+                { brand: { name: { contains: q, mode: 'insensitive' } } },
+              ],
+            },
+          },
+        },
+      ];
+    }
 
     const useFulfillmentStock = !aggregateStock;
     const stockCtx = useFulfillmentStock
@@ -1269,6 +1307,14 @@ export class CatalogService {
     const { attachActivePromotions } = await import('@/modules/promotion/promotion-catalog');
     const { totalStockQty } = await import('@/lib/inventoryHelpers');
 
+    const collectionCategorySelect = {
+      id: true,
+      name: true,
+      imageUrl: true,
+      parentId: true,
+      parent: { select: { id: true, name: true, imageUrl: true } },
+    } as const;
+
     const collection = await prisma.collection.findFirst({
       where: {
         isActive: true,
@@ -1287,6 +1333,10 @@ export class CatalogService {
                 uom: true,
                 imageUrl: true,
                 images: true,
+                category: { select: collectionCategorySelect },
+                categoryLinks: {
+                  select: { category: { select: collectionCategorySelect } },
+                },
               },
             },
           },
@@ -1406,10 +1456,30 @@ export class CatalogService {
     }
 
     const OFFERS_CAP = 12;
+    const toCategoryLink = (cat: {
+      id: string;
+      name: string;
+      imageUrl: string | null;
+      parentId: string | null;
+      parent: { id: string; name: string; imageUrl: string | null } | null;
+    }) => ({
+      id: cat.id,
+      name: cat.name,
+      image: cat.imageUrl,
+      parentId: cat.parent?.id ?? cat.parentId,
+      parentName: cat.parent?.name ?? null,
+      parentImage: cat.parent?.imageUrl ?? null,
+    });
     const items = collection.masterProducts.map((link) => {
       const master = link.masterProduct;
       const offers = (byMaster.get(master.id) ?? []).slice().sort(sortOffers).slice(0, OFFERS_CAP);
       const defaultOffer = offers[0] ?? null;
+      const linked = master.categoryLinks.map((row) => toCategoryLink(row.category));
+      const subCategories = linked.length > 0
+        ? linked
+        : master.category
+          ? [toCategoryLink(master.category)]
+          : [];
       return {
         master: {
           id: master.id,
@@ -1420,6 +1490,7 @@ export class CatalogService {
           packSize: master.packSize,
           unit: master.uom,
         },
+        subCategories,
         vendorCount: offers.length,
         defaultOffer,
         offers,
@@ -1439,7 +1510,7 @@ export class CatalogService {
 
   async createProduct(vendorId: string, data: {
     name: string;
-    slug: string;
+    slug?: string;
     categoryId?: string;
     categoryIds?: string[];
     description?: string;
@@ -1845,16 +1916,6 @@ export class CatalogService {
       delete productData.masterProductId;
       delete productData.sku;
 
-      const dupSlug = await prisma.product.findFirst({
-        where: {
-          vendorId,
-          slug: productData.slug,
-        },
-        select: { id: true, name: true, slug: true },
-      });
-      if (dupSlug && !dupSlug.slug.startsWith(TOMBSTONE_PREFIX)) {
-        throw Errors.conflict(`You already have a product named "${dupSlug.name}". Edit it instead.`);
-      }
     } else if (isDraft) {
       if (!resolvedVendorSku && typeof productData.sku === 'string' && productData.sku.trim()) {
         resolvedVendorSku = productData.sku.trim();
@@ -1866,6 +1927,20 @@ export class CatalogService {
     if (resolvedVendorSku) {
       await assertVendorPosSkuUnique(vendorId, resolvedVendorSku);
     }
+
+    // Resolve store-scoped unique slug format: [store]-[product-name]-[sku] with auto-increment fallback
+    const vendorRow = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { slug: true, businessName: true },
+    });
+    const storeSlug = vendorRow?.slug || vendorRow?.businessName || '';
+    const finalSlug = await resolveUniqueProductSlug(
+      prisma,
+      vendorId,
+      storeSlug,
+      productData.name,
+      resolvedVendorSku || (typeof productData.sku === 'string' ? productData.sku : undefined),
+    );
 
     // Do NOT silently create Brand rows from a free-text product.brand string.
     // That auto-pending Brand blocked product approval (QA-04). New brands must
@@ -1880,6 +1955,7 @@ export class CatalogService {
     const created = await prisma.product.create({
       data: {
         ...productFields,
+        slug: finalSlug,
         ...(productMetadata !== undefined
           ? { metadata: productMetadata as Prisma.InputJsonValue }
           : {}),

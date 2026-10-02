@@ -12,30 +12,47 @@ export type VoicesTeaser = VoiceStoryCardData & {
 
 export function VoicesSection({ stories }: { stories: VoicesTeaser[] }) {
   return (
-    <section className="w-full py-6 md:py-8 bg-white">
+    <section className="w-full py-6 bg-white overflow-hidden">
       <div className="max-w-[var(--container-max)] mx-auto px-[var(--container-padding)]">
+        {/* Section Header */}
         <SectionHeader
           title="Horeca1 Voices"
-          subtitle="Stories from the industry, for the industry"
-          actionLabel="Meet more →"
+          subtitle="Stories from top chefs & hospitality leaders"
+          actionLabel="View all →"
           actionHref="/voices"
+          className="mb-3.5"
         />
+
+        {/* Stories Grid / Responsive Mobile Carousel */}
         {stories.length > 0 ? (
-          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+          <div className="flex lg:grid lg:grid-cols-4 overflow-x-auto lg:overflow-visible gap-4 md:gap-5 pb-2 pt-0.5 -mx-[var(--container-padding)] px-[var(--container-padding)] scroll-pl-[var(--container-padding)] sm:mx-0 sm:px-0 sm:scroll-pl-0 no-scrollbar snap-x snap-mandatory">
             {stories.map((s) => (
-              <VoiceStoryCard key={s.id} story={s} variant="teaser" />
+              <div 
+                key={s.id} 
+                className="min-w-[280px] max-w-[310px] sm:min-w-[300px] lg:min-w-0 lg:max-w-none shrink-0 lg:shrink snap-start flex"
+              >
+                <VoiceStoryCard story={s} variant="teaser" />
+              </div>
             ))}
           </div>
         ) : (
-          <p className="text-[14px] text-text-secondary text-pretty">
-            Featured stories appear here once they are published.
-          </p>
+          <div className="rounded-2xl border border-dashed border-neutral-200 p-8 text-center bg-[#FAF8F5]">
+            <p className="text-[14px] text-neutral-500 font-medium">
+              Featured editorial stories will appear here once published.
+            </p>
+          </div>
         )}
-        <p className="mt-4">
-          <Link href="/voices/nominate" className="text-[13px] font-semibold text-primary hover:underline">
-            Know someone with a story worth featuring? Nominate them →
+
+        {/* Subtle Bottom Link */}
+        <div className="mt-2.5 flex items-center justify-end">
+          <Link
+            href="/voices/nominate"
+            className="text-[12px] font-medium text-neutral-400 hover:text-primary transition-colors inline-flex items-center gap-1"
+          >
+            <span>Nominate a story</span>
+            <span>→</span>
           </Link>
-        </p>
+        </div>
       </div>
     </section>
   );

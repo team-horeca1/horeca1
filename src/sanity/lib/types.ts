@@ -1,6 +1,6 @@
 import type { PortableTextBlock } from '@portabletext/types'
 
-export type VoiceCategory = 'chef' | 'consultant' | 'vendor' | 'owner'
+export type VoiceCategory = 'chef' | 'consultant' | 'vendor' | 'owner' | (string & {})
 
 export type VoiceRecipe = {
   dishName?: string
@@ -39,7 +39,7 @@ export type VoiceStory = {
   storySquareUrl: string | null
 }
 
-export const VOICE_BADGES: Record<VoiceCategory, string> = {
+export const VOICE_BADGES: Record<string, string> = {
   chef: 'CHEF OF THE WEEK',
   consultant: 'CONSULTANT SPOTLIGHT',
   vendor: 'VENDOR SPOTLIGHT',
@@ -48,9 +48,9 @@ export const VOICE_BADGES: Record<VoiceCategory, string> = {
 
 export function voiceBadge(category: string | null | undefined): string {
   if (category && category in VOICE_BADGES) {
-    return VOICE_BADGES[category as VoiceCategory]
+    return VOICE_BADGES[category]
   }
-  return 'HORECA1 VOICES'
+  return category ? category.replace(/[-_]/g, ' ').toUpperCase() : 'HORECA1 VOICES'
 }
 
 export function voiceTitleLine(role: string | null, venue: string | null): string {

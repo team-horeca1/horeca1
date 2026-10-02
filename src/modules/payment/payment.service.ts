@@ -6,8 +6,8 @@ import { orderService } from '@/modules/order/order.service';
 import { canInitiateRazorpay } from '@/lib/offlinePayment';
 import crypto from 'crypto';
 
-function timingSafeEqHex(expectedHex: string, providedHex: string): boolean {
-  if (expectedHex.length !== providedHex.length) return false;
+function timingSafeEqHex(expectedHex?: string | null, providedHex?: string | null): boolean {
+  if (!expectedHex || !providedHex || expectedHex.length !== providedHex.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expectedHex, 'utf8'), Buffer.from(providedHex, 'utf8'));
 }
 

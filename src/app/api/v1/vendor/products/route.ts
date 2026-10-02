@@ -11,7 +11,7 @@ import { prisma } from '@/lib/prisma';
 import { vendorOnly } from '@/middleware/rbac';
 import { Errors, errorResponse } from '@/middleware/errorHandler';
 import { ensureInventoryForAllOutlets } from '@/lib/inventoryOutlet';
-import { CatalogService } from '@/modules/catalog/catalog.service';
+import { CatalogService, assertVendorPosSkuUnique } from '@/modules/catalog/catalog.service';
 import { emitEvent } from '@/events/emitter';
 import { resolveVendorId, resolveVendorContext } from '@/lib/resolveVendorId';
 import { requirePermission } from '@/lib/permissions/engine';
@@ -120,22 +120,27 @@ export const POST = vendorOnly(async (req: NextRequest, ctx) => {
     const data = createProductSchema.parse(body);
     const isDraft = data.listingStatus === 'draft';
 
-    // Prevent duplicate: check if this vendor already has a product with the same name.
+    // Prevent duplicate: check POS code if provided, otherwise check name.
     // Tombstoned rows (slug prefixed with _deleted_) are ignored so re-adding works after delete.
     // Draft autosaves skip this — the same draft row is PATCHed on subsequent saves.
     if (!isDraft) {
-      const existing = await prisma.product.findFirst({
-        where: {
-          vendorId,
-          name: { equals: data.name, mode: 'insensitive' },
-          slug: { not: { startsWith: '_deleted_' } },
-        },
-        select: { id: true, name: true, approvalStatus: true },
-      });
-      if (existing) {
-        throw Errors.conflict(
-          `You already have a product named "${existing.name}" (${existing.approvalStatus}). Edit the existing product instead.`
-        );
+      const incomingPosSku = (data.vendorSku || data.sku)?.trim();
+      if (incomingPosSku) {
+        await assertVendorPosSkuUnique(vendorId, incomingPosSku);
+      } else {
+        const existing = await prisma.product.findFirst({
+          where: {
+            vendorId,
+            name: { equals: data.name, mode: 'insensitive' },
+            slug: { not: { startsWith: '_deleted_' } },
+          },
+          select: { id: true, name: true, approvalStatus: true },
+        });
+        if (existing) {
+          throw Errors.conflict(
+            `You already have a product named "${existing.name}" (${existing.approvalStatus}). Edit the existing product instead.`
+          );
+        }
       }
     }
 

@@ -89,6 +89,10 @@ export function formatVendorSku(vendorCode: string, posSku: string): string {
   if (!code || !pos) {
     throw new Error('vendorCode and posSku are required');
   }
+  const prefix = `${code}${VENDOR_SKU_SEPARATOR}`;
+  if (pos.toUpperCase().startsWith(prefix)) {
+    return `${code}${VENDOR_SKU_SEPARATOR}${pos.slice(prefix.length).trim()}`;
+  }
   return `${code}${VENDOR_SKU_SEPARATOR}${pos}`;
 }
 
@@ -100,21 +104,30 @@ export function parseVendorSku(
   if (!trimmed) return { vendorCode: vendorCode?.toUpperCase() ?? '', posSku: '' };
 
   if (vendorCode) {
-    const prefix = `${vendorCode.toUpperCase()}${VENDOR_SKU_SEPARATOR}`;
+    const code = vendorCode.trim().toUpperCase();
+    const prefix = `${code}${VENDOR_SKU_SEPARATOR}`;
     if (trimmed.toUpperCase().startsWith(prefix)) {
-      return { vendorCode: vendorCode.toUpperCase(), posSku: trimmed.slice(prefix.length) };
+      return { vendorCode: code, posSku: trimmed.slice(prefix.length).trim() };
+    }
+    // The SKU was not prefixed with this vendor's code, so the entire trimmed
+    // string is the vendor's raw POS SKU (which may contain hyphens, e.g. AMUL-CHS-1KG).
+    return { vendorCode: code, posSku: trimmed };
+  }
+
+  // When no vendorCode is specified:
+  // If the string starts with a valid vendor code prefix (e.g. VEND-123), extract it.
+  const sepIdx = trimmed.indexOf(VENDOR_SKU_SEPARATOR);
+  if (sepIdx > 0) {
+    const candidatePrefix = trimmed.slice(0, sepIdx).toUpperCase();
+    if (VENDOR_CODE_PATTERN.test(candidatePrefix) && sepIdx < trimmed.length - 1) {
+      return {
+        vendorCode: candidatePrefix,
+        posSku: trimmed.slice(sepIdx + 1).trim(),
+      };
     }
   }
 
-  const sepIdx = trimmed.indexOf(VENDOR_SKU_SEPARATOR);
-  if (sepIdx > 0) {
-    return {
-      vendorCode: trimmed.slice(0, sepIdx).toUpperCase(),
-      posSku: trimmed.slice(sepIdx + 1),
-    };
-  }
-
-  return { vendorCode: vendorCode?.toUpperCase() ?? '', posSku: trimmed };
+  return { vendorCode: '', posSku: trimmed };
 }
 
 function normPos(s: string): string {

@@ -15,6 +15,7 @@ import {
     LayoutDashboard,
     Wallet,
     CreditCard,
+    Mic2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -52,6 +53,7 @@ const DESKTOP_NAV = [
     { name: 'Home', href: '/', Icon: HomeIcon },
     { name: 'Vendors', href: '/vendors', Icon: Store },
     { name: 'Lists', href: '/order-lists', Icon: ClipboardList },
+    { name: 'Voices', href: '/voices', Icon: Mic2 },
 ];
 
 type NavStyledCategory = Category & { image: string; bgColor: string };

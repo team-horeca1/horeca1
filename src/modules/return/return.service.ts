@@ -919,6 +919,114 @@ export class ReturnService {
     return toVendorReturnDetail(created);
   }
 
+  async createByStaffOrVendor(
+    orderId: string,
+    actor: { role: 'admin' | 'vendor'; userId: string; vendorId?: string },
+    input: CustomerCreateInput,
+  ) {
+    const where: Prisma.OrderWhereInput = { id: orderId };
+    if (actor.role === 'vendor' && actor.vendorId) {
+      where.vendorId = actor.vendorId;
+    }
+    const order = await prisma.order.findFirst({
+      where,
+      include: { items: true },
+    });
+    if (!order) throw Errors.notFound('Order');
+
+    const remaining = await remainingReturnableByOrderItem(orderId, order.items);
+    const type = input.type ?? 'return';
+    let lineCreates: Array<{
+      id: string;
+      orderItemId: string;
+      requestedQty: number;
+      approvedQty: number;
+      decision: PrismaReturnItemDecision;
+      reason: PrismaReturnItemReason;
+      note: string | null;
+    }> = [];
+
+    if (input.items && input.items.length > 0) {
+      const itemMap = new Map(order.items.map((i) => [i.id, i]));
+      for (const line of input.items) {
+        const oi = itemMap.get(line.orderItemId);
+        if (!oi) throw Errors.badRequest(`Order item ${line.orderItemId} not on this order`);
+        const maxQty = remaining.get(line.orderItemId) ?? 0;
+        if (maxQty <= 0) {
+          throw Errors.badRequest(`No remaining returnable qty for "${oi.productName}"`);
+        }
+        if (line.quantity > maxQty) {
+          throw Errors.badRequest(
+            `Requested qty ${line.quantity} exceeds remaining returnable ${maxQty} for "${oi.productName}"`,
+          );
+        }
+        lineCreates.push({
+          id: randomUUID(),
+          orderItemId: line.orderItemId,
+          requestedQty: line.quantity,
+          approvedQty: line.quantity,
+          decision: 'approved' as PrismaReturnItemDecision,
+          reason: line.reason,
+          note: line.note?.trim() || null,
+        });
+      }
+    } else {
+      lineCreates = order.items
+        .map((oi) => {
+          const qty = remaining.get(oi.id) ?? 0;
+          if (qty <= 0) return null;
+          return {
+            id: randomUUID(),
+            orderItemId: oi.id,
+            requestedQty: qty,
+            approvedQty: qty,
+            decision: 'approved' as PrismaReturnItemDecision,
+            reason: 'other' as PrismaReturnItemReason,
+            note: null,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+    }
+
+    if (lineCreates.length === 0) {
+      throw Errors.badRequest('No returnable items remaining on this order');
+    }
+
+    const initiatorRole = actor.role === 'admin' ? 'Admin' : 'Supplier';
+
+    const created = await prisma.returnRequest.create({
+      data: {
+        id: randomUUID(),
+        orderId,
+        customerId: order.userId,
+        reason: input.reason?.trim() || `${initiatorRole} initiated return`,
+        adminNote: `${initiatorRole} initiated return: ${input.reason?.trim() || 'Direct return'}`,
+        invoiceNumber: order.orderNumber,
+        type,
+        status: 'approved',
+        items: { create: lineCreates },
+        events: {
+          create: {
+            id: randomUUID(),
+            actorId: actor.userId,
+            action: RETURN_EVENT_ACTIONS.CREATED,
+            toStatus: 'approved',
+            payload: {
+              type,
+              initiatedBy: initiatorRole,
+              itemCount: lineCreates.length,
+              invoiceNumber: order.orderNumber,
+            } as Prisma.InputJsonValue,
+          },
+        },
+      },
+      include: DETAIL_INCLUDE,
+    });
+
+    void notifyReturnSubmitted(created.id);
+    return toVendorReturnDetail(created);
+  }
+
   async list(vendorId: string, filters: ListFilters = {}) {
     const limit = filters.limit ?? 20;
     const where = buildReturnListWhere(vendorId, filters);
@@ -2161,6 +2269,11 @@ export const returnService = {
   remainingReturnableByOrderItem,
   createForOrder: (orderId: string, customerId: string, input: CustomerCreateInput) =>
     returnWorkspaceService.createForOrder(orderId, customerId, input),
+  createByStaffOrVendor: (
+    orderId: string,
+    actor: { role: 'admin' | 'vendor'; userId: string; vendorId?: string },
+    input: CustomerCreateInput,
+  ) => returnWorkspaceService.createByStaffOrVendor(orderId, actor, input),
   list: (vendorId: string, filters?: ListFilters) =>
     returnWorkspaceService.list(vendorId, filters),
   exportCsv: (vendorId: string, filters?: ReportFilters) =>

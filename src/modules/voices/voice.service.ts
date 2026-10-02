@@ -50,14 +50,95 @@ function toPublic(story: VoiceStory): VoiceStoryPublic {
   }
 }
 
+export const DEMO_VOICE_STORIES: VoiceStoryPublic[] = [
+  {
+    id: 'demo-voice-1',
+    slug: 'chef-vikramaditya-sharma',
+    badge: 'CHEF OF THE WEEK',
+    category: 'chef',
+    name: 'Chef Vikramaditya Sharma',
+    role: 'Executive Chef',
+    venue: 'The Grand Gourmet, Mumbai',
+    quote: 'Quality ingredients and direct supplier trust are non-negotiable in fine dining.',
+    body: null,
+    recipe: null,
+    qa: null,
+    brandLinks: null,
+    photoUrl: '/images/voices/chef-vikramaditya.jpg',
+    photoOgUrl: null,
+    publishedAt: new Date(),
+    storyPortraitUrl: null,
+    storySquareUrl: null,
+  },
+  {
+    id: 'demo-voice-2',
+    slug: 'rhea-nair-consulting',
+    badge: 'CONSULTANT SPOTLIGHT',
+    category: 'consultant',
+    name: 'Rhea Nair',
+    role: 'Hospitality Strategist',
+    venue: 'MenuCraft Solutions, Delhi NCR',
+    quote: 'Consistent, verified supply chains are the secret backbone of restaurant profitability.',
+    body: null,
+    recipe: null,
+    qa: null,
+    brandLinks: null,
+    photoUrl: '/images/voices/rhea-nair.jpg',
+    photoOgUrl: null,
+    publishedAt: new Date(),
+    storyPortraitUrl: null,
+    storySquareUrl: null,
+  },
+  {
+    id: 'demo-voice-3',
+    slug: 'anand-singhania-foodline',
+    badge: 'VENDOR SPOTLIGHT',
+    category: 'vendor',
+    name: 'Anand Singhania',
+    role: 'Managing Director',
+    venue: 'Foodline Provisions, Bengaluru',
+    quote: 'Partnering directly with commercial kitchens via Horeca1 cut our fulfillment cycles by 40%.',
+    body: null,
+    recipe: null,
+    qa: null,
+    brandLinks: null,
+    photoUrl: '/images/voices/anand-singhania.jpg',
+    photoOgUrl: null,
+    publishedAt: new Date(),
+    storyPortraitUrl: null,
+    storySquareUrl: null,
+  },
+  {
+    id: 'demo-voice-4',
+    slug: 'pooja-dsouza-coastal-bay',
+    badge: 'RESTAURATEUR SPOTLIGHT',
+    category: 'owner',
+    name: "Pooja D'Souza",
+    role: 'Founder & Managing Partner',
+    venue: 'Coastal Bay Bistro, Goa',
+    quote: 'Reliable supplier cutoff times let our brigade focus on culinary craft instead of chasing deliveries.',
+    body: null,
+    recipe: null,
+    qa: null,
+    brandLinks: null,
+    photoUrl: '/images/voices/pooja-dsouza.jpg',
+    photoOgUrl: null,
+    publishedAt: new Date(),
+    storyPortraitUrl: null,
+    storySquareUrl: null,
+  },
+];
+
 export async function listPublishedVoiceStories(limit = 20): Promise<VoiceStoryPublic[]> {
   try {
     const rows = await client.fetch<VoiceStory[]>(publishedVoicesQuery)
-    return (rows ?? []).slice(0, limit).map(toPublic)
+    if (Array.isArray(rows) && rows.length > 0) {
+      return rows.slice(0, limit).map(toPublic)
+    }
   } catch (error) {
     console.error('[voices] Sanity list failed', error)
-    return []
   }
+  return DEMO_VOICE_STORIES.slice(0, limit);
 }
 
 /** Homepage teaser: one live story per category, newest first, max 4. */
@@ -78,11 +159,11 @@ export async function listHomepageVoiceStories(): Promise<VoiceStoryPublic[]> {
 export async function getPublishedVoiceStoryBySlug(slug: string): Promise<VoiceStoryPublic | null> {
   try {
     const row = await liveClient.fetch<VoiceStory | null>(voiceBySlugQuery, { slug })
-    return row ? toPublic(row) : null
+    if (row) return toPublic(row)
   } catch (error) {
     console.error('[voices] Sanity get failed', error)
-    return null
   }
+  return DEMO_VOICE_STORIES.find((s) => s.slug === slug) ?? null
 }
 
 export async function listRelatedVoiceStories(slug: string, limit = 6): Promise<VoiceStoryPublic[]> {

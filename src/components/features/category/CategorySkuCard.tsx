@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Package, Store } from 'lucide-react';
-import { formatPackSize, formatPrice } from '@/lib/utils';
+import { formatPackSize, formatPrice, cn } from '@/lib/utils';
 import { categorySkuHref } from '@/lib/categoryBrowse';
 import type { VendorProduct } from '@/types';
 import { ShareButton } from '@/components/features/share/ShareButton';
@@ -23,13 +23,21 @@ export interface CategorySkuItem {
   offers: VendorProduct[];
 }
 
+export interface CategorySkuCardProps {
+  categorySlug: string;
+  item: CategorySkuItem;
+  onCompare?: (item: CategorySkuItem) => void;
+  onAdd?: (offer: VendorProduct) => void;
+  addingId?: string | null;
+}
+
 export function CategorySkuCard({
   categorySlug,
   item,
-}: {
-  categorySlug: string;
-  item: CategorySkuItem;
-}) {
+  onCompare,
+  onAdd,
+  addingId,
+}: CategorySkuCardProps) {
   const title = item.master?.name || item.defaultOffer.displayName || item.defaultOffer.name;
   const img =
     item.master?.imageUrl ||
@@ -52,12 +60,22 @@ export function CategorySkuCard({
     pack: pack || null,
   });
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (onCompare) {
+      e.preventDefault();
+      onCompare(item);
+    }
+  };
+
   return (
-    <Link
-      href={href}
-      className="group bg-white rounded-xl border border-divider overflow-hidden shadow-cdl-1 hover:shadow-cdl-2 hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative"
+    <div
+      onClick={handleClick}
+      className={cn(
+        'group bg-white rounded-xl border border-divider overflow-hidden shadow-cdl-1 hover:shadow-cdl-2 hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative',
+        onCompare ? 'cursor-pointer' : '',
+      )}
     >
-      <div className="relative aspect-square bg-ivory">
+      <div className="relative aspect-square bg-white rounded-t-xl overflow-hidden">
         {img ? (
           <Image src={img} alt={title} fill sizes="(max-width: 768px) 42vw, 220px" className="object-contain p-2 md:p-3" />
         ) : (
@@ -65,7 +83,7 @@ export function CategorySkuCard({
             <Package size={28} className="text-gray-300" strokeWidth={1.5} />
           </div>
         )}
-        <div className="absolute top-2 right-2 z-10">
+        <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
           <ShareButton content={shareContent} variant="overlay" />
         </div>
       </div>
@@ -81,11 +99,17 @@ export function CategorySkuCard({
             From {formatPrice(price)}
           </p>
         ) : null}
-        <p className="mt-auto pt-1.5 md:pt-2 inline-flex items-center gap-1 text-[11px] md:text-[12px] font-semibold text-primary">
-          <Store size={12} strokeWidth={2.5} />
-          {item.vendorCount} vendor{item.vendorCount === 1 ? '' : 's'}
-        </p>
+        
+        <div className="mt-auto pt-2 flex items-center justify-between gap-1">
+          <p className="inline-flex items-center gap-1 text-[11px] md:text-[12px] font-semibold text-primary">
+            <Store size={12} strokeWidth={2.5} />
+            {item.vendorCount} {item.vendorCount === 1 ? 'vendor' : 'vendors'}
+          </p>
+          <span className="text-[11px] font-bold text-primary group-hover:translate-x-0.5 transition-transform">
+            View &rsaquo;
+          </span>
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }

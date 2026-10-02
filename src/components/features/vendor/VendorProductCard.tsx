@@ -24,6 +24,7 @@ interface VendorProductCardProps {
     availabilityLabel?: 'out' | 'area' | 'none';
     /** Keep card visually in-stock when browsing catalog (e.g. wrong pincode). */
     forceInStockDisplay?: boolean;
+    isHighlighted?: boolean;
 }
 
 export const VendorProductCard = React.memo(function VendorProductCard({ 
@@ -34,6 +35,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
     onDistributorClick,
     availabilityLabel,
     forceInStockDisplay = false,
+    isHighlighted = false,
 }: VendorProductCardProps) {
     const { addToCart, groups, updateQuantity, adjustQuantity, removeFromCart, purchaseAccess } = useCart();
     const { status: sessionStatus } = useSession();
@@ -530,11 +532,12 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         {variant === 'list' ? (
             <div
                 className={cn(
-                    "w-full h-full bg-white rounded-xl border-[0.5px] border-primary overflow-hidden relative flex flex-col",
+                    "w-full h-full bg-white rounded-xl overflow-hidden relative flex flex-col",
+                    isHighlighted ? "border-2 border-primary shadow-lg ring-2 ring-primary/25" : "border-[0.5px] border-primary",
                     isOutOfStock ? "opacity-75" : ""
                 )}
             >
-                <div className="relative h-[112px] shrink-0 bg-ivory">
+                <div className="relative h-[112px] shrink-0 bg-white">
                     <Image
                         src={product.images[0] || '/images/placeholders/no-product.svg'}
                         alt={product.name}
@@ -606,7 +609,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         )}
                     </div>
 
-                    <div className="mt-2 min-h-[115px] rounded-lg border border-divider bg-ivory/60 p-1.5 flex flex-col">
+                    <div className="mt-2 min-h-[115px] rounded-lg border border-divider bg-white p-1.5 flex flex-col">
                             {savingsSlabs.length > 0 && !isOutOfStock ? (
                                 <>
                                     <p className="mb-1 text-center text-[10px] font-semibold uppercase text-primary">
@@ -693,12 +696,15 @@ export const VendorProductCard = React.memo(function VendorProductCard({
             <>
                 <div
                     className={cn(
-                        "sm:hidden bg-white rounded-2xl border border-gray-100 overflow-hidden transition-all duration-300 group p-0 relative flex flex-col h-full",
+                        "sm:hidden bg-white rounded-2xl overflow-hidden transition-all duration-300 group p-0 relative flex flex-col h-full",
+                        isHighlighted
+                            ? "border-2 border-primary shadow-lg ring-2 ring-primary/25"
+                            : "border border-gray-100",
                         isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_12px_30px_-12px_rgba(107,29,46,0.18)] hover:-translate-y-0.5 hover:border-primary/30"
                     )}
                 >
                     {/* Full-width Image Container */}
-                    <div className="relative w-full aspect-square bg-gradient-to-br from-ivory via-white to-cream overflow-hidden">
+                    <div className="relative w-full aspect-square bg-white overflow-hidden">
                         {/* Image wrapper centered in the top area (excluding the bottom 30px bar) */}
                         <div className="absolute top-0 left-0 right-0 bottom-7 flex items-center justify-center p-2">
                             <div className="relative w-full h-full">
@@ -708,12 +714,31 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                     fill
                                     sizes="(max-width: 640px) 45vw, 320px"
                                     className={cn(
-                                        "object-contain transition-transform duration-500 ease-out p-1 group-hover:scale-[1.04]",
+                                        "object-contain transition-all duration-500 ease-out p-1",
+                                        product.images[1] ? "group-hover:opacity-0" : "group-hover:scale-[1.04]",
                                         isOutOfStock ? "grayscale" : ""
                                     )}
                                 />
+                                {product.images[1] && (
+                                    <Image
+                                        src={product.images[1]}
+                                        alt={product.name}
+                                        fill
+                                        sizes="(max-width: 640px) 45vw, 320px"
+                                        className={cn(
+                                            "object-contain transition-all duration-500 ease-out p-1 opacity-0 group-hover:opacity-100 group-hover:scale-[1.04]",
+                                            isOutOfStock ? "grayscale" : ""
+                                        )}
+                                    />
+                                )}
                             </div>
                         </div>
+
+                        {product.images && product.images.length > 1 && (
+                            <span className="absolute bottom-8 right-2 z-20 px-1.5 py-0.5 rounded-[5px] bg-black/60 text-white text-[9px] font-bold backdrop-blur-xs">
+                                1/{product.images.length}
+                            </span>
+                        )}
 
                         {imageBadges}
 
@@ -815,13 +840,16 @@ export const VendorProductCard = React.memo(function VendorProductCard({
 
                 <div
                     className={cn(
-                        "hidden sm:flex bg-white rounded-[22px] border border-gray-100 overflow-hidden transition-all duration-500 group p-4 md:p-5 relative flex-col gap-3 h-full",
+                        "hidden sm:flex bg-white rounded-[22px] overflow-hidden transition-all duration-500 group p-4 md:p-5 relative flex-col gap-3 h-full",
+                        isHighlighted
+                            ? "border-2 border-primary shadow-lg ring-2 ring-primary/25"
+                            : "border border-gray-100",
                         isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_18px_45px_-12px_rgba(107,29,46,0.18)] hover:-translate-y-1 hover:border-primary/30"
                     )}
                 >
                     <div className="absolute top-4 right-4 z-20">{shareButton}</div>
 
-                    <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-ivory via-white to-cream flex items-center justify-center">
+                    <div className="relative aspect-square overflow-hidden rounded-2xl bg-white border border-gray-100 flex items-center justify-center">
                         <div className="relative w-[85%] h-[85%]">
                             <Image
                                 src={product.images[0] || '/images/placeholders/no-product.svg'}

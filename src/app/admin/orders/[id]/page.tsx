@@ -20,10 +20,18 @@ import {
     FileText,
     FileDown,
     Mail,
+    RotateCcw,
+    Truck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { isOfflinePaymentMethod } from '@/lib/offlinePayment';
+import { InitiateReturnModal } from '@/components/features/orders/InitiateReturnModal';
+import {
+    StatusTimeline,
+    ORDER_STATUS_STEPS,
+    orderTimelineCurrentKey,
+} from '@/components/features/finance/StatusTimeline';
 
 interface OrderVendor {
     id: string;
@@ -98,6 +106,8 @@ interface OrderData {
     payments: OrderPayment[];
     deliverySlot: DeliverySlot | null;
     creditTxns: CreditTxn[];
+    deliveryOtp?: string | null;
+    deliveryOtpVerifiedAt?: string | null;
 }
 
 const ORDER_STATUSES = [
@@ -193,6 +203,7 @@ export default function OrderDetailsPage() {
     const [error, setError] = useState<string | null>(null);
     const [updatingStatus, setUpdatingStatus] = useState(false);
     const [selectedStatus, setSelectedStatus] = useState('');
+    const [showReturnModal, setShowReturnModal] = useState(false);
     // Ops: edit quantities
     const [editedQty, setEditedQty] = useState<Record<string, number>>({});
     const [savingQty, setSavingQty] = useState(false);
@@ -206,6 +217,31 @@ export default function OrderDetailsPage() {
     const [markPaidReference, setMarkPaidReference] = useState('');
     const [markPaidNote, setMarkPaidNote] = useState('');
     const [markingPaid, setMarkingPaid] = useState(false);
+    const [returns, setReturns] = useState<any[]>([]);
+    const [loadingReturns, setLoadingReturns] = useState(false);
+
+    useEffect(() => {
+        if (!orderId) return;
+        async function fetchReturns() {
+            setLoadingReturns(true);
+            try {
+                const res = await fetch(`/api/v1/admin/orders/${orderId}/return`);
+                const json = await res.json();
+                if (json.success && json.data) {
+                    if (Array.isArray(json.data.returns)) {
+                        setReturns(json.data.returns);
+                    } else if (json.data.id) {
+                        setReturns([json.data]);
+                    }
+                }
+            } catch {
+                /* ignore */
+            } finally {
+                setLoadingReturns(false);
+            }
+        }
+        fetchReturns();
+    }, [orderId]);
 
     useEffect(() => {
         fetch('/api/v1/admin/vendors?limit=200')
@@ -414,6 +450,18 @@ export default function OrderDetailsPage() {
                         <p className="text-[#6B7280] text-[12px] font-medium mt-1">ID: {order.orderNumber} &bull; Created at {formatDate(order.createdAt)}</p>
                     </div>
                 </div>
+                <div className="flex items-center gap-2">
+                    {order.status !== 'cancelled' && (
+                        <button
+                            type="button"
+                            onClick={() => setShowReturnModal(true)}
+                            className="h-[34px] px-4 rounded-[10px] border border-amber-300 bg-amber-50 text-[13px] font-bold text-amber-800 hover:bg-amber-100 flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                        >
+                            <RotateCcw size={15} />
+                            Initiate Return
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Main Layout Grid */}
@@ -576,6 +624,113 @@ export default function OrderDetailsPage() {
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    {/* Returns & Replacements Card */}
+                    <div className="bg-white rounded-[16px] border border-[#EEEEEE] shadow-sm p-5 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#F3F4F6] pb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-[#F8E8EC] text-[#6B1D2E] flex items-center justify-center">
+                                    <RotateCcw size={15} />
+                                </div>
+                                <div>
+                                    <h3 className="text-[14px] font-black text-[#111827]">Returns &amp; Replacements</h3>
+                                    <p className="text-[11px] text-[#6B7280]">
+                                        {returns.length > 0 
+                                            ? `${returns.length} return request${returns.length > 1 ? 's' : ''} recorded for this order`
+                                            : 'No customer return requests filed for this order'
+                                        }
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowReturnModal(true)}
+                                className="h-[32px] px-3 bg-white border border-[#6B1D2E]/30 text-[#6B1D2E] hover:bg-[#F8E8EC] text-[11px] font-bold rounded-[8px] transition-colors flex items-center gap-1.5 shrink-0 self-start sm:self-auto cursor-pointer"
+                            >
+                                <RotateCcw size={12} />
+                                Initiate Admin Return
+                            </button>
+                        </div>
+
+                        {loadingReturns ? (
+                            <div className="flex items-center justify-center py-4 text-[12px] text-[#9CA3AF] gap-2">
+                                <Loader2 size={14} className="animate-spin" />
+                                Loading return history…
+                            </div>
+                        ) : returns.length > 0 ? (
+                            <div className="space-y-3">
+                                {returns.map((ret: any) => (
+                                    <div key={ret.id} className="rounded-xl border border-[#EEEEEE] bg-[#FAFAFA] p-3.5 space-y-2.5">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[12px] font-black text-[#111827]">
+                                                    Return #{ret.id.slice(0, 8)}
+                                                </span>
+                                                <span className={cn(
+                                                    'px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border',
+                                                    ret.status === 'closed' || ret.status === 'approved'
+                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                        : ret.status === 'rejected'
+                                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                                            : 'bg-amber-50 text-amber-800 border-amber-200'
+                                                )}>
+                                                    {ret.status.replace(/_/g, ' ')}
+                                                </span>
+                                            </div>
+                                            <span className="text-[11px] text-[#9CA3AF] font-medium">
+                                                {formatDate(ret.createdAt)}
+                                            </span>
+                                        </div>
+
+                                        {ret.reason && (
+                                            <p className="text-[11.5px] text-[#4B5563]">
+                                                <strong className="text-[#111827]">Reason:</strong> {ret.reason}
+                                            </p>
+                                        )}
+
+                                        {ret.adminNote && (
+                                            <p className="text-[11.5px] text-[#1E40AF] bg-[#EFF6FF] border border-[#DBEAFE] px-2.5 py-1.5 rounded-lg">
+                                                <strong>Admin Note:</strong> {ret.adminNote}
+                                            </p>
+                                        )}
+
+                                        {ret.creditNoteNumber && (
+                                            <p className="text-[11px] text-emerald-800 font-bold bg-emerald-50 border border-emerald-200 px-2 py-1 rounded inline-block">
+                                                Credit Note: {ret.creditNoteNumber}
+                                            </p>
+                                        )}
+
+                                        {ret.items && ret.items.length > 0 && (
+                                            <div className="pt-1 border-t border-[#E5E7EB]">
+                                                <p className="text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF] mb-1">Returned Items</p>
+                                                <div className="space-y-1">
+                                                    {ret.items.map((it: any) => (
+                                                        <div key={it.id} className="flex items-center justify-between text-[11.5px] text-[#374151] bg-white px-2.5 py-1.5 rounded border border-[#E5E7EB]">
+                                                            <span className="font-semibold truncate max-w-[280px]">
+                                                                {it.orderItem?.productName || 'Item'}
+                                                            </span>
+                                                            <span className="font-bold text-[#6B1D2E] shrink-0">
+                                                                Qty: {it.requestedQty ?? it.approvedQty ?? 1}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-[#FAFAFA] rounded-xl border border-dashed border-[#E5E7EB] p-4 text-center">
+                                <p className="text-[12px] font-semibold text-[#6B7280]">
+                                    No return or replacement has been initiated for this order.
+                                </p>
+                                <p className="text-[11px] text-[#9CA3AF] mt-0.5">
+                                    Customer is entitled to a 7-day inspection and return window following delivery.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Products Table Card */}
@@ -799,6 +954,55 @@ export default function OrderDetailsPage() {
                         </div>
                     </div>
 
+                    {/* Delivery & Fulfillment Timeline */}
+                    <div className="bg-white rounded-[16px] border border-[#EEEEEE] p-5 shadow-sm space-y-4">
+                        <div className="border-b border-[#F3F4F6] pb-2 flex items-center justify-between">
+                            <h4 className="text-[14px] font-black text-[#111827] flex items-center gap-1.5">
+                                <Truck size={15} className="text-[#6B1D2E]" />
+                                Delivery Progress
+                            </h4>
+                            <span className={cn(
+                                'inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase border',
+                                getStatusBadgeClasses(order.status)
+                            )}>
+                                {order.status.replace(/_/g, ' ')}
+                            </span>
+                        </div>
+
+                        {/* OTP Verification Pill */}
+                        {order.deliveryOtpVerifiedAt ? (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-2.5">
+                                <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                                <div>
+                                    <p className="text-[12px] font-bold text-emerald-900">OTP Verified at Delivery</p>
+                                    <p className="text-[10px] text-emerald-700 font-medium">
+                                        Confirmed on {formatDate(order.deliveryOtpVerifiedAt)}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : order.deliveryOtp ? (
+                            <div className="bg-indigo-50/70 border border-indigo-100 rounded-xl p-3 flex items-center justify-between gap-2">
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Delivery Security OTP</p>
+                                    <p className="text-[16px] font-black text-indigo-950 font-mono tracking-widest mt-0.5">
+                                        {order.deliveryOtp}
+                                    </p>
+                                </div>
+                                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-100/80 px-2 py-1 rounded-md">
+                                    Awaiting Handover
+                                </span>
+                            </div>
+                        ) : null}
+
+                        {/* Timeline */}
+                        <div className="pt-1">
+                            <StatusTimeline
+                                steps={ORDER_STATUS_STEPS}
+                                currentKey={orderTimelineCurrentKey(order.status)}
+                            />
+                        </div>
+                    </div>
+
                     {/* Invoice ledger box */}
                     <div className="bg-[#FAFAFA] rounded-[16px] border border-[#E5E7EB] p-5 space-y-4 shadow-inner">
                         <div className="border-b border-[#E5E7EB] pb-2">
@@ -823,7 +1027,7 @@ export default function OrderDetailsPage() {
                             </div>
                         </div>
 
-                        {order.paymentStatus === 'paid' && (
+                        {order.status !== 'cancelled' && (
                             <div className="flex flex-col gap-2 pt-1 border-t border-[#E5E7EB]">
                                 <a
                                     href={`/api/v1/admin/orders/${order.id}/invoice`}
@@ -831,7 +1035,7 @@ export default function OrderDetailsPage() {
                                     className="w-full h-[38px] rounded-[8px] text-[12px] font-bold border border-[#6B1D2E]/40 text-[#6B1D2E] hover:bg-[#F8E8EC] transition-colors flex items-center justify-center gap-1.5"
                                 >
                                     <FileDown size={14} />
-                                    Download Invoice
+                                    Download Tax Invoice {order.paymentStatus !== 'paid' ? '(Payment Pending)' : '(Paid)'}
                                 </a>
                                 <button
                                     type="button"
@@ -913,6 +1117,18 @@ export default function OrderDetailsPage() {
                     )}
                 </div>
             </div>
+
+            <InitiateReturnModal
+                isOpen={showReturnModal}
+                onClose={() => setShowReturnModal(false)}
+                orderId={order.id}
+                orderNumber={order.orderNumber}
+                apiEndpoint={`/api/v1/admin/orders/${order.id}/return`}
+                onSuccess={() => {
+                    // Refetch order
+                    window.location.reload();
+                }}
+            />
         </div>
     );
 }

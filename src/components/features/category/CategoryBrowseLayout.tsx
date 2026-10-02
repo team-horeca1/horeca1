@@ -6,8 +6,9 @@ import Image from 'next/image';
 import { ArrowLeft, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
-import { CategoryBrowseSidebar } from '@/components/features/category/CategoryBrowseSidebar';
-import type { CatNode } from '@/lib/categoryBrowse';
+import { VendorCatalogNav } from '@/components/features/vendor/VendorCatalogNav';
+import { VendorCategoryRail } from '@/components/features/vendor/VendorCategoryRail';
+import type { CategoryTreeNode } from '@/lib/categoryTree';
 
 export interface CategoryCrumb {
   href?: string;
@@ -19,16 +20,24 @@ export function CategoryBrowseLayout({
   image,
   subtitle,
   crumbs,
-  parent,
-  activeChildSlug,
+  railTree,
+  catalogTab,
+  onCatalogTab,
+  productCount,
+  searchQuery,
+  onSearchChange,
   children,
 }: {
   displayName: string;
   image?: string;
   subtitle: string;
   crumbs: CategoryCrumb[];
-  parent: CatNode;
-  activeChildSlug: string | null;
+  railTree: CategoryTreeNode[];
+  catalogTab: string;
+  onCatalogTab: (tab: string) => void;
+  productCount: number;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -89,10 +98,27 @@ export function CategoryBrowseLayout({
         </div>
       </div>
 
+      <VendorCatalogNav
+        activeTab={catalogTab}
+        onTabChange={onCatalogTab}
+        categories={[]}
+        searchQuery={searchQuery}
+        onSearchChange={onSearchChange}
+        searchPlaceholder={`Search in ${displayName}`}
+        showStoreTabs={false}
+        barClassName="top-[5.75rem] md:top-0"
+      />
+
       <div className="max-w-[var(--container-max)] mx-auto px-2 min-[380px]:px-3 md:px-[var(--container-padding)] pt-2 md:pt-6">
-        <div className="flex gap-1.5 min-[380px]:gap-2 md:gap-4 lg:gap-6 items-start">
-          <CategoryBrowseSidebar parent={parent} activeChildSlug={activeChildSlug} />
-          <div className="flex-1 min-w-0 overflow-x-hidden">{children}</div>
+        <div className="flex gap-2 md:gap-4 lg:gap-6 items-start">
+          <VendorCategoryRail
+            tree={railTree}
+            activeTab={catalogTab}
+            productCount={productCount}
+            onSelect={onCatalogTab}
+            showYourItems={false}
+          />
+          <div className="flex-1 min-w-0">{children}</div>
         </div>
       </div>
 

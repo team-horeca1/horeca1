@@ -1417,13 +1417,12 @@ export default function VendorProductsPage() {
                 if (opts.isDraft) {
                     if (editingProduct?.slug) return editingProduct.slug;
                     if (form.slug?.trim()) return form.slug.trim();
-                    if (form.name.trim()) return slugify(form.name.trim());
                     if (!draftSlugRef.current) {
                         draftSlugRef.current = `draft-${crypto.randomUUID().slice(0, 8)}`;
                     }
                     return draftSlugRef.current;
                 }
-                return form.slug || slugify(form.name.trim() || 'untitled-product');
+                return editingProduct?.slug || form.slug?.trim() || undefined;
             })(),
             listingStatus: opts.isDraft ? 'draft' : 'submitted',
             isActive: !opts.isDraft,
@@ -3350,6 +3349,8 @@ export default function VendorProductsPage() {
                                         }
                                         imageUrl={form.imageUrl}
                                         onImageUrlChange={(url) => updateField('imageUrl', url)}
+                                        images={form.images}
+                                        onImagesChange={(urls) => updateField('images', urls)}
                                         pricing={{
                                             basePrice: form.basePrice,
                                             originalPrice: form.originalPrice,

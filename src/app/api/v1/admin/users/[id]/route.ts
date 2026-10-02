@@ -433,6 +433,130 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         }
       }
 
+      // 3.1 Update primary outlet & default SavedAddress if deliveryAddress or address fields are specified
+      const da = (body.deliveryAddress && typeof body.deliveryAddress === 'object') ? body.deliveryAddress : {};
+      const targetAddressLine = da.addressLine || body.addressLine || body.companyProfile?.addressLine;
+      const targetOutletName = da.outletName || body.outletName || body.companyProfile?.outletName;
+      const targetFlatInfo = da.flatInfo !== undefined ? da.flatInfo : body.flatInfo !== undefined ? body.flatInfo : body.companyProfile?.flatInfo;
+      const targetLandmark = da.landmark !== undefined ? da.landmark : body.landmark !== undefined ? body.landmark : body.companyProfile?.landmark;
+      const targetCity = da.city || body.city || body.companyProfile?.city;
+      const targetState = da.state || body.state || body.companyProfile?.state;
+      const targetPincode = da.pincode || body.pincode || body.companyProfile?.pincode || body.companyProfile?.billingPincode;
+      const targetLat = typeof da.latitude === 'number' ? da.latitude : typeof body.latitude === 'number' ? body.latitude : typeof body.companyProfile?.latitude === 'number' ? body.companyProfile.latitude : null;
+      const targetLng = typeof da.longitude === 'number' ? da.longitude : typeof body.longitude === 'number' ? body.longitude : typeof body.companyProfile?.longitude === 'number' ? body.companyProfile.longitude : null;
+      const targetPlaceId = da.placeId || body.placeId || body.companyProfile?.placeId;
+
+      if (targetAddressLine || targetCity || targetState || targetPincode || targetOutletName) {
+        const membership = await tx.businessAccountMember.findFirst({
+          where: { userId: id, isPrimary: true },
+          select: {
+            businessAccountId: true,
+            businessAccount: { select: { primaryOutletId: true, legalName: true } },
+          },
+        });
+
+        if (membership) {
+          const bizAccountId = membership.businessAccountId;
+          let primaryOutletId = membership.businessAccount.primaryOutletId;
+
+          if (primaryOutletId) {
+            await tx.outlet.update({
+              where: { id: primaryOutletId },
+              data: {
+                ...(targetOutletName ? { name: targetOutletName } : {}),
+                ...(targetAddressLine ? { addressLine: targetAddressLine, requiresAddressUpdate: false } : {}),
+                ...(targetFlatInfo !== undefined ? { flatInfo: targetFlatInfo || null } : {}),
+                ...(targetLandmark !== undefined ? { landmark: targetLandmark || null } : {}),
+                ...(targetCity ? { city: targetCity } : {}),
+                ...(targetState ? { state: targetState } : {}),
+                ...(targetPincode ? { pincode: targetPincode } : {}),
+                ...(targetLat !== null ? { latitude: targetLat } : {}),
+                ...(targetLng !== null ? { longitude: targetLng } : {}),
+                ...(targetPlaceId ? { placeId: targetPlaceId } : {}),
+              },
+            });
+          } else {
+            const newOutlet = await tx.outlet.create({
+              data: {
+                businessAccountId: bizAccountId,
+                name: targetOutletName || 'Main Outlet',
+                addressLine: targetAddressLine || 'Address not set',
+                flatInfo: targetFlatInfo || null,
+                landmark: targetLandmark || null,
+                city: targetCity || null,
+                state: targetState || null,
+                pincode: targetPincode || null,
+                latitude: targetLat,
+                longitude: targetLng,
+                placeId: targetPlaceId || null,
+                requiresAddressUpdate: !targetAddressLine,
+                isActive: true,
+              },
+            });
+            primaryOutletId = newOutlet.id;
+            await tx.businessAccount.update({
+              where: { id: bizAccountId },
+              data: { primaryOutletId },
+            });
+          }
+
+          if (targetAddressLine) {
+            const existingSaved = await tx.savedAddress.findFirst({
+              where: { userId: id },
+              orderBy: { isDefault: 'desc' },
+            });
+
+            if (existingSaved) {
+              await tx.savedAddress.update({
+                where: { id: existingSaved.id },
+                data: {
+                  outletId: primaryOutletId,
+                  fullAddress: targetAddressLine,
+                  shortAddress: targetAddressLine.split(',').slice(0, 2).join(', '),
+                  ...(targetFlatInfo !== undefined ? { flatInfo: targetFlatInfo || null } : {}),
+                  ...(targetLandmark !== undefined ? { landmark: targetLandmark || null } : {}),
+                  ...(targetCity ? { city: targetCity } : {}),
+                  ...(targetState ? { state: targetState } : {}),
+                  ...(targetPincode ? { pincode: targetPincode } : {}),
+                  ...(targetLat !== null ? { latitude: targetLat } : {}),
+                  ...(targetLng !== null ? { longitude: targetLng } : {}),
+                  ...(targetPlaceId ? { placeId: targetPlaceId } : {}),
+                  ...(targetOutletName ? { label: targetOutletName } : {}),
+                  isDefault: true,
+                },
+              });
+            } else {
+              await tx.savedAddress.create({
+                data: {
+                  userId: id,
+                  outletId: primaryOutletId,
+                  label: targetOutletName || 'Primary Delivery Address',
+                  businessName: membership.businessAccount.legalName || user.fullName,
+                  fullAddress: targetAddressLine,
+                  shortAddress: targetAddressLine.split(',').slice(0, 2).join(', '),
+                  flatInfo: targetFlatInfo || null,
+                  landmark: targetLandmark || null,
+                  city: targetCity || null,
+                  state: targetState || null,
+                  pincode: targetPincode || null,
+                  latitude: targetLat ?? 0,
+                  longitude: targetLng ?? 0,
+                  placeId: targetPlaceId || null,
+                  isDefault: true,
+                },
+              });
+            }
+          }
+
+          if (targetPincode) {
+            await tx.user.update({
+              where: { id },
+              data: { pincode: targetPincode },
+            }).catch(() => {});
+          }
+        }
+      }
+
       // 4. Update vendor customer mapping if specified
       if (body.vendorMapping && body.vendorMapping.vendorId) {
         const vm = body.vendorMapping;

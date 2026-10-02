@@ -23,6 +23,7 @@ const FOOTER_LINKS: Record<string, Array<{ label: string; href: string }>> = {
         { label: 'Brands', href: '/brands' },
         { label: 'Deals', href: '/deals' },
         { label: 'Collections', href: '/collections' },
+        { label: 'Horeca1 Voices', href: '/voices' },
     ],
     support: [
         { label: 'Help Center', href: 'mailto:sales@horeca1.com' },
@@ -72,7 +73,7 @@ export function Footer() {
                             <img src="/Horeca1.png" alt="Horeca1" className="h-8 md:h-10 w-auto object-contain" />
                         </Link>
                         <p className="text-[14px] text-[#7C7C7C] leading-[1.6] max-w-[320px]">
-                            Horeca1 — bulk food and supplies for restaurants, hotels, and caterers.
+                            Bharat&apos;s Food &amp; Grocery Distribution OS. F&amp;B Wholesale Made Easy.
                         </p>
                         <ul className="space-y-5 pt-2">
                             <li className="flex items-start gap-4">

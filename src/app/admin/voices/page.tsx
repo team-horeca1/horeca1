@@ -107,12 +107,28 @@ const EMPTY: FormState = {
   storySquareUrl: '',
 };
 
-const CATEGORY_OPTIONS: { value: VoiceCategory; label: string; icon: React.ElementType }[] = [
-  { value: 'chef', label: 'Chef of the Week', icon: ChefHat },
-  { value: 'consultant', label: 'Consultant Spotlight', icon: HelpCircle },
-  { value: 'vendor', label: 'Vendor Spotlight', icon: Store },
-  { value: 'owner', label: 'Restaurateur Spotlight', icon: Utensils },
+export type EditorialCategory = {
+  key: string;
+  label: string;
+  badge: string;
+  description?: string;
+  isDefault?: boolean;
+};
+
+const DEFAULT_EDITORIAL_CATEGORIES: EditorialCategory[] = [
+  { key: 'chef', label: 'Chef of the Week', badge: 'CHEF OF THE WEEK', description: 'Highlighting executive chefs and rising culinary stars', isDefault: true },
+  { key: 'consultant', label: 'Consultant Spotlight', badge: 'CONSULTANT SPOTLIGHT', description: 'Industry experts, menu developers and restaurant consultants', isDefault: true },
+  { key: 'vendor', label: 'Vendor Spotlight', badge: 'VENDOR SPOTLIGHT', description: 'Featured suppliers, farmers, distributors, and artisanal brands', isDefault: true },
+  { key: 'owner', label: 'Restaurateur Spotlight', badge: 'RESTAURATEUR SPOTLIGHT', description: 'Hospitality founders, café owners, and business leaders', isDefault: true },
 ];
+
+function getCategoryIcon(key: string) {
+  if (key === 'chef') return ChefHat;
+  if (key === 'consultant') return HelpCircle;
+  if (key === 'vendor') return Store;
+  if (key === 'owner') return Utensils;
+  return Sparkles;
+}
 
 function slugify(text: string): string {
   return text
@@ -213,6 +229,31 @@ export default function AdminVoicesPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [previewTab, setPreviewTab] = useState<'card' | 'whatsapp'>('card');
+  const [categories, setCategories] = useState<EditorialCategory[]>(() => {
+    if (typeof window === 'undefined') return DEFAULT_EDITORIAL_CATEGORIES;
+    try {
+      const saved = localStorage.getItem('h1_editorial_categories');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return DEFAULT_EDITORIAL_CATEGORIES;
+  });
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<EditorialCategory | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('h1_editorial_categories', JSON.stringify(categories));
+      } catch {
+        // ignore
+      }
+    }
+  }, [categories]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -346,7 +387,7 @@ export default function AdminVoicesPage() {
     const photoShown = form.photoUrl && !form.clearPhoto;
     const quoteLength = form.quote.length;
     const titleLine = [form.role, form.venue].filter(Boolean).join(' · ');
-    const categoryBadge = VOICE_BADGES[form.category] || 'HORECA1 VOICES';
+    const categoryBadge = categories.find((c) => c.key === form.category)?.badge || VOICE_BADGES[form.category] || 'HORECA1 VOICES';
 
     return (
       <div className="space-y-6 pb-12">
@@ -439,14 +480,14 @@ export default function AdminVoicesPage() {
                   <span className="text-[10px] text-text-muted font-normal">Select the recognition category</span>
                 </p>
                 <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {CATEGORY_OPTIONS.map((opt) => {
-                    const selected = form.category === opt.value;
-                    const Icon = opt.icon;
+                  {categories.map((opt) => {
+                    const selected = form.category === opt.key;
+                    const Icon = getCategoryIcon(opt.key);
                     return (
                       <button
-                        key={opt.value}
+                        key={opt.key}
                         type="button"
-                        onClick={() => setForm({ ...form, category: opt.value })}
+                        onClick={() => setForm({ ...form, category: opt.key as VoiceCategory })}
                         className={cn(
                           'p-3 rounded-xl text-[12px] font-bold border-2 transition-all flex flex-col items-center text-center gap-1.5',
                           selected
@@ -1021,6 +1062,11 @@ export default function AdminVoicesPage() {
               label: 'Nominations',
               badge: <span className="ml-1 text-[11px] text-text-secondary">{nominations.length}</span>,
             },
+            {
+              id: 'categories',
+              label: 'Editorial Categories',
+              badge: <span className="ml-1 text-[11px] text-text-secondary">{categories.length}</span>,
+            },
           ]}
           activeTab={tab}
           onTabChange={setTab}
@@ -1061,7 +1107,7 @@ export default function AdminVoicesPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-[12px] font-bold text-primary">
-                      {VOICE_BADGES[story.category as VoiceCategory] ?? story.category}
+                      {categories.find((c) => c.key === story.category)?.badge ?? VOICE_BADGES[story.category] ?? story.category}
                     </td>
                     <td className="px-4 py-3">
                       <AdminStatusBadge
@@ -1095,7 +1141,8 @@ export default function AdminVoicesPage() {
               </AdminRegistryTableBody>
             </AdminRegistryTableShell>
           )
-        ) : nominations.length === 0 ? (
+        ) : tab === 'nominations' ? (
+          nominations.length === 0 ? (
           <AdminRegistryEmptyState icon={Mic2} title="No nominations" subtitle="Public nominations from /voices/nominate appear here." />
         ) : (
           <div className="divide-y divide-divider">
@@ -1166,8 +1213,220 @@ export default function AdminVoicesPage() {
               </div>
             ))}
           </div>
+          )
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2">
+              <div>
+                <h3 className="text-[16px] font-bold text-text">Editorial Recognition Categories</h3>
+                <p className="text-[12px] text-text-muted">
+                  Define custom spotlight roles, badges, and recognition categories for your stories.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingCategory({ key: '', label: '', badge: '', description: '' });
+                  setShowCategoryModal(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-primary text-white text-[13px] font-bold hover:bg-primary-dark inline-flex items-center gap-1.5 shadow-sm active:scale-95"
+              >
+                <Plus size={15} /> Add Category
+              </button>
+            </div>
+
+            <AdminRegistryTableShell>
+              <AdminRegistryTableHead>
+                <th className="text-left px-4 py-3">Category Name</th>
+                <th className="text-left px-4 py-3">Key / Slug</th>
+                <th className="text-left px-4 py-3">Badge Label</th>
+                <th className="text-left px-4 py-3">Description</th>
+                <th className="text-right px-4 py-3">Actions</th>
+              </AdminRegistryTableHead>
+              <AdminRegistryTableBody>
+                {categories.map((cat) => (
+                  <tr key={cat.key} className="border-t border-divider group hover:bg-ivory/30 transition-colors">
+                    <td className="px-4 py-3 font-bold text-[14px] text-text">
+                      <div className="flex items-center gap-2">
+                        <span>{cat.label}</span>
+                        {cat.isDefault && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-neutral-100 text-text-muted">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-[13px] text-text-secondary">{cat.key}</td>
+                    <td className="px-4 py-3">
+                      <span className="px-2.5 py-1 rounded-md text-[11px] font-extrabold uppercase bg-primary/10 text-primary">
+                        {cat.badge}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-[12px] text-text-muted max-w-xs truncate">
+                      {cat.description || '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCategory({ ...cat });
+                          setShowCategoryModal(true);
+                        }}
+                        className="text-primary font-bold text-[13px] mr-3 hover:underline"
+                      >
+                        Edit
+                      </button>
+                      {!cat.isDefault && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(`Delete category "${cat.label}"?`)) {
+                              setCategories((prev) => prev.filter((c) => c.key !== cat.key));
+                              toast.success('Category deleted');
+                            }
+                          }}
+                          className="text-error font-semibold text-[13px] hover:underline"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </AdminRegistryTableBody>
+            </AdminRegistryTableShell>
+          </div>
         )}
       </AdminEntityTabPanel>
+
+      {/* Edit / Add Category Modal */}
+      {showCategoryModal && editingCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-xl border border-divider p-6 w-full max-w-md space-y-4">
+            <div className="flex items-center justify-between border-b border-divider pb-3">
+              <h4 className="text-[16px] font-bold text-text">
+                {editingCategory.key && categories.some((c) => c.key === editingCategory.key && !c.isDefault)
+                  ? 'Edit Editorial Category'
+                  : 'New Editorial Category'}
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowCategoryModal(false)}
+                className="p-1 rounded-lg text-text-muted hover:text-text hover:bg-neutral-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[12px] font-bold text-text">Category Display Name</label>
+                <input
+                  type="text"
+                  value={editingCategory.label}
+                  placeholder="e.g. Mixologist Spotlight"
+                  onChange={(e) => {
+                    const label = e.target.value;
+                    const key = editingCategory.isDefault
+                      ? editingCategory.key
+                      : slugify(label);
+                    const badge = label.toUpperCase();
+                    setEditingCategory({
+                      ...editingCategory,
+                      label,
+                      key: editingCategory.isDefault ? editingCategory.key : key,
+                      badge: editingCategory.badge || badge,
+                    });
+                  }}
+                  className="w-full text-[13px] p-2.5 border border-divider rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1"
+                />
+              </div>
+
+              <div>
+                <label className="text-[12px] font-bold text-text">Key / Slug</label>
+                <input
+                  type="text"
+                  disabled={editingCategory.isDefault}
+                  value={editingCategory.key}
+                  placeholder="e.g. mixologist"
+                  onChange={(e) =>
+                    setEditingCategory({
+                      ...editingCategory,
+                      key: slugify(e.target.value),
+                    })
+                  }
+                  className="w-full font-mono text-[13px] p-2.5 border border-divider rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1 disabled:bg-neutral-100"
+                />
+              </div>
+
+              <div>
+                <label className="text-[12px] font-bold text-text">Badge Label</label>
+                <input
+                  type="text"
+                  value={editingCategory.badge}
+                  placeholder="e.g. MIXOLOGIST SPOTLIGHT"
+                  onChange={(e) =>
+                    setEditingCategory({
+                      ...editingCategory,
+                      badge: e.target.value.toUpperCase(),
+                    })
+                  }
+                  className="w-full text-[13px] p-2.5 border border-divider rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1 uppercase"
+                />
+              </div>
+
+              <div>
+                <label className="text-[12px] font-bold text-text">Description</label>
+                <textarea
+                  rows={2}
+                  value={editingCategory.description || ''}
+                  placeholder="Short explanation of this recognition"
+                  onChange={(e) =>
+                    setEditingCategory({
+                      ...editingCategory,
+                      description: e.target.value,
+                    })
+                  }
+                  className="w-full text-[13px] p-2.5 border border-divider rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 mt-1 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-divider">
+              <button
+                type="button"
+                onClick={() => setShowCategoryModal(false)}
+                className="px-4 py-2 rounded-xl text-[13px] font-semibold text-text-muted hover:bg-neutral-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!editingCategory.label.trim() || !editingCategory.key.trim()) {
+                    toast.error('Name and key are required');
+                    return;
+                  }
+                  setCategories((prev) => {
+                    const idx = prev.findIndex((c) => c.key === editingCategory.key);
+                    if (idx >= 0) {
+                      const updated = [...prev];
+                      updated[idx] = editingCategory;
+                      return updated;
+                    }
+                    return [...prev, editingCategory];
+                  });
+                  toast.success('Editorial category saved');
+                  setShowCategoryModal(false);
+                }}
+                className="px-5 py-2 rounded-xl bg-primary text-white text-[13px] font-bold hover:bg-primary-dark shadow-sm"
+              >
+                Save Category
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

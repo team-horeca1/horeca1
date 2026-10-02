@@ -7,12 +7,13 @@ import {
     ChevronLeft, User, Package, MapPin, Loader2, AlertCircle, Clock,
     CheckCircle2, XCircle, Printer, ChevronRight, AlertTriangle,
     Truck, ClipboardList, Minus, Plus, Info, ShoppingBag, Landmark,
-    Calendar, FileText, FileDown,
+    Calendar, FileText, FileDown, RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { CancelRequestBanner } from '@/components/features/vendor/orders/CancelRequestBanner';
 import { LinkedWorkspacesCard } from '@/components/features/vendor/orders/LinkedWorkspacesCard';
+import { InitiateReturnModal } from '@/components/features/orders/InitiateReturnModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -833,6 +834,7 @@ export default function VendorOrderDetailPage() {
     const [itemsExpanded, setItemsExpanded] = useState(true);
     const [creatingPicklist, setCreatingPicklist] = useState(false);
     const [printingPicklist, setPrintingPicklist] = useState(false);
+    const [showReturnModal, setShowReturnModal] = useState(false);
 
     const ensurePicklist = async (): Promise<{ id: string; orderId: string; status: string; reused?: boolean }> => {
         const res = await fetch('/api/v1/vendor/warehouse/picklists', {
@@ -1113,6 +1115,16 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                         >
                             {printingPicklist ? <Loader2 size={15} className="animate-spin" /> : <Printer size={15} />}
                             Print Picklist
+                        </button>
+                    )}
+                    {['delivered', 'partially_delivered', 'shipped', 'completed'].includes(order.status) && (
+                        <button
+                            type="button"
+                            onClick={() => setShowReturnModal(true)}
+                            className="h-[34px] px-4 rounded-[10px] border border-amber-300 bg-amber-50 text-[13px] font-bold text-amber-800 hover:bg-amber-100 flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                        >
+                            <RotateCcw size={15} />
+                            Initiate Return
                         </button>
                     )}
                 </div>
@@ -1571,14 +1583,14 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                             )}
                         </div>
 
-                        {order.paymentStatus === 'paid' && (
+                        {order.status !== 'cancelled' && (
                             <a
                                 href={`/api/v1/vendor/orders/${order.id}/invoice`}
                                 download
                                 className="w-full h-[38px] rounded-[8px] text-[12px] font-bold border border-primary/40 text-primary hover:bg-primary-light transition-colors flex items-center justify-center gap-1.5"
                             >
                                 <FileDown size={14} />
-                                Download Invoice
+                                Download Tax Invoice {order.paymentStatus !== 'paid' ? '(Payment Pending)' : '(Paid)'}
                             </a>
                         )}
                     </div>
@@ -1626,6 +1638,15 @@ setOrder(prev => prev ? { ...prev, ewayBillNo: ewayBill.trim() } : prev);
                     <p className="text-[13px] text-[#7C7C7C]">{order.notes}</p>
                 </div>
             )}
+
+            <InitiateReturnModal
+                isOpen={showReturnModal}
+                onClose={() => setShowReturnModal(false)}
+                orderId={order.id}
+                orderNumber={order.orderNumber}
+                apiEndpoint={`/api/v1/vendor/orders/${order.id}/return`}
+                onSuccess={fetchOrder}
+            />
         </div>
     );
 }
