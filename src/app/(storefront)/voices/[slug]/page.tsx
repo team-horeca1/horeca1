@@ -13,6 +13,7 @@ import { VoiceStoryCard } from '@/components/features/voices/VoiceStoryCard';
 import { VoicesOnThisPageSidebar, type TocSection } from './VoicesOnThisPageSidebar';
 import { voiceTitleLine, VOICE_BADGES, type VoiceCategory } from '@/sanity/lib/types';
 import { sanityImageUrl } from '@/sanity/lib/image';
+import { voiceShareMetadata } from '@/lib/share-cards/pageMetadata';
 
 export const revalidate = 60;
 
@@ -20,23 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const story = await getPublishedVoiceStoryBySlug(slug);
   if (!story) return { title: 'Story not found' };
-  const origin = process.env.AUTH_URL || 'http://localhost:3000';
-  const og = story.storySquareUrl || `${origin}/api/og/voices/${slug}?format=square`;
-  return {
-    title: `${story.name} | Horeca1 Voices`,
-    description: story.quote,
-    openGraph: {
-      title: story.name,
-      description: story.quote,
-      images: [{ url: og, width: 1080, height: 1080 }],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: story.name,
-      description: story.quote,
-      images: [og],
-    },
-  };
+  return voiceShareMetadata(slug, story);
 }
 
 const portableTextComponents: PortableTextComponents = {

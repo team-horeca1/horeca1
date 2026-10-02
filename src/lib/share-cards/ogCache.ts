@@ -55,12 +55,30 @@ export async function getOrRenderOgCard(
       if (!imageResponse) return null;
 
       // Extract bytes and headers
-      const buffer = await imageResponse.arrayBuffer();
+      const rawBuffer = await imageResponse.arrayBuffer();
+      let buffer: ArrayBuffer = rawBuffer;
       const contentType = imageResponse.headers.get('content-type') || 'image/png';
       const etag = imageResponse.headers.get('etag') || `"og-${now.toString(36)}"`;
       const cacheControl =
         imageResponse.headers.get('cache-control') ||
         'public, max-age=300, s-maxage=86400, stale-while-revalidate=604800';
+
+      // Compress PNG through sharp to keep payload <300KB for social crawlers (WhatsApp, Facebook, Twitter)
+      // and fast mobile in-app transfers.
+      if (contentType.includes('png')) {
+        try {
+          const sharp = (await import('sharp')).default;
+          const compressed = await sharp(Buffer.from(rawBuffer))
+            .png({ compressionLevel: 9, effort: 7, palette: true })
+            .toBuffer();
+          buffer = compressed.buffer.slice(
+            compressed.byteOffset,
+            compressed.byteOffset + compressed.byteLength,
+          );
+        } catch (optErr) {
+          console.warn('[ogCache] Sharp compression skipped:', optErr);
+        }
+      }
 
       // Keep cache size bounded
       if (cardCache.size >= MAX_CACHE_ENTRIES) {

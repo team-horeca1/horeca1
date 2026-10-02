@@ -532,8 +532,8 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         {variant === 'list' ? (
             <div
                 className={cn(
-                    "w-full h-full bg-white rounded-xl overflow-hidden relative flex flex-col",
-                    isHighlighted ? "border-2 border-primary shadow-lg ring-2 ring-primary/25" : "border-[0.5px] border-primary",
+                    "w-full h-full bg-white rounded-xl overflow-hidden relative flex flex-col transition-all duration-200",
+                    isHighlighted ? "border-2 border-primary shadow-lg ring-2 ring-primary/25" : "border border-divider hover:border-primary",
                     isOutOfStock ? "opacity-75" : ""
                 )}
             >
@@ -699,8 +699,8 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         "sm:hidden bg-white rounded-2xl overflow-hidden transition-all duration-300 group p-0 relative flex flex-col h-full",
                         isHighlighted
                             ? "border-2 border-primary shadow-lg ring-2 ring-primary/25"
-                            : "border border-gray-100",
-                        isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_12px_30px_-12px_rgba(107,29,46,0.18)] hover:-translate-y-0.5 hover:border-primary/30"
+                            : "border border-divider",
+                        isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_12px_30px_-12px_rgba(107,29,46,0.18)] hover:-translate-y-0.5 hover:border-primary"
                     )}
                 >
                     {/* Full-width Image Container */}
@@ -843,8 +843,8 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         "hidden sm:flex bg-white rounded-[22px] overflow-hidden transition-all duration-500 group p-4 md:p-5 relative flex-col gap-3 h-full",
                         isHighlighted
                             ? "border-2 border-primary shadow-lg ring-2 ring-primary/25"
-                            : "border border-gray-100",
-                        isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_18px_45px_-12px_rgba(107,29,46,0.18)] hover:-translate-y-1 hover:border-primary/30"
+                            : "border border-divider",
+                        isOutOfStock ? "opacity-75 cursor-default" : "hover:shadow-[0_18px_45px_-12px_rgba(107,29,46,0.18)] hover:-translate-y-1 hover:border-primary"
                     )}
                 >
                     <div className="absolute top-4 right-4 z-20">{shareButton}</div>
@@ -974,7 +974,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             return (
                                 <div
                                     key={i}
-                                    className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 hover:border-primary/30 hover:bg-primary-light/40 transition-all"
+                                    className="flex items-center gap-3 p-3 rounded-2xl border border-divider hover:border-primary hover:bg-primary-light/40 transition-all"
                                 >
                                     <div className="relative w-14 h-14 shrink-0">
                                         <div className="absolute inset-0 rounded-xl bg-gray-50 overflow-hidden">
@@ -1084,7 +1084,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                 const altImg = alt.images?.[0] || alt.imageUrl || alt.vendor.logoUrl || null;
                                 return (
                                     <a key={alt.id} href={vendorProductHref(alt.vendor.id, alt.id)}
-                                        className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 hover:border-primary/30 hover:bg-[#f7fbf8] transition-all group"
+                                        className="flex items-center gap-4 p-4 rounded-2xl border border-divider hover:border-primary hover:bg-[#f7fbf8] transition-all group"
                                         onClick={(e) => e.stopPropagation()}>
                                         <div className="w-14 h-14 rounded-xl bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden relative">
                                             {altImg ? (

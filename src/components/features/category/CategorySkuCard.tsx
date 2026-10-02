@@ -71,7 +71,7 @@ export function CategorySkuCard({
     <div
       onClick={handleClick}
       className={cn(
-        'group bg-white rounded-xl border border-divider overflow-hidden shadow-cdl-1 hover:shadow-cdl-2 hover:border-primary/30 hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative',
+        'group bg-white rounded-xl border border-divider overflow-hidden shadow-cdl-1 hover:shadow-cdl-2 hover:border-primary hover:-translate-y-0.5 transition-all duration-200 flex flex-col relative',
         onCompare ? 'cursor-pointer' : '',
       )}
     >

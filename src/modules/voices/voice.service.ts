@@ -131,39 +131,43 @@ export const DEMO_VOICE_STORIES: VoiceStoryPublic[] = [
 
 export async function listPublishedVoiceStories(limit = 20): Promise<VoiceStoryPublic[]> {
   try {
-    const rows = await client.fetch<VoiceStory[]>(publishedVoicesQuery)
+    const fetchPromise = client.fetch<VoiceStory[]>(publishedVoicesQuery);
+    const timeoutPromise = new Promise<VoiceStory[]>((resolve) => setTimeout(() => resolve([]), 2500));
+    const rows = await Promise.race([fetchPromise, timeoutPromise]);
     if (Array.isArray(rows) && rows.length > 0) {
-      return rows.slice(0, limit).map(toPublic)
+      return rows.slice(0, limit).map(toPublic);
     }
   } catch (error) {
-    console.error('[voices] Sanity list failed', error)
+    console.error('[voices] Sanity list failed', error);
   }
   return DEMO_VOICE_STORIES.slice(0, limit);
 }
 
 /** Homepage teaser: one live story per category, newest first, max 4. */
 export async function listHomepageVoiceStories(): Promise<VoiceStoryPublic[]> {
-  const all = await listPublishedVoiceStories(40)
-  const seen = new Set<string>()
-  const picked: VoiceStoryPublic[] = []
+  const all = await listPublishedVoiceStories(40);
+  const seen = new Set<string>();
+  const picked: VoiceStoryPublic[] = [];
   for (const story of all) {
-    const key = String(story.category)
-    if (seen.has(key)) continue
-    seen.add(key)
-    picked.push(story)
-    if (picked.length >= 4) break
+    const key = String(story.category);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    picked.push(story);
+    if (picked.length >= 4) break;
   }
-  return picked
+  return picked;
 }
 
 export async function getPublishedVoiceStoryBySlug(slug: string): Promise<VoiceStoryPublic | null> {
   try {
-    const row = await liveClient.fetch<VoiceStory | null>(voiceBySlugQuery, { slug })
-    if (row) return toPublic(row)
+    const fetchPromise = liveClient.fetch<VoiceStory | null>(voiceBySlugQuery, { slug });
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500));
+    const row = await Promise.race([fetchPromise, timeoutPromise]);
+    if (row) return toPublic(row);
   } catch (error) {
-    console.error('[voices] Sanity get failed', error)
+    console.error('[voices] Sanity get failed', error);
   }
-  return DEMO_VOICE_STORIES.find((s) => s.slug === slug) ?? null
+  return DEMO_VOICE_STORIES.find((s) => s.slug === slug) ?? null;
 }
 
 export async function listRelatedVoiceStories(slug: string, limit = 6): Promise<VoiceStoryPublic[]> {

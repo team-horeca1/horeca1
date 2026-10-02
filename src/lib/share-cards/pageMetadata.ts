@@ -134,3 +134,18 @@ export async function collectionShareMetadata(slug: string): Promise<Metadata> {
     ogPath: `/api/og/collection/${encodeURIComponent(slug)}?format=square`,
   });
 }
+
+export function voiceShareMetadata(
+  slug: string,
+  story: { name: string; quote?: string | null; storySquareUrl?: string | null },
+): Metadata {
+  const title = `${story.name} | Horeca1 Voices`;
+  const description = clip(story.quote, 'Stories from the industry, for the industry.');
+  const ogPath = story.storySquareUrl || `/api/og/voices/${encodeURIComponent(slug)}?format=square`;
+  return catalogShareMetadata({
+    title,
+    description,
+    path: `/voices/${slug}`,
+    ogPath,
+  });
+}

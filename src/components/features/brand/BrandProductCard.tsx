@@ -83,7 +83,7 @@ export function BrandProductCard({
           onOpenSuppliers();
         }
       }}
-      className="group w-full text-left bg-white rounded-xl border border-divider overflow-hidden hover:border-primary/30 transition-colors cursor-pointer"
+      className="group w-full text-left bg-white rounded-xl border border-divider overflow-hidden hover:border-primary transition-all duration-200 cursor-pointer"
     >
       <div className="relative aspect-square bg-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
