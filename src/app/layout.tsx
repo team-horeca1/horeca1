@@ -10,11 +10,11 @@ import { ScrollRestoration } from '@/components/layout/ScrollRestoration';
 import { CallbackUrlRedirect } from '@/components/auth/CallbackUrlRedirect';
 import { PostLoginAccountSelector } from '@/components/auth/PostLoginAccountSelector';
 
-// Only weights used by UI tokens — fewer font files on cold start.
+// Inter is a variable font — omitting weight downloads the single optimized variable file instead of 35 static slices.
 const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
   variable: '--font-inter',
+  display: 'swap',
 });
 
 const SITE_URL = process.env.AUTH_URL || process.env.NEXTAUTH_URL || 'https://horeca1.com';
