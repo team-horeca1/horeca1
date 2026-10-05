@@ -10,7 +10,6 @@ import { Prisma, type ApprovalStatus, type MasterProduct } from '@prisma/client'
 import { prisma } from '@/lib/prisma';
 import { ApiError, Errors } from '@/middleware/errorHandler';
 import { emitEvent } from '@/events/emitter';
-import { runMappingForVendorProduct, embedDistributorProduct } from '@/modules/brand/brand-mapper';
 import {
   formatVendorSku,
   nextMasterSku,
@@ -2012,13 +2011,6 @@ export class CatalogService {
       });
     }
 
-    // Fire-and-forget: embed first, THEN run brand mapping so the AI signal is available.
-    // Skip the auto-mapper when we already created a verified mapping above.
-    if (!isDraft && approvalStatus === 'approved' && !brandMaster) {
-      embedDistributorProduct(created.id)
-        .catch(() => {})
-        .finally(() => runMappingForVendorProduct(created.id).catch(() => {}));
-    }
 
     return created;
   }
@@ -2436,9 +2428,6 @@ export class CatalogService {
           productName: updated.name,
           approvedBy: '',
         });
-        embedDistributorProduct(updated.id)
-          .catch(() => {})
-          .finally(() => runMappingForVendorProduct(updated.id).catch(() => {}));
       } else if (updated.approvalStatus === 'pending') {
         emitEvent('ProductSubmitted', {
           productId: updated.id,
@@ -2671,10 +2660,6 @@ export class CatalogService {
         approvedBy: adminUserId,
       });
     }
-    // Fire-and-forget: embed then run brand mapping once approved.
-    embedDistributorProduct(product.id)
-      .catch(() => {})
-      .finally(() => runMappingForVendorProduct(product.id).catch(() => {}));
     return product;
   }
 

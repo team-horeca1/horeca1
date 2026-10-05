@@ -176,27 +176,53 @@ export class SearchService {
     const hasMore = products.length > limit;
     if (hasMore) products = products.slice(0, limit);
 
-    // Extract unique vendors and categories for the 3-block response
+    // Extract unique vendors, categories, and brands from matched products
     const vendorMap = new Map<string, ProductWithIncludes['vendor']>();
     const categoryMap = new Map<string, NonNullable<ProductWithIncludes['category']>>();
+    const productBrandNames = new Set<string>();
+    const productBrandIds = new Set<string>();
 
     for (const p of products) {
       if (p.vendor) vendorMap.set(p.vendor.id, p.vendor);
       if (p.category) categoryMap.set(p.category.id, p.category);
+      if (p.brand?.trim()) productBrandNames.add(p.brand.trim());
+      for (const m of p.brandMappings ?? []) {
+        if (m.brandId) productBrandIds.add(m.brandId);
+        if (m.brandMasterProduct?.brand?.name) productBrandNames.add(m.brandMasterProduct.brand.name.trim());
+      }
     }
 
-    // 4th block: Brands matching the query (name, slug, or category tag)
-    const brands = await prisma.brand.findMany({
+    // 4th block: Brands matching the query (name, slug, or categories) OR matched from products
+    const tokens = query.trim().split(/\s+/).filter((t) => t.length >= 2);
+    const tokenVariants = Array.from(
+      new Set(
+        tokens.flatMap((t) => [
+          t.toLowerCase(),
+          t.charAt(0).toUpperCase() + t.slice(1).toLowerCase(),
+          t.toUpperCase(),
+          t,
+        ]),
+      ),
+    );
+
+    const brandOrConditions: Prisma.BrandWhereInput[] = [
+      { name: { contains: query, mode: 'insensitive' } },
+      { slug: { contains: query, mode: 'insensitive' } },
+      ...Array.from(productBrandIds).map((id) => ({ id })),
+      ...Array.from(productBrandNames).map((name) => ({ name: { contains: name, mode: 'insensitive' as const } })),
+      ...tokens.map((t) => ({ name: { contains: t, mode: 'insensitive' as const } })),
+      ...tokens.map((t) => ({ slug: { contains: t, mode: 'insensitive' as const } })),
+    ];
+
+    if (tokenVariants.length > 0) {
+      brandOrConditions.push({ categories: { hasSome: tokenVariants } });
+    }
+
+    const matchedBrands = await prisma.brand.findMany({
       where: {
         ...publicStorefrontBrandWhere(),
-        OR: [
-          { name: { contains: query, mode: 'insensitive' } },
-          { slug: { contains: query, mode: 'insensitive' } },
-          { categories: { has: query } },
-        ],
+        OR: brandOrConditions,
       },
-      take: 5,
-      orderBy: { name: 'asc' },
       select: {
         id: true,
         name: true,
@@ -209,6 +235,27 @@ export class SearchService {
         showcaseImages: true,
       },
     });
+
+    const qLower = query.toLowerCase();
+    const scoredBrands = matchedBrands
+      .map((b) => {
+        const bNameLower = b.name.toLowerCase();
+        let score = 0;
+        if (bNameLower === qLower || b.slug.toLowerCase() === qLower) score += 100;
+        else if (qLower.includes(bNameLower) || bNameLower.includes(qLower)) score += 80;
+        else if (tokens.some((t) => bNameLower.includes(t.toLowerCase()))) score += 60;
+        if (productBrandIds.has(b.id) || productBrandNames.has(b.name)) score += 50;
+        if (b.categories?.some((c) => tokens.some((t) => c.toLowerCase() === t.toLowerCase()))) score += 20;
+        return { brand: b, score };
+      })
+      .sort((a, b) => b.score - a.score || a.brand.name.localeCompare(b.brand.name));
+
+    // If any brands matched by name or from matched products (score >= 50),
+    // prioritize them so multi-word queries like "prabhat cheese" focus on the brand.
+    const strongBrandMatches = scoredBrands.filter((item) => item.score >= 50);
+    const brands = (strongBrandMatches.length > 0 ? strongBrandMatches : scoredBrands)
+      .slice(0, 6)
+      .map((item) => item.brand);
 
     return {
       products,

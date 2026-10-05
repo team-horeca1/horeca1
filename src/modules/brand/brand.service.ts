@@ -7,7 +7,6 @@ import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
 import { listActivePageHeroSlides } from '@/modules/homepage/page-hero.service';
 import { provisionDefaultAccount } from '@/lib/provisionAccount';
-import { runMappingForProduct, runMappingForBrand, embedBrandMasterProduct } from './brand-mapper';
 import { assertLeafCategory, createMasterProductWithSku, syncMasterProductCategories } from '@/modules/catalog/catalog.service';
 import { pushMasterCategoriesToVendorListings } from '@/modules/catalog/master-sync.service';
 import type {
@@ -925,11 +924,6 @@ export class BrandService {
       }
     }
 
-    // Embed first so the AI signal is available, then auto-map. Non-blocking.
-    embedBrandMasterProduct(product.id)
-      .catch(console.error)
-      .finally(() => runMappingForProduct(product.id).catch(console.error));
-
     return product;
   }
 
@@ -1090,15 +1084,6 @@ export class BrandService {
       }
     }
 
-    // Re-embed + re-map when name (or other text-affecting fields) changed.
-    if (input.name || input.packSize !== undefined || input.unit !== undefined
-        || input.categoryId !== undefined || input.categoryIds !== undefined
-        || input.aliasNames !== undefined || input.description !== undefined
-        || input.tags !== undefined) {
-      embedBrandMasterProduct(productId)
-        .catch(console.error)
-        .finally(() => runMappingForProduct(productId).catch(console.error));
-    }
 
     return updated;
   }
@@ -1254,19 +1239,12 @@ export class BrandService {
   // surface what changed in the UI later if needed.
   async triggerMapping(userId: string, actingBrandId?: string | null) {
     const brandId = await this.getBrandIdForUser(userId, actingBrandId);
-    const before = await prisma.brandProductMapping.count({ where: { brandId } });
-    try {
-      await runMappingForBrand(brandId);
-    } catch (err) {
-      console.error('runMappingForBrand failed', err);
-      throw err;
-    }
-    const after = await prisma.brandProductMapping.count({ where: { brandId } });
+    const count = await prisma.brandProductMapping.count({ where: { brandId } });
     return {
-      message: after > before ? `Mapped ${after - before} new distributor product(s)` : 'No new matches found',
-      before,
-      after,
-      newMappings: after - before,
+      message: 'Automated mapping is disabled. Please map products manually.',
+      before: count,
+      after: count,
+      newMappings: 0,
     };
   }
 
@@ -1506,10 +1484,6 @@ export async function syncProductToBrand(
         },
       });
 
-      // Embed and map in the background
-      embedBrandMasterProduct(brandMasterProduct.id)
-        .catch(console.error)
-        .finally(() => runMappingForProduct(brandMasterProduct!.id).catch(console.error));
     } else {
       // Brand owns name/slug — only fill empty scalars; backfill masterProductId.
       brandMasterProduct = await prisma.brandMasterProduct.update({

@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  GitMerge, Search, Check, Loader2, Package, Unlink, X, ArrowRight, ChevronLeft,
+  GitMerge, Search, Loader2, Package, Unlink, ArrowRight, ChevronLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn, formatPackSize } from '@/lib/utils';
@@ -46,8 +46,8 @@ interface TableRow {
   brandImage: string | null;
   brandCategory: string | null;
   mappingId: string | null;
-  mappingStatus: 'mapped' | 'pending' | 'unmapped';
-  linkStatus: 'auto_mapped' | 'verified' | 'pending_review' | null;
+  mappingStatus: 'mapped' | 'unmapped';
+  linkStatus: 'auto_mapped' | 'verified' | null;
 }
 
 type StatusFilter = 'all' | 'mapped' | 'unmapped';
@@ -144,7 +144,7 @@ export default function VendorBrandMappingWorkspacePage() {
   const mappedMasterIds = useMemo(() => {
     const ids = new Set<string>();
     for (const r of rows) {
-      if (r.brandMasterProductId && (r.mappingStatus === 'mapped' || r.mappingStatus === 'pending')) {
+      if (r.brandMasterProductId && r.mappingStatus === 'mapped') {
         ids.add(r.brandMasterProductId);
       }
     }
@@ -153,7 +153,6 @@ export default function VendorBrandMappingWorkspacePage() {
 
   const counts = useMemo(() => ({
     mapped: rows.filter((r) => r.mappingStatus === 'mapped').length,
-    pending: rows.filter((r) => r.mappingStatus === 'pending').length,
     unmapped: rows.filter((r) => r.mappingStatus === 'unmapped').length,
   }), [rows]);
 
@@ -169,8 +168,6 @@ export default function VendorBrandMappingWorkspacePage() {
     const pick = (items: TableRow[]): TableRow => {
       const forBrand = items.find((i) => i.brandId === brandId && i.mappingStatus !== 'unmapped');
       if (forBrand) return forBrand;
-      const pending = items.find((i) => i.mappingStatus === 'pending');
-      if (pending) return pending;
       const mapped = items.find((i) => i.mappingStatus === 'mapped');
       if (mapped) return mapped;
       return items[0];
@@ -224,33 +221,12 @@ export default function VendorBrandMappingWorkspacePage() {
 
   const handlePickVendorProduct = (row: TableRow) => {
     if (!selectedMaster || saving) return;
-    if (row.mappingStatus === 'mapped' || row.mappingStatus === 'pending') {
+    if (row.mappingStatus === 'mapped') {
       toast.error('Unlink this product first, or pick an unmapped SKU');
       return;
     }
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => saveMapping(row.productId, selectedMaster), 150);
-  };
-
-  const handleConfirmPending = async (row: TableRow, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!row.mappingId) return;
-    setSaving(true);
-    try {
-      const r = await fetch(`/api/v1/vendor/brand-mappings/${row.mappingId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'verified' }),
-      });
-      const j = await r.json();
-      if (!j.success) throw new Error(j.error?.message || 'Confirm failed');
-      toast.success('Confirmed');
-      await load();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Confirm failed');
-    } finally {
-      setSaving(false);
-    }
   };
 
   const handleUnlink = async (row: TableRow, e: React.MouseEvent) => {
@@ -265,26 +241,6 @@ export default function VendorBrandMappingWorkspacePage() {
       await load();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Unlink failed');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRejectPending = async (row: TableRow, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!row.mappingId) return;
-    setSaving(true);
-    try {
-      const r = await fetch(`/api/v1/vendor/brand-mappings/${row.mappingId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'rejected' }),
-      });
-      const j = await r.json();
-      if (!j.success) throw new Error(j.error?.message || 'Reject failed');
-      await load();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Reject failed');
     } finally {
       setSaving(false);
     }
@@ -333,7 +289,7 @@ export default function VendorBrandMappingWorkspacePage() {
   }
 
   const statusTabs: { key: StatusFilter; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: counts.mapped + counts.pending + counts.unmapped },
+    { key: 'all', label: 'All', count: counts.mapped + counts.unmapped },
     { key: 'unmapped', label: 'Unmapped', count: counts.unmapped },
     { key: 'mapped', label: 'Mapped', count: counts.mapped },
   ];
@@ -484,7 +440,7 @@ export default function VendorBrandMappingWorkspacePage() {
               <p className="text-[12px] text-gray-400 text-center py-10">No products in this filter</p>
             ) : (
               vendorProducts.map((row) => {
-                const isOverride = row.mappingStatus === 'mapped' || row.mappingStatus === 'pending';
+                const isMapped = row.mappingStatus === 'mapped';
                 const canLink = Boolean(selectedMaster) && row.mappingStatus === 'unmapped' && !saving;
 
                 return (
@@ -502,13 +458,13 @@ export default function VendorBrandMappingWorkspacePage() {
                       'w-full flex items-start gap-2 px-3 py-2.5 text-left border-b border-gray-50 transition-colors',
                       canLink
                         ? 'hover:bg-primary-light cursor-pointer border-l-2 border-l-transparent hover:border-l-primary'
-                        : isOverride
+                        : isMapped
                           ? 'border-l-2 border-l-primary/40 bg-[#FAFDFB]'
                           : 'border-l-2 border-l-transparent',
-                      !canLink && !isOverride && selectedMaster && 'opacity-60',
+                      !canLink && !isMapped && selectedMaster && 'opacity-60',
                     )}
                   >
-                    {isOverride ? (
+                    {isMapped ? (
                       <>
                         <ProductThumb src={row.brandImage} alt="" className="mt-0.5" />
                         <div className="flex-1 min-w-0">
@@ -516,11 +472,6 @@ export default function VendorBrandMappingWorkspacePage() {
                             <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary-light text-primary">
                               Brand override
                             </span>
-                            {row.mappingStatus === 'pending' && (
-                              <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
-                                Pending
-                              </span>
-                            )}
                           </div>
                           <p className="text-[12px] font-bold text-[#181725] truncate leading-tight">
                             {row.brandItemName}
@@ -556,29 +507,7 @@ export default function VendorBrandMappingWorkspacePage() {
                     )}
 
                     <div className="shrink-0 flex items-center gap-0.5 pt-0.5">
-                      {row.mappingStatus === 'pending' && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={(e) => handleConfirmPending(row, e)}
-                            disabled={saving}
-                            className="p-1 rounded hover:bg-primary-light text-primary"
-                            title="Confirm"
-                          >
-                            <Check size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => handleRejectPending(row, e)}
-                            disabled={saving}
-                            className="p-1 rounded hover:bg-red-100 text-red-500"
-                            title="Reject suggestion"
-                          >
-                            <X size={13} />
-                          </button>
-                        </>
-                      )}
-                      {row.mappingStatus === 'mapped' && row.mappingId && (
+                      {isMapped && row.mappingId && (
                         <button
                           type="button"
                           onClick={(e) => handleUnlink(row, e)}
@@ -590,10 +519,10 @@ export default function VendorBrandMappingWorkspacePage() {
                         </button>
                       )}
                       {row.mappingStatus === 'unmapped' && canLink && (
-                        <span className="text-[10px] font-bold text-primary shrink-0">Map</span>
+                        <span className="text-[10px] font-bold text-primary px-2 py-0.5 rounded bg-primary-light shrink-0">Map</span>
                       )}
                       {row.mappingStatus === 'unmapped' && !selectedMaster && (
-                        <span className="text-[9px] font-bold text-gray-400 uppercase px-1">New</span>
+                        <span className="text-[9px] font-bold text-gray-400 uppercase px-1">Unmapped</span>
                       )}
                     </div>
                   </div>

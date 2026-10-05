@@ -35,34 +35,9 @@ export const POST = vendorOnly(async (req: NextRequest, ctx: AuthContext) => {
       throw Errors.forbidden('No authorized brand relationships');
     }
 
-    if (productId) {
-      const product = await prisma.product.findFirst({
-        where: { id: productId, vendorId, isActive: true, approvalStatus: 'approved' },
-        select: { id: true },
-      });
-      if (!product) throw Errors.notFound('Product not found');
-
-      await runMappingForVendorProduct(productId);
-
-      if (brandId && !approvedIds.has(brandId)) {
-        throw Errors.forbidden('Not authorized for this brand');
-      }
-
-      return NextResponse.json({
-        success: true,
-        data: { message: 'Suggestions generated for product — review pending items' },
-      });
-    }
-
-    const brandIds = brandId ? [brandId] : [...approvedIds];
-    for (const bid of brandIds) {
-      if (!approvedIds.has(bid)) throw Errors.forbidden('Not authorized for this brand');
-      await runMappingForBrand(bid);
-    }
-
     return NextResponse.json({
       success: true,
-      data: { message: `Suggestions generated for ${brandIds.length} brand(s)` },
+      data: { message: 'Automated suggestions are disabled. Products must be mapped manually.' },
     });
   } catch (error) {
     return errorResponse(error);
