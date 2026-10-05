@@ -849,7 +849,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 >
                     <div className="absolute top-4 right-4 z-20">{shareButton}</div>
 
-                    <div className="relative aspect-square overflow-hidden rounded-2xl bg-white border border-[#EAE4DC] flex items-center justify-center">
+                    <div className="relative aspect-square overflow-hidden rounded-2xl bg-white flex items-center justify-center">
                         <div className="relative w-[85%] h-[85%]">
                             <Image
                                 src={product.images[0] || '/images/placeholders/no-product.svg'}
