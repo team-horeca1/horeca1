@@ -473,7 +473,7 @@ export function CategoryProductRails() {
                           key={key}
                           type="button"
                           onClick={() => openSuppliers(item)}
-                          className="w-[160px] md:w-[180px] shrink-0 text-left bg-white rounded-xl border border-[#E9E3DD] overflow-hidden hover:shadow-md transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 relative"
+                          className="w-[160px] md:w-[180px] shrink-0 text-left bg-white rounded-xl border border-[#CDC4BA] overflow-hidden hover:border-primary hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 relative"
                         >
                           <div className="relative aspect-square bg-white">
                             {img ? (

@@ -14,6 +14,8 @@ export const CDL = {
   cream: '#FAF5EC',
   surface: '#FFFFFF',
   divider: '#E9E3DD',
+  border: '#CDC4BA',
+  cardBorder: '#CDC4BA',
 
   text: '#1C1C1C',
   textSecondary: '#667085',

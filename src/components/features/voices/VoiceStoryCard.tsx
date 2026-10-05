@@ -42,7 +42,7 @@ export function VoiceStoryCard({
   return (
     <article
       className={cn(
-        'group relative bg-white border border-divider rounded-[22px] overflow-hidden transition-all duration-300 flex flex-col h-full',
+        'group relative bg-white border border-[#CDC4BA] rounded-[22px] overflow-hidden transition-all duration-300 flex flex-col h-full',
         'shadow-[0_2px_12px_-3px_rgba(0,0,0,0.04)] hover:shadow-[0_16px_36px_-6px_rgba(107,29,46,0.14)] hover:border-primary hover:-translate-y-1.5',
         variant === 'teaser' && 'w-full',
         variant === 'related' && 'min-w-[220px] max-w-[240px] shrink-0',

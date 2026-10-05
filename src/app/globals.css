@@ -18,12 +18,13 @@
   --color-cream: #faf5ec;
   --color-beige: #ede4d6;
   --color-divider: #e9e3dd;
+  --color-card-border: #cdc4ba;
 
   /* Text */
   --color-text: #1c1c1c;
   --color-text-secondary: #667085;
   --color-text-muted: #6b7280;
-  --color-border: #e9e3dd;
+  --color-border: #cdc4ba;
 
   /* Semantic */
   --color-success: #16a34a;

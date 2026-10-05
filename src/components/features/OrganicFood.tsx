@@ -171,7 +171,7 @@ export function OrganicFood() {
                             <Link
                                 href={`/product/${product.id}`}
                                 key={product.id}
-                                className="flex-none w-[calc(50%-8px)] md:w-[calc(33.333%-14px)] lg:w-[calc(20%-16px)] xl:w-[calc(16.666%-17px)] bg-white rounded-2xl border border-gray-100 p-3 md:p-4 transition-all duration-300 hover:shadow-xl hover:shadow-gray-200/50 flex flex-col group snap-start"
+                                className="flex-none w-[calc(50%-8px)] md:w-[calc(33.333%-14px)] lg:w-[calc(20%-16px)] xl:w-[calc(16.666%-17px)] bg-white rounded-2xl border border-[#CDC4BA] p-3 md:p-4 transition-all duration-300 hover:shadow-xl hover:shadow-gray-200/50 hover:border-primary flex flex-col group snap-start"
                             >
                                 {/* Product Image */}
                                 <div className="aspect-square bg-white rounded-xl mb-4 flex items-center justify-center overflow-hidden">

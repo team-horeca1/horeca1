@@ -111,7 +111,7 @@ export function FeaturedProducts() {
                         <Link
                             href={`/product/${product.id}`}
                             key={product.id}
-                            className="group bg-white rounded-2xl border border-gray-100 p-4 hover:shadow-xl hover:shadow-gray-200/50 transition-all duration-300 flex flex-col h-full"
+                            className="group bg-white rounded-2xl border border-[#CDC4BA] p-4 hover:shadow-xl hover:shadow-gray-200/50 hover:border-primary transition-all duration-300 flex flex-col h-full"
                         >
                             {/* Product Image & Add Button */}
                             <div className="relative aspect-square mb-4 bg-gray-50 rounded-xl overflow-hidden p-0.5 flex items-center justify-center">

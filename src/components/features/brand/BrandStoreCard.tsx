@@ -48,7 +48,7 @@ export function BrandStoreCard({
             className={cn(
                 'group relative isolate flex flex-col justify-between overflow-hidden',
                 'h-[235px] md:h-[260px] w-full rounded-2xl',
-                'bg-white border border-black/[0.06] shadow-cdl-1 hover:shadow-cdl-2 hover:-translate-y-1',
+                'bg-white border border-[#CDC4BA] shadow-cdl-1 hover:shadow-cdl-2 hover:-translate-y-1',
                 'transition-all duration-300',
                 className,
             )}
