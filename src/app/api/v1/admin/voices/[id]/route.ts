@@ -12,10 +12,8 @@ import {
 } from '@/modules/voices/voice.admin'
 import { generateVoiceShareCards, voicesSiteOrigin } from '@/modules/voices/voice.shareCards'
 
-const CATEGORIES = ['chef', 'consultant', 'vendor', 'owner'] as const
-
 const storyBody = z.object({
-  category: z.enum(CATEGORIES),
+  category: z.string().trim().min(1).max(40).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   name: z.string().trim().min(2).max(120),
   slug: z.string().trim().max(160).optional(),
   role: z.string().trim().max(160).optional().nullable(),

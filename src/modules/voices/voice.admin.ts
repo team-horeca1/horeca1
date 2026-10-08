@@ -6,6 +6,7 @@ import {
   adminNominationsQuery,
   adminVoiceByIdQuery,
   adminVoicesQuery,
+  editorialCategoriesQuery,
 } from '@/sanity/lib/queries'
 import type { VoiceBrandLink, VoiceCategory, VoiceQa, VoiceRecipe, VoiceStory } from '@/sanity/lib/types'
 import { ApiError } from '@/middleware/errorHandler'
@@ -22,6 +23,32 @@ export type AdminNomination = {
   status: string
   _createdAt: string
 }
+
+export type EditorialCategory = {
+  _id: string
+  key: string
+  label: string
+  badge: string
+  description: string | null
+  isDefault: boolean
+}
+
+export type EditorialCategoryInput = {
+  key: string
+  label: string
+  badge: string
+  description?: string | null
+}
+
+const DEFAULT_EDITORIAL_CATEGORIES: Array<Omit<EditorialCategory, '_id'>> = [
+  { key: 'chef', label: 'Chef of the Week', badge: 'CHEF OF THE WEEK', description: 'Highlighting executive chefs and rising culinary stars', isDefault: true },
+  { key: 'consultant', label: 'Consultant Spotlight', badge: 'CONSULTANT SPOTLIGHT', description: 'Industry experts, menu developers and restaurant consultants', isDefault: true },
+  { key: 'vendor', label: 'Vendor Spotlight', badge: 'VENDOR SPOTLIGHT', description: 'Featured suppliers, farmers, distributors, and artisanal brands', isDefault: true },
+  { key: 'owner', label: 'Restaurateur Spotlight', badge: 'RESTAURATEUR SPOTLIGHT', description: 'Hospitality founders, café owners, and business leaders', isDefault: true },
+]
+
+const DEFAULT_CATEGORY_ORDER = DEFAULT_EDITORIAL_CATEGORIES.map((cat) => cat.key)
+const CATEGORY_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export type VoiceStoryInput = {
   category: VoiceCategory
@@ -82,7 +109,159 @@ function withKeys<T extends Record<string, unknown>>(items: T[] | null | undefin
   }))
 }
 
-function storyDoc(input: VoiceStoryInput): Record<string, unknown> {
+function sortEditorialCategories(rows: EditorialCategory[]): EditorialCategory[] {
+  return [...rows].sort((a, b) => {
+    const ai = DEFAULT_CATEGORY_ORDER.indexOf(a.key)
+    const bi = DEFAULT_CATEGORY_ORDER.indexOf(b.key)
+    if (ai !== -1 || bi !== -1) {
+      if (ai === -1) return 1
+      if (bi === -1) return -1
+      return ai - bi
+    }
+    return a.label.localeCompare(b.label)
+  })
+}
+
+function assertCategoryKey(key: string): string {
+  const normalized = key.trim().toLowerCase()
+  if (!CATEGORY_KEY.test(normalized) || normalized.length > 40) {
+    throw new ApiError('BAD_REQUEST', 'Category key must be a short lowercase slug', 400)
+  }
+  return normalized
+}
+
+async function fetchEditorialCategories(): Promise<EditorialCategory[]> {
+  const rows = await liveClient.fetch<EditorialCategory[]>(editorialCategoriesQuery)
+  return sortEditorialCategories(rows ?? [])
+}
+
+export async function listEditorialCategories(): Promise<EditorialCategory[]> {
+  const rows = await fetchEditorialCategories()
+  if (rows.length > 0) return rows
+
+  const write = requireVoicesWriteClient()
+  await Promise.all(
+    DEFAULT_EDITORIAL_CATEGORIES.map((cat) =>
+      write.createIfNotExists({
+        _id: `editorialCategory.${cat.key}`,
+        _type: 'editorialCategory',
+        key: cat.key,
+        label: cat.label,
+        badge: cat.badge,
+        description: cat.description,
+        isDefault: true,
+      }),
+    ),
+  )
+  const seeded = await fetchEditorialCategories()
+  if (seeded.length > 0) return seeded
+  return DEFAULT_EDITORIAL_CATEGORIES.map((cat) => ({
+    ...cat,
+    _id: `editorialCategory.${cat.key}`,
+  }))
+}
+
+async function categoryByKey(key: string): Promise<EditorialCategory | null> {
+  const categories = await listEditorialCategories()
+  return categories.find((cat) => cat.key === key) ?? null
+}
+
+async function categoryBadgeFor(category: string): Promise<string> {
+  const match = await categoryByKey(category)
+  if (!match) throw new ApiError('BAD_REQUEST', 'Choose an editorial category', 400)
+  return match.badge
+}
+
+async function patchStoryBadges(key: string, categoryBadge: string): Promise<string[]> {
+  const ids = await liveClient.fetch<string[]>(
+    '*[_type == "voiceStory" && category == $key]._id',
+    { key },
+  )
+  if (!ids?.length) return []
+  const write = requireVoicesWriteClient()
+  for (const id of ids) {
+    await write.patch(id).set({ categoryBadge }).commit()
+  }
+  const slugs = await liveClient.fetch<string[]>(
+    '*[_type == "voiceStory" && category == $key && defined(slug.current)].slug.current',
+    { key },
+  )
+  return slugs ?? []
+}
+
+export async function createEditorialCategory(input: EditorialCategoryInput): Promise<EditorialCategory> {
+  const key = assertCategoryKey(input.key)
+  const label = input.label.trim()
+  const badge = input.badge.trim()
+  if (label.length < 2) throw new ApiError('BAD_REQUEST', 'Category name is required', 400)
+  if (badge.length < 2) throw new ApiError('BAD_REQUEST', 'Badge label is required', 400)
+
+  const existing = await categoryByKey(key)
+  if (existing) throw new ApiError('BAD_REQUEST', 'A category with this key already exists', 400)
+
+  const write = requireVoicesWriteClient()
+  const created = await write.create({
+    _id: `editorialCategory.${key}`,
+    _type: 'editorialCategory',
+    key,
+    label,
+    badge,
+    description: input.description?.trim() || '',
+    isDefault: false,
+  })
+  return {
+    _id: created._id,
+    key,
+    label,
+    badge,
+    description: input.description?.trim() || null,
+    isDefault: false,
+  }
+}
+
+export async function updateEditorialCategory(
+  key: string,
+  input: Pick<EditorialCategoryInput, 'label' | 'badge' | 'description'>,
+): Promise<{ category: EditorialCategory; slugs: string[] }> {
+  const normalized = assertCategoryKey(key)
+  const current = await categoryByKey(normalized)
+  if (!current) throw new ApiError('NOT_FOUND', 'Editorial category not found', 404)
+
+  const label = input.label.trim()
+  const badge = input.badge.trim()
+  if (label.length < 2) throw new ApiError('BAD_REQUEST', 'Category name is required', 400)
+  if (badge.length < 2) throw new ApiError('BAD_REQUEST', 'Badge label is required', 400)
+  const description = input.description?.trim() || null
+
+  const write = requireVoicesWriteClient()
+  await write.patch(current._id).set({ label, badge, description: description || '' }).commit()
+
+  const slugs = badge !== current.badge ? await patchStoryBadges(normalized, badge) : []
+  return {
+    category: { ...current, label, badge, description },
+    slugs,
+  }
+}
+
+export async function deleteEditorialCategory(key: string): Promise<void> {
+  const normalized = assertCategoryKey(key)
+  const current = await categoryByKey(normalized)
+  if (!current) throw new ApiError('NOT_FOUND', 'Editorial category not found', 404)
+  if (current.isDefault) {
+    throw new ApiError('BAD_REQUEST', 'Built-in categories cannot be deleted', 400)
+  }
+  const storyCount = await liveClient.fetch<number>(
+    'count(*[_type == "voiceStory" && category == $key])',
+    { key: normalized },
+  )
+  if (storyCount > 0) {
+    throw new ApiError('BAD_REQUEST', 'This category is still used by stories', 400)
+  }
+  const write = requireVoicesWriteClient()
+  await write.delete(current._id)
+}
+
+function storyDoc(input: VoiceStoryInput, categoryBadge: string): Record<string, unknown> {
   const slug = slugify(input.slug || input.name)
   const published = input.published === true
   const publishedAt =
@@ -93,6 +272,7 @@ function storyDoc(input: VoiceStoryInput): Record<string, unknown> {
   const doc: Record<string, unknown> = {
     _type: 'voiceStory',
     category: input.category,
+    categoryBadge,
     name: input.name.trim(),
     slug: { _type: 'slug', current: slug },
     role: input.role?.trim() || undefined,
@@ -121,8 +301,9 @@ export async function createVoiceStory(input: VoiceStoryInput): Promise<VoiceSto
   const write = requireVoicesWriteClient()
   const slug = slugify(input.slug || input.name)
   if (!slug) throw new ApiError('BAD_REQUEST', 'Could not generate a slug', 400)
+  const categoryBadge = await categoryBadgeFor(input.category)
 
-  const created = await write.create({ ...storyDoc(input), _type: 'voiceStory' })
+  const created = await write.create({ ...storyDoc(input, categoryBadge), _type: 'voiceStory' })
   const row = await getAdminVoiceStory(created._id)
   if (!row) throw new ApiError('NOT_FOUND', 'Voice story not found after create', 404)
   return row
@@ -133,7 +314,8 @@ export async function updateVoiceStory(id: string, input: VoiceStoryInput): Prom
   const existing = await getAdminVoiceStory(id)
   if (!existing) throw new ApiError('NOT_FOUND', 'Voice story not found', 404)
 
-  const doc = storyDoc(input)
+  const categoryBadge = await categoryBadgeFor(input.category)
+  const doc = storyDoc(input, categoryBadge)
   const patch = write.patch(id).set(doc)
   if (input.clearPhoto) patch.unset(['photo'])
   else if (!input.photoAssetId && input.photoAlt != null && existing.photoUrl) {

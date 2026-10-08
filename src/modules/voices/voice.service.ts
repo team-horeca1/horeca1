@@ -32,7 +32,7 @@ function toPublic(story: VoiceStory): VoiceStoryPublic {
   return {
     id: story._id,
     slug: story.slug,
-    badge: voiceBadge(story.category),
+    badge: voiceBadge(story.category, story.categoryBadge),
     category: story.category,
     name: story.name,
     role: story.role ?? null,
@@ -143,7 +143,7 @@ export async function listPublishedVoiceStories(limit = 20): Promise<VoiceStoryP
   return DEMO_VOICE_STORIES.slice(0, limit);
 }
 
-/** Homepage teaser: one live story per category, newest first, max 4. */
+/** Homepage teaser: one live story per category, newest first, max 8. */
 export async function listHomepageVoiceStories(): Promise<VoiceStoryPublic[]> {
   const all = await listPublishedVoiceStories(40);
   const seen = new Set<string>();
@@ -153,7 +153,7 @@ export async function listHomepageVoiceStories(): Promise<VoiceStoryPublic[]> {
     if (seen.has(key)) continue;
     seen.add(key);
     picked.push(story);
-    if (picked.length >= 4) break;
+    if (picked.length >= 8) break;
   }
   return picked;
 }

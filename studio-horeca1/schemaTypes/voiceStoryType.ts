@@ -16,8 +16,15 @@ export const voiceStoryType = defineType({
       name: 'category',
       title: 'Category',
       type: 'string',
-      options: { list: [...VOICE_CATEGORIES], layout: 'radio' },
-      validation: (Rule) => Rule.required(),
+      description: 'Editorial category key, for example chef or mixologist. Managed in the Horeca1 admin.',
+      validation: (Rule) =>
+        Rule.required().max(40).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { name: 'lowercase slug' }),
+    }),
+    defineField({
+      name: 'categoryBadge',
+      title: 'Category badge',
+      type: 'string',
+      description: 'Display label copied from the editorial category when the story is saved.',
     }),
     defineField({
       name: 'name',

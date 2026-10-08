@@ -81,7 +81,7 @@ export default async function VoiceStoryPage({ params }: { params: Promise<{ slu
   if (!story) notFound();
   const related = await listRelatedVoiceStories(slug, 6);
   const titleLine = voiceTitleLine(story.role, story.venue);
-  const categoryLabel = VOICE_BADGES[story.category as VoiceCategory] || story.badge || 'EDITORIAL';
+  const categoryLabel = story.badge || VOICE_BADGES[story.category as VoiceCategory] || 'EDITORIAL';
 
   // Build Table of Contents sections
   const sections: TocSection[] = [

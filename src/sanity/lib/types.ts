@@ -21,6 +21,7 @@ export type VoiceBrandLink = {
 export type VoiceStory = {
   _id: string
   category: VoiceCategory
+  categoryBadge?: string | null
   name: string
   slug: string
   role: string | null
@@ -46,7 +47,12 @@ export const VOICE_BADGES: Record<string, string> = {
   owner: 'RESTAURATEUR SPOTLIGHT',
 }
 
-export function voiceBadge(category: string | null | undefined): string {
+export function voiceBadge(
+  category: string | null | undefined,
+  categoryBadge?: string | null,
+): string {
+  const stored = categoryBadge?.trim()
+  if (stored) return stored
   if (category && category in VOICE_BADGES) {
     return VOICE_BADGES[category]
   }
