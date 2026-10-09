@@ -366,8 +366,15 @@ export default function AdminVoicesPage() {
     }
   };
 
+  const openEditCategory = (cat: EditorialCategory) => {
+    setEditingCategory({ ...cat });
+    setCategoryMode('edit');
+    setKeyManual(true);
+    setBadgeManual(true);
+    setShowCategoryModal(true);
+  };
+
   const removeCategory = async (cat: EditorialCategory) => {
-    if (cat.isDefault) return;
     if (!window.confirm(`Delete category "${cat.label}"?`)) return;
     const res = await fetch(`/api/v1/admin/voices/categories/${encodeURIComponent(cat.key)}`, {
       method: 'DELETE',
@@ -378,6 +385,12 @@ export default function AdminVoicesPage() {
       toast.error(apiError(json, 'Could not delete category'));
       return;
     }
+    const remaining = categories.filter((c) => c.key !== cat.key);
+    setCategories(remaining);
+    setForm((prev) => {
+      if (!prev || prev.category !== cat.key) return prev;
+      return { ...prev, category: (remaining[0]?.key ?? '') as VoiceCategory };
+    });
     toast.success('Category deleted');
     await loadCategories();
   };
@@ -660,10 +673,8 @@ export default function AdminVoicesPage() {
                     const selected = form.category === opt.key;
                     const Icon = getCategoryIcon(opt.key);
                     return (
-                      <button
+                      <div
                         key={opt.key}
-                        type="button"
-                        onClick={() => setForm({ ...form, category: opt.key as VoiceCategory })}
                         className={cn(
                           'p-3 rounded-xl text-[12px] font-bold border-2 transition-all flex flex-col items-center text-center gap-1.5',
                           selected
@@ -671,9 +682,33 @@ export default function AdminVoicesPage() {
                             : 'border-divider/80 text-text-secondary hover:border-primary/40 bg-white'
                         )}
                       >
-                        <Icon size={18} className={selected ? 'text-primary' : 'text-text-muted'} />
-                        <span className="leading-tight">{opt.label}</span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, category: opt.key as VoiceCategory })}
+                          className="flex flex-col items-center text-center gap-1.5 w-full"
+                        >
+                          <Icon size={18} className={selected ? 'text-primary' : 'text-text-muted'} />
+                          <span className="leading-tight">{opt.label}</span>
+                        </button>
+                        {canWrite && (
+                          <span className="flex items-center gap-2 normal-case tracking-normal">
+                            <button
+                              type="button"
+                              onClick={() => openEditCategory(opt)}
+                              className="text-[10px] font-bold text-primary hover:underline"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void removeCategory(opt)}
+                              className="text-[10px] font-bold text-error hover:underline"
+                            >
+                              Delete
+                            </button>
+                          </span>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -1448,28 +1483,23 @@ export default function AdminVoicesPage() {
                       {cat.description || '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        disabled={!canWrite}
-                        onClick={() => {
-                          setEditingCategory({ ...cat });
-                          setCategoryMode('edit');
-                          setKeyManual(true);
-                          setBadgeManual(true);
-                          setShowCategoryModal(true);
-                        }}
-                        className="text-primary font-bold text-[13px] mr-3 hover:underline disabled:opacity-60"
-                      >
-                        Edit
-                      </button>
-                      {!cat.isDefault && canWrite && (
-                        <button
-                          type="button"
-                          onClick={() => void removeCategory(cat)}
-                          className="text-error font-semibold text-[13px] hover:underline"
-                        >
-                          Delete
-                        </button>
+                      {canWrite && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openEditCategory(cat)}
+                            className="text-primary font-bold text-[13px] mr-3 hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void removeCategory(cat)}
+                            className="text-error font-semibold text-[13px] hover:underline"
+                          >
+                            Delete
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>

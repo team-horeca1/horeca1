@@ -247,15 +247,12 @@ export async function deleteEditorialCategory(key: string): Promise<void> {
   const normalized = assertCategoryKey(key)
   const current = await categoryByKey(normalized)
   if (!current) throw new ApiError('NOT_FOUND', 'Editorial category not found', 404)
-  if (current.isDefault) {
-    throw new ApiError('BAD_REQUEST', 'Built-in categories cannot be deleted', 400)
-  }
   const storyCount = await liveClient.fetch<number>(
     'count(*[_type == "voiceStory" && category == $key])',
     { key: normalized },
   )
   if (storyCount > 0) {
-    throw new ApiError('BAD_REQUEST', 'This category is still used by stories', 400)
+    throw new ApiError('BAD_REQUEST', 'This category is still used by stories. Move those stories to another category first.', 400)
   }
   const write = requireVoicesWriteClient()
   await write.delete(current._id)

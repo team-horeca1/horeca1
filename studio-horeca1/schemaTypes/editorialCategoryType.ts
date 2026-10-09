@@ -37,7 +37,7 @@ export const editorialCategoryType = defineType({
       title: 'Built-in category',
       type: 'boolean',
       initialValue: false,
-      description: 'Built-in categories can be renamed, not deleted.',
+      description: 'Seeded with the original four categories. Any category can be edited or deleted when no story uses it.',
     }),
   ],
   preview: {
