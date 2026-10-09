@@ -1,7 +1,7 @@
 import type { ApprovalStatus, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { aggregateInventories } from '@/lib/inventoryHelpers';
-import { getApprovedDistributorKeys, distributorAuthKey } from '@/lib/brandAuthorizedDistributor';
+import { getApprovedDistributorKeys, distributorAuthKey, namesMatchForMapping } from '@/lib/brandAuthorizedDistributor';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 import { emitEvent } from '@/events/emitter';
 import { Errors } from '@/middleware/errorHandler';
@@ -1229,12 +1229,25 @@ export class BrandService {
       select: {
         id: true,
         status: true,
+        matchedBy: true,
         brandMasterProductId: true,
         distributorProduct: { select: { id: true, name: true, packSize: true } },
       },
     });
+    const masterById = new Map(masters.map((master) => [master.id, master]));
     const linkByMaster = new Map<string, (typeof mappings)[number]>();
     for (const mapping of mappings) {
+      const master = masterById.get(mapping.brandMasterProductId);
+      const exact = master
+        ? namesMatchForMapping(
+            master.name,
+            master.packSize,
+            mapping.distributorProduct.name,
+            mapping.distributorProduct.packSize,
+          )
+        : false;
+      // Guessed auto-matches stay off this desk. Only a confirmed or exact link is shown.
+      if (mapping.status !== 'verified' && mapping.matchedBy !== 'manually_verified' && !exact) continue;
       const current = linkByMaster.get(mapping.brandMasterProductId);
       if (!current || (mapping.status === 'verified' && current.status !== 'verified')) {
         linkByMaster.set(mapping.brandMasterProductId, mapping);

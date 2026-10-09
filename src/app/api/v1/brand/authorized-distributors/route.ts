@@ -49,7 +49,7 @@ export const GET = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
                 products: {
                   where: {
                     isActive: true,
-                    brandMappings: { some: { brandId, status: { in: ['verified', 'auto_mapped', 'pending_review'] } } },
+                    brandMappings: { some: { brandId, status: 'verified' } },
                   },
                 },
               },

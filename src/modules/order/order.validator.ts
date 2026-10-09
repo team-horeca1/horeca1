@@ -83,7 +83,7 @@ export const reassignVendorSchema = z.object({
 });
 
 export const listOrdersSchema = z.object({
-  status: z.enum(['draft', 'pending', 'confirmed', 'processing', 'ready_for_dispatch', 'shipped', 'partially_delivered', 'delivered', 'returned', 'cancelled']).optional(),
+  status: z.enum(['draft', 'pending', 'confirmed', 'processing', 'ready_for_dispatch', 'shipped', 'partially_delivered', 'delivered', 'returned', 'cancelled', 'abandoned']).optional(),
   vendorId: z.string().uuid().optional(),
   cursor: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
