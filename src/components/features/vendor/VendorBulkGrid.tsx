@@ -62,9 +62,27 @@ type RowEdits = Partial<Record<EditableField, any>>;
 const STICKY_COL = { vendor: 120, itemId: 200, name: 280 } as const;
 const STICKY_LEFT_PX = [0, STICKY_COL.vendor, STICKY_COL.vendor + STICKY_COL.itemId] as const;
 
-function stickyLeftStyle(colIdx: number): React.CSSProperties | undefined {
-  if (colIdx > 2) return undefined;
-  return { left: STICKY_LEFT_PX[colIdx] };
+/** Price / slab cells save on blur. Other columns still wait for Save changes. */
+const RATE_FIELDS = new Set<string>([
+  'basePrice',
+  'taxPercent',
+  'bulkQty1Quantity',
+  'bulkQty1NetRate',
+  'bulkQty2Quantity',
+  'bulkQty2NetRate',
+  'bulkQty3Quantity',
+  'bulkQty3NetRate',
+]);
+
+const noSpin =
+  '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+
+function stickyMeta(hideIdentity: boolean, colIdx: number): { sticky: boolean; left?: number; edge: boolean } {
+  if (hideIdentity) {
+    return { sticky: colIdx === 0, left: colIdx === 0 ? 0 : undefined, edge: colIdx === 0 };
+  }
+  if (colIdx > 2) return { sticky: false, edge: false };
+  return { sticky: true, left: STICKY_LEFT_PX[colIdx], edge: colIdx === 2 };
 }
 
 function formatItemIdDisplay(p: GridProduct): { display: string; full: string } {
@@ -74,8 +92,8 @@ function formatItemIdDisplay(p: GridProduct): { display: string; full: string } 
   return { display: `${full.slice(0, 4)}…${full.slice(-4)}`, full };
 }
 
-function stickyBodyBg(colIdx: number, isDirty: boolean, rowError: string | undefined): string {
-  if (colIdx === 2) {
+function stickyBodyBg(isNameCol: boolean, isDirty: boolean, rowError: string | undefined): string {
+  if (isNameCol) {
     if (rowError) return 'bg-red-50';
     if (isDirty) return 'bg-success-light';
     return 'bg-white';
@@ -150,6 +168,11 @@ export default function VendorBulkGrid({
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
+  const [rowBaseline, setRowBaseline] = useState<Record<string, Partial<GridProduct>>>({});
+  const editsRef = React.useRef(edits);
+  editsRef.current = edits;
+  const baselineRef = React.useRef(rowBaseline);
+  baselineRef.current = rowBaseline;
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = React.useRef<HTMLDivElement>(null);
 
@@ -238,6 +261,12 @@ export default function VendorBulkGrid({
     { key: 'substituteMapping', label: 'Substitute Mapping', width: 'w-[150px]', type: 'text' },
   ], [brandNames, categoryNames, subCategoryNames, readOnlyCommission]);
 
+  const hideIdentity = isAdmin;
+  const visibleColumns = useMemo(
+    () => (hideIdentity ? COLUMNS.filter((c) => c.key !== 'vendorId' && c.key !== 'itemId') : COLUMNS),
+    [COLUMNS, hideIdentity],
+  );
+
   const subCategoriesForParent = (parentName: string) => {
     if (!parentName) return subCategoryNames;
     const parent = categories.find((c) => c.name === parentName && !c.parentId);
@@ -251,6 +280,7 @@ export default function VendorBulkGrid({
         setEdits({});
         setQuery('');
         setSaveErrors({});
+        setRowBaseline({});
       });
     }
   }, [open]);
@@ -272,7 +302,20 @@ export default function VendorBulkGrid({
     return categories.find((c) => c.name === p.categoryName) || null;
   };
 
-  const getVal = (p: GridProduct, field: EditableField): any => {
+  const withBaseline = (raw: GridProduct): GridProduct => {
+    const extra = baselineRef.current[raw.id];
+    if (!extra) return raw;
+    return {
+      ...raw,
+      ...extra,
+      priceSlabs: extra.priceSlabs ?? raw.priceSlabs,
+      inventory: extra.inventory ?? raw.inventory,
+      metadata: extra.metadata ?? raw.metadata,
+    };
+  };
+
+  const getVal = (raw: GridProduct, field: EditableField): any => {
+    const p = withBaseline(raw);
     if (edits[p.id]?.[field] !== undefined) {
       return edits[p.id][field];
     }
@@ -379,24 +422,42 @@ export default function VendorBulkGrid({
   };
 
   const setVal = (id: string, field: EditableField, value: any) => {
-    setEdits((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+    setEdits((prev) => {
+      const next = { ...prev, [id]: { ...prev[id], [field]: value } };
+      editsRef.current = next;
+      return next;
+    });
   };
 
-  const save = async () => {
-    if (dirtyIds.length === 0) {
-      toast('No changes to save');
+  const save = async (opts?: { ids?: string[]; onlyFields?: ReadonlySet<string>; quiet?: boolean }) => {
+    const source = editsRef.current;
+    const only = opts?.onlyFields;
+    const ids = (opts?.ids ?? Object.keys(source)).filter((id) => {
+      const row = source[id];
+      if (!row) return false;
+      return Object.keys(row).some((k) => !only || only.has(k));
+    });
+    if (ids.length === 0) {
+      if (!opts?.quiet && !only) toast('No changes to save');
       return;
     }
+    const autosave = Boolean(only);
     setSaving(true);
     setSaveErrors({});
     let ok = 0;
     let fail = 0;
     const rowErrors: Record<string, string> = {};
+    const savedSnapshot: Record<string, RowEdits> = {};
+    const patches: Record<string, Partial<GridProduct>> = {};
 
-    for (const id of dirtyIds) {
-      const e = edits[id];
-      const p = products.find((prod) => prod.id === id);
-      if (!p) continue;
+    for (const id of ids) {
+      const full = source[id] ?? {};
+      const e: RowEdits = only
+        ? Object.fromEntries(Object.entries(full).filter(([k]) => only.has(k)))
+        : full;
+      const raw = products.find((prod) => prod.id === id);
+      const p = raw ? withBaseline(raw) : undefined;
+      if (!p || Object.keys(e).length === 0) continue;
 
       const body: Record<string, unknown> = {};
       const meta: Record<string, unknown> = { ...(p.metadata ?? {}) };
@@ -405,7 +466,15 @@ export default function VendorBulkGrid({
       if (e.sku !== undefined) body.sku = e.sku;
       if (e.hsn !== undefined) body.hsn = e.hsn;
       if (e.brand !== undefined) body.brand = e.brand;
-      if (e.basePrice !== undefined) body.basePrice = parseFloat(String(e.basePrice)) || 0;
+      if (e.basePrice !== undefined) {
+        const rate = parseFloat(String(e.basePrice));
+        if (!Number.isFinite(rate) || rate <= 0) {
+          rowErrors[id] = 'Enter a valid rate';
+          fail++;
+          continue;
+        }
+        body.basePrice = rate;
+      }
       if (e.taxPercent !== undefined) {
         body.taxPercent = parseFloat(String(e.taxPercent)) || 0;
       }
@@ -523,6 +592,18 @@ export default function VendorBulkGrid({
         }
 
         ok++;
+        savedSnapshot[id] = e;
+        const patch: Partial<GridProduct> = {};
+        if (body.basePrice != null) patch.basePrice = Number(body.basePrice);
+        if (body.taxPercent != null) patch.taxPercent = Number(body.taxPercent);
+        if (Array.isArray(body.priceSlabs)) {
+          patch.priceSlabs = body.priceSlabs as { minQty: number; price: number }[];
+        }
+        if (e.stockOnHand !== undefined) {
+          const qty = parseInt(String(e.stockOnHand), 10);
+          if (!isNaN(qty)) patch.inventory = { qtyAvailable: qty };
+        }
+        patches[id] = patch;
       } catch {
         rowErrors[id] = 'Network error';
         fail++;
@@ -531,6 +612,38 @@ export default function VendorBulkGrid({
 
     setSaving(false);
     setSaveErrors(rowErrors);
+
+    if (ok > 0) {
+      setRowBaseline((prev) => {
+        const next = { ...prev };
+        for (const [id, patch] of Object.entries(patches)) {
+          next[id] = { ...next[id], ...patch };
+        }
+        baselineRef.current = next;
+        return next;
+      });
+      setEdits((prev) => {
+        const next = { ...prev };
+        for (const [id, snap] of Object.entries(savedSnapshot)) {
+          const row = { ...(next[id] ?? {}) };
+          for (const key of Object.keys(snap)) {
+            if (row[key as EditableField] === snap[key as EditableField]) {
+              delete row[key as EditableField];
+            }
+          }
+          if (Object.keys(row).length === 0) delete next[id];
+          else next[id] = row;
+        }
+        editsRef.current = next;
+        return next;
+      });
+    }
+
+    if (autosave) {
+      if (fail === 0 && ok > 0) toast.success('Rate saved', { id: 'sheet-rate-save' });
+      else if (fail > 0) toast.error(Object.values(rowErrors)[0] || 'Could not save rate');
+      return;
+    }
 
     if (fail === 0) {
       toast.success(`Saved ${ok} product${ok !== 1 ? 's' : ''}`);
@@ -562,7 +675,7 @@ export default function VendorBulkGrid({
           <div className="min-w-0">
             <h2 className="text-[18px] font-bold text-[#181725]">Bulk Update</h2>
             <p className="text-[12px] text-[#AEAEAE]">
-              Edit price, tax, metadata and availability inline — like a spreadsheet.
+              Edit price, tax, metadata and availability inline — like a spreadsheet. Rates save when you leave the cell.
             </p>
           </div>
         </div>
@@ -676,21 +789,27 @@ export default function VendorBulkGrid({
           <div className="w-full h-full overflow-auto custom-excel-scrollbar">
             <table className="min-w-max table-fixed border-collapse text-[13px] bg-white">
               <colgroup>
-                <col style={{ width: STICKY_COL.vendor }} />
-                <col style={{ width: STICKY_COL.itemId }} />
-                <col style={{ width: STICKY_COL.name }} />
+                {hideIdentity ? (
+                  <col style={{ width: STICKY_COL.name }} />
+                ) : (
+                  <>
+                    <col style={{ width: STICKY_COL.vendor }} />
+                    <col style={{ width: STICKY_COL.itemId }} />
+                    <col style={{ width: STICKY_COL.name }} />
+                  </>
+                )}
               </colgroup>
               <thead className="sticky top-0 z-10 bg-[#F3F4F6]">
                 <tr className="text-left text-[11px] font-bold text-[#4B5563] uppercase tracking-wide h-[36px]">
-                  {COLUMNS.map((col, colIdx) => {
-                    const isSticky = colIdx < 3;
-                    const stickyClass = isSticky
-                      ? cn('sticky z-30 bg-[#F3F4F6] overflow-hidden truncate max-w-0', colIdx === 2 && 'shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]')
+                  {visibleColumns.map((col, colIdx) => {
+                    const meta = stickyMeta(hideIdentity, colIdx);
+                    const stickyClass = meta.sticky
+                      ? cn('sticky z-30 bg-[#F3F4F6] overflow-hidden truncate max-w-0', meta.edge && 'shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]')
                       : '';
                     return (
                     <th
                       key={col.key}
-                      style={stickyLeftStyle(colIdx)}
+                      style={meta.left != null ? { left: meta.left } : undefined}
                       className={cn('px-2.5 py-1.5 border-r border-b border-[#D1D5DB] text-center font-bold', col.width, stickyClass)}
                     >
                       {col.label}
@@ -716,14 +835,14 @@ export default function VendorBulkGrid({
                       )}
                       title={rowError || undefined}
                     >
-                      {COLUMNS.map((col, colIdx) => {
+                      {visibleColumns.map((col, colIdx) => {
                         const fieldKey = col.key as EditableField;
-                        const isSticky = colIdx < 3;
-                        const stickyClass = isSticky
+                        const meta = stickyMeta(hideIdentity, colIdx);
+                        const stickyClass = meta.sticky
                           ? cn(
                               'sticky z-20 overflow-hidden truncate max-w-0',
-                              stickyBodyBg(colIdx, isDirty, rowError),
-                              colIdx === 2 && 'shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]',
+                              stickyBodyBg(meta.edge, isDirty, rowError),
+                              meta.edge && 'shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]',
                             )
                           : '';
 
@@ -740,11 +859,11 @@ export default function VendorBulkGrid({
                             <td
                               key={col.key}
                               title={titleText}
-                              style={stickyLeftStyle(colIdx)}
+                              style={meta.left != null ? { left: meta.left } : undefined}
                               className={cn(
                                 'px-2.5 py-1 text-[#9CA3AF] select-none border-r border-b border-[#E5E7EB] truncate text-[12px] align-middle',
                                 col.width,
-                                isSticky ? stickyClass : 'bg-gray-50/50',
+                                meta.sticky ? stickyClass : 'bg-gray-50/50',
                               )}
                             >
                               {displayText || '—'}
@@ -806,7 +925,7 @@ export default function VendorBulkGrid({
                           return (
                             <td
                               key={col.key}
-                              style={stickyLeftStyle(colIdx)}
+                              style={meta.left != null ? { left: meta.left } : undefined}
                               className={cn(
                                 'p-0 border-r border-b border-[#E5E7EB] align-middle focus-within:ring-1 focus-within:ring-primary focus-within:bg-white overflow-hidden',
                                 col.width,
@@ -831,20 +950,23 @@ export default function VendorBulkGrid({
                         return (
                           <td
                             key={col.key}
-                            style={stickyLeftStyle(colIdx)}
+                            style={meta.left != null ? { left: meta.left } : undefined}
                             className={cn(
                               'p-0 border-r border-b border-[#E5E7EB] align-middle focus-within:ring-1 focus-within:ring-primary focus-within:bg-white overflow-hidden',
                               col.width,
-                              isSticky ? stickyClass : '',
+                              meta.sticky ? stickyClass : '',
                             )}
                           >
                             <input
                               type={col.type}
                               value={textVal(p, fieldKey)}
                               onChange={(e) => setVal(p.id, fieldKey, e.target.value)}
+                              onBlur={() => {
+                                if (RATE_FIELDS.has(col.key)) void save({ ids: [p.id], onlyFields: RATE_FIELDS, quiet: true });
+                              }}
                               className={cn(
                                 cellInput,
-                                col.type === 'number' ? 'text-right font-mono' : 'text-left',
+                                col.type === 'number' ? cn('text-right font-mono', noSpin) : 'text-left',
                                 col.key === 'sku' || col.key === 'hsn' ? 'font-mono text-[11px]' : ''
                               )}
                               placeholder="—"
@@ -857,7 +979,7 @@ export default function VendorBulkGrid({
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={COLUMNS.length} className="px-4 py-12 text-center text-[#AEAEAE] text-[13px]">
+                    <td colSpan={visibleColumns.length} className="px-4 py-12 text-center text-[#AEAEAE] text-[13px]">
                       No products match “{query}”.
                     </td>
                   </tr>
