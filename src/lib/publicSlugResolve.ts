@@ -10,6 +10,7 @@ export type PublicSlugHit =
 /**
  * One short name can only open one page.
  * A supplier store wins over a brand or product with the same slug.
+ * When two products still share a slug, the older listing keeps it.
  * /brand/:slug and /vendor/:id still open those pages when the short name is taken.
  */
 export async function resolvePublicSlug(raw: string): Promise<PublicSlugHit | null> {
@@ -36,7 +37,9 @@ export async function resolvePublicSlug(raw: string): Promise<PublicSlugHit | nu
       archivedAt: null,
       vendor: { isActive: true },
     },
-    orderBy: { updatedAt: 'desc' },
+    // Oldest listing keeps a shared slug. updatedAt would move the public
+    // link to whichever store edited the product last.
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: {
       id: true,
       vendorId: true,

@@ -12,7 +12,7 @@ import {
   composeVendorListingSku,
 } from '@/modules/catalog/catalog.service';
 import { formatVendorSku, parseVendorSku, resolveVendorCode } from '@/lib/sku';
-import { mintUniqueImportSlug } from '@/lib/productSlug';
+import { loadOccupiedSlugSet, mintUniqueImportSlug } from '@/lib/productSlug';
 import { syncProductToBrand, findOrCreateBrandByName } from '@/modules/brand/brand.service';
 import {
   partitionImportRows,
@@ -524,12 +524,14 @@ export async function handleAdminProductImport(req: NextRequest, ctx: any) {
     }
 
     // Fetch all slugs for duplicate detection and unique slug generation
-    const usedSlugs = new Set(
-      (await prisma.product.findMany({
-        where: vendorId ? { vendorId } : { vendorId: null },
-        select: { slug: true }
-      })).map(p => p.slug.toLowerCase())
-    );
+    const usedSlugs = await loadOccupiedSlugSet(prisma);
+    if (vendorId) {
+      const ownTombstones = await prisma.product.findMany({
+        where: { vendorId, slug: { startsWith: '_deleted_' } },
+        select: { slug: true },
+      });
+      for (const row of ownTombstones) usedSlugs.add(row.slug.toLowerCase());
+    }
     function uniqueSlug(name: string, sku?: string | null): string {
       return mintUniqueImportSlug(usedSlugs, storeSlug, name, sku);
     }

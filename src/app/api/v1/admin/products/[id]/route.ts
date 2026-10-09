@@ -15,6 +15,7 @@ import { CatalogService, assertLeafCategory, findOrCreateMaster } from '@/module
 import { syncProductToBrand } from '@/modules/brand/brand.service';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { hasProductImage } from '@/lib/productImage';
+import { claimUniqueProductSlug } from '@/lib/productSlug';
 
 // Helper: extract the [id] segment from the URL
 function extractId(req: NextRequest): string {
@@ -129,6 +130,9 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
     if (!existing) throw Errors.notFound('Product');
 
     const { priceSlabs, categoryIds, primaryCategoryId, listingStatus: reqListingStatus, ...productData } = data;
+    if (typeof productData.slug === 'string' && productData.slug.trim()) {
+      productData.slug = await claimUniqueProductSlug(prisma, productData.slug, id);
+    }
 
     const isDraftSave = reqListingStatus === 'draft';
     const isPublishing =
