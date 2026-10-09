@@ -9,12 +9,14 @@ import { VendorCatalogNav } from '@/components/features/vendor/VendorCatalogNav'
 import { VendorCategoryRail } from '@/components/features/vendor/VendorCategoryRail';
 import { VendorCategoryHeaderBar } from '@/components/features/vendor/VendorCategoryHeaderBar';
 import { VendorProductCard } from '@/components/features/vendor/VendorProductCard';
+import { VendorAreaGate } from '@/components/features/vendor/VendorAreaGate';
 import { StickyCartBar } from '@/components/features/vendor/StickyCartBar';
 import { dal } from '@/lib/dal';
 import { cn } from '@/lib/utils';
 import { buildCategoryTree, filterProductsByCatalogTab, slugifyCategory, extractCategoryName } from '@/lib/categoryTree';
 import { useCart } from '@/context/CartContext';
-import { useDeliveryPincode } from '@/hooks/useDeliveryPincode';
+import { useAddress } from '@/context/AddressContext';
+import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import type { Vendor, VendorProduct } from '@/types';
 import { Package, Star, CheckCircle, Clock, ChevronRight, CreditCard } from 'lucide-react';
 
@@ -35,9 +37,17 @@ export default function VendorStorePage() {
     const vendorId = params.id as string;
     const { status: sessionStatus } = useSession();
     const { addToCart } = useCart();
-    const deliveryPincode = useDeliveryPincode();
+    const { selectedAddress } = useAddress();
+    const { currentOutlet, loading: accountsLoading } = useBusinessAccountSwitcher();
+    const rawPin =
+        currentOutlet?.pincode
+        || selectedAddress?.pincode
+        || (typeof window !== 'undefined' ? localStorage.getItem('user_pincode') : null)
+        || undefined;
+    const deliveryPincode = rawPin && /^\d{6}$/.test(rawPin) ? rawPin : undefined;
     const [vendor, setVendor] = useState<Vendor | null>(null);
     const [products, setProducts] = useState<VendorProduct[]>([]);
+    const [catalogGate, setCatalogGate] = useState<'shop' | 'enter-pincode' | 'outside'>('shop');
     const [loading, setLoading] = useState(true);
     const [productsError, setProductsError] = useState<string | null>(null);
     const [reloadToken, setReloadToken] = useState(0);
@@ -78,9 +88,11 @@ export default function VendorStorePage() {
         window.scrollTo({ top: 0, behavior: 'instant' });
     }, [vendorId]);
 
-    // Fetch vendor + products (AUD-002: allSettled so products failure doesn't hang / wipe vendor)
+    // Fetch vendor, then products only when this pin is inside the vendor's delivery area.
+    // A pin outside that area used to zero every SKU and the cards said "Out of stock".
     useEffect(() => {
-        if (!vendorId) return;
+        if (!vendorId || sessionStatus === 'loading') return;
+        if (sessionStatus === 'authenticated' && accountsLoading) return;
         let cancelled = false;
         Promise.resolve().then(() => {
             if (!cancelled) {
@@ -88,42 +100,70 @@ export default function VendorStorePage() {
                 setProductsError(null);
             }
         });
-        const pin = deliveryPincode;
+        const pin = deliveryPincode && /^\d{6}$/.test(deliveryPincode) ? deliveryPincode : undefined;
+        const guest = sessionStatus !== 'authenticated';
 
-        Promise.allSettled([
-            dal.vendors.getById(vendorId),
-            dal.vendors.getProducts(vendorId, { limit: 200, pincode: pin }),
-            fetch(`/api/v1/vendors/${vendorId}/store-promotions`).then((r) => r.json()).catch(() => ({ success: false })),
-        ]).then(([vRes, pRes, promoRes]) => {
+        (async () => {
+            const [vRes, promoRes] = await Promise.allSettled([
+                dal.vendors.getById(vendorId),
+                fetch(`/api/v1/vendors/${vendorId}/store-promotions`).then((r) => r.json()).catch(() => ({ success: false })),
+            ]);
             if (cancelled) return;
-            if (vRes.status === 'fulfilled') {
-                setVendor(vRes.value);
-            } else {
+            if (vRes.status !== 'fulfilled') {
                 console.error(vRes.reason);
                 setVendor(null);
-            }
-            if (pRes.status === 'fulfilled') {
-                setProducts(pRes.value.products);
-                setProductsError(null);
-            } else {
-                console.error(pRes.reason);
                 setProducts([]);
-                setProductsError(
-                    pRes.reason instanceof Error ? pRes.reason.message : 'Failed to load products'
-                );
+                return;
             }
+            const loaded = vRes.value;
+            setVendor(loaded);
             if (promoRes.status === 'fulfilled') {
                 const promosRes = promoRes.value as { success?: boolean; data?: unknown };
                 if (promosRes?.success && Array.isArray(promosRes.data)) {
                     setStorePromos(promosRes.data as Array<{ id: string; name: string; badgeLabel: string; type: 'pct_discount' | 'flat_discount' }>);
                 }
             }
-        }).finally(() => {
+
+            if (guest && !pin) {
+                setProducts([]);
+                setCatalogGate('enter-pincode');
+                return;
+            }
+
+            if (pin) {
+                try {
+                    const svc = await dal.vendors.checkServiceability(pin);
+                    if (cancelled) return;
+                    if (!(svc.vendorIds ?? []).includes(loaded.id)) {
+                        setProducts([]);
+                        setCatalogGate('outside');
+                        return;
+                    }
+                } catch (err) {
+                    // Lookup failed — keep the existing catalog path so a blip does not blank the store.
+                    console.error(err);
+                }
+            }
+
+            try {
+                const productRes = await dal.vendors.getProducts(vendorId, { limit: 200, pincode: pin });
+                if (cancelled) return;
+                setProducts(productRes.products);
+                setProductsError(null);
+                setCatalogGate('shop');
+            } catch (err) {
+                if (cancelled) return;
+                console.error(err);
+                setProducts([]);
+                setProductsError(err instanceof Error ? err.message : 'Failed to load products');
+                setCatalogGate('shop');
+            }
+        })().finally(() => {
             if (!cancelled) setLoading(false);
         });
 
         return () => { cancelled = true; };
-    }, [vendorId, deliveryPincode, reloadToken]);
+    }, [vendorId, deliveryPincode, reloadToken, sessionStatus, accountsLoading]);
 
     useEffect(() => {
         if (sessionStatus !== 'authenticated' || !vendorId) return;
@@ -411,7 +451,7 @@ export default function VendorStorePage() {
             {/* The hierarchical Categories >> Sub-Categories sidebar (rendered inside
                 the main content block below) covers category nav at every breakpoint,
                 so the horizontal CategoryShowcase strip is no longer needed on mobile. */}
-            {activeTab !== 'ratings' && activeTab !== 'about' && activeTab !== 'orders' && (
+            {catalogGate === 'shop' && activeTab !== 'ratings' && activeTab !== 'about' && activeTab !== 'orders' && (
                 <VendorCatalogNav
                     activeTab={activeTab}
                     onTabChange={handleCategoryTabChange}
@@ -464,6 +504,14 @@ export default function VendorStorePage() {
                         )}
                     </div>
                 ) : activeTab === 'all' || activeTab === 'deals' || activeTab === 'frequent' || activeTab === 'prev-ordered' || activeTab.startsWith('cat:') ? (
+                    catalogGate !== 'shop' ? (
+                        <VendorAreaGate
+                            mode={catalogGate === 'outside' ? 'outside' : 'enter-pincode'}
+                            vendorName={vendor.name}
+                            pincode={deliveryPincode}
+                            allowPincodeChange={sessionStatus !== 'authenticated'}
+                        />
+                    ) : (
                     <div className="flex gap-2 md:gap-4 lg:gap-6 items-start">
                         <VendorCategoryRail
                             tree={vendorCategoryTree}
@@ -543,6 +591,7 @@ export default function VendorStorePage() {
                             )}
                         </div>
                     </div>
+                    )
                 ) : activeTab === 'ratings' ? (
                     <div className="max-w-4xl mx-auto space-y-8">
                         {reviewsLoading ? (

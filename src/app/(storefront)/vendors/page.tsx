@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ArrowUpDown, Star, TrendingUp, Sparkles, Building2 } from 'lucide-react';
 import { dal } from '@/lib/dal';
+import { useAddress } from '@/context/AddressContext';
+import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import type { Vendor } from '@/types';
 import { VendorCard } from '@/components/features/homepage/VendorCardShared';
 import { cn } from '@/lib/utils';
@@ -21,6 +24,15 @@ const SORT_TABS: { id: SortOption; label: string; icon?: React.ElementType }[] =
 function VendorsContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { status: sessionStatus } = useSession();
+    const { selectedAddress } = useAddress();
+    const { currentOutlet, loading: accountsLoading } = useBusinessAccountSwitcher();
+    const rawPin =
+        currentOutlet?.pincode
+        || selectedAddress?.pincode
+        || (typeof window !== 'undefined' ? localStorage.getItem('user_pincode') : null)
+        || undefined;
+    const deliveryPincode = rawPin && /^\d{6}$/.test(rawPin) ? rawPin : undefined;
     const initialSort = (searchParams.get('sort') as SortOption) || 'all';
 
     const [allVendors, setAllVendors] = useState<Vendor[]>([]);
@@ -30,11 +42,23 @@ function VendorsContent() {
     );
 
     useEffect(() => {
-        dal.vendors.list()
-            .then(({ vendors }) => setAllVendors(vendors))
+        if (sessionStatus === 'loading') return;
+        if (sessionStatus === 'authenticated' && accountsLoading) return;
+        let cancelled = false;
+        const pincode = sessionStatus === 'authenticated' ? deliveryPincode : undefined;
+        Promise.resolve().then(() => {
+            if (!cancelled) setIsLoading(true);
+        });
+        dal.vendors.list(pincode ? { pincode } : undefined)
+            .then(({ vendors }) => {
+                if (!cancelled) setAllVendors(vendors);
+            })
             .catch((err) => console.error('Failed to load vendors:', err))
-            .finally(() => setIsLoading(false));
-    }, []);
+            .finally(() => {
+                if (!cancelled) setIsLoading(false);
+            });
+        return () => { cancelled = true; };
+    }, [sessionStatus, deliveryPincode, accountsLoading]);
 
     const handleSortChange = (sortId: SortOption) => {
         setActiveSort(sortId);
@@ -131,8 +155,11 @@ function VendorsContent() {
                         </div>
                         <h2 className="text-lg font-bold text-text mb-1">No Suppliers Found</h2>
                         <p className="text-sm text-text-secondary mb-6">
-                            No verified suppliers currently match this sorting criteria. Try resetting the filters.
+                            {sessionStatus === 'authenticated' && deliveryPincode
+                                ? `No verified suppliers deliver to ${deliveryPincode}.`
+                                : 'No verified suppliers currently match this sorting criteria. Try resetting the filters.'}
                         </p>
+                        {!(sessionStatus === 'authenticated' && deliveryPincode) && (
                         <button
                             type="button"
                             onClick={() => handleSortChange('all')}
@@ -140,6 +167,7 @@ function VendorsContent() {
                         >
                             Reset Sorting
                         </button>
+                        )}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6">
