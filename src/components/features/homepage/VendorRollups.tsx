@@ -11,6 +11,23 @@ import { VendorCard } from '@/components/features/homepage/VendorCardShared';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 import { isFrequentlyOrderedOrder, orderVendorId } from '@/lib/orderingRails';
 
+type FrequentVendorRow = {
+    id: string;
+    businessName?: string;
+    displayName?: string | null;
+    slug?: string;
+    logoUrl?: string;
+    rating?: number | string;
+    minOrderValue?: number | string;
+    creditEnabled?: boolean;
+    categories?: string[];
+    bannerUrl?: string;
+    createdAt?: string;
+    productCount?: number;
+    isVerified?: boolean;
+    nextDeliveryDate?: string | null;
+};
+
 /** Suppliers this buyer has paid or received an order from, most orders first. */
 export function FrequentlyOrderedVendors() {
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -26,7 +43,7 @@ export function FrequentlyOrderedVendors() {
             fetch('/api/v1/orders?limit=50').then((r) => r.json()).catch(() => ({ data: { orders: [] } })),
         ])
             .then(([vRes, oRes]) => {
-                const allVendors = vRes.data?.vendors || [];
+                const allVendors: FrequentVendorRow[] = vRes.data?.vendors || [];
                 const userOrders = oRes.data?.orders || [];
                 const orderCounts = new Map<string, number>();
                 userOrders.forEach((o: { vendorId?: string; vendor?: { id: string }; status?: string; paymentStatus?: string }) => {
@@ -35,28 +52,15 @@ export function FrequentlyOrderedVendors() {
                     if (!vid) return;
                     orderCounts.set(vid, (orderCounts.get(vid) || 0) + 1);
                 });
-                const byId = new Map(allVendors.map((v: { id: string }) => [v.id, v]));
+                const byId = new Map(allVendors.map((v) => [v.id, v]));
                 const sorted = [...orderCounts.entries()]
                     .sort((a, b) => b[1] - a[1])
-                    .map(([id]) => byId.get(id))
-                    .filter((v): v is NonNullable<typeof v> => Boolean(v))
+                    .flatMap(([id]) => {
+                        const row = byId.get(id);
+                        return row ? [row] : [];
+                    })
                     .slice(0, 10);
-                setVendors(sorted.map((v: {
-                    id: string;
-                    businessName?: string;
-                    displayName?: string | null;
-                    slug?: string;
-                    logoUrl?: string;
-                    rating?: number | string;
-                    minOrderValue?: number | string;
-                    creditEnabled?: boolean;
-                    categories?: string[];
-                    bannerUrl?: string;
-                    createdAt?: string;
-                    productCount?: number;
-                    isVerified?: boolean;
-                    nextDeliveryDate?: string | null;
-                }) => ({
+                setVendors(sorted.map((v) => ({
                     id: v.id,
                     name: storeDisplayName(v),
                     slug: v.slug || '',
