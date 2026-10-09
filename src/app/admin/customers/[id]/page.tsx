@@ -507,9 +507,7 @@ export default function CustomerDetailsPage() {
                                                     ['billingState', 'Billing state'], ['billingPincode', 'Billing pincode'],
                                                     ['businessType', 'Business type'], ['subType', 'Sub-type'],
                                                     ['cuisine', 'Cuisine / category'], ['businessSize', 'Business size'],
-                                                    ['businessStructure', 'Business structure'], ['serviceModel', 'Service model'],
-                                                    ['monthlyPurchaseBand', 'Monthly purchase band'], ['procurementFrequency', 'Procurement frequency'],
-                                                    ['designation', 'Designation'], ['leadStatus', 'Lead status'], ['creditType', 'Credit type'],
+                                                    ['designation', 'Designation'],
                                                 ] as [string, string][]).map(([key, label]) => (
                                                     <EditField key={key} label={label}>
                                                         <input value={draft.cp[key] ?? ''} onChange={e => setDraft(d => ({ ...d, cp: { ...d.cp, [key]: e.target.value } }))}
@@ -547,7 +545,6 @@ export default function CustomerDetailsPage() {
                                                     <InfoCardField label="FSSAI License Number" value={primaryBa?.fssaiNumber} copyable />
                                                     <InfoCardField label="PAN Card" value={primaryBa?.pan} copyable />
                                                     <InfoCardField label="Designation" value={primaryBa?.designation} />
-                                                    <InfoCardField label="Lead Status" value={primaryBa?.leadStatus} />
                                                 </div>
                                             </div>
 
@@ -629,11 +626,6 @@ export default function CustomerDetailsPage() {
                                                     <InfoCardField label="Sub Type" value={primaryBa?.subType} />
                                                     <InfoCardField label="Cuisine / Category" value={primaryBa?.cuisine} />
                                                     <InfoCardField label="Business Size" value={primaryBa?.businessSize} />
-                                                    <InfoCardField label="Business Structure" value={primaryBa?.businessStructure} />
-                                                    <InfoCardField label="Service Model" value={primaryBa?.serviceModel} />
-                                                    <InfoCardField label="Monthly Purchase Band" value={primaryBa?.monthlyPurchaseBand} />
-                                                    <InfoCardField label="Procurement Frequency" value={primaryBa?.procurementFrequency} />
-                                                    <InfoCardField label="Credit Type" value={primaryBa?.creditType} />
                                                 </div>
                                             </div>
                                         </div>

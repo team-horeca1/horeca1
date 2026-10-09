@@ -187,8 +187,9 @@ export function VendorStoreHeader({ vendor, activeTab, onTabChange, storePromos 
 
     const shareContent = vendorShareContent({
         id: vendor.id,
+        slug: vendor.slug,
         name: vendor.name,
-        image: vendor.logo || vendor.coverImage || null,
+        image: vendor.coverImage || vendor.logo || null,
     });
 
     return (

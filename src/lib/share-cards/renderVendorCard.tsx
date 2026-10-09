@@ -1,7 +1,8 @@
 import 'server-only';
 import { ImageResponse } from 'next/og';
 import { CommerceShareCard } from '@/lib/share-cards/templates';
-import { resolveOgImage } from '@/lib/share-cards/absoluteUrl';
+import { loadHorecaLogoDataUrl, resolveOgImage } from '@/lib/share-cards/absoluteUrl';
+import { vendorPublicPath } from '@/lib/publicSlug';
 import { qrPngDataUrl } from '@/lib/share-cards/qr';
 import { prisma } from '@/lib/prisma';
 import {
@@ -78,7 +79,7 @@ export async function renderVendorShareImage(
 
   if (!vendor) return null;
 
-  const pageUrl = `${origin}/vendor/${vendor.slug || vendor.id}`;
+  const pageUrl = `${origin}${vendorPublicPath(vendor)}`;
 
   const name = vendor.displayName || vendor.businessName || 'Horeca1 supplier';
   const categories = [
@@ -98,16 +99,17 @@ export async function renderVendorShareImage(
 
   const productPhoto =
     vendor.products.find((p) => p.imageUrl || p.images?.[0]) ?? null;
-  const [qrDataUrl, imageUrl] = await Promise.all([
+  const [qrDataUrl, imageUrl, logoUrl] = await Promise.all([
     qrPngDataUrl(pageUrl),
     resolveOgImage(
       origin,
-      vendor.logoUrl ||
-        vendor.bannerUrl ||
+      vendor.bannerUrl ||
         productPhoto?.imageUrl ||
         productPhoto?.images?.[0] ||
+        vendor.logoUrl ||
         null,
     ),
+    loadHorecaLogoDataUrl(),
   ]);
 
   return new ImageResponse(
@@ -121,6 +123,8 @@ export async function renderVendorShareImage(
         offer={offer}
         cta="Order from us on Horeca1"
         imageUrl={imageUrl}
+        imageFit="cover"
+        logoUrl={logoUrl}
         pageUrl={pageUrl}
         qrDataUrl={qrDataUrl}
       />

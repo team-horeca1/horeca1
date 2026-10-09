@@ -9,6 +9,7 @@ import type { Vendor, VendorProduct, VendorSummary, Category } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { BrandStoreCard } from '@/components/features/brand/BrandStoreCard';
 import { vendorProductHref } from '@/lib/share-cards/types';
+import { vendorPublicPath } from '@/lib/publicSlug';
 
 interface SearchBrand {
     id: string;
@@ -207,8 +208,8 @@ export function MobileSearchOverlay({ isOpen, onClose, initialQuery = '' }: Mobi
                     // surface per UI/UX Notes V2.2 ("vendor-first marketplace").
                     const buildVendorTarget = (vendor: VendorSummary) => {
                         const catMatch = vendor.categories.find(c => slugify(c) === slugify(q));
-                        if (catMatch) return `/vendor/${vendor.id}?cat=${slugify(catMatch)}`;
-                        return `/vendor/${vendor.id}`;
+                        if (catMatch) return vendorPublicPath(vendor, { cat: slugify(catMatch) });
+                        return vendorPublicPath(vendor);
                     };
 
                     const renderVendorCard = (vendor: VendorSummary) => (

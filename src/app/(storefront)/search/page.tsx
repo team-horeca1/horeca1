@@ -12,6 +12,7 @@ import { VendorProductCard } from '@/components/features/vendor/VendorProductCar
 import { BrandStoreCard } from '@/components/features/brand/BrandStoreCard';
 import { useDeliveryPincode } from '@/hooks/useDeliveryPincode';
 import { cn } from '@/lib/utils';
+import { vendorPublicPath } from '@/lib/publicSlug';
 
 interface SearchBrand {
     id: string;
@@ -227,9 +228,7 @@ function SearchPageContent() {
                                         const categoryMatch = vendor.categories.find(c => slugify(c) === slugify(query));
                                         // Unified Vendor Store URL: ?cat=<slug> deep-links into the
                                         // sub-category sidebar (no separate /category/<vendor>/<cat> page).
-                                        const vendorPath = categoryMatch
-                                            ? `/vendor/${vendor.id}?cat=${slugify(categoryMatch)}`
-                                            : `/vendor/${vendor.id}`;
+                                        const vendorPath = vendorPublicPath(vendor, categoryMatch ? { cat: slugify(categoryMatch) } : undefined);
                                             
                                         return (
                                             <Link

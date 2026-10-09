@@ -11,6 +11,7 @@ import { useCart } from '@/context/CartContext';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 import { cn } from '@/lib/utils';
+import { vendorPublicPath } from '@/lib/publicSlug';
 
 interface ContinueCard {
   id: string;
@@ -135,7 +136,7 @@ export function ContinueOrdering() {
           coverImage: group.items[0]?.product?.images?.[0] || vendor?.coverImage,
           subtitle: `${itemCount} ${itemCount === 1 ? 'item' : 'items'} in cart • ₹${total.toLocaleString('en-IN')}`,
           subtitleIcon: 'cart',
-          href: `/vendor/${vendor?.slug || group.vendorId}`,
+          href: vendorPublicPath({ id: group.vendorId, slug: vendor?.slug }),
           priority: 1,
           timestamp: Date.now(),
         });
@@ -169,7 +170,7 @@ export function ContinueOrdering() {
             subtitle: itemCount > 0 ? `In Progress · ${itemCount} items` : 'In Progress',
             subtitle2: getRelativeTime(new Date(order.createdAt).getTime()),
             subtitleIcon: 'order',
-            href: `/vendor/${order.vendor?.slug || vendor?.slug || vendorId}`,
+            href: vendorPublicPath({ id: vendorId, slug: order.vendor?.slug || vendor?.slug }),
             priority: 2,
             timestamp: new Date(order.createdAt).getTime(),
           });
@@ -265,7 +266,9 @@ export function ContinueOrdering() {
                 existing.subtitle2 = finalSubtitle2;
                 existing.subtitleIcon = 'viewed';
                 existing.href =
-                  products.length > 0 ? `/recently-viewed/${entry.vendorId}` : `/vendor/${entry.vendorId}`;
+                  products.length > 0
+                    ? `/recently-viewed/${entry.vendorId}`
+                    : vendorPublicPath({ id: vendorId, slug: vendors.find((v) => v.id === vendorId)?.slug });
                 if ((entry.viewedAt ?? 0) > existing.timestamp) {
                   existing.timestamp = entry.viewedAt ?? 0;
                 }
@@ -281,7 +284,9 @@ export function ContinueOrdering() {
                 subtitle: productLabel,
                 subtitle2: finalSubtitle2,
                 subtitleIcon: 'viewed',
-                href: products.length > 0 ? `/recently-viewed/${entry.vendorId}` : `/vendor/${entry.vendorId}`,
+                href: products.length > 0
+                  ? `/recently-viewed/${entry.vendorId}`
+                  : vendorPublicPath({ id: vendorId, slug: vendors.find((v) => v.id === vendorId)?.slug }),
                 priority: 4,
                 timestamp: entry.viewedAt || 0,
               });

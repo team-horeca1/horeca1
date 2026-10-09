@@ -2,7 +2,7 @@ import 'server-only';
 import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
 import { shareSiteOrigin } from '@/lib/share-cards/ogHelpers';
-import { vendorProductHref } from '@/lib/share-cards/types';
+import { productPublicPath, vendorPublicPath, brandPublicPath } from '@/lib/publicSlug';
 
 export function catalogShareMetadata(opts: {
   title: string;
@@ -64,6 +64,7 @@ export async function productShareMetadata(id: string, routeVendorId?: string): 
     where: { id, isActive: true, approvalStatus: 'approved', archivedAt: null },
     select: {
       name: true,
+      slug: true,
       description: true,
       vendorId: true,
       vendor: { select: { id: true, slug: true } },
@@ -83,8 +84,13 @@ export async function productShareMetadata(id: string, routeVendorId?: string): 
   return catalogShareMetadata({
     title,
     description: clip(product.description, `Shop ${title} on Horeca1 — Bharat's Food & Grocery Distribution OS`),
-    path: vendorProductHref(vendor.slug || vendor.id, id),
-    ogPath: `/api/og/product/${id}?format=square`,
+    path: productPublicPath({
+      id,
+      slug: product.slug,
+      vendorId: vendor.id,
+      vendorSlug: vendor.slug,
+    }),
+    ogPath: `/api/og/product/${id}?format=square&cv=5`,
   });
 }
 
@@ -102,8 +108,8 @@ export async function vendorShareMetadata(idOrSlug: string): Promise<Metadata> {
   return catalogShareMetadata({
     title,
     description: clip(vendor?.description, `Order from ${title} on Horeca1 — Bharat's Food & Grocery Distribution OS`),
-    path: `/vendor/${pathId}`,
-    ogPath: `/api/og/vendor/${encodeURIComponent(pathId)}?format=square`,
+    path: vendorPublicPath({ id: vendor?.id || idOrSlug, slug: vendor?.slug }),
+    ogPath: `/api/og/vendor/${encodeURIComponent(pathId)}?format=square&cv=5`,
   });
 }
 
@@ -116,8 +122,8 @@ export async function brandShareMetadata(slug: string): Promise<Metadata> {
   return catalogShareMetadata({
     title,
     description: clip(brand?.description, `Find ${title} on Horeca1 — Bharat's Food & Grocery Distribution OS`),
-    path: `/brand/${slug}`,
-    ogPath: `/api/og/brand/${encodeURIComponent(slug)}?format=square`,
+    path: brandPublicPath(slug),
+    ogPath: `/api/og/brand/${encodeURIComponent(slug)}?format=square&cv=5`,
   });
 }
 

@@ -31,10 +31,16 @@ interface VendorOrder {
     items?: Array<{ name?: string; productName?: string; productId?: string; product?: { id: string }; quantity?: number }>;
 }
 
-export default function VendorStorePage() {
+export default function VendorStorePage({
+    forcedVendorKey,
+    forcedProductId,
+}: {
+    forcedVendorKey?: string;
+    forcedProductId?: string;
+} = {}) {
     const params = useParams();
     const searchParams = useSearchParams();
-    const vendorId = params.id as string;
+    const vendorId = forcedVendorKey || (params.slug as string) || (params.id as string);
     const { status: sessionStatus } = useSession();
     const { addToCart } = useCart();
     const { selectedAddress } = useAddress();
@@ -55,7 +61,8 @@ export default function VendorStorePage() {
     // ?cat=mayo-sauces → activeTab='cat:Mayo & Sauces' once products load (slug → name match below).
     const initialCatSlug = searchParams?.get('cat') || '';
     const brandFilter = (searchParams?.get('brand') || '').trim();
-    const highlightProductId = (searchParams?.get('product') || '').trim();
+    const highlightProductId = (forcedProductId || searchParams?.get('product') || '').trim();
+    const canonicalVendorId = vendor?.id || (/^[0-9a-f-]{36}$/i.test(vendorId) ? vendorId : '');
     const [activeTab, setActiveTab] = useState(initialCatSlug ? `cat:${initialCatSlug}` : 'all');
     // Pre-fill search from ?q= param (e.g. navigating from search overlay with a specific product)
     const [searchQuery, setSearchQuery] = useState(() => searchParams?.get('q') || '');
@@ -166,20 +173,20 @@ export default function VendorStorePage() {
     }, [vendorId, deliveryPincode, reloadToken, sessionStatus, accountsLoading]);
 
     useEffect(() => {
-        if (sessionStatus !== 'authenticated' || !vendorId) return;
+        if (sessionStatus !== 'authenticated' || !canonicalVendorId) return;
         fetch('/api/v1/wallet')
             .then((r) => r.json())
             .then((j) => {
                 if (!j.success || !Array.isArray(j.data)) return;
                 type W = { vendorId: string | null; creditLimit: string | number; outstandingAmount: string | number; status: string };
-                const w = (j.data as W[]).find((x) => x.vendorId === vendorId && x.status === 'ACTIVE');
+                const w = (j.data as W[]).find((x) => x.vendorId === canonicalVendorId && x.status === 'ACTIVE');
                 if (!w) return;
                 const limit = Number(w.creditLimit);
                 const outstanding = Number(w.outstandingAmount);
                 setVendorCredit({ limit, available: Math.max(0, limit - outstanding) });
             })
             .catch(() => {});
-    }, [sessionStatus, vendorId]);
+    }, [sessionStatus, canonicalVendorId]);
 
     // Track recently viewed vendor for "Continue Ordering" section
     useEffect(() => {
@@ -211,16 +218,16 @@ export default function VendorStorePage() {
 
     // Fetch previous orders from this vendor when "orders" tab activated
     const loadPrevOrders = useCallback(async () => {
-        if (sessionStatus !== 'authenticated' || !vendorId) return;
+        if (sessionStatus !== 'authenticated' || !canonicalVendorId) return;
         try {
             const res = await fetch('/api/v1/orders');
             const json = await res.json();
             const vendorOrders = (json.data || json.orders || []).filter((o: VendorOrder) =>
-                o.vendorId === vendorId || o.vendor?.id === vendorId
+                o.vendorId === canonicalVendorId || o.vendor?.id === canonicalVendorId
             );
             setPrevOrders(vendorOrders);
         } catch { setPrevOrders([]); }
-    }, [vendorId, sessionStatus]);
+    }, [canonicalVendorId, sessionStatus]);
 
     // Refetch previously-ordered when delivery pin changes (stock visibility depends on pin).
     useEffect(() => {
@@ -233,7 +240,7 @@ export default function VendorStorePage() {
             Promise.resolve().then(async () => {
                 setPrevOrderedLoading(true);
                 try {
-                    const res = await fetch(`/api/v1/vendors/${vendorId}/previously-ordered`);
+                    const res = await fetch(`/api/v1/vendors/${canonicalVendorId || vendorId}/previously-ordered`);
                     const json = await res.json();
                     setPrevOrderedProducts((json.data || json.items || []).map((p: { id: string; name: string; basePrice?: number | string; price?: number | string; imageUrl?: string; categoryName?: string; packSize?: string; lastOrderedQty?: number; lastOrderedDate?: string; stock?: number; qty_available?: number }) => {
                         const fromCatalog = products.find((c) => c.id === p.id);
@@ -270,7 +277,7 @@ export default function VendorStorePage() {
                 finally { setPrevOrderedLoading(false); }
             });
         }
-    }, [activeTab, loadPrevOrders, products, deliveryPincode, vendorId, vendor?.name, vendor?.logo, prevOrderedLoading, prevOrderedProducts.length]);
+    }, [activeTab, loadPrevOrders, products, deliveryPincode, vendorId, canonicalVendorId, vendor?.name, vendor?.logo, prevOrderedLoading, prevOrderedProducts.length]);
 
     // Load reviews when ratings tab is activated
     useEffect(() => {

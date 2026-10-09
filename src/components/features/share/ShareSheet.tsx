@@ -96,9 +96,25 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
   };
 
   const handleWhatsApp = async () => {
-    const result = await nativeShare('whatsapp');
-    if (result === 'cancelled' || result === 'shared') return;
-    openWhatsAppShare(shareText);
+    setBusy('whatsapp');
+    try {
+      const result = await shareCard({
+        title: content.title,
+        text: content.text,
+        url: pageUrl,
+        imageUrl,
+        fileName: content.downloadName,
+        filesOnly: true,
+      });
+      if (result === 'cancelled') return;
+      if (result === 'shared') {
+        onClose();
+        return;
+      }
+      openWhatsAppShare(shareText);
+    } finally {
+      setBusy(null);
+    }
   };
 
 
@@ -113,12 +129,29 @@ export function ShareSheet({ isOpen, onClose, content }: ShareSheetProps) {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(shareText);
+      const blob = await getShareImageBlob(imageUrl);
+      if (blob && typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'text/plain': new Blob([shareText], { type: 'text/plain' }),
+            'image/png': blob,
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(shareText);
+      }
       setCopied(true);
       toast.success('Link copied');
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error('Failed to copy');
+      try {
+        await navigator.clipboard.writeText(shareText);
+        setCopied(true);
+        toast.success('Link copied');
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        toast.error('Failed to copy');
+      }
     }
   };
 

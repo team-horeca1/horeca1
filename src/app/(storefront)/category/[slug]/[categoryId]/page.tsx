@@ -12,6 +12,7 @@
 
 import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { vendorPublicPath } from '@/lib/publicSlug';
 
 export default function DeprecatedCategoryVendorPage() {
     const params = useParams();
@@ -21,9 +22,7 @@ export default function DeprecatedCategoryVendorPage() {
 
     useEffect(() => {
         if (!slug) return;
-        const target = categoryId
-            ? `/vendor/${slug}?cat=${encodeURIComponent(categoryId)}`
-            : `/vendor/${slug}`;
+        const target = vendorPublicPath({ id: slug, slug }, categoryId ? { cat: categoryId } : undefined);
         router.replace(target);
     }, [slug, categoryId, router]);
 

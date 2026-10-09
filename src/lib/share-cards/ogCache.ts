@@ -2,11 +2,23 @@ import 'server-only';
 import type { ImageResponse } from 'next/og';
 
 interface CachedCard {
-  buffer: ArrayBuffer;
+  bytes: ArrayBuffer;
   contentType: string;
   etag: string;
   cacheControl: string;
   timestamp: number;
+}
+
+/**
+ * Node 22+ Buffer backing stores can be SharedArrayBuffer.
+ * `new Response(sharedArrayBuffer)` sends the text "[object SharedArrayBuffer]"
+ * instead of the PNG. Always copy into a fresh ArrayBuffer first.
+ */
+function toPngBytes(input: ArrayBuffer | Uint8Array): ArrayBuffer {
+  const view = input instanceof Uint8Array ? input : new Uint8Array(input);
+  const copy = new ArrayBuffer(view.byteLength);
+  new Uint8Array(copy).set(view);
+  return copy;
 }
 
 const cardCache = new Map<string, CachedCard>();
@@ -30,7 +42,7 @@ export async function getOrRenderOgCard(
   // 1. Fast path: In-memory cache hit (<1ms)
   const cached = cardCache.get(cacheKey);
   if (cached && now - cached.timestamp < CACHE_TTL_MS) {
-    return new Response(cached.buffer, {
+    return new Response(cached.bytes, {
       status: 200,
       headers: {
         'content-type': cached.contentType,
@@ -56,7 +68,7 @@ export async function getOrRenderOgCard(
 
       // Extract bytes and headers
       const rawBuffer = await imageResponse.arrayBuffer();
-      let buffer: ArrayBuffer = rawBuffer;
+      let bytes: ArrayBuffer = toPngBytes(rawBuffer);
       const contentType = imageResponse.headers.get('content-type') || 'image/png';
       const etag = imageResponse.headers.get('etag') || `"og-${now.toString(36)}"`;
       const cacheControl =
@@ -65,16 +77,13 @@ export async function getOrRenderOgCard(
 
       // Compress PNG through sharp to keep payload <300KB for social crawlers (WhatsApp, Facebook, Twitter)
       // and fast mobile in-app transfers.
-      if (contentType.includes('png')) {
+      if (contentType.includes('png') && bytes.byteLength > 32) {
         try {
           const sharp = (await import('sharp')).default;
-          const compressed = await sharp(Buffer.from(rawBuffer))
+          const compressed = await sharp(Buffer.from(bytes))
             .png({ compressionLevel: 9, effort: 7, palette: true })
             .toBuffer();
-          buffer = compressed.buffer.slice(
-            compressed.byteOffset,
-            compressed.byteOffset + compressed.byteLength,
-          );
+          bytes = toPngBytes(compressed);
         } catch (optErr) {
           console.warn('[ogCache] Sharp compression skipped:', optErr);
         }
@@ -87,14 +96,14 @@ export async function getOrRenderOgCard(
       }
 
       cardCache.set(cacheKey, {
-        buffer,
+        bytes,
         contentType,
         etag,
         cacheControl,
         timestamp: now,
       });
 
-      return new Response(buffer, {
+      return new Response(bytes, {
         status: 200,
         headers: {
           'content-type': contentType,

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { dal } from '@/lib/dal';
+import { vendorPublicPath } from '@/lib/publicSlug';
 import { CATEGORY_FETCH_CONCURRENCY, mapWithConcurrency } from '@/lib/mapWithConcurrency';
 import { useDeliveryPincode } from '@/hooks/useDeliveryPincode';
 import {
@@ -143,11 +144,10 @@ function CategorySkuVendorsContent() {
     if (child) router.push(`/category/${child.slug}`);
   };
   const vendorHref = (offer: CategorySkuItem['offers'][number]) => {
-    const dest = offer.vendorSlug || offer.vendorId;
-    const qs = new URLSearchParams();
-    qs.set('product', offer.id);
-    qs.set('cat', slug);
-    return `/vendor/${dest}?${qs.toString()}`;
+    return vendorPublicPath(
+      { id: offer.vendorId, slug: offer.vendorSlug },
+      { product: offer.id, cat: slug },
+    );
   };
 
   return (

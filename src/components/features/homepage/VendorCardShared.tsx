@@ -8,6 +8,7 @@ import type { Vendor } from '@/types';
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { vendorShareContent } from '@/lib/share-cards/types';
 import { PLACEHOLDERS } from '@/lib/constants';
+import { vendorPublicPath } from '@/lib/publicSlug';
 
 export const VENDOR_COVERS = [
   '/images/placeholders/no-vendor.svg',
@@ -51,9 +52,10 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
   const remainingCategories = Math.max(0, vendor.categories.length - 3);
   const years = vendorYears(vendor.createdAt);
   const nextDelivery = vendor.nextDeliveryDate ? formatNextDelivery(vendor.nextDeliveryDate) : null;
-  const vendorHref = `/vendor/${vendor.id}`;
+  const vendorHref = vendorPublicPath(vendor);
   const shareContent = vendorShareContent({
     id: vendor.id,
+    slug: vendor.slug,
     name: vendor.name,
     image: vendor.logo || cover,
   });

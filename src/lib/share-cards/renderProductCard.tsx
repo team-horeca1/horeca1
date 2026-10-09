@@ -1,7 +1,8 @@
 import 'server-only';
 import { ImageResponse } from 'next/og';
 import { CommerceShareCard } from '@/lib/share-cards/templates';
-import { resolveOgImage } from '@/lib/share-cards/absoluteUrl';
+import { loadHorecaLogoDataUrl, resolveOgImage } from '@/lib/share-cards/absoluteUrl';
+import { productPublicPath } from '@/lib/publicSlug';
 import { qrPngDataUrl } from '@/lib/share-cards/qr';
 import { productBrandMappingsInclude } from '@/lib/brandAuthorizedDistributor';
 import { prisma } from '@/lib/prisma';
@@ -14,7 +15,6 @@ import {
   shareSiteOrigin,
   toGrossPrice,
 } from '@/lib/share-cards/ogHelpers';
-import { vendorProductHref } from '@/lib/share-cards/types';
 
 export async function renderProductShareImage(
   id: string,
@@ -33,6 +33,7 @@ export async function renderProductShareImage(
     },
     select: {
       name: true,
+      slug: true,
       packSize: true,
       unit: true,
       imageUrl: true,
@@ -42,7 +43,7 @@ export async function renderProductShareImage(
       originalPrice: true,
       taxPercent: true,
       updatedAt: true,
-      vendor: { select: { id: true, businessName: true, displayName: true } },
+      vendor: { select: { id: true, slug: true, businessName: true, displayName: true } },
       priceSlabs: {
         orderBy: { minQty: 'asc' },
         take: 1,
@@ -54,7 +55,12 @@ export async function renderProductShareImage(
 
   if (!product?.vendor?.id) return null;
 
-  const pageUrl = `${origin}${vendorProductHref(product.vendor.id, id)}`;
+  const pageUrl = `${origin}${productPublicPath({
+    id,
+    slug: product.slug,
+    vendorId: product.vendor.id,
+    vendorSlug: product.vendor.slug,
+  })}`;
 
   const master = product.brandMappings?.[0]?.brandMasterProduct;
   const rawImage =
@@ -92,9 +98,10 @@ export async function renderProductShareImage(
   const mrpLine = grossMrp != null ? formatAmount(grossMrp) : undefined;
   const discountLine = pct != null && pct > 0 ? `${pct}% OFF` : undefined;
 
-  const [qrDataUrl, imageUrl] = await Promise.all([
+  const [qrDataUrl, imageUrl, logoUrl] = await Promise.all([
     qrPngDataUrl(pageUrl),
     resolveOgImage(origin, rawImage),
+    loadHorecaLogoDataUrl(),
   ]);
 
   return new ImageResponse(
@@ -111,6 +118,8 @@ export async function renderProductShareImage(
         discount={discountLine}
         cta="Open in Horeca1"
         imageUrl={imageUrl}
+        imageFit="contain"
+        logoUrl={logoUrl}
         pageUrl={pageUrl}
         qrDataUrl={qrDataUrl}
       />

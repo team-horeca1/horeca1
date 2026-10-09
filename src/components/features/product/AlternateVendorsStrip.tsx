@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Store, ArrowRight } from 'lucide-react';
 import { storeDisplayName } from '@/lib/storeDisplayName';
+import { vendorPublicPath } from '@/lib/publicSlug';
 
 interface AlternateVendor {
   id: string;
@@ -91,7 +92,7 @@ export default function AlternateVendorsStrip({ productId }: Props) {
           return (
             <Link
               key={alt.id}
-              href={`/vendor/${vendor.id}`}
+              href={vendorPublicPath({ id: vendor.id })}
               className="shrink-0 w-[260px] snap-start rounded-2xl border border-gray-100 bg-white p-4 hover:shadow-md hover:-translate-y-0.5 transition-all group"
             >
               <div className="flex items-center gap-3 mb-3">

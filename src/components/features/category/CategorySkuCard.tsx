@@ -52,7 +52,9 @@ export function CategorySkuCard({
   const href = categorySkuHref(categorySlug, item);
   const shareContent = productShareContent({
     id: item.defaultOffer.id,
+    slug: item.defaultOffer.slug,
     vendorId: item.defaultOffer.vendorId,
+    vendorSlug: item.defaultOffer.vendorSlug,
     title,
     vendorName: item.defaultOffer.vendorName,
     image: img,

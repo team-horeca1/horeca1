@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { getPublishedVoiceStoryBySlug } from '@/modules/voices/voice.service';
 import { VoiceShareCard } from '@/lib/share-cards/templates';
-import { resolveOgImage } from '@/lib/share-cards/absoluteUrl';
+import { loadHorecaLogoDataUrl, resolveOgImage } from '@/lib/share-cards/absoluteUrl';
 import { qrPngDataUrl } from '@/lib/share-cards/qr';
 import { voiceTitleLine } from '@/sanity/lib/types';
 import { shareSiteOrigin } from '@/lib/share-cards/ogHelpers';
@@ -15,8 +15,11 @@ export default async function Image({ params }: { params: Promise<{ slug: string
   const story = await getPublishedVoiceStoryBySlug(slug);
   const origin = shareSiteOrigin();
   const articleUrl = `${origin}/voices/${slug}`;
-  const qrDataUrl = await qrPngDataUrl(articleUrl);
-  const photoUrl = await resolveOgImage(origin, story?.photoOgUrl || story?.photoUrl);
+  const [qrDataUrl, photoUrl, logoUrl] = await Promise.all([
+    qrPngDataUrl(articleUrl),
+    resolveOgImage(origin, story?.photoOgUrl || story?.photoUrl),
+    loadHorecaLogoDataUrl(),
+  ]);
 
   return new ImageResponse(
     (
@@ -27,6 +30,7 @@ export default async function Image({ params }: { params: Promise<{ slug: string
         quote={story?.quote ?? 'Stories from the industry, for the industry.'}
         titleLine={story ? voiceTitleLine(story.role, story.venue) : ''}
         photoUrl={photoUrl}
+        logoUrl={logoUrl}
         articleUrl={articleUrl}
         qrDataUrl={qrDataUrl}
       />

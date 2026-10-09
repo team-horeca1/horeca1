@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { dal } from '@/lib/dal';
 import type { Vendor } from '@/types';
+import { vendorPublicPath } from '@/lib/publicSlug';
 
 export function ShopByStoreAlt() {
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -79,7 +80,7 @@ export function ShopByStoreAlt() {
                             return (
                                 <Link
                                     key={`alt-${vendor.id}-${index}`}
-                                    href={`/vendor/${vendor.id}`}
+                                    href={vendorPublicPath(vendor)}
                                     className="flex-none flex flex-col items-center group w-[90px] md:w-[110px]"
                                 >
                                     {/* Logo Circle - white bg, subtle border, no hover effects */}

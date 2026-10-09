@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { CUSTOMER_CARE_WHATSAPP_DISPLAY, CUSTOMER_CARE_WHATSAPP_URL } from '@/lib/customerCare';
 
 /** Only ship links that resolve to real storefront routes (no dead /under-construction stubs). */
 const FOOTER_LINKS: Record<string, Array<{ label: string; href: string }>> = {
@@ -89,9 +90,14 @@ export function Footer() {
                                 <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
                                     <Phone size={18} className="text-white" />
                                 </div>
-                                <span className="text-[14px] text-[#181725] font-medium">
-                                    7710920002
-                                </span>
+                                <a
+                                    href={CUSTOMER_CARE_WHATSAPP_URL}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[14px] text-[#181725] font-medium hover:text-primary"
+                                >
+                                    {CUSTOMER_CARE_WHATSAPP_DISPLAY}
+                                </a>
                             </li>
                             <li className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
@@ -124,11 +130,13 @@ export function Footer() {
                             <ul className="space-y-4">
                                 <li>
                                     <a
-                                        href="tel:7710920002"
+                                        href={CUSTOMER_CARE_WHATSAPP_URL}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
                                         className="flex items-center gap-2 text-[14px] text-primary font-semibold hover:text-primary-dark transition-colors"
                                     >
                                         <PhoneCall size={15} />
-                                        7710920002
+                                        {CUSTOMER_CARE_WHATSAPP_DISPLAY}
                                     </a>
                                 </li>
                                 {FOOTER_LINKS.support.map((link) => (

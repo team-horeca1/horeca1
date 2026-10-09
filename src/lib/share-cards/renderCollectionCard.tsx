@@ -1,7 +1,7 @@
 import 'server-only';
 import { ImageResponse } from 'next/og';
 import { CommerceShareCard } from '@/lib/share-cards/templates';
-import { resolveOgImage } from '@/lib/share-cards/absoluteUrl';
+import { loadHorecaLogoDataUrl, resolveOgImage } from '@/lib/share-cards/absoluteUrl';
 import { qrPngDataUrl } from '@/lib/share-cards/qr';
 import { prisma } from '@/lib/prisma';
 import {
@@ -48,9 +48,10 @@ export async function renderCollectionShareImage(
       ? `${itemCount} product${itemCount === 1 ? '' : 's'}`
       : undefined;
 
-  const [qrDataUrl, imageUrl] = await Promise.all([
+  const [qrDataUrl, imageUrl, logoUrl] = await Promise.all([
     qrPngDataUrl(pageUrl),
     resolveOgImage(origin, collection.bannerImageUrl || collection.imageUrl),
+    loadHorecaLogoDataUrl(),
   ]);
 
   return new ImageResponse(
@@ -63,6 +64,8 @@ export async function renderCollectionShareImage(
         statLine={statLine}
         cta="Open Collection"
         imageUrl={imageUrl}
+        imageFit="contain"
+        logoUrl={logoUrl}
         pageUrl={pageUrl}
         qrDataUrl={qrDataUrl}
       />

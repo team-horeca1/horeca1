@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { toast } from 'sonner';
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { productShareContent, vendorProductHref } from '@/lib/share-cards/types';
+import { brandPublicPath } from '@/lib/publicSlug';
 import { useSession } from 'next-auth/react';
 import { cn, formatPackSize } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
@@ -507,7 +508,9 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         () =>
             productShareContent({
                 id: product.id,
+                slug: product.slug,
                 vendorId: product.vendorId,
+                vendorSlug: product.vendorSlug,
                 title: product.displayName ?? product.name,
                 vendorName: product.vendorName,
                 image: product.images?.[0] ?? null,
@@ -562,7 +565,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                     <div className="h-4 truncate">
                         {product.brandSlug && product.brandName ? (
                             <Link
-                                href={`/brand/${product.brandSlug}`}
+                                href={brandPublicPath(product.brandSlug || '')}
                                 onClick={(e) => e.stopPropagation()}
                                 className="block truncate text-[11px] leading-4 font-medium text-text-muted hover:text-primary hover:underline"
                             >
@@ -801,7 +804,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                                 {product.brandSlug && product.brandName && (
                                     <Link
-                                        href={`/brand/${product.brandSlug}`}
+                                        href={brandPublicPath(product.brandSlug || '')}
                                         onClick={(e) => e.stopPropagation()}
                                         className="relative z-20 text-[10px] font-semibold text-primary hover:underline shrink-0"
                                     >
@@ -875,7 +878,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         <div className="flex items-center gap-2 flex-wrap">
                             {product.brandSlug && product.brandName ? (
                                 <Link
-                                    href={`/brand/${product.brandSlug}`}
+                                    href={brandPublicPath(product.brandSlug || '')}
                                     onClick={(e) => e.stopPropagation()}
                                     className="relative z-20 text-[11px] font-semibold text-primary hover:underline shrink-0"
                                 >

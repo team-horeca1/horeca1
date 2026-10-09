@@ -223,6 +223,47 @@ const shell: CSSProperties = {
   justifyContent: 'space-between',
 };
 
+function BrandLockup(props: { logoUrl?: string | null; isPortrait: boolean }) {
+  const height = props.isPortrait ? 86 : 70;
+  const width = props.isPortrait ? 320 : 260;
+  if (props.logoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={props.logoUrl}
+        alt="Horeca1"
+        width={width}
+        height={height}
+        style={{ width, height, objectFit: 'contain', objectPosition: 'left center' }}
+      />
+    );
+  }
+  return (
+    <div style={{ ...flexRow, alignItems: 'center' }}>
+      <div
+        style={{
+          ...flexRow,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: PRIMARY,
+          color: '#FFFFFF',
+          fontWeight: 900,
+          fontSize: props.isPortrait ? 28 : 24,
+          width: props.isPortrait ? 64 : 56,
+          height: props.isPortrait ? 64 : 56,
+          borderRadius: 16,
+          marginRight: 14,
+        }}
+      >
+        H1
+      </div>
+      <span style={{ fontSize: props.isPortrait ? 36 : 30, fontWeight: 900, color: INK_PRIMARY }}>
+        Horeca1
+      </span>
+    </div>
+  );
+}
+
 export function VoiceShareCard(props: {
   format: 'portrait' | 'square';
   name: string;
@@ -232,6 +273,7 @@ export function VoiceShareCard(props: {
   photoUrl: string | null;
   articleUrl: string;
   qrDataUrl?: string | null;
+  logoUrl?: string | null;
 }) {
   const isPortrait = props.format === 'portrait';
   const topPad = isPortrait ? 48 : 36;
@@ -245,42 +287,7 @@ export function VoiceShareCard(props: {
     <div style={{ ...shell, padding: `${topPad}px ${sidePad}px ${bottomPad}px` }}>
       {/* TOP BRAND HEADER */}
       <div style={{ ...flexRow, width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ ...flexRow, alignItems: 'center' }}>
-          <div
-            style={{
-              ...flexRow,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: PRIMARY,
-              color: '#FFFFFF',
-              fontWeight: 900,
-              fontSize: isPortrait ? 22 : 19,
-              width: isPortrait ? 48 : 42,
-              height: isPortrait ? 48 : 42,
-              borderRadius: 14,
-              marginRight: 14,
-            }}
-          >
-            H1
-          </div>
-          <div style={{ ...flexCol }}>
-            <span style={{ fontSize: isPortrait ? 26 : 22, fontWeight: 900, color: INK_PRIMARY, letterSpacing: -0.3 }}>
-              Horeca1
-            </span>
-            <span
-              style={{
-                fontSize: isPortrait ? 13 : 11,
-                fontWeight: 700,
-                color: INK_MUTED,
-                letterSpacing: 0.8,
-                textTransform: 'uppercase',
-                marginTop: 1,
-              }}
-            >
-              Voices & Stories
-            </span>
-          </div>
-        </div>
+        <BrandLockup logoUrl={props.logoUrl} isPortrait={isPortrait} />
 
         <div
           style={{
@@ -469,6 +476,9 @@ export function CommerceShareCard(props: {
   discount?: string;
   cta: string;
   imageUrl?: string | null;
+  /** cover = store banner. contain = full brand or product image, scaled to the card. */
+  imageFit?: 'cover' | 'contain';
+  logoUrl?: string | null;
   pageUrl: string;
   qrDataUrl?: string | null;
 }) {
@@ -477,7 +487,10 @@ export function CommerceShareCard(props: {
   const sidePad = isPortrait ? 52 : 40;
   const bottomPad = isPortrait ? 44 : 36;
   const kicker = props.kicker.toUpperCase();
-  const imageH = isPortrait ? 560 : 440;
+  const imageFit = props.imageFit ?? 'contain';
+  const imageH = imageFit === 'cover'
+    ? (isPortrait ? 620 : 480)
+    : (isPortrait ? 680 : 520);
   const initial = (props.title.trim()[0] || 'H').toUpperCase();
 
   const priceNum = parsePriceNumber(props.price);
@@ -488,42 +501,7 @@ export function CommerceShareCard(props: {
     <div style={{ ...shell, padding: `${topPad}px ${sidePad}px ${bottomPad}px` }}>
       {/* TOP BRAND HEADER */}
       <div style={{ ...flexRow, width: '100%', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ ...flexRow, alignItems: 'center' }}>
-          <div
-            style={{
-              ...flexRow,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: PRIMARY,
-              color: '#FFFFFF',
-              fontWeight: 900,
-              fontSize: isPortrait ? 22 : 19,
-              width: isPortrait ? 48 : 42,
-              height: isPortrait ? 48 : 42,
-              borderRadius: 14,
-              marginRight: 14,
-            }}
-          >
-            H1
-          </div>
-          <div style={{ ...flexCol }}>
-            <span style={{ fontSize: isPortrait ? 26 : 22, fontWeight: 900, color: INK_PRIMARY, letterSpacing: -0.3 }}>
-              Horeca1
-            </span>
-            <span
-              style={{
-                fontSize: isPortrait ? 13 : 11,
-                fontWeight: 700,
-                color: INK_MUTED,
-                letterSpacing: 0.6,
-                textTransform: 'uppercase',
-                marginTop: 1,
-              }}
-            >
-              B2B Wholesale Marketplace
-            </span>
-          </div>
-        </div>
+        <BrandLockup logoUrl={props.logoUrl} isPortrait={isPortrait} />
 
         <div
           style={{
@@ -575,9 +553,10 @@ export function CommerceShareCard(props: {
             width={imageH}
             height={imageH}
             style={{
-              width: '90%',
-              height: '90%',
-              objectFit: 'contain',
+              width: '100%',
+              height: '100%',
+              objectFit: imageFit,
+              objectPosition: 'center',
             }}
           />
         ) : (

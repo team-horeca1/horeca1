@@ -1,7 +1,8 @@
 import 'server-only';
 import { ImageResponse } from 'next/og';
 import { CommerceShareCard } from '@/lib/share-cards/templates';
-import { resolveOgImage } from '@/lib/share-cards/absoluteUrl';
+import { loadHorecaLogoDataUrl, resolveOgImage } from '@/lib/share-cards/absoluteUrl';
+import { brandPublicPath } from '@/lib/publicSlug';
 import { qrPngDataUrl } from '@/lib/share-cards/qr';
 import { prisma } from '@/lib/prisma';
 import {
@@ -17,7 +18,7 @@ export async function renderBrandShareImage(
   req?: Request,
 ): Promise<ImageResponse | null> {
   const origin = shareSiteOrigin(req);
-  const pageUrl = `${origin}/brand/${slug}`;
+  const pageUrl = `${origin}${brandPublicPath(slug)}`;
 
   const brand = await prisma.brand.findFirst({
     where: {
@@ -55,16 +56,17 @@ export async function renderBrandShareImage(
 
   const masterPhoto =
     brand.masterProducts.find((p) => p.imageUrl || p.images?.[0]) ?? null;
-  const [qrDataUrl, imageUrl] = await Promise.all([
+  const [qrDataUrl, imageUrl, logoUrl] = await Promise.all([
     qrPngDataUrl(pageUrl),
     resolveOgImage(
       origin,
-      brand.logoUrl ||
-        brand.bannerUrl ||
+      brand.bannerUrl ||
         masterPhoto?.imageUrl ||
         masterPhoto?.images?.[0] ||
+        brand.logoUrl ||
         null,
     ),
+    loadHorecaLogoDataUrl(),
   ]);
 
   return new ImageResponse(
@@ -77,6 +79,8 @@ export async function renderBrandShareImage(
         statLine={statLine}
         cta="Find us on Horeca1"
         imageUrl={imageUrl}
+        imageFit="contain"
+        logoUrl={logoUrl}
         pageUrl={pageUrl}
         qrDataUrl={qrDataUrl}
       />

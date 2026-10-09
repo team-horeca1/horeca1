@@ -4,6 +4,8 @@
 // CGST+SGST split, taxable + tax breakdown row, amount-in-words, declaration block.
 
 import PDFDocument from 'pdfkit';
+import QRCode from 'qrcode';
+import { CUSTOMER_CARE_WHATSAPP_URL } from '@/lib/customerCare';
 import { prisma } from '@/lib/prisma';
 import { buildInvoiceLineItems, type InvoiceItem } from '@/lib/invoice-items';
 import {
@@ -160,6 +162,13 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
   const { cgst, sgst, igst } = splitGstTax(totalTax, supplyType);
   const cess = 0;
 
+  const careQr = await QRCode.toBuffer(CUSTOMER_CARE_WHATSAPP_URL, {
+    type: 'png',
+    width: 180,
+    margin: 0,
+    errorCorrectionLevel: 'M',
+  });
+
   // ── 3. Build PDF ─────────────────────────────────────────────────────────
   return new Promise<Buffer>((resolve, reject) => {
     const doc = new PDFDocument({ margin: 30, size: 'A4' });
@@ -220,12 +229,16 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
       : '-';
     const invDate = new Date(order.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
-    // Row 1
-    cell(LEFT,           y, colW, cellH, 'Invoice Number',     order.orderNumber, { bold: true });
-    cell(LEFT + colW,     y, colW, cellH, 'Order No.',          order.orderNumber, { bold: true });
-    cell(LEFT + colW * 2, y, colW, cellH, 'Invoice Date',       invDate);
-    cell(LEFT + colW * 3, y, colW, cellH, 'Last Payment Date',  lastPaymentDate);
-    y += cellH;
+    // Row 1 — invoice number is replaced by the customer-care WhatsApp QR.
+    const row1H = 92;
+    doc.lineWidth(0.6).strokeColor('#000').rect(LEFT, y, colW, row1H).stroke();
+    doc.image(careQr, LEFT + 8, y + 8, { width: 48, height: 48 });
+    doc.font('Helvetica-Bold').fontSize(7).fillColor('#000');
+    doc.text('Scan to reach Customer Care', LEFT + 8, y + 60, { width: colW - 16, align: 'left' });
+    cell(LEFT + colW,     y, colW, row1H, 'Order No.',          order.orderNumber, { bold: true });
+    cell(LEFT + colW * 2, y, colW, row1H, 'Invoice Date',       invDate);
+    cell(LEFT + colW * 3, y, colW, row1H, 'Last Payment Date',  lastPaymentDate);
+    y += row1H;
 
     const isPaid = order.paymentStatus?.toLowerCase() === 'paid';
     const payStatusDisplay = isPaid ? 'PAID' : (order.paymentStatus ? order.paymentStatus.toUpperCase() : 'PENDING');
@@ -464,7 +477,7 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
       doc.text('PAYMENT PENDING / REMITTANCE INSTRUCTIONS:', LEFT + 5, y + 3);
       doc.font('Helvetica').fontSize(7.5).fillColor('#000');
       
-      let remitText = `Please remit payment against Invoice #${order.orderNumber} via ${payMethodDisplay}.`;
+      let remitText = `Please remit payment against Order No. ${order.orderNumber} via ${payMethodDisplay}.`;
       if (hasBankDetails) {
         remitText += ` Bank: ${order.vendor.bankName || 'Vendor Bank'} | A/C Name: ${order.vendor.bankAccountName || order.vendor.businessName} | A/C No: ${order.vendor.bankAccountNumber} | IFSC: ${order.vendor.bankIfsc}`;
       }

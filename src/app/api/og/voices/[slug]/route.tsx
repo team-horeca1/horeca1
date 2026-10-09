@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { VoiceShareCard } from '@/lib/share-cards/templates';
-import { resolveOgImage } from '@/lib/share-cards/absoluteUrl';
+import { loadHorecaLogoDataUrl, resolveOgImage } from '@/lib/share-cards/absoluteUrl';
 import { qrPngDataUrl } from '@/lib/share-cards/qr';
 import { getPublishedVoiceStoryBySlug } from '@/modules/voices/voice.service';
 import { voiceTitleLine } from '@/sanity/lib/types';
@@ -34,9 +34,10 @@ export async function GET(
     const badge = story.badge ?? 'HORECA1 VOICES';
     const titleLine = voiceTitleLine(story.role, story.venue);
     const articleUrl = `${origin}/voices/${slug}`;
-    const [qrDataUrl, photoUrl] = await Promise.all([
+    const [qrDataUrl, photoUrl, logoUrl] = await Promise.all([
       qrPngDataUrl(articleUrl),
       resolveOgImage(origin, story.photoOgUrl || story.photoUrl),
+      loadHorecaLogoDataUrl(),
     ]);
 
     return new ImageResponse(
@@ -48,6 +49,7 @@ export async function GET(
           quote={quote}
           titleLine={titleLine}
           photoUrl={photoUrl}
+          logoUrl={logoUrl}
           articleUrl={articleUrl}
           qrDataUrl={qrDataUrl}
         />

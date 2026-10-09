@@ -17,8 +17,7 @@ import {
 } from '@/components/ui/form';
 import {
   SALUTATIONS, GST_TREATMENTS, PAYMENT_TERMS, LANGUAGES, INDIAN_STATES,
-  BUSINESS_SIZES, BUSINESS_STRUCTURES, SERVICE_MODELS, MONTHLY_PURCHASE_BANDS,
-  PROCUREMENT_FREQUENCIES, LEAD_STATUSES, CREDIT_TYPES, CUSTOMER_BUSINESS_TYPES,
+  BUSINESS_SIZES, CUSTOMER_BUSINESS_TYPES,
   subTypesForBusinessType, cuisinesForSubType, defaultOutletName,
 } from '@/lib/constants/customerProfile';
 import { validateFieldBlur, type CustomerProfileInput } from '@/lib/validators/customer-profile';
@@ -744,42 +743,6 @@ export function CustomerProfileForm({
             <FormSelect value={value.businessSize ?? ''} onChange={v => set({ businessSize: v })}>
               <option value="">Select size</option>
               {BUSINESS_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-            </FormSelect>
-          </FormField>
-          <FormField label="Business Structure">
-            <FormSelect value={value.businessStructure ?? ''} onChange={v => set({ businessStructure: v })}>
-              <option value="">Select structure</option>
-              {BUSINESS_STRUCTURES.map(s => <option key={s} value={s}>{s}</option>)}
-            </FormSelect>
-          </FormField>
-          <FormField label="Service Model">
-            <FormSelect value={value.serviceModel ?? ''} onChange={v => set({ serviceModel: v })}>
-              <option value="">Select model</option>
-              {SERVICE_MODELS.map(s => <option key={s} value={s}>{s}</option>)}
-            </FormSelect>
-          </FormField>
-          <FormField label="Monthly Purchase Band">
-            <FormSelect value={value.monthlyPurchaseBand ?? ''} onChange={v => set({ monthlyPurchaseBand: v })}>
-              <option value="">Select band</option>
-              {MONTHLY_PURCHASE_BANDS.map(s => <option key={s} value={s}>{s}</option>)}
-            </FormSelect>
-          </FormField>
-          <FormField label="Procurement Frequency">
-            <FormSelect value={value.procurementFrequency ?? ''} onChange={v => set({ procurementFrequency: v })}>
-              <option value="">Select frequency</option>
-              {PROCUREMENT_FREQUENCIES.map(s => <option key={s} value={s}>{s}</option>)}
-            </FormSelect>
-          </FormField>
-          <FormField label="Lead Status">
-            <FormSelect value={value.leadStatus ?? ''} onChange={v => set({ leadStatus: v })}>
-              <option value="">Select status</option>
-              {LEAD_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-            </FormSelect>
-          </FormField>
-          <FormField label="Credit Type">
-            <FormSelect value={value.creditType ?? ''} onChange={v => set({ creditType: v })}>
-              <option value="">Select type</option>
-              {CREDIT_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
             </FormSelect>
           </FormField>
         </div>

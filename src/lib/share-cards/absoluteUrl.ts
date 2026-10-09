@@ -87,6 +87,27 @@ export async function resolveOgImage(origin: string, url: string | null | undefi
   return absoluteMediaUrl(origin, trimmed);
 }
 
+let logoDataUrl: Promise<string | null> | null = null;
+
+/** Wide Horeca1 wordmark for the top of share cards. */
+export function loadHorecaLogoDataUrl(): Promise<string | null> {
+  if (!logoDataUrl) {
+    logoDataUrl = (async () => {
+      const filePath = path.join(process.cwd(), 'public', 'Horeca1.png');
+      const input = await fs.promises.readFile(filePath);
+      const png = await sharp(input)
+        .resize({ width: 720, withoutEnlargement: false })
+        .png()
+        .toBuffer();
+      return `data:image/png;base64,${png.toString('base64')}`;
+    })().catch((err) => {
+      console.warn('[share-card] Horeca1 logo unavailable:', err);
+      return null;
+    });
+  }
+  return logoDataUrl;
+}
+
 /**
  * next/og (Satori) cannot decode webp/avif/svg directly.
  * Instead of dropping them, convert CDN URLs (ImageKit, Sanity, etc.) to JPG/PNG
