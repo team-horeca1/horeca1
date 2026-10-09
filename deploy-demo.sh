@@ -41,6 +41,10 @@ fi
 if grep -qE '^MSG91_AUTH_KEY=.+' .env.demo 2>/dev/null; then
   echo "WARN: MSG91_AUTH_KEY is set in .env.demo — demo may send real SMS. Prefer unsetting it."
 fi
+if ! grep -qE '^SANITY_API_WRITE_TOKEN=.+' .env.demo 2>/dev/null; then
+  echo "ERROR: SANITY_API_WRITE_TOKEN is missing in .env.demo — Voices category and story saves will fail."
+  exit 1
+fi
 
 pull_image() {
   local tag="$1"
