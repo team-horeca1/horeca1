@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { useStableSession } from '@/hooks/useStableSession';
 import { toast } from 'sonner';
 import { dal } from '@/lib/dal';
+import { isAbandonedCart } from '@/lib/abandonedOrder';
 import { cn } from '@/lib/utils';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 
@@ -38,6 +39,7 @@ interface ApiOrder {
     subtotal: string | number;
     totalAmount: string | number;
     createdAt: string;
+    abandonedAt?: string | null;
     vendor: ApiOrderVendor;
     items: ApiOrderItem[];
     review?: { rating: number } | null;
@@ -69,6 +71,7 @@ const FILTER_TABS: Array<{ key: string | null; label: string }> = [
     { key: null,         label: 'All Orders' },
     { key: 'draft',      label: 'Drafts' },
     { key: 'pending',    label: 'Pending' },
+    { key: 'abandoned',  label: 'Abandoned' },
     { key: 'confirmed',  label: 'Accepted' },
     { key: 'shipped',    label: 'Out for Delivery' },
     { key: 'delivered',  label: 'Delivered' },
@@ -90,8 +93,10 @@ function formatDate(iso: string): string {
     } catch { return iso; }
 }
 
-function StatusChip({ status }: { status: string }) {
-    const cfg = STATUS_CONFIG[status] ?? { label: status, color: 'text-gray-500', bg: 'bg-gray-100', icon: null };
+function StatusChip({ status, abandoned }: { status: string; abandoned?: boolean }) {
+    const cfg = abandoned
+        ? { label: 'Abandoned', color: 'text-amber-800', bg: 'bg-amber-50', icon: <Clock size={10} /> }
+        : (STATUS_CONFIG[status] ?? { label: status, color: 'text-gray-500', bg: 'bg-gray-100', icon: null });
     return (
         <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wide whitespace-nowrap', cfg.bg, cfg.color)}>
             {cfg.icon}
@@ -391,7 +396,7 @@ function OrdersPageContent() {
                                                 <td className="px-4 py-3">
                                                     <span className={cn('text-[11px] font-bold', paymentCfg.color)}>{paymentCfg.label}</span>
                                                 </td>
-                                                <td className="px-4 py-3"><StatusChip status={order.status} /></td>
+                                                <td className="px-4 py-3"><StatusChip status={order.status} abandoned={isAbandonedCart(order)} /></td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                                                         {isDraft ? (
@@ -488,7 +493,7 @@ function OrdersPageContent() {
                                             </div>
                                         </div>
                                         <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-gray-50" onClick={e => e.stopPropagation()}>
-                                            <StatusChip status={order.status} />
+                                            <StatusChip status={order.status} abandoned={isAbandonedCart(order)} />
                                             <div className="flex items-center gap-1">
                                                 {isDraft ? (
                                                     <>

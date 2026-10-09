@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Search, Loader2, Eye, CheckCircle2, ChevronRight, ChevronLeft, AlertTriangle, Download, X, ChevronDown, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { personFirstCustomerLabel } from '@/lib/customerLabel';
+import { isAbandonedCart } from '@/lib/abandonedOrder';
 import { toast } from 'sonner';
 import { useVendorOutletScope } from '@/hooks/useVendorOutletScope';
 import OrderWorkspace from '@/components/features/vendor/OrderWorkspace';
@@ -14,6 +15,7 @@ interface VendorOrder {
     id: string;
     orderNumber: string;
     status: string;
+    abandonedAt?: string | null;
     isPartial?: boolean;
     totalAmount: number;
     paymentStatus: string;
@@ -53,6 +55,7 @@ const STATUS_STYLE: Record<string, string> = {
     partially_delivered: 'bg-orange-50 text-orange-700 border-orange-100',
     returned: 'bg-rose-50 text-rose-700 border-rose-100',
     cancelled: 'bg-[#FDF2F2] text-[#EF4444] border-[#FEE2E2]',
+    abandoned: 'bg-amber-50 text-amber-800 border-amber-200',
 };
 
 const PAYMENT_STYLE: Record<string, string> = {
@@ -78,6 +81,7 @@ const STATUS_LABELS: Record<string, string> = {
     delivered: 'Delivered',
     returned: 'Returned',
     cancelled: 'Cancelled',
+    abandoned: 'Abandoned',
 };
 
 /** Tab chip labels — separate so Processing bucket ≠ DB processing → Packed. */
@@ -91,6 +95,7 @@ const TAB_LABELS: Record<string, string> = {
     dispatched: 'Dispatched',
     delivered: 'Delivered',
     cancelled: 'Cancelled',
+    abandoned: 'Abandoned',
 };
 
 const STATUS_OPTIONS = [
@@ -109,6 +114,7 @@ const STATUS_TABS = [
     'dispatched',
     'delivered',
     'cancelled',
+    'abandoned',
 ] as const;
 const PAGE_SIZE = 20;
 
@@ -619,8 +625,10 @@ export default function VendorOrdersPage() {
                             >
                                 <div className="flex justify-between items-start gap-2">
                                     <p className="text-[14px] font-bold text-[#181725]">{order.orderNumber}</p>
-                                    <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-[6px] uppercase', STATUS_STYLE[order.status] || 'bg-gray-100')}>
-                                        {order.isPartial && order.status !== 'cancelled'
+                                    <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-[6px] uppercase', isAbandonedCart(order) ? STATUS_STYLE.abandoned : (STATUS_STYLE[order.status] || 'bg-gray-100'))}>
+                                        {isAbandonedCart(order)
+                                            ? 'Abandoned'
+                                            : order.isPartial && order.status !== 'cancelled'
                                             ? 'Partially Accepted'
                                             : (STATUS_LABELS[order.status] ?? order.status)}
                                     </span>
@@ -630,6 +638,7 @@ export default function VendorOrdersPage() {
                                         {personFirstCustomerLabel({
                                             fullName: order.user.fullName,
                                             businessName: order.user.businessName,
+                                            outletName: order.outlet?.name,
                                         })}
                                     </p>
                                     {orderFulfillmentChip(order)}
@@ -672,7 +681,8 @@ export default function VendorOrdersPage() {
                                         </td>
                                     </tr>
                                 ) : orders.map((order) => {
-                                    const overSLA = order.status === 'pending' && isOverSLA(order.createdAt);
+                                    const abandoned = isAbandonedCart(order);
+                                    const overSLA = order.status === 'pending' && !abandoned && isOverSLA(order.createdAt);
                                     return (
                                         <tr
                                             key={order.id}
@@ -711,6 +721,7 @@ export default function VendorOrdersPage() {
                                                     {personFirstCustomerLabel({
                                                         fullName: order.user.fullName,
                                                         businessName: order.user.businessName,
+                                                        outletName: order.outlet?.name,
                                                     })}
                                                 </p>
                                                 {orderFulfillmentChip(order)}
@@ -736,14 +747,18 @@ export default function VendorOrdersPage() {
                                                 <div className="flex justify-center items-center">
                                                     <div className="relative inline-block">
                                                         <select
-                                                            value={order.status}
-                                                            disabled={busyId === order.id}
+                                                            value={abandoned ? 'abandoned' : order.status}
+                                                            disabled={busyId === order.id || abandoned}
+                                                            title={abandoned ? 'Abandoned cart. The customer can pay to make this a normal order.' : undefined}
                                                             onChange={(e) => updateOrderStatus(order.id, e.target.value)}
                                                             className={cn(
                                                                 "cursor-pointer rounded-[8px] text-[11px] font-black uppercase tracking-wider pl-3.5 pr-8 py-2 outline-none border border-transparent appearance-none disabled:opacity-50 transition-all shadow-sm",
-                                                                STATUS_STYLE[order.status] || 'bg-gray-100 text-gray-700 border-gray-200'
+                                                                (abandoned ? STATUS_STYLE.abandoned : STATUS_STYLE[order.status]) || 'bg-gray-100 text-gray-700 border-gray-200'
                                                             )}
                                                         >
+                                                            {abandoned && (
+                                                                <option value="abandoned">Abandoned</option>
+                                                            )}
                                                             {!STATUS_OPTIONS.includes(order.status) && (
                                                                 <option value={order.status} disabled className="bg-white text-gray-800 capitalize">
                                                                     {STATUS_LABELS[order.status] || order.status.replace(/_/g, ' ')}

@@ -807,7 +807,16 @@ export class OrderService {
   async list(userId: string, options: { status?: string; vendorId?: string; cursor?: string; limit?: number }) {
     const { status, vendorId, cursor, limit = 20 } = options;
     const where: Prisma.OrderWhereInput = { userId, customerDeleted: false };
-    if (status) where.status = status as OrderStatus;
+    if (status === 'abandoned') {
+      where.status = 'pending';
+      where.abandonedAt = { not: null };
+      where.paymentStatus = { not: 'paid' };
+    } else if (status === 'pending') {
+      where.status = 'pending';
+      where.abandonedAt = null;
+    } else if (status) {
+      where.status = status as OrderStatus;
+    }
     if (vendorId) where.vendorId = vendorId;
 
     const orders = await prisma.order.findMany({
@@ -871,6 +880,88 @@ export class OrderService {
       });
       return { deleted: true, status: order.status };
     }
+  }
+
+  /**
+   * Online payment closed or failed. Release reserved stock once and keep the
+   * order so sales can call. A later successful payment resumes it.
+   */
+  async markPaymentAbandoned(orderId: string, reason: string) {
+    return prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            select: { productId: true, quantity: true, fulfilledQty: true, cancelledQty: true },
+          },
+        },
+      });
+      if (!order) return { abandoned: false as const };
+      if (order.paymentStatus === 'paid') return { abandoned: false as const, alreadyPaid: true as const };
+      if (order.status !== 'pending') return { abandoned: false as const };
+      if (order.abandonedAt) return { abandoned: true as const, alreadyAbandoned: true as const };
+
+      const remaining = order.items
+        .map((i) => ({
+          productId: i.productId,
+          quantity: Math.max(0, i.quantity - (i.fulfilledQty ?? 0) - (i.cancelledQty ?? 0)),
+        }))
+        .filter((l) => l.quantity > 0);
+      if (remaining.length > 0) {
+        const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
+        await this.inventoryService.releaseStock(remaining, fulfillOutlet, tx);
+      }
+
+      const now = new Date();
+      await tx.order.update({
+        where: { id: orderId },
+        data: { abandonedAt: now, rejectionReason: reason },
+      });
+      await recordOrderEvent(tx, {
+        orderId,
+        action: ORDER_EVENT_ACTIONS.PAYMENT_ABANDONED,
+        fromStatus: order.status,
+        toStatus: order.status,
+        payload: { reason },
+      });
+      return { abandoned: true as const };
+    });
+  }
+
+  /**
+   * Customer is paying an abandoned cart. Reserve stock again and clear the flag
+   * so the existing verify path can confirm the same order.
+   */
+  async resumeAbandonedOrder(orderId: string) {
+    return prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            select: { productId: true, quantity: true, fulfilledQty: true, cancelledQty: true },
+          },
+        },
+      });
+      if (!order) throw Errors.notFound('Order');
+      if (order.paymentStatus === 'paid') return { resumed: false as const, alreadyPaid: true as const };
+      if (!order.abandonedAt || order.status !== 'pending') return { resumed: false as const };
+
+      const remaining = order.items
+        .map((i) => ({
+          productId: i.productId,
+          quantity: Math.max(0, i.quantity - (i.fulfilledQty ?? 0) - (i.cancelledQty ?? 0)),
+        }))
+        .filter((l) => l.quantity > 0);
+      if (remaining.length > 0) {
+        const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
+        await this.inventoryService.reserveStock(remaining, fulfillOutlet, tx);
+      }
+      await tx.order.update({
+        where: { id: orderId },
+        data: { abandonedAt: null },
+      });
+      return { resumed: true as const };
+    });
   }
 
   /**
@@ -2062,6 +2153,12 @@ export class OrderService {
       });
       if (!order) throw Errors.notFound('Order');
 
+      if (order.abandonedAt && order.paymentStatus !== 'paid' && status !== 'cancelled') {
+        throw Errors.badRequest(
+          'This order is an abandoned cart. The customer can pay to turn it into a normal order.',
+        );
+      }
+
       // Same-status PATCH is a no-op (must run before the transition guard so
       // re-deliver / re-confirm does not 400 and can stay idempotent for
       // cashback settle + program issuance callers).
@@ -2109,7 +2206,8 @@ export class OrderService {
         .filter((l) => l.quantity > 0);
 
       const RESERVED_STATES = ['pending', 'confirmed', 'processing', 'ready_for_dispatch', 'shipped', 'partially_delivered'];
-      const stockReserved = RESERVED_STATES.includes(order.status as string);
+      // Abandoned carts already released stock when payment was closed.
+      const stockReserved = RESERVED_STATES.includes(order.status as string) && !order.abandonedAt;
       const fulfillOutlet = await this.orderFulfillmentOutletId(order, tx);
       if (status === 'cancelled' && stockReserved) {
         await this.inventoryService.releaseStock(remainingReserved, fulfillOutlet, tx);

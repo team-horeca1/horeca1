@@ -97,20 +97,19 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
   const isVendorPortal = portal === 'vendor';
   const supplierPersonName = session?.user?.name?.trim() || null;
   const accountDisplayName = currentAccount?.displayName ?? currentAccount?.legalName ?? null;
-  const displayName = (isVendorPortal && supplierPersonName)
-    ? supplierPersonName
-    : (accountDisplayName
-      ?? (session?.user as { fullName?: string } | undefined)?.fullName
-      ?? session?.user?.name
-      ?? session?.user?.email
-      ?? 'Signed in');
-
   const activeStores = availableStores.filter((s) => s.isActive);
   const activeStore =
     activeStores.find((s) => s.id === activeVendorId)
     ?? activeStores.find((s) => s.isPrimaryStore)
     ?? activeStores[0]
     ?? null;
+  const displayName = (isVendorPortal && activeStore)
+    ? activeStore.displayName
+    : (accountDisplayName
+      ?? (session?.user as { fullName?: string } | undefined)?.fullName
+      ?? session?.user?.name
+      ?? session?.user?.email
+      ?? 'Signed in');
 
   const kind = currentAccount ? classifyAccount(currentAccount) : null;
   const role = (session?.user?.role ?? 'customer').toLowerCase();
@@ -155,7 +154,9 @@ export function BusinessAccountSwitcherDropdown({ isAdminMode = false }: { isAdm
         </div>
         <div className="hidden lg:flex flex-col items-start min-w-0">
           <span className="text-[14px] font-bold text-[#181725] truncate max-w-[180px]">{displayName}</span>
-          {isVendorPortal && activeStore ? (
+          {isVendorPortal && supplierPersonName && supplierPersonName !== displayName ? (
+            <span className="text-[11px] text-[#666] truncate max-w-[180px]">{supplierPersonName}</span>
+          ) : isVendorPortal && activeStore ? (
             <span className="text-[11px] text-[#666] flex items-center gap-1 truncate max-w-[180px]">
               <Store size={10} className="shrink-0 text-primary" />
               <span className="truncate">{activeStore.displayName}</span>

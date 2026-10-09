@@ -62,14 +62,16 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
         totalAmount: true,
         paymentMethod: true,
         paymentStatus: true,
+        abandonedAt: true,
         deliveryDate: true,
         createdAt: true,
         vendor: {
           select: { id: true, businessName: true, displayName: true },
         },
         user: {
-          select: { id: true, fullName: true, email: true },
+          select: { id: true, fullName: true, email: true, businessName: true },
         },
+        outlet: { select: { id: true, name: true } },
         items: {
           select: {
             id: true,

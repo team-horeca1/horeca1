@@ -895,6 +895,9 @@ model Order {
   deliveryMode              DeliveryMode? @map("delivery_mode")
   notes                     String?      @db.Text
   rejectionReason           String?      @map("rejection_reason") @db.Text
+  // Set when online payment is closed or fails. Stock is released. The order
+  // stays out of fulfilment until the customer pays, then this is cleared.
+  abandonedAt               DateTime?    @map("abandoned_at") @db.Timestamptz
   acceptedAt                DateTime?    @map("accepted_at") @db.Timestamptz
   rejectedAt                DateTime?    @map("rejected_at") @db.Timestamptz
   isPartial                 Boolean      @default(false) @map("is_partial")

@@ -1213,6 +1213,132 @@ export class BrandService {
     };
   }
 
+  async listProductLinkDesk(userId: string, vendorId: string, actingBrandId?: string | null) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
+    const masters = await prisma.brandMasterProduct.findMany({
+      where: { brandId, isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true, sku: true, packSize: true, unit: true, imageUrl: true },
+    });
+    const mappings = await prisma.brandProductMapping.findMany({
+      where: {
+        brandId,
+        status: { not: 'rejected' },
+        distributorProduct: { vendorId },
+      },
+      select: {
+        id: true,
+        status: true,
+        brandMasterProductId: true,
+        distributorProduct: { select: { id: true, name: true, packSize: true } },
+      },
+    });
+    const linkByMaster = new Map<string, (typeof mappings)[number]>();
+    for (const mapping of mappings) {
+      const current = linkByMaster.get(mapping.brandMasterProductId);
+      if (!current || (mapping.status === 'verified' && current.status !== 'verified')) {
+        linkByMaster.set(mapping.brandMasterProductId, mapping);
+      }
+    }
+    return {
+      masters: masters.map((master) => {
+        const link = linkByMaster.get(master.id);
+        return {
+          id: master.id,
+          name: master.name,
+          sku: master.sku,
+          packSize: master.packSize,
+          unit: master.unit,
+          imageUrl: master.imageUrl,
+          link: link
+            ? {
+                mappingId: link.id,
+                status: link.status,
+                distributorProductId: link.distributorProduct.id,
+                distributorProductName: link.distributorProduct.name,
+                distributorPackSize: link.distributorProduct.packSize,
+              }
+            : null,
+        };
+      }),
+    };
+  }
+
+  async searchVendorProductsForLink(vendorId: string, query: string) {
+    const q = query.trim();
+    return prisma.product.findMany({
+      where: {
+        vendorId,
+        isActive: true,
+        slug: { not: { startsWith: '_deleted_' } },
+        ...(q ? { name: { contains: q, mode: 'insensitive' as const } } : {}),
+      },
+      take: 12,
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, packSize: true, imageUrl: true },
+    });
+  }
+
+  async linkMasterToVendorProduct(
+    userId: string,
+    vendorId: string,
+    masterProductId: string,
+    distributorProductId: string,
+    actingBrandId?: string | null,
+  ) {
+    const brandId = await this.getBrandIdForUser(userId, actingBrandId);
+    const master = await prisma.brandMasterProduct.findFirst({
+      where: { id: masterProductId, brandId },
+      select: { id: true },
+    });
+    if (!master) throw Errors.notFound('Brand product');
+    const storeProduct = await prisma.product.findFirst({
+      where: { id: distributorProductId, vendorId, slug: { not: { startsWith: '_deleted_' } } },
+      select: { id: true },
+    });
+    if (!storeProduct) throw Errors.notFound('Store product');
+
+    await prisma.brandProductMapping.updateMany({
+      where: {
+        brandId,
+        brandMasterProductId: masterProductId,
+        status: { not: 'rejected' },
+        distributorProduct: { vendorId },
+        distributorProductId: { not: distributorProductId },
+      },
+      data: {
+        status: 'rejected',
+        reviewedBy: userId,
+        reviewNote: 'Replaced by a manual link',
+      },
+    });
+
+    return prisma.brandProductMapping.upsert({
+      where: {
+        brandMasterProductId_distributorProductId: {
+          brandMasterProductId: masterProductId,
+          distributorProductId,
+        },
+      },
+      create: {
+        brandId,
+        brandMasterProductId: masterProductId,
+        distributorProductId,
+        confidenceScore: 1,
+        status: 'verified',
+        matchedBy: 'manually_verified',
+        reviewedBy: userId,
+      },
+      update: {
+        status: 'verified',
+        matchedBy: 'manually_verified',
+        reviewedBy: userId,
+        confidenceScore: 1,
+        reviewNote: null,
+      },
+    });
+  }
+
   // ── Brand: reject / flag an incorrect mapping ─────────────────────────
   async brandRejectMapping(userId: string, mappingId: string, reviewNote?: string, actingBrandId?: string | null) {
     const brandId = await this.getBrandIdForUser(userId, actingBrandId);

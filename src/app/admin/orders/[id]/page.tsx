@@ -102,6 +102,7 @@ interface OrderData {
     updatedAt: string;
     vendor: OrderVendor;
     user: OrderUser;
+    outlet?: { id: string; name: string } | null;
     items: OrderItem[];
     payments: OrderPayment[];
     deliverySlot: DeliverySlot | null;
@@ -479,7 +480,8 @@ export default function OrderDetailsPage() {
                                 </div>
                                 <div className="min-w-0">
                                     <h4 className="text-[13px] font-black text-[#111827] uppercase tracking-wider mb-1">Customer Profile</h4>
-                                    <p className="text-[13px] font-bold text-[#374151] truncate">{order.user.fullName}</p>
+                                    <p className="text-[13px] font-bold text-[#374151] truncate">{order.outlet?.name || order.user.businessName || order.user.fullName}</p>
+                                    <p className="text-[12px] text-[#6B7280] truncate font-medium mt-0.5">{order.user.fullName}</p>
                                     <p className="text-[12px] text-[#6B7280] truncate font-medium mt-0.5">{order.user.email}</p>
                                     {order.user.phone && <p className="text-[11px] text-[#9CA3AF] font-semibold font-mono mt-0.5">{order.user.phone}</p>}
                                 </div>

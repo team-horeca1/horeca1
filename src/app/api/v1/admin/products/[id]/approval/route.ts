@@ -19,6 +19,7 @@ import {
   CatalogService,
 } from '@/modules/catalog/catalog.service';
 import { transitionProductApproval } from '@/modules/catalog/approval-state.service';
+import { hasProductImage } from '@/lib/productImage';
 
 // Helper: extract the [id] segment from /api/v1/admin/products/{id}/approval
 function extractId(req: NextRequest): string {
@@ -61,6 +62,7 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
         brand: true,
         categoryId: true,
         imageUrl: true,
+        images: true,
         unit: true,
         packSize: true,
         vendorSku: true,
@@ -166,6 +168,14 @@ export const PATCH = adminOnly(async (req: NextRequest, ctx) => {
       });
 
       await applyMasterLinkToVendorProduct(id, existing.vendorId, resolvedMasterId);
+
+      const withImage = await prisma.product.findUnique({
+        where: { id },
+        select: { imageUrl: true, images: true },
+      });
+      if (!hasProductImage(withImage?.imageUrl, withImage?.images)) {
+        throw Errors.badRequest('Add a product photo before this listing can go live.');
+      }
 
       const product = await transitionProductApproval(id, 'approved', ctx.userId, {
         data: {

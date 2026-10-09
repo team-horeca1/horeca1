@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { personFirstCustomerLabel } from '@/lib/customerLabel';
+import { isAbandonedCart } from '@/lib/abandonedOrder';
 
 interface AdminOrder {
     id: string;
@@ -27,7 +29,9 @@ interface AdminOrder {
     paymentStatus: string;
     createdAt: string;
     vendor: { id: string; businessName: string };
-    user: { id: string; fullName: string; email: string };
+    user: { id: string; fullName: string; email: string; businessName?: string | null };
+    outlet?: { id: string; name: string } | null;
+    abandonedAt?: string | null;
     items: { id: string; productName: string; quantity: number; unitPrice: number; totalPrice: number }[];
 }
 
@@ -202,11 +206,11 @@ export default function OrdersPage() {
                             <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                     <p className="text-[14px] font-bold text-[#111827] tabular-nums">{order.orderNumber}</p>
-                                    <p className="text-[13px] text-[#667085] truncate mt-0.5">{order.user.fullName}</p>
+                                    <p className="text-[13px] text-[#667085] truncate mt-0.5">{personFirstCustomerLabel({ fullName: order.user.fullName, businessName: order.user.businessName, outletName: order.outlet?.name })}</p>
                                     <p className="text-[12px] text-[#6B7280] truncate">{order.vendor.businessName}</p>
                                 </div>
-                                <span className={cn('shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase', STATUS_STYLE[order.status] || 'bg-gray-100 text-gray-700')}>
-                                    {order.status.replace(/_/g, ' ')}
+                                <span className={cn('shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase', isAbandonedCart(order) ? 'bg-amber-50 text-amber-800' : (STATUS_STYLE[order.status] || 'bg-gray-100 text-gray-700'))}>
+                                    {isAbandonedCart(order) ? 'Abandoned' : order.status.replace(/_/g, ' ')}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between mt-2">
@@ -240,7 +244,7 @@ export default function OrdersPage() {
                                     {/* Customer */}
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col">
-                                            <span className="text-[13px] font-bold text-[#374151]">{order.user.fullName}</span>
+                                            <span className="text-[13px] font-bold text-[#374151]">{personFirstCustomerLabel({ fullName: order.user.fullName, businessName: order.user.businessName, outletName: order.outlet?.name })}</span>
                                             <span className="text-[11px] text-[#9CA3AF] font-medium max-w-[180px] truncate">{order.user.email}</span>
                                         </div>
                                     </td>
@@ -274,14 +278,16 @@ export default function OrdersPage() {
                                         <div className="flex justify-center items-center">
                                             <div className="relative inline-block">
                                                 <select
-                                                    value={order.status}
-                                                    disabled={busyId === order.id}
+                                                    value={isAbandonedCart(order) ? 'abandoned' : order.status}
+                                                    disabled={busyId === order.id || isAbandonedCart(order)}
+                                                    title={isAbandonedCart(order) ? 'Abandoned cart. Payment turns this into a normal order.' : undefined}
                                                     onChange={(e) => updateOrderStatus(order.id, e.target.value)}
                                                     className={cn(
                                                         "cursor-pointer rounded-[8px] text-[11px] font-black uppercase tracking-wider pl-3.5 pr-8 py-2 outline-none border border-transparent appearance-none disabled:opacity-50 transition-all shadow-sm",
-                                                        STATUS_STYLE[order.status] || 'bg-gray-100 text-gray-700 border-gray-200'
+                                                        isAbandonedCart(order) ? 'bg-amber-50 text-amber-800' : (STATUS_STYLE[order.status] || 'bg-gray-100 text-gray-700 border-gray-200')
                                                     )}
                                                 >
+                                                    {isAbandonedCart(order) && <option value="abandoned">Abandoned</option>}
                                                     {!STATUS_OPTIONS.includes(order.status) && (
                                                         <option value={order.status} disabled className="bg-white text-gray-800 capitalize">
                                                             {order.status.replace(/_/g, ' ')}

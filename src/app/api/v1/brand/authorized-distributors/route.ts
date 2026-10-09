@@ -9,7 +9,7 @@ import { brandOnly } from '@/middleware/rbac';
 import { resolveBrandContext } from '@/lib/resolveBrandId';
 import { requirePermission } from '@/lib/permissions/engine';
 import { errorResponse, Errors } from '@/middleware/errorHandler';
-import { approveDistributorByBrand, rejectDistributorAuth, unapproveDistributorByBrand, healRejectedDistributorsWithLiveMappings } from '@/lib/brandAuthorizedDistributor';
+import { approveDistributorByBrand, rejectDistributorAuth, unapproveDistributorByBrand, healRejectedDistributorsWithLiveMappings, settleMappingsOnDistributorApprove } from '@/lib/brandAuthorizedDistributor';
 import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 import type { AuthContext } from '@/middleware/auth';
@@ -110,6 +110,7 @@ export const POST = brandOnly(async (req: NextRequest, ctx: AuthContext) => {
     }
 
     const row = await approveDistributorByBrand(brandId, vendorId, ctx.userId, note);
+    await settleMappingsOnDistributorApprove(brandId, vendorId, ctx.userId);
     logAction(ctx, req, {
       action: AUDIT_ACTIONS.brandDistributorApproved,
       entity: 'BrandAuthorizedDistributor',

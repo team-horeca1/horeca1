@@ -65,6 +65,12 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
           // Legacy bookmark alias → same as delivered
           statusWhere = { status: 'delivered' };
           break;
+        case 'abandoned':
+          statusWhere = { status: 'pending', abandonedAt: { not: null }, paymentStatus: { not: 'paid' } };
+          break;
+        case 'pending':
+          statusWhere = { status: 'pending', abandonedAt: null };
+          break;
         default:
           // Native enum values: confirmed, ready_for_dispatch, shipped, delivered, …
           statusWhere = { status: statusParam };
@@ -120,6 +126,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
         id: true,
         orderNumber: true,
         status: true,
+        abandonedAt: true,
         isPartial: true,
         totalAmount: true,
         paymentStatus: true,
@@ -165,6 +172,7 @@ export const GET = vendorOnly(async (req: NextRequest, ctx) => {
       const attentionReasons = computeAttentionReasons({
         status: o.status,
         paymentStatus: o.paymentStatus,
+        abandonedAt: o.abandonedAt,
         isPartial: o.isPartial,
         createdAt: o.createdAt,
         hasPendingCancelRequest: o.cancelRequest?.status === 'pending',
