@@ -170,9 +170,7 @@ export default function VendorBulkGrid({
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
   const [rowBaseline, setRowBaseline] = useState<Record<string, Partial<GridProduct>>>({});
   const editsRef = React.useRef(edits);
-  editsRef.current = edits;
   const baselineRef = React.useRef(rowBaseline);
-  baselineRef.current = rowBaseline;
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = React.useRef<HTMLDivElement>(null);
 
@@ -275,6 +273,14 @@ export default function VendorBulkGrid({
   };
 
   useEffect(() => {
+    editsRef.current = edits;
+  }, [edits]);
+
+  useEffect(() => {
+    baselineRef.current = rowBaseline;
+  }, [rowBaseline]);
+
+  useEffect(() => {
     if (open) {
       Promise.resolve().then(() => {
         setEdits({});
@@ -303,7 +309,7 @@ export default function VendorBulkGrid({
   };
 
   const withBaseline = (raw: GridProduct): GridProduct => {
-    const extra = baselineRef.current[raw.id];
+    const extra = rowBaseline[raw.id];
     if (!extra) return raw;
     return {
       ...raw,
@@ -456,7 +462,18 @@ export default function VendorBulkGrid({
         ? Object.fromEntries(Object.entries(full).filter(([k]) => only.has(k)))
         : full;
       const raw = products.find((prod) => prod.id === id);
-      const p = raw ? withBaseline(raw) : undefined;
+      const extra = baselineRef.current[id];
+      const p = raw
+        ? (extra
+          ? {
+              ...raw,
+              ...extra,
+              priceSlabs: extra.priceSlabs ?? raw.priceSlabs,
+              inventory: extra.inventory ?? raw.inventory,
+              metadata: extra.metadata ?? raw.metadata,
+            }
+          : raw)
+        : undefined;
       if (!p || Object.keys(e).length === 0) continue;
 
       const body: Record<string, unknown> = {};
