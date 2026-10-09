@@ -10,6 +10,7 @@ import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import type { Vendor } from '@/types';
 import { VendorCard } from '@/components/features/homepage/VendorCardShared';
 import { cn } from '@/lib/utils';
+import { isFrequentlyOrderedOrder, orderVendorId, type OrderRailFields } from '@/lib/orderingRails';
 
 type SortOption = 'all' | 'rating' | 'frequent' | 'mov_asc' | 'name_asc';
 
@@ -36,6 +37,7 @@ function VendorsContent() {
     const initialSort = (searchParams.get('sort') as SortOption) || 'all';
 
     const [allVendors, setAllVendors] = useState<Vendor[]>([]);
+    const [orderedCounts, setOrderedCounts] = useState<Map<string, number>>(new Map());
     const [isLoading, setIsLoading] = useState(true);
     const [activeSort, setActiveSort] = useState<SortOption>(
         SORT_TABS.some((t) => t.id === initialSort) ? initialSort : 'all'
@@ -49,14 +51,34 @@ function VendorsContent() {
         Promise.resolve().then(() => {
             if (!cancelled) setIsLoading(true);
         });
-        dal.vendors.list(pincode ? { pincode } : undefined)
+        const vendorsPromise = dal.vendors.list(pincode ? { pincode } : undefined)
             .then(({ vendors }) => {
                 if (!cancelled) setAllVendors(vendors);
             })
-            .catch((err) => console.error('Failed to load vendors:', err))
-            .finally(() => {
-                if (!cancelled) setIsLoading(false);
-            });
+            .catch((err) => console.error('Failed to load vendors:', err));
+        const ordersPromise = sessionStatus === 'authenticated'
+            ? fetch('/api/v1/orders?limit=50', { credentials: 'include' })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((json) => {
+                    if (cancelled) return;
+                    const counts = new Map<string, number>();
+                    const rawOrders: unknown = json?.data?.orders;
+                    const orders: OrderRailFields[] = Array.isArray(rawOrders) ? rawOrders as OrderRailFields[] : [];
+                    for (const order of orders) {
+                        if (!isFrequentlyOrderedOrder(order)) continue;
+                        const id = orderVendorId(order);
+                        if (!id) continue;
+                        counts.set(id, (counts.get(id) || 0) + 1);
+                    }
+                    setOrderedCounts(counts);
+                })
+                .catch(() => {
+                    if (!cancelled) setOrderedCounts(new Map());
+                })
+            : Promise.resolve();
+        Promise.all([vendorsPromise, ordersPromise]).finally(() => {
+            if (!cancelled) setIsLoading(false);
+        });
         return () => { cancelled = true; };
     }, [sessionStatus, deliveryPincode, accountsLoading]);
 
@@ -78,6 +100,11 @@ function VendorsContent() {
             case 'rating':
                 return copy.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
             case 'frequent':
+                if (sessionStatus === 'authenticated') {
+                    return copy
+                        .filter((vendor) => orderedCounts.has(vendor.id))
+                        .sort((a, b) => (orderedCounts.get(b.id) || 0) - (orderedCounts.get(a.id) || 0));
+                }
                 return copy.sort((a, b) => ((b.totalRatings ?? 0) + (b.productCount ?? 0)) - ((a.totalRatings ?? 0) + (a.productCount ?? 0)));
             case 'mov_asc':
                 return copy.sort((a, b) => (a.minOrderValue || 0) - (b.minOrderValue || 0));
@@ -87,7 +114,7 @@ function VendorsContent() {
             default:
                 return copy;
         }
-    }, [allVendors, activeSort]);
+    }, [allVendors, activeSort, orderedCounts, sessionStatus]);
 
     return (
         <div className="min-h-screen bg-background">
@@ -155,7 +182,9 @@ function VendorsContent() {
                         </div>
                         <h2 className="text-lg font-bold text-text mb-1">No Suppliers Found</h2>
                         <p className="text-sm text-text-secondary mb-6">
-                            {sessionStatus === 'authenticated' && deliveryPincode
+                            {activeSort === 'frequent' && sessionStatus === 'authenticated'
+                                ? 'Suppliers you have paid or received an order from will show up here.'
+                                : sessionStatus === 'authenticated' && deliveryPincode
                                 ? `No verified suppliers deliver to ${deliveryPincode}.`
                                 : 'No verified suppliers currently match this sorting criteria. Try resetting the filters.'}
                         </p>

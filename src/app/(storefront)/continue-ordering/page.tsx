@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { ChevronLeft, ClipboardList, Clock, AlertCircle, ShoppingCart, Package, Eye, ChevronRight, Home, Building2 } from 'lucide-react';
+import { ChevronLeft, ClipboardList, Clock, ShoppingCart, Package, ChevronRight } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { dal } from '@/lib/dal';
 import type { Vendor } from '@/types';
 import { useCart } from '@/context/CartContext';
+import { vendorPublicPath } from '@/lib/publicSlug';
+import { isContinueOrder } from '@/lib/orderingRails';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 interface ContinueCard {
     id: string;
@@ -17,7 +19,7 @@ interface ContinueCard {
     vendorLogos?: string[];
     subtitle: string;
     subtitle2?: string;
-    subtitleIcon: 'cart' | 'order' | 'list' | 'viewed';
+    subtitleIcon: 'cart' | 'order' | 'list';
     href: string;
     priority: number;
     timestamp: number;
@@ -29,8 +31,8 @@ export default function ContinueOrderingPage() {
     const [isMounted, setIsMounted] = useState(false);
     const [cards, setCards] = useState<ContinueCard[]>([]);
     const [vendorsList, setVendorsList] = useState<Vendor[]>([]);
+    const [pastOrders, setPastOrders] = useState<Array<{ id: string; createdAt: string; status?: string; paymentStatus?: string; vendorId?: string; vendor?: { id: string; businessName: string; displayName?: string | null; slug?: string; logoUrl: string | null }; items?: Array<{ quantity: number }> }>>([]);
     const { groups: cartGroups } = useCart();
-    const pathname = usePathname();
 
     const getRelativeTime = (timestamp: number) => {
         const now = Date.now();
@@ -52,7 +54,12 @@ export default function ContinueOrderingPage() {
         dal.vendors.list()
             .then(result => setVendorsList(result.vendors))
             .catch(() => setVendorsList([]));
-    }, []);
+        if (status !== 'authenticated') return;
+        fetch('/api/v1/orders?limit=50', { credentials: 'include' })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((json) => setPastOrders(json?.data?.orders ?? []))
+            .catch(() => setPastOrders([]));
+    }, [status]);
 
     useEffect(() => {
         if (!isMounted || !isLoggedIn) return;
@@ -75,42 +82,33 @@ export default function ContinueOrderingPage() {
                     vendorLogo: group.vendorLogo || vendor?.logo || '',
                     subtitle: `${itemCount} items in cart • ₹${group.subtotal.toLocaleString('en-IN')}`,
                     subtitleIcon: 'cart',
-                    href: `/vendor/${vendor?.slug || group.vendorId}`,
+                    href: vendorPublicPath({ id: group.vendorId, slug: vendor?.slug }),
                     priority: 1,
                     timestamp: Date.now(),
                 });
             });
 
-            // SOURCE 2: Past Orders (in progress / unpaid only)
-            try {
-                const savedOrders = localStorage.getItem('horeca_orders');
-                if (savedOrders) {
-                    const orders: Array<{id: string; vendorId: string; vendorName?: string; vendorLogo?: string; createdAt: string; status?: string; paymentStatus?: string}> = JSON.parse(savedOrders);
-                    orders
-                        .filter((order) => {
-                            const isPaidOrCompleted = order.paymentStatus === 'paid' || order.status === 'completed' || order.status === 'delivered';
-                            return !isPaidOrCompleted;
-                        })
-                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                        .forEach((order) => {
-                            if (!order.vendorId || seenVendors.has(order.vendorId)) return;
-                            seenVendors.add(order.vendorId);
-                            const vendor = vendorsList.find(v => v.id === order.vendorId);
-                            allCards.push({
-                                id: `order-${order.id}`,
-                                vendorId: order.vendorId,
-                                vendorName: order.vendorName || vendor?.name || 'Vendor',
-                                vendorLogo: order.vendorLogo || vendor?.logo || '',
-                                subtitle: `In Progress`,
-                                subtitle2: getRelativeTime(new Date(order.createdAt).getTime()),
-                                subtitleIcon: 'order',
-                                href: `/vendor/${vendor?.slug || order.vendorId}`,
-                                priority: 2,
-                                timestamp: new Date(order.createdAt).getTime(),
-                            });
-                        });
-                }
-            } catch (e) {}
+            pastOrders
+                .filter((order) => isContinueOrder(order))
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .forEach((order) => {
+                    const vendorId = order.vendorId || order.vendor?.id;
+                    if (!vendorId || seenVendors.has(vendorId)) return;
+                    seenVendors.add(vendorId);
+                    const vendor = vendorsList.find(v => v.id === vendorId);
+                    allCards.push({
+                        id: `order-${order.id}`,
+                        vendorId,
+                        vendorName: order.vendor ? storeDisplayName(order.vendor) || vendor?.name || 'Vendor' : vendor?.name || 'Vendor',
+                        vendorLogo: order.vendor?.logoUrl || vendor?.logo || '',
+                        subtitle: `In Progress`,
+                        subtitle2: getRelativeTime(new Date(order.createdAt).getTime()),
+                        subtitleIcon: 'order',
+                        href: vendorPublicPath({ id: vendorId, slug: order.vendor?.slug || vendor?.slug }),
+                        priority: 2,
+                        timestamp: new Date(order.createdAt).getTime(),
+                    });
+                });
 
             // SOURCE 3: Order Lists
             try {
@@ -157,55 +155,6 @@ export default function ContinueOrderingPage() {
                     });
             } catch (e) {}
 
-            // SOURCE 4: Recently Viewed
-            try {
-                const savedViewed = localStorage.getItem('horeca_recently_viewed');
-                if (savedViewed) {
-                    type ViewedEntry = { vendorId?: string; vendorName?: string; vendorLogo?: string; viewedAt?: number; viewedProducts?: Array<{ name: string }> };
-                    const viewedEntries: ViewedEntry[] = JSON.parse(savedViewed);
-                    viewedEntries.forEach((entry) => {
-                        if (!entry.vendorId) return;
-                        const products = entry.viewedProducts || [];
-                        let productLabel = 'Recently Viewed';
-                        if (products.length === 1) {
-                            productLabel = `Recently Viewed • ${products[0].name}`;
-                        } else if (products.length > 1) {
-                            productLabel = `Recently Viewed • ${products[0].name} + ${products.length - 1} more`;
-                        }
-                        const finalSubtitle2 = getRelativeTime(entry.viewedAt || 0);
-
-                        if (seenVendors.has(entry.vendorId)) {
-                            const existing = allCards.find(c => c.vendorId === entry.vendorId);
-                            if (existing) {
-                                existing.subtitle = productLabel;
-                                existing.subtitle2 = finalSubtitle2;
-                                existing.subtitleIcon = 'viewed';
-                                existing.href = products.length > 0 
-                                    ? `/recently-viewed/${entry.vendorId}` 
-                                    : `/vendor/${entry.vendorId}`;
-                                if ((entry.viewedAt ?? 0) > existing.timestamp) existing.timestamp = entry.viewedAt ?? 0;
-                            }
-                        } else {
-                            seenVendors.add(entry.vendorId);
-                            allCards.push({
-                                id: `viewed-${entry.vendorId}`,
-                                vendorId: entry.vendorId,
-                                vendorName: entry.vendorName || 'Vendor',
-                                vendorLogo: entry.vendorLogo || vendorsList.find(v => v.id === entry.vendorId)?.logo || '',
-                                subtitle: productLabel,
-                                subtitle2: finalSubtitle2,
-                                subtitleIcon: 'viewed',
-                                href: products.length > 0 
-                                    ? `/recently-viewed/${entry.vendorId}` 
-                                    : `/vendor/${entry.vendorId}`,
-                                priority: 4,
-                                timestamp: entry.viewedAt || 0,
-                            });
-                        }
-                    });
-                }
-            } catch (e) {}
-
             allCards.sort((a, b) => b.timestamp - a.timestamp);
             setCards(allCards);
         };
@@ -217,14 +166,13 @@ export default function ContinueOrderingPage() {
             window.removeEventListener('storage', buildCards);
             window.removeEventListener('focus', buildCards);
         };
-    }, [isMounted, isLoggedIn, cartGroups]);
+    }, [isMounted, isLoggedIn, cartGroups, vendorsList, pastOrders]);
 
     const getSubtitleIcon = (type: ContinueCard['subtitleIcon']) => {
         switch (type) {
             case 'cart': return <ShoppingCart size={12} />;
             case 'order': return <Package size={12} />;
             case 'list': return <ClipboardList size={12} />;
-            case 'viewed': return <Eye size={12} />;
         }
     };
 
@@ -233,7 +181,6 @@ export default function ContinueOrderingPage() {
             case 'cart': return 'text-[#e67e22]';
             case 'order': return 'text-primary';
             case 'list': return 'text-[#3b82f6]';
-            case 'viewed': return 'text-[#8b5cf6]';
         }
     };
 
@@ -328,7 +275,7 @@ export default function ContinueOrderingPage() {
                             <Clock size={40} className="text-gray-300" />
                         </div>
                         <h2 className="text-[20px] font-bold text-[#181725] mb-2">No recent activity</h2>
-                        <p className="text-[14px] text-gray-400 max-w-[280px] mx-auto">Items you view, add to cart, or order will appear here to help you quickly continue your shopping.</p>
+                        <p className="text-[14px] text-gray-400 max-w-[280px] mx-auto">Open carts and unpaid orders show up here. Paid and delivered orders move to Frequently Ordered.</p>
                         <Link href="/" className="mt-8 text-primary font-bold hover:underline">Start exploring vendors</Link>
                     </div>
                 )}

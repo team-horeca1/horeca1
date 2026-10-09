@@ -12,6 +12,7 @@ import { SectionHeader } from '@/components/ui/SectionHeader';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 import { cn } from '@/lib/utils';
 import { vendorPublicPath } from '@/lib/publicSlug';
+import { isContinueOrder } from '@/lib/orderingRails';
 
 interface ContinueCard {
   id: string;
@@ -22,7 +23,7 @@ interface ContinueCard {
   coverImage?: string;
   subtitle: string;
   subtitle2?: string;
-  subtitleIcon: 'cart' | 'order' | 'list' | 'viewed';
+  subtitleIcon: 'cart' | 'order' | 'list';
   href: string;
   priority: number;
   timestamp: number;
@@ -89,7 +90,7 @@ export function ContinueOrdering() {
       .then((res) => setOrderLists(res as unknown as Record<string, unknown>[]))
       .catch(() => setOrderLists([]));
 
-    fetch('/api/v1/orders?limit=10', { credentials: 'include' })
+    fetch('/api/v1/orders?limit=50', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((json) => {
         const orders: ApiOrder[] = json?.data?.orders ?? [];
@@ -144,14 +145,7 @@ export function ContinueOrdering() {
 
       pastOrders
         .slice()
-        .filter((order) => {
-          // Once paid and completed, it should disappear from continue ordering section
-          const isPaidOrCompleted =
-            order.paymentStatus === 'paid' ||
-            order.status === 'completed' ||
-            order.status === 'delivered';
-          return !isPaidOrCompleted;
-        })
+        .filter((order) => isContinueOrder(order))
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .forEach((order) => {
           const vendorId = order.vendorId || order.vendor?.id;
@@ -234,69 +228,6 @@ export function ContinueOrdering() {
         console.error('Failed to parse order lists:', e);
       }
 
-      try {
-        const savedViewed = localStorage.getItem('horeca_recently_viewed');
-        if (savedViewed) {
-          type ViewedEntry = {
-            vendorId?: string;
-            vendorName?: string;
-            vendorLogo?: string;
-            viewedAt?: number;
-            viewedProducts?: Array<{ name: string }>;
-          };
-          const viewedEntries: ViewedEntry[] = JSON.parse(savedViewed);
-          viewedEntries.forEach((entry) => {
-            const vendorId = entry.vendorId;
-            if (!vendorId) return;
-
-            const products = entry.viewedProducts || [];
-            let productLabel = 'Recently Viewed';
-            if (products.length === 1) {
-              productLabel = `Recently Viewed • ${products[0].name}`;
-            } else if (products.length > 1) {
-              productLabel = `Recently Viewed • ${products[0].name} + ${products.length - 1} more`;
-            }
-
-            const finalSubtitle2 = getRelativeTime(entry.viewedAt || 0);
-
-            if (seenVendors.has(vendorId)) {
-              const existing = allCards.find((c) => c.vendorId === vendorId);
-              if (existing) {
-                existing.subtitle = productLabel;
-                existing.subtitle2 = finalSubtitle2;
-                existing.subtitleIcon = 'viewed';
-                existing.href =
-                  products.length > 0
-                    ? `/recently-viewed/${entry.vendorId}`
-                    : vendorPublicPath({ id: vendorId, slug: vendors.find((v) => v.id === vendorId)?.slug });
-                if ((entry.viewedAt ?? 0) > existing.timestamp) {
-                  existing.timestamp = entry.viewedAt ?? 0;
-                }
-              }
-            } else {
-              seenVendors.add(vendorId);
-              allCards.push({
-                id: `viewed-${vendorId}`,
-                vendorId,
-                vendorName: entry.vendorName || 'Vendor',
-                vendorLogo: entry.vendorLogo || vendors.find((v) => v.id === vendorId)?.logo || '',
-                coverImage: vendors.find((v) => v.id === vendorId)?.coverImage,
-                subtitle: productLabel,
-                subtitle2: finalSubtitle2,
-                subtitleIcon: 'viewed',
-                href: products.length > 0
-                  ? `/recently-viewed/${entry.vendorId}`
-                  : vendorPublicPath({ id: vendorId, slug: vendors.find((v) => v.id === vendorId)?.slug }),
-                priority: 4,
-                timestamp: entry.viewedAt || 0,
-              });
-            }
-          });
-        }
-      } catch (e) {
-        console.error('Failed to parse recently viewed:', e);
-      }
-
       allCards.sort((a, b) => b.timestamp - a.timestamp);
       setCards(allCards);
     };
@@ -326,7 +257,6 @@ export function ContinueOrdering() {
   if (!isMounted || !isLoggedIn || cards.length === 0) return null;
 
   const lineFor = (card: ContinueCard) => {
-    if (card.subtitleIcon === 'viewed' && card.subtitle2) return `Viewed · ${card.subtitle2}`;
     if (card.subtitle2) return `${card.subtitle} · ${card.subtitle2}`;
     return card.subtitle;
   };

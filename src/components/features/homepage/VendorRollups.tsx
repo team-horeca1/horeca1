@@ -9,40 +9,39 @@ import type { Vendor } from '@/types';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { VendorCard } from '@/components/features/homepage/VendorCardShared';
 import { storeDisplayName } from '@/lib/storeDisplayName';
+import { isFrequentlyOrderedOrder, orderVendorId } from '@/lib/orderingRails';
 
-/** Frequently Ordered Vendors — top N vendors by order count for the logged-in user (last 90 days). */
+/** Suppliers this buyer has paid or received an order from, most orders first. */
 export function FrequentlyOrderedVendors() {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(true);
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const { status } = useSession();
-    const { selectedAddress } = useAddress();
-    const { currentOutlet } = useBusinessAccountSwitcher();
-    const pincode = currentOutlet?.pincode ?? selectedAddress?.pincode;
 
     useEffect(() => {
         if (status !== 'authenticated') return;
-        const params = new URLSearchParams({ sort: 'frequent', limit: '15' });
-        if (pincode && /^\d{6}$/.test(pincode)) params.set('pincode', pincode);
         Promise.all([
-            fetch(`/api/v1/vendors?${params.toString()}`).then((r) => r.json()).catch(() => ({ data: { vendors: [] } })),
-            fetch('/api/v1/orders?limit=30').then((r) => r.json()).catch(() => ({ data: { orders: [] } })),
+            fetch('/api/v1/vendors?limit=50').then((r) => r.json()).catch(() => ({ data: { vendors: [] } })),
+            fetch('/api/v1/orders?limit=50').then((r) => r.json()).catch(() => ({ data: { orders: [] } })),
         ])
             .then(([vRes, oRes]) => {
                 const allVendors = vRes.data?.vendors || [];
                 const userOrders = oRes.data?.orders || [];
-                const userOrderedVendorIds = new Set<string>();
-                userOrders.forEach((o: { vendorId?: string; vendor?: { id: string } }) => {
-                    const vid = o.vendorId || o.vendor?.id;
-                    if (vid) userOrderedVendorIds.add(vid);
+                const orderCounts = new Map<string, number>();
+                userOrders.forEach((o: { vendorId?: string; vendor?: { id: string }; status?: string; paymentStatus?: string }) => {
+                    if (!isFrequentlyOrderedOrder(o)) return;
+                    const vid = orderVendorId(o);
+                    if (!vid) return;
+                    orderCounts.set(vid, (orderCounts.get(vid) || 0) + 1);
                 });
-                const sorted = [...allVendors].sort((a, b) => {
-                    const aOrdered = userOrderedVendorIds.has(a.id) ? 1 : 0;
-                    const bOrdered = userOrderedVendorIds.has(b.id) ? 1 : 0;
-                    return bOrdered - aOrdered;
-                });
-                setVendors(sorted.slice(0, 10).map((v: {
+                const byId = new Map(allVendors.map((v: { id: string }) => [v.id, v]));
+                const sorted = [...orderCounts.entries()]
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([id]) => byId.get(id))
+                    .filter((v): v is NonNullable<typeof v> => Boolean(v))
+                    .slice(0, 10);
+                setVendors(sorted.map((v: {
                     id: string;
                     businessName?: string;
                     displayName?: string | null;
@@ -79,7 +78,7 @@ export function FrequentlyOrderedVendors() {
                 })));
             })
             .catch(() => setVendors([]));
-    }, [status, pincode]);
+    }, [status]);
 
     const checkScroll = () => {
         if (scrollRef.current) {
@@ -104,7 +103,7 @@ export function FrequentlyOrderedVendors() {
                 <div className="px-4 md:px-[var(--container-padding)]">
                     <SectionHeader
                         title="Frequently Ordered"
-                        subtitle="Vendors you restock from most often"
+                        subtitle="Suppliers you have placed orders with"
                         actionLabel="View all →"
                         actionHref="/vendors?sort=frequent"
                     />
