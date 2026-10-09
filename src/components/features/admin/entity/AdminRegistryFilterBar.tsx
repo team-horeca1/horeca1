@@ -8,6 +8,8 @@ interface AdminRegistryFilterBarProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
+  /** Full-width row above the search line. Other pages omit this. */
+  topSlot?: React.ReactNode;
   leftSlot?: React.ReactNode;
   trailingSlot?: React.ReactNode;
   searching?: boolean;
@@ -25,18 +27,16 @@ export function AdminRegistryFilterBar({
   searchValue,
   onSearchChange,
   searchPlaceholder = 'Search...',
+  topSlot,
   leftSlot,
   trailingSlot,
   searching,
 }: AdminRegistryFilterBarProps) {
-  return (
-    <div className="bg-white p-3 lg:p-4 rounded-[16px] border border-divider shadow-sm flex flex-col lg:flex-row lg:items-center gap-3">
-      {/* Left: filters / pills — always present as flex spacer so search stays right-aligned */}
+  const filterRow = (
+    <>
       <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0 w-full lg:w-auto">
         {leftSlot}
       </div>
-
-      {/* Right: search + trailing tools */}
       <div className="flex items-center gap-3 w-full lg:w-auto shrink-0">
         <div className="relative group flex-1 sm:flex-none sm:w-[320px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={16} />
@@ -53,6 +53,22 @@ export function AdminRegistryFilterBar({
         </div>
         {trailingSlot}
       </div>
+    </>
+  );
+
+  return (
+    <div className={cn(
+      'bg-white p-3 lg:p-4 rounded-[16px] border border-divider shadow-sm gap-3',
+      topSlot ? 'flex flex-col' : 'flex flex-col lg:flex-row lg:items-center',
+    )}>
+      {topSlot ? (
+        <>
+          <div className="w-full min-w-0">{topSlot}</div>
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 w-full">
+            {filterRow}
+          </div>
+        </>
+      ) : filterRow}
     </div>
   );
 }

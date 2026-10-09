@@ -1958,8 +1958,7 @@ export default function ProductsPage() {
                 searchValue={searchInput}
                 onSearchChange={setSearchInput}
                 searchPlaceholder="Search products..."
-                leftSlot={
-                    <div className="flex flex-col gap-2 w-full min-w-0">
+                topSlot={
                         <div className="flex items-center gap-1.5 flex-wrap">
                         {(
                             [
@@ -2020,6 +2019,8 @@ export default function ProductsPage() {
                             </div>
                         )}
                         </div>
+                }
+                leftSlot={
                         <div className="flex items-center gap-2 flex-wrap">
                         <select
                             aria-label="Choose supplier"
@@ -2046,7 +2047,6 @@ export default function ProductsPage() {
                             ))}
                         </select>
                         </div>
-                    </div>
                 }
                 trailingSlot={
                     <AdminRegistryViewToggle viewMode={viewMode} onChange={setViewMode} />
