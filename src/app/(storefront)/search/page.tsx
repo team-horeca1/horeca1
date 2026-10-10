@@ -34,6 +34,7 @@ function SearchPageContent() {
     const [tab, setTab] = useState<'all' | 'vendors' | 'products'>('all');
     const [sort, setSort] = useState<'relevance' | 'price_asc' | 'price_desc'>('relevance');
     const [servicingIds, setServicingIds] = useState<Set<string> | null>(null);
+    const [searching, setSearching] = useState(Boolean(initialQuery.trim()));
 
     const pincode = useDeliveryPincode();
 
@@ -59,12 +60,18 @@ function SearchPageContent() {
 
     useEffect(() => {
         if (!query.trim()) {
-            Promise.resolve().then(() => setResults({ products: [], vendors: [], categories: [], brands: [] }));
+            Promise.resolve().then(() => {
+                setResults({ products: [], vendors: [], categories: [], brands: [] });
+                setSearching(false);
+            });
             return;
         }
 
         let cancelled = false;
         let retried = false;
+        Promise.resolve().then(() => {
+            if (!cancelled) setSearching(true);
+        });
 
         const run = () => {
             dal.search.query(query).then((data) => {
@@ -86,6 +93,7 @@ function SearchPageContent() {
                     categories: data.categories,
                     brands: data.brands as SearchBrand[],
                 });
+                setSearching(false);
             }).catch(() => {
                 if (cancelled) return;
                 if (!retried) {
@@ -94,6 +102,7 @@ function SearchPageContent() {
                     return;
                 }
                 setResults({ products: [], vendors: [], categories: [], brands: [] });
+                setSearching(false);
             });
         };
         run();
@@ -184,6 +193,10 @@ function SearchPageContent() {
                         <p className="text-[48px] mb-3">🔍</p>
                         <p className="text-[16px] font-bold text-gray-700">Search for products or vendors</p>
                         <p className="text-[13px] text-gray-400 mt-1">Try &quot;cheese&quot;, &quot;dairy&quot;, or &quot;Sharad&quot;</p>
+                    </div>
+                ) : searching ? (
+                    <div className="text-center py-16">
+                        <p className="text-[16px] font-bold text-gray-700">Searching for &quot;{query}&quot;</p>
                     </div>
                 ) : !hasResults ? (
                     <div className="text-center py-16">

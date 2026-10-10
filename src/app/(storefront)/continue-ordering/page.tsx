@@ -80,7 +80,7 @@ export default function ContinueOrderingPage() {
                     vendorId: group.vendorId,
                     vendorName: group.vendorName,
                     vendorLogo: group.vendorLogo || vendor?.logo || '',
-                    subtitle: `${itemCount} items in cart • ₹${group.subtotal.toLocaleString('en-IN')}`,
+                    subtitle: `${itemCount} ${itemCount === 1 ? 'item' : 'items'} in cart • ₹${group.subtotal.toLocaleString('en-IN')}`,
                     subtitleIcon: 'cart',
                     href: vendorPublicPath({ id: group.vendorId, slug: vendor?.slug }),
                     priority: 1,
@@ -196,7 +196,7 @@ export default function ContinueOrderingPage() {
                     </button>
                     <div>
                         <h1 className="text-[18px] md:text-[22px] font-bold text-[#181725]">Continue Ordering</h1>
-                        <p className="text-[12px] md:text-[14px] text-gray-500 font-medium">{cards.length} items from your recent activity</p>
+                        <p className="text-[12px] md:text-[14px] text-gray-500 font-medium">{cards.length} {cards.length === 1 ? 'supplier' : 'suppliers'} from your recent activity</p>
                     </div>
                 </div>
             </header>
