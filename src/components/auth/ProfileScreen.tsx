@@ -368,7 +368,7 @@ export function ProfileScreen({ isOpen, onClose }: ProfileScreenProps) {
     const primaryActions = [
         { id: 'reorder', label: 'Reorder', sub: 'From last order', icon: RotateCcw, onClick: () => router.push('/orders') },
         { id: 'quick-order', label: 'Quick Order', sub: 'Saved order lists', icon: ListOrdered, onClick: () => router.push('/order-lists') },
-        { id: 'my-vendors', label: 'My Vendors', sub: 'Saved suppliers', icon: Store, onClick: () => router.push('/vendors') },
+        { id: 'my-vendors', label: 'My Vendors', sub: 'Saved suppliers', icon: Store, onClick: () => router.push('/vendors?sort=saved') },
         { id: 'orders', label: 'Your Orders', sub: 'Track & history', icon: ShoppingBag, onClick: () => router.push('/orders') },
     ];
 

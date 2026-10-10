@@ -258,10 +258,12 @@ function SearchPageContent() {
                                                         {vendor.categories.join(', ')}
                                                     </p>
                                                     <div className="flex items-center gap-2 mt-1.5">
+                                                        {Number(vendor.rating) > 0 && (
                                                         <div className="flex items-center gap-0.5 text-[10px] font-bold text-success">
                                                             <Star size={10} fill="currentColor" />
-                                                            {vendor.rating}
+                                                            {Number(vendor.rating).toFixed(1)}
                                                         </div>
+                                                        )}
                                                         <div className="flex items-center gap-0.5 text-[10px] font-semibold text-blue-600">
                                                             <Clock size={10} />
                                                             {vendor.deliveryTime}

@@ -21,7 +21,7 @@ const ACTIONS = [
     desc: 'Order lists',
   },
   {
-    href: '/vendors',
+    href: '/vendors?sort=saved',
     icon: Store,
     label: 'My Vendors',
     mobileLabel: 'Vendors',

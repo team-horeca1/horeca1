@@ -107,10 +107,12 @@ export function VendorCard({ vendor, index, fluid = false, priority = false }: V
               <span className="tabular-nums">{vendor.productCount}+ products</span>
             </span>
           )}
-          <span className="inline-flex h-6 items-center gap-1 bg-amber-50 border border-amber-200/80 text-amber-950 px-2 rounded-full text-[11px] font-bold tabular-nums">
-            <Star size={12} className="text-amber-500 fill-amber-500" />
-            {vendor.rating ? Number(vendor.rating).toFixed(1) : '4.8'}
-          </span>
+          {Number(vendor.rating) > 0 && (
+            <span className="inline-flex h-6 items-center gap-1 bg-amber-50 border border-amber-200/80 text-amber-950 px-2 rounded-full text-[11px] font-bold tabular-nums">
+              <Star size={12} className="text-amber-500 fill-amber-500" />
+              {Number(vendor.rating).toFixed(1)}
+            </span>
+          )}
           {years && (
             <span className="inline-flex h-6 items-center text-[11px] font-medium text-text-secondary bg-stone-100 px-2 rounded-full border border-stone-200/70">
               {years}

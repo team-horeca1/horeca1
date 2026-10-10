@@ -3,19 +3,21 @@
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, ArrowUpDown, Star, TrendingUp, Sparkles, Building2 } from 'lucide-react';
+import { ChevronLeft, ArrowUpDown, Star, TrendingUp, Sparkles, Building2, Heart } from 'lucide-react';
 import { dal } from '@/lib/dal';
 import { useAddress } from '@/context/AddressContext';
 import { useBusinessAccountSwitcher } from '@/hooks/useBusinessAccountSwitcher';
 import type { Vendor } from '@/types';
 import { VendorCard } from '@/components/features/homepage/VendorCardShared';
 import { cn } from '@/lib/utils';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 import { isFrequentlyOrderedOrder, orderVendorId, type OrderRailFields } from '@/lib/orderingRails';
 
-type SortOption = 'all' | 'rating' | 'frequent' | 'mov_asc' | 'name_asc';
+type SortOption = 'all' | 'rating' | 'frequent' | 'mov_asc' | 'name_asc' | 'saved';
 
 const SORT_TABS: { id: SortOption; label: string; icon?: React.ElementType }[] = [
     { id: 'all', label: 'All Suppliers' },
+    { id: 'saved', label: 'Saved', icon: Heart },
     { id: 'rating', label: 'Top Rated', icon: Star },
     { id: 'frequent', label: 'Frequently Ordered', icon: TrendingUp },
     { id: 'mov_asc', label: 'Min Order: Low → High', icon: ArrowUpDown },
@@ -38,6 +40,8 @@ function VendorsContent() {
 
     const [allVendors, setAllVendors] = useState<Vendor[]>([]);
     const [orderedCounts, setOrderedCounts] = useState<Map<string, number>>(new Map());
+    const [savedVendors, setSavedVendors] = useState<Vendor[]>([]);
+    const [savedLoading, setSavedLoading] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [activeSort, setActiveSort] = useState<SortOption>(
         SORT_TABS.some((t) => t.id === initialSort) ? initialSort : 'all'
@@ -82,6 +86,52 @@ function VendorsContent() {
         return () => { cancelled = true; };
     }, [sessionStatus, deliveryPincode, accountsLoading]);
 
+    useEffect(() => {
+        if (activeSort !== 'saved' || sessionStatus !== 'authenticated') return;
+        let cancelled = false;
+        Promise.resolve().then(() => {
+            if (!cancelled) setSavedLoading(true);
+        });
+        fetch('/api/v1/vendors/my-vendors', { credentials: 'include' })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((json) => {
+                if (cancelled) return;
+                const rows: unknown = json?.data;
+                const list = Array.isArray(rows) ? rows : [];
+                setSavedVendors(list.flatMap((row) => {
+                    const record = row as { vendor?: Record<string, unknown> | null };
+                    const vendor = record.vendor;
+                    if (!vendor || typeof vendor.id !== 'string') return [];
+                    const name = storeDisplayName({
+                        displayName: typeof vendor.displayName === 'string' ? vendor.displayName : null,
+                        businessName: typeof vendor.businessName === 'string' ? vendor.businessName : null,
+                    });
+                    if (!name) return [];
+                    return [{
+                        id: vendor.id,
+                        name,
+                        slug: typeof vendor.slug === 'string' ? vendor.slug : '',
+                        logo: typeof vendor.logoUrl === 'string' ? vendor.logoUrl : '',
+                        rating: Number(vendor.rating) || 0,
+                        totalRatings: 0,
+                        deliverySchedule: '',
+                        deliveryTime: '',
+                        minOrderValue: Number(vendor.minOrderValue) || 0,
+                        creditEnabled: false,
+                        categories: [],
+                        isActive: true,
+                    } satisfies Vendor];
+                }));
+            })
+            .catch(() => {
+                if (!cancelled) setSavedVendors([]);
+            })
+            .finally(() => {
+                if (!cancelled) setSavedLoading(false);
+            });
+        return () => { cancelled = true; };
+    }, [activeSort, sessionStatus]);
+
     const handleSortChange = (sortId: SortOption) => {
         setActiveSort(sortId);
         const params = new URLSearchParams(searchParams.toString());
@@ -97,6 +147,8 @@ function VendorsContent() {
     const sortedVendors = useMemo(() => {
         const copy = [...allVendors];
         switch (activeSort) {
+            case 'saved':
+                return savedVendors;
             case 'rating':
                 return copy.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
             case 'frequent':
@@ -114,7 +166,7 @@ function VendorsContent() {
             default:
                 return copy;
         }
-    }, [allVendors, activeSort, orderedCounts, sessionStatus]);
+    }, [allVendors, activeSort, orderedCounts, savedVendors, sessionStatus]);
 
     return (
         <div className="min-h-screen bg-background">
@@ -170,7 +222,7 @@ function VendorsContent() {
 
             {/* Vendor Grid Container */}
             <div className="max-w-[var(--container-max)] mx-auto px-4 md:px-[var(--container-padding)] py-6 md:py-8 pb-32">
-                {isLoading ? (
+                {isLoading || (activeSort === 'saved' && savedLoading) ? (
                     <div className="flex flex-col items-center justify-center py-32 gap-3">
                         <div className="size-10 border-3 border-primary/20 border-t-primary rounded-full animate-spin" />
                         <span className="text-xs font-medium text-text-secondary">Finding verified suppliers...</span>
@@ -182,13 +234,25 @@ function VendorsContent() {
                         </div>
                         <h2 className="text-lg font-bold text-text mb-1">No Suppliers Found</h2>
                         <p className="text-sm text-text-secondary mb-6">
-                            {activeSort === 'frequent' && sessionStatus === 'authenticated'
+                            {activeSort === 'saved' && sessionStatus !== 'authenticated'
+                                ? 'Sign in to see the suppliers you follow.'
+                                : activeSort === 'saved'
+                                ? 'Suppliers you follow will show up here.'
+                                : activeSort === 'frequent' && sessionStatus === 'authenticated'
                                 ? 'Suppliers you have paid or received an order from will show up here.'
                                 : sessionStatus === 'authenticated' && deliveryPincode
                                 ? `No verified suppliers deliver to ${deliveryPincode}.`
                                 : 'No verified suppliers currently match this sorting criteria. Try resetting the filters.'}
                         </p>
-                        {!(sessionStatus === 'authenticated' && deliveryPincode) && (
+                        {activeSort === 'saved' && sessionStatus !== 'authenticated' ? (
+                        <button
+                            type="button"
+                            onClick={() => router.push('/login?redirect=%2Fvendors%3Fsort%3Dsaved')}
+                            className="px-5 py-2.5 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-dark transition-colors"
+                        >
+                            Sign in
+                        </button>
+                        ) : !(sessionStatus === 'authenticated' && deliveryPincode) && activeSort !== 'saved' && (
                         <button
                             type="button"
                             onClick={() => handleSortChange('all')}
