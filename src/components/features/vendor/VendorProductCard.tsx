@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { toast } from 'sonner';
 import { ShareButton } from '@/components/features/share/ShareButton';
 import { productShareContent, vendorProductHref } from '@/lib/share-cards/types';
-import { brandPublicPath } from '@/lib/publicSlug';
+import { brandPublicPath, productPublicPath } from '@/lib/publicSlug';
 import { useSession } from 'next-auth/react';
 import { cn, formatPackSize } from '@/lib/utils';
 import type { VendorProduct } from '@/types';
@@ -524,6 +524,21 @@ export const VendorProductCard = React.memo(function VendorProductCard({
         <ShareButton content={shareContent} variant="overlay" className="size-9" />
     );
 
+    const productName = product.displayName ?? product.name;
+    const productHref = productPublicPath({
+        id: product.id,
+        slug: product.slug,
+        vendorId: product.vendorId,
+        vendorSlug: product.vendorSlug,
+    });
+    const renderProductPhotoLink = () => (
+        <Link
+            href={productHref}
+            aria-label={`Open ${productName}`}
+            className="absolute inset-0 z-10"
+        />
+    );
+
     const onCardClick = (e: React.MouseEvent) => {
         if (isOutOfStock) {
             e.preventDefault();
@@ -541,6 +556,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 )}
             >
                 <div className="relative h-[112px] shrink-0 bg-white">
+                    {renderProductPhotoLink()}
                     <Image
                         src={product.images[0] || '/images/placeholders/no-product.svg'}
                         alt={product.name}
@@ -588,7 +604,9 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                         "mt-0.5 text-[14px] font-semibold leading-snug line-clamp-2 min-h-[2.8em] text-balance",
                         isOutOfStock ? "text-gray-400" : "text-text"
                     )}>
-                        {product.displayName ?? product.name}
+                        <Link href={productHref} className="hover:underline">
+                            {productName}
+                        </Link>
                     </h3>
                     <p className="mt-0.5 text-[11px] text-text-muted truncate">
                         {product.packSize || product.unit || '1 unit'}
@@ -708,6 +726,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                 >
                     {/* Full-width Image Container */}
                     <div className="relative w-full aspect-square bg-white overflow-hidden">
+                        {renderProductPhotoLink()}
                         {/* Image wrapper centered in the top area (excluding the bottom 30px bar) */}
                         <div className="absolute top-0 left-0 right-0 bottom-7 flex items-center justify-center p-2">
                             <div className="relative w-full h-full">
@@ -799,7 +818,9 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                                 "text-[12px] font-bold leading-[1.25] line-clamp-2 min-h-[2.5em] text-pretty",
                                 isOutOfStock ? "text-gray-400" : "text-[#181725]"
                             )}>
-                                {product.displayName ?? product.name}
+                                <Link href={productHref} className="hover:underline">
+                                    {productName}
+                                </Link>
                             </h3>
                             <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                                 {product.brandSlug && product.brandName && (
@@ -853,6 +874,7 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                     <div className="absolute top-4 right-4 z-20">{shareButton}</div>
 
                     <div className="relative aspect-square overflow-hidden rounded-2xl bg-white flex items-center justify-center">
+                        {renderProductPhotoLink()}
                         <div className="relative w-[85%] h-[85%]">
                             <Image
                                 src={product.images[0] || '/images/placeholders/no-product.svg'}
@@ -873,7 +895,9 @@ export const VendorProductCard = React.memo(function VendorProductCard({
                             "text-[15px] font-bold leading-[1.35] line-clamp-2 h-[2.7em]",
                             isOutOfStock ? "text-gray-400" : "text-[#181725]"
                         )}>
-                            {product.displayName ?? product.name}
+                            <Link href={productHref} className="hover:underline">
+                                {productName}
+                            </Link>
                         </h3>
                         <div className="flex items-center gap-2 flex-wrap">
                             {product.brandSlug && product.brandName ? (
