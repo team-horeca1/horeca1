@@ -3,7 +3,7 @@
 // WHY: Admin manages the category taxonomy — views all categories regardless of
 //      approval status and creates new ones that are immediately active.
 // PROTECTED: Admin only
-// SUPPORTS (GET): ?approvalStatus=&search=
+// SUPPORTS (GET): ?approvalStatus=&search=&vendorId=
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -39,12 +39,39 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
     const params = req.nextUrl.searchParams;
     const approvalStatus = params.get('approvalStatus') || undefined;
     const search = params.get('search') || undefined;
+    const vendorId = params.get('vendorId') || undefined;
 
     const where: Record<string, unknown> = {};
 
     if (approvalStatus) where.approvalStatus = approvalStatus;
     if (search) {
       where.name = { contains: search, mode: 'insensitive' };
+    }
+
+    if (vendorId) {
+      if (!z.string().uuid().safeParse(vendorId).success) {
+        return errorResponse(Errors.badRequest('vendorId must be a valid id'));
+      }
+      const [primaryRows, linkRows] = await Promise.all([
+        prisma.product.findMany({
+          where: { vendorId, categoryId: { not: null } },
+          select: { categoryId: true },
+          distinct: ['categoryId'],
+        }),
+        prisma.productCategory.findMany({
+          where: { product: { vendorId } },
+          select: { categoryId: true },
+          distinct: ['categoryId'],
+        }),
+      ]);
+      const categoryIds = [...new Set([
+        ...primaryRows.flatMap((row) => (row.categoryId ? [row.categoryId] : [])),
+        ...linkRows.map((row) => row.categoryId),
+      ])];
+      if (categoryIds.length === 0) {
+        return NextResponse.json({ success: true, data: [] });
+      }
+      where.id = { in: categoryIds };
     }
 
     const categories = await prisma.category.findMany({

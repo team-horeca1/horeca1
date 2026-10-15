@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  GitMerge, Search, Loader2, Package, Unlink, ArrowRight, ChevronLeft,
+  GitMerge, Search, Loader2, Package, Unlink, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn, formatPackSize } from '@/lib/utils';
@@ -78,13 +78,12 @@ export default function VendorBrandMappingWorkspacePage() {
   const [brands, setBrands] = useState<BrandOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [selectedMasterId, setSelectedMasterId] = useState<string | null>(null);
-  const [vendorSearch, setVendorSearch] = useState('');
+  const [openMapId, setOpenMapId] = useState<string | null>(null);
+  const [mapQuery, setMapQuery] = useState('');
   const [catalog, setCatalog] = useState<BrandCatalogItem[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
   const [saving, setSaving] = useState(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeBrand = useMemo(
     () => brands.find((b) => b.id === brandId) ?? null,
@@ -141,63 +140,56 @@ export default function VendorBrandMappingWorkspacePage() {
     return () => clearTimeout(t);
   }, [brandId, catalogSearch, loadCatalog]);
 
-  const mappedMasterIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const r of rows) {
-      if (r.brandMasterProductId && r.mappingStatus === 'mapped') {
-        ids.add(r.brandMasterProductId);
-      }
+  const linksByMaster = useMemo(() => {
+    const map = new Map<string, TableRow[]>();
+    for (const row of rows) {
+      if (row.mappingStatus !== 'mapped' || !row.brandMasterProductId) continue;
+      if (row.brandId && row.brandId !== brandId) continue;
+      const list = map.get(row.brandMasterProductId) ?? [];
+      list.push(row);
+      map.set(row.brandMasterProductId, list);
     }
-    return ids;
+    return map;
+  }, [rows, brandId]);
+
+  const counts = useMemo(() => {
+    let mapped = 0;
+    for (const item of catalog) {
+      if (linksByMaster.has(item.id)) mapped += 1;
+    }
+    return { all: catalog.length, mapped, unmapped: catalog.length - mapped };
+  }, [catalog, linksByMaster]);
+
+  const visibleCatalog = useMemo(() => {
+    if (statusFilter === 'mapped') return catalog.filter((item) => linksByMaster.has(item.id));
+    if (statusFilter === 'unmapped') return catalog.filter((item) => !linksByMaster.has(item.id));
+    return catalog;
+  }, [catalog, statusFilter, linksByMaster]);
+
+  const unmappedVendorProducts = useMemo(() => {
+    const mappedProductIds = new Set<string>();
+    for (const row of rows) {
+      if (row.mappingStatus === 'mapped') mappedProductIds.add(row.productId);
+    }
+    const byId = new Map<string, TableRow>();
+    for (const row of rows) {
+      if (mappedProductIds.has(row.productId) || byId.has(row.productId)) continue;
+      byId.set(row.productId, row);
+    }
+    return [...byId.values()];
   }, [rows]);
 
-  const counts = useMemo(() => ({
-    mapped: rows.filter((r) => r.mappingStatus === 'mapped').length,
-    unmapped: rows.filter((r) => r.mappingStatus === 'unmapped').length,
-  }), [rows]);
-
-  const vendorProducts = useMemo(() => {
-    const q = vendorSearch.trim().toLowerCase();
-    const byProduct = new Map<string, TableRow[]>();
-    for (const r of rows) {
-      const list = byProduct.get(r.productId) ?? [];
-      list.push(r);
-      byProduct.set(r.productId, list);
-    }
-
-    const pick = (items: TableRow[]): TableRow => {
-      const forBrand = items.find((i) => i.brandId === brandId && i.mappingStatus !== 'unmapped');
-      if (forBrand) return forBrand;
-      const mapped = items.find((i) => i.mappingStatus === 'mapped');
-      if (mapped) return mapped;
-      return items[0];
-    };
-
-    let list = [...byProduct.values()].map(pick);
-
-    if (brandId) {
-      list = list.filter((r) =>
-        r.mappingStatus === 'unmapped'
-        || !r.brandId
-        || r.brandId === brandId,
-      );
-    }
-    if (statusFilter !== 'all') {
-      list = list.filter((r) => r.mappingStatus === statusFilter);
-    }
-    if (q) {
-      list = list.filter((r) =>
-        r.distributorProductName.toLowerCase().includes(q)
-        || (r.brandItemName?.toLowerCase().includes(q) ?? false),
-      );
-    }
-    return list;
-  }, [rows, vendorSearch, brandId, statusFilter]);
-
-  const selectedMaster = useMemo(
-    () => catalog.find((c) => c.id === selectedMasterId) ?? null,
-    [catalog, selectedMasterId],
-  );
+  const mapMatches = useMemo(() => {
+    const q = mapQuery.trim().toLowerCase();
+    if (!q) return [];
+    return unmappedVendorProducts
+      .filter((row) =>
+        row.distributorProductName.toLowerCase().includes(q)
+        || (row.distributorPackSize?.toLowerCase().includes(q) ?? false)
+        || (row.distributorCategory?.toLowerCase().includes(q) ?? false),
+      )
+      .slice(0, 8);
+  }, [mapQuery, unmappedVendorProducts]);
 
   const saveMapping = async (productId: string, master: BrandCatalogItem) => {
     setSaving(true);
@@ -209,8 +201,9 @@ export default function VendorBrandMappingWorkspacePage() {
       });
       const j = await r.json();
       if (!j.success) throw new Error(j.error?.message || 'Mapping failed');
-      toast.success(`Mapped → ${master.name}`);
-      setSelectedMasterId(null);
+      toast.success(`Mapped to ${master.name}`);
+      setOpenMapId(null);
+      setMapQuery('');
       await load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Mapping failed');
@@ -219,14 +212,9 @@ export default function VendorBrandMappingWorkspacePage() {
     }
   };
 
-  const handlePickVendorProduct = (row: TableRow) => {
-    if (!selectedMaster || saving) return;
-    if (row.mappingStatus === 'mapped') {
-      toast.error('Unlink this product first, or pick an unmapped SKU');
-      return;
-    }
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => saveMapping(row.productId, selectedMaster), 150);
+  const openMapSearch = (masterId: string) => {
+    setOpenMapId(masterId);
+    setMapQuery('');
   };
 
   const handleUnlink = async (row: TableRow, e: React.MouseEvent) => {
@@ -311,220 +299,162 @@ export default function VendorBrandMappingWorkspacePage() {
           {activeBrand?.name ?? 'Brand Mappings'}
         </h1>
 
-        <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-lg">
+        <div className="flex gap-0.5 bg-white p-0.5 rounded-[8px] border border-[#E9E3DD]">
           {statusTabs.map((t) => (
             <button
               key={t.key}
               type="button"
               onClick={() => setStatusFilter(t.key)}
               className={cn(
-                'px-2.5 h-7 rounded-md text-[11px] font-bold transition-colors flex items-center gap-1',
-                statusFilter === t.key ? 'bg-white text-[#181725] shadow-sm' : 'text-gray-500 hover:text-gray-700',
+                'px-2.5 h-7 rounded-[8px] text-[11px] font-bold transition-colors flex items-center gap-1',
+                statusFilter === t.key ? 'bg-[#1C1C1C] text-white' : 'text-[#6B7280] hover:text-[#1C1C1C]',
               )}
             >
               {t.label}
-              <span className={cn(
-                'text-[10px] px-1 rounded',
-                statusFilter === t.key ? 'bg-gray-100' : 'bg-transparent',
-              )}
-              >
-                {t.count}
-              </span>
+              <span className="text-[10px] tabular-nums">{t.count}</span>
             </button>
           ))}
         </div>
+
+        <div className="relative ml-auto w-full sm:w-[240px]">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#6B7280]" />
+          <input
+            value={catalogSearch}
+            onChange={(e) => setCatalogSearch(e.target.value)}
+            placeholder="Search brand SKUs"
+            disabled={!brandId}
+            className="w-full h-8 pl-8 pr-2 border border-[#E9E3DD] rounded-[8px] text-[12px] bg-white disabled:opacity-50 outline-none focus:border-[#6B1D2E]"
+          />
+        </div>
       </div>
 
-      {/* Selection hint */}
-      <div className="shrink-0 py-2 flex items-center gap-2 text-[11px] text-gray-500">
-        <span className="font-bold text-gray-400">1.</span>
-        Pick brand product
-        <ArrowRight size={12} className="text-gray-300" />
-        <span className="font-bold text-gray-400">2.</span>
-        Click your matching SKU
-        {selectedMaster && (
-          <span className="ml-2 text-primary font-bold truncate max-w-[40%]">
-            → {selectedMaster.name}
-          </span>
-        )}
-      </div>
-
-      {/* Full-width split workspace: left = brand, right = vendor */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-0 bg-white border border-gray-200 rounded-xl overflow-hidden">
-        {/* Left — brand products */}
-        <div className="flex flex-col min-h-0 border-b lg:border-b-0 lg:border-r border-gray-100">
-          <div className="sticky top-0 z-10 shrink-0 px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-            <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wide shrink-0">
-              Brand products
-            </span>
-            <div className="relative flex-1">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                value={catalogSearch}
-                onChange={(e) => setCatalogSearch(e.target.value)}
-                placeholder="Search brand SKUs…"
-                disabled={!brandId}
-                className="w-full h-8 pl-8 pr-2 border border-gray-200 rounded-lg text-[12px] bg-white disabled:opacity-50 outline-none focus:border-primary/50"
-              />
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 mt-3 overflow-y-auto">
+        <div className="flex flex-col min-h-0">
+          <div>
             {!brandId ? (
               <p className="text-[12px] text-gray-400 text-center py-10">Select a brand</p>
             ) : catalogLoading ? (
               <div className="flex justify-center py-10">
                 <Loader2 size={18} className="animate-spin text-primary" />
               </div>
-            ) : catalog.length === 0 ? (
-              <p className="text-[12px] text-gray-400 text-center py-10">No SKUs found</p>
+            ) : visibleCatalog.length === 0 ? (
+              <p className="text-[13px] text-[#6B7280] text-center py-12">
+                {statusFilter === 'mapped' ? 'Nothing mapped yet' : 'No brand products in this view'}
+              </p>
             ) : (
-              catalog.map((item) => {
-                const alreadyMapped = mappedMasterIds.has(item.id);
-                const selected = selectedMasterId === item.id;
+              visibleCatalog.map((item) => {
+                const links = linksByMaster.get(item.id) ?? [];
+                const searching = openMapId === item.id;
                 const category = brandCategoryLabel(item);
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    disabled={saving}
-                    onClick={() => setSelectedMasterId(selected ? null : item.id)}
-                    className={cn(
-                      'w-full flex items-center gap-2 px-3 py-2 text-left border-b border-gray-50 transition-colors',
-                      selected
-                        ? 'bg-primary-light border-l-2 border-l-primary'
-                        : 'hover:bg-gray-50/80 border-l-2 border-l-transparent',
-                    )}
-                  >
-                    <ProductThumb src={item.imageUrl} alt="" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[12px] font-bold text-[#181725] truncate leading-tight">{item.name}</p>
-                      <p className="text-[10px] text-gray-400 truncate">
-                        {formatPackSize(item.packSize, item.unit) || '—'}
-                        {item.sku ? ` · ${item.sku}` : ''}
-                        {category ? ` · ${category}` : ''}
-                      </p>
-                    </div>
-                    {alreadyMapped && (
-                      <span className="text-[9px] font-bold text-primary uppercase px-1.5 py-0.5 bg-primary-light rounded shrink-0">
-                        Linked
-                      </span>
-                    )}
-                    {selected && !alreadyMapped && (
-                      <span className="text-[10px] font-bold text-primary shrink-0">Selected</span>
-                    )}
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Right — my products */}
-        <div className="flex flex-col min-h-0">
-          <div className="sticky top-0 z-10 shrink-0 px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-            <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wide shrink-0">
-              My products
-            </span>
-            <div className="relative flex-1">
-              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                value={vendorSearch}
-                onChange={(e) => setVendorSearch(e.target.value)}
-                placeholder="Filter…"
-                className="w-full h-8 pl-8 pr-2 border border-gray-200 rounded-lg text-[12px] bg-white outline-none focus:border-primary/50"
-              />
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {vendorProducts.length === 0 ? (
-              <p className="text-[12px] text-gray-400 text-center py-10">No products in this filter</p>
-            ) : (
-              vendorProducts.map((row) => {
-                const isMapped = row.mappingStatus === 'mapped';
-                const canLink = Boolean(selectedMaster) && row.mappingStatus === 'unmapped' && !saving;
-
+                const meta = [
+                  formatPackSize(item.packSize, item.unit),
+                  item.sku,
+                  category,
+                ].filter(Boolean).join(' · ');
                 return (
                   <div
-                    key={`${row.productId}-${row.mappingId ?? 'u'}`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      if (canLink) handlePickVendorProduct(row);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && canLink) handlePickVendorProduct(row);
-                    }}
-                    className={cn(
-                      'w-full flex items-start gap-2 px-3 py-2.5 text-left border-b border-gray-50 transition-colors',
-                      canLink
-                        ? 'hover:bg-primary-light cursor-pointer border-l-2 border-l-transparent hover:border-l-primary'
-                        : isMapped
-                          ? 'border-l-2 border-l-primary/40 bg-[#FAFDFB]'
-                          : 'border-l-2 border-l-transparent',
-                      !canLink && !isMapped && selectedMaster && 'opacity-60',
-                    )}
+                    key={item.id}
+                    className="mb-2 flex flex-col gap-3 rounded-[8px] border border-[#E9E3DD] bg-white px-4 py-3 sm:flex-row sm:items-start"
                   >
-                    {isMapped ? (
-                      <>
-                        <ProductThumb src={row.brandImage} alt="" className="mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                            <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary-light text-primary">
-                              Brand override
-                            </span>
-                          </div>
-                          <p className="text-[12px] font-bold text-[#181725] truncate leading-tight">
-                            {row.brandItemName}
-                          </p>
-                          <p className="text-[10px] text-gray-500 truncate">
-                            {[row.brandPackSize, row.brandCategory].filter(Boolean).join(' · ') || '—'}
-                          </p>
-                          <div className="mt-1.5 flex items-center gap-1.5 opacity-70">
-                            <ProductThumb src={row.distributorImage} alt="" className="w-5 h-5 opacity-60" />
-                            <div className="min-w-0">
-                              <p className="text-[10px] text-gray-400 line-through truncate">
-                                {row.distributorProductName}
-                              </p>
-                              <p className="text-[9px] text-gray-300 line-through truncate">
-                                {[row.distributorPackSize, row.distributorCategory].filter(Boolean).join(' · ') || '—'}
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <ProductThumb src={item.imageUrl} alt="" className="h-10 w-10 rounded-[8px]" />
+                      <div className="min-w-0">
+                        <p className="truncate text-[14px] font-semibold text-[#1C1C1C]">{item.name}</p>
+                        <p className="truncate text-[12px] text-[#6B7280]">{meta || '—'}</p>
+                      </div>
+                    </div>
+
+                    {links.length > 0 ? (
+                      <div className="flex min-w-0 flex-1 flex-col gap-2">
+                        {links.map((link) => (
+                          <div key={link.mappingId ?? link.productId} className="flex min-w-0 items-center gap-2">
+                            <ChevronRight size={16} className="shrink-0 text-[#AEAEAE]" aria-hidden />
+                            <ProductThumb src={link.distributorImage} alt="" className="h-8 w-8 rounded-[8px]" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-[13px] font-semibold text-[#1C1C1C]">{link.distributorProductName}</p>
+                              <p className="truncate text-[11px] text-[#6B7280]">
+                                {[link.distributorPackSize, link.distributorCategory].filter(Boolean).join(' · ') || 'Your product'}
                               </p>
                             </div>
+                            {link.mappingId && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleUnlink(link, e)}
+                                disabled={saving}
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#6B7280] hover:bg-[#F8E8EC] hover:text-[#6B1D2E] disabled:opacity-40"
+                                title="Unlink"
+                                aria-label={`Unlink ${link.distributorProductName}`}
+                              >
+                                <Unlink size={14} />
+                              </button>
+                            )}
                           </div>
+                        ))}
+                      </div>
+                    ) : searching ? (
+                      <div className="w-full sm:w-[320px] sm:shrink-0">
+                        <div className="relative">
+                          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
+                          <input
+                            autoFocus
+                            value={mapQuery}
+                            onChange={(e) => setMapQuery(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setOpenMapId(null);
+                                setMapQuery('');
+                              }
+                            }}
+                            placeholder="Search your products"
+                            className="h-10 w-full rounded-[8px] border border-[#E9E3DD] bg-white pl-9 pr-16 text-[13px] text-[#1C1C1C] shadow-[0_8px_24px_rgba(28,28,28,0.08)] outline-none focus:border-[#6B1D2E]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenMapId(null);
+                              setMapQuery('');
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-[12px] font-medium text-[#6B7280] hover:text-[#1C1C1C]"
+                          >
+                            Cancel
+                          </button>
                         </div>
-                      </>
+                        <div className="mt-1 overflow-hidden rounded-[8px] border border-[#E9E3DD] bg-white shadow-[0_12px_28px_rgba(28,28,28,0.12)]">
+                          {mapQuery.trim().length === 0 ? (
+                            <p className="px-3 py-3 text-[12px] text-[#6B7280]">Type to find your product</p>
+                          ) : mapMatches.length === 0 ? (
+                            <p className="px-3 py-3 text-[12px] text-[#6B7280]">No matching product</p>
+                          ) : (
+                            mapMatches.map((match) => (
+                              <button
+                                key={match.productId}
+                                type="button"
+                                disabled={saving}
+                                onClick={() => void saveMapping(match.productId, item)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[#F8E8EC] disabled:opacity-50"
+                              >
+                                <ProductThumb src={match.distributorImage} alt="" />
+                                <span className="min-w-0">
+                                  <span className="block truncate text-[13px] font-semibold text-[#1C1C1C]">{match.distributorProductName}</span>
+                                  <span className="block truncate text-[11px] text-[#6B7280]">
+                                    {[match.distributorPackSize, match.distributorCategory].filter(Boolean).join(' · ') || 'Your product'}
+                                  </span>
+                                </span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </div>
                     ) : (
-                      <>
-                        <ProductThumb src={row.distributorImage} alt="" className="mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-bold text-[#181725] truncate leading-tight">
-                            {row.distributorProductName}
-                          </p>
-                          <p className="text-[10px] text-gray-400 truncate">
-                            {[row.distributorPackSize, row.distributorCategory].filter(Boolean).join(' · ') || '—'}
-                          </p>
-                        </div>
-                      </>
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => openMapSearch(item.id)}
+                        className="h-9 shrink-0 self-center rounded-[8px] border border-[#6B1D2E] px-3 text-[13px] font-semibold text-[#6B1D2E] hover:bg-[#F8E8EC] disabled:opacity-40"
+                      >
+                        Map
+                      </button>
                     )}
-
-                    <div className="shrink-0 flex items-center gap-0.5 pt-0.5">
-                      {isMapped && row.mappingId && (
-                        <button
-                          type="button"
-                          onClick={(e) => handleUnlink(row, e)}
-                          disabled={saving}
-                          className="p-1 rounded hover:bg-red-100 text-red-500"
-                          title="Unlink — revert to supplier values"
-                        >
-                          <Unlink size={13} />
-                        </button>
-                      )}
-                      {row.mappingStatus === 'unmapped' && canLink && (
-                        <span className="text-[10px] font-bold text-primary px-2 py-0.5 rounded bg-primary-light shrink-0">Map</span>
-                      )}
-                      {row.mappingStatus === 'unmapped' && !selectedMaster && (
-                        <span className="text-[9px] font-bold text-gray-400 uppercase px-1">Unmapped</span>
-                      )}
-                    </div>
                   </div>
                 );
               })

@@ -9,6 +9,7 @@ import { ConfirmProvider } from '@/components/ui/ConfirmDialog';
 import { ScrollRestoration } from '@/components/layout/ScrollRestoration';
 import { CallbackUrlRedirect } from '@/components/auth/CallbackUrlRedirect';
 import { PostLoginAccountSelector } from '@/components/auth/PostLoginAccountSelector';
+import { DisableNativeNumberStepping } from '@/components/providers/DisableNativeNumberStepping';
 
 // Inter is a variable font — omitting weight downloads the single optimized variable file instead of 35 static slices.
 const inter = Inter({
@@ -95,6 +96,7 @@ export default async function RootLayout({
                 <CallbackUrlRedirect />
               </Suspense>
               <Toaster position="top-center" richColors />
+              <DisableNativeNumberStepping />
               {children}
               <PostLoginAccountSelector />
             </ConfirmProvider>

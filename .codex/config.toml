@@ -1,0 +1,12 @@
+[mcp_servers.code-review-graph]
+command = "code-review-graph"
+args = ["serve"]
+
+[mcp_servers.playwright]
+command = "npx.cmd"
+args = [
+    "-y",
+    "@playwright/mcp@latest",
+    "--browser",
+    "msedge",
+]

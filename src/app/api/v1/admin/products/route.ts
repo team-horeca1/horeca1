@@ -19,6 +19,16 @@ import { logAction, AUDIT_ACTIONS } from '@/lib/auditLog';
 import { resolveUniqueProductSlug } from '@/lib/productSlug';
 import { storeDisplayName } from '@/lib/storeDisplayName';
 
+function summedStock(inventories: { qtyAvailable: number; qtyReserved?: number | null }[]) {
+  let qtyAvailable = 0;
+  let qtyReserved = 0;
+  for (const row of inventories) {
+    qtyAvailable += Number(row.qtyAvailable) || 0;
+    qtyReserved += Number(row.qtyReserved) || 0;
+  }
+  return { qtyAvailable, qtyReserved, inventory: { qtyAvailable, qtyReserved } };
+}
+
 // Validation schema for admin product creation
 // vendorId is optional — admin can create catalog products without a vendor
 const createProductSchema = z.object({
@@ -117,7 +127,7 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
       include: {
         vendor: { select: { id: true, businessName: true, displayName: true, vendorCode: true } },
         category: { select: { id: true, name: true, parentId: true } },
-        inventories: { select: { qtyAvailable: true } },
+        inventories: { select: { qtyAvailable: true, qtyReserved: true } },
         priceSlabs: { orderBy: { sortOrder: 'asc' } },
         masterProduct: { select: { sku: true, name: true } },
       },
@@ -139,12 +149,16 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
 
       const products = page.map((p) => {
         const vName = p.vendor ? storeDisplayName(p.vendor) : '';
+        const stock = summedStock(p.inventories);
         return {
           ...p,
           vendorCount: p.vendor ? 1 : 0,
           vendors: vName ? [vName] : [],
           vendorStock: [{ vendor: vName, qty: totalStockQty(p.inventories) }],
           totalStock: totalStockQty(p.inventories),
+          qtyAvailable: stock.qtyAvailable,
+          qtyReserved: stock.qtyReserved,
+          inventory: stock.inventory,
         };
       });
 
@@ -189,12 +203,16 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
 
       const products = page.map((p) => {
         const vName = p.vendor ? storeDisplayName(p.vendor) : '';
+        const stock = summedStock(p.inventories);
         return {
           ...p,
           vendorCount: 1,
           vendors: vName ? [vName] : [],
           vendorStock: [{ vendor: vName, qty: totalStockQty(p.inventories) }],
           totalStock: totalStockQty(p.inventories),
+          qtyAvailable: stock.qtyAvailable,
+          qtyReserved: stock.qtyReserved,
+          inventory: stock.inventory,
         };
       });
 
@@ -239,12 +257,16 @@ export const GET = adminOnly(async (req: NextRequest, ctx) => {
 
       const products = page.map(p => {
         const vName = p.vendor ? storeDisplayName(p.vendor) : '';
+        const stock = summedStock(p.inventories);
         return {
           ...p,
           vendorCount: 1,
           vendors: vName ? [vName] : [],
           vendorStock: [{ vendor: vName, qty: totalStockQty(p.inventories) }],
           totalStock: totalStockQty(p.inventories),
+          qtyAvailable: stock.qtyAvailable,
+          qtyReserved: stock.qtyReserved,
+          inventory: stock.inventory,
         };
       });
 

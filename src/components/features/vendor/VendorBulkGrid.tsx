@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { X, Loader2, Search, Save, Wand2, Upload, FileDown, FileSpreadsheet, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { storeDisplayName } from '@/lib/storeDisplayName';
 
 // In-browser editable grid ("Excel-like") for fast bulk edits of pricing, metadata and identifiers.
 // Inline-edit cells → Save patches each changed row via the vendor product API.
@@ -31,7 +32,7 @@ interface GridProduct {
   barcode?: string | null;
   aliasNames?: string[];
   metadata?: Record<string, unknown>;
-  inventory?: { qtyAvailable: number } | null;
+  inventory?: { qtyAvailable: number; qtyReserved?: number } | null;
   priceSlabs?: { minQty: number; price: number }[];
   vendor?: {
     id: string;
@@ -49,7 +50,7 @@ type EditableField =
   | 'taxable' | 'exemptionReason' | 'taxabilityType' | 'productType'
   | 'source' | 'referenceId' | 'lastSyncTime'
   | 'inventoryAccount' | 'inventoryAccountCode' | 'inventoryValuationMethod' | 'reorderPoint' | 'openingStock'
-  | 'stockOnHand' | 'itemType' | 'sellable' | 'purchasable' | 'trackInventory' | 'platformCommission'
+  | 'stockOnHand' | 'qtyReserved' | 'stockNet' | 'itemType' | 'sellable' | 'purchasable' | 'trackInventory' | 'platformCommission'
   | 'packageWeight' | 'packageLength' | 'packageWidth' | 'packageHeight' | 'dimensionUnit' | 'weightUnit'
   | 'aliasName' | 'upc' | 'ean' | 'isbn' | 'countryOfOrigin' | 'substituteMapping'
   | 'bulkQty1Quantity' | 'bulkQty1NetRate'
@@ -149,6 +150,12 @@ export default function VendorBulkGrid({
   onExport,
   readOnlyCommission = true,
   isAdmin = false,
+  vendors,
+  vendorId = '',
+  onVendorChange,
+  categoryOptions,
+  categoryId = '',
+  onCategoryChange,
 }: {
   open: boolean;
   onClose: () => void;
@@ -163,6 +170,13 @@ export default function VendorBulkGrid({
   /** When true, Platform Commission column is read-only (vendor portal default). */
   readOnlyCommission?: boolean;
   isAdmin?: boolean;
+  /** Admin sheet filters. Omitted on the vendor portal. */
+  vendors?: { id: string; businessName: string; displayName?: string | null; vendorCode?: string | null }[];
+  vendorId?: string;
+  onVendorChange?: (vendorId: string) => void;
+  categoryOptions?: { id: string; name: string; parentId?: string | null }[];
+  categoryId?: string;
+  onCategoryChange?: (categoryId: string) => void;
 }) {
   const [edits, setEdits] = useState<Record<string, RowEdits>>({});
   const [query, setQuery] = useState('');
@@ -236,6 +250,8 @@ export default function VendorBulkGrid({
     { key: 'reorderPoint', label: 'Reorder Point', width: 'w-[110px]', type: 'number' },
     { key: 'openingStock', label: 'Opening Stock', width: 'w-[110px]', type: 'number' },
     { key: 'stockOnHand', label: 'Stock On Hand', width: 'w-[110px]', type: 'number' },
+    { key: 'qtyReserved', label: 'Reserved', width: 'w-[100px]', type: 'number', readOnly: true },
+    { key: 'stockNet', label: 'Net', width: 'w-[90px]', type: 'number', readOnly: true },
     { key: 'itemType', label: 'Item Type', width: 'w-[110px]', type: 'text' },
     { key: 'sellable', label: 'Sellable', width: 'w-[85px]', type: 'checkbox' },
     { key: 'purchasable', label: 'Purchasable', width: 'w-[85px]', type: 'checkbox' },
@@ -260,9 +276,17 @@ export default function VendorBulkGrid({
   ], [brandNames, categoryNames, subCategoryNames, readOnlyCommission]);
 
   const hideIdentity = isAdmin;
+  const supplierStock = isAdmin && Boolean(vendorId);
   const visibleColumns = useMemo(
-    () => (hideIdentity ? COLUMNS.filter((c) => c.key !== 'vendorId' && c.key !== 'itemId') : COLUMNS),
-    [COLUMNS, hideIdentity],
+    () => {
+      const base = hideIdentity ? COLUMNS.filter((c) => c.key !== 'vendorId' && c.key !== 'itemId') : COLUMNS;
+      return base.flatMap((col) => {
+        if (col.key === 'qtyReserved' || col.key === 'stockNet') return supplierStock ? [col] : [];
+        if (col.key === 'stockOnHand' && supplierStock) return [{ ...col, label: 'Available' }];
+        return [col];
+      });
+    },
+    [COLUMNS, hideIdentity, supplierStock],
   );
 
   const subCategoriesForParent = (parentName: string) => {
@@ -366,6 +390,13 @@ export default function VendorBulkGrid({
     if (field === 'storageType') return p.storageType ?? '';
     if (field === 'countryOfOrigin') return p.countryOfOrigin ?? '';
     if (field === 'stockOnHand') return p.inventory?.qtyAvailable ?? '';
+    if (field === 'qtyReserved') return p.inventory?.qtyReserved ?? 0;
+    if (field === 'stockNet') {
+      const edited = edits[p.id]?.stockOnHand;
+      const available = edited !== undefined ? Number(edited) : Number(p.inventory?.qtyAvailable ?? 0);
+      const reserved = Number(p.inventory?.qtyReserved ?? 0);
+      return (Number.isFinite(available) ? available : 0) - reserved;
+    }
     if (field === 'aliasName') return p.aliasNames?.[0] ?? '';
     if (field === 'upc') return p.barcode ?? '';
     if (field === 'bulkQty1Quantity') return p.priceSlabs?.[0]?.minQty ?? '';
@@ -618,7 +649,10 @@ export default function VendorBulkGrid({
         }
         if (e.stockOnHand !== undefined) {
           const qty = parseInt(String(e.stockOnHand), 10);
-          if (!isNaN(qty)) patch.inventory = { qtyAvailable: qty };
+          if (!isNaN(qty)) {
+            const reserved = baselineRef.current[id]?.inventory?.qtyReserved ?? 0;
+            patch.inventory = { qtyAvailable: qty, qtyReserved: reserved };
+          }
         }
         patches[id] = patch;
       } catch {
@@ -755,6 +789,34 @@ export default function VendorBulkGrid({
               <Wand2 size={13} className="text-primary" />
               Advanced
             </button>
+          )}
+          {vendors && onVendorChange && (
+            <select
+              aria-label="Choose supplier"
+              value={vendorId}
+              onChange={(e) => onVendorChange(e.target.value)}
+              className="h-[38px] max-w-[200px] px-3 border border-[#EEEEEE] rounded-[10px] text-[13px] font-semibold text-[#6B7280] outline-none focus:border-primary/40 bg-white cursor-pointer"
+            >
+              <option value="">Choose supplier</option>
+              {vendors.map((v) => (
+                <option key={v.id} value={v.id}>{storeDisplayName(v)}</option>
+              ))}
+            </select>
+          )}
+          {categoryOptions && onCategoryChange && (
+            <select
+              aria-label="Filter by category"
+              value={categoryId}
+              onChange={(e) => onCategoryChange(e.target.value)}
+              className="h-[38px] max-w-[200px] px-3 border border-[#EEEEEE] rounded-[10px] text-[13px] font-semibold text-[#6B7280] outline-none focus:border-primary/40 bg-white cursor-pointer"
+            >
+              <option value="">All Categories</option>
+              {categoryOptions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.parentId ? `— ${c.name}` : c.name}
+                </option>
+              ))}
+            </select>
           )}
           <div className="relative hidden sm:block">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
