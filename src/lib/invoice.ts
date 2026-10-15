@@ -164,9 +164,10 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
 
   const careQr = await QRCode.toBuffer(CUSTOMER_CARE_WHATSAPP_URL, {
     type: 'png',
-    width: 180,
-    margin: 0,
+    width: 256,
+    margin: 1,
     errorCorrectionLevel: 'M',
+    color: { dark: '#1C1C1C', light: '#FFFFFF' },
   });
 
   // ── 3. Build PDF ─────────────────────────────────────────────────────────
@@ -184,16 +185,29 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     const cell = (
       x: number, y: number, w: number, h: number,
       label: string | null, value: string,
-      opts: { bold?: boolean; valueSize?: number; labelSize?: number; align?: 'left' | 'center' | 'right' } = {}
+      opts: {
+        bold?: boolean;
+        valueSize?: number;
+        labelSize?: number;
+        align?: 'left' | 'center' | 'right';
+        vAlign?: 'top' | 'middle';
+      } = {}
     ) => {
       doc.lineWidth(0.6).strokeColor('#000').rect(x, y, w, h).stroke();
       const padX = 4;
+      const labelSize = opts.labelSize ?? 7;
+      const valueSize = opts.valueSize ?? 9;
+      const labelGap = 4;
+      const blockH = label ? labelSize + labelGap + valueSize : valueSize;
+      const topPad = opts.vAlign === 'middle'
+        ? Math.max(4, (h - blockH) / 2)
+        : (label ? 3 : 4);
       if (label) {
-        doc.font('Helvetica').fontSize(opts.labelSize ?? 7).fillColor('#444');
-        doc.text(label, x + padX, y + 3, { width: w - padX * 2, align: opts.align ?? 'left' });
+        doc.font('Helvetica').fontSize(labelSize).fillColor('#444');
+        doc.text(label, x + padX, y + topPad, { width: w - padX * 2, align: opts.align ?? 'left' });
       }
-      doc.font(opts.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(opts.valueSize ?? 9).fillColor('#000');
-      const valY = label ? y + 14 : y + 4;
+      doc.font(opts.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(valueSize).fillColor('#000');
+      const valY = label ? y + topPad + labelSize + labelGap : y + topPad;
       doc.text(value, x + padX, valY, { width: w - padX * 2, align: opts.align ?? 'left' });
     };
 
@@ -230,14 +244,31 @@ export async function generateInvoicePdf(orderId: string): Promise<Buffer> {
     const invDate = new Date(order.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
     // Row 1 — invoice number is replaced by the customer-care WhatsApp QR.
-    const row1H = 92;
+    const row1H = 100;
+    const qrSize = 64;
+    const qrGap = 3;
+    const captionSize = 6.5;
+    const captionBlockH = captionSize * 2 + 2;
+    const qrGroupH = qrSize + qrGap + captionBlockH;
+    const qrGroupTop = y + (row1H - qrGroupH) / 2;
+    const qrX = LEFT + (colW - qrSize) / 2;
+
+    doc.save();
+    doc.rect(LEFT, y, colW, row1H).fill('#F8E8EC');
+    doc.restore();
     doc.lineWidth(0.6).strokeColor('#000').rect(LEFT, y, colW, row1H).stroke();
-    doc.image(careQr, LEFT + 8, y + 8, { width: 48, height: 48 });
-    doc.font('Helvetica-Bold').fontSize(7).fillColor('#000');
-    doc.text('Scan to reach Customer Care', LEFT + 8, y + 60, { width: colW - 16, align: 'left' });
-    cell(LEFT + colW,     y, colW, row1H, 'Order No.',          order.orderNumber, { bold: true });
-    cell(LEFT + colW * 2, y, colW, row1H, 'Invoice Date',       invDate);
-    cell(LEFT + colW * 3, y, colW, row1H, 'Last Payment Date',  lastPaymentDate);
+    doc.image(careQr, qrX, qrGroupTop, { width: qrSize, height: qrSize });
+    doc.font('Helvetica-Bold').fontSize(captionSize).fillColor('#6B1D2E');
+    doc.text('Scan to reach\nCustomer Care', LEFT + 4, qrGroupTop + qrSize + qrGap, {
+      width: colW - 8,
+      align: 'center',
+      lineGap: 0.5,
+      height: captionBlockH + 2,
+    });
+    doc.link(LEFT, y, colW, row1H, CUSTOMER_CARE_WHATSAPP_URL);
+    cell(LEFT + colW,     y, colW, row1H, 'Order No.',          order.orderNumber, { bold: true, vAlign: 'middle' });
+    cell(LEFT + colW * 2, y, colW, row1H, 'Invoice Date',       invDate, { vAlign: 'middle' });
+    cell(LEFT + colW * 3, y, colW, row1H, 'Last Payment Date',  lastPaymentDate, { vAlign: 'middle' });
     y += row1H;
 
     const isPaid = order.paymentStatus?.toLowerCase() === 'paid';
